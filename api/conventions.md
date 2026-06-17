@@ -90,7 +90,7 @@ Response:
 ```json
 {
   "error": {
-    "code": "NOT_FOUND",
+  "code": "not_found",
     "message": "resource not found",
     "traceId": "trace_000001"
   }
@@ -99,7 +99,7 @@ Response:
 
 规则：
 
-- `code` 使用 `SCREAMING_SNAKE_CASE`（全大写+下划线），面向程序，必须稳定。
+- `code` 使用 `snake_case`（全小写+下划线），面向程序，必须稳定。
 - `message` 英文，人类可读描述，不含内部路径、密钥或主机名。
 - `traceId` 每次错误自动生成（`trace_` 前缀 + 6 位递增序号），可通过 `X-Request-ID` 串联请求链路。
 - 成功响应沿用现有格式不变：Hub 返回 `{"code":"OK","data":{...}}`，Edge 返回裸 JSON 对象或数组。
@@ -114,46 +114,46 @@ Edge 和 Hub 共享，不可各自重定义：
 
 | code | HTTP | 含义 |
 |---|---:|---|
-| `INTERNAL_ERROR` | 500 | 未知服务端错误 |
-| `BAD_REQUEST` | 400 | 请求参数无效 |
-| `NOT_FOUND` | 404 | 资源不存在 |
-| `METHOD_NOT_ALLOWED` | 405 | HTTP 方法不支持 |
-| `REQUEST_TIMEOUT` | 504 | 请求超时 |
-| `NOT_IMPLEMENTED` | 501 | 端点未实现 |
-| `TOO_MANY_REQUESTS` | 429 | 触发限流 |
-| `UNAUTHORIZED` | 401 | 需要认证 |
-| `FORBIDDEN` | 403 | 权限不足 |
-| `INVALID_TOKEN` | 401 | Token 无效 |
-| `TOKEN_EXPIRED` | 401 | Token 已过期 |
-| `INVALID_JSON` | 400 | JSON 解析失败 |
-| `VALIDATION_ERROR` | 400 | 字段校验失败 |
-| `CONTENT_REQUIRED` | 400 | 内容字段缺失 |
-| `PAYLOAD_TOO_LARGE` | 413 | 请求体过大 |
-| `CONFLICT` | 409 | 资源冲突 |
-| `ALREADY_EXISTS` | 409 | 资源已存在 |
+| `internal_error` | 500 | 未知服务端错误 |
+| `bad_request` | 400 | 请求参数无效 |
+| `not_found` | 404 | 资源不存在 |
+| `method_not_allowed` | 405 | HTTP 方法不支持 |
+| `request_timeout` | 504 | 请求超时 |
+| `not_implemented` | 501 | 端点未实现 |
+| `too_many_requests` | 429 | 触发限流 |
+| `unauthorized` | 401 | 需要认证 |
+| `forbidden` | 403 | 权限不足 |
+| `invalid_token` | 401 | Token 无效 |
+| `token_expired` | 401 | Token 已过期 |
+| `invalid_json` | 400 | JSON 解析失败 |
+| `validation_error` | 400 | 字段校验失败 |
+| `content_required` | 400 | 内容字段缺失 |
+| `payload_too_large` | 413 | 请求体过大 |
+| `conflict` | 409 | 资源冲突 |
+| `already_exists` | 409 | 资源已存在 |
 
 #### Edge 域码（edge-server/internal/errcode/codes.go）
 
 | code | HTTP | 含义 |
 |---|---:|---|
-| `WORKSPACE_NOT_ALLOWED` | 403 | 工作目录不在白名单 |
-| `INVALID_PERMISSION_MODE` | 400 | 权限模式参数无效 |
-| `INVALID_DECISION` | 400 | 审批决策值非法 |
-| `EXECUTOR_UNAVAILABLE` | 503 | 无 Agent Runtime 执行器 |
-| `EXECUTOR_START_FAILED` | 500 | Run 启动失败 |
-| `TOO_MANY_CONCURRENT_RUNS` | 429 | 并发 Run 数达上限 |
-| `ACTIVE_RUN_EXISTS` | 409 | Thread 已有活跃 Run |
-| `INVALID_AGENT_ID` | 400 | Agent 适配器未知 |
-| `AGENT_REGISTRY_NOT_CONFIGURED` | 404 | Agent 注册表未配置 |
-| `AGENT_INSTANCE_NOT_FOUND` | 404 | Agent 实例未找到 |
-| `PERMISSION_REQUEST_NOT_FOUND` | 404 | 权限请求不存在 |
-| `RUN_ID_REQUIRED` | 400 | runId 缺失 |
-| `REQUEST_ID_REQUIRED` | 400 | requestId 缺失 |
-| `NOT_CONFIGURED` | 503 | 资源未配置 |
+| `workspace_not_allowed` | 403 | 工作目录不在白名单 |
+| `invalid_permission_mode` | 400 | 权限模式参数无效 |
+| `invalid_decision` | 400 | 审批决策值非法 |
+| `executor_unavailable` | 503 | 无 Agent Runtime 执行器 |
+| `executor_start_failed` | 500 | Run 启动失败 |
+| `too_many_concurrent_runs` | 429 | 并发 Run 数达上限 |
+| `active_run_exists` | 409 | Thread 已有活跃 Run |
+| `invalid_agent_id` | 400 | Agent 适配器未知 |
+| `agent_registry_not_configured` | 404 | Agent 注册表未配置 |
+| `agent_instance_not_found` | 404 | Agent 实例未找到 |
+| `permission_request_not_found` | 404 | 权限请求不存在 |
+| `run_id_required` | 400 | runId 缺失 |
+| `request_id_required` | 400 | requestId 缺失 |
+| `not_configured` | 503 | 资源未配置 |
 
 #### Hub 域码（hub-server/internal/errcode/codes.go）
 
-Hub 域码完整列表见 `hub-server/internal/errcode/codes.go`。域码遵循 `{DOMAIN}_{ENTITY}_{EVENT}` 三段式命名，如 `MSG_NOT_FOUND`、`SESSION_NOT_MEMBER`、`AGENT_TASK_TIMEOUT`。
+Hub 域码完整列表见 `hub-server/internal/errcode/codes.go`。域码遵循 `{domain}_{entity}_{event}` 三段式命名，如 `msg_not_found`、`session_not_member`、`agent_task_timeout`。
 
 ### Hub 成功响应格式（现状）
 

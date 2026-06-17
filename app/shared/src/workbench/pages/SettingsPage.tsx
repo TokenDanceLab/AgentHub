@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
   type DesignNavIconName,
 } from '../designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import type { LocalCliDiscoveryManifest } from '../../platform';
 import styles from './SettingsPage.module.css';
 
@@ -549,6 +551,7 @@ function NotifyPane(props: SettingsPageProps): React.ReactElement {
 }
 
 function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <>
       <SettingsSection title="默认运行配置">
@@ -579,7 +582,7 @@ function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement {
       </SettingsSection>
 
       {props.onOpenAgentConfig && (
-        <section className={styles.agentConfigLink} aria-label="Agent 配置入口">
+        <section className={styles.agentConfigLink} aria-label={t('aria.agentConfig')}>
           <div className={styles.agentConfigLinkContent}>
             <h3>单个 Agent 配置</h3>
             <p>
@@ -708,6 +711,7 @@ const PANE_RENDERERS: Record<SettingsPaneId, React.FC<SettingsPageProps>> = {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SettingsPage(props: SettingsPageProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { activePane, spaceTitle, spaceMeta, onSelectPane } = props;
   const meta = PANE_META[activePane] ?? PANE_META.appearance;
   const PaneContent = PANE_RENDERERS[activePane] ?? PANE_RENDERERS.appearance;

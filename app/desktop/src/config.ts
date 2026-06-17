@@ -87,4 +87,4 @@ export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL ||
 export const HEALTH_POLL_MS = 5000;
 export const RUNNERS_POLL_MS = 5000;
 export const EVENT_LOG_MAX = 1000;
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.4.1';

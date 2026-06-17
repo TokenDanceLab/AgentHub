@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-10
+> 最后更新：2026-06-17
 
 ## 概述
 
@@ -63,16 +63,16 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 支持 `--agenthub-runtime-fixture-replay` 独立回放模式
 - `AgentSpec fixture` 使用此机制注册 demo runtime/profile
 
-## PreflightAdapter 接口
+## PreflightCheck 接口
 
 ```go
-// PreflightAdapter 在真实执行前检查必要条件，快速失败
-type PreflightAdapter interface {
-    Preflight(ctx context.Context) error
+// PreflightCheck 在真实执行前检查必要条件，快速失败
+type PreflightCheck interface {
+    PreflightCheck() error
 }
 ```
 
-Codex adapter 实现了此接口：预检 `OPENAI_API_KEY` 是否存在，缺失时返回描述性错误而非进程启动后失败。
+Codex adapter 实现了 `PreflightCheck` 接口：预检 `OPENAI_API_KEY` 是否存在，缺失时返回描述性错误而非进程启动后失败。
 
 ## 事件映射合同
 

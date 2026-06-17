@@ -1,4 +1,5 @@
 import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { formatComposerAttachmentSize as formatSize } from '../composer/attachments';
 import styles from './ArtifactCard.module.css';
 
 export interface ArtifactCardProps {
@@ -18,13 +19,6 @@ const TYPE_ICON: Record<string, typeof FileText> = {
   image: Image,
   iframe: Monitor,
 };
-
-function formatSize(bytes: number | undefined): string | null {
-  if (bytes == null) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export default function ArtifactCard({
   artifactId,

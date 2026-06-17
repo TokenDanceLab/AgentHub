@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # v0.3.0 完成报告
 
 > 日期：2026-06-10 · HEAD `750e27cc` · 25 commits · Tag `v0.3.0-rc.9`

@@ -1,6 +1,6 @@
 # ADR Index
 
-最后更新：2026-06-10
+最后更新：2026-06-17
 
 本目录保存 AgentHub 项目已采纳的架构决策记录（Architecture Decision Records）。ADR 解释"为什么当时这样决定"，不自动覆盖当前主文档。若 ADR 与 `docs/architecture.md`、`docs/architecture/` 或 `api/` 契约冲突，以当前主文档和契约为准，并在后续新增 ADR 记录变更原因。
 
@@ -29,7 +29,7 @@
 | ADR | 标题 | 当前状态 | 备注 |
 |-----|------|----------|------|
 | ADR-007 | [三运行时统一适配器架构](ADR-007-unified-adapter-architecture.md) | 已采纳 | AgentAdapter 接口 + AdapterRegistry + EventEmitter 统一事件模型，支持 Claude/Codex/OpenCode |
-| ADR-008 | [Glass Token 设计系统](ADR-008-glass-token-design-system.md) | 已采纳 | `--glass-*` CSS 变量系统，26 个语义化变量，替代 797 处 rgba() 硬编码 |
+| ADR-008 | [Glass Token 设计系统](ADR-008-glass-token-design-system.md) | 已采纳 | `--glass-*` CSS 变量系统，25 个语义化变量，逐步替代 1200+ 处 rgba() 硬编码 |
 | ADR-009 | [SettingsPage 渐进式拆分策略](ADR-009-settings-page-refactoring.md) | 已采纳 | 三阶段拆分：Section 提取 + CSS 模块化 + Lazy Loading。当前已降至 765 行 |
 | ADR-010 | [MCP Server 端点设计](ADR-010-mcp-server-endpoint.md) | 已采纳 | JSON-RPC 2.0 MCP Server，8 tools，Streamable HTTP Transport |
 | ADR-011 | [前端 Monorepo 架构](ADR-011-frontend-monorepo.md) | 已采纳 | pnpm workspace monorepo：shared/desktop/web/mobile 四包 |

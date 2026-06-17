@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './EmptyState.module.css';
 
 export interface EmptyStateAction {
@@ -33,9 +34,6 @@ export interface EmptyStateProps {
   suggestionClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function EmptyState({
   title,

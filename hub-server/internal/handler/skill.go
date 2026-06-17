@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -91,6 +92,12 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 	isPublic := c.DefaultQuery("is_public", "")
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
 
 	if isPublic == "true" {
 		// Public market: return all published skills (no owner filter).

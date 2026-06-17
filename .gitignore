@@ -260,6 +260,7 @@ docs/deployment/*deployment*
 # Generated Files & Compiler Output
 # =============================================================================
 **/tsc-output.txt
+**/eslint-*.txt
 app/desktop/stats.html
 .handoff.md
 **/local-secrets/

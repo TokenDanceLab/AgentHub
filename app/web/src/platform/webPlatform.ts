@@ -232,11 +232,9 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
-        const shouldUseDemoFallback = isWorkbenchFixtureDataMode(dataMode) || (
-          dataMode === 'auto' &&
-          !hasInjectedHubClient &&
-          !hasHubToken &&
-          !ensureAuth
+        const shouldUseDemoFallback = !hasInjectedHubClient && !ensureAuth && (
+          isWorkbenchFixtureDataMode(dataMode) ||
+          (dataMode === 'auto' && !hasHubToken)
         );
         if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);

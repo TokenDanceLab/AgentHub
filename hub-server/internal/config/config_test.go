@@ -46,7 +46,7 @@ upload:
 	path := writeTempConfig(t, yaml)
 
 	// Set the JWT secret via env var (required by validation).
-	t.Setenv("AGENTHUB_JWT_SECRET", "test-jwt-secret-42")
+	t.Setenv("AGENTHUB_JWT_SECRET", "test-jwt-secret-42-padded-to-32-chars")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -68,13 +68,13 @@ upload:
 	if cfg.Redis.Host != "localhost" {
 		t.Errorf("Redis.Host = %q, want %q", cfg.Redis.Host, "localhost")
 	}
-	if cfg.JWT.Secret != "test-jwt-secret-42" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "test-jwt-secret-42")
+	if cfg.JWT.Secret != "test-jwt-secret-42-padded-to-32-chars" {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "test-jwt-secret-42-padded-to-32-chars")
 	}
 }
 
 func TestLoadMissingFile(t *testing.T) {
-	t.Setenv("AGENTHUB_JWT_SECRET", "some-secret-value")
+	t.Setenv("AGENTHUB_JWT_SECRET", "some-secret-value-padded-to-32-chars")
 	_, err := Load("/nonexistent/path/to/config.yaml")
 	if err == nil {
 		t.Fatal("expected error for missing config file, got nil")
@@ -90,15 +90,15 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "env-secret-override")
+	t.Setenv("AGENTHUB_JWT_SECRET", "env-secret-override-padded-to-32-chars")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if cfg.JWT.Secret != "env-secret-override" {
-		t.Errorf("JWT.Secret = %q, want %q (env var should override file)", cfg.JWT.Secret, "env-secret-override")
+	if cfg.JWT.Secret != "env-secret-override-padded-to-32-chars" {
+		t.Errorf("JWT.Secret = %q, want %q (env var should override file)", cfg.JWT.Secret, "env-secret-override-padded-to-32-chars")
 	}
 }
 
@@ -148,13 +148,13 @@ jwt:
 	path := writeTempConfig(t, yaml)
 
 	// Env var set but too short — must be rejected.
-	t.Setenv("AGENTHUB_JWT_SECRET", "short")
+	t.Setenv("AGENTHUB_JWT_SECRET", "too-short-25-chars-test!!")
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for JWT secret shorter than 16 chars, got nil")
+		t.Fatal("expected error for JWT secret shorter than 32 chars, got nil")
 	}
 }
 
@@ -167,14 +167,14 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "real-secret-from-env")
+	t.Setenv("AGENTHUB_JWT_SECRET", "real-secret-from-env-padded-to-32-chars")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v, expected success when env var overrides hardcoded default", err)
 	}
-	if cfg.JWT.Secret != "real-secret-from-env" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "real-secret-from-env")
+	if cfg.JWT.Secret != "real-secret-from-env-padded-to-32-chars" {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "real-secret-from-env-padded-to-32-chars")
 	}
 }
 
@@ -186,14 +186,14 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "env-only-secret!!")
+	t.Setenv("AGENTHUB_JWT_SECRET", "env-only-secret!!-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.JWT.Secret != "env-only-secret!!" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "env-only-secret!!")
+	if cfg.JWT.Secret != "env-only-secret!!-padded-to-minimum-32-chars.." {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "env-only-secret!!-padded-to-minimum-32-chars..")
 	}
 }
 
@@ -232,7 +232,7 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "global-test-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "global-test-secret-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -242,8 +242,8 @@ jwt:
 	if cfg == nil {
 		t.Fatal("Load() returned nil config")
 	}
-	if cfg.JWT.Secret != "global-test-secret" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "global-test-secret")
+	if cfg.JWT.Secret != "global-test-secret-padded-to-minimum-32-chars.." {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "global-test-secret-padded-to-minimum-32-chars..")
 	}
 }
 
@@ -273,7 +273,7 @@ upload:
 
 func TestEnvOverrideServerPort(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "override-secret!!")
+	t.Setenv("AGENTHUB_JWT_SECRET", "override-secret!!-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_SERVER_PORT", "9999")
 
 	cfg, err := Load(path)
@@ -287,7 +287,7 @@ func TestEnvOverrideServerPort(t *testing.T) {
 
 func TestEnvOverrideDBConfig(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "db-override-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "db-override-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_DB_HOST", "env-db-host")
 	t.Setenv("AGENTHUB_DB_USER", "env-db-user")
 	t.Setenv("AGENTHUB_DB_NAME", "env-db-name")
@@ -313,7 +313,7 @@ func TestEnvOverrideDBConfig(t *testing.T) {
 
 func TestEnvOverrideRedisConfig(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "redis-override-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "redis-override-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_REDIS_HOST", "env-redis-host")
 	t.Setenv("AGENTHUB_REDIS_PORT", "6390")
 	t.Setenv("AGENTHUB_REDIS_DB", "2")
@@ -335,7 +335,7 @@ func TestEnvOverrideRedisConfig(t *testing.T) {
 
 func TestEnvOverrideUploadConfig(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "upload-override-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "upload-override-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_UPLOAD_DIR", "/custom/uploads")
 	t.Setenv("AGENTHUB_UPLOAD_MAX_SIZE", "20971520")
 	t.Setenv("AGENTHUB_UPLOAD_ALLOWED_MIME_TYPES", "text/plain, application/octet-stream")
@@ -363,7 +363,7 @@ func TestEnvOverrideUploadConfig(t *testing.T) {
 
 func TestLoadUploadAllowedMimeTypesDefaultExcludesOctetStream(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "upload-mime-default-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "upload-mime-default-secret-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -388,7 +388,7 @@ tokendance_id:
   client_secret: ""
   redirect_uri: ""
 `)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "https://id.example/oidc/jwks")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
@@ -428,7 +428,7 @@ tokendance_id:
 
 func TestEnvOverrideTokenDanceIDCanonicalNamesWithoutYAMLSection(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
@@ -463,7 +463,7 @@ tokendance_id:
   client_secret: ""
   redirect_uri: ""
 `)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-legacy-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-legacy-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_TOKENDANCE_ISSUER_URL", "https://legacy-id.example")
 	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_ID", "legacy-client")
 	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET", "legacy-secret")
@@ -492,7 +492,7 @@ tokendance_id:
 
 func TestLoadAgentTeamGuardrailDefaults(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-default-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-default-secret-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -524,7 +524,7 @@ func TestLoadAgentTeamGuardrailDefaults(t *testing.T) {
 
 func TestEnvOverrideAgentTeamGuardrails(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-env-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-env-secret-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_DELEGATION_DEPTH", "2")
 	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_ACTIVE_SUBAGENTS_PER_RUN", "3")
 	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_ROUTE_REPEATS", "4")
@@ -574,7 +574,7 @@ func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret",
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
 		},
 		AgentTeam: AgentTeamConfig{
 			MaxDelegationDepth: -1,
@@ -603,7 +603,7 @@ func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret",
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
 		},
 		TokenDanceID: TokenDanceIDConfig{
 			IssuerURL:    "https://id.example",
@@ -671,13 +671,13 @@ func TestRedisConfigAddrIPv4(t *testing.T) {
 
 func TestLoadYAMLEmptyFile(t *testing.T) {
 	path := writeTempConfig(t, "")
-	t.Setenv("AGENTHUB_JWT_SECRET", "empty-file-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "empty-file-secret-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error on empty YAML = %v", err)
 	}
-	if cfg.JWT.Secret != "empty-file-secret" {
+	if cfg.JWT.Secret != "empty-file-secret-padded-to-minimum-32-chars.." {
 		t.Errorf("JWT.Secret = %q, want empty-file-secret", cfg.JWT.Secret)
 	}
 }
@@ -689,7 +689,7 @@ server:
   port: 3000
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "bare-min-secret!!")
+	t.Setenv("AGENTHUB_JWT_SECRET", "bare-min-secret!!-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -706,7 +706,7 @@ server:
 func TestLoadYAMLEnvVarNotSetForNonSecretField(t *testing.T) {
 	// Env var is not set for log_level — should use YAML value.
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "log-level-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "log-level-secret-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -770,13 +770,13 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "real-production-secret!!")
+	t.Setenv("AGENTHUB_JWT_SECRET", "real-production-secret!!-padded-to-minimum-32-chars..")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.JWT.Secret != "real-production-secret!!" {
+	if cfg.JWT.Secret != "real-production-secret!!-padded-to-minimum-32-chars.." {
 		t.Errorf("JWT.Secret = %q, want real-production-secret!! (env override)", cfg.JWT.Secret)
 	}
 	// Validate should pass because env var overrides the hardcoded value.
@@ -814,7 +814,7 @@ func TestS3Config_IsEmpty(t *testing.T) {
 
 func TestEnvOverrideS3Config(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "s3-env-secret!!")
+	t.Setenv("AGENTHUB_JWT_SECRET", "s3-env-secret!!-padded-to-minimum-32-chars..")
 	t.Setenv("AGENTHUB_S3_ENDPOINT", "https://r2.example.com")
 	t.Setenv("AGENTHUB_S3_ACCESS_KEY", "access-key")
 	t.Setenv("AGENTHUB_S3_SECRET_KEY", "secret-key")
@@ -859,7 +859,7 @@ func TestValidateS3ConfigRequiresCompleteCredentials(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-s3-secret!!",
+			Secret: "strong-s3-secret!!padded-to-minimum-32-chars..",
 		},
 		S3: S3Config{
 			Endpoint: "https://r2.example.com",
@@ -889,7 +889,7 @@ func TestValidateS3ConfigDoesNotRequireLocalUploadDir(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-s3-secret!!",
+			Secret: "strong-s3-secret!!padded-to-minimum-32-chars..",
 		},
 		Upload: UploadConfig{
 			Dir: filepath.Join(t.TempDir(), "missing"),

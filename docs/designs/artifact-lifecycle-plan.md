@@ -1,5 +1,7 @@
 # Artifact Lifecycle 实现计划
 
+> **DEPRECATED** — 本计划已过期（标记于 2026-06-17）。Artifact lifecycle 已在主分支实现，本文件仅供历史参考。当前实现以 `docs/architecture/` 和 `docs/roadmap.md` 为准。
+
 分支：`feat/artifact-lifecycle` | 日期：2026-06-02
 
 ## 调研结论

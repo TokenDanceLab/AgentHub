@@ -6,6 +6,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"testing"
+
+	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 func TestPinAndForward(t *testing.T) {
@@ -104,7 +106,7 @@ func TestGroupManagement(t *testing.T) {
 
 	t.Run("OwnerCannotLeave", func(t *testing.T) {
 		w := postAuth("/client/sessions/"+sid+"/leave", bob.Token, nil)
-		mustCode(t, parse(w), "GROUP_OWNER_CANNOT_LEAVE", "owner cannot leave")
+		mustCode(t, parse(w), errcode.GroupOwnerCannotLeave.Code, "owner cannot leave")
 	})
 
 	t.Run("DissolveGroup", func(t *testing.T) {

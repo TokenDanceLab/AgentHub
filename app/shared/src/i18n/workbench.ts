@@ -6,7 +6,7 @@ export const sharedWorkbenchResources = {
   zh: {
     nav: {
       chat: '对话',
-      contacts: '联系人',
+      contacts: '通讯录',
       docs: '云文档',
       agents: 'Agent',
       tasks: '任务',

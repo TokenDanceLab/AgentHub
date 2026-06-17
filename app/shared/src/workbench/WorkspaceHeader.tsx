@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface WorkspaceHeaderProps {
@@ -19,6 +21,7 @@ export function WorkspaceHeader({
   onToggleInspector,
   onOpenSearch,
 }: WorkspaceHeaderProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const initial = activeConversation?.avatarLabel ?? (activeConversation?.title ?? 'A').slice(0, 1);
   const hasModel = Boolean(activeConversation?.model);
   const runtimeLabel = activeConversation?.runtimeLabel ?? activeConversation?.subtitle;
@@ -56,11 +59,11 @@ export function WorkspaceHeader({
             {threadLabel}
           </span>
           {hasModel ? (
-            <span className={styles.workspaceModel}>{activeConversation!.model}</span>
+            <span className={styles.workspaceModel}>{activeConversation?.model}</span>
           ) : null}
         </div>
 
-        <div aria-label="Workspace tabs" className={styles.workspaceTabs} role="tablist">
+        <div aria-label={t('aria.workspaceTabs')} className={styles.workspaceTabs} role="tablist">
           <button
             aria-selected="true"
             className={styles.workspaceTab}
@@ -82,7 +85,7 @@ export function WorkspaceHeader({
             云文档
           </button>
           <button
-            aria-label="新建频道"
+            aria-label={t('aria.newChannel')}
             className={`${styles.workspaceTab} ${styles.workspaceTabIconOnly}`}
             data-workspace-tab="new-channel"
             role="tab"
@@ -95,7 +98,7 @@ export function WorkspaceHeader({
 
       <div className={styles.workspaceActions}>
         <button
-          aria-label="搜索"
+          aria-label={t('aria.search')}
           className={styles.iconButton}
           onClick={onOpenSearch}
           title="搜索"
@@ -104,7 +107,7 @@ export function WorkspaceHeader({
           <DesignNavIcon name="search" />
         </button>
         <button
-          aria-label="新任务"
+          aria-label={t('aria.newTask')}
           className={styles.iconButton}
           title="新任务"
           type="button"
@@ -112,7 +115,7 @@ export function WorkspaceHeader({
           <DesignNavIcon name="template" />
         </button>
         <button
-          aria-label="确认项"
+          aria-label={t('aria.confirmItems')}
           className={styles.iconButton}
           title="确认项"
           type="button"
@@ -120,7 +123,7 @@ export function WorkspaceHeader({
           <DesignNavIcon name="check" />
         </button>
         <button
-          aria-label="会话设置"
+          aria-label={t('aria.sessionSettings')}
           className={styles.iconButton}
           title="会话设置"
           type="button"
@@ -128,7 +131,7 @@ export function WorkspaceHeader({
           <DesignNavIcon name="settings" />
         </button>
         <button
-          aria-label={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}
+          aria-label={inspectorCollapsed ? t('aria.expandInspector') : t('aria.collapseInspector')}
           className={`${styles.iconButton} ${styles.inspectorToggleBtn}`}
           onClick={onToggleInspector}
           title={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}
