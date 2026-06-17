@@ -92,6 +92,10 @@ export const chatviewResources = {
     'card.ctx.fail': '上下文耗尽',
     'card.attachment.fail': '附件加载失败',
 
+    'card.preview.ready': '预览就绪',
+    'card.preview.running': '正在生成预览...',
+    'card.preview.fail': '预览失败',
+
     'sidebar.overview': '概览',
     'sidebar.files': '文件',
     'sidebar.context': '上下文',
@@ -191,6 +195,10 @@ export const chatviewResources = {
     'card.session.fail': 'Session failed',
     'card.ctx.fail': 'Context exhausted',
     'card.attachment.fail': 'Attachment failed',
+
+    'card.preview.ready': 'Preview Ready',
+    'card.preview.running': 'Generating preview...',
+    'card.preview.fail': 'Preview failed',
 
     'sidebar.overview': 'Overview',
     'sidebar.files': 'Files',
