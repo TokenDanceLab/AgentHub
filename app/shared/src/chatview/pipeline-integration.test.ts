@@ -408,8 +408,8 @@ describe('Pipeline 2: Hub message -> normalize -> adapter -> TranscriptItem', ()
       hubMsg({
         content: { text: 'Hello from Hub user' },
         sender_type: 'user',
-        sender_id: 'user-ding',
-        sender: { nickname: 'Ding' },
+        sender_id: 'user-alice',
+        sender: { nickname: 'Alice' },
       }),
     ]
 
@@ -418,14 +418,14 @@ describe('Pipeline 2: Hub message -> normalize -> adapter -> TranscriptItem', ()
     expect(blocks[0]!.kind).toBe('text')
     expect((blocks[0]! as TextTranscriptBlock).text).toBe('Hello from Hub user')
     expect(blocks[0]!.author.role).toBe('human')
-    expect(blocks[0]!.author.name).toBe('Ding')
+    expect(blocks[0]!.author.name).toBe('Alice')
 
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1)
     const userItem = items[0] as TranscriptUserItem
     expect(userItem.type).toBe('user')
     expect(userItem.text).toBe('Hello from Hub user')
-    expect(userItem.name).toBe('Ding')
+    expect(userItem.name).toBe('Alice')
   })
 
   /* -- 2b. Agent text message => TranscriptAgentItem with bubble -- */
