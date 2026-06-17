@@ -118,7 +118,7 @@ describe('useDesktopWorkbenchModel', () => {
   it('keeps the mock workbench usable when Local Edge has no threads', () => {
     mockedUseThreads.mockReturnValue({
       data: { items: [], page: { hasMore: false } },
-    } as ReturnType<typeof useThreads>);
+    } as unknown as ReturnType<typeof useThreads>);
 
     const { result } = renderWithProvider();
 

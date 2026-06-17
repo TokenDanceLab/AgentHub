@@ -18,6 +18,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
@@ -342,7 +343,7 @@ func TestSetupRegisterCreatesHubSession(t *testing.T) {
 
 	w := get("/client/auth/me", u.Token)
 	r := parse(w)
-	if r.GetCode() != "OK" {
+	if r.GetCode() != errcode.OK.Code {
 		t.Fatalf("me %s failed: %s", u.Username, r.GetCode())
 	}
 	id := extract(r.Data, "id")
@@ -362,7 +363,7 @@ func testDeviceID(username, deviceType string) string {
 
 func mustOK(t *testing.T, r apiResp, msg string) {
 	t.Helper()
-	if r.GetCode() != "OK" {
+	if r.GetCode() != errcode.OK.Code {
 		t.Fatalf("%s: expected OK got %s: %s", msg, r.GetCode(), r.GetMsg())
 	}
 }

@@ -1,32 +1,31 @@
 import React, { type ComponentType } from 'react';
-import {
-  ClaudeCode,
-  Codex,
-  GeminiCLI,
-  OpenCode,
-  // Direct icon imports — avoids @lobehub/icons barrel (ModelIcon/ProviderIcon pull ALL 302 icons via modelConfig.js)
-  Alibaba,
-  AlibabaCloud,
-  Anthropic,
-  Azure,
-  Aws,
-  Bedrock,
-  ByteDance,
-  Claude,
-  Cohere,
-  DeepSeek,
-  Doubao,
-  Gemini,
-  Google,
-  Meta,
-  Mistral,
-  Moonshot,
-  OpenAI,
-  Perplexity,
-  Qwen,
-  Volcengine,
-  Zhipu,
-} from '@lobehub/icons';
+// Subpath imports — avoids @lobehub/icons barrel (index.d.ts re-exports all 302 icons
+// which fails under certain tsconfig contexts like web's moduleResolution + paths setup)
+import ClaudeCode from '@lobehub/icons/es/ClaudeCode';
+import Codex from '@lobehub/icons/es/Codex';
+import GeminiCLI from '@lobehub/icons/es/GeminiCLI';
+import OpenCode from '@lobehub/icons/es/OpenCode';
+import Alibaba from '@lobehub/icons/es/Alibaba';
+import AlibabaCloud from '@lobehub/icons/es/AlibabaCloud';
+import Anthropic from '@lobehub/icons/es/Anthropic';
+import Azure from '@lobehub/icons/es/Azure';
+import Aws from '@lobehub/icons/es/Aws';
+import Bedrock from '@lobehub/icons/es/Bedrock';
+import ByteDance from '@lobehub/icons/es/ByteDance';
+import Claude from '@lobehub/icons/es/Claude';
+import Cohere from '@lobehub/icons/es/Cohere';
+import DeepSeek from '@lobehub/icons/es/DeepSeek';
+import Doubao from '@lobehub/icons/es/Doubao';
+import Gemini from '@lobehub/icons/es/Gemini';
+import Google from '@lobehub/icons/es/Google';
+import Meta from '@lobehub/icons/es/Meta';
+import Mistral from '@lobehub/icons/es/Mistral';
+import Moonshot from '@lobehub/icons/es/Moonshot';
+import OpenAI from '@lobehub/icons/es/OpenAI';
+import Perplexity from '@lobehub/icons/es/Perplexity';
+import Qwen from '@lobehub/icons/es/Qwen';
+import Volcengine from '@lobehub/icons/es/Volcengine';
+import Zhipu from '@lobehub/icons/es/Zhipu';
 import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';

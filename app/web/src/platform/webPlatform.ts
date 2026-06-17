@@ -232,12 +232,9 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
-        // When a Hub client is explicitly injected (e.g. in tests or when the
-        // caller owns its own client lifecycle), never fall back to demo mode.
-        // Likewise, when an auth guard is provided, defer the auth check to the
-        // ensureAuth call below instead of silently switching to demo data.
         const shouldUseDemoFallback = !hasInjectedHubClient && !ensureAuth && (
-          isWorkbenchFixtureDataMode(dataMode) || (dataMode === 'auto' && !hasHubToken)
+          isWorkbenchFixtureDataMode(dataMode) ||
+          (dataMode === 'auto' && !hasHubToken)
         );
         if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);
