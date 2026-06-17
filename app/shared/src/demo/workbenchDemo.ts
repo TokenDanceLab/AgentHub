@@ -714,9 +714,13 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
       return { intentId: agentMessageId };
     },
     pinMessage(conversationId: string, messageId: string, pinnedBy = 'Demo'): void {
-      const current = transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
-      const exists = current.some((block) => block.id === messageId);
+      // Search across ALL transcripts (and fallback preview) for the message,
+      // not just the current conversation's transcript.
+      const exists = Object.entries(transcripts).some(([, blocks]) =>
+        blocks.some((block) => block.id === messageId),
+      ) || createConversationPreviewTranscript(conversationId).some((block) => block.id === messageId);
       if (!exists) return;
+      const current = transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
       if (!transcripts[conversationId]) {
         transcripts = {
           ...transcripts,
@@ -772,7 +776,11 @@ function conversationWithPins(
   const pin = pins.find((item) => item.conversationId === conversation.id);
   if (!pin) return { ...conversation };
   const conversationTranscript = transcripts[conversation.id] ?? createConversationPreviewTranscript(conversation.id);
-  const message = conversationTranscript.find((block) => block.id === pin.messageId);
+  // Also search the fallback preview transcript — pinMessage may have pinned a message
+  // that only exists in the fallback, not the stored transcript.
+  const fallbackTranscript = createConversationPreviewTranscript(conversation.id);
+  const message = conversationTranscript.find((block) => block.id === pin.messageId)
+    ?? fallbackTranscript.find((block) => block.id === pin.messageId);
   if (!message || !('text' in message)) return { ...conversation };
   const content = conversation.id === WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID
     ? BUILDER_PINNED_ANNOUNCEMENT

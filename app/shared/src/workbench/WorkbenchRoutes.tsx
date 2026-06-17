@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
@@ -29,14 +29,6 @@ import type {
   TaskStatus,
   TasksPane,
   ViewMode,
-} from './pages';
-import {
-  AgentsPage,
-  ContactsPage,
-  DocsPage,
-  ProjectsPage,
-  SettingsPage,
-  TasksPage,
 } from './pages';
 import type { AgentConfig, AgentsPaneId, ToolPermission, SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { TaskEditDraft } from './pages/TasksPage';
@@ -72,6 +64,14 @@ import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry
 import type { HubClient } from '../hubClient';
 import { workspaceProjectToProjectInfo } from './hubDataMapping';
 import styles from './AgentHubWorkbench.module.css';
+
+// ── Lazily loaded page components (only one rendered at a time) ──
+const LazyContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
+const LazyDocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.DocsPage })));
+const LazyAgentsPage = lazy(() => import('./pages/AgentsPage').then(m => ({ default: m.AgentsPage })));
+const LazyTasksPage = lazy(() => import('./pages/TasksPage').then(m => ({ default: m.TasksPage })));
+const LazyProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const LazySettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
 type WorkbenchPage = Exclude<GlobalRailPage, 'chat'>;
 type TaskSortMode = 'custom' | 'due';
@@ -1182,7 +1182,8 @@ export function WorkbenchRoutes({
   switch (activePage) {
     case 'contacts':
       return (
-        <ContactsPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazyContactsPage
           activePane={contactsPane}
           externalContacts={contactsData.externalContacts ?? []}
           groups={contactsData.groups ?? []}
@@ -1205,10 +1206,12 @@ export function WorkbenchRoutes({
           onBlockContact={contactsActions?.onBlockContact}
           onUpdateRemark={contactsActions?.onUpdateRemark}
         />
+        </Suspense>
       );
     case 'docs':
       return (
-        <DocsPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazyDocsPage
           activeNav={docsNav}
           activeTab={docsTab}
           navItems={[]}
@@ -1222,10 +1225,12 @@ export function WorkbenchRoutes({
           onCreateDoc={documentsActions?.onCreateDoc}
           onDeleteDoc={documentsActions?.onDeleteDoc}
         />
+        </Suspense>
       );
     case 'agents':
       return (
-        <AgentsPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazyAgentsPage
           activePane={agentsPane}
           agents={agentConfigs}
           agentActionError={agentProfilesStatus?.actionError}
@@ -1284,10 +1289,12 @@ export function WorkbenchRoutes({
           ccSwitchStatus={ccSwitchStatus}
           ccSwitchProviders={ccSwitchProviders}
         />
+        </Suspense>
       );
     case 'runs':
       return (
-        <TasksPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazyTasksPage
           activePane={tasksPane}
           activeFilterCount={taskFilterActive ? 1 : 0}
           crossProjectCount={new Set(visibleTasks.map((task) => task.project)).size}
@@ -1358,10 +1365,12 @@ export function WorkbenchRoutes({
           taskActionLabel={taskActionLabel}
           viewMode={taskViewMode}
         />
+        </Suspense>
       );
     case 'projects':
       return (
-        <ProjectsPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazyProjectsPage
           activeFilter={projectFilter}
           activeProjectId={projectId}
           activeTab={projectTab}
@@ -1383,10 +1392,12 @@ export function WorkbenchRoutes({
           projectsError={effectiveProjectsStatus?.error}
           projectsLoading={effectiveProjectsStatus?.loading}
         />
+        </Suspense>
       );
     case 'settings':
       return (
-        <SettingsPage
+        <Suspense fallback={<div className={styles.routeMissing} />}>
+        <LazySettingsPage
           {...settings}
           activePane={settingsPane}
           onChangeSetting={handleSettingChange}
@@ -1400,6 +1411,7 @@ export function WorkbenchRoutes({
           spaceTitle="AgentHub Desktop"
           currentUserDisplayName={userDisplayName}
         />
+        </Suspense>
       );
     default:
       return (

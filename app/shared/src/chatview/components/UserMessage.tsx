@@ -14,7 +14,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
   if (chatMode === 'dm') {
     return (
       <div className="grp-row user-row-right">
-        <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
+        <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
         <div className="grp-content user-content-right">
           <div className="user-bubble">{item.text}</div>
         </div>
@@ -25,7 +25,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
 
   return (
     <div className="grp-row user-row-right">
-      <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
+      <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
       <div className="grp-content user-content-right">
         <div className="user-meta">
           <span className="ag-time">{item.time}</span>

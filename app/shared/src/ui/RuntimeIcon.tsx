@@ -1,5 +1,32 @@
-import React from 'react';
-import { ClaudeCode, Codex, GeminiCLI, ModelIcon, OpenCode, ProviderIcon } from '@lobehub/icons';
+import React, { type ComponentType } from 'react';
+import {
+  ClaudeCode,
+  Codex,
+  GeminiCLI,
+  OpenCode,
+  // Direct icon imports — avoids @lobehub/icons barrel (ModelIcon/ProviderIcon pull ALL 302 icons via modelConfig.js)
+  Alibaba,
+  AlibabaCloud,
+  Anthropic,
+  Azure,
+  Aws,
+  Bedrock,
+  ByteDance,
+  Claude,
+  Cohere,
+  DeepSeek,
+  Doubao,
+  Gemini,
+  Google,
+  Meta,
+  Mistral,
+  Moonshot,
+  OpenAI,
+  Perplexity,
+  Qwen,
+  Volcengine,
+  Zhipu,
+} from '@lobehub/icons';
 import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';
@@ -90,12 +117,89 @@ export function RuntimeIcon({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Direct provider icon lookup — bypasses @lobehub/icons barrel
+// (ProviderIcon pulls providerMappings → providerConfig → ALL 302 icons)
+// Each entry maps a provider value (from runtimeIconRegistry) to a
+// lobehub icon component with a .Color subcomponent.
+// ═══════════════════════════════════════════════════════════════════════
+
+type LobeIcon = ComponentType<{ size?: number }> & {
+  Color?: ComponentType<{ size?: number }>;
+};
+
+const providerIconMap: Record<string, LobeIcon | undefined> = {
+  alibaba: Alibaba,
+  alibabacloud: AlibabaCloud,
+  anthropic: Anthropic,
+  azure: Azure,
+  aws: Aws,
+  bedrock: Bedrock,
+  bytedance: ByteDance,
+  claude: Claude,
+  cohere: Cohere,
+  deepseek: DeepSeek,
+  doubao: Doubao,
+  gemini: Gemini,
+  google: Google,
+  meta: Meta,
+  mistral: Mistral,
+  moonshot: Moonshot,
+  openai: OpenAI,
+  perplexity: Perplexity,
+  qwen: Qwen,
+  volcengine: Volcengine,
+  zhipu: Zhipu,
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Direct model icon lookup — bypasses @lobehub/icons barrel
+// (ModelIcon pulls modelMappings → modelConfig → ALL 302 icons)
+// ═══════════════════════════════════════════════════════════════════════
+
+const modelIconMap: Record<string, LobeIcon | undefined> = {
+  claude: Claude,
+  deepseek: DeepSeek,
+  doubao: Doubao,
+  gemini: Gemini,
+  glm: Zhipu,       // ChatGLM → Zhipu icon
+  gpt: OpenAI,
+  kimi: Moonshot,
+  qwen: Qwen,
+  'o1': OpenAI,
+  'o3': OpenAI,
+  'o4': OpenAI,
+};
+
+function resolveModelIcon(modelName: string): LobeIcon | undefined {
+  const key = modelName.toLowerCase().replace(/[._/]+/g, '-').replace(/[^a-z0-9-]+/g, '-');
+  // Try exact match first, then prefix match (e.g. "claude-sonnet-4" → "claude")
+  if (modelIconMap[key]) return modelIconMap[key];
+  for (const [prefix, Icon] of Object.entries(modelIconMap)) {
+    if (key.startsWith(prefix + '-') || key.startsWith(prefix)) return Icon;
+  }
+  return undefined;
+}
+
+function renderProviderColorIcon(provider: string, size: number): React.ReactNode {
+  const Icon = providerIconMap[provider.toLowerCase()];
+  const Color = Icon?.Color;
+  if (Color) return <Color size={size} />;
+  return runtimeIconFallbackSvg('provider', size);
+}
+
+function renderModelColorIcon(model: string, size: number): React.ReactNode {
+  const Icon = resolveModelIcon(model);
+  const Color = Icon?.Color;
+  if (Color) return <Color size={size} />;
+  return runtimeIconFallbackSvg('model', size);
+}
+
 function renderRuntimeIcon(resolution: RuntimeIconResolution, iconSize: number): React.ReactNode {
   if (resolution.source === 'lobehub') {
     if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value, iconSize);
-    if (resolution.lobeType === 'provider')
-      return <ProviderIcon provider={resolution.value} size={iconSize} type="color" />;
-    return <ModelIcon model={resolution.value} size={iconSize} />;
+    if (resolution.lobeType === 'provider') return renderProviderColorIcon(resolution.value, iconSize);
+    return renderModelColorIcon(resolution.value, iconSize);
   }
 
   return runtimeIconFallbackSvg(resolution.fallback, iconSize);
