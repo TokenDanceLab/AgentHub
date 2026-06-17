@@ -5,8 +5,9 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { Component, useMemo, useEffect, useRef, useCallback, memo } from 'react'
-import { Transcript } from './Transcript'
 import { useTranslation } from 'react-i18next'
+
+import { Transcript } from './Transcript'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
 import type { BlockActionCallback } from '../transcript-item'

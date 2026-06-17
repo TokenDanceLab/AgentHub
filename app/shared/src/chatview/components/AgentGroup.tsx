@@ -94,20 +94,55 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
       )}
       {item.rows.length > 0 && (
         <div className="card-stack">
-          {item.rows.map((row) => (
-            row.type === 'route' && row.orchAgents?.length
-              ? <OrchestratorCard key={row.id} item={row} />
-              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(selectedBlockIds ? { selected: selectedBlockIds.has(row.id) } : {})} {...(selectionMode !== undefined ? { selectedAny: selectionMode } : {})} {...(softHiddenBlockIds ? { softHidden: softHiddenBlockIds.has(row.id) } : {})} {...(actionedBlockIds ? { actioned: actionedBlockIds.has(row.id) } : {})} />
-          ))}
+          {item.rows.map((row) => {
+            if (row.type === 'route' && row.orchAgents?.length) {
+              return <OrchestratorCard key={row.id} item={row} />;
+            }
+            return (
+              <RowItem
+                key={row.id}
+                item={row}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onRetry={handleRetry}
+                {...(onDeploySubmit ? { onDeploySubmit } : {})}
+                {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})}
+                {...(onBlockSelect ? { onBlockSelect } : {})}
+                {...(onReviewFile ? { onReviewFile } : {})}
+                {...(selectedBlockIds ? { selected: selectedBlockIds.has(row.id) } : {})}
+                {...(selectionMode !== undefined ? { selectedAny: selectionMode } : {})}
+                {...(softHiddenBlockIds ? { softHidden: softHiddenBlockIds.has(row.id) } : {})}
+                {...(actionedBlockIds ? { actioned: actionedBlockIds.has(row.id) } : {})}
+              />
+            );
+          })}
         </div>
       )}
       {item.standaloneRows.length > 0 && (
         <div className="card-stack">
-          {item.standaloneRows.map((row) => (
-            row.type === 'route' && row.orchAgents?.length
-              ? <OrchestratorCard key={row.id} item={row} />
-              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(selectedBlockIds ? { selected: selectedBlockIds.has(row.id) } : {})} {...(selectionMode !== undefined ? { selectedAny: selectionMode } : {})} {...(softHiddenBlockIds ? { softHidden: softHiddenBlockIds.has(row.id) } : {})} {...(actionedBlockIds ? { actioned: actionedBlockIds.has(row.id) } : {})} />
-          ))}
+          {item.standaloneRows.map((row) => {
+            if (row.type === 'route' && row.orchAgents?.length) {
+              return <OrchestratorCard key={row.id} item={row} />;
+            }
+            return (
+              <RowItem
+                key={row.id}
+                item={row}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onRetry={handleRetry}
+                {...(onDeploySubmit ? { onDeploySubmit } : {})}
+                {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})}
+                {...(onBlockSelect ? { onBlockSelect } : {})}
+                {...(onReviewFile ? { onReviewFile } : {})}
+                {...(selectedBlockIds ? { selected: selectedBlockIds.has(row.id) } : {})}
+                {...(selectionMode !== undefined ? { selectedAny: selectionMode } : {})}
+                {...(softHiddenBlockIds ? { softHidden: softHiddenBlockIds.has(row.id) } : {})}
+                {...(actionedBlockIds ? { actioned: actionedBlockIds.has(row.id) } : {})}
+              />
+            );
+          })}
+          })}
         </div>
       )}
       {bubblesContent}
