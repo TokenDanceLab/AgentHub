@@ -347,7 +347,7 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeSuccess(w, http.StatusOK, map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  status,
 		"version": "v1",
 		"edgeId":  "local",
@@ -1018,7 +1018,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid json body")))
 		return
 	}
 

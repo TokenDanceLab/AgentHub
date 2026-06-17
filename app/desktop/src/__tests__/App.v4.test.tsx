@@ -20,16 +20,6 @@ import { useHealth } from '@/hooks/useHealth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
 
-vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: () => null,
-  Codex: () => null,
-  ModelIcon: () => null,
-  OpenCode: () => null,
-}));
-
-vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
-
 vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
 }));

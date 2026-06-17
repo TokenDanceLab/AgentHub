@@ -8,27 +8,27 @@ import "net/http"
 
 var (
 	// --- Generic ---
-	ErrInternal         = &Error{Code: "INTERNAL_ERROR", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
-	ErrBadRequest       = &Error{Code: "BAD_REQUEST", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
-	ErrNotFound         = &Error{Code: "NOT_FOUND", Message: "resource not found", HTTPStatus: http.StatusNotFound}
-	ErrMethodNotAllowed = &Error{Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", HTTPStatus: http.StatusMethodNotAllowed}
-	ErrTimeout          = &Error{Code: "REQUEST_TIMEOUT", Message: "request timed out", HTTPStatus: http.StatusGatewayTimeout}
-	ErrNotImplemented   = &Error{Code: "NOT_IMPLEMENTED", Message: "endpoint not yet implemented", HTTPStatus: http.StatusNotImplemented}
-	ErrTooManyRequests  = &Error{Code: "TOO_MANY_REQUESTS", Message: "rate limit exceeded", HTTPStatus: http.StatusTooManyRequests}
+	ErrInternal         = &Error{Code: "internal_error", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
+	ErrBadRequest       = &Error{Code: "bad_request", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
+	ErrNotFound         = &Error{Code: "not_found", Message: "resource not found", HTTPStatus: http.StatusNotFound}
+	ErrMethodNotAllowed = &Error{Code: "method_not_allowed", Message: "method not allowed", HTTPStatus: http.StatusMethodNotAllowed}
+	ErrTimeout          = &Error{Code: "request_timeout", Message: "request timed out", HTTPStatus: http.StatusGatewayTimeout}
+	ErrNotImplemented   = &Error{Code: "not_implemented", Message: "endpoint not yet implemented", HTTPStatus: http.StatusNotImplemented}
+	ErrTooManyRequests  = &Error{Code: "too_many_requests", Message: "rate limit exceeded", HTTPStatus: http.StatusTooManyRequests}
 
 	// --- Auth ---
-	ErrUnauthorized  = &Error{Code: "UNAUTHORIZED", Message: "authentication required", HTTPStatus: http.StatusUnauthorized}
-	ErrForbidden     = &Error{Code: "FORBIDDEN", Message: "permission denied", HTTPStatus: http.StatusForbidden}
-	ErrInvalidToken  = &Error{Code: "INVALID_TOKEN", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
-	ErrTokenExpired  = &Error{Code: "TOKEN_EXPIRED", Message: "token has expired", HTTPStatus: http.StatusUnauthorized}
+	ErrUnauthorized  = &Error{Code: "unauthorized", Message: "authentication required", HTTPStatus: http.StatusUnauthorized}
+	ErrForbidden     = &Error{Code: "forbidden", Message: "permission denied", HTTPStatus: http.StatusForbidden}
+	ErrInvalidToken  = &Error{Code: "invalid_token", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
+	ErrTokenExpired  = &Error{Code: "token_expired", Message: "token has expired", HTTPStatus: http.StatusUnauthorized}
 
 	// --- Validation ---
-	ErrInvalidJSON     = &Error{Code: "INVALID_JSON", Message: "invalid json body", HTTPStatus: http.StatusBadRequest}
-	ErrValidation      = &Error{Code: "VALIDATION_ERROR", Message: "validation failed", HTTPStatus: http.StatusBadRequest}
-	ErrContentRequired = &Error{Code: "CONTENT_REQUIRED", Message: "content is required", HTTPStatus: http.StatusBadRequest}
-	ErrTooLarge        = &Error{Code: "PAYLOAD_TOO_LARGE", Message: "request payload too large", HTTPStatus: http.StatusRequestEntityTooLarge}
+	ErrInvalidJSON     = &Error{Code: "invalid_json", Message: "invalid json body", HTTPStatus: http.StatusBadRequest}
+	ErrValidation      = &Error{Code: "validation_error", Message: "validation failed", HTTPStatus: http.StatusBadRequest}
+	ErrContentRequired = &Error{Code: "content_required", Message: "content is required", HTTPStatus: http.StatusBadRequest}
+	ErrTooLarge        = &Error{Code: "payload_too_large", Message: "request payload too large", HTTPStatus: http.StatusRequestEntityTooLarge}
 
 	// --- Conflict ---
-	ErrConflict      = &Error{Code: "CONFLICT", Message: "resource conflict", HTTPStatus: http.StatusConflict}
-	ErrAlreadyExists = &Error{Code: "ALREADY_EXISTS", Message: "resource already exists", HTTPStatus: http.StatusConflict}
+	ErrConflict      = &Error{Code: "conflict", Message: "resource conflict", HTTPStatus: http.StatusConflict}
+	ErrAlreadyExists = &Error{Code: "already_exists", Message: "resource already exists", HTTPStatus: http.StatusConflict}
 )
