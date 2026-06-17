@@ -68,8 +68,6 @@ import {
   DEVICE_ID_KEY,
   NOOP,
 } from './settings/utils';
-  NOOP,
-} from './settings/utils';
 
 // ── Lazily loaded section components (33 sections, only one visible at a time) ──
 const GeneralSection = lazy(() => import('./settings/sections/GeneralSection'));

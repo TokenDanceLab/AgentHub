@@ -3,7 +3,6 @@ import type { WorkbenchAgent, WorkbenchConversation } from '../platform';
 import type { TranscriptBlock } from '../transcript';
 import { normalizeHubMessagesToTranscript, type HubMessageTranscriptInput } from '../transcript/normalizeHubMessages';
 import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoTranscript } from './teamrunDemo';
-import { chatviewBuilderTranscript, chatviewAgentCollabTranscript, chatviewAnnouncementTranscript } from './chatviewFixtures';
 
 export type WorkbenchDemoSurface = 'desktop' | 'web';
 
@@ -630,22 +629,49 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
   },
 ];
 
-export const demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> = {
-  'agent-collab': chatviewAgentCollabTranscript,
-  builder: chatviewBuilderTranscript,
-  deployer: chatviewBuilderTranscript,
-  reviewer: chatviewBuilderTranscript,
-  researcher: chatviewBuilderTranscript,
-  orchestrator: chatviewBuilderTranscript,
-  'pinned-announcements': chatviewAnnouncementTranscript,
-  [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
-};
+// ChatView fixtures (~62 KB hardcoded demo data) — lazily loaded only in DEV
+// In production builds (import.meta.env.PROD), the dynamic import is
+// dead-code-eliminated by Vite, saving ~62 KB from the main bundle.
+let _demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> | null = null;
+
+async function loadChatviewTranscripts(): Promise<void> {
+  if (_demoWorkbenchTranscripts) return;
+  if (import.meta.env.DEV) {
+    const fixtures = await import('./chatviewFixtures');
+    _demoWorkbenchTranscripts = {
+      'agent-collab': fixtures.chatviewAgentCollabTranscript,
+      builder: fixtures.chatviewBuilderTranscript,
+      deployer: fixtures.chatviewBuilderTranscript,
+      reviewer: fixtures.chatviewBuilderTranscript,
+      researcher: fixtures.chatviewBuilderTranscript,
+      orchestrator: fixtures.chatviewBuilderTranscript,
+      'pinned-announcements': fixtures.chatviewAnnouncementTranscript,
+      [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
+    };
+  }
+}
+
+function getChatviewTranscripts(): Record<string, TranscriptBlock[]> {
+  if (!_demoWorkbenchTranscripts) {
+    // Fallback for PROD or before lazy load completes
+    _demoWorkbenchTranscripts = {
+      [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
+    };
+  }
+  return _demoWorkbenchTranscripts;
+}
+
+// Eager-load chatview transcripts in DEV so demo conversations render immediately.
+// In PROD this is a no-op (dead-code eliminated).
+if (import.meta.env.DEV) {
+  void loadChatviewTranscripts();
+}
 
 export function createWorkbenchDemoStore(): WorkbenchDemoStore {
   return {
     conversations: demoConversationsBase.map((conversation) => conversationWithDemoPin(conversation)),
     agents: demoWorkbenchAgents,
-    transcripts: demoWorkbenchTranscripts,
+    transcripts: getChatviewTranscripts(),
     pins: demoWorkbenchPins,
   };
 }
@@ -761,11 +787,11 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
 export const workbenchDemoRuntimeStore = createWorkbenchDemoRuntimeStore();
 
 export function resolveDemoWorkbenchTranscript(conversationId: string): TranscriptBlock[] {
-  return demoWorkbenchTranscripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
+  return getChatviewTranscripts()[conversationId] ?? createConversationPreviewTranscript(conversationId);
 }
 
 function conversationWithDemoPin(conversation: WorkbenchConversation): WorkbenchConversation {
-  return conversationWithPins(conversation, demoWorkbenchTranscripts, demoWorkbenchPins);
+  return conversationWithPins(conversation, getChatviewTranscripts(), demoWorkbenchPins);
 }
 
 function conversationWithPins(
