@@ -49,25 +49,39 @@ function extractTextFromXml(xmlString: string): string[] {
 // ═══════════════════════════════════════════════════════════════════════
 // Lazy JSZip loader — dynamic import keeps ~96 KB out of main bundle.
 // Only loaded when a slideshow file (.pptx/.odp) is actually opened.
+//
+// JSZip 3.x uses `export = JSZip` (CJS), so dynamic import() yields
+// { default: typeof JSZip }. We unwrap .default and cast to get access
+// to the static `loadAsync` helper (present at runtime but missing from
+// the DT type declarations for the constructor side).
 // ═══════════════════════════════════════════════════════════════════════
 
-let jszipModule: typeof import('jszip') | null = null;
+interface JSZipStatic {
+  loadAsync(data: ArrayBuffer, options?: Record<string, unknown>): Promise<JSZipInstance>;
+}
 
-async function getJSZip(): Promise<typeof import('jszip')> {
+interface JSZipInstance {
+  file(path: string): { async(type: 'string'): Promise<string>; async(type: 'blob'): Promise<Blob> } | null;
+  forEach(callback: (relativePath: string, file: { dir: boolean; name: string }) => void): void;
+}
+
+let jszipModule: JSZipStatic | null = null;
+
+async function getJSZip(): Promise<JSZipStatic> {
   if (!jszipModule) {
-    jszipModule = await import('jszip');
+    const mod = await import('jszip') as { default: JSZipStatic };
+    jszipModule = mod.default;
   }
   return jszipModule;
 }
 
 async function parsePptx(arrayBuffer: ArrayBuffer): Promise<SlideData[]> {
-  const JSZipModule = await getJSZip();
-  const JSZip = JSZipModule.default ?? JSZipModule;
+  const JSZip = await getJSZip();
   const zip = await JSZip.loadAsync(arrayBuffer);
 
   /* Find slide files: ppt/slides/slide1.xml, slide2.xml, etc. */
   const slideFiles: { index: number; path: string }[] = [];
-  zip.forEach((relativePath, file) => {
+  zip.forEach((relativePath: string, file: { dir: boolean }) => {
     const slideMatch = relativePath.match(/^ppt\/slides\/slide(\d+)\.xml$/);
     if (slideMatch?.[1] && !file.dir) {
       slideFiles.push({
