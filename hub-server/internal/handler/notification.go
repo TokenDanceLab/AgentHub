@@ -37,6 +37,12 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 			limit = v
 		}
 	}
+	if limit <= 0 {
+		limit = config.DefaultPaginationLimit
+	}
+	if limit > config.MaxPageLimit {
+		limit = config.MaxPageLimit
+	}
 
 	offset := 0
 	if o := c.Query("offset"); o != "" {

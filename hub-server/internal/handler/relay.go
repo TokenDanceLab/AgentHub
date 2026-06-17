@@ -14,8 +14,8 @@ import (
 // RelayService is the subset of *service.RelayService used by RelayHandler.
 type RelayService interface {
 	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error)
-	GetCommand(ctx context.Context, id string) (*service.RelayCommandData, error)
-	AckCommand(ctx context.Context, id string) error
+	GetCommand(ctx context.Context, id string, userID string) (*service.RelayCommandData, error)
+	AckCommand(ctx context.Context, id string, userID string) error
 }
 
 // RelayHandler handles HTTP requests for relay commands between Hub and Edge.
@@ -80,7 +80,8 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 // GetCommand handles GET /web/relay/commands/:id — retrieves a relay command.
 func (h *RelayHandler) GetCommand(c *gin.Context) {
 	id := c.Param("id")
-	cmd, err := h.service.GetCommand(c.Request.Context(), id)
+	userID := c.GetString("user_id")
+	cmd, err := h.service.GetCommand(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -95,7 +96,8 @@ func (h *RelayHandler) GetCommand(c *gin.Context) {
 // AckCommand handles POST /web/relay/commands/:id/ack — acknowledges a relay command.
 func (h *RelayHandler) AckCommand(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.service.AckCommand(c.Request.Context(), id); err != nil {
+	userID := c.GetString("user_id")
+	if err := h.service.AckCommand(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
