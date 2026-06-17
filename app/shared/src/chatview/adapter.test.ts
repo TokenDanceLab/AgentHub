@@ -26,21 +26,15 @@ describe('blocksToTranscriptItems', () => {
 
   it('groups consecutive agent blocks into single AgentTranscriptBlock', () => {
     const blocks: TranscriptBlock[] = [
-      {
-        id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'),
-        content: 'thinking...', isThinking: true,
-      },
-      {
-        id: 'tc1', kind: 'tool_call', createdAt: makeTime(2), author: makeAuthor('b1'),
-        toolName: 'Read', status: 'running',
-      },
+      { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'thinking...', isThinking: true },
+      { id: 'tc1', kind: 'tool_call', createdAt: makeTime(2), author: makeAuthor('b1'), toolName: 'Read', status: 'running' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    expect(items).toHaveLength(1)
+    expect(items.length).toBe(1)
     const agent = items[0] as AgentTranscriptBlock
-    expect(agent.rows).toHaveLength(2)
-    expect(agent.rows![0]!.type).toBe('think')
-    expect(agent.rows![1]!.type).toBe('tool')
+    expect(agent.rows.length).toBe(2)
+    expect(agent.rows[0]!.type).toBe('think')
+    expect(agent.rows[1]!.type).toBe('tool')
   })
 
   it('splits different agents into separate blocks', () => {
@@ -78,11 +72,11 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as AgentTranscriptBlock).rows
+    // tool_result merges with tool_call (same toolName) → 1 card, status transitions to ok
+    expect(rows!.length).toBe(1)
     expect(rows![0]!.type).toBe('tool')
-    expect(rows![0]!.status).toBe('running')
-    expect(rows![1]!.type).toBe('tool')
-    expect(rows![1]!.status).toBe('ok')
-    expect(rows![1]!.isResult).toBe(true)
+    expect(rows![0]!.status).toBe('ok')
+    expect(rows![0]!.isResult).toBe(true)
   })
 
   it('maps file_change with patch to diffLines', () => {
