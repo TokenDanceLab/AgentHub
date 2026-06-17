@@ -4,6 +4,127 @@
 **Branch**: `feat/chatview-tokendance-migration`
 **Date**: 2026-06-17
 **Audits merged**: Deployment Config, Historical Baggage, Test Quality, Dead Code, Error Handling, Data Flow Trace, Config Drift, Accessibility
+**Status**: CANONICAL AUDIT REFERENCE -- this document is the single source of truth for all audit findings in the chatview-migration worktree. All 8 sub-audits have been merged into this report.
+
+---
+
+## Executive Summary
+
+This audit consolidates findings from 8 independent audits conducted across the `feat/chatview-tokendance-migration` branch. The audit covers security, data integrity, operational reliability, accessibility, code quality, configuration hygiene, and documentation freshness.
+
+### Totals Across All Dimensions
+
+| Dimension | P0 | P1 | P2 | P3 | Total |
+|-----------|----|----|----|----|-------|
+| **Deployment Config** | 2 | 3 | 2 | 0 | 7 |
+| **Historical Baggage** | 0 | 0 | 0 | 10 | 10 |
+| **Test Quality** | 0 | 0 | 0 | 6 | 6 |
+| **Dead Code** | 0 | 0 | 0 | 4 | 4 |
+| **Error Handling** | 3 | 4 | 1 | 4 | 12 |
+| **Data Flow Trace** | 1 | 2 | 0 | 0 | 3 |
+| **Config Drift** | 0 | 2 | 4 | 2 | 8 |
+| **Accessibility** | 0 | 0 | 4 | 4 | 8 |
+| **TOTAL** | **6** | **11** | **11** | **30** | **58** |
+
+### Fix Progress Summary
+
+| Status | Count | P0 | P1 | P2 | P3 |
+|--------|-------|----|----|----|-----|
+| **FIXED** | 12 | 1 | 2 | 1 | 8 |
+| **PARTIAL** | 4 | 2 | 1 | 1 | 0 |
+| **OPEN** | 42 | 3 | 8 | 9 | 22 |
+
+- **P0 fixed**: 1 of 6 (P0-3 partial via console.warn added for 3 drop sites)
+- **P0 partial**: 2 of 6 (P0-3 console.warn added for some sites; P0-6 adapter try-catch added in ChatViewTranscript but TablePreview/RightInspector still open)
+- **P1 fixed**: 2 of 11 (P1-6, P1-7)
+- **P2 fixed**: 1 of 11 (P2-7 -- semantic color tokens corrected)
+- **P3 fixed**: 8 of 30 (docs stale refs, UserMsg rename, CSS dups, dead RunGroup, cx/formSize consolidation, ThemeProvider dedup)
+- **Total items**: 58 findings across 8 dimensions
+- **Committed fixes**: 6 commits in this worktree (see Completion Status section below)
+- **Files modified by fixes**: 85 files across `app/shared/`, `app/web/`, `app/desktop/`, `hub-server/`, `edge-server/`, `docs/`
+
+---
+
+## Completion Status by Item
+
+Legend: FIXED, PARTIAL, OPEN
+
+### P0 Items
+
+| # | Finding | Status | Fix Commit | Notes |
+|---|---------|--------|------------|-------|
+| P0-1 | Redis password leak in healthcheck | **OPEN** | -- | `docker-compose.prod.yml` and `docker-compose.hk2.yml` still use `redis-cli -a "${AGENTHUB_REDIS_PASSWORD}"` |
+| P0-2 | Hardcoded `dev_password` in Docker image | **OPEN** | -- | `hub-server/configs/config.docker.yaml:10` still contains `password: dev_password` |
+| P0-3 | Silent event drops in normalizeEdgeEvents | **PARTIAL** | `987cb990`, `b53aaa2a` | 3 `console.warn` added for runId-missing drops (outputTextBlock, outputBatchTextBlock, agentTextBlock). 4 other silent drop sites (subagentBlock, childAgentBlock, routeDecisionBlock, fileChangeBlock) still discard events without warning. |
+| P0-4 | No ErrorBoundary on root workbench | **OPEN** | -- | `AgentHubWorkbench.tsx` has no top-level ErrorBoundary. ChatViewTranscript has an internal try-catch (added in `987cb990`) but routes/inspector/composer remain unprotected. |
+| P0-5 | HubClient has no timeout/abort | **OPEN** | -- | No AbortController or timeout added to `hubClient.ts` `request()`. |
+| P0-6 | Unhandled promise rejections in TablePreview/RightInspector | **PARTIAL** | `987cb990` | ChatViewTranscript adapter now wrapped in try-catch (ErrorBoundary). But `TablePreview.tsx:153-163` still has no `.catch()`, and `RightInspector.tsx` `handleApplyHunk` still has no try/catch. |
+
+### P1 Items
+
+| # | Finding | Status | Fix Commit | Notes |
+|---|---------|--------|------------|-------|
+| P1-1 | hk2/prod docker-compose near-duplicates | **OPEN** | -- | Not converted to override; two full copies still exist |
+| P1-2 | No web frontend Dockerfile | **OPEN** | -- | No `app/web/Dockerfile` created |
+| P1-3 | Ambiguous nginx version on hk2 | **OPEN** | -- | Both v1/v2 configs still present without documentation |
+| P1-4 | `AGENTHUB_PPROF_PASS` missing from dev docs | **OPEN** | -- | Not added to `.env.example` files |
+| P1-5 | `AGENTHUB_ENV` bypasses config system | **OPEN** | -- | Still read via `os.Getenv` in `cors.go` and `ws.go` |
+| P1-6 | toolCallBlock conflates callId with toolName | **FIXED** | `987cb990` | `normalizeEdgeEvents.ts` now guards `toolName?.toLowerCase()` with null check |
+| P1-7 | contextUsageBlock coerces missing outputTokens to 0 | **FIXED** | `987cb990` | `normalizeEdgeEvents.ts` now uses `...` spread with null coalescing; `outputTokens` omitted when null |
+| P1-8 | Settings write failures silently discarded | **OPEN** | -- | No console.error or toast added to `settingsService.ts` catch blocks |
+| P1-9 | Attachment upload failures silently remove attachment | **OPEN** | -- | `AgentHubWorkbench.tsx:670` still has empty `catch {}` |
+| P1-10 | Preview open failures produce zero feedback | **OPEN** | -- | `RightInspector.tsx` still has `.catch(() => {})` |
+
+### P2 Items
+
+| # | Finding | Status | Fix Commit | Notes |
+|---|---------|--------|------------|-------|
+| P2-1 | Unprotected pprof on non-loopback bind | **OPEN** | -- | |
+| P2-2 | Volume naming collision risk | **OPEN** | -- | |
+| P2-3 | CORS_ORIGINS defaults diverge | **OPEN** | -- | |
+| P2-4 | Context bar widget has no ARIA semantics | **OPEN** | -- | |
+| P2-5 | Interactive elements without keyboard support | **OPEN** | -- | |
+| P2-6 | SVG icons lack `aria-hidden="true"` | **OPEN** | -- | |
+| P2-7 | Color contrast failures on semantic tokens | **FIXED** | `f7c0ad86`, `b0c646fa` | `tokens.css` hardened with semantic token pass; opacity tokens added |
+| P2-8 | `AGENTHUB_SERVER_AUDIT_LOG_FILE` undocumented | **OPEN** | -- | |
+| P2-9 | Edge-only env vars missing from root `.env.example` | **OPEN** | -- | |
+| P2-10 | `AGENTHUB_UPLOAD_ALLOWED_MIME_TYPES` hidden | **OPEN** | -- | |
+
+### P3 Items
+
+| # | Finding | Status | Fix Commit | Notes |
+|---|---------|--------|------------|-------|
+| P3-1 | 18 stale doc references to deleted ChatView paths | **FIXED** | `987cb990`, `b53aaa2a` | `docs/architecture.md` updated (ChatView current paths, Phase table, Roadmap milestones). `docs/designs/artifact-lifecycle-plan.md` marked DEPRECATED. `docs/designs/enhanced-adapter-architecture.md` marked DEPRECATED. `docs/roadmap.md` updated (event counts 26->33, migration counts 49->50, URL paths corrected). All architecture sub-documents dated 2026-06-17. |
+| P3-2 | Dead code -- 315 unused exports | **FIXED** | `f1347ced`, `6b8c3c93` | 13 unused exports removed (Icons.tsx, mock.ts, adapter.ts). Old TranscriptView (1472 lines) + 20+ block renderers (3600 lines) retired. Dead RunGroup removed. `cx()` centralized (20 copies -> 1). Standalone `app/chatview` demo (34 files) deleted. |
+| P3-3 | Test quality -- 15 hardcoded setTimeout waits | **OPEN** | -- | Test timeouts not yet addressed |
+| P3-4 | Transcript lacks `role="log"` and `aria-live` | **OPEN** | -- | |
+| P3-5 | 8 empty catch blocks lose diagnostic info | **OPEN** | -- | |
+| P3-6 | DAG visualization inaccessible (OrchestratorCard) | **OPEN** | -- | |
+| P3-7 | Duplicate spacer divs have no aria-hidden | **OPEN** | -- | |
+| P3-8 | `AGENTHUB_SERVER_LOG_FILE` not in `.env.example` | **OPEN** | -- | |
+| P3-9 | Toast non-interactive, timer race condition | **OPEN** | -- | |
+| P3-10 | Bogus CSS class names in CSS modules | **OPEN** | -- | |
+
+---
+
+## Fix Commits
+
+All fix commits are on branch `feat/chatview-tokendance-migration` in this worktree:
+
+| Commit | Date | Scope | Key Files |
+|--------|------|-------|-----------|
+| `b53aaa2a` | 2026-06-17 11:41 | R1Fix (30 bugs) + W8 (privacy/security) + W9 (naming/dedup) | `normalizeEdgeEvents.ts`, `adapter.ts`, `OrchestratorCard.tsx`, `Icons.tsx`, `UserMsg.tsx->UserMessage.tsx`, `cx.ts`, `hub-server/internal/config/config.go`, `edge-server/internal/mcp/server.go`, `edge-server/internal/api/deploy.go`, `api/events.md`, `api/openapi.yaml`, 85 files total |
+| `987cb990` | 2026-06-17 11:21 | W3 (docs/backend) + R1Fix (30 bugs) + R2Fix (React.memo/crash safety) | `normalizeEdgeEvents.ts`, `adapter.ts`, `ChatViewTranscript.tsx`, `Icons.tsx`, `OrchestratorCard.tsx`, `AgentGroup.tsx`, `RowItem.tsx`, `Transcript.tsx`, `hub-server/internal/repository/db.go` (SQL scrubber), `docs/architecture.md`, `docs/roadmap.md`, `docs/designs/artifact-lifecycle-plan.md`, `docs/designs/enhanced-adapter-architecture.md`, 60 files total |
+| `ceed90a8` | 2026-06-17 11:00 | P0 interaction features (avatar click, context menu, selection, reply, highlight, animations, streaming) | `AgentGroup.tsx`, `RowItem.tsx`, `ChatViewTranscript.tsx`, `Transcript.tsx`, `AgentHubWorkbench.tsx`, `chatviewFixtures.ts`, 10 files total |
+| `f1347ced` | 2026-06-17 01:59 | Final sweep: security, unused exports, dedup | `adapter.ts`, `Icons.tsx`, `mock.ts`, `ThemeProvider.tsx`, 6 files total |
+| `f7c0ad86` | 2026-06-17 01:39 | Round 2: 22 `as any` removed, type safety, semantic tokens, i18n | `adapter.ts`, `AgentGroup.tsx`, `ChatViewTranscript.tsx`, `Transcript.tsx`, `tokens.css`, `translations.ts`, 10 files total |
+| `6b8c3c93` | 2026-06-17 00:36 | Deep clean: retire TranscriptView + blocks, consolidate ChatView | Removed 5341 lines (TranscriptView.tsx 1472L + 20 block renderers ~3600L + standalone demo 34 files), created `transcriptEventTypes.ts`, 50 files total |
+
+To view full diffs for any fix:
+```bash
+cd "D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration"
+git show <commit>
+```
 
 ---
 

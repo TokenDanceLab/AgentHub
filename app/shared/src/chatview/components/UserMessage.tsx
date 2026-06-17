@@ -1,6 +1,7 @@
 import { memo } from 'react'
-import type { TranscriptUserItem } from '../transcript-item'
 import { useTranslation } from 'react-i18next'
+
+import type { TranscriptUserItem } from '../transcript-item'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
 interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
