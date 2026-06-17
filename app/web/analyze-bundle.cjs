@@ -14,7 +14,8 @@ const result = esbuild.buildSync({
   target: ['es2021'],
   platform: 'browser',
   loader: {
-    '.css': 'text',
+    '.css': 'css',
+    '.module.css': 'css',
     '.svg': 'text',
     '.png': 'empty',
   },
