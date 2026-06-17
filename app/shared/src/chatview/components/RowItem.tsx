@@ -6,7 +6,8 @@ import {
   IconTarget, IconUpload, IconChart, IconDatabase, IconBraces,
   IconMarkdown, IconCss, IconTerminal,
 } from './Icons'
-import { useI18n } from '../i18n/I18nProvider'
+import { useTranslation } from 'react-i18next'
+import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
 import './RowItem.css'
 
@@ -56,7 +57,7 @@ interface Props {
 }
 
 export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick }: Props) {
-  const { t } = useI18n()
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const isOpen = item.type === 'route' ? true : open
 
