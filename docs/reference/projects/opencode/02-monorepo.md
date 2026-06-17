@@ -436,12 +436,12 @@ OpenCode 在 dep 类型上的关键约定：
 | OpenCode Layer | OpenCode 包 | AgentHub 对应 | 关键差异 |
 |---------------|-------------|---------------|---------|
 | **Layer 0 Foundation** | `core`（Effect Services, Schema, 工具函数）| `packages/protocol/` + `packages/transport/` | OpenCode 的 core 是运行时+类型一体；AgentHub 的 protocol 是纯 proto 生成代码，transport 是纯接口。在 Go 中这些应分开。 |
-| **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + Runner 内部的 `internal/executor/` | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
+| **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + `edge-server/internal/lifecycle/` (execution lifecycle) | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
 | **Layer 0 Foundation** | `sdk`（OpenAPI codegen client）| `gen/go/` (ConnectRPC 生成) + `gen/ts/` (Connect-ES 生成) | 同等地位。OpenCode 用 `@hey-api/openapi-ts`；AgentHub 用 Buf + ConnectRPC。都是协议生成代码路线。 |
 | **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `edge-server/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
 | **Layer 1 Domain** | `ui`（SolidJS 组件）| `apps/web/`（React UI，独立 workspace）| UI 层独立，与 Go 服务不在同一 module。 |
 | **Layer 2 UI** | `app`（SolidStart SPA）| `apps/web/` | 同上。 |
-| **Layer 3 App** | `opencode`（CLI + Hono Server, 720 files）| **拆分为 3 个服务**：`hub/` + `edge/` + `runner/` | **这是最大差异**。OpenCode 是单体 CLI+Server（720 个 .ts 文件全在一个包里）；AgentHub 按职责拆分为 3 个独立 Go 服务。AgentHub 的拆分优于 OpenCode 的单体——部署独立、故障隔离、可独立扩展。 |
+| **Layer 3 App** | `opencode`（CLI + Hono Server, 720 files）| **拆分为 2 个服务**：`hub/` + `edge/`（runner 生命周期已合并进 edge-server） | **这是最大差异**。OpenCode 是单体 CLI+Server（720 个 .ts 文件全在一个包里）；AgentHub 按职责拆分为 2 个独立 Go 服务。AgentHub 的拆分优于 OpenCode 的单体——部署独立、故障隔离、可独立扩展。 |
 | **Layer 4 Delivery** | `desktop` (Electron) + `web` (Astro) | `apps/web/` (React) + 未来可能的 Tauri desktop | 文档站点：AgentHub 尚未有 Astro 等价物。Desktop：OpenCode 的 Electron 方案对 AgentHub 有参考价值。 |
 
 ### 5.2 架构范式可复用性
@@ -469,10 +469,10 @@ OpenCode 在 dep 类型上的关键约定：
 | OpenCode 包 | 文件数 | AgentHub 对应（规划） | 合理规模 |
 |-------------|--------|---------------------|---------|
 | `core` | 163 | `packages/protocol/` + `packages/transport/` | ~20-50 Go 文件 |
-| `llm` | 96 | `runner/internal/executor/` + `runner/internal/adapters/` | ~30-60 Go 文件 |
+| `llm` | 96 | `edge-server/internal/lifecycle/` + `edge-server/internal/adapters/`（原 runner/ 已废弃） | ~30-60 Go 文件 |
 | `sdk` | 43 | `gen/go/` + `gen/ts/` | 自动生成，不计 |
 | `plugin` | 8 | `packages/adapters/` (shared interface) | ~5-15 Go 文件 |
-| `opencode` | 720 | `hub/` + `edge/` + `runner/`（3 个服务） | 每个服务 ~30-80 Go 文件 |
+| `opencode` | 720 | `hub/` + `edge/`（2 个服务，runner 已合并进 edge） | 每个服务 ~30-80 Go 文件 |
 | `app` + `ui` | 219 | `apps/web/` (React, 独立) | 独立 workspace |
 
 **结论**：AgentHub 的 3 服务拆分避免了 OpenCode 的 720 文件单包问题。每个 Go 服务的 `internal/` 应按功能拆分为 5-15 个文件/包，而不是堆在单一级别。
@@ -487,7 +487,7 @@ OpenCode 在 dep 类型上的关键约定：
 
 4. **`sdk` → Buf + ConnectRPC**：同是协议生成代码，AgentHub 生成 Go + TypeScript 双端类型。
 
-5. **`opencode` (720 files) → hub/ + edge/ + runner/**：AgentHub 的拆分是正确方向。但需注意：hub/edge/runner 之间有共享逻辑（如 conversation CRUD），应提取到 `packages/im-core/` 而不是复制。
+5. **`opencode` (720 files) → hub/ + edge/**：AgentHub 的拆分是正确方向。原独立 `runner/` 已废弃，执行生命周期合并进 `edge-server/internal/lifecycle/`。但需注意：hub/edge 之间有共享逻辑（如 conversation CRUD），应提取到 `packages/im-core/` 而不是复制。
 
 6. **`desktop` → 未来 Tauri/SwiftUI**：OpenCode 的 Electron desktop（server + webview 内嵌）模式对 AgentHub 的 desktop app 有直接参考。
 

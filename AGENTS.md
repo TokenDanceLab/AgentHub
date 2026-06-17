@@ -285,8 +285,8 @@ feat/* → dev/maintainer → master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/maintainer** | 当前唯一开发事实源（Desktop/Web v4 已合入） | ✅ 活跃 |
-| **dev/maintainer** | v0.4.0 开发分支（从 dev/maintainer fork，并行线） | ✅ 活跃 |
+| **dev/maintainer** | 当前集成开发分支 (HEAD 118bdd84)，从 dev/maintainer 创建 | ✅ 活跃 |
+| **dev/maintainer** | 上一版集成主线 (v0.3.0, 1e03b7ec) | ✅ 已归档 |
 | master | PR-only 稳定快照 | ✅ 当前 |
 | origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
 | ~~origin/dev/contributor-b~~ | 已归档 | ✅ 已清理 |
