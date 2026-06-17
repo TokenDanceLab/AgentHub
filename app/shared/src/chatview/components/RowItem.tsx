@@ -1,4 +1,6 @@
 import { useState, useEffect, memo } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import type { RowItem as RowItemType } from '../types'
 import {
   IconBrain, IconFileText, IconSearch, IconFile, IconEdit,
@@ -6,7 +8,6 @@ import {
   IconTarget, IconUpload, IconChart, IconDatabase, IconBraces,
   IconMarkdown, IconCss, IconTerminal,
 } from './Icons'
-import { useTranslation } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
 import './RowItem.css'

@@ -1544,6 +1544,7 @@ export function AgentHubWorkbench({
                     showWorkbenchToast('已关闭置顶');
                   },
                 } : undefined}
+                connectionStatus={connectionStatus}
               />
             </div>
             <MessageSearchPanel
