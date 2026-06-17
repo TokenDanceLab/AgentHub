@@ -62,7 +62,9 @@ export function verifyStreamingKeyStability(blocks: TranscriptBlock[]): string[]
 
 import { describe, it, expect } from 'vitest'
 
-const makeAuthor = (id: string) => ({ id, name: 'Builder', role: 'agent' as const })
+const DEFAULT_AGENT_NAME = 'TestAgent'
+
+const makeAuthor = (id: string) => ({ id, name: DEFAULT_AGENT_NAME, role: 'agent' as const })
 
 describe('simulateStreaming', () => {
   it('produces growing snapshots', () => {

@@ -6,8 +6,11 @@ import { describe, it, expect } from 'vitest'
 import { blocksToTranscriptItems, type AgentTranscriptBlock } from './adapter'
 import type { TranscriptBlock } from '../transcript/types'
 
-const makeAuthor = (id: string, name = 'Builder') => ({ id, name, role: 'agent' as const })
-const makeUser = (id: string, name = 'Ding') => ({ id, name, role: 'human' as const })
+const DEFAULT_AGENT_NAME = 'TestAgent'
+const DEFAULT_USER_NAME = 'User'
+
+const makeAuthor = (id: string, name = DEFAULT_AGENT_NAME) => ({ id, name, role: 'agent' as const })
+const makeUser = (id: string, name = DEFAULT_USER_NAME) => ({ id, name, role: 'human' as const })
 const makeTime = (offsetMin = 0) => new Date(Date.UTC(2026, 5, 17, 14, 30 + offsetMin)).toISOString()
 
 describe('blocksToTranscriptItems', () => {
@@ -15,13 +18,13 @@ describe('blocksToTranscriptItems', () => {
     expect(blocksToTranscriptItems([])).toEqual([])
   })
 
-  it('converts user text to UserTranscriptMsg', () => {
+  it('converts user text to TranscriptUserItem', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('ding'), text: 'hello' },
     ]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1)
-    expect(items[0]).toMatchObject({ type: 'user', text: 'hello', name: 'Ding' })
+    expect(items[0]).toMatchObject({ type: 'user', text: 'hello', name: DEFAULT_USER_NAME })
   })
 
   it('groups consecutive agent blocks into single AgentTranscriptBlock', () => {
@@ -44,14 +47,14 @@ describe('blocksToTranscriptItems', () => {
         content: 'a', isThinking: true,
       },
       {
-        id: 'th2', kind: 'thinking', createdAt: makeTime(2), author: { id: 'r1', name: 'Reviewer', role: 'agent' },
+        id: 'th2', kind: 'thinking', createdAt: makeTime(2), author: { id: 'r1', name: 'ReviewerAgent', role: 'agent' },
         content: 'b', isThinking: true,
       },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(2)
-    expect((items[0] as AgentTranscriptBlock).agent).toBe('Builder')
-    expect((items[1] as AgentTranscriptBlock).agent).toBe('Reviewer')
+    expect((items[0] as AgentTranscriptBlock).agent).toBe(DEFAULT_AGENT_NAME)
+    expect((items[1] as AgentTranscriptBlock).agent).toBe('ReviewerAgent')
   })
 
   it('maps thinking block to think RowItem', () => {
@@ -72,7 +75,7 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as AgentTranscriptBlock).rows
-    // tool_result merges with tool_call (same toolName) → 1 card, status transitions to ok
+    // tool_result merges with tool_call (same toolName) -> 1 card, status transitions to ok
     expect(rows!.length).toBe(1)
     expect(rows![0]!.type).toBe('tool')
     expect(rows![0]!.status).toBe('ok')

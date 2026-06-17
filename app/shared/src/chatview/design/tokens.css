@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS — scoped to .chatview to avoid AgentHub :root pollution
+   DESIGN TOKENS — scoped to .chatview to avoid :root pollution
    ══════════════════════════════════════════════════════════════════════ */
 
 .chatview {
@@ -17,7 +17,7 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --think-max-h: 240px; --avatar-size: 32px; --icon-size: 18px;
 
-  /* Surfaces — matches AgentHub main repo themes.css */
+  /* Surfaces — platform-agnostic theme tokens */
   --app-bg: #f7f6f9;
   --surface: #ffffff;
   --surface-dim: #f1f0f5;

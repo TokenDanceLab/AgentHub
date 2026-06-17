@@ -46,11 +46,15 @@
 
 /* Think */  .row-item.think > .row-hd .row-icon { color:var(--info) }
 .row-item.think > .row-bd { color:var(--text-2); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto }
+.row-item.think.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.think.fail > .row-bd { border-left-color:var(--danger) }
 
 /* Tool */  .row-item.tool > .row-hd .row-label { font-size:0.6875rem; font-weight:500 }
 .row-item.tool > .row-bd { font:var(--label); font-weight:400; line-height:1.5 }
 .row-item.tool.result-row > .row-bd { border-left-color:var(--success) }
 .row-item.tool.result-row.fail > .row-bd { border-left-color:var(--danger) }
+.row-item.tool.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.tool.fail > .row-bd { border-left-color:var(--danger) }
 
 .file-act { font:500 0.6875rem var(--font-sans); padding:var(--sp-2) var(--sp-xxs); border-radius:var(--r-xs) }
 .file-act.cr { background:var(--success-bg); color:var(--success) }
@@ -64,9 +68,13 @@
 .row-item.file > .row-hd .row-icon.mod { color:var(--warning) }
 .row-item.file > .row-hd .row-icon.del { color:var(--danger) }
 .row-item.file > .row-hd .row-label { font-size:0.6875rem }
+.row-item.file.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.file.fail > .row-bd { border-left-color:var(--danger) }
 
 /* Sub */   .row-item.sub > .row-hd .row-icon { color:var(--info) }
 .row-item.sub > .row-bd { border-left-color:var(--info) }
+.row-item.sub.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.sub.fail > .row-bd { border-left-color:var(--danger) }
 
 /* Approval */  .row-item.approval > .row-hd .row-icon { color:var(--warning) }
 .row-item.approval > .row-hd { font-weight:600 }
@@ -94,6 +102,8 @@
 .row-item.deploy > .row-bd { display:grid; gap:var(--sp-xs); padding-bottom:var(--sp-sm) }
 .row-item.deploy .dp-url { font:var(--label); color:var(--primary); word-break:break-all }
 .row-item.deploy .dp-meta { font:var(--label-xs); color:var(--text-3) }
+.row-item.deploy.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.deploy.fail > .row-bd { border-left-color:var(--danger) }
 
 /* Attachment */ .row-item.attachment > .row-hd .row-icon { color:var(--text-2) }
 .row-item.attachment .att-row { display:flex; align-items:center; gap:var(--sp-sm) }
