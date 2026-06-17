@@ -853,7 +853,7 @@ function buildSceneUrl(scene) {
 
 async function waitForSceneReady(page, scene) {
   const readinessPatterns = scene.readyTextPatterns ?? [];
-  const fallbackPattern = 'Delicious233|AgentHub Mobile Workbench|AgentHub Mobile 工作台视觉校准|AgentHub|TokenDance';
+  const fallbackPattern = 'Alice|AgentHub Mobile Workbench|AgentHub Mobile 工作台视觉校准|AgentHub|TokenDance';
   const pattern = readinessPatterns.length > 0 ? readinessPatterns.join('|') : fallbackPattern;
 
   await page.getByText(new RegExp(pattern, 'i')).first().waitFor({ timeout: 60_000 });

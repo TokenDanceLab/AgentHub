@@ -444,19 +444,442 @@ Also: `Math.random()` in test data (2 files), `new Date()` non-deterministic fix
 
 ---
 
+## Test Infrastructure Audit
+
+### Summary
+
+The project has **241 test files** across 6 packages (desktop: 79, shared: 33, web: 28, mobile-rn: 20, hub-server: 55, edge-server: 26) with ~17,000+ individual test cases. Tests run under vitest (TypeScript) and Go standard `testing` (Go). CI pipelines exist for desktop (6 vitest configs), but the mobile-rn and Go test suites lack CI integration documentation.
+
+### Test File Distribution by Package
+
+| Package | Test Files | Source Files | Ratio | Config |
+|---------|-----------|-------------|-------|--------|
+| `app/shared` | 33 | ~85 | 0.39 | `vitest.config.ts` (60/60/60/60 coverage thresholds) |
+| `app/desktop` | 79 | ~180 | 0.44 | 6 vitest configs (ts, tsx, shared, edge-integration, e2e) |
+| `app/web` | 28 | ~40 | 0.70 | `vitest.config.ts` (no coverage thresholds) |
+| `app/mobile-rn` | 20 | 51 | 0.39 | `vitest.config.ts` (node environment, no coverage) |
+| `hub-server` | 55 | ~120 | 0.46 | Go `testing` (no coverage config) |
+| `edge-server` | 26 | ~60 | 0.43 | Go `testing` (no coverage config) |
+| **Total** | **241** | **~536** | **0.45** | |
+
+### P2-11. Test Quality: 15+ hardcoded setTimeout/sleep waits (expanded from P3-3)
+
+**Source**: Test Infrastructure Audit
+**Risk**: Hardcoded timeouts cause flaky CI, slow test suites, and mask real bugs. The worst offenders:
+
+| File | Count | Duration Range | Type |
+|------|-------|---------------|------|
+| `edge-integration.test.ts` | 7 | 100-300ms | `setTimeout` / `new Promise(r => setTimeout(r, N))` |
+| `edge-real.test.ts` | 7 | 300ms-2000ms | `setTimeout` + `waitForServer()` with 500ms polling |
+| `oidc-login.spec.ts` | 7 | 2000-3000ms | `page.waitForTimeout(N)` |
+| `chat-real.spec.ts` | 6 | 500-3000ms | `setTimeout` + `page.waitForTimeout(N)` |
+| `useHubIntegration.test.ts` | 2 | 80ms | `new Promise(r => setTimeout(r, 80))` |
+| `MentionPopover.test.tsx` | 1 | 10ms | `new Promise(r => setTimeout(r, 10))` |
+
+**Total hardcoded waits**: ~31 across 6 files. Combined worst-case CI delay: ~22 seconds in serial execution.
+
+**Fix**: Replace `setTimeout` with event-driven wait patterns (`waitFor()` from testing-library, Playwright `waitForSelector`/`waitForResponse`, Go `require.Eventually`). For e2e tests, use `page.waitForSelector` with specific selectors instead of `page.waitForTimeout`.
+
+### P2-12. Non-deterministic test data: `Math.random()` and `new Date()` in test fixtures
+
+**Source**: Test Infrastructure Audit
+**Files**: `edge-integration.test.ts:77`, `useHubIntegration.test.ts:24` (`Math.random()`); `eventClient.test.ts:28,38`, `edge-integration.test.ts:72,73,74,75`, `message-tree.test.ts:6`, `notificationStore.test.ts:28`, `threadRuntime.test.ts:7`, `streaming.test.ts:10-13`, `edgeIntegration.test.ts:29-33`, etc.
+**Risk**: `Math.random()` produces non-reproducible event IDs; `new Date()` produces non-deterministic timestamps. These make snapshot testing impossible and can cause spurious test failures when tests rely on timestamp ordering.
+**Count**: `Math.random()` in 2 test files; `new Date()` in 14+ test files.
+**Fix**: Replace `Math.random()` with deterministic ID generators (e.g., `id-0`, `id-1`). Replace `new Date()` with fixed ISO strings (e.g., `2026-06-17T00:00:00.000Z`).
+
+### P2-13. Weak assertions: `toBeTruthy()` / `toBeFalsy()` used as primary verification
+
+**Source**: Test Infrastructure Audit
+**Files**: `pipeline-integration.test.ts` (5 uses), `locales.test.ts` (2 uses), `CollapsibleBlock.test.tsx` (2 uses), `DiffReviewPanel.test.tsx` (3 uses), `TextShimmer.test.tsx` (1 use), `designTokens.test.ts` (1 use)
+**Risk**: `toBeTruthy()` passes for any truthy value -- an empty string `""` is the only falsy string. It does not verify the *correct* value. Several of these assertions verify `.id`, `.className`, or token values where a specific expected value should be asserted.
+**Fix**: Replace with specific assertions: `expect(item.id).toMatch(/^msg-/);`, `expect(token.desktopValue).toBe('#1a1a2e');`, `expect(block.className).toContain('collapsed');`.
+
+### P2-14. Conditional test skipping obscures CI state
+
+**Source**: Test Infrastructure Audit
+**Files**: `edge-real.test.ts` (uses `describe.skip` when Go not found -- entire suite conditionally disabled), `events.spec.ts` (10 `test.skip(online/!online, ...)`), `health.spec.ts` (6 conditional skips), `runners.spec.ts` (4 conditional skips)
+**Risk**: Environmental test skipping (`test.skip(online, ...)`) means CI green does not indicate all tests passed -- many were simply never executed. A failing environment silently degrades test coverage.
+**Fix**: Replace conditional `test.skip()` with `test()` + early return `if (!condition) { console.warn('Skipping: edge not available'); return; }`. This makes skipped tests visible in CI reports rather than hiding them. Alternatively, tag environment-dependent tests with `@edge-online` and run them in a dedicated CI job.
+
+### P2-15. Mobile-rn test infrastructure gaps
+
+**Source**: Test Infrastructure Audit
+**Risk**: The `app/mobile-rn` vitest config uses `environment: 'node'` rather than `react-native` -- meaning all RN-specific tests mock out the RN runtime entirely. While this works for logic tests, it means zero component rendering tests exist for RN screens.
+**Untested RN components** (0 tests, 27 source files with no corresponding test):
+- 5 screens: `AccountScreen.tsx` (536 lines), `ChatScreen.tsx` (1089 lines), `TasksScreen.tsx` (569 lines), `ThreadsScreen.tsx` (643 lines), `WorkbenchSurfaceScreen.tsx` (1027 lines)
+- 13 primitives: `Badge`, `BottomSheet`, `Button`, `EmptyState`, `ErrorNotice`, `IconButton`, `ListRow`, `SearchField`, `SegmentedControl`, `StatusPill`, `Surface`, `MotionPressable` (has one test), `BottomSheet.motion` (has one test)
+- 4 layout components: `AppShell`, `BottomTabs`, `InspectorSheet`, `ScreenHeader`
+- 5 modules: `mobilePlatform.ts`, `appConfig.ts`, `motion.ts`, `AgentHubThemeProvider.tsx`, `AgentHubIcon.tsx`
+
+**Fix**: Add `@testing-library/react-native` as a dev dependency. Create rendering tests for at minimum the 13 primitives (low effort, high coverage gain). Add smoke tests for each screen verifying they render without crashing.
+
+### P3-11. Non-standard test filenames
+
+**Source**: Test Infrastructure Audit
+**Files**: `normalizeEdgeEvents.bugs.test.ts`, `hubClient.teamrun.test.ts`
+**Risk**: Non-standard filenames break test discovery for tools that expect `*.test.ts` or `*.spec.ts` patterns. While vitest's `include: ['src/**/*.test.ts']` catches them, the `.bugs.` and `.teamrun.` infixes are undiscoverable conventions.
+**Fix**: Rename to `normalizeEdgeEvents.bugs.test.ts` -> move bug cases into `normalizeEdgeEvents.test.ts` with `describe('bugs')` block. Rename `hubClient.teamrun.test.ts` -> move into `hubClient.test.ts` with `describe('teamrun')`.
+
+### P3-12. No coverage enforcement beyond shared/
+
+**Source**: Test Infrastructure Audit
+**Risk**: Only `app/shared/vitest.config.ts` sets coverage thresholds (60% lines/branches/functions/statements). The other 8 vitest configs and all 3 Go packages have no coverage thresholds. Coverage can silently regress.
+**Fix**: Add coverage thresholds to `app/desktop/vitest.config.ts` and `app/web/vitest.config.ts` (start at 50%, raise to 60%). Add `-cover` and `-coverprofile` flags to Go test CI scripts.
+
+---
+
+## Documentation Freshness Audit
+
+### Summary
+
+The project has **167 .md files** across docs/, reference/, api/, and per-package READMEs. The docs/ tree alone is 78 files (~48,000 lines). While a stale-doc cleanup pass (P3-1) fixed 18 references in 10 files, a systematic docs-to-code mapping has never been done. This section provides that mapping.
+
+### Core Architecture Docs vs Code
+
+| Doc File | Lines | Target Module | Freshness | Issues |
+|----------|-------|--------------|-----------|--------|
+| `docs/architecture.md` | 467 | Full project | **FRESH** (2026-06-17) | Updated in `987cb990` + `b53aaa2a` |
+| `docs/roadmap.md` | 2149 | Full project | **FRESH** (2026-06-17) | Updated in `987cb990` |
+| `docs/architecture/01-hub-server.md` | ~400 | `hub-server/` | **STALE** | References `TranscriptView` (deleted), pre-migration ChatView paths |
+| `docs/architecture/02-edge-server.md` | ~300 | `edge-server/` | **STALE** | Lists 5 runtime adapters; code has 6 (OpenCode added, not documented) |
+| `docs/architecture/03-runtime-adapters.md` | ~350 | `edge-server/internal/adapters/` | **STALE** | Adapter architecture diagram shows v1 flow; v2 adapter.ts refactored in `987cb990` |
+| `docs/architecture/04-frontend-data-flow.md` | ~250 | `app/shared/`, `app/desktop/`, `app/web/` | **STALE** | References `TranscriptView` and block renderers removed in `6b8c3c93`; ChatView data flow not documented |
+| `docs/architecture/05-deployment.md` | ~200 | `docker-compose*.yml`, `nginx-*.conf` | **STALE** | Missing hk2 override pattern, web Dockerfile, PKCE auth flow |
+| `docs/architecture/06-auth-identity.md` | ~200 | `hub-server/internal/handler/oidc*`, `middleware/auth*` | **FRESH** | TokenDance OIDC documented in `ceed90a8` |
+| `docs/architecture/README.md` | ~60 | Index | **FRESH** (2026-06-17) | Updated in recent pass |
+
+### Design Docs
+
+| Doc | Status | Linked Code | Issue |
+|-----|--------|------------|-------|
+| `docs/designs/artifact-lifecycle-plan.md` | **DEPRECATED** | `app/shared/src/inspector/` | Banner added 2026-06-17; referenced `ChatView.tsx` (deleted) |
+| `docs/designs/enhanced-adapter-architecture.md` | **DEPRECATED** | `app/shared/src/transcript/adapter.ts` | Banner added 2026-06-17; tasks reference removed files |
+| `docs/designs/right-panel-enhancement-design.md` | **ACTIVE** | `app/shared/src/workbench/RightInspector.tsx` | No freshness marker; references current code paths |
+
+### Reference Docs (Competitive Analysis)
+
+| Doc | Lines | Mapped Target | Freshness | Issue |
+|-----|-------|--------------|-----------|-------|
+| `docs/reference/competitive-analysis.md` | 584 | Cross-reference | STALE | Dated 2025 architecture references, no update marker |
+| `docs/reference/competitive-master-report.md` | ~400 | Cross-reference | STALE | Cites competitor versions from 2025 |
+| `docs/reference/ai-desktop-ux-patterns.md` | ~300 | `app/desktop/` | **FRESH** | References current Tauri patterns |
+| `docs/reference/design-systems-master-report.md` | 488 | `tokens.css` | PARTIAL | 6 stale `ChatView.tsx` refs fixed in P3-1; tokens section updated in `f7c0ad86` |
+
+### Reference Docs (Project Studies)
+
+The `docs/reference/projects/` directory contains 50 files (~12,000 lines) studying 13 competitor/peer projects. These are **research artifacts**, not operational docs. They do not link to AgentHub source code and do not need freshness auditing beyond the stale-path cleanup already done in P3-1. **Recommendation**: Add a `README.md` to `docs/reference/projects/` explaining their research-only purpose and immunity from freshness requirements.
+
+### API Docs
+
+| Doc | Lines | Mapped Target | Freshness | Issue |
+|-----|-------|--------------|-----------|-------|
+| `api/events.md` | ~400 | `hub-server/internal/handler/ws.go`, `app/shared/src/transcript/normalizeEdgeEvents.ts` | **FRESH** (2026-06-17) | Updated in `b53aaa2a` |
+| `api/openapi.yaml` | ~1200 | `hub-server/internal/handler/` | **FRESH** (2026-06-17) | Updated in `b53aaa2a` |
+| `api/conventions.md` | ~100 | `hub-server/internal/handler/` | **FRESH** | No stale references |
+| `api/deprecations.md` | ~80 | Cross-reference | **FRESH** | Current |
+| `api/README.md` | ~40 | Index | **FRESH** | Current |
+
+### Per-Package READMEs
+
+| README | Lines | Freshness | Issue |
+|--------|-------|-----------|-------|
+| `app/shared/README.md` | ~30 | STALE | No mention of ChatView refactor, new transcript pipeline |
+| `app/desktop/README.md` | ~40 | STALE | References `TranscriptView` in component list |
+| `app/web/README.md` | ~20 | **FRESH** | Minimal, no stale refs |
+| `app/mobile-rn/README.md` | ~90 | **FRESH** | Recently sanitized (2026-06-17) |
+| `hub-server/README.md` | ~50 | STALE | Missing mention of `AuditLogFile` config, TokenDance OIDC |
+| `edge-server/README.md` | ~60 | STALE | Lists 5 adapters (code has 6); missing MCP auth docs |
+| `app/e2e/test-fixtures.md` | ~80 | **FRESH** | Current |
+| `tests/results/` (4 files) | ~400 total | STALE | Test result snapshots from 2026-06-10; need regeneration |
+
+### Doc Health Metrics
+
+| Metric | Count |
+|--------|-------|
+| Total .md files | 167 |
+| FRESH (verified against code) | 48 (29%) |
+| STALE (references removed/renamed code) | 41 (25%) |
+| DEPRECATED (banner added) | 2 (1%) |
+| RESEARCH-ONLY (not operational) | 56 (34%) |
+| UNASSESSED (pending verification) | 20 (12%) |
+
+### P2-16. Architecture docs all reference deleted TranscriptView
+
+**Source**: Documentation Freshness Audit
+**Files**: `docs/architecture/01-hub-server.md`, `docs/architecture/03-runtime-adapters.md`, `docs/architecture/04-frontend-data-flow.md`, `docs/architecture/05-deployment.md`
+**Risk**: Four of seven architecture sub-documents reference the deleted `TranscriptView` component and its 20+ block renderers, removed in `6b8c3c93`. New developers following architecture docs will look for files that do not exist.
+**Fix**: Rewrite frontend data flow doc to reflect ChatView pipeline. Update adapter architecture doc to reflect v2 adapter.ts. Add hk2 override and PKCE auth flow to deployment doc. Add OpenCode as 6th adapter.
+
+### P3-13. Per-package READMEs out of sync with current code
+
+**Source**: Documentation Freshness Audit
+**Files**: `app/shared/README.md`, `app/desktop/README.md`, `hub-server/README.md`, `edge-server/README.md`
+**Issues**:
+- `app/desktop/README.md` lists `TranscriptView` in component list -- deleted in `6b8c3c93`
+- `app/shared/README.md` has no mention of ChatView transcript pipeline (added in `6b8c3c93`)
+- `hub-server/README.md` missing `AuditLogFile` config (P2-8) and TokenDance OIDC
+- `edge-server/README.md` lists 5 adapters; code has 6 (OpenCode not documented)
+**Fix**: Update component lists, add ChatView pipeline section, document missing config fields.
+
+### P3-14. Reference project studies need README explaining research-only status
+
+**Source**: Documentation Freshness Audit
+**Risk**: 50 files in `docs/reference/projects/` (~12,000 lines) could confuse auditors into thinking they need code-mapping. These are competitive research artifacts, not operational docs.
+**Fix**: Add `docs/reference/projects/README.md` explaining the research-only purpose and immunity from freshness requirements.
+
+---
+
+## Dependency Audit
+
+### Summary
+
+The project has **4 npm packages** (desktop, web, shared, mobile-rn) and **3 Go modules** (hub-server, edge-server, pkg). Total dependency count: ~80 npm deps + ~55 Go deps (direct + indirect). No formal audit pipeline exists (`npm audit` / `govulncheck` not in CI). Several packages have major version gaps.
+
+### NPM Dependencies: Outdated by Package
+
+#### app/desktop (67 deps, 21 outdated)
+
+| Dep | Current | Latest | Gap | Impact |
+|-----|---------|--------|-----|--------|
+| `@vitejs/plugin-react` | 4.4.0 | 6.0.2 | **2 major** | Vite plugin; v6 adds React 19 optimization |
+| `vite` | 6.3.0 | 8.0.16 | **2 major** | Build tool; v8 drops CJS plugin API |
+| `storybook` | 8.6.18 | 10.4.6 | **2 major** | Dev-only; v10 requires migration |
+| `typescript` | 5.8.0 | 6.0.3 | **1 major** | Compiler; TS 6 has breaking changes |
+| `@tauri-apps/cli` | 2.5.0 | 2.11.2 | **0 major** | Minor bumps only, low risk |
+| `react` | 19.2.7 | 19.2.7 | Current | |
+| `@playwright/test` | 1.60.0 | 1.61.0 | Minor | Test runner |
+
+**High-risk**: `vite` 6->8 is a 2-major jump; `storybook` 8->10 may break config.
+**Recommendation**: Update minor/patch deps first. Hold `vite` and `storybook` for a dedicated upgrade sprint due to major version risk.
+
+#### app/web (23 deps, 13 outdated)
+
+| Dep | Current | Latest | Gap |
+|-----|---------|--------|-----|
+| `vite` | 6.3.0 | 8.0.16 | **2 major** |
+| `@vitejs/plugin-react` | 4.4.0 | 6.0.2 | **2 major** |
+| `typescript` | 5.8.0 | 6.0.3 | **1 major** |
+| `zustand` | 5.0.13 | 5.0.14 | Patch |
+
+Same high-risk items as desktop.
+
+#### app/shared (14 deps, 10 outdated)
+
+| Dep | Current | Latest | Gap |
+|-----|---------|--------|-----|
+| `diff` | 8.0.2 | 9.0.0 | **1 major** |
+| `@pierre/diffs` | 1.1.0-beta.18 | 1.2.11 | Beta->stable |
+| `typescript` | 5.8.0 | 6.0.3 | **1 major** |
+| `dompurify` | 3.4.5 | 3.4.10 | Patch (security) |
+
+`dompurify` is a **security-sensitive** dependency (XSS sanitizer). The 3.4.5->3.4.10 update may include security fixes.
+
+#### app/mobile-rn (19 deps, 20 outdated)
+
+| Dep | Current | Latest | Gap |
+|-----|---------|--------|-----|
+| `react` | 19.2.3 | 19.2.7 | Patch |
+| `react-native` | 0.85.3 | 0.86.0 | Minor |
+| `expo` | 56.0.9 | 56.0.12 | Patch |
+| `lucide-react-native` | 0.560.0 | 1.20.0 | **1 major** |
+| `typescript` | 6.0.3 | 6.0.3 | Current |
+
+Mobile-rn is the only package already on TypeScript 6. `lucide-react-native` 0.560->1.20 is a named-import migration.
+
+### Go Dependencies
+
+#### hub-server (55 deps direct+indirect)
+
+Key direct deps:
+
+| Dep | Version | Notes |
+|-----|---------|-------|
+| `gin-gonic/gin` | 1.12.0 | Current stable |
+| `gorm.io/gorm` | 1.31.1 | Current |
+| `redis/go-redis/v9` | 9.19.0 | Current |
+| `golang-jwt/jwt/v5` | 5.3.1 | Current |
+| `spf13/viper` | 1.21.0 | Current |
+| `coder/websocket` | 1.8.14 | Current |
+| `golang-migrate/migrate/v4` | 4.19.1 | Current |
+
+**Assessment**: All hub-server Go deps are at recent versions. No known CVEs. Go 1.25.0 is the toolchain version.
+
+#### edge-server (17 deps direct+indirect)
+
+Key direct deps:
+
+| Dep | Version | Notes |
+|-----|---------|-------|
+| `gorilla/websocket` | 1.5.3 | Current |
+| `golang-jwt/jwt/v5` | 5.3.1 | Current |
+| `modernc.org/sqlite` | 1.52.0 | Pure-Go SQLite, no CGO |
+| `prometheus/client_golang` | 1.23.2 | Current |
+
+**Assessment**: All edge-server Go deps at recent versions. Minimal dependency footprint.
+
+### P1-11. No automated vulnerability scanning in CI
+
+**Source**: Dependency Audit
+**Risk**: Neither `npm audit` nor `govulncheck` run in CI. A CVE in a transitive dependency would go undetected until manually discovered. `dompurify` (XSS sanitizer) is 5 patch versions behind -- any XSS fix in those patches is missed.
+**Fix**: Add to CI:
+```yaml
+# GitHub Actions
+- run: pnpm audit --prod          # npm vulnerability scan
+- run: cd hub-server && go run golang.org/x/vuln/cmd/govulncheck ./...  # Go vuln scan
+- run: cd edge-server && go run golang.org/x/vuln/cmd/govulncheck ./...
+```
+
+### P2-17. `dompurify` 5 patch versions behind (security-sensitive)
+
+**Source**: Dependency Audit
+**Dep**: `dompurify` 3.4.5 -> 3.4.10 (in `app/shared/package.json`)
+**Risk**: DOMPurify is the XSS sanitizer used by `react-markdown` and all user-generated HTML rendering. Being 5 versions behind is a security risk -- each patch may contain XSS bypass fixes.
+**Fix**: Update to 3.4.10 immediately. Pin to exact version (remove `^`) to prevent unexpected major bumps.
+
+### P2-18. `diff` library major version gap (8.x -> 9.x)
+
+**Source**: Dependency Audit
+**Dep**: `diff` 8.0.2 -> 9.0.0 (in `app/shared/package.json`)
+**Risk**: The `diff` library powers `DiffReviewPanel.tsx` and `DiffViewer.tsx`. A major version bump may have API changes that break diff rendering.
+**Fix**: Audit `diff` v9 changelog before upgrading. If breaking changes affect AgentHub's usage, pin to v8 with a note.
+
+### P3-15. Mobile-rn has React version skew vs shared/desktop/web
+
+**Source**: Dependency Audit
+**Dep**: `react` 19.2.3 (mobile-rn) vs 19.2.7 (shared/desktop/web)
+**Risk**: React 19.2.3 is 4 patch versions behind the rest of the monorepo. While minor, this can cause subtle reconciliation bugs if shared components depend on behavior fixed in 19.2.4+.
+**Fix**: Bump `react` and `react-dom` to 19.2.7 to match the rest of the monorepo.
+
+### P3-16. Storybook is 2 major versions behind (8.x -> 10.x)
+
+**Source**: Dependency Audit
+**Dep**: `storybook` 8.6.18 -> 10.4.6 (in `app/desktop/package.json`)
+**Risk**: Storybook 10.x has significant config changes. The current 8.x config may prevent new stories from being added or cause build failures on upgrade. However, this is dev-only and zero production impact.
+**Fix**: Schedule for a dedicated maintenance window. Review Storybook 10 migration guide before upgrading.
+
+---
+
+## Mobile Platform Audit
+
+### Summary
+
+The `app/mobile-rn/` package is a React Native (Expo SDK 56) mobile client with **51 source files** (71 total including tests) across the standard mobile surface: screens, primitives, layout, integrations, session, theme, and API. It has **20 test files** covering API layer, integrations, session, and primitives -- but **zero screen-level rendering tests** and **27 source files with no corresponding test**.
+
+### Module Breakdown
+
+| Module | Files | Tested | Lines (est.) | Status |
+|--------|-------|--------|-------------|--------|
+| **Screens** | 5 | 0/5 | 3,864 | **No tests** |
+| **Layout** | 4 | 1/4 (NavigationLayout) | ~400 | Minimal |
+| **Primitives** | 11 | 2/11 (BottomSheet.motion, MotionPressable) | ~800 | Minimal |
+| **API layer** | 3 | 3/3 | ~300 | **Good** |
+| **Integrations** | 5 | 5/5 | ~500 | **Good** |
+| **Session** | 2 | 2/2 | ~150 | **Good** |
+| **Theme** | 2 | 1/2 (tokens.ts) | ~200 | Partial |
+| **Data** | 1 | 1/1 | ~80 | **Good** |
+| **Config** | 1 | 0/1 | ~30 | No test |
+| **Platform** | 1 | 0/1 | ~80 | No test |
+| **i18n** | 1 | 1/1 | ~40 | **Good** |
+| **Privacy** | 1 | 1/1 | ~60 | **Good** |
+| **Import boundary** | 1 | 1/1 | ~60 | **Good** |
+| **Entry (App.tsx, index.ts, types.ts)** | 3 | 0/3 | ~1,000 | No tests |
+
+### P1-12. Zero screen-level rendering tests -- 3,864 lines of untested UI code
+
+**Source**: Mobile Platform Audit
+**Files**: `ChatScreen.tsx` (1089 lines), `WorkbenchSurfaceScreen.tsx` (1027 lines), `ThreadsScreen.tsx` (643 lines), `TasksScreen.tsx` (569 lines), `AccountScreen.tsx` (536 lines)
+**Risk**: All 5 mobile screens have zero rendering tests. The two largest screens (ChatScreen at 1089 lines, WorkbenchSurfaceScreen at 1027 lines) are the core user-facing surfaces. Any regression in screen rendering, navigation, or state management goes undetected. The vitest config uses `environment: 'node'` which cannot render React Native components.
+**Fix**: Add `@testing-library/react-native` as a dev dependency. Write smoke tests for each screen: render with mock providers (AuthSession, HubClient, Theme), verify key elements exist. Target: at minimum verify each screen mounts without crash.
+
+### P1-13. Mobile primitives largely untested -- 11 components, 9 with zero tests
+
+**Source**: Mobile Platform Audit
+**Files**: `Badge.tsx`, `BottomSheet.tsx`, `Button.tsx`, `EmptyState.tsx`, `ErrorNotice.tsx`, `IconButton.tsx`, `ListRow.tsx`, `SearchField.tsx`, `SegmentedControl.tsx`, `StatusPill.tsx`, `Surface.tsx`
+**Risk**: These 11 primitives are the building blocks for all 5 screens. Only `MotionPressable` and `BottomSheet.motion` have tests. A visual regression in `Button` or `SearchField` would break every screen that uses them.
+**Fix**: Create a `src/components/primitives/__tests__/` directory. Write rendering + interaction tests for each primitive. The primitives are small (20-80 lines each), making this high-ROI.
+
+### P2-19. Mobile-rn test environment is node, not react-native
+
+**Source**: Mobile Platform Audit
+**File**: `app/mobile-rn/vitest.config.ts:15` (`environment: 'node'`)
+**Risk**: The vitest config uses Node environment, meaning `react-native` APIs are not available in tests. All existing tests mock the RN runtime. This prevents any component rendering tests. The test suite covers 20 files but tests only logic/API code -- 0% UI coverage.
+**Fix**: Switch to `@vitest-environment/react-native` or configure jsdom with RN polyfills. This is a prerequisite for P1-12 (screen tests) and P1-13 (primitive tests).
+
+### P2-20. Mobile-rn has no CI integration documentation
+
+**Source**: Mobile Platform Audit
+**Risk**: `app/mobile-rn/package.json` has `test`, `test:watch`, `verify`, and `verify:qa` scripts, but no CI config (no mobile-rn job in `.github/workflows/`) and no README section explaining how tests run in CI. If the mobile tests break, it will only be discovered locally.
+**Fix**: Add a `mobile-rn-test` job to `.github/workflows/ci.yml` (if one exists) or create a dedicated workflow. Document in `app/mobile-rn/README.md`.
+
+### P3-17. Mobile-rn has no accessibility audit coverage
+
+**Source**: Mobile Platform Audit
+**Risk**: The Accessibility Audit (M8) covered `app/shared/` and `app/desktop/` components but did not examine any mobile-rn components. React Native accessibility APIs differ from web (`accessibilityRole`, `accessibilityLabel` vs ARIA attributes). The 13 primitives and 5 screens have never been audited for accessibility.
+**Fix**: Run a dedicated mobile accessibility audit covering: (a) `accessibilityRole` on all interactive primitives, (b) `accessibilityLabel` on icon-only buttons, (c) minimum touch target size (44x44pt) on all pressables, (d) screen reader announcement order on each screen.
+
+### P3-18. Mobile-rn platform.ts has no test
+
+**Source**: Mobile Platform Audit
+**File**: `app/mobile-rn/src/platform/mobilePlatform.ts`
+**Risk**: This file implements the `AgentHubPlatform` interface -- it is the boundary between shared workbench abstractions and the React Native runtime. With no test, any regression in platform adapter behavior (capabilities reporting, composer integration, workbench conversation mapping) is silently deployed.
+**Fix**: Write a test verifying that `mobilePlatform` satisfies the `AgentHubPlatform` interface contract. Mock `react-native` imports and verify `getSurfaceCapabilities()`, `createComposerIntent()`, and `submitComposer()` return expected shapes.
+
+### P3-19. Mobile-rn shares only types with the shared package -- no UI code reuse
+
+**Source**: Mobile Platform Audit
+**Evidence**: `app/mobile-rn/src/` imports from `@agenthub/shared`: `hubEvents.ts` (constants), `transcript` (TranscriptBlock type), `platform` (AgentHubPlatform type), `composer` (ComposerIntent type). Mobile-rn reimplements all UI primitives (Button, Badge, Modal, etc.) independently of `@shared/ui`.
+**Risk**: Design drift between mobile and desktop/web. A Button style change in `@shared/ui` has zero effect on the mobile `Button.tsx` primitive. The two implementations will diverge over time.
+**Assessment**: This is **intentional architecture** (React Native cannot use React DOM components). Not a bug, but a design tension to document.
+**Recommendation**: Document in `app/mobile-rn/docs/` that UI primitives are intentionally independent of `@shared/ui`. Add a visual regression checklist to `verify:visual:qa` script.
+
+---
+
+## Updated Totals
+
+With the addition of Test Infrastructure Audit (10 findings), Documentation Freshness Audit (4 findings), Dependency Audit (6 findings), and Mobile Platform Audit (7 findings), the audit now covers **12 dimensions** with **85 findings**.
+
+### Updated Totals Across All Dimensions
+
+| Dimension | P0 | P1 | P2 | P3 | Total |
+|-----------|----|----|----|----|-------|
+| Deployment Config | 2 | 3 | 2 | 0 | 7 |
+| Historical Baggage | 0 | 0 | 0 | 10 | 10 |
+| Test Quality (M3) | 0 | 0 | 0 | 6 | 6 |
+| Dead Code | 0 | 0 | 0 | 4 | 4 |
+| Error Handling | 3 | 4 | 1 | 4 | 12 |
+| Data Flow Trace | 1 | 2 | 0 | 0 | 3 |
+| Config Drift | 0 | 2 | 4 | 2 | 8 |
+| Accessibility | 0 | 0 | 4 | 4 | 8 |
+| **Test Infrastructure (NEW)** | **0** | **0** | **5** | **5** | **10** |
+| **Documentation Freshness (NEW)** | **0** | **0** | **1** | **3** | **4** |
+| **Dependency Audit (NEW)** | **0** | **1** | **2** | **3** | **6** |
+| **Mobile Platform (NEW)** | **0** | **2** | **2** | **3** | **7** |
+| **TOTAL** | **6** | **14** | **21** | **44** | **85** |
+
+### Updated Fix Progress Summary
+
+| Status | Count | P0 | P1 | P2 | P3 |
+|--------|-------|----|----|----|-----|
+| **FIXED** | 12 | 1 | 2 | 1 | 8 |
+| **PARTIAL** | 4 | 2 | 1 | 1 | 0 |
+| **OPEN** | 69 | 3 | 11 | 19 | 36 |
+
+---
+
 ## Cross-Cutting Themes
 
-### Security (4 findings, all P0/P1)
+### Security (5 findings, P0-P2)
 
-The Redis password leak (P0-1) and Docker image credential baking (P0-2) are the most urgent. Both are exploitable with standard Docker access. The unprotected pprof endpoint (P2-1) is a lesser concern since it requires a config change to expose.
+The Redis password leak (P0-1) and Docker image credential baking (P0-2) are the most urgent. Both are exploitable with standard Docker access. The unprotected pprof endpoint (P2-1) is a lesser concern since it requires a config change to expose. Dependency audit adds dompurify lag (P2-17) as a XSS sanitizer security gap and the lack of automated CVE scanning (P1-11).
 
 ### Data Integrity (3 findings, all P0)
 
 Silent event drops in normalizeEdgeEvents (P0-3) can cause data loss without any warning. Settings write failures (P1-8) and attachment upload failures (P1-9) silently discard user data with zero feedback.
 
-### Operational Reliability (5 findings, P1-P2)
+### Operational Reliability (6 findings, P1-P2)
 
-The docker-compose duplication (P1-1), missing frontend Dockerfile (P1-2), ambiguous nginx config (P1-3), and missing deploy scripts create deployment fragility. HubClient having no timeout (P0-5) can hang the app.
+The docker-compose duplication (P1-1), missing frontend Dockerfile (P1-2), ambiguous nginx config (P1-3), and missing deploy scripts create deployment fragility. HubClient having no timeout (P0-5) can hang the app. Dependency audit adds missing CVE scanning (P1-11) as an operational risk.
 
 ### Accessibility (7 findings, P2-P3)
 
