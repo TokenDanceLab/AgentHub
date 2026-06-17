@@ -1138,7 +1138,12 @@ export function mergeHubRuntimeEvents(
 }
 
 function hubRuntimeEventKey(event: HubRuntimeEventTranscriptInput): string {
-  const identityKey = event.id ?? [
+  // When an explicit ID is present, use it as the key for ID-based dedup.
+  // Content hashing is reserved for events without IDs (composite-key fallback).
+  if (event.id) {
+    return event.id;
+  }
+  const identityKey = [
     event.task_id,
     event.edge_run_id,
     event.event_seq,
