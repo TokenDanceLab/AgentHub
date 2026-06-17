@@ -1548,6 +1548,7 @@ export function AgentHubWorkbench({
                 } : undefined}
                 connectionStatus={connectionStatus}
               />
+              </Suspense>
             </div>
             <MessageSearchPanel
               open={searchOpen}
