@@ -784,7 +784,7 @@ export function useWorkbenchCallbacks(p: UseWorkbenchCallbacksParams): Workbench
       event.preventDefault();
       if (isSubmittingRef.current) return;
       const form = event.currentTarget;
-      const textarea = form.querySelector<HTMLTextAreaElement>('textarea[aria-label="Composer input"]');
+      const textarea = form.querySelector<HTMLTextAreaElement>('textarea[data-composer-input]');
       const liveText = textarea?.value ?? composer.text;
       if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
       const capturedConversationId = currentConversationId;
