@@ -3,6 +3,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 .chatview {
+  display:flex; flex-direction:column; height:100%; overflow:hidden;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
   --body: 400 0.8125rem/1.5 var(--font-sans);
@@ -25,12 +26,12 @@
   --surface-high: #efedf5;
   --surface-highest: #e6e4ef;
 
-  /* Text — matches AgentHub */
+  /* Text — platform-agnostic */
   --text-1: #1a1a2e;
   --text-2: #585870;
   --text-3: #9595ac;
 
-  /* Borders — matches AgentHub */
+  /* Borders — platform-agnostic */
   --bdr: rgba(0, 0, 0, 0.055);
   --bdr-strong: rgba(0, 0, 0, 0.095);
 
@@ -51,7 +52,7 @@
   --shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
-/* ── Dark theme overrides — responds to AgentHub data-theme ── */
+/* ── Dark theme overrides — responds to consumer data-theme ── */
 [data-theme="dark"] .chatview {
   --app-bg: #121217;
   --surface: #1c1c24;
