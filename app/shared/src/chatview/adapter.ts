@@ -566,7 +566,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           collapsible: true,
           open: g.open ?? false,
           children: childRows,
-          extra: g.meta,
+          ...(g.meta !== undefined ? { extra: g.meta } : {}),
         }
         currentAgent.rows.push(groupRow)
       }
