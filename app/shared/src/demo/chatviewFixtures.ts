@@ -26,7 +26,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   {
     id: 'bth1', kind: 'thinking', createdAt: T(2), author: B('builder'),
     content: 'User wants to change status to an enum. Currently status is VARCHAR(20) with values active/inactive/banned. Need to create a PostgreSQL custom ENUM type, compatible with existing data. Files involved: model definition, API handler validation, migration script.',
-    isThinking: true,
+    isThinking: false,
   },
   { id: 'bto1', kind: 'tool_call', createdAt: T(3), author: B('builder'), toolName: 'Read', status: 'running' },
   { id: 'btr1', kind: 'tool_result', createdAt: T(4), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines · status field currently VARCHAR(20)' },
@@ -102,7 +102,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   {
     id: 'goth1', kind: 'thinking', createdAt: T(1), author: O('orch'),
     content: '@Ding asked to change the users table status from VARCHAR to ENUM. First, understand the project structure, locate relevant files, confirm the scope of changes.',
-    isThinking: true,
+    isThinking: false,
   },
   { id: 'goto1', kind: 'tool_call', createdAt: T(2), author: O('orch'), toolName: 'Read', status: 'running' },
   { id: 'gotr1', kind: 'tool_result', createdAt: T(3), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines · status field currently VARCHAR(20)' },
@@ -124,7 +124,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   {
     id: 'gbth1', kind: 'thinking', createdAt: T(9), author: B('builder2'),
     content: 'VARCHAR(20), existing values active/inactive/banned. Create migration script, update model definition, update API handler type guard.',
-    isThinking: true,
+    isThinking: false,
   },
   { id: 'gbto1', kind: 'tool_call', createdAt: T(10), author: B('builder2'), toolName: 'Read', status: 'running' },
   { id: 'gbtr1', kind: 'tool_result', createdAt: T(11), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines' },
@@ -148,7 +148,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   {
     id: 'grth1', kind: 'thinking', createdAt: T(18), author: R('reviewer'),
     content: 'Review task received. Checklist: (1) Migration SQL syntax and USING clause (2) ENUM value consistency with existing data (3) API handler type guard completeness (4) Rollback plan.',
-    isThinking: true,
+    isThinking: false,
   },
   { id: 'grto1', kind: 'tool_call', createdAt: T(19), author: R('reviewer'), toolName: 'Read', status: 'running' },
   { id: 'grtr1', kind: 'tool_result', createdAt: T(20), author: R('reviewer'), toolName: 'Read', status: 'completed', summary: 'migrations/003_add_status_enum.sql · 4 lines' },
@@ -170,7 +170,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   {
     id: 'gqth1', kind: 'thinking', createdAt: T(26), author: Q('qa'),
     content: 'Final acceptance checklist: (1) Migration script syntax and rollback (2) Model definition completeness (3) API handler type guard (4) Integration test coverage.',
-    isThinking: true,
+    isThinking: false,
   },
   { id: 'gqto1', kind: 'tool_call', createdAt: T(27), author: Q('qa'), toolName: 'Test', status: 'running' },
   { id: 'gqtr1', kind: 'tool_result', createdAt: T(28), author: Q('qa'), toolName: 'Test', status: 'completed', summary: 'pnpm test · 12/12 passed · 2.3s' },
