@@ -46,7 +46,10 @@ const NodeEl = memo(function NodeEl({n,x,y}:{n:DagNode;x:number;y:number}){
   </g>
 })
 
-export default memo(function OrchestratorCard({item}:{item:RowItemType}){
+/** Render an orchestrator dispatch card as a DAG (directed acyclic graph).
+ *  Nodes are topologically sorted into layers; edges connect dependencies.
+ *  Detects and reports cycles when present. */
+export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowItemType}){
   const nodes: DagNode[]=item.orchAgents||[]
   if (!nodes.length) return null
 

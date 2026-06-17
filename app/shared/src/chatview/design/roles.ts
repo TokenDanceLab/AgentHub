@@ -10,6 +10,9 @@ export type AgentRole = string
 /** Role display helpers — consumer-provided.
  *  If a role is not in these maps, the component falls back to the first
  *  letter of the role string. */
+
+/** CSS custom property mapping for role avatar background colors.
+ *  Each key is a role name, each value a `var(--role-*)` token. */
 export const roleColor: Record<string, string> = {
   builder: 'var(--role-builder)',
   reviewer: 'var(--role-reviewer)',
@@ -19,6 +22,8 @@ export const roleColor: Record<string, string> = {
   shield: 'var(--warning)',
 }
 
+/** Role-to-initial mapping for avatar display.
+ *  Each key is a role name, each value is a 1-2 character initial string. */
 export const roleInitial: Record<string, string> = {
   builder: 'B',
   reviewer: 'R',

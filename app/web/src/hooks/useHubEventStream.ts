@@ -101,7 +101,7 @@ export function useHubEventStream(
       handle.close();
       handleRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [getToken, url]);
 
   const sendTyping = useCallback((sessionId: string) => {

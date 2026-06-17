@@ -452,9 +452,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// JWT: enforce minimum length.
-	if len(c.JWT.Secret) < 16 {
-		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
+	// JWT: enforce minimum length (32 chars = 256 bits for HS256).
+	if len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("JWT secret too short: minimum 32 characters required (got %d)", len(c.JWT.Secret))
 	}
 
 	// TokenDance ID config is optional; validate only when explicitly configured

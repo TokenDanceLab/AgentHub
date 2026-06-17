@@ -6,8 +6,12 @@
 /** Agent role: arbitrary string (consumers define their own set). */
 export type AgentRole = string
 
+/** Discriminated row card kind — determines icon, label, and rendering strategy. */
 export type RowType = 'think' | 'tool' | 'file' | 'sub' | 'approval' | 'route' | 'deploy' | 'attachment' | 'ctx' | 'session'
 
+/** A single row/card displayed inside an agent group in the transcript.
+ *  Core data model for all card types: think, tool, file, sub, approval,
+ *  route, deploy, attachment, context, session. */
 export interface RowItem {
   id: string
   type: RowType

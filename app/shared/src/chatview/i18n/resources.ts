@@ -3,13 +3,18 @@
    Namespace: 'chatview'. Key format: dot.separated.flat (same as before).
    ══════════════════════════════════════════════════════════════════════ */
 
+/** i18next namespace identifier for the ChatView translation bundle.
+ *  Consumers must load this namespace into their I18nextProvider. */
 export const CHATVIEW_I18N_NAMESPACE = 'chatview'
 
 /** Union of all translatable keys in the chatview namespace */
 export type TransKey = keyof typeof chatviewResources.en
+
+/** Supported locale codes for the ChatView i18n bundle. */
 export type Locale = 'zh' | 'en'
 
-// Flat key-value pairs per language (same keys as before, just repackaged)
+/** Flat key-value translation resources for the 'chatview' i18next namespace.
+ *  Keys are dot-separated (e.g. `'card.think.running'`). */
 export const chatviewResources = {
   zh: {
     // App shell

@@ -3,7 +3,8 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { describe, it, expect } from 'vitest'
-import { blocksToTranscriptItems, type AgentTranscriptBlock } from './adapter'
+import { blocksToTranscriptItems } from './adapter'
+import type { AgentTranscriptBlock } from './index'
 import type { TranscriptBlock } from '../transcript/types'
 
 const DEFAULT_AGENT_NAME = 'TestAgent'
