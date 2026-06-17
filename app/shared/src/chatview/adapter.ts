@@ -18,6 +18,7 @@ import type {
   RunStepGroupTranscriptBlock,
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   EvidenceRefStatus,
+  PreviewTranscriptBlock,
 } from '../transcript/types'
 import type { RowItem } from './types'
 import type { TranscriptItem, TranscriptUserItem, TranscriptAgentItem } from './transcript-item'
@@ -132,6 +133,39 @@ function deployStatusNorm(s?: string): RowItem['status'] {
   if (s === 'pending' || s === 'deploying') return 'running'
   if (s === 'ready' || s === 'deployed') return 'ok'
   return 'ok'
+}
+
+/**
+ * Extract a human-readable domain from a URL string (without www. prefix).
+ */
+function extractDomain(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+/**
+ * Derive a display title from a URL path segment when no explicit title is provided.
+ */
+function deriveTitleFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    const path = parsed.pathname
+      .replace(/\/$/, '')
+      .split('/')
+      .filter(Boolean)
+      .pop()
+    if (!path) return extractDomain(url)
+    const decoded = decodeURIComponent(path)
+      .replace(/[-_]/g, ' ')
+      .replace(/\.\w+$/, '')
+    return decoded.length > 60 ? decoded.slice(0, 57) + '...' : decoded
+  } catch {
+    return url
+  }
 }
 
 /**
@@ -368,10 +402,24 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
+    case 'preview': {
+      const p = b as PreviewTranscriptBlock
+      const domain = p.url ? extractDomain(p.url) : ''
+      const displayTitle = p.url ? deriveTitleFromUrl(p.url) : (p.previewId || '')
+      return {
+        id: p.id, type: 'preview',
+        label: '',
+        status: statusNorm(p.status),
+        collapsible: false, standalone: true,
+        url: p.url,
+        previewDomain: domain,
+        previewTitle: displayTitle,
+      } as RowItem
+    }
+
     case 'result':
     case 'finished':
     case 'replay_gap':
-    case 'preview':
     case 'agent_timeline':
     case 'run_step_group':
       return null
@@ -534,7 +582,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!currentAgent) continue
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
-        row.type === 'approval' || row.type === 'session' || row.type === 'attachment'
+        row.type === 'approval' || row.type === 'session' || row.type === 'attachment' || row.type === 'preview'
       if (standalone) {
         currentAgent.standaloneRows.push(row)
       } else {

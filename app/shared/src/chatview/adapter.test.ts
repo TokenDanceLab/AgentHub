@@ -119,6 +119,23 @@ describe('blocksToTranscriptItems', () => {
     expect(items).toHaveLength(0)
   })
 
+  it('maps preview block to standalone preview RowItem', () => {
+    const blocks: TranscriptBlock[] = [
+      { id: 'p1', kind: 'preview', createdAt: makeTime(1), author: makeAuthor('b1'), previewId: 'prev-1', url: 'https://example.com/docs/report.html', status: 'completed' },
+    ] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(1)
+    const agent = items[0] as AgentTranscriptBlock
+    expect(agent.standaloneRows).toHaveLength(1)
+    expect(agent.rows).toHaveLength(0)
+    const row = agent.standaloneRows![0]!
+    expect(row.type).toBe('preview')
+    expect(row.status).toBe('ok')
+    expect(row.url).toBe('https://example.com/docs/report.html')
+    expect(row.previewDomain).toBe('example.com')
+    expect(row.previewTitle).toBe('report')
+  })
+
   it('flattens run_step_group children', () => {
     const blocks: TranscriptBlock[] = [
       {

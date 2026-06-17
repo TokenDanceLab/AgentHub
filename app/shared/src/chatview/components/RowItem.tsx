@@ -18,6 +18,7 @@ const iconMap: Record<string, IconComponent> = {
   think: IconBrain, tool: IconFileText, file: IconFile, sub: IconSubtask,
   approval: IconShield, route: IconArrowForward,
   deploy: IconTarget, attachment: IconUpload, ctx: IconChart, session: IconPlayerPlay,
+  preview: IconTarget,
 }
 
 /** Stable toolName → icon routing — keys never translated */
@@ -154,7 +155,19 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             <div className="ap-reason">{item.apReason}</div>
             {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" aria-label={t('card.approval.approve')} onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" aria-label={t('card.approval.deny')} onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           </>)}
-          {item.url && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
+          {item.type === 'preview' && item.url && (
+            <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
+              <div className="preview-thumb" aria-hidden="true">
+                <img alt="" className="preview-favicon" loading="lazy" src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.previewDomain || '')}&sz=32`} />
+              </div>
+              <div className="preview-body">
+                {item.previewDomain && <span className="preview-domain">{item.previewDomain}</span>}
+                <span className="preview-title">{item.previewTitle || item.url}</span>
+                <span className="preview-url-text">{item.url}</span>
+              </div>
+            </a>
+          )}
+          {item.url && item.type !== 'preview' && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
           {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={onFileClick ? () => onFileClick(item.id) : undefined}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
           {item.ctxPct !== undefined && (<>

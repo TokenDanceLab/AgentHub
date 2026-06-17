@@ -106,6 +106,11 @@ export function cardLabelKey(item: RowItem): LabelResult {
       if (status === 'fail') return { key: 'card.attachment.fail' }
       return { key: item.label as TransKey }
 
+    case 'preview':
+      if (status === 'fail') return { key: 'card.preview.fail' }
+      if (status === 'running') return { key: 'card.preview.running' }
+      return { key: 'card.preview.ready' }
+
     default:
       return { key: (item.label || item.type) as TransKey }
   }
