@@ -142,7 +142,6 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
               />
             );
           })}
-          })}
         </div>
       )}
       {bubblesContent}
@@ -161,7 +160,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
           {avatar}
         </div>
         <div className="grp-content">{body}</div>
-        <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
+        <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
       </div>
     )
   }
@@ -176,7 +175,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         {avatar}
       </div>
       <div className="grp-content">{body}</div>
-      <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
+      <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
     </div>
   )
 })
