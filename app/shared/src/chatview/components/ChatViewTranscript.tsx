@@ -19,20 +19,20 @@ interface Props {
   transcript: TranscriptBlock[]
   /** DM or group mode. Inferred from agent count when not provided. */
   chatMode?: 'dm' | 'group'
-  onAgentClick?: (agentName: string, anchor: HTMLElement) => void
-  onBlockContextMenu?: (blockId: string, event: React.MouseEvent) => void
-  onBlockSelect?: (blockId: string, shiftKey: boolean) => void
-  onBlockAction?: BlockActionCallback
-  onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
-  onDeploySubmit?: (id: string) => void
+  onAgentClick?: ((agentName: string, anchor: HTMLElement) => void) | undefined
+  onBlockContextMenu?: ((blockId: string, event: React.MouseEvent) => void) | undefined
+  onBlockSelect?: ((blockId: string, shiftKey: boolean) => void) | undefined
+  onBlockAction?: BlockActionCallback | undefined
+  onReviewFile?: ((file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void) | undefined
+  onDeploySubmit?: ((id: string) => void) | undefined
   selectedBlockIds?: Set<string>
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
   actionedBlockIds?: Set<string>
   /** Scroll to and highlight the block with this id, then auto-clear after 3s. */
-  highlightedBlockId?: string | null
+  highlightedBlockId?: string | null | undefined
   /** Called when the highlight animation completes (after ~3s). */
-  onHighlightEnd?: () => void
+  onHighlightEnd?: (() => void) | undefined
   /** Optional pinned announcement to show at the top of the transcript. */
   pinnedAnnouncement?: {
     title: string
