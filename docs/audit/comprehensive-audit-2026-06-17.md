@@ -3,8 +3,8 @@
 **Worktree**: `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`
 **Branch**: `feat/chatview-tokendance-migration`
 **Date**: 2026-06-17
-**Audits merged**: Deployment Config, Historical Baggage, Test Quality, Dead Code, Error Handling, Data Flow Trace, Config Drift, Accessibility
-**Status**: CANONICAL AUDIT REFERENCE -- this document is the single source of truth for all audit findings in the chatview-migration worktree. All 8 sub-audits have been merged into this report.
+**Audits merged**: Deployment Config, Historical Baggage, Test Quality, Dead Code, Error Handling, Data Flow Trace, Config Drift, Accessibility, Test Infrastructure, Documentation Freshness, Dependency Audit, Mobile Platform
+**Status**: CANONICAL AUDIT REFERENCE -- this document is the single source of truth for all audit findings in the chatview-migration worktree. All 12 sub-audits have been merged into this report.
 
 ---
 
@@ -887,7 +887,19 @@ The most impactful: missing `role="log"` and `aria-live` on transcript (P3-4), k
 
 ### Code Quality (distributed across audits)
 
-Dead code (315 unused exports), test flakiness (15 hardcoded timeouts), weak error handling (8+ empty catch blocks), and non-deterministic test data all contribute to maintenance friction. These are P3 cleanup items.
+Dead code (315 unused exports), test flakiness (31 hardcoded timeouts across 6 files), weak error handling (8+ empty catch blocks), non-deterministic test data (Math.random + new Date() in 16+ files), and weak assertions (14+ toBeTruthy() calls) all contribute to maintenance friction. These are P2-P3 cleanup items.
+
+### Documentation (8 findings, P2-P3)
+
+Four of seven architecture sub-documents reference the deleted `TranscriptView` component and its 20+ block renderers, making them actively misleading for new developers. Three of five per-package READMEs are out of sync with current code. The 50-file reference project study directory needs a README explaining its research-only status.
+
+### Mobile Platform (7 findings, P1-P3)
+
+The `app/mobile-rn/` package has zero screen-level rendering tests covering 3,864 lines of UI code, and 9 of 11 primitive components are untested. The test environment is `node` rather than `react-native`, preventing UI testing. Mobile primitives are intentionally independent of `@shared/ui` (React Native cannot use DOM components) -- this architecture is correct but undocumented.
+
+### Dependencies (6 findings, P1-P3)
+
+No automated vulnerability scanning in CI. The XSS sanitizer `dompurify` is 5 patch versions behind. Multiple packages have 2-major-version gaps (`vite` 6->8, `storybook` 8->10). Mobile-rn has React version skew (19.2.3 vs 19.2.7) against the rest of the monorepo.
 
 ---
 
@@ -902,9 +914,9 @@ Dead code (315 unused exports), test flakiness (15 hardcoded timeouts), weak err
 | 5 | P0 | Add timeout/AbortController to HubClient.request() | Error Handling | 1 hr |
 | 6 | P0 | Add .catch() handlers to TablePreview floating promises; wrap diff apply in try/catch | Error Handling | 30 min |
 | 7 | P1 | Convert hk2 compose to override file (eliminate duplication) | Deploy Config | 2 hr |
-| 8 | P1 | Fix toolCallBlock callId-conflation bug (display "Tool call" when no toolName) | Data Flow Trace | 30 min |
-| 9 | P1 | Add error toasts for settings write failures and attachment upload failures | Error Handling | 1 hr |
-| 10 | P1 | Add `AGENTHUB_ENV` to ServerConfig struct (remove ad-hoc os.Getenv) | Config Drift | 1 hr |
+| 8 | P1 | Add automated vulnerability scanning to CI (npm audit + govulncheck) | Dependency Audit | 1 hr |
+| 9 | P1 | Write screen-level rendering tests for 5 mobile-rn screens (3,864 lines untested) | Mobile Platform | 4 hr |
+| 10 | P1 | Update `dompurify` to 3.4.10 (XSS sanitizer 5 versions behind) | Dependency Audit | 15 min |
 
 ---
 
@@ -918,8 +930,11 @@ Dead code (315 unused exports), test flakiness (15 hardcoded timeouts), weak err
 | **Config hygiene** | `config.go` (add Env field), `cors.go` (use config), `ws.go` (use config), all 4 `.env.example` files, `config.yaml`, `config.docker.yaml` |
 | **Deploy hygiene** | New `Dockerfile` in `app/web/`, convert `docker-compose.hk2.yml` to override |
 | **Accessibility** | `Transcript.tsx`, `RowItem.tsx`, `RowItem.css`, `AgentGroup.tsx`, `UserMsg.tsx`, `OrchestratorCard.tsx`, `Icons.tsx`, `tokens.css` |
-| **Doc cleanup** | 10 stale doc files (see P3-1) |
+| **Doc cleanup** | 10 stale doc files (see P3-1); 4 architecture sub-docs (P2-16); 4 per-package READMEs (P3-13); new `docs/reference/projects/README.md` (P3-14) |
+| **Dependency security** | `app/shared/package.json` (dompurify, diff), CI workflow (npm audit + govulncheck) |
+| **Test infrastructure** | `edge-integration.test.ts`, `edge-real.test.ts` (timeout replacement); `normalizeEdgeEvents.bugs.test.ts` (rename); coverage thresholds in vitest configs; Go `-cover` flags |
+| **Mobile platform** | 27 untested source files in `app/mobile-rn/src/` (screens + primitives); `vitest.config.ts` (switch to RN environment); `.github/workflows/` (mobile-rn CI job) |
 
 ---
 
-*Generated by merging 8 audit reports: Deployment Config (M1), Historical Baggage (M2), Test Quality (M3), Dead Code (M4), Error Handling (M5), Data Flow Trace (M6), Config Drift (M7), Accessibility (M8).*
+*Generated by merging 12 audit reports: Deployment Config (M1), Historical Baggage (M2), Test Quality (M3), Dead Code (M4), Error Handling (M5), Data Flow Trace (M6), Config Drift (M7), Accessibility (M8), Test Infrastructure (M9), Documentation Freshness (M10), Dependency Audit (M11), Mobile Platform (M12).*
