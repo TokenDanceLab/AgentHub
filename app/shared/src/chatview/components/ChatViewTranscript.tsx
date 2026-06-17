@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   CHAT VIEW TRANSCRIPT — AgentHub integration wrapper
-   Wraps ChatView component tree. Theme deferred to AgentHub.
-   Uses react-i18next with 'chatview' namespace (provided by AgentHub outer I18nextProvider).
+   CHAT VIEW TRANSCRIPT — integration wrapper
+   Wraps ChatView component tree. Theme deferred to consumer.
+   Uses react-i18next with 'chatview' namespace (provided by consumer's outer I18nextProvider).
    ══════════════════════════════════════════════════════════════════════ */
 
 import { useMemo } from 'react'
@@ -23,9 +23,9 @@ function EmptyState() {
 }
 
 /**
- * Drop-in replacement for TranscriptView (subset of props).
- * Takes real AgentHub TranscriptBlock[] and renders via ChatView component tree.
- * i18n resolved via react-i18next (chatview namespace), co-existing with AgentHub's root provider.
+ * Drop-in replacement for a transcript view (subset of props).
+ * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
+ * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
 export function ChatViewTranscript({ transcript }: Props) {
   const items = useMemo(() => blocksToTranscriptItems(transcript), [transcript])

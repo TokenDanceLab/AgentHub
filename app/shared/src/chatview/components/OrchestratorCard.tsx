@@ -1,5 +1,5 @@
 import { IconGitBranch } from './Icons'
-import type { RowItem as RowItemType } from '../data/mock'
+import type { RowItem as RowItemType } from '../types'
 import { roleColor, roleInitial } from '../design/roles'
 import type { AgentRole } from '../design/roles'
 

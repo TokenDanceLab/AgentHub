@@ -2,7 +2,7 @@
    LABEL RESOLVER — maps RowItem → i18n TransKey for status-aware display
    ══════════════════════════════════════════════════════════════════════ */
 
-import type { RowItem } from '../data/mock'
+import type { RowItem } from '../types'
 import type { TransKey } from '../i18n/resources'
 import { SEP } from '../adapter'
 
