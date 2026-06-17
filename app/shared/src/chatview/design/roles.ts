@@ -1,12 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════
    SHARED ROLE CONFIG — single source of truth for agent role display
    Used by: OrchestratorCard.tsx, AgentGroup.tsx
+   AgentRole is string-based so consumers define their own set.
    ══════════════════════════════════════════════════════════════════════ */
 
-export type AgentRole = 'builder' | 'reviewer' | 'deployer' | 'researcher' | 'orch' | 'shield'
+/** Agent role: any string. Every consumer can define its own mapping. */
+export type AgentRole = string
 
-/** CSS custom property for role avatar background */
-export const roleColor: Record<AgentRole, string> = {
+/** Role display helpers — consumer-provided.
+ *  If a role is not in these maps, the component falls back to the first
+ *  letter of the role string. */
+export const roleColor: Record<string, string> = {
   builder: 'var(--role-builder)',
   reviewer: 'var(--role-reviewer)',
   deployer: 'var(--role-deployer)',
@@ -15,8 +19,11 @@ export const roleColor: Record<AgentRole, string> = {
   shield: 'var(--warning)',
 }
 
-/** Single-letter initial for role avatar */
-export const roleInitial: Record<AgentRole, string> = {
-  builder: 'B', reviewer: 'R', deployer: 'D',
-  researcher: 'Rs', orch: 'O', shield: 'S',
+export const roleInitial: Record<string, string> = {
+  builder: 'B',
+  reviewer: 'R',
+  deployer: 'D',
+  researcher: 'Rs',
+  orch: 'O',
+  shield: 'S',
 }

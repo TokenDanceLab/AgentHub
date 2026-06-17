@@ -1,14 +1,14 @@
-import type { AgentTranscriptBlock } from '../adapter'
+import type { TranscriptAgentItem } from '../transcript-item'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
 import { IconShield } from './Icons'
 import { roleInitial } from '../design/roles'
 import type { AgentRole } from '../design/roles'
 
-interface Props { block: AgentTranscriptBlock; chatMode: 'dm' | 'group' }
+interface Props { block: TranscriptAgentItem; chatMode: 'dm' | 'group' }
 
 export default function AgentGroup({ block, chatMode }: Props) {
-  const initial = roleInitial[block.role as AgentRole] ?? block.agent[0]
+  const initial = roleInitial[block.role] ?? block.agent[0]
   const avatar = (
     <div className={`ag-av ${block.role}`}>
       {block.role === 'shield' ? <IconShield size={14} /> : initial}
@@ -23,7 +23,6 @@ export default function AgentGroup({ block, chatMode }: Props) {
           {block.time && <span className="ag-time">{block.time}</span>}
         </div>
       )}
-      {/* Flat rows — merged into continuous card stack */}
       {block.rows.length > 0 && (
         <div className="card-stack">
           {block.rows.map((row) => (
@@ -33,7 +32,6 @@ export default function AgentGroup({ block, chatMode }: Props) {
           ))}
         </div>
       )}
-      {/* Sub-agent runs: AgentHub backend handles these as separate top-level AgentBlocks. The adapter's AgentTranscriptBlock.runs is typed as never[]. No rendering needed here. */}
       {block.standaloneRows.length > 0 && (
         <div className="card-stack">
           {block.standaloneRows.map((row) => (
