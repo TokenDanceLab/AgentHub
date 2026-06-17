@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-11 12:30 +08:00
-当前 dev HEAD：`118bdd84` (`dev/delicious223`)
+最后更新：2026-06-17 12:00 +08:00
+当前 dev HEAD：`5e653859` (`dev/delicious233`)
 Release tag：`v0.4.0`（unsigned release）
 
 ## Roadmap 最终状态
@@ -42,11 +42,11 @@ Release tag：`v0.4.0`（unsigned release）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious223` HEAD `118bdd84`，从 `dev/delicious233` 创建；v0.4.0 roadmap 已归档。 |
-| 上一条 dev | `origin/dev/delicious233 = 1e03b7ec`，领先 `origin/master` 旧基线 1 个 commit（v0.4.0 roadmap 归档）。 |
+| 当前集成 dev | `dev/delicious233` HEAD `5e653859`，ChatView migration 进行中。 |
+| 上一条 dev | `origin/dev/delicious223 = 118bdd84`，v0.4.0 已归档，`dev/delicious233` 已吸收其提交。 |
 | RC tag | `v0.4.0`（指向 `ed4f6fda`，unsigned release） |
 | master | `origin/master = 8ac93e8b`，当前可信基线，指向 v0.4.0。 |
-| 当前工作树 | `D:\Code\TokenDance\AgentHub`，分支 `dev/delicious223`。 |
+| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `dev/delicious233`）。ChatView migration 工作树：`D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`（分支 `feat/chatview-tokendance-migration`，见 ChatView Migration 节）。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/designs/right-panel-enhancement-design.md` 写右侧面板设计规范（right-panel 工作已于 2026-06-11 完成，见 P1 UI 节）；`docs/roadmap/` 写模块化路线图（3 个文件）。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 

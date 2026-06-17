@@ -1,5 +1,72 @@
 # Changelog
 
+## [Unreleased] — (feat/chatview-tokendance-migration)
+
+### ChatView Migration
+- **P0 ChatView core**: `TranscriptView` 全面替换为 `ChatView` -- DM + Group 双模式，TranscriptBlock adapter 真实管线
+- **Demo fixtures**: 98-block realistic demo data（Builder DM + Agent Collab），data-driven 4 种 enriched fallback conversations
+- **Streaming roundtrip**: Edge EventEnvelope -> TranscriptBlock normalization -> ChatView incremental rendering，WS streaming simulation
+- **Interaction features**: avatar click, context menu, selection, reply, highlight, animations, streaming P0
+- **per-conversation chatMode**: DM vs Group layout 自动切换
+- **Empty state + enriched fallback**: ChatView empty state with 4 fallback conversations
+
+### TokenDance Brand Migration
+- **Brand alignment**: AgentHub -> TokenDance 品牌统一（`agenthub-design` -> `tokendance-design` 引用同步）
+- **Demo data privacy**: `Ding` -> `Alice` in demo data，去除真实用户身份
+- **Fake domain + model name**: demo fixtures 全面脱敏
+
+### Comprehensive Audit (66 commits, 2026-06-16 ~ 2026-06-17)
+
+#### Architecture & Cleanup
+- **Deep clean**: retire TranscriptView + legacy blocks, consolidate ChatView as canonical
+- **TranscriptBlock adapter**: real adapter passthrough (P0 field passthrough -- tool_call target, deploy meta, context stats)
+- **Module dedup**: `presets.css` 2053 -> 1027 shared + 15 platform; `themes.css` dedup; `tokens.css` dedup
+- **Remove standalone `app/chatview`**: AgentHub web is canonical render target
+
+#### Security & Privacy
+- **Privacy hardening**: P0 real user identity removal from demo data
+- **Sensitive path sanitization**: hub-server `.env` example path, `cliDiscovery.ts` home paths
+- **MCP auth**: edge-server MCP endpoint authentication middleware
+- **Config dump redaction**: hub-server debug config endpoint sensitive field redaction
+- **Edge deploy fix**: shell command construction switched to `exec.Command` args
+
+#### Infrastructure
+- **hub-server**: `gin.SetTrustedProxies()` for X-Forwarded-For protection; JWT secret minimum 32 chars
+- **governance docs**: stale branch/worktree lists, broken paths, adapter counts fixed across `docs/governance/`, `docs/architecture/README.md`
+- **openapi.yaml + events.md**: WebSocket event types reconciled, requestBody schemas added, broken `$ref` references fixed
+- **Cross-project docs**: deprecation banners on stale design docs; stale `TranscriptView` references updated in roadmap + design docs
+
+#### Code Quality
+- **Type safety**: 22 `as any` removed in Round 2; `exactOptionalPropertyTypes` compliance; type dedup (RunInfo, ThreadInfo 合并)
+- **React.memo + useCallback**: all ChatView components memoized (10+ components)
+- **ESLint**: W11 sweep -- unused imports, formatting
+- **Naming systematization**: ChatView module conventions, `UserMsg` -> `UserMessage`, named exports throughout
+- **i18n unification**: single `react-i18next` system (-618 lines); zh tool names unified; adapter de-hardcode
+- **CSS scoping**: ChatView primary selector, `scrollbar-width:thin`, `scrollbar-gutter:stable`, 44 CSS spacing tokens extracted from `RowItem.css`
+- **Dead code removal**: `RunGroup` import, unused exports, barrel cleanup
+
+#### Testing
+- **Pipeline integration**: 54 tests covering ChatView pipeline (694 total, 679 pass)
+- **Adapter unit**: 11 tests covering all TranscriptBlock kinds
+- **Edge roundtrip**: real EventEnvelope -> TranscriptBlock -> ChatView; WS streaming simulation
+- **Regression**: 16 ChatView regressions all green; Desktop 1165/1165 passing; failing pipeline tests (8) fixed
+- **Desktop Tauri PASS, Edge live PASS**: W14 verification gate
+
+#### Performance
+- **Lazy loading**: Desktop SettingsPage 33 sections, WorkbenchRoutes 6 pages, ChatViewTranscript
+- **Bundle optimization**: @lobehub/icons barrel fix (4.1 MB savings), xlsx/jszip dynamic imports (~800 KB), chatviewFixtures prod exclusion (~62 KB)
+- **Circular imports**: verified none; tree-shaking analyzed
+- **P0 ChatComposer performance fix**
+
+#### Accessibility
+- **a11y audit + fix**: Transcript.tsx, RowItem.tsx, UserMessage.tsx, AgentGroup.tsx, Icons.tsx, OrchestratorCard.tsx
+
+### Release Gate
+- `dev/delicious233` baseline: 66 commits ahead, full audit 6/8 PASS
+- Action plan marked complete: final audit verification
+- TypeScript compilation verified; ESLint all-clear on app/web + app/desktop
+- Build verified after lazy-loading and dedup changes
+
 ## [0.4.0] — 2026-06-11
 
 ### 发布定位
