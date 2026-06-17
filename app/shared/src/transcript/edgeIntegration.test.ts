@@ -148,6 +148,6 @@ describe('Edge event → TranscriptBlock normalization', () => {
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1) // all same agent → grouped
     const agent = items[0] as any
-    expect(agent.rows).toHaveLength(3) // think + tool_call + tool_result
+    expect(agent.rows).toHaveLength(2) // think + tool (result merged into tool_call)
   })
 })

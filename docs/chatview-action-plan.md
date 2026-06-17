@@ -1,8 +1,7 @@
 # ChatView Migration — Comprehensive Action Plan
 
-> 2026-06-17 10:30 | **STATUS: HARDENING (Round 6)** — 37 commits, ~13.5K lines net cleaned, 6 workflow rounds, 45 tests, 0 TS errors.
-> Since last COMPLETE mark (d7f2bff0): +11 commits fixing dark mode, i18n unification, CSS polish, layout bugs, React key dedup.
-> Remaining: 7 items (5 P2, 2 P3) — all non-blocking.
+> 2026-06-17 | **STATUS: ACTIVE** — 20 commits post-"complete" (d7f2bff0), ~6.4K lines net (+6.4K / -9.1K), 6 workflow rounds, 48 ChatView tests, 18 TS errors (exactOptionalPropertyTypes in web app).
+> Remaining: 9 items (3 P2, 3 P3, 3 Edge Integration) — all non-blocking for ChatView migration core.
 
 ## Phase 1: Audit ✅
 - [x] Workflow `audit-demo-data-and-components` — 3 agents auditing demo modes, data contracts, component reuse
@@ -38,7 +37,7 @@
 
 ## Phase 6: Round 6 Fixes (Discovered Post-"Complete") ✅
 
-11 additional commits after the d7f2bff0 "plan marked complete" — CSS polish, i18n unification, layout bugs, dark mode restoration.
+20 additional commits after the d7f2bff0 "plan marked complete" — CSS polish, i18n unification, layout bugs, dark mode restoration.
 
 - [x] **Dark mode tokens restored** — ChatView cards no longer rendering white in dark mode (ThemeProvider removed, AgentHub theme now handles dark mode directly)
 - [x] **i18n unified to single react-i18next system** — -618 lines: removed custom I18nProvider, translations.ts (412 lines), DesignSystemProvider, ThemeProvider, tokens-dark.css; added i18next-format resources.ts (179 lines) with `chatview` namespace; wired via `useTranslation('chatview')` in RowItem, UserMsg, ChatViewTranscript
@@ -52,6 +51,10 @@
 - [x] **ChatView: per-conversation chatMode** — DM vs Group layout determined per conversation, not globally
 - [x] **Adapter: 22 `as any` removed** — full type safety (done in earlier commits 7553cfaa..1f066a57)
 - [x] **CSS token hardening** — 44 semantic spacing tokens in RowItem.css, dead RunGroup + inline styles removed
+- [x] **P0 interaction features** — avatar click, context menu, selection, reply, highlight, animations, streaming (ceed90a8)
+- [x] **CSS scrollbar fixes** — scrollbar-width:thin, scrollbar-gutter:stable, uniform edge spacing (d7480ab9..ebe864d2)
+- [x] **Fixtures: 98-block demo data** — Builder DM + Agent Collab realistic transcripts (08c8bc54)
+- [x] **Workflow Round 5** — status machine, abstraction, reusability (177e96ae)
 
 ## Phase 7: Edge Runtime Integration
 - [ ] Desktop edge events → ChatViewTranscript streaming

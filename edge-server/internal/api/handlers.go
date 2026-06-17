@@ -1467,37 +1467,6 @@ func runtimeSessionIDForThread(threadID string) string {
 	}, "-")
 }
 
-func threadHasAssistantHistory(items []store.Item) bool {
-	for _, item := range items {
-		if item.Type == "agent_message" && (item.Role == "agent" || item.Role == "assistant") && strings.TrimSpace(item.Content) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// hasFinishedRuns checks if the thread has any completed runs.
-// Used to decide between --session-id (first run) and --continue (subsequent runs).
-func hasFinishedRuns(repo store.Repository, threadID string) bool {
-	for _, run := range repo.ListRuns(threadID) {
-		if run.Status == "finished" || run.Status == "failed" {
-			return true
-		}
-	}
-	return false
-}
-
-// sessionHasRuns checks if any previous run used this session ID.
-func sessionHasRuns(repo store.Repository, sessionID string) bool {
-	for _, thread := range repo.ListThreads("") {
-		for _, run := range repo.ListRuns(thread.ID) {
-			if run.ID == sessionID {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 // ---------------------------------------------------------------------------
 // Helpers

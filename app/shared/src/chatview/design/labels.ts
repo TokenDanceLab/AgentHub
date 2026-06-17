@@ -137,16 +137,16 @@ export function toolKey(item: RowItem): string {
   if (item.type === 'tool') {
     const l = item.label.toLowerCase()
     if (l.includes('result') || l.includes('结果')) return 'result'
-    if (l === 'read' || l === '阅读') return 'read'
-    if (l === 'grep' || l === '搜索') return 'grep'
-    if (l === 'write' || l === '写入') return 'write'
+    if (l === 'read' || l.startsWith('阅读')) return 'read'
+    if (l === 'grep' || l.startsWith('搜索')) return 'grep'
+    if (l === 'write' || l.startsWith('写入')) return 'write'
     if (l === 'eslint') return 'eslint'
     if (l === 'prettier') return 'prettier'
     if (l.includes('tsc')) return 'tsc'
-    if (l === 'test' || l === '测试') return 'test'
+    if (l === 'test' || l.startsWith('测试')) return 'test'
     if (l === 'lint') return 'lint'
-    if (l === 'audit' || l === '审计') return 'audit'
-    if (l === 'check' || l === '检查') return 'check'
+    if (l === 'audit' || l.startsWith('审计')) return 'audit'
+    if (l === 'check' || l.startsWith('检查')) return 'check'
     return 'result'
   }
   if (item.type === 'think') {
@@ -173,7 +173,9 @@ export function toolKey(item: RowItem): string {
 export function isToolResult(item: RowItem): boolean {
   if (item.isResult === true) return true
   if (item.isResult === false) return false
+  if (item.type !== 'tool') return false
   // Fallback: detect result cards by label content
+  if (!item.label) return false
   const l = item.label.toLowerCase()
   return l.includes('result') || l.includes('结果')
 }

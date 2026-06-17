@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import type { RowItem as RowItemType } from '../types'
 import {
   IconBrain, IconFileText, IconSearch, IconFile, IconEdit,
@@ -54,6 +54,7 @@ interface Props {
   onRetry?: (id: string) => void
   onCopy?: (id: string, text: string) => void
   onFileClick?: (id: string) => void
+  onDeploySubmit?: (id: string) => void
   onContextMenu?: (id: string, event: React.MouseEvent) => void
   onBlockSelect?: (id: string, shiftKey: boolean) => void
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
@@ -63,7 +64,7 @@ interface Props {
   actioned?: boolean
 }
 
-export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
+export default memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const isOpen = item.type === 'route' ? true : open
@@ -144,7 +145,7 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
             {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           </>)}
           {item.status==='fail' && onRetry && <div className="ap-actions"><button className="ap-approve" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
-          {item.url && <div className="dp-url">{item.url}</div>}
+          {item.url && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
           {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={() => onFileClick?.(item.id)}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
           {item.ctxPct !== undefined && (<>
@@ -161,4 +162,4 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
       )}
     </div>
   )
-}
+})

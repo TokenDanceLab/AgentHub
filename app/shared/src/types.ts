@@ -86,7 +86,10 @@ export interface ThreadInfo {
   threadId: string;
   projectId: string;
   title: string;
+  kind?: string;
   status: string;
+  avatarColor?: string;
+  avatarLabel?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,17 +151,6 @@ export interface Run {
   finishedAt?: string | undefined;
 }
 
-export interface StartRunRequest {
-  projectId?: string;
-  threadId?: string;
-  prompt?: string;
-  agentId?: string;
-  model?: string;
-  modelAlias?: string;
-  reasoningEffort?: string;
-  modelMappingEnabled?: boolean;
-  providerFallbackEnabled?: boolean;
-}
 export interface RunInfo {
   runId: string;
   projectId: string;
@@ -205,28 +197,6 @@ export interface AgentInfo {
   targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
-}
-
-export interface RunInfo {
-  runId: string;
-  projectId: string;
-  threadId: string;
-  status: string;
-  createdAt?: string;
-  startedAt?: string;
-  finishedAt?: string;
-}
-
-export interface ThreadInfo {
-  threadId: string;
-  projectId: string;
-  title: string;
-  kind?: string;
-  status: string;
-  avatarColor?: string;
-  avatarLabel?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface ThreadItemInfo {
@@ -288,10 +258,10 @@ export interface RunLogs {
 
 export interface RunDiff {
   runId: string;
-  files: DiffFile[];
+  files: ApiDiffFile[];
 }
 
-export interface DiffFile {
+export interface ApiDiffFile {
   path: string;
   diff: string;
   status: 'added' | 'modified' | 'deleted';
