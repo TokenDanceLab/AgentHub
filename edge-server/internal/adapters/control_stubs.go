@@ -36,19 +36,6 @@ type hookCallbackControlRequest struct {
 	Data     map[string]any `json:"data,omitempty"`
 }
 
-// ControlCapabilityResponse reports that a known control-protocol subtype was
-// routed but cannot be fulfilled by this adapter yet.
-type ControlCapabilityResponse struct {
-	RequestID        string `json:"request_id"`
-	Subtype          string `json:"subtype"`
-	RequestedSubtype string `json:"requestedSubtype"`
-	Capability       string `json:"capability"`
-	Supported        bool   `json:"supported"`
-	Status           string `json:"status"`
-	Applied          bool   `json:"applied"`
-	Message          string `json:"message"`
-}
-
 func (h *DefaultPermissionHandler) handleGetContextUsage(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
 	_ = ctx
 	var req contextUsageControlRequest

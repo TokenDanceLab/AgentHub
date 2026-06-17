@@ -162,6 +162,75 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// RefreshToken rejects tokens whose hash is in the Redis blacklist
+// (set during a previous rotation). This closes the race window between
+// DB revocation and Redis blacklisting.
+func TestRefreshToken_RejectsBlacklistedTokenHash(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-abc", false, expiry))
+
+	cacheClient := testCacheClient(t)
+	// Pre-set the token hash in the blacklist (simulating a prior rotation
+	// that blacklisted faster than DB commit).
+	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "hash-abc", time.Hour))
+
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	_, err := svc.RefreshToken(context.Background(), "any-token-producing-hash-abc")
+	assert.Error(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// RefreshToken rejects tokens when the user:device compound key is
+// blacklisted (set during logout before DB revocation completes).
+func TestRefreshToken_RejectsBlacklistedUserDevice(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-xyz", false, expiry))
+
+	cacheClient := testCacheClient(t)
+	// Pre-set the user:device blacklist key (simulating a logout that
+	// wrote to Redis but hasn't finished DB commit yet).
+	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "user-uuid:dev-1", time.Hour))
+
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	_, err := svc.RefreshToken(context.Background(), "any-token-for-user-uuid-dev-1")
+	assert.Error(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// RefreshToken rejects tokens when the user:device:device_type compound key
+// is blacklisted (set during logout with device_type scoping, #149).
+func TestRefreshToken_RejectsBlacklistedUserDeviceType(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-uvw", false, expiry))
+
+	cacheClient := testCacheClient(t)
+	// Pre-set the scoped blacklist key.
+	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "user-uuid:dev-1:desktop", time.Hour))
+
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	_, err := svc.RefreshToken(context.Background(), "any-token-for-user-uuid-dev-1-desktop")
+	assert.Error(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== Logout ====================
 
 func TestLogout(t *testing.T) {

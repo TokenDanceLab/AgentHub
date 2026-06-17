@@ -1,4 +1,5 @@
 import React from 'react';
+import { cx } from './cx';
 import styles from './SkeletonBar.module.css';
 
 export interface SkeletonBarProps {
@@ -16,9 +17,6 @@ export interface SkeletonBarProps {
   lineClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 /** Structural skeleton placeholder with reduced-motion support.
  *  Use TextShimmer for text-specific loading; use SkeletonBar for

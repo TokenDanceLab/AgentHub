@@ -1,0 +1,29 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL STYLES — reset + base
+   ══════════════════════════════════════════════════════════════════════ */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font: var(--body);
+  color: var(--text-1);
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   ComposerAction,
   ComposerAttachment,
@@ -7,6 +8,7 @@ import type {
 } from '../composer';
 import { browserFilesToComposerAttachments, canSubmitComposer, formatComposerAttachmentSize } from '../composer';
 import { DesignNavIcon } from './designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -51,6 +53,7 @@ export function UnifiedComposer({
   targetLabel = 'AgentHub',
   uploadProgresses,
 }: UnifiedComposerProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const isSubmitting = composer.submitState === 'submitting';
   const targetSelectionRequired = Boolean(executionTargets) && composer.mentions.length > 0;
   const targetSelected = !targetSelectionRequired || executionTargetId.trim().length > 0;
@@ -175,7 +178,7 @@ export function UnifiedComposer({
             回复至 {composer.replyTo.author}: {composer.replyTo.preview}
           </span>
           <button
-            aria-label="取消回复"
+            aria-label={t('aria.cancelReply')}
             className={styles.replyToCancel}
             disabled={isSubmitting}
             onClick={() => dispatchComposer({ type: 'setReplyTo', replyTo: null })}
@@ -191,7 +194,7 @@ export function UnifiedComposer({
             {composer.quote.author ? `${composer.quote.author}: ` : ''}{composer.quote.text.slice(0, 60)}
           </span>
           <button
-            aria-label="取消引用"
+            aria-label={t('aria.cancelQuote')}
             className={styles.quoteBarCancel}
             disabled={isSubmitting}
             onClick={() => dispatchComposer({ type: 'setQuote', quote: null })}
@@ -202,10 +205,10 @@ export function UnifiedComposer({
         </div>
       )}
       {composer.mentions.length > 0 && (
-        <div className={styles.composerMentions} aria-label="Selected agents">
+        <div className={styles.composerMentions} aria-label={t('aria.selectedAgents')}>
           {composer.mentions.map((mention) => (
             <button
-              aria-label={`Remove @${mention.label}`}
+              aria-label={t('action.removeMention', { label: mention.label })}
               className={styles.composerMentionChip}
               disabled={isSubmitting}
               key={mention.id}
@@ -218,7 +221,7 @@ export function UnifiedComposer({
         </div>
       )}
       {composer.mentions.length > 0 && (
-        <div className={styles.composerMainchain} aria-label="@Agent main chain">
+        <div className={styles.composerMainchain} aria-label={t('aria.agentMainChain')}>
           <span data-state="selected">Agent {selectedAgentLabel}</span>
           <span data-state={targetSelected ? 'selected' : 'missing'}>
             Target {selectedTargetLabel ?? 'missing'}
@@ -229,7 +232,7 @@ export function UnifiedComposer({
         </div>
       )}
       {composer.attachments.length > 0 && (
-        <div className={styles.composerAttachmentBar} aria-label="Attachments">
+        <div className={styles.composerAttachmentBar} aria-label={t('aria.attachments')}>
           {composer.attachments.map((attachment) => {
             const progress = uploadProgresses?.[attachment.id];
             return (
@@ -246,7 +249,8 @@ export function UnifiedComposer({
       )}
       <div className={styles.composerRow}>
         <textarea
-          aria-label="Composer input"
+          aria-label={t('aria.composerInput')}
+          data-composer-input
           className={styles.composerInput}
           ref={inputRef}
           onChange={(event) => dispatchComposer({ type: 'setText', text: event.target.value })}
@@ -268,7 +272,7 @@ export function UnifiedComposer({
         />
 
         <button
-          aria-label="Add attachment"
+          aria-label={t('aria.addAttachment')}
           className={styles.attachmentButton}
           disabled={isSubmitting}
           onClick={openFilePicker}
@@ -281,7 +285,7 @@ export function UnifiedComposer({
           <label className={styles.composerAgentPicker}>
             <span>@Agent</span>
             <select
-              aria-label="@Agent"
+              aria-label={t('aria.atAgent')}
               className={styles.composerAgentSelect}
               disabled={isSubmitting || availableMentionOptions.length === 0}
               onChange={(event) => selectMention(event.target.value)}
@@ -304,7 +308,7 @@ export function UnifiedComposer({
           <label className={styles.composerTargetPicker}>
             <span>Desktop/Edge target</span>
             <select
-              aria-label="Desktop/Edge target"
+              aria-label={t('aria.target')}
               className={styles.composerTargetSelect}
               disabled={isSubmitting || executionTargets.length === 0}
               onChange={(event) => onExecutionTargetChange?.(event.target.value)}
@@ -323,7 +327,7 @@ export function UnifiedComposer({
         )}
 
         <button
-          aria-label={composer.mentions.length > 0 ? '启动 Agent 任务' : '发送消息'}
+          aria-label={composer.mentions.length > 0 ? t('action.startAgentTask') : t('profile.sendMessage')}
           className={styles.sendButton}
           disabled={submitDisabled}
           type="submit"
@@ -355,6 +359,7 @@ function ComposerAttachmentChip({
   onRemove: () => void;
   uploadProgress?: AttachmentUploadState;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const isImage = attachment.mime?.startsWith('image/');
   const sizeLabel = attachment.size ? formatComposerAttachmentSize(attachment.size) : undefined;
   const isUploading = uploadProgress && uploadProgress.phase !== 'done' && !attachment.attachmentRef;
@@ -378,7 +383,7 @@ function ComposerAttachmentChip({
         </span>
       ) : (
         <button
-          aria-label={`Remove ${attachment.name}`}
+          aria-label={t('action.removeAttachment', { name: attachment.name })}
           className={styles.attachmentChipRemove}
           disabled={isSubmitting}
           onClick={onRemove}

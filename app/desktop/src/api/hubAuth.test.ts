@@ -100,15 +100,15 @@ describe('PKCE helpers', () => {
 describe('OIDC state validation', () => {
   it('detects state mismatch (CSRF protection)', () => {
     // Use let to avoid TypeScript narrowing these to literal types
-    let expectedState: string = 'server-state-abc';
-    let receivedState: string = 'attacker-state-xyz';
+    const expectedState: string = 'server-state-abc';
+    const receivedState: string = 'attacker-state-xyz';
     const isValid = receivedState === expectedState;
     expect(isValid).toBe(false);
   });
 
   it('accepts matching states', () => {
-    let expectedState: string = 'server-state-abc';
-    let receivedState: string = 'server-state-abc';
+    const expectedState: string = 'server-state-abc';
+    const receivedState: string = 'server-state-abc';
     const isValid = receivedState === expectedState;
     expect(isValid).toBe(true);
   });

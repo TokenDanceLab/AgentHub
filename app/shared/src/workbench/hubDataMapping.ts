@@ -63,7 +63,7 @@ export function resolveHubContacts(
   dataMode: WorkbenchDataMode,
 ): WorkbenchContactsData | undefined {
   if (!hubReady) {
-    return hubEmptyContacts;
+    return isWorkbenchFixtureDataMode(dataMode) ? undefined : hubEmptyContacts;
   }
   const members = contacts?.map(contactInfoToMember) ?? [];
   return {

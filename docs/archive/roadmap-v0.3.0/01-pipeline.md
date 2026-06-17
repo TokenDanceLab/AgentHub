@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # 01 — 管线类功能（不需要新 UI）
 
 > 后端/合同层已就绪或仅需接线，改动全在 Edge/Hub Go 代码或 shared 合同层。

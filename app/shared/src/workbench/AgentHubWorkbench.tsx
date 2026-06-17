@@ -1,6 +1,6 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  buildComposerIntent,
   type ComposerMention,
   composerReducer,
   createInitialComposerState,
@@ -13,9 +13,11 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock, TextTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
+import { ConversationHost, type MainchainSummary } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
+import type { MainchainNode } from './WorkbenchShell';
 import {
   ContextMenu,
   MultiSelectBar,
@@ -26,23 +28,20 @@ import {
 } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
-import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
-import { WorkspaceHeader } from './WorkspaceHeader';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
-import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
-import { useComposerSubmitBehavior } from './workbenchPreferences';
 import { createSettingsService, type SettingsService } from './settingsService';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -59,38 +58,6 @@ const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
-
-type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
-
-function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
-  switch (block.kind) {
-    case 'run_step_group':
-    case 'run_session':
-    case 'agent_timeline':
-    case 'route_decision':
-    case 'subagent':
-    case 'subtask':
-    case 'child_agent':
-    case 'context_usage':
-      return true;
-    default:
-      return false;
-  }
-}
-
-interface MainchainNode {
-  id: string;
-  label: string;
-  detail: string;
-  state: MainchainStatusKind;
-}
-
-interface MainchainSummary {
-  nodes: MainchainNode[];
-  exportEnabled: boolean;
-  exportLabel: string;
-  exportDetail: string;
-}
 
 const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
@@ -133,14 +100,14 @@ export interface AgentHubWorkbenchProps {
   agents?: WorkbenchAgent[];
   composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
   workbenchStatus?: {
-    dataMode?: string | undefined;
-    replayLabel?: string | undefined;
-    targetLabel?: string | undefined;
-    targetState?: string | undefined;
+    dataMode?: string;
+    replayLabel?: string;
+    targetLabel?: string;
+    targetState?: string;
     /** Whether the workbench is loading initial data (threads/conversations not yet loaded). */
-    initialLoading?: boolean | undefined;
+    initialLoading?: boolean;
     /** Error message from initial data load, if any. */
-    loadError?: string | undefined;
+    loadError?: string;
   } | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
@@ -271,7 +238,10 @@ export function AgentHubWorkbench({
   highlightedBlockId,
   onHighlightEnd,
   onRegenerate,
+  connectionStatus,
 }: AgentHubWorkbenchProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
     () => platform.settings ? createSettingsService(platform.settings, WORKBENCH_MOCK_SETTINGS_DEFAULTS) : null,
@@ -324,7 +294,6 @@ export function AgentHubWorkbench({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const isSubmittingRef = useRef(false);
   const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
   const sidebarShouldCollapseRef = useRef(false);
@@ -336,33 +305,14 @@ export function AgentHubWorkbench({
     y: number;
   } | null>(null);
   const suppressSelectionPointerUpRef = useRef(false);
+  const runMultiActionRef = useRef<((action: string) => void) | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const pulseTimersRef = useRef<Map<string, number>>(new Map());
   const [composer, dispatchComposer] = useReducer(
     composerReducer,
     currentConversationId,
     createInitialComposerState,
   );
-  const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
-  /** Optimistic user message shown in transcript before the API confirms the run. */
-  const [pendingUserBlock, setPendingUserBlock] = useState<TextTranscriptBlock | null>(null);
-  const composerSubmitBehavior = useComposerSubmitBehavior();
-  const chatTranscript = useMemo(
-    () => transcript.filter((block) => !isSidebarOnlyTranscriptBlock(block)),
-    [transcript],
-  );
-  // Chat transcript with optimistic user message appended (for rendering only).
-  // Derived data (evidence, inspector blocks) continues to use the raw transcript.
-  const displayTranscript = useMemo(
-    () => pendingUserBlock ? [...chatTranscript, pendingUserBlock] : chatTranscript,
-    [chatTranscript, pendingUserBlock],
-  );
-  // Clear the optimistic block as soon as the real transcript gains new blocks
-  // (i.e. the API response has arrived and the query cache was updated).
-  useEffect(() => {
-    if (!pendingUserBlock) return;
-    if (transcript.some((block) => block.id === pendingUserBlock.id)) {
-      setPendingUserBlock(null);
-    }
-  }, [transcript, pendingUserBlock]);
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
     composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
@@ -373,6 +323,7 @@ export function AgentHubWorkbench({
     targetRequired: Boolean(composerExecutionTargets),
     transcript,
     workbenchStatus,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
   });
 
   // ── Inspector data: route decisions, context usage, deploy preview ──
@@ -547,12 +498,12 @@ export function AgentHubWorkbench({
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         event.preventDefault();
-        runMultiAction('copy');
+        runMultiActionRef.current?.('copy');
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        runMultiAction('delete');
+        runMultiActionRef.current?.('delete');
       }
     }
 
@@ -582,6 +533,15 @@ export function AgentHubWorkbench({
     selectionHoldRef.current = null;
   }, []);
 
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    pulseTimersRef.current.forEach((id) => window.clearTimeout(id));
+    pulseTimersRef.current.clear();
+  }, []);
+
   useEffect(() => {
     if (!selectionMode) return;
 
@@ -598,105 +558,6 @@ export function AgentHubWorkbench({
     window.addEventListener('resize', updateSelectBarRect);
     return () => window.removeEventListener('resize', updateSelectBarRect);
   }, [selectionMode, inspectorCollapsed, inspectorWidth]);
-
-  async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    // Guard against double-submit race: two rapid Enter presses
-    if (isSubmittingRef.current) return;
-
-    // Read the textarea's current DOM value to avoid stale React state.
-    // When the user types and presses Enter quickly, React may not have
-    // re-rendered yet, so composer.text can be stale.
-    const form = event.currentTarget;
-    const textarea = form.querySelector<HTMLTextAreaElement>('textarea[aria-label="Composer input"]');
-    const liveText = textarea?.value ?? composer.text;
-
-    if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
-
-    // Capture conversation ID to prevent thread-switch race:
-    // if the user switches threads during async operations, the intent
-    // must still target the original conversation.
-    const capturedConversationId = currentConversationId;
-
-    isSubmittingRef.current = true;
-    dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-
-    try {
-      // Build intent and capture attachment state BEFORE resetting the composer.
-      const intent = buildComposerIntent(composer);
-      const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
-      const capturedAttachments = composer.attachments;
-      const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
-
-      // ── Optimistic UI: reset the composer immediately so the user can
-      // type the next message while uploads and the API call are in flight. ──
-      const optimisticId = `pending-user-${Date.now()}`;
-      setPendingUserBlock({
-        id: optimisticId,
-        kind: 'text',
-        text: liveText.trim(),
-        author: { id: 'user', name: 'You', role: 'human' as const },
-        createdAt: new Date().toISOString(),
-        ...(composer.replyTo ? { replyToMessageId: composer.replyTo.messageId, replyPreview: composer.replyTo.preview, replyAuthor: composer.replyTo.author } : {}),
-        ...(composer.quote ? { quote: composer.quote.text } : {}),
-      });
-
-      dispatchComposer({ type: 'resetAfterSubmit' });
-      dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-      setUploadProgresses({});
-
-      // Upload attachments in background (composer is already cleared).
-      let enrichedAttachments = capturedAttachments;
-      if (pendingAttachments.length > 0 && platform.attachments?.uploadAttachment) {
-        const uploadPort = platform.attachments;
-        for (const attachment of pendingAttachments) {
-          if (!attachment.file) continue;
-          try {
-            setUploadProgresses((prev) => ({
-              ...prev,
-              [attachment.id]: { percent: 5, phase: 'hashing' },
-            }));
-            const ref = await uploadPort.uploadAttachment(attachment.file);
-            setUploadProgresses((prev) => ({
-              ...prev,
-              [attachment.id]: { percent: 100, phase: 'done' },
-            }));
-            enrichedAttachments = enrichedAttachments.map((a) =>
-              a.id === attachment.id ? { ...a, attachmentRef: ref } : a,
-            );
-          } catch {
-            setUploadProgresses((prev) => {
-              const next = { ...prev };
-              delete next[attachment.id];
-              return next;
-            });
-          }
-        }
-      }
-
-      const finalIntent = enrichedAttachments.length > 0
-        ? { ...intentWithLiveText, attachments: enrichedAttachments }
-        : intentWithLiveText;
-
-      const submitPayload = {
-        ...finalIntent,
-        ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
-      };
-
-      await platform.runs.submitComposerIntent(submitPayload);
-
-      setPendingUserBlock(null);
-      dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
-    } catch (err) {
-      setPendingUserBlock(null);
-      dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-      setUploadProgresses({});
-      showWorkbenchToast(err instanceof Error ? err.message : '提交失败，请重试');
-    } finally {
-      isSubmittingRef.current = false;
-    }
-  }
 
   function clampInspectorWidth(value: number): number {
     return Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, Math.round(value)));
@@ -853,9 +714,12 @@ export function AgentHubWorkbench({
   }
 
   function showWorkbenchToast(message: string): void {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(message);
     setToastVisible(true);
-    window.setTimeout(() => setToastVisible(false), 1700);
+    toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 1700);
   }
 
   function openAgentProfile(agentName: string, anchor: HTMLElement): void {
@@ -924,9 +788,9 @@ export function AgentHubWorkbench({
     return {
       id: runtimeAgent.id,
       name: runtimeAgent.name,
-      role: runtimeAgent.description ?? 'Agent',
-      engine: 'AgentHub',
-      model: runtimeAgent.model ?? '未配置',
+      role: runtimeAgent.description ?? t('label.agent'),
+      engine: t('label.agentHub'),
+      model: runtimeAgent.model ?? t('status.unconfigured'),
       state: runtimeAgent.status ?? 'available',
       skills: [],
     };
@@ -946,10 +810,10 @@ export function AgentHubWorkbench({
       id: contact?.id ?? conversation?.id ?? resolvedName.toLowerCase(),
       name: resolvedName,
       initials: contact?.initials ?? conversation?.avatarLabel ?? resolvedName.slice(0, 1).toUpperCase(),
-      org: contact?.org ?? '联系人',
-      status: contact?.status ?? conversation?.updatedLabel ?? '在线',
-      tag: contact?.tag ?? (conversation?.kind === 'group' ? '群聊' : '好友'),
-      subtitle: conversation?.subtitle ?? contact?.org ?? '好友',
+      org: contact?.org ?? t('label.contact'),
+      status: contact?.status ?? conversation?.updatedLabel ?? t('status.online'),
+      tag: contact?.tag ?? (conversation?.kind === 'group' ? t('chat.kind.group') : t('chat.kind.friend')),
+      subtitle: conversation?.subtitle ?? contact?.org ?? t('chat.kind.friend'),
       avatarColor: conversation?.avatarColor,
       anchor,
     };
@@ -966,7 +830,7 @@ export function AgentHubWorkbench({
     } else if (onNavigateToConversation) {
       onNavigateToConversation({ name: activeAgentProfile.name, id: activeAgentProfile.id, kind: 'dm' });
     } else {
-      showWorkbenchToast(`还没有 ${activeAgentProfile.name} 的私聊会话`);
+      showWorkbenchToast(t('toast.noDmSession', { name: activeAgentProfile.name }));
       return;
     }
     setActivePage('chat');
@@ -987,7 +851,7 @@ export function AgentHubWorkbench({
     } else if (onNavigateToConversation) {
       onNavigateToConversation({ name: activeHumanProfile.name, id: activeHumanProfile.id, kind: 'dm' });
     } else {
-      showWorkbenchToast(`还没有 ${activeHumanProfile.name} 的私聊会话`);
+      showWorkbenchToast(t('toast.noDmSession', { name: activeHumanProfile.name }));
       return;
     }
     setActivePage('chat');
@@ -1002,7 +866,7 @@ export function AgentHubWorkbench({
     setFocusedAgentId(activeAgentProfile.id);
     setActivePage('agents');
     setActiveAgentProfile(null);
-    showWorkbenchToast(`已打开 ${activeAgentProfile.name} 配置`);
+    showWorkbenchToast(t('toast.agentConfigOpened', { name: activeAgentProfile.name }));
   }
 
   function openReviewFile(file: FileItem): void {
@@ -1010,13 +874,9 @@ export function AgentHubWorkbench({
     setReviewFileRequest({ ...file });
   }
 
-  function handleSearchJump(messageId: string, _messageIndex?: number): void {
-    setSearchOpen(false);
-    setSearchHighlightId(messageId);
-  }
-
-  function handleSearchHighlightEnd(): void {
-    setSearchHighlightId(null);
+  function handleDeploySubmit(_id: string): void {
+    openInspector();
+    showWorkbenchToast(t('toast.deployPreviewOpened'));
   }
 
   function blockTitle(block: TranscriptBlock): string {
@@ -1046,11 +906,11 @@ export function AgentHubWorkbench({
       case 'run_step_group':
         return block.title;
       case 'agent_timeline':
-        return block.title ?? '运行时间线';
+        return block.title ?? t('mainchain.timeline');
       case 'result':
-        return block.summary || (block.success ? '运行结果' : '运行失败');
+        return block.summary || (block.success ? t('mainchain.result') : t('mainchain.fail'));
       case 'thinking':
-        return '思考过程';
+        return t('mainchain.thinking');
       case 'route_decision':
         return block.targetAgent || block.action;
       case 'context_usage':
@@ -1062,7 +922,7 @@ export function AgentHubWorkbench({
 
   function blockTitleById(blockId: string): string {
     const block = transcript.find((item) => item.id === blockId);
-    return block ? blockTitle(block) : '选中卡片';
+    return block ? blockTitle(block) : t('mainchain.selectedCard');
   }
 
   function openBlockContextMenu(
@@ -1189,41 +1049,47 @@ export function AgentHubWorkbench({
   }
 
   function pulseBlock(blockId: string): void {
+    const existing = pulseTimersRef.current.get(blockId);
+    if (existing !== undefined) {
+      window.clearTimeout(existing);
+    }
     setActionedBlockIds((current) => (
       current.includes(blockId) ? current : [...current, blockId]
     ));
-    window.setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       setActionedBlockIds((current) => current.filter((id) => id !== blockId));
+      pulseTimersRef.current.delete(blockId);
     }, 900);
+    pulseTimersRef.current.set(blockId, timerId);
   }
 
   function cardActionLabel(action: string, title: string): string {
     const labels: Record<string, string> = {
-      copy: '已复制卡片内容',
-      react: '已打开表情回复',
-      reply: `正在回复 ${title}`,
-      forward: '已加入转发队列',
-      topic: '已创建话题草稿',
-      pin: '已更新置顶',
-      link: '已复制消息链接',
-      translate: '已加入翻译队列',
-      task: '已添加到任务草稿',
-      export: '已导出到云文档草稿',
-      apps: '已打开快捷应用',
-      delete: '已标记删除',
+      copy: t('toast.cardCopied'),
+      react: t('toast.reactOpened'),
+      reply: `${t('context.reply')} ${title}`,
+      forward: t('toast.forwardQueued'),
+      topic: t('toast.topicDraft'),
+      pin: t('toast.pinUpdated'),
+      link: t('toast.linkCopied'),
+      translate: t('toast.translateQueued'),
+      task: t('toast.taskDraft'),
+      export: t('toast.exportDraft'),
+      apps: t('toast.appsOpened'),
+      delete: t('toast.deleteQueued'),
     };
-    return labels[action] ?? '操作已记录';
+    return labels[action] ?? t('toast.actionRecorded');
   }
 
   function multiActionLabel(action: string, count: number): string {
     const labels: Record<string, string> = {
-      copy: `已复制 ${count} 项`,
-      forward: `已准备转发 ${count} 项`,
-      task: `已为 ${count} 项创建任务草稿`,
-      export: `已导出 ${count} 项到文档草稿`,
-      delete: `已删除 ${count} 项`,
+      copy: t('toast.multiCopy', { count }),
+      forward: t('toast.multiForward', { count }),
+      task: t('toast.multiTaskDraft', { count }),
+      export: t('toast.multiExport', { count }),
+      delete: t('toast.multiDelete', { count }),
     };
-    return labels[action] ?? `已处理 ${count} 项`;
+    return labels[action] ?? t('toast.multiProcessed', { count });
   }
 
   function runContextAction(action: string, blockId: string): void {
@@ -1278,10 +1144,56 @@ export function AgentHubWorkbench({
     showWorkbenchToast(cardActionLabel(action, title));
   }
 
+  /** Handles block actions (approve/deny/retry/copy/regenerate) from the ChatViewTranscript component chain. */
+  function handleTranscriptBlockAction(action: string, blockId: string, metadata?: Record<string, unknown>): void {
+    const block = transcript.find((b) => b.id === blockId);
+    if (!block) return;
+
+    if (action === 'approve' || action === 'deny') {
+      // Approval blocks carry PermissionRequestTranscriptBlock data
+      if (block.kind === 'permission_request') {
+        const decision: ApprovalDecisionAction = {
+          approvalId: block.requestId,
+          decision: action === 'approve' ? 'allow' : 'deny',
+          ...(block.teamId !== undefined ? { teamId: block.teamId } : {}),
+          ...(block.teamRunId !== undefined ? { teamRunId: block.teamRunId } : {}),
+          ...(block.agentTaskId !== undefined ? { agentTaskId: block.agentTaskId } : {}),
+          ...(block.targetId !== undefined ? { targetId: block.targetId } : {}),
+          ...(block.edgeDeviceId !== undefined ? { edgeDeviceId: block.edgeDeviceId } : {}),
+          ...(block.correlationId !== undefined ? { correlationId: block.correlationId } : {}),
+        };
+        onApprovalDecision?.(decision);
+        pulseBlock(blockId);
+        showWorkbenchToast(action === 'approve' ? t('action.approved') : t('action.denied'));
+      }
+    }
+
+    if (action === 'retry' || action === 'regenerate') {
+      // Retry a failed agent message -- dispatch regeneration
+      if (block.kind === 'text' && block.author.role === 'agent') {
+        setSoftHiddenBlockIds((current) => {
+          const next = new Set(current);
+          next.add(block.id);
+          return Array.from(next);
+        });
+        onRegenerate?.(blockId);
+        pulseBlock(blockId);
+        showWorkbenchToast(t('action.regenerating'));
+      }
+    }
+
+    if (action === 'copy') {
+      const title = (metadata?.text as string) || blockTitle(block);
+      copyText(title);
+      pulseBlock(blockId);
+      showWorkbenchToast(cardActionLabel('copy', title));
+    }
+  }
+
   function runMultiAction(action: string): void {
     const count = selectedBlockIds.length;
     if (!count) {
-      showWorkbenchToast('还没有选择卡片');
+      showWorkbenchToast(t('toast.noCardSelected'));
       return;
     }
     if (action === 'copy') {
@@ -1298,10 +1210,11 @@ export function AgentHubWorkbench({
     }
     showWorkbenchToast(multiActionLabel(action, count));
   }
+  runMultiActionRef.current = runMultiAction;
 
   function exportMainchainEvidence(): void {
     if (!mainchainSummary.exportEnabled) {
-      showWorkbenchToast('暂无可导出的主链证据');
+      showWorkbenchToast(t('toast.noEvidence'));
       return;
     }
     copyText(JSON.stringify({
@@ -1312,7 +1225,7 @@ export function AgentHubWorkbench({
       evidence,
       runtimeEvidence,
     }, null, 2));
-    showWorkbenchToast('已复制主链证据 JSON');
+    showWorkbenchToast(t('toast.evidenceCopied'));
   }
 
   function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
@@ -1321,47 +1234,47 @@ export function AgentHubWorkbench({
     const isTextBlock = block?.kind === 'text';
     return [
       [
-        { label: '复制', icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
-        { label: '表情回复', icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
-        { label: '回复', icon: 'notes', onClick: () => runContextAction('reply', blockId) },
-        ...(isTextBlock ? [{ label: '引用', icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
-        { label: '转发', icon: 'external', onClick: () => runContextAction('forward', blockId) },
+        { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
+        { label: t('context.react'), icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
+        { label: t('context.reply'), icon: 'notes', onClick: () => runContextAction('reply', blockId) },
+        ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
+        { label: t('context.forward'), icon: 'external', onClick: () => runContextAction('forward', blockId) },
       ],
       [
-        { label: '创建话题', icon: 'groups', onClick: () => runContextAction('topic', blockId) },
-        { label: '多选', icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
-        { label: '置顶消息', icon: 'bell', onClick: () => runContextAction('pin', blockId) },
-        { label: '复制消息链接', icon: 'external', onClick: () => runContextAction('link', blockId) },
-        { label: '翻译', icon: 'library', onClick: () => runContextAction('translate', blockId) },
+        { label: t('context.createTopic'), icon: 'groups', onClick: () => runContextAction('topic', blockId) },
+        { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
+        { label: t('context.pinMessage'), icon: 'bell', onClick: () => runContextAction('pin', blockId) },
+        { label: t('context.copyLink'), icon: 'external', onClick: () => runContextAction('link', blockId) },
+        { label: t('context.translate'), icon: 'library', onClick: () => runContextAction('translate', blockId) },
       ],
       [
-        ...(isAgentText ? [{ label: '重新生成', icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
-        { label: '添加任务', icon: 'running', onClick: () => runContextAction('task', blockId) },
-        { label: '导出到文档', icon: 'download', onClick: () => runContextAction('export', blockId) },
-        { label: '快捷应用', icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
-        { label: '删除', icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
+        ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
+        { label: t('context.addTask'), icon: 'running', onClick: () => runContextAction('task', blockId) },
+        { label: t('context.exportDoc'), icon: 'download', onClick: () => runContextAction('export', blockId) },
+        { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
+        { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
       ],
     ];
   }
 
   const multiSelectActions: Array<MultiSelectBarAction> = [
     {
-      label: '全选',
+      label: t('bar.selectAll'),
       icon: 'done',
       onClick: () => setSelectedBlockIds(transcript.map((block) => block.id)),
     },
     {
-      label: '清空',
+      label: t('bar.clear'),
       icon: 'filter',
       onClick: () => setSelectedBlockIds([]),
     },
-    { label: '复制', icon: 'fileText', onClick: () => runMultiAction('copy') },
-    { label: '转发', icon: 'external', onClick: () => runMultiAction('forward') },
-    { label: '添加任务', icon: 'running', onClick: () => runMultiAction('task') },
-    { label: '导出文档', icon: 'download', onClick: () => runMultiAction('export') },
-    { label: '删除', icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
+    { label: t('context.copy'), icon: 'fileText', onClick: () => runMultiAction('copy') },
+    { label: t('context.forward'), icon: 'external', onClick: () => runMultiAction('forward') },
+    { label: t('context.addTask'), icon: 'running', onClick: () => runMultiAction('task') },
+    { label: t('context.exportDoc'), icon: 'download', onClick: () => runMultiAction('export') },
+    { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
     {
-      label: '退出',
+      label: t('bar.exit'),
       icon: 'close',
       ghost: true,
       onClick: () => {
@@ -1407,7 +1320,7 @@ export function AgentHubWorkbench({
             onArchiveConversation={onConversationArchive}
           />
           <div
-            aria-label="调整最近频道宽度"
+            aria-label={t('aria.resizeSidebar')}
             aria-orientation="vertical"
             aria-valuemax={SIDEBAR_MAX_WIDTH}
             aria-valuemin={SIDEBAR_MIN_WIDTH}
@@ -1433,7 +1346,7 @@ export function AgentHubWorkbench({
 
       <main
         ref={workspaceRef}
-        aria-label="Workspace"
+        aria-label={t('aria.workspace')}
         className={styles.workspace}
         data-mainchain={showMainchainStatus ? 'true' : 'false'}
         data-mode={isChatPage ? 'chat' : 'workbench'}
@@ -1443,87 +1356,53 @@ export function AgentHubWorkbench({
         {workbenchStatus?.initialLoading && conversations.length === 0 ? (
           <div className={styles.workspaceLoading} role="status">
             <span className={styles.workspaceLoadingSpinner} />
-            <span className={styles.workspaceLoadingLabel}>正在连接 Edge 并加载数据...</span>
+            <span className={styles.workspaceLoadingLabel}>{t('connection.connecting')}</span>
           </div>
         ) : isChatPage ? (
-          <>
-            <WorkspaceHeader
-              activeConversation={activeConversation}
-              dataMode={workbenchStatus?.dataMode}
-              inspectorCollapsed={inspectorCollapsed}
-              onToggleInspector={toggleInspector}
-              onOpenSearch={() => setSearchOpen(true)}
-            />
-            {showMainchainStatus ? (
-              <MainchainStatusStrip
-                summary={mainchainSummary}
-                onExportEvidence={exportMainchainEvidence}
-              />
-            ) : null}
-            <TranscriptView
-              actionedBlockIds={actionedBlockIds}
-              contextBlockId={contextMenu?.blockId}
-              highlightedBlockId={searchHighlightId ?? highlightedBlockId}
-              onBlockContextMenu={openBlockContextMenu}
-              onBlockPointerDown={beginBlockHoldSelection}
-              onBlockPointerMove={(_block, event) => updateBlockHoldSelection(event)}
-              onBlockPointerUp={handleBlockPointerUp}
-              onBlockSelect={handleBlockSelect}
-              onHighlightEnd={searchHighlightId ? handleSearchHighlightEnd : onHighlightEnd}
-              onAgentProfileOpen={openAgentProfile}
-              onApprovalDecision={(action) => {
-                void onApprovalDecision?.(action);
-              }}
-              onReviewFile={openReviewFile}
-              activeConversation={activeConversation}
-              pinnedAnnouncement={activeConversation?.pinnedAnnouncement && !dismissedPinnedIds.has(activeConversation.id) ? {
-                ...activeConversation.pinnedAnnouncement,
-                onCopy: () => showWorkbenchToast('已打开置顶内容'),
-                onDismiss: () => {
-                  setDismissedPinnedIds((prev) => {
-                    const next = new Set(prev);
-                    next.add(activeConversation.id);
-                    return next;
-                  });
-                  showWorkbenchToast('已关闭置顶');
-                },
-              } : undefined}
-              selectedBlockIds={selectedBlockIds}
-              selectionMode={selectionMode}
-              softHiddenBlockIds={softHiddenBlockIds}
-              transcript={displayTranscript}
-            />
-            <MessageSearchPanel
-              open={searchOpen}
-              onClose={() => setSearchOpen(false)}
-              onJumpToMessage={handleSearchJump}
-              highlightMessageId={searchHighlightId}
-              onHighlightEnd={handleSearchHighlightEnd}
-              transcriptBlocks={displayTranscript}
-              searchLabel="搜索消息"
-              searchPlaceholder="搜索消息内容..."
-              noResultsLabel="未找到匹配的消息"
-            />
-            {!selectionMode && (
-              <UnifiedComposer
-                composer={composer}
-                dispatchComposer={dispatchComposer}
-                executionTargets={composerExecutionTargets}
-                executionTargetId={selectedExecutionTargetId}
-                inputRef={composerInputRef}
-                mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
-                onExecutionTargetChange={setSelectedExecutionTargetId}
-                onPickLocalAttachments={platform.attachments?.pickFiles}
-                onSubmit={submitComposer}
-                status={showComposerStatus ? workbenchStatus : undefined}
-                submitBehavior={composerSubmitBehavior}
-                targetLabel={activeConversation?.title ?? 'AgentHub'}
-                uploadProgresses={uploadProgresses}
-              />
-            )}
-          </>
+          <ConversationHost
+            transcript={transcript}
+            activeConversation={activeConversation}
+            connectionStatus={connectionStatus}
+            inspectorCollapsed={inspectorCollapsed}
+            onToggleInspector={toggleInspector}
+            showMainchainStatus={showMainchainStatus}
+            mainchainSummary={mainchainSummary}
+            onExportMainchainEvidence={exportMainchainEvidence}
+            workbenchStatus={workbenchStatus}
+            onAgentClick={openAgentProfile}
+            onBlockContextMenu={(blockId, event) => {
+              const block = transcript.find((b) => b.id === blockId);
+              if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
+            }}
+            onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey: shiftKey ?? false })}
+            onBlockAction={handleTranscriptBlockAction}
+            onReviewFile={openReviewFile}
+            onDeploySubmit={handleDeploySubmit}
+            selectedBlockIds={new Set(selectedBlockIds)}
+            selectionMode={selectionMode}
+            softHiddenBlockIds={new Set(softHiddenBlockIds)}
+            actionedBlockIds={new Set(actionedBlockIds)}
+            highlightedBlockId={highlightedBlockId}
+            onHighlightEnd={onHighlightEnd}
+            dismissedPinnedIds={dismissedPinnedIds}
+            onToast={showWorkbenchToast}
+            composerExecutionTargets={composerExecutionTargets}
+            selectedExecutionTargetId={selectedExecutionTargetId}
+            onExecutionTargetChange={setSelectedExecutionTargetId}
+            mentionableAgents={mentionableAgents}
+            showComposerAgentPicker={showComposerAgentPicker}
+            showComposerStatus={showComposerStatus}
+            composerTargetLabel={activeConversation?.title ?? 'AgentHub'}
+            currentConversationId={currentConversationId}
+            platform={platform}
+            composer={composer}
+            dispatchComposer={dispatchComposer}
+            composerInputRef={composerInputRef}
+            searchOpen={searchOpen}
+            onSearchOpenChange={setSearchOpen}
+          />
         ) : (
-          <section aria-label="Workbench page" className={styles.workbenchPageHost}>
+          <section aria-label={t('aria.workbenchPage')} className={styles.workbenchPageHost}>
             <WorkbenchRoutes
               activePage={activePage}
               agents={agents}
@@ -1608,24 +1487,24 @@ export function AgentHubWorkbench({
       {activeAgentProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
-            { label: 'Agent 配置' },
+            { label: t('profile.sendMessage') },
+            { label: t('profile.agentConfig') },
           ]}
           anchorElement={activeAgentProfile.anchor}
           avatar={workbenchProfileInitials(activeAgentProfile.name)}
           avatarColor={workbenchAgentColor(activeAgentProfile)}
-          badge={agentStateLabel(activeAgentProfile.state)}
+          badge={agentStateLabel(t, activeAgentProfile.state)}
           isOpen
           meta={[
-            { label: '职责', value: activeAgentProfile.role },
-            { label: '引擎', value: activeAgentProfile.engine },
-            { label: '模型', value: activeAgentProfile.model },
-            { label: 'Skills', value: activeAgentProfile.skills.join(' · ') || '未配置' },
+            { label: t('profile.role'), value: activeAgentProfile.role },
+            { label: t('profile.engine'), value: activeAgentProfile.engine },
+            { label: t('profile.model'), value: activeAgentProfile.model },
+            { label: t('profile.skills'), value: activeAgentProfile.skills.join(' · ') || t('status.unconfigured') },
           ]}
           name={activeAgentProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') openAgentDirectMessage();
-            if (action === 'Agent 配置') openAgentConfig();
+            if (action === t('profile.sendMessage')) openAgentDirectMessage();
+            if (action === t('profile.agentConfig')) openAgentConfig();
           }}
           onClose={() => setActiveAgentProfile(null)}
           subtitle={`${activeAgentProfile.role} · ${activeAgentProfile.engine}`}
@@ -1635,8 +1514,8 @@ export function AgentHubWorkbench({
       {activeHumanProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
-            { label: '复制链接' },
+            { label: t('profile.sendMessage') },
+            { label: t('profile.copyLink') },
           ]}
           anchorElement={activeHumanProfile.anchor}
           avatar={activeHumanProfile.initials}
@@ -1644,17 +1523,17 @@ export function AgentHubWorkbench({
           badge={activeHumanProfile.tag}
           isOpen
           meta={[
-            { label: '身份', value: activeHumanProfile.tag },
-            { label: '组织', value: activeHumanProfile.org },
-            { label: '状态', value: activeHumanProfile.status },
-            { label: '最近消息', value: activeHumanProfile.subtitle },
+            { label: t('profile.identity'), value: activeHumanProfile.tag },
+            { label: t('profile.org'), value: activeHumanProfile.org },
+            { label: t('profile.state'), value: activeHumanProfile.status },
+            { label: t('profile.recentMessage'), value: activeHumanProfile.subtitle },
           ]}
           name={activeHumanProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') openHumanDirectMessage();
-            if (action === '复制链接') {
+            if (action === t('profile.sendMessage')) openHumanDirectMessage();
+            if (action === t('profile.copyLink')) {
               copyText(`agenthub://user/${activeHumanProfile.id}`);
-              showWorkbenchToast('已复制联系人链接');
+              showWorkbenchToast(t('toast.contactLinkCopied'));
             }
           }}
           onClose={() => setActiveHumanProfile(null)}
@@ -1664,68 +1543,35 @@ export function AgentHubWorkbench({
       {activeGroupProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
+            { label: t('profile.sendMessage') },
           ]}
           anchorElement={activeGroupProfile.anchor}
           avatar={workbenchProfileInitials(activeGroupProfile.name)}
           avatarColor="var(--primary)"
-          badge="群聊"
+          badge={t('profile.groupChat')}
           isOpen
           meta={[
-            { label: '类型', value: '协作群' },
+            { label: t('profile.type'), value: t('profile.groupType') },
             ...(activeGroupProfile.memberNames.length > 0
-              ? [{ label: '成员', value: activeGroupProfile.memberNames.join(' · ') }]
+              ? [{ label: t('profile.members'), value: activeGroupProfile.memberNames.join(' · ') }]
               : []),
           ]}
           name={activeGroupProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') {
+            if (action === t('profile.sendMessage')) {
               selectConversation(activeGroupProfile.id);
               setActiveGroupProfile(null);
             }
           }}
           onClose={() => setActiveGroupProfile(null)}
           subtitle={activeGroupProfile.memberNames.length > 0
-            ? `${activeGroupProfile.memberNames.length} 人`
-            : '群聊会话'}
+            ? `${activeGroupProfile.memberNames.length} ${t('profile.members').toLowerCase()}`
+            : t('profile.groupSession')}
           variant="group"
         />
       )}
       <Toast message={toastMessage} visible={toastVisible} />
     </div>
-  );
-}
-
-function MainchainStatusStrip({
-  onExportEvidence,
-  summary,
-}: {
-  onExportEvidence: () => void;
-  summary: MainchainSummary;
-}): React.ReactElement {
-  return (
-    <section className={styles.mainchainStrip} aria-label="Demo main chain status">
-      <div className={styles.mainchainTrack} role="list">
-        {summary.nodes.map((node) => (
-          <div className={styles.mainchainNode} data-state={node.state} key={node.id} role="listitem">
-            <span className={styles.mainchainDot} aria-hidden="true" />
-            <span className={styles.mainchainCopy}>
-              <strong>{node.label}</strong>
-              <em>{node.detail}</em>
-            </span>
-          </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className={styles.mainchainExport}
-        disabled={!summary.exportEnabled}
-        onClick={onExportEvidence}
-        title={summary.exportDetail}
-      >
-        {summary.exportLabel}
-      </button>
-    </section>
   );
 }
 
@@ -1738,6 +1584,7 @@ function buildMainchainSummary({
   targetRequired,
   transcript,
   workbenchStatus,
+  t,
 }: {
   composerTargetLabel?: string | undefined;
   evidence: EvidenceRef[];
@@ -1747,6 +1594,7 @@ function buildMainchainSummary({
   targetRequired: boolean;
   transcript: TranscriptBlock[];
   workbenchStatus?: AgentHubWorkbenchProps['workbenchStatus'];
+  t: (key: string, options?: Record<string, unknown>) => string;
 }): MainchainSummary {
   const runSession = transcript.find((block) => block.kind === 'run_session');
   const taskId = runSession?.kind === 'run_session' ? runSession.taskId : undefined;
@@ -1811,7 +1659,7 @@ function buildMainchainSummary({
     {
       id: 'hub-task',
       label: 'Hub task',
-      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? '等待 task/replay',
+      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? t('mainchain.waitingTask'),
       state: taskId ? 'done' : workbenchStatus?.replayLabel ? 'active' : 'waiting',
     },
     {
@@ -1823,7 +1671,7 @@ function buildMainchainSummary({
     {
       id: 'worker',
       label: 'Worker',
-      detail: workerLabel ?? '等待 worker route',
+      detail: workerLabel ?? t('mainchain.waitingWorker'),
       state: workerLabel ? 'active' : 'waiting',
     },
     {
@@ -1835,19 +1683,19 @@ function buildMainchainSummary({
     {
       id: 'target',
       label: 'Exact target',
-      detail: targetLabel ?? (targetBlocked ? '没有在线 Desktop/Edge target' : '待选择 Desktop/Edge target'),
+      detail: targetLabel ?? (targetBlocked ? t('mainchain.noTarget') : t('mainchain.pickTarget')),
       state: targetState,
     },
     {
       id: 'edge',
       label: 'Active run',
-      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence),
+      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence, t),
       state: runId || edgeRunId ? 'active' : hasRuntimeEvidence ? 'done' : 'waiting',
     },
     {
       id: 'replay',
       label: 'Replay',
-      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : '暂无 transcript',
+      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : t('mainchain.noTranscript'),
       state: transcript.length > 0 ? 'done' : 'empty',
     },
     {
@@ -1855,7 +1703,7 @@ function buildMainchainSummary({
       label: 'Approval/artifact',
       detail: artifactCount + approvalCount + diffCount + previewCount > 0
         ? `${evidencePathDetail} / ${diffCount} diff / ${previewCount} preview`
-        : '无 approval/artifact evidence',
+        : t('mainchain.noApprovalArtifact'),
       state: approvalCount > 0 ? 'active' : artifactCount + diffCount + previewCount > 0 ? 'done' : 'empty',
     },
   ];
@@ -1863,15 +1711,15 @@ function buildMainchainSummary({
   return {
     nodes,
     exportEnabled: hasExportEvidence,
-    exportLabel: hasExportEvidence ? '导出证据 JSON' : '等待证据',
+    exportLabel: hasExportEvidence ? t('mainchain.exportJson') : t('mainchain.waitingEvidence'),
     exportDetail: hasExportEvidence
-      ? '复制 Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
-      : '暂无 transcript、runtime evidence 或 run session 可导出',
+      ? 'Copy Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
+      : t('mainchain.noRuntimeEvidence'),
   };
 }
 
-function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined): string {
-  if (!runtimeEvidence) return '等待 Edge evidence';
+function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined, t: (key: string) => string): string {
+  if (!runtimeEvidence) return t('mainchain.waitingEdgeEvidence');
   const loading = [
     runtimeEvidence.loading?.diff ? 'diff loading' : undefined,
     runtimeEvidence.loading?.artifacts ? 'artifact loading' : undefined,
@@ -1899,20 +1747,20 @@ function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {
   }));
 }
 
-function agentStateLabel(state: string): string {
+function agentStateLabel(t: (key: string) => string, state: string): string {
   switch (state) {
     case 'running':
-      return '运行中';
+      return t('agent.state.running');
     case 'ready':
     case 'available':
-      return '可运行';
+      return t('agent.state.ready');
     case 'waiting':
-      return '等待中';
+      return t('agent.state.waiting');
     case 'configuring':
-      return '配置中';
+      return t('agent.state.configuring');
     case 'unavailable':
-      return '不可用';
+      return t('agent.state.unavailable');
     default:
-      return state || 'Agent';
+      return state || t('label.agent');
   }
 }

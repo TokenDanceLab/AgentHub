@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE, sharedWorkbenchResources } from '@shared/i18n';
+import { CHATVIEW_I18N_NAMESPACE, chatviewResources } from '@shared/chatview/i18n/resources';
 
 import zhCommon from './locales/zh/common.json';
 import zhStatus from './locales/zh/status.json';
@@ -70,6 +71,7 @@ i18n.use(initReactI18next).init({
       privateChats: zhPrivateChats,
       groupWorkspace: zhGroupWorkspace,
       project: zhProject,
+      [CHATVIEW_I18N_NAMESPACE]: chatviewResources.zh,
     },
     en: {
       common: enCommon,
@@ -80,9 +82,10 @@ i18n.use(initReactI18next).init({
       privateChats: enPrivateChats,
       groupWorkspace: enGroupWorkspace,
       project: enProject,
+      [CHATVIEW_I18N_NAMESPACE]: chatviewResources.en,
     },
   },
-  ns: ['common', 'status', 'workbench', SHARED_WORKBENCH_I18N_NAMESPACE, 'agentSquare', 'privateChats', 'groupWorkspace', 'project'],
+  ns: ['common', 'status', 'workbench', SHARED_WORKBENCH_I18N_NAMESPACE, 'agentSquare', 'privateChats', 'groupWorkspace', 'project', CHATVIEW_I18N_NAMESPACE],
   defaultNS: 'common',
   lng: getInitialLanguage(),
   fallbackLng: 'en',

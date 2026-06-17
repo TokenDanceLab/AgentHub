@@ -25,9 +25,9 @@ func TestErrorWithTrace(t *testing.T) {
 }
 
 func TestIs(t *testing.T) {
-	e1 := New("NOT_FOUND", "a", http.StatusNotFound)
-	e2 := New("NOT_FOUND", "b", http.StatusNotFound)
-	e3 := New("BAD_REQUEST", "c", http.StatusBadRequest)
+	e1 := New("not_found", "a", http.StatusNotFound)
+	e2 := New("not_found", "b", http.StatusNotFound)
+	e3 := New("bad_request", "c", http.StatusBadRequest)
 
 	if !errors.Is(e1, e2) {
 		t.Fatal("same code should match")
@@ -82,7 +82,7 @@ func TestWithTrace(t *testing.T) {
 
 func TestWriteError(t *testing.T) {
 	w := httptest.NewRecorder()
-	WriteError(w, New("NOT_FOUND", "resource gone", http.StatusNotFound))
+	WriteError(w, New("not_found", "resource gone", http.StatusNotFound))
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d", w.Code)
@@ -93,7 +93,7 @@ func TestWriteError(t *testing.T) {
 		t.Fatal(err)
 	}
 	errObj, _ := env["error"].(map[string]any)
-	if errObj["code"] != "NOT_FOUND" {
+	if errObj["code"] != "not_found" {
 		t.Fatalf("code = %v", errObj["code"])
 	}
 	if errObj["message"] != "resource gone" {
@@ -114,7 +114,7 @@ func TestWriteErrorGeneric(t *testing.T) {
 	var env map[string]any
 	json.Unmarshal(w.Body.Bytes(), &env)
 	errObj, _ := env["error"].(map[string]any)
-	if errObj["code"] != "INTERNAL_ERROR" {
+	if errObj["code"] != "internal_error" {
 		t.Fatalf("code = %v", errObj["code"])
 	}
 	if errObj["message"] != "something broke" {
