@@ -374,7 +374,22 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
   }
 }
 
-// ── TranscriptBlock[] → TranscriptItem[] ──
+/**
+ * Extract evidence refs from a block into the simplified form used by
+ * {@link TranscriptAgentItem}.evidenceRefs.
+ */
+function mapEvidenceRefs(b: TranscriptBlock): TranscriptAgentItem['evidenceRefs'] | undefined {
+  if (!b.evidenceRefs || b.evidenceRefs.length === 0) return undefined
+  return b.evidenceRefs.map(ref => ({
+    id: ref.id,
+    kind: ref.kind,
+    label: ref.label,
+    status: ref.status,
+    path: ref.path,
+    uri: ref.uri,
+    mimeType: ref.mimeType,
+  }))
+}
 // Re-export the generic types (backward-compat aliases)
 export type { TranscriptItem as ChatViewTranscriptItem }
 export type { TranscriptAgentItem as AgentTranscriptBlock }
@@ -432,12 +447,19 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
         if (currentAgent) items.push(currentAgent)
         currentAgent = Object.assign(newAgentBlock(block.author, role, block.createdAt), { groupId } as any,
           pickDisplay(t as unknown as Record<string, unknown>),
+          { evidenceRefs: mapEvidenceRefs(block) },
         )
         // Unique React key: author.id + first-block-seq
         currentAgent!.id = `${groupId}-${_seq}`
       }
       const bubbleText = t.displayDetail || t.text
       if (bubbleText) currentAgent!.bubbles.push(bubbleText)
+      // Map reply-to metadata from upstream block
+      if (t.replyToMessageId && !currentAgent!.replyBlockId) {
+        currentAgent!.replyBlockId = t.replyToMessageId
+        currentAgent!.replyAuthor = t.replyAuthor
+        currentAgent!.replyPreview = t.replyPreview
+      }
       continue
     }
 
@@ -458,6 +480,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
             ;(currentAgent as any).groupId = groupId
+            currentAgent.evidenceRefs = mapEvidenceRefs(block)
           }
           currentAgent.rows.push(row)
         }
@@ -476,6 +499,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
             ;(currentAgent as any).groupId = groupId
+            currentAgent.evidenceRefs = mapEvidenceRefs(block)
           }
           currentAgent.rows.push(childRow)
         }
@@ -489,7 +513,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!row) continue
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId }
+        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, evidenceRefs: mapEvidenceRefs(block) }
         currentAgent.id = `${block.author.id}-${_seq}`
       }
       // Standalone cards vs inline rows

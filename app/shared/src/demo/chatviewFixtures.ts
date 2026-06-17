@@ -344,7 +344,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   /* ── Approval → user approves → deploy ── */
   {
     id: 'bap1', kind: 'approval', createdAt: T(23), author: B('builder'),
-    title: 'Write 5 files (2 new, 3 modified)', status: 'pending',
+    title: 'Write 5 files (2 new, 3 modified)', status: 'waiting' as any,
     reason: 'Builder requests creation of src/api/types.ts, src/api/create-client.ts and modification of 3 existing files. All type checks and lint pass. Confirmation required to proceed.',
   },
   { id: 'bu2', kind: 'text', createdAt: T(24), author: U('ding'), text: 'Looks good, approved. Go ahead and write the files.' },
@@ -366,11 +366,100 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
 
   /* ── Final bubble ── */
   { id: 'ba4', kind: 'text', createdAt: T(28), author: B('builder'), text: 'All done. Generic API client deployed: src/api/types.ts (32 lines), src/api/create-client.ts (78 lines). users.ts (-45/+12 lines) and projects.ts (-38/+10 lines) migrated as proof of concept. The remaining 6 endpoint files can follow in a follow-up — the type system already covers them. 53 duplicated fetch wrappers consolidated into a single 78-line factory.' },
+
+  /* ── Reply/quote: User asks follow-up about call-site migration ── */
+  {
+    id: 'bu3', kind: 'text', createdAt: T(30), author: U('ding'),
+    text: 'What about the 31 call sites you mentioned? When will those be updated?',
+    replyToMessageId: 'ba4',
+    replyPreview: 'All done. Generic API client deployed: src/api/types.ts (32 lines)...',
+    replyAuthor: 'Builder',
+    quote: 'The remaining 6 endpoint files can follow in a follow-up — the type system already covers them.',
+  },
+
+  /* ── Reply/quote: Builder responds to the quoted message ── */
+  {
+    id: 'ba5', kind: 'text', createdAt: T(31), author: B('builder'),
+    text: 'Good question. I already surveyed all 31 import sites during the Grep analysis. The call-site migration is non-breaking since the legacy client.ts still exports the old named functions as compatibility stubs. We can migrate incrementally — each call site is a one-liner change from `getUsers({page, limit})` to `usersApi.list({page, limit})`. I recommend a separate PR for that to keep this one focused on the core generic client.',
+    displayTitle: 'Call-site migration plan',
+    displayDetail: '31 import sites, non-breaking incremental migration, separate PR recommended.',
+  },
+
+  /* ── Reply: User pins down the timeline ── */
+  {
+    id: 'bu4', kind: 'text', createdAt: T(32), author: U('ding'),
+    text: 'OK, let\'s do that as a follow-up today. Please create the tracking issue.',
+    replyToMessageId: 'ba5',
+    replyPreview: 'I already surveyed all 31 import sites during the Grep analysis...',
+    replyAuthor: 'Builder',
+  },
+
+  /* ── Tool call with evidenceRefs ── */
+  {
+    id: 'bto11', kind: 'tool_call', createdAt: T(33), author: B('builder'),
+    toolName: 'Write',
+    status: 'completed',
+    summary: 'Created tracking issue #1224 — "Migrate 31 call sites to generic API client"',
+    evidenceRefs: [
+      { id: 'ev_issue_1224', kind: 'artifact', label: 'Issue #1224 — Call-site migration tracker', status: 'completed', path: 'docs/issues/1224-call-site-migration.md' },
+      { id: 'ev_survey_grep', kind: 'tool', label: 'Grep survey of 31 import sites', status: 'completed', path: 'src/', uri: '/evidence/btr7' },
+      { id: 'ev_compat_stubs', kind: 'file', label: 'Legacy compatibility stubs in client.ts', status: 'completed', path: 'src/api/client.ts' },
+    ],
+  },
+
+  /* ── Tool result with evidenceRefs ── */
+  {
+    id: 'btr11', kind: 'tool_result', createdAt: T(33.5), author: B('builder'),
+    toolName: 'Write',
+    status: 'completed',
+    summary: 'docs/issues/1224-call-site-migration.md · 95 lines · migration plan with 31 checkboxes, estimated 2h effort, non-breaking incremental approach',
+    evidenceRefs: [
+      { id: 'ev_issue_1224', kind: 'artifact', label: 'Issue #1224 — Call-site migration tracker', status: 'completed', path: 'docs/issues/1224-call-site-migration.md' },
+    ],
+  },
+
+  /* ── Deployment preview block ── */
+  {
+    id: 'bprev1', kind: 'preview', createdAt: T(34), author: B('builder'),
+    previewId: 'preview_f7c92a',
+    threadId: 'thread_builder_001',
+    status: 'completed',
+    url: 'https://preview.example.com/deploy-f7c92a',
+  },
+
+  /* ── Second preview (still running for testing the pending state) ── */
+  {
+    id: 'bprev2', kind: 'preview', createdAt: T(34.5), author: B('builder'),
+    previewId: 'preview_e2b890',
+    threadId: 'thread_builder_001',
+    status: 'running',
+    url: 'https://preview.example.com/deploy-e2b890',
+  },
+
+  /* ── Second approval (waiting state, exercises onApprove/onReject) ── */
+  {
+    id: 'bap2', kind: 'approval', createdAt: T(35), author: B('builder'),
+    title: 'Migrate 31 call sites (non-breaking, incremental)', status: 'waiting' as any,
+    risk: 'low',
+    reason: 'Non-breaking incremental migration. Each call site changes one import line. Legacy stubs remain active until all call sites are migrated. Rollback: revert the PR — old client.ts untouched throughout.',
+  },
+
+  /* ── Thinking with evidenceRefs ── */
+  {
+    id: 'bth7', kind: 'thinking', createdAt: T(36), author: B('builder'),
+    content: 'The tracking issue #1224 is created with 31 checkboxes. Each checkbox maps to a concrete import site found during the Grep survey. The migration is safe because legacy exports remain in place via client.ts — old code still works even if only half the call sites are migrated. The work can be parallelized across 9 files. Caveat: one call site (src/components/UserTable.tsx) uses getUsers with extra query params beyond the standard pagination; the generic client supports searchParams so this is covered, but needs a small signature adjustment in the endpoint def.',
+    isThinking: false,
+    evidenceRefs: [
+      { id: 'ev_issue_1224', kind: 'artifact', label: 'Issue #1224', status: 'completed' },
+      { id: 'ev_survey_grep', kind: 'tool', label: 'Grep survey', status: 'completed' },
+      { id: 'ev_usertable', kind: 'file', label: 'UserTable.tsx — extra query params edge case', status: 'completed', path: 'src/components/UserTable.tsx' },
+    ],
+  },
 ]
 
 // ═══════════════════════════════════════════════════════════════════════
 // Agent Collab Group — long realistic: "Add RBAC middleware"
-// ~45 blocks: Orchestrator think×2 → tool×6 → route → Builder → Reviewer → QA → context
+// ~60 blocks: Orchestrator think×2 → tool×6 → route → Builder → Reviewer → QA → reply×2 → approval → preview → context
 // ═══════════════════════════════════════════════════════════════════════
 
 const O = (id: string) => ({ id, name: 'Orchestrator', role: 'agent' as const })
@@ -620,5 +709,136 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     inputTokens: 178000, outputTokens: 6200, usagePercent: 89,
     contextLimit: 200000, modelLabel: 'Claude Sonnet 4',
     cachePercent: 15, cost: '$2.08',
+  },
+
+  /* ── Reply/quote: User follows up on the RBAC policy ── */
+  {
+    id: 'gu2', kind: 'text', createdAt: T(40), author: U('ding'),
+    text: 'One more thing -- can we also add a `billing-reader` role that only sees the billing GET endpoint but nothing else?',
+    replyToMessageId: 'gq1',
+    replyPreview: 'Final acceptance passed. 28/28 integration tests...',
+    replyAuthor: 'QA',
+    quote: 'all three roles behave correctly, no privilege escalation possible',
+  },
+
+  /* ── QA replies to the quoted follow-up ── */
+  {
+    id: 'gq2', kind: 'text', createdAt: T(41), author: Q('qa'),
+    text: 'The current types already support that — we just need to add `billing-reader` to the Role enum and update the policy YAML to scoped allowlists. The middleware is generic enough that any new role Just Works once added to the allowlists. Should I open a follow-up issue?',
+    replyToMessageId: 'gu2',
+    replyPreview: 'can we also add a `billing-reader` role...',
+    replyAuthor: 'Ding',
+    displayTitle: 'Re: billing-reader role',
+    displayDetail: 'Type system already supports new roles, just update Role enum + policy YAML.',
+  },
+
+  /* ── Approval block for the billing-reader follow-up ── */
+  {
+    id: 'gap1', kind: 'approval', createdAt: T(42), author: Q('qa'),
+    title: 'Add billing-reader role (1 file change, 5 lines)', status: 'waiting' as any,
+    risk: 'low',
+    reason: 'Single-file change: add `billing-reader` to Role enum in rbac-types.ts and add policy entries. No new middleware or logic changes. 0 risk of regression.',
+    evidenceRefs: [
+      { id: 'ev_rbac_types', kind: 'file', label: 'rbac-types.ts — Role enum definition', status: 'completed', path: 'src/auth/rbac-types.ts' },
+      { id: 'ev_policy_yaml', kind: 'file', label: 'rbac-policy.yaml — current allowlists', status: 'completed', path: 'src/middleware/rbac-policy.yaml' },
+    ],
+  },
+
+  /* ── Deploy preview for the RBAC PR ── */
+  {
+    id: 'gprev1', kind: 'preview', createdAt: T(43), author: Q('qa'),
+    previewId: 'preview_rbac_a3c91d',
+    threadId: 'thread_rbac_001',
+    status: 'completed',
+    url: 'https://preview.example.com/deploy-rbac-a3c91d',
+  },
+]
+
+// ═══════════════════════════════════════════════════════════════════════
+// Pinned Announcement Conversation — simulates system-wide announcements
+// from the Hub administrator. Mix of pinned text, attachments, and links.
+// ═══════════════════════════════════════════════════════════════════════
+
+const S = (id: string) => ({ id, name: 'System', role: 'system' as const })
+
+export const chatviewAnnouncementTranscript: TranscriptBlock[] = [
+  /* ── Pinned announcement: maintenance window ── */
+  {
+    id: 'an1', kind: 'text', createdAt: '2026-06-15T08:00:00+08:00',
+    author: S('admin-hub'),
+    text: 'SCHEDULED MAINTENANCE: The AgentHub API gateway will undergo a zero-downtime rolling restart on 2026-06-18 02:00-04:00 UTC. All active runs will be preserved. WebSocket connections will reconnect automatically. No action required from users.',
+    displayTitle: 'Scheduled Maintenance',
+    displayDetail: '2026-06-18 02:00-04:00 UTC · Zero-downtime rolling restart',
+    badgeLabel: 'Pinned',
+    badgeVariant: 'warning',
+  },
+
+  /* ── Attachment: Changelog PDF ── */
+  {
+    id: 'anatt1', kind: 'attachment', createdAt: '2026-06-15T08:05:00+08:00',
+    author: S('admin-hub'),
+    attachmentRef: {
+      id: 'att_changelog_v2_4',
+      name: 'changelog-v2.4.0.pdf',
+      original_name: 'AgentHub Changelog v2.4.0.pdf',
+      size: 456789,
+      mime_type: 'application/pdf',
+      hash: 'sha256:abcd1234ef567890abcd1234ef567890',
+      url: '/client/attachments/att_changelog_v2_4',
+      metadata: '{"pages": 12}',
+      created_at: '2026-06-15T08:00:00+08:00',
+    },
+    contentType: 'file',
+  },
+
+  /* ── Pinned announcement: New model available ── */
+  {
+    id: 'an2', kind: 'text', createdAt: '2026-06-15T08:10:00+08:00',
+    author: S('admin-hub'),
+    text: 'NEW MODEL: Claude Sonnet 4.5 is now available for all agent runs. This model shows a 2.3x improvement on coding benchmarks and supports extended thinking (32K token budget). Update your agent configs to use `model: "claude-sonnet-4-5-20250929"` to opt in. Legacy Sonnet 4 remains the default until 2026-07-01.',
+    displayTitle: 'New Model Available',
+    displayDetail: 'Claude Sonnet 4.5 · 2.3x coding improvement · Extended thinking 32K',
+    badgeLabel: 'Pinned',
+    badgeVariant: 'primary',
+  },
+
+  /* ── Pinned announcement: Security advisory ── */
+  {
+    id: 'an3', kind: 'text', createdAt: '2026-06-16T10:00:00+08:00',
+    author: S('admin-hub'),
+    text: 'SECURITY ADVISORY: A privilege escalation vulnerability (CVE-2026-49975) was patched in nginx 1.30.2. All AgentHub gateway nodes (hk2, us1, us2, sgp1) have been updated as of 2026-06-12. No exploitation detected. Full audit trail available in Fleet Hardening report. If you run self-hosted edge nodes, please update immediately.',
+    displayTitle: 'Security Advisory',
+    displayDetail: 'CVE-2026-49975 patched · All gateway nodes updated 2026-06-12',
+    badgeLabel: 'Pinned',
+    badgeVariant: 'danger',
+  },
+
+  /* ── Attachment: Fleet hardening report ── */
+  {
+    id: 'anatt2', kind: 'attachment', createdAt: '2026-06-16T10:05:00+08:00',
+    author: S('admin-hub'),
+    attachmentRef: {
+      id: 'att_fleet_hardening',
+      name: 'fleet-hardening-20260611.md',
+      original_name: 'fleet-hardening-20260611.md',
+      size: 18934,
+      mime_type: 'text/markdown',
+      hash: 'sha256:fleet1234hardening5678report9012',
+      url: '/client/attachments/att_fleet_hardening',
+      metadata: '{}',
+      created_at: '2026-06-12T00:00:00+08:00',
+    },
+    contentType: 'file',
+  },
+
+  /* ── Pinned announcement: deprecation notice ── */
+  {
+    id: 'an4', kind: 'text', createdAt: '2026-06-17T09:00:00+08:00',
+    author: S('admin-hub'),
+    text: 'DEPRECATION NOTICE: The legacy `api/endpoints/` named-function exports will be removed in v2.5.0 (target: 2026-07-15). All consumers must migrate to the generic `createApiClient<Schema>()` pattern introduced in v2.4.0. See the migration guide for step-by-step instructions. 31 call sites have been identified; a tracking issue (#1224) with per-file checkboxes is available.',
+    displayTitle: 'Deprecation Notice',
+    displayDetail: 'Legacy endpoint exports removed in v2.5.0 · Target: 2026-07-15 · 31 call sites to migrate',
+    badgeLabel: 'Pinned',
+    badgeVariant: 'warning',
   },
 ]
