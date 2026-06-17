@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # 06 — Orchestrator 增强
 
 > 2026-06-10 · 基于 4 竞品深度审计 + 比赛要求解读

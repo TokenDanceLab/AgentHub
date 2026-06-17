@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Agent Command Centers: Source Adoption Map
 
 > Generated 2026-05-24 from actual source code of 7 projects mapped against AgentHub `app/desktop/src/`.

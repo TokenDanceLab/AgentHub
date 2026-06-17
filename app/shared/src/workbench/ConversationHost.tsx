@@ -1,6 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript';
-import { isSidebarOnlyTranscriptBlock } from '../transcript';
 import type { ComposerMention } from '../composer';
 import { buildComposerIntent, composerReducer, createInitialComposerState } from '../composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
@@ -17,6 +16,22 @@ import styles from './AgentHubWorkbench.module.css';
 export interface MainchainSummary {
   nodes: Array<{ id: string; label: string; detail: string; state: 'done' | 'active' | 'waiting' | 'blocked' | 'empty' }>;
   exportEnabled: boolean; exportLabel: string; exportDetail: string;
+}
+
+function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
+  switch (block.kind) {
+    case 'run_step_group':
+    case 'run_session':
+    case 'agent_timeline':
+    case 'route_decision':
+    case 'subagent':
+    case 'subtask':
+    case 'child_agent':
+    case 'context_usage':
+      return true;
+    default:
+      return false;
+  }
 }
 
 export interface ConversationHostProps {
@@ -136,7 +151,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       <WorkspaceHeader activeConversation={activeConversation} dataMode={workbenchStatus?.dataMode}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
-      <div className={styles.transcriptRegion}>
+      <div className={styles.transcriptRegion} role="region" aria-label="Transcript">
         <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}

@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # 03 — 右侧栏增强（需要新 UI 面）
 
 > 全在 `RightInspector`（813 行，已有 overview/browser/files 三个 tab）内加内容。

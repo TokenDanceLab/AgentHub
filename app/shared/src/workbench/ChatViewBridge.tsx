@@ -5,17 +5,11 @@
    construction and chatMode derivation.
    ══════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, lazy, Suspense } from 'react';
+import React, { useMemo } from 'react';
 import type { TranscriptBlock } from '../transcript';
 import type { WorkbenchConversation } from '../platform';
 import type { ConnectionStatusKind } from './GlobalRail';
-
-const LazyChatViewTranscript = lazy(
-  () =>
-    import('../chatview/components/ChatViewTranscript').then((m) => ({
-      default: m.ChatViewTranscript,
-    })),
-);
+import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
 
 export interface ChatViewBridgeProps {
   /** Filtered + optimistic transcript blocks to render. */
@@ -109,25 +103,23 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   }, [activeConversation, dismissedPinnedIds, onToast]);
 
   return (
-    <Suspense fallback={<div className="chatview-loading" />}>
-      <LazyChatViewTranscript
-        transcript={displayTranscript}
-        chatMode={chatMode}
-        onAgentClick={onAgentClick}
-        onBlockContextMenu={onBlockContextMenu}
-        onBlockSelect={onBlockSelect}
-        onBlockAction={onBlockAction}
-        onReviewFile={onReviewFile}
-        onDeploySubmit={onDeploySubmit}
-        selectedBlockIds={selectedBlockIds}
-        selectionMode={selectionMode}
-        softHiddenBlockIds={softHiddenBlockIds}
-        actionedBlockIds={actionedBlockIds}
-        highlightedBlockId={highlightedBlockId}
-        onHighlightEnd={onHighlightEnd}
-        pinnedAnnouncement={pinnedAnnouncement}
-        connectionStatus={connectionStatus}
-      />
-    </Suspense>
+    <ChatViewTranscript
+      transcript={displayTranscript}
+      chatMode={chatMode}
+      onAgentClick={onAgentClick}
+      onBlockContextMenu={onBlockContextMenu}
+      onBlockSelect={onBlockSelect}
+      onBlockAction={onBlockAction}
+      onReviewFile={onReviewFile}
+      onDeploySubmit={onDeploySubmit}
+      selectedBlockIds={selectedBlockIds}
+      selectionMode={selectionMode}
+      softHiddenBlockIds={softHiddenBlockIds}
+      actionedBlockIds={actionedBlockIds}
+      highlightedBlockId={highlightedBlockId}
+      onHighlightEnd={onHighlightEnd}
+      pinnedAnnouncement={pinnedAnnouncement}
+      connectionStatus={connectionStatus}
+    />
   );
 });
