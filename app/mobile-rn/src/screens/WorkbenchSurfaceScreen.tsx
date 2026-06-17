@@ -205,7 +205,7 @@ function getSurfaceConfig(
             title: t.starredContacts,
             description: t.starredContactsDescription,
             rows: [
-              row('star', 'Delicious233', 'TokenDance', t.pinned, 'account', onOpenAccount),
+              row('star', 'Alice', 'TokenDance', t.pinned, 'account', onOpenAccount),
               row('star', 'AgentHub Mobile Workbench', t.mobileProjectDescription, t.pinned, 'chat'),
             ],
           },
