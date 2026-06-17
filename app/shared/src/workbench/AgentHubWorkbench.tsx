@@ -1461,7 +1461,9 @@ export function AgentHubWorkbench({
                 onExportEvidence={exportMainchainEvidence}
               />
             ) : null}
-            <ChatViewTranscript transcript={displayTranscript} />
+            <div className={styles.transcriptRegion}>
+              <ChatViewTranscript transcript={displayTranscript} />
+            </div>
             <MessageSearchPanel
               open={searchOpen}
               onClose={() => setSearchOpen(false)}
