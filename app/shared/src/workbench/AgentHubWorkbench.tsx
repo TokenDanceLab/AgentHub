@@ -1,4 +1,4 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState, lazy, Suspense } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   buildComposerIntent,
   type ComposerMention,
@@ -13,8 +13,9 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock, TextTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
+import { ConversationHost, type MainchainSummary } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
   ContextMenu,
@@ -27,24 +28,18 @@ import {
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
-// ── Lazily loaded: ChatViewTranscript only renders when activePage === 'chat' ──
-const LazyChatViewTranscript = lazy(() => import('../chatview/components/ChatViewTranscript').then(m => ({ default: m.ChatViewTranscript })));
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
-import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
-import { WorkspaceHeader } from './WorkspaceHeader';
 
-import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
-import { useComposerSubmitBehavior } from './workbenchPreferences';
 import { createSettingsService, type SettingsService } from './settingsService';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -62,39 +57,7 @@ const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
-type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
-
-function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
-  switch (block.kind) {
-    case 'run_step_group':
-    case 'run_session':
-    case 'agent_timeline':
-    case 'route_decision':
-    case 'subagent':
-    case 'subtask':
-    case 'child_agent':
-    case 'context_usage':
-      return true;
-    default:
-      return false;
-  }
-}
-
-interface MainchainNode {
-  id: string;
-  label: string;
-  detail: string;
-  state: MainchainStatusKind;
-}
-
-interface MainchainSummary {
-  nodes: MainchainNode[];
-  exportEnabled: boolean;
-  exportLabel: string;
-  exportDetail: string;
-}
-
-const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
+const SIDEBAR_DEFAULT_WIDTH = 260;: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
   readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
   readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
@@ -1515,10 +1478,9 @@ export function AgentHubWorkbench({
               />
             ) : null}
             <div className={styles.transcriptRegion}>
-              <Suspense fallback={<div className={styles.transcriptRegion} />}>
-              <LazyChatViewTranscript
-                transcript={displayTranscript}
-                chatMode={activeConversation?.kind === 'group' ? 'group' : 'dm'}
+              <ChatViewBridge
+                displayTranscript={displayTranscript}
+                activeConversation={activeConversation}
                 onAgentClick={openAgentProfile}
                 onBlockContextMenu={(blockId, event) => {
                   const block = transcript.find((b) => b.id === blockId);
@@ -1534,21 +1496,10 @@ export function AgentHubWorkbench({
                 actionedBlockIds={new Set(actionedBlockIds)}
                 highlightedBlockId={searchHighlightId}
                 onHighlightEnd={handleSearchHighlightEnd}
-                pinnedAnnouncement={activeConversation?.pinnedAnnouncement && !dismissedPinnedIds.has(activeConversation.id) ? {
-                  ...activeConversation.pinnedAnnouncement,
-                  onCopy: () => showWorkbenchToast('已打开置顶内容'),
-                  onDismiss: () => {
-                    setDismissedPinnedIds((prev) => {
-                      const next = new Set(prev);
-                      next.add(activeConversation.id);
-                      return next;
-                    });
-                    showWorkbenchToast('已关闭置顶');
-                  },
-                } : undefined}
                 connectionStatus={connectionStatus}
+                dismissedPinnedIds={dismissedPinnedIds}
+                onToast={showWorkbenchToast}
               />
-              </Suspense>
             </div>
             <MessageSearchPanel
               open={searchOpen}
