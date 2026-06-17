@@ -186,16 +186,18 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     ],
   },
 
+  /* ── Additional tool calls: Read call-site files ── */
+  { id: 'bto6', kind: 'tool_call', createdAt: T(18.7), author: B('builder'), toolName: 'Read', status: 'running' },
+  { id: 'btr6', kind: 'tool_result', createdAt: T(18.8), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/components/UserTable.tsx · 145 lines · imports getUsers, createUser from endpoints/users · uses named function imports' },
+  { id: 'bto7', kind: 'tool_call', createdAt: T(18.9), author: B('builder'), toolName: 'Grep', status: 'running' },
+  { id: 'btr7', kind: 'tool_result', createdAt: T(19.0), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/ → "import.*from.*api/endpoints" · 31 import sites · 9 files · all importing named functions, will need migration to client.method() style' },
+
   /* ── Think 3: Wire up endpoints, assess remaining scope ── */
   {
     id: 'bth3', kind: 'thinking', createdAt: T(19), author: B('builder'),
     content: 'Core implementation done. The generic client now handles request construction, body serialization, error normalization, and response parsing in one place. Two endpoint files migrated as proof: users.ts went from 143 lines to 110 (net -33), projects.ts from 112 to 84 (net -28). The old client.ts still holds 6 more endpoint wrappers that can be migrated in a follow-up — they follow the identical pattern and the type system already covers them. Next: run linter and type-check via subagents to verify correctness.',
     isThinking: false,
   },
-
-  /* ── Additional tool calls: check call-site references ── */
-  { id: 'bto6', kind: 'tool_call', createdAt: T(19.1), author: B('builder'), toolName: 'Grep', status: 'running' },
-  { id: 'btr6', kind: 'tool_result', createdAt: T(19.2), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/ → "import.*from.*api/endpoints" · 31 import sites · 9 files · all importing named functions, will need migration to client.method() style' },
 
   /* ── Diff 3: Migrated users endpoint ── */
   {
@@ -257,6 +259,61 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     isThinking: false,
   },
 
+  /* ── Diff 5: index.ts re-export update ── */
+  {
+    id: 'bdiff5', kind: 'diff', createdAt: T(19.6),
+    author: B('builder'),
+    title: 'src/api/index.ts — Re-export generic client + migrated endpoints',
+    files: ['src/api/index.ts'],
+    additions: 6, deletions: 3,
+    patch: '@@ -1,3 +1,6 @@\n-export { getUsers, getUserById, createUser, updateUser, deleteUser } from "./endpoints/users";\n-export { getProjects, getProjectById, createProject, updateProject } from "./endpoints/projects";\n+export { createApiClient } from "./create-client";\n+export type { EndpointDef, EndpointMap, ApiClient } from "./types";\n+export { usersApi } from "./endpoints/users";\n+export { projectsApi } from "./endpoints/projects";\n+// Legacy exports preserved for backward compatibility\n+export { getUsers, getProjects } from "./client";\n',
+    lines: [
+      { type: 'del', content: 'export { getUsers, getUserById, createUser, updateUser, deleteUser } from "./endpoints/users";' },
+      { type: 'del', content: 'export { getProjects, getProjectById, createProject, updateProject } from "./endpoints/projects";' },
+      { type: 'add', content: 'export { createApiClient } from "./create-client";' },
+      { type: 'add', content: 'export type { EndpointDef, EndpointMap, ApiClient } from "./types";' },
+      { type: 'add', content: 'export { usersApi } from "./endpoints/users";' },
+      { type: 'add', content: 'export { projectsApi } from "./endpoints/projects";' },
+      { type: 'add', content: '// Legacy exports preserved for backward compatibility' },
+      { type: 'add', content: 'export { getUsers, getProjects } from "./client";' },
+    ],
+  },
+
+  /* ── Additional tool call: type-check proofs ── */
+  { id: 'bto8', kind: 'tool_call', createdAt: T(19.7), author: B('builder'), toolName: 'TypeCheck', status: 'running' },
+  { id: 'btr8', kind: 'tool_result', createdAt: T(19.8), author: B('builder'), toolName: 'TypeCheck', status: 'completed', summary: 'tsc --noEmit --strict · 0 errors · generic type inference resolves correctly for all endpoint shapes (GET no body required, POST body typed, DELETE void)' },
+
+  /* ── Think 5: Pre-subagent assessment ── */
+  {
+    id: 'bth5', kind: 'thinking', createdAt: T(19.9), author: B('builder'),
+    content: 'All implementation files written, diffs generated for reviewers, type-check passed. The migration approach is validated: users.ts and projects.ts now use the generic client, re-exports updated in index.ts, legacy client.ts preserved for backward compatibility. Ready to run subagent checks before requesting approval.',
+    isThinking: false,
+  },
+
+  /* ── Additional tool calls: tasks endpoint + error scenarios ── */
+  { id: 'bto9', kind: 'tool_call', createdAt: T(19.91), author: B('builder'), toolName: 'Read', status: 'running' },
+  { id: 'btr9', kind: 'tool_result', createdAt: T(19.92), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/api/endpoints/tasks.ts · 95 lines · getTasks, getTaskById, createTask, updateTask, deleteTask — exact same pattern, ready for follow-up migration' },
+  { id: 'bto10', kind: 'tool_call', createdAt: T(19.93), author: B('builder'), toolName: 'Read', status: 'running' },
+  { id: 'btr10', kind: 'tool_result', createdAt: T(19.94), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/api/endpoints/billing.ts · 78 lines · getInvoices, getInvoiceById, createPayment — same fetch-wrapper pattern, 3 more wrappers to migrate in follow-up' },
+
+  /* ── Diff 6: billing endpoint survey (not yet migrated, documented for follow-up) ── */
+  {
+    id: 'bdiff6', kind: 'diff', createdAt: T(19.95),
+    author: B('builder'),
+    title: 'src/api/endpoints/billing.ts — Identified for follow-up migration',
+    files: ['src/api/endpoints/billing.ts'],
+    additions: 0, deletions: 0,
+    patch: '@@ -1,78 +1,78 @@\n // Same fetch-wrapper pattern as users and projects\n // getInvoices, getInvoiceById, createPayment\n // Will be migrated in a follow-up PR — type system already covers all shapes\n export async function getInvoices() { /* ... */ }\n export async function getInvoiceById(id: string) { /* ... */ }\n export async function createPayment(body: CreatePaymentBody) { /* ... */ }\n',
+    lines: [
+      { type: 'ctx', content: '// Same fetch-wrapper pattern as users and projects' },
+      { type: 'ctx', content: '// getInvoices, getInvoiceById, createPayment' },
+      { type: 'ctx', content: '// Will be migrated in a follow-up PR — type system already covers all shapes' },
+      { type: 'ctx', content: 'export async function getInvoices() { /* ... */ }' },
+      { type: 'ctx', content: 'export async function getInvoiceById(id: string) { /* ... */ }' },
+      { type: 'ctx', content: 'export async function createPayment(body: CreatePaymentBody) { /* ... */ }' },
+    ],
+  },
+
   /* ── Subagents (2 total) ── */
   {
     id: 'bsub1', kind: 'subagent', createdAt: T(20), author: B('builder'),
@@ -275,6 +332,13 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     text: 'Changes ready. Two new files (src/api/types.ts, src/api/create-client.ts), three modified files (users.ts -45/+12, projects.ts -38/+10, index.ts re-export). Linter and type auditor both passed. The generic client eliminates 53 duplicated fetch wrappers across 8 endpoint files. Awaiting approval to write changes.',
     displayTitle: 'Changes ready for review',
     displayDetail: 'Two new files, three modified files. Linter and type auditor both passed. 53 duplicated fetch wrappers eliminated.',
+  },
+
+  /* ── Think 6: Final pre-approval sanity check ── */
+  {
+    id: 'bth6', kind: 'thinking', createdAt: T(22.5), author: B('builder'),
+    content: 'Final sanity check before requesting approval. (1) Two new files: types.ts (32 lines) and create-client.ts (78 lines) — clean, no external dependencies beyond fetch. (2) Three modified files: users.ts (-45/+12), projects.ts (-38/+10), index.ts (-3/+6). Net code reduction: 127 lines removed, 38 lines added across all changes. (3) All type checks pass in strict mode. (4) Backward compatibility maintained: legacy client.ts still exports old named functions. (5) 31 call sites need migration in follow-up but no breakage. Safe to proceed to approval.',
+    isThinking: false,
   },
 
   /* ── Approval → user approves → deploy ── */
