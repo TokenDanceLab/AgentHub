@@ -7,8 +7,9 @@
      fileBlob  — Optional pre-fetched Blob (skips fetch)
      onClose   — Called when the close button is clicked
 
-   Fetches the file, parses via XLSX.read, and renders as a scrollable
-   HTML table with sortable columns.
+   Fetches the file, parses via XLSX.read (dynamic import — lazy-loaded
+   to keep ~694 KB xlsx out of the main bundle), and renders as a
+   scrollable HTML table with sortable columns.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -29,6 +30,19 @@ interface SortState {
   direction: SortDirection;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Lazy xlsx module loader — dynamic import keeps 694 KB out of main bundle
+// ═══════════════════════════════════════════════════════════════════════
+
+let xlsxModule: typeof import('xlsx') | null = null;
+
+async function getXLSX(): Promise<typeof import('xlsx')> {
+  if (!xlsxModule) {
+    xlsxModule = await import('xlsx');
+  }
+  return xlsxModule;
+}
+
 export const TablePreview: React.FC<TablePreviewProps> = ({
   fileUrl,
   fileName,
@@ -44,10 +58,32 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheet, setActiveSheet] = useState<string>('');
 
-  // Lazy-load xlsx (694 KB) only when spreadsheet preview is opened
-  const loadXLSX = useCallback(async () => {
-    const XLSX = await import('xlsx');
-    return XLSX;
+  const parseSheet = useCallback((workbook: import('xlsx').WorkBook, sheetName: string) => {
+    const XLSX = xlsxModule!;
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) return;
+
+    const data: string[][] = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    });
+
+    const firstRow = data[0];
+    if (!firstRow) {
+      setHeaders([]);
+      setRows([]);
+      setRawRows([]);
+      return;
+    }
+
+    const headerRow = firstRow.map(String);
+    const dataRows = data.slice(1).map((row) => row.map(String));
+
+    setHeaders(headerRow);
+    setRawRows(dataRows);
+    setRows(dataRows);
+    setSort({ column: -1, direction: null });
   }, []);
 
   const loadFile = useCallback(async () => {
@@ -70,7 +106,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         arrayBuffer = await response.arrayBuffer();
       }
 
-      const XLSX = await loadXLSX();
+      const XLSX = await getXLSX();
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const names = workbook.SheetNames;
       setSheetNames(names);
@@ -87,41 +123,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [fileUrl, fileBlob, loadXLSX]);
-
-  function parseSheet(workbook: { Sheets: Record<string, unknown>; SheetNames: string[] }, sheetName: string): void {
-    const XLSX_utils = { sheet_to_json: (ws: unknown, opts: Record<string, unknown>) => [] as string[][] };
-    // Use the dynamically loaded XLSX — but this is called within loadFile where XLSX is in scope
-    const worksheet = (workbook.Sheets as Record<string, unknown>)[sheetName];
-    if (!worksheet) return;
-
-    // We need to import utils dynamically here too. However, parseSheet is called
-    // from loadFile/handleSheetSwitch where XLSX is already loaded. Refactor:
-    // The actual parse is done inline in those callbacks. We keep this as a thin wrapper.
-    const data: string[][] = (
-      (workbook as { Sheets: Record<string, unknown> }).Sheets[sheetName] as { utils?: unknown }
-    ) ? [] : [];
-      header: 1,
-      defval: '',
-      raw: false,
-    });
-
-    const firstRow = data[0];
-    if (!firstRow) {
-      setHeaders([]);
-      setRows([]);
-      setRawRows([]);
-      return;
-    }
-
-    const headerRow = firstRow.map(String);
-    const dataRows = data.slice(1).map((row) => row.map(String));
-
-    setHeaders(headerRow);
-    setRawRows(dataRows);
-    setRows(dataRows);
-    setSort({ column: -1, direction: null });
-  }
+  }, [fileUrl, fileBlob, parseSheet]);
 
   useEffect(() => {
     void loadFile();
@@ -163,7 +165,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       if (fileBlob) {
         /* Re-parse from the same blob — we already have it loaded */
         void fileBlob.arrayBuffer().then(async (ab) => {
-          const XLSX = await loadXLSX();
+          const XLSX = await getXLSX();
           const wb = XLSX.read(ab, { type: 'array' });
           parseSheet(wb, sheetName);
         });
@@ -171,7 +173,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         void fetch(fileUrl).then((response) => {
           if (!response.ok) return;
           void response.arrayBuffer().then(async (ab) => {
-            const XLSX = await loadXLSX();
+            const XLSX = await getXLSX();
             const wb = XLSX.read(ab, { type: 'array' });
             parseSheet(wb, sheetName);
           });
@@ -180,7 +182,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     } catch {
       /* Ignore sheet switch errors */
     }
-  }, [fileBlob, fileUrl, loadXLSX]);
+  }, [fileBlob, fileUrl, parseSheet]);
 
   const sortIcon = useMemo(() => {
     return (colIndex: number) => {
