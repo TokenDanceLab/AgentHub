@@ -39,12 +39,19 @@
   margin-left:19px; padding:var(--sp-2) var(--sp-md) var(--sp-sm) var(--sp-16);
   font:var(--body); color:var(--text-2); line-height:1.55;
   border-left:1px solid var(--guide-line);
+  overflow:hidden;
+  animation:rowBdExpand var(--dur) var(--ease);
 }
+@keyframes rowBdExpand { from { max-height:0; opacity:0 } to { max-height:var(--think-max-h, 2000px); opacity:1 } }
 /* Nested RowItems (subagent children): strip card border, keep inner spacing */
 .row-bd .row-item { background:transparent; border:none; border-radius:0; margin:0 }
 .row-bd .row-item + .row-item { border-top:none; margin-top:0 }
 
 .row-children { display:flex; flex-direction:column; gap:var(--sp-xs); margin-top:var(--sp-xs) }
+
+/* ── Fail state: icon color ─────────────────────────────────────── */
+.row-item.fail > .row-hd .row-icon { color:var(--danger) }
+.row-item.fail > .row-bd { border-left-color:var(--danger) }
 
 /* Think */  .row-item.think > .row-hd .row-icon { color:var(--info) }
 .row-item.think > .row-bd { color:var(--text-2); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto }
@@ -91,6 +98,11 @@
 .ap-actions button:hover { opacity:0.85 }
 .ap-approve { background:var(--success); color:var(--on-primary) }
 .ap-deny { background:var(--surface); color:var(--danger); border:1px solid var(--danger-bg) }
+
+/* ── Retry bar (card-level, visible even when collapsed) ────────── */
+.retry-bar { display:flex; padding:var(--sp-xs) var(--sp-10) var(--sp-xs) var(--sp-10); border-top:1px solid var(--danger-bg) }
+.retry-btn { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:1px solid var(--danger); background:var(--danger-bg); color:var(--danger); transition:opacity var(--dur) }
+.retry-btn:hover { opacity:0.85 }
 
 /* Route — dispatch indicator */
 .row-item.route { margin:var(--sp-xs) 0; animation:routeSlideIn var(--dur-slow) var(--ease) both }
