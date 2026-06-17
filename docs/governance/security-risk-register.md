@@ -1,6 +1,6 @@
 # AgentHub Security Risk Register
 
-Last reviewed: 2026-06-10 (file path audit, branch alignment)
+Last reviewed: 2026-06-17 (file path audit, branch alignment)
 
 This register tracks security, privacy, reliability, network, disk, and logic risks for AgentHub. It is a living queue for audit loops; update status and evidence when a finding is fixed or intentionally accepted.
 
@@ -266,7 +266,7 @@ git diff --check
 - Cross-repo identity/auth changes must also update `../docs/identity/identity-auth.md`, `../docs/identity/authorization-model.md`, and `../docs/identity/relying-party.md`.
 - Feishu/Lark Gateway security items should be added here when the integration skeleton lands.
 - 2026-06-04: Merged 17 findings from root `docs/security-risk-register.md` (reviewed 2026-06-03) as AH-SR-028 through AH-SR-044. Root copy can now be deleted.
-- 2026-06-08: Backend merge slice mitigated OIDC token exchange error leakage and Edge subprocess inherited environment leakage in repo. Deployment verification remains required for both because production logs and runtime environment are private evidence surfaces.
+- 2026-06-17: Audit pass updated branch/worktree lists and removed stale backend slice references. ChatView migration worktree is current active branch.
 - 2026-06-08: Restored backend subagent findings `AH-SR-045` through `AH-SR-049` from the older governance register. Current dev reclassified `AH-SR-048` as mitigated in repo pending runtime/log verification; `AH-SR-045`, `AH-SR-046`, `AH-SR-047`, and `AH-SR-049` remain open because the residual remote Edge authorization, subprocess environment, and Hub-Edge delivery risks are not closed by the current code.
 
 ## 2026-05-27 — Dependabot 上游漏洞（等待上游修复）

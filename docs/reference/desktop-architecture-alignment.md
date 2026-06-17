@@ -4,7 +4,7 @@
 
 ## 1. Architecture Overview (from docs)
 
-The system architecture defines a **Hub-Edge-Runner** three-tier model:
+The system architecture defines a **Hub-Edge** two-tier model with Agent Runtime adapters embedded in Edge Server:
 
 ```
 UI (Desktop/Web) → Edge Server (local control) → Runner (process execution)

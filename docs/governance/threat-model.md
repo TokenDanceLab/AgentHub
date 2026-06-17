@@ -1,6 +1,6 @@
 # Threat Model
 
-> Updated: 2026-06-10
+> Updated: 2026-06-17
 > 本页是 AgentHub 的信任边界模型与安全亮点速览，供评审快速理解安全深度。
 > 完整逐条风险台账（44+ 条，含代码行号、测试命令、生产部署证据）见 [security-risk-register.md](security-risk-register.md)。
 

@@ -2,15 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CustomAgentCreator, { readCustomAgentDrafts } from './CustomAgentCreator';
 
-vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: () => <span data-testid="mock-claude-code-icon" />,
-  Codex: () => <span data-testid="mock-codex-icon" />,
-  GeminiCLI: () => <span data-testid="mock-gemini-cli-icon" />,
-  ModelIcon: () => <span data-testid="mock-model-icon" />,
-  OpenCode: () => <span data-testid="mock-opencode-icon" />,
-  ProviderIcon: () => <span data-testid="mock-provider-icon" />,
-}));
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => {

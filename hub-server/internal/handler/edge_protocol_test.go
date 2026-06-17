@@ -118,8 +118,8 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 
 		assertStatus(t, w, 200)
 		resp := parseResp(t, w)
-		if resp.Code != "OK" {
-			t.Fatalf("stage 2 trigger task: expected OK got %s", resp.Code)
+		if resp.Code != "ok" {
+			t.Fatalf("stage 2 trigger task: expected ok got %s", resp.Code)
 		}
 		if !taskCreated {
 			t.Fatal("task should have been created")
@@ -427,8 +427,8 @@ func TestTaskEventSummaryReturnsRuntimeSummary(t *testing.T) {
 
 	assertStatus(t, w, 200)
 	resp := parseResp(t, w)
-	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s", resp.Code)
+	if resp.Code != "ok" {
+		t.Fatalf("expected ok, got %s", resp.Code)
 	}
 	payload, ok := resp.Data.(map[string]interface{})
 	if !ok {
@@ -457,8 +457,8 @@ func TestTaskEventSummaryAliasReturnsRuntimeSummary(t *testing.T) {
 
 	assertStatus(t, w, 200)
 	resp := parseResp(t, w)
-	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s", resp.Code)
+	if resp.Code != "ok" {
+		t.Fatalf("expected ok, got %s", resp.Code)
 	}
 	payload, ok := resp.Data.(map[string]interface{})
 	if !ok {
@@ -560,8 +560,8 @@ func assertStatus(t *testing.T, w *httptest.ResponseRecorder, expected int) {
 func assertOK(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	resp := parseResp(t, w)
-	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s", resp.Code)
+	if resp.Code != "ok" {
+		t.Fatalf("expected ok, got %s", resp.Code)
 	}
 }
 

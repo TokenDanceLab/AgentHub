@@ -8,7 +8,7 @@ const EDGE_AUTHOR: TranscriptAuthor = { id: 'edge', name: 'Edge', role: 'system'
 export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefined): TranscriptBlock[] {
   if (!events?.length) return [];
 
-  return events
+  const blocks = events
     .map((event, index) => ({
       block: normalizeEdgeEvent(event),
       index,
@@ -27,11 +27,83 @@ export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefi
       return a.index - b.index;
     })
     .map((entry) => entry.block);
+
+  // Post-process: merge consecutive text/thinking blocks from streaming deltas.
+  // This prevents UI thrashing from many incremental text_delta/thinking events.
+  // Merging only applies to blocks from the same author AND same run (via evidenceRefs).
+  const merged = blocks.reduce((acc: TranscriptBlock[], block) => {
+    const last = acc[acc.length - 1];
+    if (!last) { acc.push(block); return acc; }
+
+    const sameRun = evidenceRunId(last) === evidenceRunId(block);
+
+    // Merge consecutive text blocks with same author + run (streaming text_delta → single text block)
+    if (
+      last.kind === 'text' &&
+      block.kind === 'text' &&
+      last.author.id === block.author.id &&
+      sameRun
+    ) {
+      acc[acc.length - 1] = {
+        ...last,
+        text: last.text + block.text,
+      };
+      return acc;
+    }
+
+    // Merge consecutive thinking blocks with same author + run (streaming thinking → single thinking block)
+    if (
+      last.kind === 'thinking' &&
+      block.kind === 'thinking' &&
+      last.author.id === block.author.id &&
+      sameRun
+    ) {
+      const mergedIsThinking = last.isThinking || block.isThinking
+      acc[acc.length - 1] = {
+        ...last,
+        content: (last.content ?? '') + (block.content ?? ''),
+        ...(mergedIsThinking ? { isThinking: true as const } : {}),
+      };
+      return acc;
+    }
+
+    acc.push(block);
+    return acc;
+  }, []);
+
+  // Post-process: auto-transition thinking blocks to 'completed' when the next
+  // non-thinking block arrives. This prevents thinking blocks from staying in
+  // 'running' state forever when the model has already moved on to a text reply.
+  for (let i = 0; i < merged.length; i++) {
+    const block = merged[i]!;
+    if (block.kind === 'thinking' && block.isThinking) {
+      const nextBlock = merged[i + 1];
+      if (!nextBlock || nextBlock.kind !== 'thinking') {
+        // Mark as completed; update evidenceRef status too
+        block.isThinking = false;
+        if (block.evidenceRefs) {
+          for (const ref of block.evidenceRefs) {
+            ref.status = 'completed';
+          }
+        }
+      }
+    }
+  }
+
+  return merged;
+}
+
+/** Extract the first run evidence ref ID from a block's evidenceRefs, or empty string if none. */
+function evidenceRunId(block: TranscriptBlock): string {
+  const refs = block.evidenceRefs;
+  if (!refs) return '';
+  const runRef = refs.find((r) => r.kind === 'run');
+  return runRef?.id ?? '';
 }
 
 // System-level run lifecycle events that should not appear as transcript blocks.
 // These are status indicators, not conversational content.
-const SKIPPED_EVENT_TYPES = new Set(['run.queued']);
+const SKIPPED_EVENT_TYPES = new Set<string>([]);
 
 function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
   if (SKIPPED_EVENT_TYPES.has(event.type)) return null;
@@ -177,9 +249,12 @@ function outputTextBlock(event: EventEnvelope): TranscriptBlock | null {
   const text = cleanText(stringField(event.payload.text));
   if (!text) return null;
   const runId = eventRunId(event);
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.output missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
+  }
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'running')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running')),
     kind: 'text',
     text,
   };
@@ -199,9 +274,12 @@ function outputBatchTextBlock(event: EventEnvelope): TranscriptBlock | null {
   );
   if (!text) return null;
   const runId = eventRunId(event);
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.output.batch missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
+  }
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'running')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running')),
     kind: 'text',
     text,
   };
@@ -211,9 +289,12 @@ function agentTextBlock(event: EventEnvelope): TranscriptBlock | null {
   const text = cleanText(stringField(event.payload.content) ?? stringField(event.payload.text));
   if (!text) return null;
   const runId = eventRunId(event);
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: agent text block missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
+  }
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, 'running')),
+    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId ?? event.id, 'running')),
     kind: 'text',
     text,
   };
@@ -515,8 +596,7 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
 function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null {
   const requestId =
     stringField(event.payload.requestId) ??
-    stringField(event.payload.approvalId) ??
-    event.id;
+    stringField(event.payload.approvalId);
   const approvalTitle = cleanText(stringField(event.payload.title));
   const toolName =
     stringField(event.payload.toolName) ??
@@ -532,13 +612,23 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
     cleanText(stringField(event.payload.path));
   const risk = normalizeApprovalRisk(stringField(event.payload.risk) ?? stringField(event.payload.riskLevel));
 
+  const baseBlock = requestId
+    ? {
+        ...blockBase(event, EDGE_AUTHOR, [
+          ...runEvidence(runId, 'pending'),
+          approvalEvidence(requestId, toolName, 'pending'),
+        ]),
+      }
+    : {
+        ...blockBase(event, EDGE_AUTHOR, [
+          ...runEvidence(runId, 'pending'),
+        ]),
+      };
+
   return {
-    ...blockBase(event, EDGE_AUTHOR, [
-      ...runEvidence(runId, 'pending'),
-      approvalEvidence(requestId, toolName, 'pending'),
-    ]),
+    ...baseBlock,
     kind: 'permission_request',
-    requestId,
+    requestId: requestId ?? event.id,
     title: approvalTitle ?? `Permission requested: ${toolName}`,
     status: 'pending',
     ...approvalHubContext(event),
@@ -551,8 +641,7 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
 function permissionDecidedBlock(event: EventEnvelope): TranscriptBlock | null {
   const requestId =
     stringField(event.payload.requestId) ??
-    stringField(event.payload.approvalId) ??
-    event.id;
+    stringField(event.payload.approvalId);
   const decision = stringField(event.payload.decision) ?? 'decided';
   const status: EvidenceRefStatus = decision === 'deny' || decision === 'rejected' ? 'failed' : 'completed';
   const toolName = stringField(event.payload.toolName) ?? stringField(event.payload.kind) ?? 'permission';
@@ -561,13 +650,23 @@ function permissionDecidedBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.reason)) ??
     cleanText(stringField(event.payload.summary));
 
+  const baseBlock = requestId
+    ? {
+        ...blockBase(event, EDGE_AUTHOR, [
+          ...runEvidence(runId, status),
+          approvalEvidence(requestId, toolName, status),
+        ]),
+      }
+    : {
+        ...blockBase(event, EDGE_AUTHOR, [
+          ...runEvidence(runId, status),
+        ]),
+      };
+
   return {
-    ...blockBase(event, EDGE_AUTHOR, [
-      ...runEvidence(runId, status),
-      approvalEvidence(requestId, toolName, status),
-    ]),
+    ...baseBlock,
     kind: 'permission_result',
-    requestId,
+    requestId: requestId ?? event.id,
     title: `Permission ${decision}: ${toolName}`,
     status,
     decision,

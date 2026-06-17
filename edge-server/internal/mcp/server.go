@@ -71,6 +71,10 @@ type Server struct {
 	permissionRegistry *api.PermissionRegistry
 	workspaceAllowlist []string
 
+	// authToken, if non-empty, is required as Bearer token on every MCP request.
+	// When empty (default), MCP inherits the global Edge auth middleware.
+	authToken string
+
 	// sessionID is generated on initialize and returned to clients.
 	// For simplicity, this implementation uses a single-session model.
 	mu        sync.Mutex
@@ -92,6 +96,14 @@ func NewServer(
 	}
 }
 
+// SetAuthToken configures a required Bearer token for MCP endpoint access.
+// When empty, no additional MCP-level auth is enforced (the global middleware
+// still applies). When set, every MCP request MUST include this token as a
+// Bearer token in the Authorization header.
+func (s *Server) SetAuthToken(token string) {
+	s.authToken = token
+}
+
 // SetWorkspaceAllowlist configures the workspace allowlist for workDir validation
 // in start_run requests. When set, workDir values must fall within one of the
 // allowed roots — matching the REST API validation in PostRuns.
@@ -101,10 +113,21 @@ func (s *Server) SetWorkspaceAllowlist(roots []string) {
 
 // ServeHTTP handles MCP requests on the /mcp endpoint.
 // It accepts POST requests with JSON-RPC 2.0 payloads.
+// When an MCP-specific auth token is configured, requests must include
+// it as a Bearer token in the Authorization header.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	// MCP-level authentication: when configured, verify Bearer token.
+	if s.authToken != "" {
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") || !strings.EqualFold(strings.TrimPrefix(auth, "Bearer "), s.authToken) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	contentType := r.Header.Get("Content-Type")

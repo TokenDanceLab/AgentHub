@@ -13,8 +13,8 @@ func TestErrorMethod(t *testing.T) {
 }
 
 func TestOK(t *testing.T) {
-	if OK.Code != "OK" {
-		t.Fatalf("OK.Code = %q, want OK", OK.Code)
+	if OK.Code != "ok" {
+		t.Fatalf("OK.Code = %q, want ok", OK.Code)
 	}
 	if OK.HTTPStatus != http.StatusOK {
 		t.Fatalf("OK.HTTPStatus = %d, want 200", OK.HTTPStatus)
@@ -34,11 +34,11 @@ func TestAuthErrors(t *testing.T) {
 		code   string
 		status int
 	}{
-		{"AuthInvalidToken", AuthInvalidToken, "AUTH_INVALID_TOKEN", http.StatusUnauthorized},
-		{"AuthInvalidCredentials", AuthInvalidCredentials, "AUTH_INVALID_CREDENTIALS", http.StatusUnauthorized},
-		{"AuthTokenExpired", AuthTokenExpired, "AUTH_TOKEN_EXPIRED", http.StatusUnauthorized},
-		{"AuthDeviceMismatch", AuthDeviceMismatch, "AUTH_DEVICE_MISMATCH", http.StatusForbidden},
-		{"AuthRefreshInvalid", AuthRefreshInvalid, "AUTH_REFRESH_INVALID", http.StatusUnauthorized},
+		{"AuthInvalidToken", AuthInvalidToken, AuthInvalidToken.Code, http.StatusUnauthorized},
+		{"AuthInvalidCredentials", AuthInvalidCredentials, AuthInvalidCredentials.Code, http.StatusUnauthorized},
+		{"AuthTokenExpired", AuthTokenExpired, AuthTokenExpired.Code, http.StatusUnauthorized},
+		{"AuthDeviceMismatch", AuthDeviceMismatch, AuthDeviceMismatch.Code, http.StatusForbidden},
+		{"AuthRefreshInvalid", AuthRefreshInvalid, AuthRefreshInvalid.Code, http.StatusUnauthorized},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,10 +59,10 @@ func TestMessageErrors(t *testing.T) {
 		code   string
 		status int
 	}{
-		{"MsgNotFound", MsgNotFound, "MSG_NOT_FOUND", http.StatusNotFound},
-		{"MsgRecallTimeout", MsgRecallTimeout, "MSG_RECALL_TIMEOUT", http.StatusBadRequest},
-		{"MsgPinLimitExceeded", MsgPinLimitExceeded, "MSG_PIN_LIMIT_EXCEEDED", http.StatusBadRequest},
-		{"MsgBlockedByReceiver", MsgBlockedByReceiver, "MSG_BLOCKED_BY_RECEIVER", http.StatusForbidden},
+		{"MsgNotFound", MsgNotFound, MsgNotFound.Code, http.StatusNotFound},
+		{"MsgRecallTimeout", MsgRecallTimeout, MsgRecallTimeout.Code, http.StatusBadRequest},
+		{"MsgPinLimitExceeded", MsgPinLimitExceeded, MsgPinLimitExceeded.Code, http.StatusBadRequest},
+		{"MsgBlockedByReceiver", MsgBlockedByReceiver, MsgBlockedByReceiver.Code, http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestAttachmentErrors(t *testing.T) {
 	if AttachHashMismatch.HTTPStatus != http.StatusBadRequest {
 		t.Errorf("AttachHashMismatch.HTTPStatus = %d", AttachHashMismatch.HTTPStatus)
 	}
-	if AttachTypeNotAllowed.Code != "ATTACH_TYPE_NOT_ALLOWED" {
+	if AttachTypeNotAllowed.Code != "attach_type_not_allowed" {
 		t.Errorf("AttachTypeNotAllowed.Code = %q", AttachTypeNotAllowed.Code)
 	}
 	if AttachTypeNotAllowed.HTTPStatus != http.StatusUnsupportedMediaType {

@@ -105,7 +105,7 @@ Local Android APK packaging on Windows:
 corepack pnpm android:package
 
 # Build, install, and launch on a Wi-Fi ADB device:
-corepack pnpm android:package -- -Version 0.3.0-rc.7 -InstallSerial 192.168.1.105:5555 -Launch
+corepack pnpm android:package -- -Version 0.3.0-rc.7 -InstallSerial <DEVICE_IP>:5555 -Launch
 ```
 
 `android:package` runs `scripts/package-android.ps1`. On Windows it creates or reuses a short real-path junction at `D:\ah\agenthub-mobile`, installs dependencies with a short pnpm virtual store at `D:\p\agenthub-mobile`, regenerates the ignored native Android project from Expo config, builds `assembleRelease` by default so the JS bundle is embedded, and writes the APK plus `android-package-manifest.json` under `.tmp/android-package/`. Use `-Version` when producing a release-candidate artifact; otherwise the artifact name follows `app/mobile-rn/package.json`. Use this for local installable APK proof; `assembleDebug` is a Metro/dev-server build and is not valid offline install proof. The `v0.3.0-rc.7` local device proof used the explicit short paths `D:\ah\a` and `D:\p\a`.

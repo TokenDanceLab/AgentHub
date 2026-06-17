@@ -7,19 +7,33 @@
     "strict": true,
     "strictNullChecks": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2021",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@shared/*": ["../shared/src/*"]
-    }
+      "@/*": [
+        "src/*"
+      ],
+      "@shared/*": [
+        "../shared/src/*"
+      ]
+    },
+    "rootDirs": [
+      "src",
+      "../shared/src"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

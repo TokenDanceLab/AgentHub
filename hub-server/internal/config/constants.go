@@ -17,6 +17,11 @@ const MaxMessagePageLimit = 100
 // MaxMessagePageLimit because sync clients often fetch larger batches.
 const MaxIncrementalMessageLimit = 500
 
+// MaxPageLimit is the maximum allowed page size (pageSize / limit) for list
+// endpoints across all Hub handlers. Handlers MUST clamp user-supplied values
+// to this ceiling to prevent unbounded query resource usage.
+const MaxPageLimit = 500
+
 // ── HTTP server timeouts ─────────────────────────────────────────────────────
 
 // DefaultReadHeaderTimeout is applied to both the main HTTP server and the
