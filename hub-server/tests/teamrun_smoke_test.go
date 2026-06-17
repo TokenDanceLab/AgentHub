@@ -372,14 +372,14 @@ func TestTeamRunSmoke(t *testing.T) {
 			"description": "E2E smoke test team with supervisor + 2 workers",
 		})
 		r := parse(resp)
-		assertCode(t, r, "OK", "create team")
+		assertCode(t, r, "ok", "create team")
 		assert.NotEmpty(t, extract(r.Data, "id"), "team id")
 	})
 
 	t.Run("ListTeams", func(t *testing.T) {
 		resp := get("/web/agent-teams")
 		r := parse(resp)
-		assertCode(t, r, "OK", "list teams")
+		assertCode(t, r, "ok", "list teams")
 	})
 
 	t.Run("CreateTeam_EmptyName_Fails", func(t *testing.T) {
@@ -394,7 +394,7 @@ func TestTeamRunSmoke(t *testing.T) {
 		"description": "E2E smoke test team",
 	})
 	teamResp := parse(resp)
-	require.Equal(t, "OK", teamResp.Code, "create team must succeed")
+	require.Equal(t, "ok", teamResp.Code, "create team must succeed")
 	teamID := extract(teamResp.Data, "id")
 	require.NotEmpty(t, teamID, "team id")
 
@@ -406,7 +406,7 @@ func TestTeamRunSmoke(t *testing.T) {
 			"role":             model.TeamMemberRoleSupervisor,
 		})
 		r := parse(resp)
-		assertCode(t, r, "OK", "add supervisor member")
+		assertCode(t, r, "ok", "add supervisor member")
 	})
 
 	var workerMemberID string
@@ -416,7 +416,7 @@ func TestTeamRunSmoke(t *testing.T) {
 			"role":             model.TeamMemberRoleExecutor,
 		})
 		r := parse(resp)
-		assertCode(t, r, "OK", "add worker member")
+		assertCode(t, r, "ok", "add worker member")
 	})
 
 	t.Run("AddMember_AgentNotFound_Fails", func(t *testing.T) {
@@ -426,13 +426,13 @@ func TestTeamRunSmoke(t *testing.T) {
 			"role":             model.TeamMemberRoleExecutor,
 		})
 		r := parse(resp)
-		assertCode(t, r, "AGENT_NOT_FOUND", "non-existent agent profile")
+		assertCode(t, r, "agent_not_found", "non-existent agent profile")
 	})
 
 	// Fetch team with members to extract member IDs.
 	resp = get("/web/agent-teams/" + teamID)
 	detailResp := parse(resp)
-	assertCode(t, detailResp, "OK", "get team detail")
+	assertCode(t, detailResp, "ok", "get team detail")
 	var detail model.TeamDetail
 	require.NoError(t, json.Unmarshal(detailResp.Data, &detail), "unmarshal team detail")
 	require.GreaterOrEqual(t, len(detail.Members), 2, "need at least 2 members")
@@ -456,7 +456,7 @@ func TestTeamRunSmoke(t *testing.T) {
 			"trigger_message": "Refactor the auth module and add tests",
 		})
 		r := parse(resp)
-		assertCode(t, r, "OK", "start team run")
+		assertCode(t, r, "ok", "start team run")
 		runID = extract(r.Data, "id")
 		require.NotEmpty(t, runID, "run id")
 		status := extract(r.Data, "status")
@@ -468,14 +468,14 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("GetRun", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID)
 		r := parse(resp)
-		assertCode(t, r, "OK", "get run")
+		assertCode(t, r, "ok", "get run")
 	})
 
 	t.Run("StartTeamRun_NoMembers_Fails", func(t *testing.T) {
 		// Create a team with no members.
 		resp := post("/web/agent-teams", map[string]string{"name": "Empty Team"})
 		r := parse(resp)
-		assertCode(t, r, "OK", "create empty team")
+		assertCode(t, r, "ok", "create empty team")
 		emptyTeamID := extract(r.Data, "id")
 
 		resp = post("/web/agent-teams/"+emptyTeamID+"/runs", map[string]string{
@@ -501,7 +501,7 @@ func TestTeamRunSmoke(t *testing.T) {
 				Context:      "Current auth.go is 500 lines, needs modularization",
 			})
 		r := parse(resp)
-		assertCode(t, r, "OK", "delegate route decision")
+		assertCode(t, r, "ok", "delegate route decision")
 
 		// Verify the returned assignment is typed.
 		assignmentID := extract(r.Data, "id")
@@ -538,7 +538,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("ListTeamEvents", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/events")
 		r := parse(resp)
-		assertCode(t, r, "OK", "list team events")
+		assertCode(t, r, "ok", "list team events")
 
 		// Parse the event list.
 		var events []model.AgentTeamEvent
@@ -569,7 +569,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("ListTeamTasks", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/tasks")
 		r := parse(resp)
-		assertCode(t, r, "OK", "list team tasks")
+		assertCode(t, r, "ok", "list team tasks")
 
 		var tasks []model.AgentTeamTask
 		require.NoError(t, json.Unmarshal(r.Data, &tasks), "unmarshal tasks")
@@ -593,7 +593,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("GetRunState", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/state")
 		r := parse(resp)
-		assertCode(t, r, "OK", "get run state")
+		assertCode(t, r, "ok", "get run state")
 
 		var state model.TeamRunState
 		require.NoError(t, json.Unmarshal(r.Data, &state), "unmarshal run state")
@@ -678,13 +678,13 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// finish returns nil assignment, so data is null.
-		assertCode(t, r, "OK", "finish route decision")
+		assertCode(t, r, "ok", "finish route decision")
 	})
 
 	t.Run("VerifyRunCompleted", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID)
 		r := parse(resp)
-		assertCode(t, r, "OK", "get run after finish")
+		assertCode(t, r, "ok", "get run after finish")
 		status := extract(r.Data, "status")
 		assert.Equal(t, model.TeamRunStatusCompleted, status, "run must be completed")
 	})
@@ -692,7 +692,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("VerifyRunCompletedInState", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/state")
 		r := parse(resp)
-		assertCode(t, r, "OK", "get state after finish")
+		assertCode(t, r, "ok", "get state after finish")
 		var state model.TeamRunState
 		require.NoError(t, json.Unmarshal(r.Data, &state))
 		assert.Equal(t, model.TeamRunStatusCompleted, state.Status, "state status must be completed")
@@ -702,7 +702,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("VerifyAllEvents", func(t *testing.T) {
 		resp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/events")
 		r := parse(resp)
-		assertCode(t, r, "OK", "list all events")
+		assertCode(t, r, "ok", "list all events")
 
 		var events []model.AgentTeamEvent
 		require.NoError(t, json.Unmarshal(r.Data, &events))

@@ -243,8 +243,8 @@ func TestAttachmentUploadHashMismatchDoesNotModifyExistingBlob(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Error.Code != "ATTACH_HASH_MISMATCH" {
-		t.Fatalf("expected ATTACH_HASH_MISMATCH, got %s", resp.Error.Code)
+	if resp.Error.Code != "attach_hash_mismatch" {
+		t.Fatalf("expected attach_hash_mismatch, got %s", resp.Error.Code)
 	}
 	if svc.saveCalled {
 		t.Fatal("SaveAttachment should not be called for a mismatched hash")
@@ -358,8 +358,8 @@ func TestAttachmentUploadRejectsDisallowedSniffedMimeBeforeStorage(t *testing.T)
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Error.Code != "ATTACH_TYPE_NOT_ALLOWED" {
-		t.Fatalf("expected ATTACH_TYPE_NOT_ALLOWED, got %s", resp.Error.Code)
+	if resp.Error.Code != "attach_type_not_allowed" {
+		t.Fatalf("expected attach_type_not_allowed, got %s", resp.Error.Code)
 	}
 	if svc.storeCalled {
 		t.Fatal("StoreBlob should not be called for a disallowed MIME type")

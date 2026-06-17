@@ -574,7 +574,7 @@ func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret",
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
 		},
 		AgentTeam: AgentTeamConfig{
 			MaxDelegationDepth: -1,
@@ -603,7 +603,7 @@ func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret",
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
 		},
 		TokenDanceID: TokenDanceIDConfig{
 			IssuerURL:    "https://id.example",
@@ -859,7 +859,7 @@ func TestValidateS3ConfigRequiresCompleteCredentials(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-s3-secret!!",
+			Secret: "strong-s3-secret!!padded-to-minimum-32-chars..",
 		},
 		S3: S3Config{
 			Endpoint: "https://r2.example.com",
@@ -889,7 +889,7 @@ func TestValidateS3ConfigDoesNotRequireLocalUploadDir(t *testing.T) {
 			Port: 6379,
 		},
 		JWT: JWTConfig{
-			Secret: "strong-s3-secret!!",
+			Secret: "strong-s3-secret!!padded-to-minimum-32-chars..",
 		},
 		Upload: UploadConfig{
 			Dir: filepath.Join(t.TempDir(), "missing"),
