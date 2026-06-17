@@ -727,6 +727,8 @@
 .modalBody {
   overflow-y: auto;
   padding: 22px 36px 36px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 /* ── QR panel ── */

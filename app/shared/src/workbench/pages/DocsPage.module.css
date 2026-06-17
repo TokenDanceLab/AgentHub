@@ -301,7 +301,8 @@
 
 /* ── Doc table ── */
 .docTable {
-  min-width: 760px;
+  min-width: 560px;
+  /* was 760px — lowered; grid-template-columns provide natural floor */
 }
 
 .docTableHead {

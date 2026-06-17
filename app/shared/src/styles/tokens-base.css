@@ -295,6 +295,8 @@ html {
 body {
   font: var(--body);
   min-width: 1180px;
-  overflow: hidden;
-}
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* overflow-y: auto provides scroll fallback for layout overflows
+     while preserving the desktop-SPA clip model via overflow-x: hidden */
 

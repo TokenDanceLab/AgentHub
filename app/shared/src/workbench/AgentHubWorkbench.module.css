@@ -278,6 +278,8 @@
   margin: 0;
   padding: 0 6px;
   list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 .conversationButton {
