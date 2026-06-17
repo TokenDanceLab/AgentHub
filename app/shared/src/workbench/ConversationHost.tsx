@@ -80,6 +80,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   composer, dispatchComposer, composerInputRef,
   searchOpen, onSearchOpenChange,
 }: ConversationHostProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
   const [pendingUserBlock, setPendingUserBlock] = useState<TextTranscriptBlock | null>(null);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   const submitComposer = useCallback(async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (isSubmittingRef.current) return;
-    const textarea = event.currentTarget.querySelector<HTMLTextAreaElement>('textarea[aria-label="Composer input"]');
+    const textarea = event.currentTarget.querySelector<HTMLTextAreaElement>('textarea[data-composer-input]');
     const liveText = textarea?.value ?? composer.text;
     if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
     const capturedConversationId = currentConversationId;
@@ -153,7 +154,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       <WorkspaceHeader activeConversation={activeConversation} dataMode={workbenchStatus?.dataMode}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
-      <div className={styles.transcriptRegion} role="region" aria-label="Transcript">
+      <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
         <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
@@ -183,8 +184,9 @@ function MainchainStatusStrip({ onExportEvidence, summary }: {
   onExportEvidence: () => void;
   summary: MainchainSummary;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <section className={styles.mainchainStrip} aria-label="Demo main chain status">
+    <section className={styles.mainchainStrip} aria-label={t('aria.mainChainStatus')}>
       <div className={styles.mainchainTrack} role="list">
         {summary.nodes.map((n) => (
           <div className={styles.mainchainNode} data-state={n.state} key={n.id} role="listitem">
