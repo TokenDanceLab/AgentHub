@@ -32,50 +32,54 @@ function ev(id: string, seq: number, type: string, payload: Record<string, unkno
 describe('Edge WebSocket streaming → ChatView', () => {
   it('streaming: agent blocks accumulate incrementally', () => {
     const stream: EventEnvelope[] = [
-      ev('e2', 2, 'run.agent.thinking', { content: 'analyzing...', is_thinking: true }),
-      ev('e3', 3, 'run.agent.thinking', { content: 'analyzed.', is_thinking: false }),
-      ev('e4', 4, 'run.agent.tool_call', { toolName: 'Read', status: 'running' }),
-      ev('e5', 5, 'run.agent.tool_result', { toolName: 'Read', status: 'completed', summary: '42 lines' }),
-      ev('e6', 6, 'run.agent.file_change', { path: 'src/user.ts', action: 'modified', additions: 2 }),
+      ev('e2', 2, 'run.agent.thinking', { content: 'analyzing...' }),
+      ev('e3', 3, 'run.agent.tool_call', { toolName: 'Read', status: 'running' }),
+      ev('e4', 4, 'run.agent.tool_result', { toolName: 'Read', status: 'completed', summary: '42 lines' }),
+      ev('e5', 5, 'run.agent.file_change', { path: 'src/user.ts', action: 'modified', additions: 2 }),
     ]
 
     const snapshots = simulateEdgeStream(stream)
-    expect(snapshots.length).toBe(5)
+    expect(snapshots.length).toBe(4)
 
     // After first think event: 1 agent with 1 row
     expect(snapshots[0]!.length).toBe(1)
-    // Final: all events → 1 agent (same AGENT_AUTHOR) with 5 rows (result skipped by adapter)
-    const final = snapshots[4]!
+    // Final: all events → 1 agent with 3 rows (thinking, tool result merged into tool call, file)
+    const final = snapshots[3]!
     expect(final.length).toBe(1)
     const agent = final[0] as any
-    expect(agent.rows.length).toBe(5)
+    expect(agent.rows.length).toBe(3)
   })
 
   it('streaming: agent IDs remain stable across WS events', () => {
     const stream: EventEnvelope[] = [
-      ev('e1', 1, 'run.agent.thinking', { content: 'a', is_thinking: true }),
+      ev('e1', 1, 'run.agent.thinking', { content: 'a' }),
       ev('e2', 2, 'run.agent.tool_call', { toolName: 'Read', status: 'running' }),
       ev('e3', 3, 'run.agent.tool_result', { toolName: 'Read', status: 'completed', summary: 'ok' }),
     ]
     const snapshots = simulateEdgeStream(stream)
-    // All snapshots: single agent with growing rows
-    for (let i = 0; i < snapshots.length; i++) {
-      const items = snapshots[i]!
-      expect(items.length).toBe(1)
-      expect((items[0] as any).rows.length).toBe(i + 1)
-    }
+    // Snapshots: [thinking], [thinking, tool_call], [thinking, tool_merged]
+    // After snapshot 2 (tool_result merges into tool_call), row count stays at 2
+    expect(snapshots[0]!.length).toBe(1)
+    expect((snapshots[0]![0] as any).rows.length).toBe(1)
+    expect(snapshots[1]!.length).toBe(1)
+    expect((snapshots[1]![0] as any).rows.length).toBe(2)
+    // Final: tool_result merged into tool_call, so still 2 rows
+    expect(snapshots[2]!.length).toBe(1)
+    expect((snapshots[2]![0] as any).rows.length).toBe(2)
   })
 
-  it('streaming: interleaved runs merge under same AGENT_AUTHOR', () => {
-    // All AGENT_AUTHOR blocks share id='agent' — they group into one AgentTranscriptBlock
+  it('streaming: interleaved runs do NOT merge thinking blocks from different runs', () => {
+    // Thinking blocks from different runs should remain separate
+    // because evidenceRunId differs between them
     const stream: EventEnvelope[] = [
-      ev('b1', 1, 'run.agent.thinking', { content: 'Builder...', is_thinking: true }, { runId: 'rb' }),
-      ev('r1', 2, 'run.agent.thinking', { content: 'Reviewer...', is_thinking: true }, { runId: 'rr' }),
+      ev('b1', 1, 'run.agent.thinking', { content: 'Builder...' }, { runId: 'rb' }),
+      ev('r1', 2, 'run.agent.thinking', { content: 'Reviewer...' }, { runId: 'rr' }),
       ev('b2', 3, 'run.agent.tool_call', { toolName: 'Read', status: 'running' }, { runId: 'rb' }),
     ]
     const snapshots = simulateEdgeStream(stream)
     const final = snapshots[2]!
-    expect(final.length).toBe(1) // all same AGENT_AUTHOR → one group with 3 rows
+    expect(final.length).toBe(1) // all same AGENT_AUTHOR → one group
+    // 3 rows: Builder thinking, Reviewer thinking, Read tool_call (no merges across runs)
     expect((final[0] as any).rows.length).toBe(3)
   })
 })

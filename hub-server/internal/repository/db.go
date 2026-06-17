@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
@@ -13,8 +14,34 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
+// scrubSQLContent replaces JSON content field values in SQL log output to
+// prevent sensitive message content from appearing in structured logs.
+// It matches PostgreSQL/JSONB content patterns like:
+//
+//	content->>'text' = '{"text":"..."}' or $N = '{"text":"..."}'
+//
+// and replaces the JSON value body with "[REDACTED:content]".
+//
+// This is a best-effort lossy scrubber: it operates on the already-formatted
+// SQL string. It does NOT guarantee perfect redaction for all edge cases.
+// Do not rely on this scrubber alone to protect classified data in logs;
+// it is a defense-in-depth measure for accidentally logged message bodies.
+var scrubContentRE = regexp.MustCompile(`'\{("text"|"markdown"|"html"|"image_url"|"file_key"|"structured_data"|"thinking"):[^']*}'`)
+var scrubParamRE = regexp.MustCompile(`\$(\d+)\s*=\s*'\{("text"|"markdown"|"html"|"image_url"|"file_key"|"structured_data"|"thinking"):[^}]*\}[^']*'`)
+
+func scrubSQLContent(sql string) string {
+	sql = scrubContentRE.ReplaceAllString(sql, "'[REDACTED:content]'")
+	sql = scrubParamRE.ReplaceAllString(sql, "REDACTED:$1")
+	return sql
+}
+
 // slogGormLogger implements gormlogger.Interface so GORM slow queries and
 // errors are emitted as structured slog records instead of plain-text lines.
+//
+// SECURITY: Raw SQL may contain user data or secrets.  Every log site in
+// Trace() passes the SQL through scrubSQLContent() before logging.  In
+// production the LogLevel should additionally be held at gormlogger.Warn
+// or higher so Info-level trace is never emitted.
 type slogGormLogger struct {
 	SlowThreshold             time.Duration
 	LogLevel                  gormlogger.LogLevel
@@ -54,6 +81,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 	switch {
 	case err != nil && l.LogLevel >= gormlogger.Error && (!l.IgnoreRecordNotFoundError || !errors.Is(err, gorm.ErrRecordNotFound)):
 		sql, rows := fc()
+		sql = scrubSQLContent(sql)
 		slog.Error("gorm error",
 			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
 			"rows", rows,
@@ -62,6 +90,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		)
 	case elapsed > l.SlowThreshold && l.SlowThreshold > 0 && l.LogLevel >= gormlogger.Warn:
 		sql, rows := fc()
+		sql = scrubSQLContent(sql)
 		slog.Warn("slow query",
 			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
 			"threshold", l.SlowThreshold.String(),
@@ -70,6 +99,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		)
 	case l.LogLevel >= gormlogger.Info:
 		sql, rows := fc()
+		sql = scrubSQLContent(sql)
 		slog.Info("gorm trace",
 			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
 			"rows", rows,

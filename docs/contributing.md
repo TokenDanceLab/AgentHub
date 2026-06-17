@@ -1,8 +1,8 @@
 # AgentHub 开发者贡献指南
 
-> 最后更新：2026-06-10
+> 最后更新：2026-06-17
 
-本文档面向所有贡献者——无论是人类开发者还是 AI Agent——提供从环境搭建到提交 PR 的完整工作流。开始之前，请先阅读 `README.md` 了解项目定位，再阅读 `docs/architecture.md` 了解架构全貌。
+本文档面向所有贡献者——无论是人类开发者还是 AI Agent——提供从环境搭建到提交 PR 的完整工作流。开始之前，请先阅读 `README.md` 了解项目定位，再阅读 `docs/architecture/`（主索引为 `docs/architecture.md`）了解架构全貌。
 
 ## 目录
 
@@ -722,7 +722,7 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 |------|---------|---------|
 | `STATE.md` | 每次重要里程碑或基线变更 | 当前事实快照：分支状态、已合入能力、release gate、不声明完成项 |
 | `docs/roadmap.md` | 调整目标或优先级时 | 持续开发目标、当前进展、验证和下一步 |
-| `docs/architecture.md` | 架构决策变更时 | 架构边界、分层、通信方式、数据流模式、验收门禁 |
+| `docs/architecture/` | 架构决策变更时 | 架构边界、分层、通信方式、数据流模式、验收门禁 |
 | `AGENTS.md` | 开发流程或规范变更时 | 开发规范、分工、Git 规则、安全规则 |
 | `README.md` | 新增面向外部的能力说明时 | 对外展示页，给新读者快速了解项目 |
 | `docs/developer-quickstart.md` | 环境搭建流程变更时 | 快速上手步骤 |
@@ -733,11 +733,11 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 ### 7.2 文档维护规则
 
 1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
-2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节。
+2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture/`、`docs/roadmap.md` 中对应章节。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
 4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名（M1/M3a/P0-1/Phase 0/Phase 1）。
 5. **时间戳快照删除**：文件名含日期的快照文档完成任务后直接删除，不留在活跃目录。
-6. **不新增根级文档**：新增长期说明先考虑合并进主文档（`docs/architecture.md`、`docs/roadmap.md`），不要随手新增根级文档。
+6. **不新增根级文档**：新增长期说明先考虑合并进主文档（`docs/architecture/`、`docs/roadmap.md`），不要随手新增根级文档。
 7. **详细调研放 `docs/reference/`**：第三方调研和源码分析放 `docs/reference/`，不混入主文档。
 
 ### 7.3 语言规范
