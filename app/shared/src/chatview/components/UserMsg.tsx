@@ -1,8 +1,8 @@
-import type { UserTranscriptMsg } from '../adapter'
+import type { TranscriptUserItem } from '../transcript-item'
 import { useTranslation } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
-interface Props { item: UserTranscriptMsg; chatMode: 'dm' | 'group' }
+interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
 
 export default function UserMessage({ item, chatMode }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)

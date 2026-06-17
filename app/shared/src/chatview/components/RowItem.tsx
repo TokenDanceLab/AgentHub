@@ -131,9 +131,9 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
           {item.status==='fail' && onRetry && <div className="ap-actions"><button className="ap-approve" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
           {item.url && <div className="dp-url">{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
-          {item.fileName && <div className="att-row" onClick={() => onFileClick?.(item.id)} style={{cursor: onFileClick ? 'pointer' : undefined}}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
+          {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={() => onFileClick?.(item.id)}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
           {item.ctxPct !== undefined && (<>
-            <div className="ctx-bar-wrap"><div className="ctx-bar"><div className={`ctx-fill ${(item.ctxPct??0)>80?'warn':'ok'}`} style={{width:`${item.ctxPct}%`}} /></div><span className="pct">{item.ctxPct}%</span></div>
+            <div className="ctx-bar-wrap"><div className="ctx-bar"><div className={`ctx-fill ${(item.ctxPct??0)>80?'warn':'ok'}`} style={{'--ctx-pct': `${item.ctxPct}%`} as React.CSSProperties} /></div><span className="pct">{item.ctxPct}%</span></div>
             {item.ctxStats && <div className="ctx-meta">{item.ctxStats.map((s,i) => <span key={i}>{s}</span>)}</div>}
           </>)}
           {item.sessionTags && <div className="sess-meta">{item.sessionTags.map((t,i) => <span key={i}>{t}</span>)}</div>}
