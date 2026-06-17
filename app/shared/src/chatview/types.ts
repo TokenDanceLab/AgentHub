@@ -7,7 +7,7 @@
 export type AgentRole = string
 
 /** Discriminated row card kind — determines icon, label, and rendering strategy. */
-export type RowType = 'think' | 'tool' | 'file' | 'sub' | 'approval' | 'route' | 'deploy' | 'attachment' | 'ctx' | 'session'
+export type RowType = 'think' | 'tool' | 'file' | 'sub' | 'approval' | 'route' | 'deploy' | 'attachment' | 'ctx' | 'session' | 'preview'
 
 /** A single row/card displayed inside an agent group in the transcript.
  *  Core data model for all card types: think, tool, file, sub, approval,
@@ -41,4 +41,8 @@ export interface RowItem {
   children?: RowItem[]
   orchAgents?: { id: string; agent: string; role: AgentRole; task: string; status: 'pending' | 'running' | 'ok' | 'fail'; dependsOn?: string[] }[]
   orchNote?: string
+  /** Domain extracted from preview URL (e.g. "github.com"). */
+  previewDomain?: string
+  /** Display title for URL preview (derived from URL path when no explicit title). */
+  previewTitle?: string
 }
