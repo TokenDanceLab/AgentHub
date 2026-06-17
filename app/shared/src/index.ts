@@ -385,7 +385,6 @@ export {
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
   demoWorkbenchPins,
-  demoWorkbenchTranscripts,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,

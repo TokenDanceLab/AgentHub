@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-06-17（chatview-migration worktree 快照校正，清除已删除远端分支引用）
+最后更新：2026-06-17（worktree 列表与 live system 一致性验证通过）
 
 ## 合并规则
 
@@ -32,6 +32,8 @@ feat/* -> dev/delicious233 -> master
 | 主工作树 | `dev/delicious233` | 当前主线、Desktop/Web v4 已合入 | 直接开发前先确认 dirty paths |
 | `.worktrees/chatview-migration` | `feat/chatview-tokendance-migration` | ChatView 迁移 + TokenDance 品牌化 | ChatView 模块写入 |
 | `.worktrees/restructure-cleanup` | `feat/restructure-cleanup` | 仓库重组清理 | 结构变更写入 |
+
+已验证（2026-06-17）：worktree 列表与 live system 一致，`.worktrees/chatview-migration` 和 `.worktrees/restructure-cleanup` 均活跃且 HEAD 匹配。
 
 已归档/已删除 worktree：旧 `.worktrees/doc-governance`、`.worktrees/.trash/codex-trump-fork-archived-20260526` 等已清理或移至 trash。
 

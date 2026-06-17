@@ -247,7 +247,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: 1.2.
 
 #### 1.4 Replace Emoji Tool Icons with SVG Icons
-**File**: `app/desktop/src/components/ChatView.tsx` (lines 25-36)
+**File**: `app/shared/src/chatview/components/Transcript.tsx` (TOOL_ICONS record)
 **Action**: Replace the `TOOL_ICONS` Record<string, string> with proper lucide-react SVG components.
 **Specific mapping**:
 - Read → `FileText`
@@ -261,7 +261,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: None.
 
 #### 1.5 Redesign Tool Call Cards
-**File**: `app/desktop/src/components/ChatView.tsx` (tool call rendering section)
+**File**: `app/shared/src/chatview/components/RowItem.tsx`, `app/shared/src/chatview/components/AgentGroup.tsx` (tool call rendering sections)
 **Action**: Enhance tool call cards with:
 - Status indicator (spinner/check/X)
 - Elapsed time display
@@ -270,7 +270,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: 1.4.
 
 #### 1.6 Add Thinking Block Auto-Collapse
-**File**: `app/desktop/src/components/ChatView.tsx` (ThinkingBlock component, lines 96+)
+**File**: `app/shared/src/chatview/components/ChatViewTranscript.tsx` (ThinkingBlock component, streaming state)
 **Action**: Add auto-collapse behavior — thinking block starts expanded, auto-collapses when actual response text begins streaming.
 **Dependencies**: None.
 
@@ -316,7 +316,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Specific files** (highest impact first):
 - `App.module.css` — Shell colors, sidebar, top bar
 - `SettingsPage.module.css` — Panel colors, card colors
-- `ChatView.module.css` — Message bubbles, tool cards, code blocks
+- `ChatViewTranscript.module.css` — Message bubbles, tool cards, code blocks
 - `WelcomeScreen.module.css` — Launcher panel, mode pills
 - `AgentList.module.css` — List items, status badges
 **Dependencies**: 1.1.
