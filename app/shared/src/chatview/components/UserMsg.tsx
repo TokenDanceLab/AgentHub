@@ -1,5 +1,6 @@
 import type { UserTranscriptMsg } from '../adapter'
-import { useI18n } from '../i18n/I18nProvider'
+import { useTranslation } from 'react-i18next'
+import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
 interface Props { item: UserTranscriptMsg; chatMode: 'dm' | 'group' }
 

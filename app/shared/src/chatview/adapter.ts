@@ -59,7 +59,8 @@ function newAgentBlock(author: TranscriptBlock['author'], role: string, createdA
 
 function timeStr(iso?: string) {
   if (!iso) return ''
-  return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en-US'
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
 }
 
 function statusNorm(s: EvidenceRefStatus | string): RowItem['status'] {
@@ -237,10 +238,10 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true, standalone: true,
         ctxPct: c.usagePercent || 0,
         ctxStats: [
-          `输入 ${((c.inputTokens || 0) / 1000).toFixed(1)}k`,
-          `输出 ${((c.outputTokens || 0) / 1000).toFixed(1)}k`,
-          c.contextLimit ? `上限 ${(c.contextLimit / 1000).toFixed(0)}k` : '',
-          c.cachePercent ? `缓存 ${c.cachePercent}%` : '',
+          `in: ${((c.inputTokens || 0) / 1000).toFixed(1)}k`,
+          `out: ${((c.outputTokens || 0) / 1000).toFixed(1)}k`,
+          c.contextLimit ? `limit: ${(c.contextLimit / 1000).toFixed(0)}k` : '',
+          c.cachePercent ? `cache: ${c.cachePercent}%` : '',
           c.cost || '',
           c.modelLabel || '',
         ].filter(Boolean),
@@ -261,7 +262,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: statusNorm(d.status || 'completed'),
         collapsible: true, standalone: true,
         url: d.url,
-        deployMeta: metaParts.length > 0 ? metaParts.join(SEP) : '已部署',
+        deployMeta: metaParts.length > 0 ? metaParts.join(SEP) : 'Deployed',
       } as RowItem
     }
 
