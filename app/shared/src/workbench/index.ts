@@ -1,10 +1,24 @@
 export { AgentHubWorkbench } from './AgentHubWorkbench';
+export { ChatViewBridge } from './ChatViewBridge';
 export { ConversationSidebar } from './ConversationSidebar';
 export { GlobalRail } from './GlobalRail';
 export { RightInspector } from './RightInspector';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
+export { WorkbenchShell } from './WorkbenchShell';
 export { WorkspaceHeader } from './WorkspaceHeader';
+export {
+  INSPECTOR_MIN_WIDTH,
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_READABLE_WIDTH,
+  INSPECTOR_COLLAPSE_SNAP_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_COLLAPSE_SNAP_WIDTH,
+  WORKSPACE_AUTO_COLLAPSE_WIDTH,
+} from './WorkbenchShell';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export * from './mockData';
 export {
@@ -62,10 +76,21 @@ export {
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
+export type { ChatViewBridgeProps } from './ChatViewBridge';
 export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage, ConnectionStatusKind } from './GlobalRail';
 export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
 export type { UnifiedComposerProps } from './UnifiedComposer';
+export type {
+  WorkbenchShellProps,
+  AgentProfileState,
+  HumanProfileState,
+  GroupProfileState,
+  MainchainNode,
+  MainchainSummary,
+  MainchainStatusKind,
+  InspectorResizeDelegates,
+} from './WorkbenchShell';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,
