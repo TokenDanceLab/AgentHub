@@ -6,10 +6,12 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock } from '../transcript';
 import type { WorkbenchConversation } from '../platform';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface ChatViewBridgeProps {
   /** Filtered + optimistic transcript blocks to render. */
@@ -84,6 +86,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   dismissedPinnedIds,
   onToast,
 }: ChatViewBridgeProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const chatMode = useMemo<'dm' | 'group'>(
     () => (activeConversation?.kind === 'group' ? 'group' : 'dm'),
     [activeConversation?.kind],
@@ -97,7 +100,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
       content: activeConversation.pinnedAnnouncement.content,
       author: activeConversation.pinnedAnnouncement.author,
       time: activeConversation.pinnedAnnouncement.time,
-      onCopy: onToast ? () => onToast('已打开置顶内容') : undefined,
+      onCopy: onToast ? () => onToast(t('toast.pinnedOpened')) : undefined,
       onDismiss: undefined,
     };
   }, [activeConversation, dismissedPinnedIds, onToast]);

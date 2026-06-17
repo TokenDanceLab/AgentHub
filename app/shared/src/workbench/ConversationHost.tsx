@@ -1,8 +1,10 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript';
 import type { ComposerMention } from '../composer';
 import { buildComposerIntent, composerReducer, createInitialComposerState } from '../composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { AttachmentUploadState } from './UnifiedComposer';
 import type { FileItem } from './inspector';
 import type { ConnectionStatusKind } from './GlobalRail';
