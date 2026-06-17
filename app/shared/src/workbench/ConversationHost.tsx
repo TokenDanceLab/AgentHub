@@ -1,4 +1,4 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript';
 import { isSidebarOnlyTranscriptBlock } from '../transcript';
 import type { ComposerMention } from '../composer';
@@ -35,8 +35,7 @@ export interface ConversationHostProps {
   selectedBlockIds: Set<string>; selectionMode: boolean;
   softHiddenBlockIds: Set<string>; actionedBlockIds: Set<string>;
   highlightedBlockId?: string | undefined; onHighlightEnd?: (() => void) | undefined;
-  dismissedPinnedIds: Set<string>;
-  onToast: (message: string) => void;
+  dismissedPinnedIds: Set<string>; onToast: (message: string) => void;
   composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
   selectedExecutionTargetId: string;
   onExecutionTargetChange: (id: string) => void;

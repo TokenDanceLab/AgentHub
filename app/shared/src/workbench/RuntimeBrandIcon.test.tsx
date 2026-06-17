@@ -8,34 +8,39 @@ import {
 
 vi.mock('@lobehub/icons', () => {
   const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
+  const iconWithColor = (name: string) => {
+    const Icon = ({ size }: { size?: number }) => <span data-icon={name} data-size={size} data-testid={`${name}-icon`} />;
+    Icon.Color = ({ size }: { size?: number }) => <span data-icon={name} data-size={size} data-testid={`${name}-color-icon`} />;
+    return Icon;
+  };
   return {
-    Alibaba: span,
-    AlibabaCloud: span,
-    Anthropic: span,
-    Azure: span,
-    Aws: span,
-    Bedrock: span,
-    ByteDance: span,
-    Claude: span,
+    Alibaba: iconWithColor('alibaba'),
+    AlibabaCloud: iconWithColor('alibabacloud'),
+    Anthropic: iconWithColor('anthropic'),
+    Azure: iconWithColor('azure'),
+    Aws: iconWithColor('aws'),
+    Bedrock: iconWithColor('bedrock'),
+    ByteDance: iconWithColor('bytedance'),
+    Claude: iconWithColor('claude'),
     ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
-    Cohere: span,
+    Cohere: iconWithColor('cohere'),
     Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
-    DeepSeek: span,
-    Doubao: span,
-    Gemini: span,
+    DeepSeek: iconWithColor('deepseek'),
+    Doubao: iconWithColor('doubao'),
+    Gemini: iconWithColor('gemini'),
     GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
-    Google: span,
-    Meta: span,
-    Mistral: span,
+    Google: iconWithColor('google'),
+    Meta: iconWithColor('meta'),
+    Mistral: iconWithColor('mistral'),
     ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
-    Moonshot: span,
+    Moonshot: iconWithColor('moonshot'),
     OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
-    OpenAI: span,
-    Perplexity: span,
+    OpenAI: iconWithColor('openai'),
+    Perplexity: iconWithColor('perplexity'),
     ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
-    Qwen: span,
-    Volcengine: span,
-    Zhipu: span,
+    Qwen: iconWithColor('qwen'),
+    Volcengine: iconWithColor('volcengine'),
+    Zhipu: iconWithColor('zhipu'),
   };
 });
 
@@ -198,8 +203,8 @@ describe('RuntimeBrandIcon', () => {
     expect(screen.getByLabelText('Codex')).toHaveAttribute('data-runtime-brand-source', 'lobehub');
     expect(screen.getByTestId('codex-icon')).toBeInTheDocument();
     expect(screen.getByTestId('gemini-cli-icon')).toHaveAttribute('data-size', '24');
-    expect(screen.getByTestId('provider-icon')).toHaveAttribute('data-provider', 'openai');
-    expect(screen.getByTestId('provider-icon')).toHaveAttribute('data-size', '16');
+    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-icon', 'openai');
+    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-size', '16');
     expect(screen.getByLabelText('Shell')).toHaveAttribute('data-runtime-brand-source', 'fallback');
     expect(screen.getByLabelText('Shell')).toHaveAttribute('data-runtime-brand-fallback', 'shell');
   });
