@@ -3,7 +3,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import type { RowItem } from '../data/mock'
-import type { TransKey } from '../i18n/translations'
+import type { TransKey } from '../i18n/resources'
 import { SEP } from '../adapter'
 
 export interface LabelResult {

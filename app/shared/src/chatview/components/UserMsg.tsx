@@ -5,7 +5,7 @@ import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 interface Props { item: UserTranscriptMsg; chatMode: 'dm' | 'group' }
 
 export default function UserMessage({ item, chatMode }: Props) {
-  const { t } = useI18n()
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
 
   if (chatMode === 'dm') {
     return (

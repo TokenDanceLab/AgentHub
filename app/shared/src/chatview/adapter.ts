@@ -377,7 +377,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
           } as RowItem
           if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = newAgentBlock(block.author, role, block.createdAt)
+            currentAgent = newAgentBlock(block.author, role, block.createdAt);
+            (currentAgent as any).groupId = groupId
           }
           currentAgent.rows.push(row)
         }
@@ -394,7 +395,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
           if (!childRow) continue
           if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = newAgentBlock(block.author, role, block.createdAt)
+            currentAgent = newAgentBlock(block.author, role, block.createdAt);
+            (currentAgent as any).groupId = groupId
           }
           currentAgent.rows.push(childRow)
         }
@@ -408,7 +410,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       if (!row) continue
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId }
         currentAgent.id = `${block.author.id}-${_seq}`
       }
       // Standalone cards vs inline rows
