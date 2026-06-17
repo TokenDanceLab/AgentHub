@@ -1,4 +1,4 @@
-import { useCallback, memo } from 'react'
+import { useCallback, useMemo, memo } from 'react'
 import type { TranscriptAgentItem, BlockActionCallback } from '../transcript-item'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
@@ -38,9 +38,50 @@ export default memo(function AgentGroup({ block, chatMode, onAgentClick, onBlock
     </div>
   )
 
-  const handleApprove = useCallback(onBlockAction ? (id: string) => onBlockAction('approve', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
-  const handleReject = useCallback(onBlockAction ? (id: string) => onBlockAction('deny', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
-  const handleRetry = useCallback(onBlockAction ? (id: string) => onBlockAction('retry', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const handleApprove: ((id: string) => void) | undefined = useCallback(onBlockAction ? (id: string) => onBlockAction('approve', id) : () => {}, [onBlockAction])
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const handleReject: ((id: string) => void) | undefined = useCallback(onBlockAction ? (id: string) => onBlockAction('deny', id) : () => {}, [onBlockAction])
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const handleRetry: ((id: string) => void) | undefined = useCallback(onBlockAction ? (id: string) => onBlockAction('retry', id) : () => {}, [onBlockAction])
+
+  const bubblesContent = useMemo(() => block.bubbles.map((text, i) => {
+    const parts = text.split(/(`[^`]+`)/g)
+    return (
+      <div key={i} className="bubble-group">
+        {block.replyBlockId && i === 0 && (
+          <div className="reply-quote" data-block-id={block.replyBlockId}>
+            <span className="reply-quote-author">{block.replyAuthor ?? 'User'}</span>
+            <span className="reply-quote-preview">{block.replyPreview ?? ''}</span>
+          </div>
+        )}
+        <div className="agent-bubble">
+          {parts.map((part, j) =>
+            part.startsWith('`') && part.endsWith('`')
+              ? <code key={j}>{part.slice(1, -1)}</code>
+              : part
+          )}
+        </div>
+      </div>
+    )
+  }), [block.bubbles, block.replyBlockId, block.replyAuthor, block.replyPreview])
+
+  const evidenceChipsContent = useMemo(() => {
+    if (!block.evidenceRefs || block.evidenceRefs.length === 0) return null
+    return (
+      <div className="evidence-chips">
+        {block.evidenceRefs.map(ref => {
+          const Icon = evidenceIconMap[ref.kind] ?? IconFile
+          return (
+            <span key={ref.id} className="evidence-chip" title={ref.label}>
+              <Icon size={12} />
+              <span>{ref.label}</span>
+            </span>
+          )
+        })}
+      </div>
+    )
+  }, [block.evidenceRefs])
 
   const body = (
     <>
@@ -68,39 +109,8 @@ export default memo(function AgentGroup({ block, chatMode, onAgentClick, onBlock
           ))}
         </div>
       )}
-      {block.bubbles.map((text, i) => {
-        const parts = text.split(/(`[^`]+`)/g)
-        return (
-          <div key={i} className="bubble-group">
-            {block.replyBlockId && i === 0 && (
-              <div className="reply-quote" data-block-id={block.replyBlockId}>
-                <span className="reply-quote-author">{block.replyAuthor ?? 'User'}</span>
-                <span className="reply-quote-preview">{block.replyPreview ?? ''}</span>
-              </div>
-            )}
-            <div className="agent-bubble">
-              {parts.map((part, j) =>
-                part.startsWith('`') && part.endsWith('`')
-                  ? <code key={j}>{part.slice(1, -1)}</code>
-                  : part
-              )}
-            </div>
-          </div>
-        )
-      })}
-      {block.evidenceRefs && block.evidenceRefs.length > 0 && (
-        <div className="evidence-chips">
-          {block.evidenceRefs.map(ref => {
-            const Icon = evidenceIconMap[ref.kind] ?? IconFile
-            return (
-              <span key={ref.id} className="evidence-chip" title={ref.label}>
-                <Icon size={12} />
-                <span>{ref.label}</span>
-              </span>
-            )
-          })}
-        </div>
-      )}
+      {bubblesContent}
+      {evidenceChipsContent}
     </>
   )
 

@@ -14,7 +14,7 @@ const T = (offsetMin: number) => {
 }
 
 const B = (id: string, name = 'Builder') => ({ id, name, role: 'agent' as const })
-const U = (id: string, name = 'Ding') => ({ id, name, role: 'human' as const })
+const U = (id: string, name = 'Alice') => ({ id, name, role: 'human' as const })
 
 // ═══════════════════════════════════════════════════════════════════════
 // Builder DM — long realistic ReAct: "Refactor the API client layer to use generics"
@@ -491,7 +491,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   /* ── Orchestrator think 1: Understand scope ── */
   {
     id: 'goth1', kind: 'thinking', createdAt: T(1), author: O('orch'),
-    content: 'RBAC middleware request from @Ding. Key requirements: (1) three roles — admin, editor, viewer, (2) per-endpoint permission configuration, (3) deny-by-default policy, (4) integration with existing JWT auth middleware, (5) YAML policy file for configuration. Need to understand the current middleware chain, auth module, and routing structure before decomposing the work.',
+    content: 'RBAC middleware request from @Alice. Key requirements: (1) three roles — admin, editor, viewer, (2) per-endpoint permission configuration, (3) deny-by-default policy, (4) integration with existing JWT auth middleware, (5) YAML policy file for configuration. Need to understand the current middleware chain, auth module, and routing structure before decomposing the work.',
     isThinking: false,
   },
 
@@ -727,7 +727,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     text: 'The current types already support that — we just need to add `billing-reader` to the Role enum and update the policy YAML to scoped allowlists. The middleware is generic enough that any new role Just Works once added to the allowlists. Should I open a follow-up issue?',
     replyToMessageId: 'gu2',
     replyPreview: 'can we also add a `billing-reader` role...',
-    replyAuthor: 'Ding',
+    replyAuthor: 'Alice',
     displayTitle: 'Re: billing-reader role',
     displayDetail: 'Type system already supports new roles, just update Role enum + policy YAML.',
   },
