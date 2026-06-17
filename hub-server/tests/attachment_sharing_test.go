@@ -14,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 func TestAttachmentDownloadAllowsSessionMemberAfterFileMessage(t *testing.T) {
@@ -59,7 +61,7 @@ func TestAttachmentDownloadAllowsSessionMemberAfterFileMessage(t *testing.T) {
 	}
 
 	outsiderResp := parse(get("/client/attachments/"+attachmentID, outsider.Token))
-	mustCode(t, outsiderResp, "ATTACH_NOT_FOUND", "outsider cannot download referenced attachment")
+	mustCode(t, outsiderResp, errcode.AttachNotFound.Code, "outsider cannot download referenced attachment")
 }
 
 func TestAttachmentMetadataReadthroughAfterFileMessage(t *testing.T) {

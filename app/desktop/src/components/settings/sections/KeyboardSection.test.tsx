@@ -78,7 +78,7 @@ describe('KeyboardSection', () => {
     const { container } = render(<KeyboardSection />);
 
     fireEvent.click(screen.getByRole('button', { name: 'settings.keyboardCustomize' }));
-    fireEvent.click(screen.getAllByRole('button', { name: /^settings\.keyboardEditBinding/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^settings\.keyboardEditBinding/ })[0]!);
 
     expect(screen.getByText('settings.keyboardCapturePrompt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'settings.keyboardConfirm' })).toBeDisabled();
