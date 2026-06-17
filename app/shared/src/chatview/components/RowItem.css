@@ -48,7 +48,7 @@
 .row-item.think > .row-bd { color:var(--text-2); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto }
 
 /* Tool */  .row-item.tool > .row-hd .row-label { font-size:0.6875rem; font-weight:500 }
-.row-item.tool > .row-bd { font:var(--label); font-family:var(--font-mono); font-weight:400; line-height:1.5 }
+.row-item.tool > .row-bd { font:var(--label); font-weight:400; line-height:1.5 }
 .row-item.tool.result-row > .row-bd { border-left-color:var(--success) }
 .row-item.tool.result-row.fail > .row-bd { border-left-color:var(--danger) }
 
@@ -63,7 +63,7 @@
 /* File */  .row-item.file > .row-hd .row-icon.cr { color:var(--success) }
 .row-item.file > .row-hd .row-icon.mod { color:var(--warning) }
 .row-item.file > .row-hd .row-icon.del { color:var(--danger) }
-.row-item.file > .row-hd .row-label { font-family:var(--font-mono); font-size:0.6875rem }
+.row-item.file > .row-hd .row-label { font-size:0.6875rem }
 
 /* Sub */   .row-item.sub > .row-hd .row-icon { color:var(--info) }
 .row-item.sub > .row-bd { border-left-color:var(--info) }
@@ -92,7 +92,7 @@
 
 /* Deploy */ .row-item.deploy > .row-hd .row-icon { color:var(--primary) }
 .row-item.deploy > .row-bd { display:grid; gap:var(--sp-xs); padding-bottom:var(--sp-sm) }
-.row-item.deploy .dp-url { font:var(--label); color:var(--primary); font-family:var(--font-mono); word-break:break-all }
+.row-item.deploy .dp-url { font:var(--label); color:var(--primary); word-break:break-all }
 .row-item.deploy .dp-meta { font:var(--label-xs); color:var(--text-3) }
 
 /* Attachment */ .row-item.attachment > .row-hd .row-icon { color:var(--text-2) }
