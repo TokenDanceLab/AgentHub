@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -31,7 +32,7 @@ import (
 // ── Hub mock with full Edge callback endpoint support ──────────────────────
 
 // hubCallbackMock is a mock Hub server that records all callback requests
-// and responds with the standard Hub JSON format: {"code": "OK", ...}.
+// and responds with the standard Hub JSON format: {"code": errcode.OK.Code, ...}.
 type hubCallbackMock struct {
 	mu     sync.Mutex
 	server *httptest.Server
@@ -93,7 +94,7 @@ func (m *hubCallbackMock) handleEdgeTaskCallback(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+	json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 }
 
 func (m *hubCallbackMock) ackCount() int {
