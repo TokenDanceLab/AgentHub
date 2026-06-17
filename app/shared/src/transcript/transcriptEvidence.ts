@@ -1,5 +1,14 @@
 import type { EvidenceRef, TranscriptBlock } from './types';
 
+/**
+ * Returns true for transcript blocks that should only appear in the
+ * inspector/overview panel (main-chain status, right inspector) and NOT
+ * in the chat transcript scroll view.
+ */
+export function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
+  return block.kind === 'run_session' || block.kind === 'run_step_group';
+}
+
 export function collectTranscriptEvidence(blocks: TranscriptBlock[]): EvidenceRef[] {
   const evidence: EvidenceRef[] = [];
   const indexById = new Map<string, number>();

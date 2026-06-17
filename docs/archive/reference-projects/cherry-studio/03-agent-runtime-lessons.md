@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Cherry Studio Agent Runtime 源码经验
 
 > 范围：状态/数据流、IPC/API/SSE、Claude Code SDK、任务调度、Channel adapter、Provider/model、memory。

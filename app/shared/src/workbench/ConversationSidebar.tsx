@@ -102,6 +102,7 @@ export function ConversationSidebar({
               <button
                 aria-current={isActive ? 'true' : undefined}
                 className={styles.conversationButton}
+                data-agent-profile={conversation.kind === 'direct' ? conversation.title : undefined}
                 data-pinned={isPinned ? 'true' : undefined}
                 data-unread={conversation.unreadCount ? 'true' : undefined}
                 onClick={() => onSelectConversation?.(conversation.id)}
@@ -110,7 +111,6 @@ export function ConversationSidebar({
                 <span
                   aria-label={`${conversation.title} 资料卡`}
                   className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}
-                  role={onAvatarClick ? 'button' : undefined}
                   style={{
                     background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--primary)'),
                     color: conversation.avatarTextColor,

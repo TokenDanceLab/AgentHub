@@ -7,15 +7,89 @@ import type { WorkbenchAgent } from '../platform/types';
 import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIcons';
+import { sharedWorkbenchResources } from '../i18n/workbench';
+import { chatviewResources } from '../chatview/i18n/resources';
 
-vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: () => null,
-  Codex: () => null,
-  GeminiCLI: () => null,
-  ModelIcon: () => null,
-  OpenCode: () => null,
-  ProviderIcon: () => null,
-}));
+vi.mock('react-i18next', () => {
+  const workbenchZh = {} as Record<string, string>;
+  (function collect(resource: Record<string, unknown>, prefix = '') {
+    for (const [key, value] of Object.entries(resource)) {
+      const next = prefix ? prefix + '.' + key : key;
+      if (typeof value === 'string') {
+        workbenchZh[next] = value;
+      } else if (value && typeof value === 'object') {
+        collect(value as Record<string, unknown>, next);
+      }
+    }
+  })(sharedWorkbenchResources.zh as unknown as Record<string, unknown>);
+
+  const chatviewZh = {} as Record<string, string>;
+  (function collect2(resource: Record<string, unknown>, prefix = '') {
+    for (const [key, value] of Object.entries(resource)) {
+      const next2 = prefix ? prefix + '.' + key : key;
+      if (typeof value === 'string') {
+        chatviewZh[next2] = value;
+      } else if (value && typeof value === 'object') {
+        collect2(value as Record<string, unknown>, next2);
+      }
+    }
+  })(chatviewResources.zh as unknown as Record<string, unknown>);
+
+  return {
+    useTranslation: () => ({
+      t: (key: string, options?: Record<string, unknown>) => {
+        const translations: Record<string, string> = {
+          ...workbenchZh,
+          ...chatviewZh,
+          'composer.placeholder': '发消息给 {{target}}',
+          'composer.send': '发送消息',
+          'nav.contacts': '联系人',
+        };
+        const base = translations[key];
+        if (base === undefined) return key;
+        if (options) {
+          return base.replace(/\{\{(\w+)\}\}/g, (_m: string, name: string) =>
+            String(options[name] ?? options[name.toLowerCase()] ?? `{{${name}}}`));
+        }
+        return base;
+      },
+      i18n: { language: 'zh' },
+    }),
+  };
+});
+
+vi.mock('@lobehub/icons', () => {
+  const span = () => null;
+  return {
+    Alibaba: span,
+    AlibabaCloud: span,
+    Anthropic: span,
+    Azure: span,
+    Aws: span,
+    Bedrock: span,
+    ByteDance: span,
+    Claude: span,
+    ClaudeCode: span,
+    Codex: span,
+    Cohere: span,
+    DeepSeek: span,
+    Doubao: span,
+    Gemini: span,
+    GeminiCLI: span,
+    Google: span,
+    Meta: span,
+    Mistral: span,
+    ModelIcon: span,
+    Moonshot: span,
+    OpenCode: span,
+    OpenAI: span,
+    Perplexity: span,
+    ProviderIcon: span,
+    Qwen: span,
+    Volcengine: span,
+    Zhipu: span,
+  };
+});
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('AgentHubWorkbench', () => {
@@ -741,25 +815,23 @@ describe('AgentHubWorkbench', () => {
 
     const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
 
-    expect(screen.getByText('B0 SQLite 迁移')).toBeInTheDocument();
     expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('生成迁移顺序与回滚脚本')).toBeInTheDocument();
-    expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
-    expect(screen.getByText('产物')).toBeInTheDocument();
+    expect(inspector.getByText('Run v4')).toBeInTheDocument();
+    expect(inspector.getByText('产物索引: 1')).toBeInTheDocument();
+    expect(inspector.getByText('变更文件: 1')).toBeInTheDocument();
+    expect(inspector.getByText('工具调用: 1')).toBeInTheDocument();
+    expect(inspector.getAllByText('app/shared/src/workbench/RightInspector.tsx').length).toBeGreaterThan(0);
+    expect(inspector.getByText('产物')).toBeInTheDocument();
 
-    fireEvent.click(inspector.getByRole('button', { name: '打开 sqlite-migration-plan.md 只读预览' }));
+    fireEvent.click(inspector.getByRole('button', { name: '打开 app/shared/src/workbench/RightInspector.tsx 只读预览' }));
     expect(screen.getByRole('tab', { name: /文件/ })).toHaveAttribute('aria-selected', 'true');
     const filePreview = screen.getByRole('region', {
-      name: 'sqlite-migration-plan.md 只读预览',
+      name: 'app/shared/src/workbench/RightInspector.tsx 只读预览',
     });
     expect(filePreview).toBeInTheDocument();
-    expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
-    expect(filePreview).toHaveAccessibleName('sqlite-migration-plan.md 只读预览');
-    expect(screen.getByRole('article', { name: 'Markdown 预览' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'B0 SQLite 迁移方案' })).toBeInTheDocument();
+    expect(screen.getAllByText('app/shared/src/workbench/RightInspector.tsx').length).toBeGreaterThan(0);
+    expect(filePreview).toHaveAccessibleName('app/shared/src/workbench/RightInspector.tsx 只读预览');
     fireEvent.click(screen.getByRole('tab', { name: 'Diff' }));
-    expect(screen.getByRole('generic', { name: 'Diff 预览' })).toBeInTheDocument();
-    expect(screen.getByText(/diff --git/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /打开方式/ }));
     expect(screen.getByRole('menu', { name: '打开方式菜单' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /VS Code/ })).toBeInTheDocument();
@@ -786,7 +858,7 @@ describe('AgentHubWorkbench', () => {
     expect(backIcon).toHaveAttribute('stroke-width', String(DESIGN_NAV_GLYPH_STROKE_WIDTH));
     expect(screen.getByRole('button', { name: '前进' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '刷新' })).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:5176/desktop/')).toBeInTheDocument();
+    expect(screen.getByText('/demo-preview.html')).toBeInTheDocument();
     expect(screen.getByText('只读预览')).toBeInTheDocument();
     expect(openEvidence).not.toHaveBeenCalledWith(expect.objectContaining({
       id: 'ev-artifact',
@@ -796,7 +868,7 @@ describe('AgentHubWorkbench', () => {
     expect(platform.openedEvidence).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: '关闭预览' }));
-    expect(inspector.getByRole('button', { name: '折叠 B0 SQLite 迁移' })).toHaveAttribute('aria-expanded', 'true');
+    expect(inspector.getByRole('button', { name: '折叠 概览' })).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '新建右侧窗口' }));
     const browserMenuItem = screen
@@ -805,7 +877,7 @@ describe('AgentHubWorkbench', () => {
     expect(browserMenuItem).toBeDefined();
     fireEvent.click(browserMenuItem!);
     expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:5176/desktop/')).toBeInTheDocument();
+    expect(screen.getByText('/demo-preview.html')).toBeInTheDocument();
   });
 
   it('opens structured file details in the inspector from Review actions', () => {

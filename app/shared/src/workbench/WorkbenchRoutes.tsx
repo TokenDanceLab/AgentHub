@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
@@ -63,15 +63,15 @@ import { createSettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
 import { workspaceProjectToProjectInfo } from './hubDataMapping';
+import { ContactsPage } from './pages/ContactsPage';
+import { DocsPage } from './pages/DocsPage';
+import { AgentsPage } from './pages/AgentsPage';
+import { TasksPage } from './pages/TasksPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import styles from './AgentHubWorkbench.module.css';
 
-// ── Lazily loaded page components (only one rendered at a time) ──
-const LazyContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
-const LazyDocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.DocsPage })));
-const LazyAgentsPage = lazy(() => import('./pages/AgentsPage').then(m => ({ default: m.AgentsPage })));
-const LazyTasksPage = lazy(() => import('./pages/TasksPage').then(m => ({ default: m.TasksPage })));
-const LazyProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
-const LazySettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+// ── Static page imports (no React.lazy — lazy 在 jsdom 测试中无法同步解析) ──
 
 type WorkbenchPage = Exclude<GlobalRailPage, 'chat'>;
 type TaskSortMode = 'custom' | 'due';
@@ -671,6 +671,7 @@ export function WorkbenchRoutes({
     ?? (hubProjectsEnabled ? hubProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
   const effectiveProjectsStatus = projectsStatus
     ?? (hubProjectsEnabled ? hubProjectsStatus : undefined);
+  const canMutateProject = Boolean(onProjectCreate ?? onProjectUpdate ?? hubClient);
   const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
@@ -1155,7 +1156,7 @@ export function WorkbenchRoutes({
       setTaskActionLabel('请先选择任务');
       return;
     }
-    updateTask(selectedTask.id, { assignee: currentUserId ?? '当前用户' });
+    updateTask(selectedTask.id, { assignee: userDisplayName ?? currentUserId ?? '当前用户' });
     setTaskActionLabel(`${selectedTask.title} 已指派给 ${userDisplayName ?? '当前用户'}`);
   }
 
@@ -1182,8 +1183,7 @@ export function WorkbenchRoutes({
   switch (activePage) {
     case 'contacts':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazyContactsPage
+        <ContactsPage
           activePane={contactsPane}
           externalContacts={contactsData.externalContacts ?? []}
           groups={contactsData.groups ?? []}
@@ -1206,12 +1206,10 @@ export function WorkbenchRoutes({
           onBlockContact={contactsActions?.onBlockContact}
           onUpdateRemark={contactsActions?.onUpdateRemark}
         />
-        </Suspense>
       );
     case 'docs':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazyDocsPage
+        <DocsPage
           activeNav={docsNav}
           activeTab={docsTab}
           navItems={[]}
@@ -1225,12 +1223,10 @@ export function WorkbenchRoutes({
           onCreateDoc={documentsActions?.onCreateDoc}
           onDeleteDoc={documentsActions?.onDeleteDoc}
         />
-        </Suspense>
       );
     case 'agents':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazyAgentsPage
+        <AgentsPage
           activePane={agentsPane}
           agents={agentConfigs}
           agentActionError={agentProfilesStatus?.actionError}
@@ -1289,12 +1285,10 @@ export function WorkbenchRoutes({
           ccSwitchStatus={ccSwitchStatus}
           ccSwitchProviders={ccSwitchProviders}
         />
-        </Suspense>
       );
     case 'runs':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazyTasksPage
+        <TasksPage
           activePane={tasksPane}
           activeFilterCount={taskFilterActive ? 1 : 0}
           crossProjectCount={new Set(visibleTasks.map((task) => task.project)).size}
@@ -1365,12 +1359,10 @@ export function WorkbenchRoutes({
           taskActionLabel={taskActionLabel}
           viewMode={taskViewMode}
         />
-        </Suspense>
       );
     case 'projects':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazyProjectsPage
+        <ProjectsPage
           activeFilter={projectFilter}
           activeProjectId={projectId}
           activeTab={projectTab}
@@ -1382,9 +1374,9 @@ export function WorkbenchRoutes({
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
-          onProjectCreate={handleProjectCreate}
+          onProjectCreate={canMutateProject ? handleProjectCreate : undefined}
           onProjectSelect={selectProject}
-          onProjectUpdate={handleProjectUpdate}
+          onProjectUpdate={canMutateProject ? handleProjectUpdate : undefined}
           onTabChange={setProjectTab}
           projectActionError={effectiveProjectsStatus?.actionError}
           projectSaving={effectiveProjectsStatus?.saving}
@@ -1392,12 +1384,10 @@ export function WorkbenchRoutes({
           projectsError={effectiveProjectsStatus?.error}
           projectsLoading={effectiveProjectsStatus?.loading}
         />
-        </Suspense>
       );
     case 'settings':
       return (
-        <Suspense fallback={<div className={styles.routeMissing} />}>
-        <LazySettingsPage
+        <SettingsPage
           {...settings}
           activePane={settingsPane}
           onChangeSetting={handleSettingChange}
@@ -1411,7 +1401,6 @@ export function WorkbenchRoutes({
           spaceTitle="AgentHub Desktop"
           currentUserDisplayName={userDisplayName}
         />
-        </Suspense>
       );
     default:
       return (

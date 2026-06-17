@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Dify 深度调研报告
 
 > 仓库：`D:\Code\AgentHub\reference\dify`（`github.com/langgenius/dify`，`main` 分支，`git clone --depth 1`）

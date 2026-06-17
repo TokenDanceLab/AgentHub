@@ -242,12 +242,6 @@
   color: var(--text-1);
 }
 
-.fileTitleLang {
-  display: block;
-  margin-top: 2px;
-  font: 500 0.6875rem var(--font-sans);
-  color: var(--text-3);
-}
 
 /* ── Close button ── */
 .closeBtn {

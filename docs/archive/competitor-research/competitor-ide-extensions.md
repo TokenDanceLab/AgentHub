@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Competitor Analysis: IDE Extensions (Cline + Continue)
 
 > Researcher 2: VS Code extensions handle agent chat fundamentally differently from desktop apps -- they integrate with the IDE's native capabilities.

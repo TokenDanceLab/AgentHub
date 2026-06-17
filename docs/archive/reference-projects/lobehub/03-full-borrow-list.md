@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # LobeHub 全面借鉴清单 — icons / Hub 设计 / UI 组件 / 模型配置
 
 > 补充 `21-lobehub-adoption.md`，聚焦可立即复用的具体资源

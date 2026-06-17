@@ -680,8 +680,7 @@
   background: var(--state-running);
 }
 
-.stateCompleted,
-.stateReady {
+.stateCompleted {
   background: var(--success);
 }
 
@@ -689,8 +688,7 @@
   background: var(--state-thinking);
 }
 
-.stateWaiting,
-.stateQueued {
+.stateWaiting {
   background: var(--warning);
 }
 
@@ -740,14 +738,6 @@
   white-space: nowrap;
 }
 
-.runOwner {
-  width: 76px;
-  color: var(--text-2);
-  font: 400 0.6875rem var(--font-sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .runMeta {
   color: var(--text-3);
