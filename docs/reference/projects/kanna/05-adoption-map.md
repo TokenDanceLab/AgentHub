@@ -265,7 +265,7 @@ Kanna's frontend is single-agent: one chat = one agent's stream. The `ChatPage` 
 
 AgentHub's pre-migration ChatView rendered messages as a flat list with `isStreaming` flag:
 ```typescript
-// ChatView.tsx:321-324
+// ChatView.tsx:321-324 *(ARCHIVED)*
 const lastMsg = messages[messages.length - 1];
 const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
@@ -287,7 +287,7 @@ RunDetail shows a single agent's tool calls and file changes. It has no concept 
 
 4. **GroupChatView component**: New component that shows the conversation timeline with multiple agent streams interleaved, each agent's messages visually distinguished (color, icon, name label).
 
-5. **Concrete ChatMessage type change** (`ChatView.types.ts`):
+5. **Concrete ChatMessage type change** (`ChatView.types.ts`): *(ARCHIVED)*
 ```typescript
 interface ChatMessage {
     id: string;
@@ -465,8 +465,8 @@ For M3b, steer needs to be **agent-aware**: the user may want to steer one speci
 | 9 | Per-Agent State | `agent.ts:57-74` (ActiveTurn) | Not present | Build `agentRunState` struct (lines 160+ in new file) |
 | 10 | Segmented Prompts | `agent.ts:601-602` (AsyncMessageQueue) | Not present | Build `promptQueue` for Claude adapter dynamic input |
 | 11 | Prompt Sequence Safety | `agent.ts:88-99,1276-1303` | Not present | Add `pendingPromptSeqs` queue for steer safety |
-| 12 | Frontend Multi-Stream | `useKannaState.ts` (single) | `ChatView.tsx:321-324` (single) | Replace `isStreaming` with `streamingAgentIds: Set<string>` |
-| 13 | Frontend AgentId on Messages | N/A | `ChatView.types.ts` (no agentId) | Add `agentId`, `agentName` to ChatMessage |
+| 12 | Frontend Multi-Stream | `useKannaState.ts` (single) | `ChatView.tsx:321-324` (single, ARCHIVED) | Replace `isStreaming` with `streamingAgentIds: Set<string>` |
+| 13 | Frontend AgentId on Messages | N/A | `ChatView.types.ts` (no agentId, ARCHIVED) | Add `agentId`, `agentName` to ChatMessage |
 | 14 | AgentRunsPanel | N/A | `RunDetail.tsx` (single agent) | Build group-aware `AgentRunsPanel` |
 
 ---
