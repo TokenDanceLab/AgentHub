@@ -1296,12 +1296,12 @@ export function AgentHubWorkbench({
         const decision: ApprovalDecisionAction = {
           approvalId: block.requestId,
           decision: action === 'approve' ? 'allow' : 'deny',
-          teamId: block.teamId,
-          teamRunId: block.teamRunId,
-          agentTaskId: block.agentTaskId,
-          targetId: block.targetId,
-          edgeDeviceId: block.edgeDeviceId,
-          correlationId: block.correlationId,
+          ...(block.teamId !== undefined ? { teamId: block.teamId } : {}),
+          ...(block.teamRunId !== undefined ? { teamRunId: block.teamRunId } : {}),
+          ...(block.agentTaskId !== undefined ? { agentTaskId: block.agentTaskId } : {}),
+          ...(block.targetId !== undefined ? { targetId: block.targetId } : {}),
+          ...(block.edgeDeviceId !== undefined ? { edgeDeviceId: block.edgeDeviceId } : {}),
+          ...(block.correlationId !== undefined ? { correlationId: block.correlationId } : {}),
         };
         onApprovalDecision?.(decision);
         pulseBlock(blockId);

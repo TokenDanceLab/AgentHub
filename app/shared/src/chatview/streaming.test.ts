@@ -2,7 +2,8 @@
    STREAMING SIMULATION — helper for testing incremental block arrival
    ══════════════════════════════════════════════════════════════════════ */
 
-import { blocksToTranscriptItems, type AgentTranscriptBlock } from './adapter'
+import { blocksToTranscriptItems } from './adapter'
+import type { AgentTranscriptBlock } from './index'
 import type { TranscriptBlock } from '../transcript/types'
 
 /**

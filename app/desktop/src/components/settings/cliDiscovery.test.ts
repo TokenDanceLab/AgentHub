@@ -39,7 +39,7 @@ describe('buildLocalCliDiscoveryFromAgents', () => {
           name: 'Codex CLI',
           installed: true,
           version: 'host-0.2.0',
-          path: 'C:/Tools/codex.cmd',
+          path: '/opt/tools/codex',
           noSpend: true,
         },
       ],

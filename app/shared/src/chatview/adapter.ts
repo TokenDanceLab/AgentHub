@@ -389,10 +389,6 @@ function mapEvidenceRefs(b: TranscriptBlock): TranscriptAgentItem['evidenceRefs'
   if (!b.evidenceRefs || b.evidenceRefs.length === 0) return undefined
   return b.evidenceRefs
 }
-// Re-export the generic types (backward-compat aliases)
-export type { TranscriptItem as ChatViewTranscriptItem }
-export type { TranscriptAgentItem as AgentTranscriptBlock }
-export type { TranscriptUserItem as UserTranscriptMsg }
 
 /**
  * Convert an array of upstream {@link TranscriptBlock} objects into
@@ -456,8 +452,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       // Map reply-to metadata from upstream block
       if (t.replyToMessageId && !currentAgent!.replyBlockId) {
         currentAgent!.replyBlockId = t.replyToMessageId
-        currentAgent!.replyAuthor = t.replyAuthor
-        currentAgent!.replyPreview = t.replyPreview
+        if (t.replyAuthor !== undefined) currentAgent!.replyAuthor = t.replyAuthor
+        if (t.replyPreview !== undefined) currentAgent!.replyPreview = t.replyPreview
       }
       continue
     }
@@ -483,7 +479,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
             ;(currentAgent as any).groupId = groupId
-            currentAgent.evidenceRefs = mapEvidenceRefs(block)
+            const refs = mapEvidenceRefs(block)
+            if (refs) currentAgent.evidenceRefs = refs
           }
           currentAgent.rows.push(row)
         }
@@ -502,7 +499,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
             ;(currentAgent as any).groupId = groupId
-            currentAgent.evidenceRefs = mapEvidenceRefs(block)
+            const refs = mapEvidenceRefs(block)
+            if (refs) currentAgent.evidenceRefs = refs
           }
           currentAgent.rows.push(childRow)
         }
@@ -516,9 +514,11 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!row) continue
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: block.author?.id ?? 'unknown', agent: block.author?.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, evidenceRefs: mapEvidenceRefs(block) }
+        const refs = mapEvidenceRefs(block)
+        currentAgent = { id: block.author?.id ?? 'unknown', agent: block.author?.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, ...(refs ? { evidenceRefs: refs } : {}) }
         currentAgent.id = `${block.author?.id ?? 'unknown'}-${_seq}`
       }
+      if (!currentAgent) continue
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
         row.type === 'approval' || row.type === 'session' || row.type === 'attachment'

@@ -5,7 +5,9 @@ import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
 interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
 
-export default memo(function UserMessage({ item, chatMode }: Props) {
+/** Render a user message bubble in the transcript.
+ *  In DM mode: avatar only, right-aligned. In group mode: name + time + avatar. */
+export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
 
   if (chatMode === 'dm') {
