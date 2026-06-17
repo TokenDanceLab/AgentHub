@@ -455,6 +455,32 @@ vi.mock('@lobehub/icons', () => {
 });
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
+vi.mock('@lobehub/icons/es/Alibaba', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/AlibabaCloud', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Anthropic', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Azure', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Aws', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Bedrock', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/ByteDance', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Claude', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/ClaudeCode', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Codex', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Cohere', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/DeepSeek', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Doubao', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Gemini', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/GeminiCLI', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Google', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Meta', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Mistral', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Moonshot', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/OpenAI', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/OpenCode', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Perplexity', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Qwen', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Volcengine', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Zhipu', () => ({ default: () => null }));
+
 describe('AgentHubWorkbench', () => {
   afterEach(() => {
     cleanup();
