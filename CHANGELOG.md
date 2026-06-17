@@ -1,79 +1,169 @@
 # Changelog
 
-## [Unreleased] — (feat/chatview-tokendance-migration)
+All notable changes to the TokenDance AgentHub project.
 
-### ChatView Migration
-- **P0 ChatView core**: `TranscriptView` 全面替换为 `ChatView` -- DM + Group 双模式，TranscriptBlock adapter 真实管线
-- **Demo fixtures**: 98-block realistic demo data（Builder DM + Agent Collab），data-driven 4 种 enriched fallback conversations
-- **Streaming roundtrip**: Edge EventEnvelope -> TranscriptBlock normalization -> ChatView incremental rendering，WS streaming simulation
-- **Interaction features**: avatar click, context menu, selection, reply, highlight, animations, streaming P0
-- **per-conversation chatMode**: DM vs Group layout 自动切换
-- **Empty state + enriched fallback**: ChatView empty state with 4 fallback conversations
+## [Unreleased]
 
-### TokenDance Brand Migration
-- **Brand alignment**: AgentHub -> TokenDance 品牌统一（`agenthub-design` -> `tokendance-design` 引用同步）
-- **Demo data privacy**: `Ding` -> `Alice` in demo data，去除真实用户身份
-- **Fake domain + model name**: demo fixtures 全面脱敏
+## [v0.5.0] — 2026-06-17
 
-### Comprehensive Audit (66 commits, 2026-06-16 ~ 2026-06-17)
+> **ChatView migration + comprehensive audit** — 67 commits, 216 files changed (+12,703 -10,934).
+> Branch: `feat/chatview-tokendance-migration`. Based on `origin/dev/delicious233`.
 
-#### Architecture & Cleanup
-- **Deep clean**: retire TranscriptView + legacy blocks, consolidate ChatView as canonical
-- **TranscriptBlock adapter**: real adapter passthrough (P0 field passthrough -- tool_call target, deploy meta, context stats)
-- **Module dedup**: `presets.css` 2053 -> 1027 shared + 15 platform; `themes.css` dedup; `tokens.css` dedup
-- **Remove standalone `app/chatview`**: AgentHub web is canonical render target
+### Added
 
-#### Security & Privacy
-- **Privacy hardening**: P0 real user identity removal from demo data
-- **Sensitive path sanitization**: hub-server `.env` example path, `cliDiscovery.ts` home paths
-- **MCP auth**: edge-server MCP endpoint authentication middleware
-- **Config dump redaction**: hub-server debug config endpoint sensitive field redaction
-- **Edge deploy fix**: shell command construction switched to `exec.Command` args
+#### ChatView Core
 
-#### Infrastructure
-- **hub-server**: `gin.SetTrustedProxies()` for X-Forwarded-For protection; JWT secret minimum 32 chars
-- **governance docs**: stale branch/worktree lists, broken paths, adapter counts fixed across `docs/governance/`, `docs/architecture/README.md`
-- **openapi.yaml + events.md**: WebSocket event types reconciled, requestBody schemas added, broken `$ref` references fixed
-- **Cross-project docs**: deprecation banners on stale design docs; stale `TranscriptView` references updated in roadmap + design docs
+- **ChatView as canonical transcript renderer** — Full `TranscriptView` replacement with `ChatView` component supporting DM and Group dual-mode layout, per-conversation `chatMode` switching, and real `TranscriptBlock` adapter pipeline. (4f6f9a0d, 6346e321, 887fe093, 85c24ebb, 23f9395c, 6b8c3c93)
+- **TranscriptBlock adapter** — P0 field passthrough for tool_call target, deploy metadata, and context stats. Wired into `AgentHubWorkbench` for real rendering. (bb635c94, 27f82a47, 887fe093)
+- **P0 interaction features** — Avatar click callbacks, block context menus, block selection mode, reply/quote bubbles with in-thread threading, highlight with 3s CSS fade animation and `scrollIntoView`, soft-hidden blocks with `.soft-hidden` class, block actions (approve/deny/retry), auto-scroll streaming with `useEffect` transcript-length watcher, and streaming pulse + collapse/expand animations. (ceed90a8)
+- **Empty state + fallback conversations** — Empty state UI with 4 enriched fallback conversations for demo and fixture mode. (41b78652)
+- **98-block realistic demo data** — Builder DM + Agent Collab scenarios with data-driven fixtures, all think blocks in completed (non-streaming) state. (08c8bc54, decfbff4)
+- **Flatten nested blocks** — ChatView flattens deeply nested block structures for clean rendering. (85c24ebb)
+- **Preview block skip list** — Adapter explicitly skips preview blocks to prevent rendering artifacts. (f7beba3f)
 
-#### Code Quality
-- **Type safety**: 22 `as any` removed in Round 2; `exactOptionalPropertyTypes` compliance; type dedup (RunInfo, ThreadInfo 合并)
-- **React.memo + useCallback**: all ChatView components memoized (10+ components)
-- **ESLint**: W11 sweep -- unused imports, formatting
-- **Naming systematization**: ChatView module conventions, `UserMsg` -> `UserMessage`, named exports throughout
-- **i18n unification**: single `react-i18next` system (-618 lines); zh tool names unified; adapter de-hardcode
-- **CSS scoping**: ChatView primary selector, `scrollbar-width:thin`, `scrollbar-gutter:stable`, 44 CSS spacing tokens extracted from `RowItem.css`
-- **Dead code removal**: `RunGroup` import, unused exports, barrel cleanup
+#### i18n / Internationalization
 
-#### Testing
-- **Pipeline integration**: 54 tests covering ChatView pipeline (694 total, 679 pass)
-- **Adapter unit**: 11 tests covering all TranscriptBlock kinds
-- **Edge roundtrip**: real EventEnvelope -> TranscriptBlock -> ChatView; WS streaming simulation
-- **Regression**: 16 ChatView regressions all green; Desktop 1165/1165 passing; failing pipeline tests (8) fixed
-- **Desktop Tauri PASS, Edge live PASS**: W14 verification gate
+- **Unified i18next system** — Replaced dual i18n systems with single `react-i18next` implementation, removing 618 lines across adapter and resource layers. (59f5672b, 6cc7ac48)
+- **ZH tool name unification** — Chinese tool names standardized across all labels; no more mixed-language tool cards. (34963c2b)
+
+#### DAG / Orchestrator
+
+- **OrchestratorCard refinements** — Unique SVG marker IDs per instance, cycle fallback handling, negative viewBox guards, extracted `NodeEl` component, memoized `buildLayers` and position Map. (520ab91c, 540c3c45)
+- **Status machine refactor** — Workflow Round 5 status machine, abstraction, and reusability improvements. (177e96ae)
+
+#### Documentation (38 files, +947 -268)
+
+- **30+ docs updated** — `README.md`, `architecture.md`, `contributing.md`, `roadmap.md`, 6 architecture sub-documents, and governance files corrected for stale branch/worktree lists, broken paths, adapter counts, line ranges. Dates updated to 2026-06-17. (987cb990, b53aaa2a, fa248868, d7f2bff0, 3f649501)
+- **API documentation reconciled** — WebSocket event types in `openapi.yaml` matched with `events.md`, 6 requestBody schemas added for critical mutation endpoints, broken `$ref` schema references fixed. (b53aaa2a)
+- **Deprecation banners** — Added to obsolete design documents. (b53aaa2a)
+- **Roadmap marked complete** — Action plan final audit 6/8 PASS. (d7f2bff0)
+
+### Changed
 
 #### Performance
-- **Lazy loading**: Desktop SettingsPage 33 sections, WorkbenchRoutes 6 pages, ChatViewTranscript
-- **Bundle optimization**: @lobehub/icons barrel fix (4.1 MB savings), xlsx/jszip dynamic imports (~800 KB), chatviewFixtures prod exclusion (~62 KB)
-- **Circular imports**: verified none; tree-shaking analyzed
-- **P0 ChatComposer performance fix**
+
+- **React.memo all components** — AgentGroup, RowItem, UserMessage, ChatViewTranscript, OrchestratorCard, Transcript, and 20 icon components in Icons.tsx wrapped with `React.memo`. `useMemo` added for expensive `.map()` calls and position Map computations. `useCallback` added to AgentGroup handlers. Toast race condition fixed with ref-based timer. (540c3c45, 7cfee6f5)
+- **Lazy loading** — Desktop SettingsPage 33 section components, WorkbenchRoutes 6 page components, and ChatViewTranscript in AgentHubWorkbench converted to `React.lazy()` with Suspense boundaries. (7cfee6f5)
+- **Bundle size** — @lobehub/icons barrel import fixed (4.1 MB savings), `xlsx` dynamic import in TablePreview (approx. 700 KB savings), `jszip` dynamic import in SlideshowPreview (approx. 100 KB savings), `chatviewFixtures` removed from production bundle (approx. 62 KB savings). (7cfee6f5)
+- **ChatComposer performance** — P0 fix removing expensive inline computations. `CommandMenu` optimized with `useMemo` + `React.memo`. `ChatMessagesPane` wrapped with `React.memo`. (7cfee6f5)
+- **Circular imports verified none**, tree-shaking analyzed on chatview module. (7cfee6f5)
+
+#### Code Quality
+
+- **Type safety** — 22 `as any` casts removed, `exactOptionalPropertyTypes` enabled, duplicate types consolidated: RunInfo, ThreadInfo merged into single definitions, BadgeVariant extracted to shared type, EvidenceRef imported in transcript-item.ts. (f7c0ad86, 540c3c45)
+- **CSS token hardening** — 44 CSS spacing values tokenized in `RowItem.css`. Dead RunGroup styles removed. `presets.css` deduped from 2,053 lines to 1,027 shared + 15 platform-specific. `themes.css` and `tokens.css` deduped. Module structure cleaned, inline styles removed, dead theme code eliminated. (7553cfaa, 8260accf, 7f20f76f, 1e20d2b1, b0c646fa)
+- **CSS scoping** — `scrollbar-gutter:stable` for uniform edge spacing, 10px padding both sides, scrollbar-width:thin to minimize right gap, `.transcriptRegion` scroll container, dark mode tokens restored so ChatView cards render correctly (were white in dark mode). (ebe864d2, 310b77e8, b812a1c1, eadb2bdb, d7480ab9, a497a1e9, cc7a02ec, eff0a1c6, e59fcc08)
+- **Deduplication** — `patchToDiffLines()` helper (2 call sites to 1), `pickDisplay()` helper (2 to 1), `newAgentBlock()` factory (4 to 1), `cx()` utility centralized (20 copies to 1), `formatSize` consolidated (2 to 1), `SEP` constant replaces magic ` · ` strings (4 to 1). 13 dead exports removed across mock.ts, Icons.tsx, and adapter.ts. (f1347ced)
+- **Tool card typography** — Sans-serif for tool card labels matching think card consistency. Mono removed from tool body, file labels, and deploy URL. (6f3d7af2, e02da043)
+
+#### Naming & Systematization
+
+- **File renames** — `UserMsg.tsx` renamed to `UserMessage.tsx` matching component name. (b53aaa2a)
+- **Named exports** — All component default exports converted to named exports. `index.ts` barrel updated to use named imports. Prop naming standardized across all components (`block` to `item` in AgentGroup). (b53aaa2a, 540c3c45)
+- **ChatView module conventions systematized**. (b53aaa2a)
+
+#### Archival
+
+- **Standalone `app/chatview` removed** — AgentHub web is the canonical rendering surface. (51285377)
+- **Legacy `TranscriptView` fully retired** — All associated blocks removed, ChatView consolidated as the sole transcript renderer. (6b8c3c93, 23f9395c)
+
+#### Lint & Format
+
+- **ESLint** — All warnings and unused imports fixed across `app/web` and `app/desktop`. (ced6ebf5)
+
+### Security
+
+- **JWT hardening** — Hub-server minimum JWT secret length raised to 32 characters with validation in `config.go`. (b53aaa2a)
+- **Trusted proxies** — `gin.SetTrustedProxies()` configured for X-Forwarded-For header protection in hub-server. (b53aaa2a)
+- **MCP auth middleware** — Edge-server MCP endpoint protected by authentication middleware. (b53aaa2a)
+- **Shell command safety** — Edge-server `deploy.go` refactored to use `exec.Command` with separate args instead of shell string construction, preventing command injection. (b53aaa2a)
+- **SQL scrubber** — GORM logger configured with SQL statement scrubbing to prevent query leakage in logs. (987cb990)
+- **CSP hardening** — Content-Security-Policy headers added in desktop/web `vite.config.ts` and `index.html` (`frame-ancestors`, `script-src` directives). Nginx CSP headers added for hk2 deployment. (62a4bec4)
+- **DOMPurify** — DocxPreview now sanitizes rendered content via DOMPurify to prevent XSS. (62a4bec4)
+- **Auth Redis blacklist** — Hub-server refresh token blacklist checks added to authentication flow with full test coverage. (62a4bec4)
+- **Config dump redaction** — Edge-server and hub-server debug/diagnostics endpoints mask secret fields before output. (b53aaa2a, 62a4bec4)
+
+### Privacy
+
+- **Real identity removal** — Hardcoded "Ding" replaced with "Alice" across all demo data and fixtures. (86264550)
+- **Path sanitization** — Exposed test result file with real home directory paths deleted. Fixture mapper testdata paths sanitized (`C:\Users\Ding` replaced with `/home/testuser/`). Mobile-rn docs sanitized (real device model and IP to placeholders). Hub-server `.env.example` path replaced with `<SECRETS_DIR>`. `cliDiscovery.ts` hardcoded home paths replaced with `<HOMEDIR>`. (b53aaa2a)
+- **Domain sanitization** — All `agenthub.dev` references replaced with `example.com` in mocks and translations for public repository safety. (f1347ced)
+- **Theme storage key** — `localStorage` key renamed from `tokendance-theme` to `chatview-theme` to avoid brand leakage. (f1347ced)
+- **Deploy script** — Username sanitization for hk2 deployment. (62a4bec4)
+- **Roadmap and docs paths scrubbed**. (62a4bec4)
+
+### Fixed
+
+#### ChatView Bugs
+
+- **Duplicate React keys** — Fixed by merging `tool_call` and `tool_result` blocks into unified entries. (1f066a57)
+- **Stable UserMsg keys** — Changed from unstable array indices to content-based identifiers. (4846300d)
+- **Stable agent IDs for streaming** — Streaming blocks now use `block.author.id` instead of unstable index-derived IDs. (b9769184)
+- **Per-conversation chatMode** — DM vs Group layout now scoped per conversation, not global. (8cb57b1f)
+- **Conversation switching** — `selectedConversationId` properly passed to transcript resolver. `VITE_AGENTHUB_DATA_MODE=fixture` set correctly. (a786b96f, 6a1eced8)
+- **Avatar rendering** — Agent role color, 32px size, and transcript padding corrected. (d8a621be)
+- **Attachment block** — Fixed to use `attachmentRef.name` instead of `String(ref)` which produced `[object Object]`. (0e0d06ab)
+- **TS compilation** — TypeScript errors resolved, ctx mock coverage added, TranscriptView props restored. (a9b27517)
+- **I18nProvider** — `exactOptionalPropertyTypes` and action literal type issues fixed. (6d276b1e, 887fe093)
+- **Dead RunGroup import** — Excluded from migration scope. (dc0606cf)
+- **Review fixes** — CSS scoping adjusted, ChatView designated as primary renderer, sub/failure labels corrected. (520ab91c)
+
+#### CSS Fixes
+
+- **Scrollbar gaps** — Resolved through 5-iteration CSS refinement: removed double-layered `.transcript` padding, reduced padding for closer avatar alignment, added `.transcriptRegion` scroll container, unified 10px edge spacing with `scrollbar-gutter:stable`. (ebe864d2, 310b77e8, b812a1c1, eadb2dbb, d7480ab9, a497a1e9, cc7a02ec, eff0a1c6)
+- **Dark mode** — ChatView cards restored to correct rendering (were white in dark theme). (e59fcc08)
+- **Tool card fonts** — Mono removed from tool body, file labels, and deploy URL. Tool card labels use sans-serif. (6f3d7af2, e02da043)
+- **Fixture think blocks** — All think blocks marked `isThinking: false` for completed (non-streaming) conversations. (9d9fefd3)
 
 #### Accessibility
-- **a11y audit + fix**: Transcript.tsx, RowItem.tsx, UserMessage.tsx, AgentGroup.tsx, Icons.tsx, OrchestratorCard.tsx
+
+- **Transcript** — ARIA roles and keyboard navigation added. (7cfee6f5)
+- **RowItem** — Focus management and screen reader labels. (7cfee6f5)
+- **UserMessage + AgentGroup** — Keyboard interaction and ARIA attributes. (7cfee6f5)
+- **Icons** — Accessible labels on all 20 icon components. (7cfee6f5)
+- **OrchestratorCard** — SVG accessibility with unique marker IDs. (7cfee6f5)
+
+#### Other Fixes
+
+- **30 frontend bugs** — Null guards on `toolName?.toLowerCase()`, failed status mapping, null author guards in normalizeEdgeEvents, delta merging corrections, thinking block auto-close status fixes, SVG marker unique IDs, cycle fallback, negative viewBox guard, session.prefix values, 5 missing running i18n keys, isToolResult type guard, Chinese label startsWith. (b53aaa2a)
+- **Demo data** — Fake domain and model name, streaming test suite fixed. (e6a742e3)
+- **Workbench integration** — AgentHubWorkbench ChatViewTranscript integration fixed. (7cfee6f5)
+- **Test fixes** — 8 failing pipeline integration tests fixed, 5 stale component test files deleted, WorkbenchDemo fallback and announcement tests fixed, RuntimeBrandIcon provider entry fixed, UnifiedComposer status assertion fixed, pinMessage early return bug fixed. (7cfee6f5)
+
+### Tests
+
+- **Pipeline integration** — 54 pipeline integration tests covering 4 ChatView scenarios (W12). Total test suite: 694 tests, 679 passing. (d1c9d2c1)
+- **Edge roundtrip** — Real `EventEnvelope -> TranscriptBlock -> ChatView` roundtrip test for WebSocket streaming fidelity. (b078ae67)
+- **WS streaming simulation** — Incremental `EventEnvelope -> ChatView` streaming simulation with edge server normalization. (43cd50df)
+- **Edge normalization** — `Edge -> TranscriptBlock` normalization test plus adapter roundtrip verification. (c7e4562d)
+- **Adapter unit tests** — 11 tests covering all block kinds: tool_call, tool_result, thinking, text_delta, user_message, attachment, deploy, diff, agent_timeline, evidence, error. (96274da4)
+- **Auth tests** — Hub-server refresh token blacklist tests with full coverage. (62a4bec4)
+- **Verification** — Desktop Tauri PASS, Edge live PASS, Mobile audit completed (W14). (e93bca4f)
+
+### Removed
+
+- **TranscriptView** — Legacy transcript renderer fully retired along with associated blocks. (23f9395c, 6b8c3c93)
+- **Standalone `app/chatview` demo** — Archived as AgentHub web is the canonical rendering surface. (51285377)
+- **Dead code** — RiskBlocked enum consolidated to RiskCritical, 7 dead functions removed, dead RunGroup exports cleared, 13 unused exports across mock.ts, Icons.tsx, adapter.ts removed. (987cb990, 8260accf, f1347ced)
+- **Exposed test results** — adapters-e2e result file with real home directory paths deleted for privacy. (b53aaa2a)
+- **Accidentally committed file** — File with colon in path (`eslint-desktop-final.txt`) removed. (62a4bec4)
 
 ### Release Gate
-- `dev/delicious233` baseline: 66 commits ahead, full audit 6/8 PASS
-- Action plan marked complete: final audit verification
-- TypeScript compilation verified; ESLint all-clear on app/web + app/desktop
+
+- `feat/chatview-tokendance-migration` baseline: 67 commits ahead of `origin/dev/delicious233`
+- Action plan marked complete, final audit 6/8 PASS
+- TypeScript compilation verified; ESLint all-clear on `app/web` + `app/desktop`
 - Build verified after lazy-loading and dedup changes
 
-## [0.4.0] — 2026-06-11
+---
+
+## [v0.4.0] — 2026-06-11
 
 ### 发布定位
 - 统一收口 `dev/delicious233` 全链路，包括 v0.4.0-rc1 验证修复，基于 42+ 次提交的稳定基线。
 - 本版本面向比赛提交功能验收，不声明生产签名、商店发布或真实模型消耗完成。
 
-### v0.4.0-rc1 → v0.4.0 修复
+### v0.4.0-rc1 -> v0.4.0 修复
 - **CC Session 管理**：每次 run 创建全新 Claude Code session（`--session-id`），避免 session 复用导致的状态污染
 - **Desktop 版本号**：bump to v0.4.0，产品名统一为 "AgentHub Desktop"
 - **移除已提交二进制**：清理误提交的编译产物
@@ -84,10 +174,10 @@
 - **AgentsPage 右侧面板宽度自适应修复**
 - **Web demo conversations**：Hub 无活跃 session 时回退展示 demo
 - **截图定位统一**：移至 docs/images/
-- **文档引用同步**：agenthub-design → tokendance-design
+- **文档引用同步**：agenthub-design -> tokendance-design
 
-### 红线合入（v0.3.0-rc.9 → v0.4.0-rc1）
-- `dev/delicious233` → `origin/master` fast-forward（95afab54）
+### 红线合入（v0.3.0-rc.9 -> v0.4.0-rc1）
+- `dev/delicious233` -> `origin/master` fast-forward（95afab54）
 - 42+ 次提交覆盖 IM 全链路 10/10 chat actions、Desktop 认证令牌管道、Edge CLI 适配器真实执行、SDK HTTP 适配器 E2E 验证、Mobile hubClient 30+ 方法对齐、右侧面板 14 项增强、i18n zh/en 各 2169 键
 - OIDC Full PKCE Flow 验证通过
 - Android APK 首次本地构建成功（arm64-v8a，Release）
@@ -209,11 +299,11 @@
 
 ### Engineering
 - ChatView 16 个 regression 全绿 + Desktop 1165/1165 首次全通
-- Web i18n 7→1 测试 failures 修复
-- Hub 覆盖率 50.3%→51.2%（middleware + handler + service + model）
+- Web i18n 7->1 测试 failures 修复
+- Hub 覆盖率 50.3%->51.2%（middleware + handler + service + model）
 - Edge mock runner 从产品路径移除
 - barrel 清理——13 个未使用组件移除导出
-- WebLayout 1117→970 行拆分
+- WebLayout 1117->970 行拆分
 - Web 移除死代码依赖 react-router-dom
 - gitignore 补全 + 编译产物清理 + 本地临时目录条目
 
@@ -222,7 +312,6 @@
 ### 发布定位
 - v0.2.0 补丁候选，来自隔离 worktree。
 - 修复 CI/构建 pipeline 和生产部署配置。
-
 
 ## [0.2.0] — 2026-05-28
 
@@ -244,7 +333,7 @@
 
 ### Fixed
 - PWA 配置 + Tauri 配置 + shared/barrel + CSP 修复
-- hub-server Redis 端口文档对齐（6380→6379）
+- hub-server Redis 端口文档对齐（6380->6379）
 - 跨平台 git hooks 兼容性修复
 - CI 改进：pnpm 缓存 + node 版本一致性
 
@@ -252,8 +341,8 @@
 - Makefile 新增 release 目标：`make release VER=v0.1.1` 一键发版
 - .editorconfig 统一跨编辑器缩进和换行
 - .dockerignore 排除测试/文档/本地文件
-- git hooks 规范化：术语 runner→edge
-- errcode 包覆盖率 40%→100%
+- git hooks 规范化：术语 runner->edge
+- errcode 包覆盖率 40%->100%
 
 ## [0.1.0] — 2026-05-27
 
@@ -309,3 +398,14 @@
 - Docker build verification and Docker Compose production deployment
 - Commit message format enforcement: type(scope): 中文摘要
 - Secret guard, whitespace check, CI gate policy validation
+
+[0.5.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.9...v0.4.0
+[0.4.0-rc1]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.9...v0.4.0-rc1
+[0.3.0-rc.9]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.8...v0.3.0-rc.9
+[0.3.0-rc.8]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.7...v0.3.0-rc.8
+[0.3.0-rc.7]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0...v0.3.0-rc.7
+[0.3.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.2.1-rc.1...v0.3.0
+[0.2.1-rc.1]: https://github.com/DeliciousBuding/AgentHub/compare/v0.2.0...v0.2.1-rc.1
+[0.2.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/DeliciousBuding/AgentHub/releases/tag/v0.1.0

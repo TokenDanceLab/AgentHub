@@ -25,7 +25,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   /* ── Attachment: Existing client layer survey ── */
   {
     id: 'batt1', kind: 'attachment', createdAt: T(0.5),
-    author: U('ding'),
+    author: U('alice'),
     attachmentRef: {
       id: 'att_3c6d8f1a',
       name: 'api-client-survey.txt',
@@ -41,7 +41,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   },
 
   /* ── User opens with the feature request ── */
-  { id: 'bu1', kind: 'text', createdAt: T(0), author: U('ding'), text: 'Refactor the API client layer to use generics. Right now every endpoint has its own fetch wrapper with duplicated response parsing, error handling, and type casting. I want a single typed client like createApiClient<MySchema>() that gives full type safety on request params, response body, and error shapes.' },
+  { id: 'bu1', kind: 'text', createdAt: T(0), author: U('alice'), text: 'Refactor the API client layer to use generics. Right now every endpoint has its own fetch wrapper with duplicated response parsing, error handling, and type casting. I want a single typed client like createApiClient<MySchema>() that gives full type safety on request params, response body, and error shapes.' },
 
   /* ── Agent plan text ── */
   {
@@ -347,7 +347,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     title: 'Write 5 files (2 new, 3 modified)', status: 'waiting' as any,
     reason: 'Builder requests creation of src/api/types.ts, src/api/create-client.ts and modification of 3 existing files. All type checks and lint pass. Confirmation required to proceed.',
   },
-  { id: 'bu2', kind: 'text', createdAt: T(24), author: U('ding'), text: 'Looks good, approved. Go ahead and write the files.' },
+  { id: 'bu2', kind: 'text', createdAt: T(24), author: U('alice'), text: 'Looks good, approved. Go ahead and write the files.' },
   { id: 'ba3', kind: 'text', createdAt: T(25), author: B('builder'), text: 'Approval granted. Writing files and deploying preview.' },
 
   /* ── Deploy ── */
@@ -369,7 +369,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
 
   /* ── Reply/quote: User asks follow-up about call-site migration ── */
   {
-    id: 'bu3', kind: 'text', createdAt: T(30), author: U('ding'),
+    id: 'bu3', kind: 'text', createdAt: T(30), author: U('alice'),
     text: 'What about the 31 call sites you mentioned? When will those be updated?',
     replyToMessageId: 'ba4',
     replyPreview: 'All done. Generic API client deployed: src/api/types.ts (32 lines)...',
@@ -387,7 +387,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
 
   /* ── Reply: User pins down the timeline ── */
   {
-    id: 'bu4', kind: 'text', createdAt: T(32), author: U('ding'),
+    id: 'bu4', kind: 'text', createdAt: T(32), author: U('alice'),
     text: 'OK, let\'s do that as a follow-up today. Please create the tracking issue.',
     replyToMessageId: 'ba5',
     replyPreview: 'I already surveyed all 31 import sites during the Grep analysis...',
@@ -470,7 +470,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   /* ── Attachment: Current middleware chain diagram ── */
   {
     id: 'gatt1', kind: 'attachment', createdAt: T(0.3),
-    author: U('ding'),
+    author: U('alice'),
     attachmentRef: {
       id: 'att_9e4f8d2a',
       name: 'middleware-chain.png',
@@ -486,7 +486,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   },
 
   /* ── User dispatches to Orchestrator ── */
-  { id: 'gu1', kind: 'text', createdAt: T(0), author: U('ding'), text: '@Orchestrator Add RBAC middleware to the API gateway. We need role-based access control with three roles (admin, editor, viewer), per-endpoint permission configuration, and a deny-by-default policy. The middleware should integrate with the existing JWT auth layer and be configurable via a YAML policy file.' },
+  { id: 'gu1', kind: 'text', createdAt: T(0), author: U('alice'), text: '@Orchestrator Add RBAC middleware to the API gateway. We need role-based access control with three roles (admin, editor, viewer), per-endpoint permission configuration, and a deny-by-default policy. The middleware should integrate with the existing JWT auth layer and be configurable via a YAML policy file.' },
 
   /* ── Orchestrator think 1: Understand scope ── */
   {
@@ -713,7 +713,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
 
   /* ── Reply/quote: User follows up on the RBAC policy ── */
   {
-    id: 'gu2', kind: 'text', createdAt: T(40), author: U('ding'),
+    id: 'gu2', kind: 'text', createdAt: T(40), author: U('alice'),
     text: 'One more thing -- can we also add a `billing-reader` role that only sees the billing GET endpoint but nothing else?',
     replyToMessageId: 'gq1',
     replyPreview: 'Final acceptance passed. 28/28 integration tests...',
