@@ -24,7 +24,7 @@
 # SSH config example (~/.ssh/config):
 #   Host hk2
 #     HostName <hk2-ip>
-#     User <your-ssh-user>
+#     User <SSH_USER>
 #     IdentityFile ~/.ssh/id_ed25519
 #     ProxyJump hk1    # if hopping through hk1
 # ──────────────────────────────────────────────
@@ -40,7 +40,7 @@ TIMESTAMP=$(date +%Y%m%dT%H%M%S%Z)
 
 # Remote target
 REMOTE_HOST="${HK2_REMOTE:-hk2}"
-REMOTE_USER="${HK2_USER:-<your-ssh-user>}"
+REMOTE_USER="${HK2_USER:-}"
 
 # Hub image
 HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-}"
