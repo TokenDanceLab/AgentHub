@@ -1,0 +1,178 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — hk2 Production Deployment
+# ──────────────────────────────────────────────
+# Host: hk2 (核云 VPS, Hong Kong)
+# Public URL: https://hub.vectorcontrol.tech
+# Deploy path: /opt/agenthub-hub/hub-server/deployments/hk2/
+# Docker network: agenthub-net (172.18.0.0/16), isolated from aihub-hk2
+#
+# Usage:
+#   docker compose -f docker-compose.hk2.yml --env-file .env.hk2 up -d --no-build
+#
+# This extends the base docker-compose.prod.yml with hk2-specific overrides:
+#   - Fixed host port mapping (127.0.0.1:8090 -> 8080)
+#   - Named volumes matching production naming convention
+#   - Nginx reverse proxy via host nginx (not included in this compose)
+# ──────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL 16 (independent instance) ────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agenthub-postgres
+    restart: unless-stopped
+    mem_limit: ${AGENTHUB_POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${AGENTHUB_POSTGRES_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_POSTGRES_PIDS_LIMIT:-256}
+    environment:
+      POSTGRES_DB: ${AGENTHUB_DB_NAME:-agenthub}
+      POSTGRES_USER: ${AGENTHUB_DB_USER:-agenthub}
+      POSTGRES_PASSWORD: ${AGENTHUB_DB_PASSWORD:?AGENTHUB_DB_PASSWORD is required}
+    expose:
+      - "5432"
+    volumes:
+      - agenthub_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AGENTHUB_DB_USER:-agenthub} -d ${AGENTHUB_DB_NAME:-agenthub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Redis 7 (independent instance) ──────────
+  redis:
+    image: redis:7-alpine
+    container_name: agenthub-redis
+    restart: unless-stopped
+    mem_limit: ${AGENTHUB_REDIS_CONTAINER_MEM_LIMIT:-384m}
+    cpus: ${AGENTHUB_REDIS_CPUS:-0.5}
+    pids_limit: ${AGENTHUB_REDIS_PIDS_LIMIT:-128}
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --requirepass ${AGENTHUB_REDIS_PASSWORD:?AGENTHUB_REDIS_PASSWORD is required}
+    expose:
+      - "6379"
+    volumes:
+      - agenthub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AGENTHUB_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Hub Server ─────────────────────────────
+  hub-server:
+    image: ${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}
+    pull_policy: never
+    container_name: agenthub-hub
+    restart: unless-stopped
+    mem_limit: ${AGENTHUB_HUB_MEM_LIMIT:-256m}
+    cpus: ${AGENTHUB_HUB_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_HUB_PIDS_LIMIT:-256}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      # Database
+      AGENTHUB_DB_HOST: postgres
+      AGENTHUB_DB_PORT: "5432"
+      AGENTHUB_DB_USER: ${AGENTHUB_DB_USER:-agenthub}
+      AGENTHUB_DB_PASSWORD: ${AGENTHUB_DB_PASSWORD}
+      AGENTHUB_DB_NAME: ${AGENTHUB_DB_NAME:-agenthub}
+      # Redis
+      AGENTHUB_REDIS_HOST: redis
+      AGENTHUB_REDIS_PORT: "6379"
+      AGENTHUB_REDIS_PASSWORD: ${AGENTHUB_REDIS_PASSWORD}
+      AGENTHUB_REDIS_DB: "0"
+      AGENTHUB_REDIS_POOL_SIZE: ${AGENTHUB_REDIS_POOL_SIZE:-20}
+      AGENTHUB_REDIS_MIN_IDLE_CONNS: ${AGENTHUB_REDIS_MIN_IDLE_CONNS:-2}
+      # JWT
+      AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?AGENTHUB_JWT_SECRET is required (min 32 chars)}
+      AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}
+      AGENTHUB_JWT_REFRESH_TTL: ${AGENTHUB_JWT_REFRESH_TTL:-720h}
+      # Server
+      AGENTHUB_ENV: production
+      AGENTHUB_SERVER_PORT: "8080"
+      AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-info}
+      AGENTHUB_SERVER_ADMIN_PORT: "6060"
+      AGENTHUB_UPLOAD_DIR: ./uploads
+      AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
+      # S3 (optional, falls back to local uploads)
+      AGENTHUB_S3_ENDPOINT: ${AGENTHUB_S3_ENDPOINT:-}
+      AGENTHUB_S3_ACCESS_KEY: ${AGENTHUB_S3_ACCESS_KEY:-}
+      AGENTHUB_S3_SECRET_KEY: ${AGENTHUB_S3_SECRET_KEY:-}
+      AGENTHUB_S3_BUCKET: ${AGENTHUB_S3_BUCKET:-}
+      AGENTHUB_S3_REGION: ${AGENTHUB_S3_REGION:-}
+      AGENTHUB_S3_USE_SSL: ${AGENTHUB_S3_USE_SSL:-}
+      # PPROF auth
+      AGENTHUB_PPROF_USER: ${AGENTHUB_PPROF_USER:-admin}
+      AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?AGENTHUB_PPROF_PASS is required}
+      # CORS
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech,https://tauri.localhost}
+      # TokenDance ID OIDC
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.vectorcontrol.tech}
+      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
+      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
+      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/auth/tokendance/callback}
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.vectorcontrol.tech/auth/tokendance/callback,http://127.0.0.1/callback,http://127.0.0.1:8400/callback}
+      # Edge HTTP dispatch (Hub→Edge direct HTTP calls)
+      AGENTHUB_EDGE_URL: ${AGENTHUB_EDGE_URL:-}
+      AGENTHUB_EDGE_AUTH_TOKEN: ${AGENTHUB_EDGE_AUTH_TOKEN:-}
+    ports:
+      - "127.0.0.1:8090:8080"   # Loopback only — nginx reverse proxy
+      - "127.0.0.1:6060:6060"   # pprof/metrics — localhost only
+    volumes:
+      - agenthub_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  agenthub_pg_data:
+    name: agenthub_pg_data
+  agenthub_redis_data:
+    name: agenthub_redis_data
+  agenthub_uploads:
+    name: agenthub_uploads
+
+networks:
+  agenthub-net:
+    name: agenthub-net
+    driver: bridge
