@@ -1,15 +1,18 @@
-import type { ChatViewTranscriptItem } from '../adapter'
+import type { TranscriptItem } from '../transcript-item'
 import UserMessage from './UserMsg'
 import AgentGroup from './AgentGroup'
 import './Transcript.css'
 
-interface Props { items: ChatViewTranscriptItem[]; chatMode: 'dm' | 'group' }
+interface Props {
+  items: TranscriptItem[]
+  chatMode: 'dm' | 'group'
+}
 
-function isUser(item: ChatViewTranscriptItem): item is Extract<ChatViewTranscriptItem, { type: 'user' }> {
+function isUser(item: TranscriptItem): item is Extract<TranscriptItem, { type: 'user' }> {
   return 'type' in item && item.type === 'user'
 }
 
-function isAgent(item: ChatViewTranscriptItem): item is Extract<ChatViewTranscriptItem, { id: string }> {
+function isAgent(item: TranscriptItem): item is Extract<TranscriptItem, { id: string }> {
   return 'id' in item
 }
 
