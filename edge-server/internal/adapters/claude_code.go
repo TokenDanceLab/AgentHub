@@ -310,10 +310,17 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--include-partial-messages")
 	}
 
+	// Session handling.
 	// Each run creates a fresh CC conversation via --session-id.
-	// Subsequent runs on the same thread get a new conversation each time.
-	if ctx.SessionID != "" {
+	// When ContinueLast is set with a SessionID, use --resume to rejoin
+	// the existing session; otherwise use --continue without a session ID.
+	if ctx.SessionID != "" && ctx.ContinueLast {
+		args = append(args, "--resume", ctx.SessionID)
+	} else if ctx.SessionID != "" {
 		args = append(args, "--session-id", ctx.SessionID)
+	}
+	if ctx.ContinueLast && ctx.SessionID == "" {
+		args = append(args, "--continue")
 	}
 	if ctx.ForkSession {
 		args = append(args, "--fork-session")
