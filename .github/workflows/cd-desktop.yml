@@ -1,0 +1,272 @@
+name: CD - AgentHub Desktop (Release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v0.6.0). Leave blank to auto-detect from package.json."
+        required: false
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+
+jobs:
+  # ── Go sidecar binaries ──────────────────────
+  build-go:
+    name: Build Go sidecars
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Build Edge Server (Windows)
+        working-directory: edge-server
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-windows-amd64.exe ./cmd/agenthub-edge/
+
+      - name: Build Edge Server (macOS arm64)
+        working-directory: edge-server
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-arm64 ./cmd/agenthub-edge/
+
+      - name: Upload Go artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-binaries
+          path: dist/
+
+  # ── Windows Desktop (NSIS + portable) ────────
+  build-desktop-windows:
+    name: Build Windows Desktop
+    needs: build-go
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory "app\desktop\src-tauri\binaries" -Force
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
+
+      - name: Build Tauri (NSIS)
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ inputs.version }}" -ne "") {
+            $ver = "${{ inputs.version }}" -replace '^v',''
+            echo "version=$ver" >> $env:GITHUB_OUTPUT
+            echo "tag=${{ inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            $pkgVer = (Get-Content "app\desktop\package.json" -Raw | ConvertFrom-Json).version
+            echo "version=$pkgVer" >> $env:GITHUB_OUTPUT
+            echo "tag=v$pkgVer" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Create dist directory
+        shell: pwsh
+        run: New-Item -ItemType Directory dist -Force
+
+      - name: Collect NSIS installer
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $nsis = Get-ChildItem "app\desktop\src-tauri\target\release\bundle\nsis" -Filter "*setup.exe" | Select-Object -First 1
+          Copy-Item $nsis.FullName "dist\AgentHub_${ver}_x64-setup.exe"
+          $updater = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "latest.json" -Recurse | Select-Object -First 1
+          if ($updater) { Copy-Item $updater.FullName "dist\latest.json" }
+          $sig = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse | Select-Object -First 1
+          if ($sig) { Copy-Item $sig.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig" }
+
+      - name: Create portable zip
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $exe = Get-ChildItem "app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" | Select-Object -First 1
+          $portableDir = "dist\AgentHub-portable"
+          New-Item -ItemType Directory $portableDir -Force
+          Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
+          @"
+          AgentHub ${{ steps.version.outputs.tag }} — Portable Edition
+
+          No installation required. Double-click AgentHub.exe to run.
+          Requires: Windows 10/11 (WebView2 built-in).
+
+          Full documentation: https://github.com/TokenDanceLab/AgentHub
+          "@ | Out-File "$portableDir\README.txt" -Encoding UTF8
+          Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-artifacts
+          path: dist/
+
+  # ── macOS Desktop (DMG) ──────────────────────
+  build-desktop-macos:
+    name: Build macOS Desktop
+    needs: build-go
+    runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        run: |
+          mkdir -p app/desktop/src-tauri/binaries
+          cp go-binaries/agenthub-edge-darwin-arm64 app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin
+
+      - name: Build Tauri (DMG)
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            ver=$(node -p "require('./app/desktop/package.json').version")
+            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "tag=v$ver" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Collect DMG
+        run: |
+          ver="${{ steps.version.outputs.version }}"
+          dmg=$(find app/desktop/src-tauri/target/release/bundle/dmg -name "*.dmg" -type f | head -1)
+          if [ -z "$dmg" ]; then
+            echo "ERROR: No DMG found"
+            find app/desktop/src-tauri/target/release/bundle -type f 2>/dev/null || echo "bundle dir not found"
+            exit 1
+          fi
+          cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-artifacts
+          path: dist/
+
+  # ── GitHub Release ──────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [build-desktop-windows, build-desktop-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            ver=$(node -p "require('./app/desktop/package.json').version")
+            echo "tag=v$ver" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows-artifacts
+          path: dist
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos-artifacts
+          path: dist
+
+      - name: List assets
+        run: ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          files: dist/*
+          draft: false
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
