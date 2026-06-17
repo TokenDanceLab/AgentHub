@@ -3,6 +3,7 @@ import {
   buildComposerIntent,
   type ComposerMention,
   composerReducer,
+  createInitialComposerState,
 } from '../composer';
 import type {
   AgentHubPlatform,
@@ -16,7 +17,6 @@ import type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './trans
 import type { FileItem } from './inspector';
 import type { AttachmentUploadState } from './UnifiedComposer';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
-import { useComposerSubmitBehavior } from './workbenchPreferences';
 
 /* ── Panel width constants ── */
 export const INSPECTOR_MIN_WIDTH = 48;
@@ -91,7 +91,7 @@ export type AgentHubWorkbenchStatus = {
 /* ═══════════════════════════════════════════════════════════════════════
    Composer state shape (narrowed from reducer)
    ══════════════════════════════════════════════════════════════════════ */
-export type ComposerState = ReturnType<typeof composerReducer> extends (state: infer S, action: infer A) => infer S ? S : never;
+export type ComposerState = ReturnType<typeof createInitialComposerState>;
 export type ComposerAction = Parameters<typeof composerReducer>[1];
 
 /* ── Parameters bag ── */
@@ -257,8 +257,6 @@ export function useWorkbenchCallbacks(p: UseWorkbenchCallbacksParams): Workbench
     isChatPage, activeConversation,
     activeAgentProfile, activeHumanProfile, activeGroupProfile,
   } = p;
-
-  const composerSubmitBehavior = useComposerSubmitBehavior();
 
   /* ── Toast ── */
   const showWorkbenchToast = useCallback(

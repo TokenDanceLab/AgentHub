@@ -8,34 +8,40 @@ import {
 
 vi.mock('@lobehub/icons', () => {
   const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
+  const colorIcon = (tag: string) => {
+    const Icon: Record<string, unknown> = ({ size }: { size?: number }) =>
+      React.createElement('span', { 'data-size': size, 'data-testid': `${tag}-color-icon` });
+    Icon.Color = Icon;
+    return Icon;
+  };
   return {
-    Alibaba: span,
-    AlibabaCloud: span,
-    Anthropic: span,
-    Azure: span,
-    Aws: span,
-    Bedrock: span,
-    ByteDance: span,
-    Claude: span,
+    Alibaba: colorIcon('alibaba'),
+    AlibabaCloud: colorIcon('alibabacloud'),
+    Anthropic: colorIcon('anthropic'),
+    Azure: colorIcon('azure'),
+    Aws: colorIcon('aws'),
+    Bedrock: colorIcon('bedrock'),
+    ByteDance: colorIcon('bytedance'),
+    Claude: colorIcon('claude'),
     ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
-    Cohere: span,
+    Cohere: colorIcon('cohere'),
     Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
-    DeepSeek: span,
-    Doubao: span,
-    Gemini: span,
+    DeepSeek: colorIcon('deepseek'),
+    Doubao: colorIcon('doubao'),
+    Gemini: colorIcon('gemini'),
     GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
-    Google: span,
-    Meta: span,
-    Mistral: span,
+    Google: colorIcon('google'),
+    Meta: colorIcon('meta'),
+    Mistral: colorIcon('mistral'),
     ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
-    Moonshot: span,
+    Moonshot: colorIcon('moonshot'),
     OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
-    OpenAI: span,
-    Perplexity: span,
+    OpenAI: colorIcon('openai'),
+    Perplexity: colorIcon('perplexity'),
     ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
-    Qwen: span,
-    Volcengine: span,
-    Zhipu: span,
+    Qwen: colorIcon('qwen'),
+    Volcengine: colorIcon('volcengine'),
+    Zhipu: colorIcon('zhipu'),
   };
 });
 
@@ -124,10 +130,8 @@ describe('RuntimeIcon', () => {
     expect(screen.getByTestId('codex-icon')).toBeInTheDocument();
     expect(screen.getByTestId('claude-code-icon')).toHaveAttribute('data-size', '24');
     expect(screen.getByTestId('opencode-icon')).toBeInTheDocument();
-    const providerIcons = screen.getAllByTestId('provider-icon');
-    expect(providerIcons[0]).toHaveAttribute('data-provider', 'openai');
-    expect(providerIcons[0]).toHaveAttribute('data-size', '16');
-    expect(providerIcons[1]).toHaveAttribute('data-provider', 'claude');
+    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-size', '16');
+    expect(screen.getByTestId('claude-color-icon')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude')).toHaveAttribute('data-runtime-icon-value', 'claude');
   });
 
