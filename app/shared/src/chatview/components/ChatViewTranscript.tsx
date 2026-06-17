@@ -115,6 +115,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => {
         el.classList.remove('highlighted')
+        timerRef.current = undefined
         onHighlightEndRef.current?.()
       }, 3000)
     })

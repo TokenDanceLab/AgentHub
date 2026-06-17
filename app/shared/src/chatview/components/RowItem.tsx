@@ -144,10 +144,9 @@ export default memo(function RowItem({ item, onToggle, onApprove, onReject, onRe
             <div className="ap-reason">{item.apReason}</div>
             {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           </>)}
-          {item.status==='fail' && onRetry && <div className="ap-actions"><button className="ap-approve" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
           {item.url && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
-          {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={() => onFileClick?.(item.id)}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
+          {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={onFileClick ? () => onFileClick(item.id) : undefined}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
           {item.ctxPct !== undefined && (<>
             <div className="ctx-bar-wrap"><div className="ctx-bar"><div className={`ctx-fill ${(item.ctxPct??0)>80?'warn':'ok'}`} style={{'--ctx-pct': `${item.ctxPct}%`} as React.CSSProperties} /></div><span className="pct">{item.ctxPct}%</span></div>
             {item.ctxStats && <div className="ctx-meta">{item.ctxStats.map((s,i) => <span key={i}>{s}</span>)}</div>}
@@ -160,6 +159,7 @@ export default memo(function RowItem({ item, onToggle, onApprove, onReject, onRe
           )}
         </div>
       )}
+      {item.status==='fail' && onRetry && <div className="retry-bar"><button className="retry-btn" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
     </div>
   )
 })
