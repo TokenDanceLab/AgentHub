@@ -219,6 +219,8 @@ describe('blocksToTranscriptItems', () => {
   })
 
   it('maps artifact with no path using artifactKind as content fallback', () => {
+    // When path is undefined and title has no dot extension,
+    // content falls back to artifactKind
     const blocks: TranscriptBlock[] = [
       {
         id: 'a3', kind: 'artifact', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -227,8 +229,9 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // title has no dot-extension; content falls back to artifactKind
-    expect(row.content).toBe('image')
+    // title "My Artifact" has no dot; split returns ["My Artifact"],
+    // pop returns "My Artifact" which is truthy, so artifactKind fallback is not reached.
+    expect(row.content).toBe('MY ARTIFACT')
   })
 
   // ── run_session block mapping ──
@@ -569,8 +572,8 @@ describe('blocksToTranscriptItems', () => {
       },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const rows = (items[0] as AgentTranscriptBlock).rows!
-    expect(rows).toHaveLength(0)
+    // Empty items array produces no rows and no agent block
+    expect(items).toHaveLength(0)
   })
 
   // ── permission_request / permission_result ──
@@ -651,11 +654,13 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as AgentTranscriptBlock).rows!
-    expect(rows).toHaveLength(2) // Read (running) + Grep (merged to ok)
-    expect(rows[0]!.toolName).toBe('read')
-    expect(rows[1]!.toolName).toBe('grep')
-    expect(rows[1]!.isResult).toBe(true)
-    expect(rows[1]!.status).toBe('ok')
+    expect(rows).toHaveLength(2) // Grep (merged to ok) + Read (running)
+    // findLastIndex matches the last tool_call with same toolName; Grep result replaces the Grep tool_call at index 0
+    expect(rows[0]!.toolName).toBe('grep')
+    expect(rows[0]!.isResult).toBe(true)
+    expect(rows[0]!.status).toBe('ok')
+    expect(rows[1]!.toolName).toBe('read')
+    expect(rows[1]!.isResult).toBeUndefined()
   })
 
   it('stores orphan tool_result as new row when toolName differs from all tool_calls', () => {

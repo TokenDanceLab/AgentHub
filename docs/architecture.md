@@ -201,7 +201,7 @@ src-tauri/src/host/
 | AgentAdapter -> Edge | typed runtime events |
 | Hub -> TokenDance ID | OIDC Authorization Code + PKCE / JWKS |
 
-## 10. 旧系统清理策略
+## 10. 旧主工作台退役清单
 
 以下对象不得作为 v4 后的活跃主工作台：
 
@@ -213,51 +213,219 @@ src-tauri/src/host/
 
 迁移期间可以通过小 commit 做 adapter 或 compatibility shim，但最终验收必须证明旧入口不再承载 active route。
 
-## 10. ChatView 卡片渲染系统（替代 TranscriptView）
+## 11. ChatView 卡片渲染系统（替代 TranscriptView）
 
 `app/shared/src/chatview/` 是唯一的卡片渲染系统，替代了旧的 `TranscriptView` + 20+ block renderers。
 
 ```
 chatview/
   index.ts                   ChatViewTranscript, adapter public API
-  ChatViewTranscript.tsx      I18nProvider 包裹 + TranscriptBlock[] 入口
-  adapter.ts                  TranscriptBlock[] → RowItem[] 映射
+  ChatViewTranscript.tsx      TranscriptBlock[] 入口 + <div className="chatview"> 包裹
+  adapter.ts                  TranscriptBlock[] → TranscriptItem[] 映射
+  types.ts                   RowItem, RowType, AgentRole 共享类型
+  transcript-item.ts         TranscriptItem, TranscriptUserItem, TranscriptAgentItem
   components/
-    RowItem.tsx               10 种卡片：think/tool/file/sub/approval/route/deploy/attachment/ctx/session
-    OrchestratorCard.tsx      编排 DAG 拓扑布局 SVG
-    Transcript.tsx            grp-row DM/Group 消息列表
-    AgentGroup.tsx            头像 + card-stack + bubbles 容器
+    RowItem.tsx               Card renderer（状态感知，collapsible/content/diff/code/approval）
+    RowItem.css               Card 样式：.row-item / .row-hd / .row-bd / .result-row
+    OrchestratorCard.tsx      编排 DAG 拓扑布局 SVG（buildLayers 拓扑排序）
+    Transcript.tsx            TranscriptItem[] → UserMsg / AgentGroup 分发
+    Transcript.css            grp-row 对称布局 + bubbles + avatars
+    AgentGroup.tsx            头像 + card-stack（rows + standaloneRows）+ bubbles
     UserMsg.tsx               用户消息气泡
-    Icons.tsx                 20 SVG 图标组件
+    Icons.tsx                 20+ SVG 图标组件
   design/
-    tokens.css                .chatview 作用域 CSS 变量（零全局污染）
-    labels.ts                 cardLabelKey() 状态感知标签解析
-    roles.ts                  AgentRole SSOT
+    tokens.css                .chatview 作用域 CSS 变量（零全局污染，亮/暗双主题）
+    labels.ts                 cardLabelKey() / toolKey() / isToolResult()
+    roles.ts                  AgentRole SSOT + roleColor/roleInitial 映射
   i18n/
-    translations.ts           中英双语 120 键
-    I18nProvider.tsx          自定义 I18nProvider（与 AgentHub react-i18next 共存）
-  theme/
-    ThemeProvider.tsx          亮/暗主题切换
-    tokens-dark.css           暗色变量
+    resources.ts              中英双语 ~120 键（card.* 状态感知 + sim + sidebar + code）
+  data/
+    mock.ts                   模拟 TranscriptBlock[] 数据
+  streaming.test.ts           流式增量更新测试
+  adapter.test.ts             Adapter 映射测试
 ```
 
-**数据流：**
+### 11.1 状态机（RowItem Status State Machine）
+
+所有 10 种卡片类型共享 4 个状态变体。RowItem.type 决定卡片形状，RowItem.status 决定卡片颜色/动画/交互行为。
+
+| type | running | ok | fail | waiting |
+|------|---------|----|------|---------|
+| **think** | 思考中（蓝 pulsate，auto-open，content 流式追加） | 思考完成（auto-collapse，可展开） | 思考失败（红，显示 reason） | -- |
+| **tool** | 工具执行中（蓝 pulsate，label: "正在{tool}..."） | 工具完成（绿，result-row 合并） | 工具失败（红，可 retry） | -- |
+| **file** | 文件操作中（蓝，label: "正在{cr/mod/del}..."） | 文件完成（绿，cr=蓝/mod=橙/del=红 色标，diffLines 展开） | 文件失败（红） | -- |
+| **sub** | 子Agent工作中（蓝，label: "Agent · {name} 工作中"） | 子Agent完成（绿） | 子Agent失败（红） | -- |
+| **approval** | -- | 权限通过（绿） | 审批拒绝（红） | 等待审批（黄，show approve/deny 按钮） |
+| **route** | -- | 分派完成（DAG SVG 拓扑图） | 分派失败（红） | -- |
+| **deploy** | 部署中（蓝） | 部署就绪（绿，show url + deployMeta） | 部署失败（红） | -- |
+| **attachment** | -- | 附件可用（绿，show fileName + fileSize） | 附件失败（红） | -- |
+| **ctx** | -- | 上下文正常（ctx-bar 填充，show ctxStats） | 上下文耗尽（红） | -- |
+| **session** | -- | 会话完成（绿，show sessionTags） | 会话失败（红） | -- |
+
+**状态来源映射（adapter.ts）：**
+
+- `statusNorm()` — EvidenceRefStatus → RowItem.status：`running/pending` → `running`，`failed` → `fail`，`completed` → `ok`
+- `deployStatusNorm()` — deploy 专用：`pending/deploying` → `running`，`ready/deployed` → `ok`，`failed` → `fail`
+- `permission_request` 块固定为 `waiting`
+- `thinking` 块的 `isThinking` 标志 → `running`，否则 → `ok`
+- `tool_call` 块检查 `evidenceRefs` 是否包含 `completed`，合并后 `tool_result` 覆盖
+
+**渲染行为（RowItem.tsx）：**
+
+- `status === 'running'`：row-item 加 `.running` class（CSS pulsate 动画），think 卡片 auto-open
+- `status === 'fail'`：row-item 加 `.fail` class（红色左边框），show "重试" 按钮
+- `status === 'waiting'`：approval 卡片 show "批准"/"拒绝" action 按钮
+- `status === 'ok'`：正常显示，无特殊动画
+
+### 11.2 组件抽象层级
+
 ```
-Hub API → TranscriptBlock[] → blocksToTranscriptItems() → TranscriptItem[]
-  → Transcript → AgentGroup → RowItem[] + standaloneRows
+┌─────────────────────────────────────────────────────┐
+│  Workbench (.transcriptRegion)                       │
+│  ┌─────────────────────────────────────────────┐    │
+│  │ ChatViewTranscript (<div className="chatview">)  │
+│  │  ┌──────────────────────────────────────┐   │    │
+│  │  │ Transcript (TranscriptItem[] → type dispatch)│   │
+│  │  │  ┌─────────────┐  ┌──────────────┐   │   │    │
+│  │  │  │ UserMsg      │  │ AgentGroup    │   │   │    │
+│  │  │  │ (user-bubble)│  │ (grp-row)    │   │   │    │
+│  │  │  └─────────────┘  │  ┌─────────┐  │   │   │    │
+│  │  │                    │  │ RowItem  │  │   │   │    │
+│  │  │                    │  │ ×N rows  │  │   │   │    │
+│  │  │                    │  ├─────────┤  │   │   │    │
+│  │  │                    │  │ RowItem  │  │   │   │    │
+│  │  │                    │  │ ×N stand │  │   │   │    │
+│  │  │                    │  ├─────────┤  │   │   │    │
+│  │  │                    │  │OrchCard  │  │   │   │    │
+│  │  │                    │  │(SVG DAG) │  │   │   │    │
+│  │  │                    │  └─────────┘  │   │   │    │
+│  │  │                    │  bubbles[]     │   │   │    │
+│  │  │                    └──────────────┘   │   │    │
+│  │  └──────────────────────────────────────┘   │    │
+│  └─────────────────────────────────────────────┘    │
+│  Composer / Inspector / Sidebar ...                  │
+└─────────────────────────────────────────────────────┘
+```
+
+**层级职责：**
+
+| 层级 | 组件 | 输入 | 输出 | 职责 |
+|------|------|------|------|------|
+| L0 Shell | Workbench `.transcriptRegion` | -- | DOM wrapper | `flex:1; overflow-y:auto; min-height:0`，单滚动条容器 |
+| L1 Scope | `ChatViewTranscript` | `TranscriptBlock[]` | `<div.chatview>` | 调用 `blocksToTranscriptItems()`，包裹 chatview CSS 作用域 |
+| L2 List | `Transcript` | `TranscriptItem[]` | `UserMsg \| AgentGroup` | `type` 分发，DM/Group 传参 |
+| L3 Group | `AgentGroup` | `TranscriptAgentItem` | grp-row + avatar + card-stack + bubbles | 头像、rows、standaloneRows、bubbles 布局 |
+| L3 Leaf | `UserMsg` | `TranscriptUserItem` | user-bubble | 用户消息气泡（右对齐，primary 背景） |
+| L4 Card | `RowItem` | `RowItem` | .row-item | 状态感知渲染（collapsible/content/diff/code/approval/deploy/ctx/session） |
+| L4 DAG | `OrchestratorCard` | `RowItem` (type=route, orchAgents) | SVG DAG | 拓扑排序 → layers → SVG 节点+边 |
+
+### 11.3 数据流：TranscriptBlock -> RowItem
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ Upstream     │     │ adapter.ts   │     │ transcript-  │     │ Transcript   │
+│ Source       │ ──> │ blocksTo     │ ──> │ item.ts      │ ──> │ Component    │
+│ (Hub/Edge/   │     │ Transcript   │     │ Transcript   │     │ Tree         │
+│  Mock)       │     │ Items()      │     │ Item[]       │     │              │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+   25 kinds               grouping              2 union               dispatch
+   TranscriptBlock        + mapping              types                 render
+```
+
+**Step 1: mapBlock (TranscriptBlock → RowItem | null)**
+
+25 种 TranscriptBlock `kind` → 15 种映射到 RowItem，5 种递归/展平（`run_step_group` children 递归 → RowItem[]，`agent_timeline` items → think RowItem[]），5 种显式跳过（`result`/`finished`/`replay_gap`/`preview`/`agent_timeline`/`run_step_group` 块级）。
+
+| TranscriptBlock kind | RowItem.type | 说明 |
+|----------------------|-------------|------|
+| `thinking` | `think` | isThinking → running，否则 ok |
+| `tool_call` | `tool` | 检查 evidenceRefs 完成状态 |
+| `tool_result` | `tool` (isResult: true) | 与同 toolName 的 tool_call 合并 |
+| `file_change` | `file` | fileOp: cr/mod/del |
+| `artifact` | `file` | 同上，从 path/title 推断 |
+| `diff` | `file` | diffLines 从 patch 生成 |
+| `approval` / `permission_request` / `permission_result` | `approval` | standalone；permission_request → waiting |
+| `run_session` | `session` | standalone；sessionTags 显示 |
+| `subagent` / `subtask` / `child_agent` | `sub` | label: "Agent · {name}" |
+| `route_decision` | `route` | standalone；non-collapsible |
+| `context_usage` | `ctx` | standalone；ctxPct + ctxStats |
+| `deploy` | `deploy` | standalone；deployStatusNorm 映射 |
+| `attachment` | `attachment` | standalone；fileName + fileSize |
+| `failure` | `think` (fail) | 错误包装为 fail think 卡片 |
+
+**Step 2: blocksToTranscriptItems (TranscriptBlock[] → TranscriptItem[]) 分组规则：**
+
+1. `human` + `text` blocks → `TranscriptUserItem`（终结当前 agent group）
+2. `agent`/`system` + `text` blocks → 追加到当前 AgentGroup 的 `bubbles[]`
+3. `agent_timeline` blocks → 展平 items 为 think RowItem[] → 追加到当前 AgentGroup 的 `rows[]`
+4. `run_step_group` blocks → 递归 children 为 RowItem[] → 追加到 `rows[]`
+5. 其他 agent/system blocks → `mapBlock()` → RowItem → 分流：
+   - standalone 类型（route/deploy/ctx/approval/session/attachment）→ `standaloneRows[]`
+   - tool_result（isResult: true）→ 找到同 toolName 的 tool_call 并替换（保持 React key 稳定）
+   - 其他 → `rows[]`
+6. 作者切换时 flush 当前 AgentGroup 并新建
+
+### 11.4 i18n 架构
+
+单层 react-i18next，**不嵌套 Provider**。ChatView 使用 `'chatview'` namespace，与 AgentHub 的 `'sharedWorkbench'` namespace 在同一个 `I18nextProvider` 下共存。
+
+```
+┌─────────────────────────────────────────────────┐
+│ I18nextProvider (AgentHub root)                  │
+│  resources:                                      │
+│    sharedWorkbench → sharedWorkbenchResources    │
+│    chatview        → chatviewResources           │
+│                                                  │
+│  ┌─────────────────┐  ┌──────────────────────┐  │
+│  │ Workbench UI     │  │ ChatViewTranscript    │  │
+│  │ useTranslation   │  │ useTranslation(       │  │
+│  │ ('sharedWB')     │  │   'chatview')         │  │
+│  └─────────────────┘  └──────────────────────┘  │
+└─────────────────────────────────────────────────┘
 ```
 
 **关键设计决策：**
-- CSS 作用域在 `.chatview` 下，不与 AgentHub `:root` 冲突
-- I18n 通过嵌套 Provider 与 AgentHub react-i18next 共存
-- Adapter 使用稳定 `block.author.id` 作为 key，支持 streaming 增量更新
-- 25 种 TranscriptBlock kind 全映射：15 种映射到 RowItem，5 种递归/展平，5 种显式跳过
+
+- **单 Provider**：ChatView 不内嵌自己的 `I18nextProvider`，直接使用消费方的 root Provider。消费方必须在初始化时将 `chatviewResources` 注册到 `resources.chatview`。
+- **Namespace 隔离**：`CHATVIEW_I18N_NAMESPACE = 'chatview'`，组件内 `useTranslation('chatview')`，与 workbench 的 `'sharedWorkbench'` 互不冲突。
+- **Key 格式**：扁平 dot-separated：`card.think.running`、`card.tool.read`、`code.copy`。
+- **TransKey 类型安全**：`type TransKey = keyof typeof chatviewResources.en`——编译期检查所有 key。
+- **状态感知标签**：`cardLabelKey(item)` 根据 `type + status + toolName` 返回 `{key, params?}`，组件调用 `t(key, params)` 得到显示字符串。详见 `design/labels.ts`。
+- **双语覆盖**：zh/en 各 ~120 键，覆盖 card.*（状态感知）、sim.*（模拟控制）、sidebar.*（概览面板）、code.*（代码块）、app.*（DM/Group 标题）、transcript.*（空状态）。
+
+### 11.5 滚动与布局：.transcriptRegion 包装器
+
+ChatView 卡片树不自己管理滚动。滚动由外层 Workbench 的 `.transcriptRegion` 包装器统一控制。
+
+```
+.workbench-shell
+  .transcriptRegion          ← 唯一滚动容器
+    ChatViewTranscript       ← <div.chatview>：display:flex; flex-direction:column; height:100%; overflow:hidden
+      .transcript            ← display:flex; flex-direction:column; overflow-y:auto; flex:1
+        .grp-row             ← 每条消息行
+        .grp-row
+        ...
+  .composer                  ← 固定在底部，不参与滚动
+```
+
+**CSS 关键规则：**
+
+| 选择器 | 关键属性 | 职责 |
+|--------|---------|------|
+| `.transcriptRegion` | `flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scroll-padding-bottom: var(--composer-scroll-gap)` | 唯一滚动容器，预留 composer 间隙 |
+| `.chatview` | `display: flex; flex-direction: column; height: 100%; overflow: hidden` | CSS 作用域入口，禁止自身滚动 |
+| `.transcript` | `display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; scroll-behavior: smooth` | 消息列表，flex: 1 填满可用空间 |
+| `.grp-row` | `display: flex; gap: var(--sp-md); align-items: flex-start; margin-bottom: var(--sp-lg)` | 对称三列：[avatar-l] [content flex:1] [spacer] |
+
+**设计理由：**
+- **单一滚动源**：`.transcriptRegion` 是唯一的 `overflow-y: auto` 容器，避免嵌套滚动冲突。
+- **Composer 不遮挡**：`.transcriptRegion:last-child` 设置 `scroll-margin-bottom` 确保最后一条消息滚动到 composer 上方可见。
+- **chatview 零溢出**：`.chatview` 设 `overflow: hidden`，所有滚动委托给外层。ChatView 内部的 `.transcript` 也设 `overflow-y: auto` 作为 fallback（独立测试场景），但集成到 Workbench 后由外层接管。
+- **Pinned announcement**：`.pinnedAnnouncementWrap` 在 `.transcriptRegion` 内 `position: absolute`，浮于消息列表上方。
 
 **已退役：** `TranscriptView.tsx`、`workbench/blocks/`（20+ 渲染器）、旧 `ChatView` 组件
 
-## 11. 旧系统清理策略
-
-### 旧 UI 剩余债务分类
+## 12. 旧 UI 剩余债务分类
 
 | 类别 | 对象 | 处理策略 |
 |---|---|---|
@@ -268,7 +436,7 @@ Hub API → TranscriptBlock[] → blocksToTranscriptItems() → TranscriptItem[]
 
 完整清单见 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。
 
-## 11. 验收门禁
+## 13. 验收门禁
 
 | 门禁 | 要求 |
 |---|---|
@@ -280,7 +448,7 @@ Hub API → TranscriptBlock[] → blocksToTranscriptItems() → TranscriptItem[]
 | Legacy scan | active route/import 不依赖旧 UI |
 | Docs sync | roadmap、architecture、README、governance 同步 |
 
-## 12. 阶段划分
+## 14. 阶段划分
 
 | 阶段 | 目标 | 状态 |
 |---|---|---|
@@ -292,7 +460,7 @@ Hub API → TranscriptBlock[] → blocksToTranscriptItems() → TranscriptItem[]
 | D5 | Tauri Host API 拆分 | 未开始 |
 | D6 | 旧 UI 清理、视觉 QA、发布门禁 | 旧主路径已完成，剩余迁移债务和正式 Visual QA 继续 |
 
-## 13. 文档权威
+## 15. 文档权威
 
 - 当前目标和优先级：[roadmap.md](roadmap.md)
 - 分支事实：[governance/branch-governance.md](governance/branch-governance.md)

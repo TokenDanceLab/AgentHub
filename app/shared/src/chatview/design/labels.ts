@@ -6,12 +6,21 @@ import type { RowItem } from '../types'
 import type { TransKey } from '../i18n/resources'
 import { SEP } from '../adapter'
 
+/** Display label resolved from a {@link RowItem}, ready for i18n interpolation.
+ *  Caller uses `t(result.key, result.params)` to get the final display string. */
 export interface LabelResult {
+  /** i18next translation key in the `chatview` namespace */
   key: TransKey
+  /** Optional interpolation parameters (e.g. `{ name: 'Linter' }`) */
   params?: Record<string, string> | undefined
 }
 
-/** Extract sub-agent name from label like "Agent · Linter" */
+/**
+ * Extract sub-agent name from a label string.
+ * If the label contains the SEP delimiter (` · `), returns the portion after it.
+ * Otherwise, if the label starts with `'Agent '`, returns the remainder.
+ * Returns an empty string if neither pattern matches.
+ */
 function subName(item: RowItem): string {
   // If label contains SEP, extract the part after it
   const idx = item.label.indexOf(SEP)
@@ -20,8 +29,19 @@ function subName(item: RowItem): string {
 }
 
 /**
- * Resolve the display label for a card based on type + status + toolName.
- * Returns {key, params?} — caller passes to t(key, params) for display string.
+ * Resolve the display label for a transcript card based on `type`, `status`, and `toolName`.
+ *
+ * The returned `key` is an i18next translation key in the `chatview` namespace.
+ * Callers interpolate it via `t(result.key, result.params)`.
+ *
+ * Status-aware conventions:
+ * - `'running'` / `'pending'` -- in-flight state (e.g. `'card.think.running'`)
+ * - `'ok'` / `'completed'`   -- finished state (e.g. `'card.think.done'`)
+ * - `'fail'` / `'failed'`     -- error state (e.g. `'card.think.fail'`)
+ * - `'waiting'`               -- awaiting user input (e.g. `'card.approval.waiting'`)
+ *
+ * @param item - The row item to produce a label for.
+ * @returns A {@link LabelResult} with the resolved i18n key and optional parameters.
  */
 export function cardLabelKey(item: RowItem): LabelResult {
   const { type, status, toolName } = item
@@ -91,9 +111,20 @@ export function cardLabelKey(item: RowItem): LabelResult {
   }
 }
 
-/** Stable tool identifier for icon routing — never translated.
- *  Uses explicit toolName field when present; falls back to type+label inference
- *  for mock data that hasn't been migrated yet. */
+/**
+ * Return a stable tool identifier for icon routing and i18n key derivation.
+ *
+ * The returned value is **never translated** -- it is a machine-readable key
+ * such as `'read'`, `'grep'`, `'eslint'`, `'modify'`, or `'analyze'`.
+ *
+ * Priority:
+ * 1. Explicit `item.toolName` field (set by the adapter for fully-migrated data).
+ * 2. Fallback heuristic based on `type` + `label` content, for legacy / mock data
+ *    that does not yet provide `toolName`.
+ *
+ * @param item - The row item to derive a tool key for.
+ * @returns A stable, lowercase tool identifier string.
+ */
 export function toolKey(item: RowItem): string {
   if (item.toolName) return item.toolName
   // Fallback derivation — eventually all cards should set toolName explicitly
@@ -128,8 +159,17 @@ export function toolKey(item: RowItem): string {
   return item.type
 }
 
-/** Whether this tool card should get the result-row CSS class.
- *  Uses explicit isResult flag; falls back to label matching for legacy data. */
+/**
+ * Determine whether a tool card should receive the `result-row` CSS class.
+ *
+ * Priority:
+ * 1. Explicit `item.isResult` boolean (set by the adapter for tool_result blocks).
+ * 2. Fallback: detect result cards by label content (contains `'result'` or `'结果'`),
+ *    for legacy data that does not yet provide the `isResult` flag.
+ *
+ * @param item - The row item to check.
+ * @returns `true` if the item should be styled as a tool result.
+ */
 export function isToolResult(item: RowItem): boolean {
   if (item.isResult === true) return true
   if (item.isResult === false) return false
