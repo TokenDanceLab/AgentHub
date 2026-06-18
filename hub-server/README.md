@@ -288,3 +288,5 @@ OIDC 结构检查可在仓库根目录运行：
 ```
 
 该检查只验证公开仓库里的端点、示例环境变量、Desktop/Web 存储边界和根治理矩阵状态；它不连接生产 TokenDance ID，也不需要或打印真实 `client_secret`。部署态 client 注册、callback、refresh/logout 和截图证据仍属于发布前验收。
+
+<!-- ci: trigger cd-hub-server workflow -->
