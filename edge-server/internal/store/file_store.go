@@ -245,6 +245,14 @@ func (f *FileStore) SetRunStatusIf(id, status string, allowedCurrent ...string) 
 	return run, ok
 }
 
+func (f *FileStore) SetRunEvidenceGate(id, result string) (Run, bool) {
+	run, ok := f.store.SetRunEvidenceGate(id, result)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
 func (f *FileStore) CreateItem(item Item) (Item, error) {
 	created, err := f.store.CreateItem(item)
 	if err != nil {

@@ -469,6 +469,9 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		}
 	}
 
+	// Replay human review events to populate the Reviews slice.
+	replayReviewEvents(events, state)
+
 	return state, nil
 }
 

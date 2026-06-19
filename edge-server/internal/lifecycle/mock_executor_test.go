@@ -60,6 +60,16 @@ func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ..
 	return s.SetRunStatus(id, status)
 }
 
+func (s *lifecycleOnlyStore) SetRunEvidenceGate(id, result string) (store.Run, bool) {
+	run, ok := s.runs[id]
+	if !ok {
+		return store.Run{}, false
+	}
+	run.EvidenceGateResult = result
+	s.runs[id] = run
+	return run, true
+}
+
 func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
 	run := store.Run{
 		ID:        "run_test",

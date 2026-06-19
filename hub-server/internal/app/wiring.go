@@ -155,6 +155,7 @@ func (a *App) Run(ctx context.Context) error {
 		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
 	})
 	a.AgentTeamService.SetBus(a.bus)
+	a.AgentTeamService.SetHumanReviewEnabled(a.Config.AgentTeam.HumanReviewEnabled)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 	// Document service
 	a.DocumentService = service.NewDocumentService(a.DB)

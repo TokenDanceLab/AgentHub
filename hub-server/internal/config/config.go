@@ -151,6 +151,8 @@ type AgentTeamConfig struct {
 	AssignmentTimeout        time.Duration `mapstructure:"assignment_timeout"`
 	MaxTeamRunBudgetTokens   int64         `mapstructure:"max_team_run_budget_tokens"`
 	MaxTeamRunBudgetUsagePct float64       `mapstructure:"max_team_run_budget_usage_pct"`
+	CompeteMaxAgents         int           `mapstructure:"compete_max_agents"`
+	HumanReviewEnabled       bool          `mapstructure:"human_review_enabled"`
 }
 
 func setAgentTeamDefaults(v *viper.Viper) {
@@ -162,6 +164,7 @@ func setAgentTeamDefaults(v *viper.Viper) {
 	v.SetDefault("agent_team.assignment_timeout", defaults.AssignmentTimeout)
 	v.SetDefault("agent_team.max_team_run_budget_tokens", defaults.MaxTeamRunBudgetTokens)
 	v.SetDefault("agent_team.max_team_run_budget_usage_pct", defaults.MaxTeamRunBudgetUsagePct)
+	v.SetDefault("agent_team.compete_max_agents", defaults.CompeteMaxAgents)
 }
 
 func DefaultAgentTeamConfig() AgentTeamConfig {
@@ -173,6 +176,7 @@ func DefaultAgentTeamConfig() AgentTeamConfig {
 		AssignmentTimeout:        model.DefaultAssignmentTimeout,
 		MaxTeamRunBudgetTokens:   model.MaxTeamRunBudgetTokens,
 		MaxTeamRunBudgetUsagePct: model.MaxTeamRunBudgetUsagePct,
+		CompeteMaxAgents:         model.CompeteMaxAgentsDefault,
 	}
 }
 
@@ -198,6 +202,9 @@ func (a AgentTeamConfig) withDefaults() AgentTeamConfig {
 	}
 	if a.MaxTeamRunBudgetUsagePct == 0 {
 		a.MaxTeamRunBudgetUsagePct = defaults.MaxTeamRunBudgetUsagePct
+	}
+	if a.CompeteMaxAgents <= 0 {
+		a.CompeteMaxAgents = defaults.CompeteMaxAgents
 	}
 	return a
 }
@@ -397,6 +404,24 @@ func Load(configPath string) (*Config, error) {
 	}
 	if len(cfg.Upload.AllowedMimeTypes) == 0 {
 		cfg.Upload.AllowedMimeTypes = append([]string(nil), DefaultAllowedUploadMimeTypes...)
+	}
+
+	// Explicit env var override for compete max agents.
+	if envCompeteMaxAgents := os.Getenv("AGENTHUB_COMPETE_MAX_AGENTS"); envCompeteMaxAgents != "" {
+		n, err := strconv.Atoi(strings.TrimSpace(envCompeteMaxAgents))
+		if err != nil {
+			return nil, fmt.Errorf("invalid AGENTHUB_COMPETE_MAX_AGENTS: %w", err)
+		}
+		cfg.AgentTeam.CompeteMaxAgents = n
+	}
+
+	// Explicit env var override for human review enabled.
+	if envHR := os.Getenv("AGENTHUB_HUMAN_REVIEW_ENABLED"); envHR != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(envHR))
+		if err != nil {
+			return nil, fmt.Errorf("invalid AGENTHUB_HUMAN_REVIEW_ENABLED: %w", err)
+		}
+		cfg.AgentTeam.HumanReviewEnabled = enabled
 	}
 
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.
