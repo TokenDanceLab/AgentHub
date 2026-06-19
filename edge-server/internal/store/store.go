@@ -196,6 +196,8 @@ type Writer interface {
 	UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error)
 	DeleteAgentProfile(id string) error
 	UpsertSettings(patch map[string]string) UserSettings
+	SetRunEvidenceGate(id, result string) (Run, bool)
+	SetRunRetryCount(id string, count int) (Run, bool)
 }
 
 type Repository interface {
