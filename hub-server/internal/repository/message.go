@@ -137,12 +137,22 @@ func CountPinsBySession(db *gorm.DB, sessionID string) (int64, error) {
 
 func ListPinsBySession(db *gorm.DB, sessionID string) ([]model.MessagePin, error) {
 	var pins []model.MessagePin
-	err := db.Where("session_id = ?", sessionID).Order("pinned_at DESC").Find(&pins).Error
+	err := db.Where("session_id = ?", sessionID).Order("pinned_at DESC").Limit(100).Find(&pins).Error
 	return pins, err
 }
 
+// maxMessageIDsPerIN caps the number of message IDs accepted by
+// GetMessagesByIDs to prevent oversized IN clauses.
+const maxMessageIDsPerIN = 1000
+
 func GetMessagesByIDs(db *gorm.DB, ids []string) ([]model.Message, error) {
 	var msgs []model.Message
+	if len(ids) == 0 {
+		return msgs, nil
+	}
+	if len(ids) > maxMessageIDsPerIN {
+		ids = ids[:maxMessageIDsPerIN]
+	}
 	err := db.Where("id IN ?", ids).Find(&msgs).Error
 	return msgs, err
 }

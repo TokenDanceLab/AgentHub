@@ -76,6 +76,7 @@ func ListUserSessions(db *gorm.DB, userID string) ([]SessionWithMeta, error) {
 		LEFT JOIN (SELECT session_id, COUNT(*) as member_count FROM session_members WHERE left_at IS NULL GROUP BY session_id) mc ON mc.session_id = s.id
 		WHERE s.dissolved = false
 		ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
+		LIMIT 500
 	`, userID).Scan(&result).Error
 	return result, err
 }
@@ -90,6 +91,7 @@ func ListWorkspaceSessions(db *gorm.DB, workspaceID, userID string) ([]SessionWi
 		LEFT JOIN (SELECT session_id, COUNT(*) as member_count FROM session_members WHERE left_at IS NULL GROUP BY session_id) mc ON mc.session_id = s.id
 		WHERE s.workspace_id = ? AND s.dissolved = false
 		ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
+		LIMIT 500
 	`, userID, workspaceID).Scan(&result).Error
 	return result, err
 }

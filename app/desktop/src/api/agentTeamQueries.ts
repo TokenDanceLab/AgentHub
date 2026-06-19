@@ -166,7 +166,6 @@ export function useHubAgentTeams(enabledOrOptions: boolean | UseHubAgentTeamsOpt
   return useQuery<AgentTeamOverview>({
     queryKey: [
       ...hubQueryKeys.agentTeams.list(options.preferHub ? 'hub' : 'signed-out'),
-      options.preferHub ? 'hub' : 'signed-out',
       options.baseUrl ?? 'default',
       options.selectedTeamId ?? 'auto-team',
       options.selectedRunId ?? 'auto-run',
