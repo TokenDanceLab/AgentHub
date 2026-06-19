@@ -94,7 +94,11 @@ func TestMain(m *testing.M) {
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat()
 
-	bus = service.NewBus()
+	b, err := service.NewBus()
+	if err != nil {
+		panic(fmt.Sprintf("NewBus failed: %v", err))
+	}
+	bus = b
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
@@ -143,7 +147,9 @@ func TestMain(m *testing.M) {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil)
+	if err := router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
+		panic(fmt.Sprintf("SetupRoutes failed: %v", err))
+	}
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()

@@ -53,11 +53,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		r.GET("/health/ready", healthOK)
 	}
 
-	// Dev-only debug panic endpoint — deliberately panics to verify recovery middleware.
+	// Dev-only debug endpoint — returns an intentional 500 to verify error handling.
 	// Enabled only when log_level is "debug".
 	if cfg.Server.LogLevel == "debug" {
 		r.GET("/debug/panic", func(c *gin.Context) {
-			panic("deliberate test panic from /debug/panic")
+			handler.Fail(c, sharederr.ErrInternal.WithMessage("deliberate test error from /debug/panic"))
 		})
 	}
 
@@ -348,4 +348,5 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 				web.POST("/team-runs/:id/review-decision", agentTeamHandler.ReviewDecision)
 			}
 		}
+	return nil
 }

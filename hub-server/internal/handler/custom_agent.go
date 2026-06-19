@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +55,8 @@ func (h *CustomAgentHandler) Create(c *gin.Context) {
 	}
 	ca, err := h.service.CreateCustomAgent(c.Request.Context(), userID, req.Name, req.AvatarURL, req.AgentType, req.SystemPrompt, req.CapabilityTags, req.ToolWhitelist, req.ModelParams)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -69,7 +71,8 @@ func (h *CustomAgentHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	agents, err := h.service.ListCustomAgents(c.Request.Context(), userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -114,7 +117,8 @@ func (h *CustomAgentHandler) Update(c *gin.Context) {
 		return
 	}
 	if err := h.service.UpdateCustomAgent(c.Request.Context(), userID, ca); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -129,7 +133,8 @@ func (h *CustomAgentHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	id := c.Param("id")
 	if err := h.service.DeleteCustomAgent(c.Request.Context(), userID, id); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

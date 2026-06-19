@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -60,7 +61,8 @@ func (h *AgentHandler) AddAgentToSession(c *gin.Context) {
 	sessionID := c.Param("id")
 	agent, err := h.service.AddAgentToSession(c.Request.Context(), userID, sessionID, req.AgentType, req.CustomAgentID, req.DisplayName)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -98,7 +100,8 @@ func (h *AgentHandler) TriggerTask(c *gin.Context) {
 		req.TargetID,
 	)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -113,7 +116,8 @@ func (h *AgentHandler) CancelTask(c *gin.Context) {
 	userID := c.GetString("user_id")
 	taskID := c.Param("id")
 	if err := h.service.CancelTask(c.Request.Context(), userID, taskID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -129,7 +133,8 @@ func (h *AgentHandler) RegenerateTask(c *gin.Context) {
 	taskID := c.Param("id")
 	newTask, err := h.service.RegenerateAgentTask(c.Request.Context(), userID, taskID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -163,7 +168,8 @@ func (h *AgentHandler) TaskAck(c *gin.Context) {
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskAck(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID()); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -219,7 +225,8 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		stream.ClientMsgID = normalized
 	}
 	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), stream); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -240,7 +247,8 @@ func (h *AgentHandler) TaskEvents(c *gin.Context) {
 	}
 	events, err := h.service.ListTaskRunEvents(c.Request.Context(), userID, taskID, filter)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -256,7 +264,8 @@ func (h *AgentHandler) TaskEventSummary(c *gin.Context) {
 	taskID := c.Param("id")
 	summary, err := h.service.GetTaskRunEventSummary(c.Request.Context(), userID, taskID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -277,7 +286,8 @@ func (h *AgentHandler) TaskApprovals(c *gin.Context) {
 	}
 	approvals, err := projectionSvc.ListTaskApprovals(c.Request.Context(), userID, taskID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -306,7 +316,8 @@ func (h *AgentHandler) DecideTaskApproval(c *gin.Context) {
 		Reason:   req.Reason,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -327,7 +338,8 @@ func (h *AgentHandler) TaskArtifacts(c *gin.Context) {
 	}
 	artifacts, err := projectionSvc.ListTaskArtifacts(c.Request.Context(), userID, taskID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -378,7 +390,8 @@ func (h *AgentHandler) TaskDone(c *gin.Context) {
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskDone(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.FinalContent); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -405,7 +418,8 @@ func (h *AgentHandler) TaskFail(c *gin.Context) {
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskFail(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Error); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

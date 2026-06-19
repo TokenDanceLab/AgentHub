@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"log/slog"
 
@@ -41,7 +42,8 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	resp, err := h.service.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		slog.Error("auth refresh token error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -69,7 +71,8 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	user, err := h.service.GetMe(c.Request.Context(), userID)
 	if err != nil {
 		slog.Error("auth get me error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -95,7 +98,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	user, err := h.service.UpdateProfile(c.Request.Context(), userID, req.Nickname, req.AvatarURL)
 	if err != nil {
 		slog.Error("auth update profile error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

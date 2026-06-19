@@ -15,9 +15,18 @@ func init() {
 	metrics.Register()
 }
 
+func newTestBus(t *testing.T) *Bus {
+	t.Helper()
+	b, err := NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(b.Close)
+	return b
+}
+
 func TestBusSubscribe(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var called atomic.Bool
 	b.Subscribe("test.event", func(ctx context.Context, e Event) {
@@ -34,8 +43,7 @@ func TestBusSubscribe(t *testing.T) {
 }
 
 func TestBusPublishNoHandlers(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	// Should not panic or error when no handlers are registered.
 	b.Publish(context.Background(), Event{Type: "no.handler", Payload: nil})
@@ -47,8 +55,7 @@ func TestBusPublishNoHandlers(t *testing.T) {
 }
 
 func TestBusWildcardHandler(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var called atomic.Bool
 	b.Subscribe("*", func(ctx context.Context, e Event) {
@@ -64,8 +71,7 @@ func TestBusWildcardHandler(t *testing.T) {
 }
 
 func TestBusBothSpecificAndWildcard(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var specific, wildcard atomic.Bool
 	b.Subscribe("specific.event", func(ctx context.Context, e Event) {
@@ -87,8 +93,7 @@ func TestBusBothSpecificAndWildcard(t *testing.T) {
 }
 
 func TestBusMultipleHandlersSameType(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var h1, h2 atomic.Bool
 	b.Subscribe("shared.event", func(ctx context.Context, e Event) {
@@ -107,8 +112,7 @@ func TestBusMultipleHandlersSameType(t *testing.T) {
 }
 
 func TestBusPanicRecovery(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var survived atomic.Bool
 	b.Subscribe("panic.event", func(ctx context.Context, e Event) {
@@ -127,8 +131,7 @@ func TestBusPanicRecovery(t *testing.T) {
 }
 
 func TestBusPendingCounter(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var wg sync.WaitGroup
 	b.Subscribe("count.event", func(ctx context.Context, e Event) {
@@ -152,8 +155,7 @@ func TestBusPendingCounter(t *testing.T) {
 }
 
 func TestBusPayload(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	type payload struct{ Msg string }
 	var received atomic.Value
@@ -172,7 +174,10 @@ func TestBusPayload(t *testing.T) {
 }
 
 func TestBusClose(t *testing.T) {
-	b := NewBus()
+	b, err := NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Close()
 	if !b.pool.IsClosed() {
 		t.Fatal("expected pool to be closed after Close()")
@@ -180,8 +185,7 @@ func TestBusClose(t *testing.T) {
 }
 
 func TestBusRunningCounter(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	running := make(chan struct{})
 	done := make(chan struct{})
@@ -204,8 +208,7 @@ func TestBusRunningCounter(t *testing.T) {
 // TestBusConcurrentSubscribePublish verifies that concurrent Subscribe and
 // Publish operations do not race.
 func TestBusConcurrentSubscribePublish(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var total atomic.Int64
 	var wg sync.WaitGroup
@@ -240,8 +243,7 @@ func TestBusConcurrentSubscribePublish(t *testing.T) {
 // TestBusConcurrentSubscribeWhilePublishing verifies that subscribing while
 // events are being published does not race.
 func TestBusConcurrentSubscribeWhilePublishing(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var total atomic.Int64
 	var wg sync.WaitGroup
@@ -282,8 +284,7 @@ func TestBusConcurrentSubscribeWhilePublishing(t *testing.T) {
 // TestBusConcurrentWildcardSubscribers verifies that concurrent wildcard
 // subscribers do not race with specific subscribers.
 func TestBusConcurrentWildcardSubscribers(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var wildcard atomic.Int64
 	var specific atomic.Int64
@@ -323,8 +324,7 @@ func TestBusConcurrentWildcardSubscribers(t *testing.T) {
 
 // TestBusHighConcurrencyPublish verifies the bus under high publish pressure.
 func TestBusHighConcurrencyPublish(t *testing.T) {
-	b := NewBus()
-	defer b.Close()
+	b := newTestBus(t)
 
 	var total atomic.Int64
 	var wg sync.WaitGroup

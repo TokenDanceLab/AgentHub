@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"strings"
@@ -67,7 +68,8 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 	userID := c.GetString("user_id")
 	cmd, err := h.service.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -83,7 +85,8 @@ func (h *RelayHandler) GetCommand(c *gin.Context) {
 	userID := c.GetString("user_id")
 	cmd, err := h.service.GetCommand(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -98,7 +101,8 @@ func (h *RelayHandler) AckCommand(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 	if err := h.service.AckCommand(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
