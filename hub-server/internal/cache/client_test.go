@@ -1024,30 +1024,37 @@ func TestConcurrentRouteCRUD(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
 
+	const numGoroutines = 50
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+
+	// Each goroutine uses a unique userID+device pair.
+	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			userID := fmt.Sprintf("user-conc-%d", idx%10)
+			userID := fmt.Sprintf("user-crud-%d", idx)
 			device := fmt.Sprintf("device-%d", idx%3)
 			connID := fmt.Sprintf("conn-%d", idx)
 
 			// Set
 			require.NoError(t, c.SetRoute(ctx, userID, device, connID))
 
-			// Get
+			// Get — should find what we just set
 			got, err := c.GetRoute(ctx, userID, device)
 			require.NoError(t, err)
-			assert.Equal(t, connID, got)
+			require.Equal(t, connID, got)
 
 			// Check online
 			online, err := c.IsOnline(ctx, userID)
 			require.NoError(t, err)
-			assert.True(t, online)
+			require.True(t, online)
 
 			// Delete
 			require.NoError(t, c.DeleteRoute(ctx, userID, device))
+
+			// Verify deleted
+			_, err = c.GetRoute(ctx, userID, device)
+			require.ErrorIs(t, err, redis.Nil)
 		}(i)
 	}
 	wg.Wait()
@@ -1117,8 +1124,8 @@ func TestConcurrentCheckRateLimit(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Equal(t, int64(limit+1), allowed.Load(), "exactly limit+1 (51) should be allowed (count=51, 51>50)")
-	assert.Equal(t, int64(100-(limit+1)), blocked.Load(), "remaining should be blocked")
+	assert.Equal(t, int64(limit), allowed.Load(), "exactly limit (50) should be allowed (count up to limit)")
+	assert.Equal(t, int64(100-limit), blocked.Load(), "remaining should be blocked")
 }
 
 // TestConcurrentGetOrLoad verifies that GetOrLoad with singleflight correctly

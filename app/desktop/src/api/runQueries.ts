@@ -91,7 +91,6 @@ export function useCreateRun() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
-      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.items() });
     },
   });
 }
@@ -114,7 +113,7 @@ export function useCancelRun() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
-      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.items() });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
