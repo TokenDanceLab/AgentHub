@@ -27,10 +27,12 @@ import (
 	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
 	debugpkg "github.com/agenthub/pkg/debug"
+	sharederr "github.com/agenthub/pkg/errcode"
 	"github.com/agenthub/pkg/reqlog"
 )
 
@@ -456,7 +458,7 @@ func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string)
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			if !security.IsAllowedOrigin(origin, remoteMode, allowedOrigins) {
-				http.Error(w, "forbidden origin", http.StatusForbidden)
+				sharederr.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrForbidden.WithMessage("forbidden origin")))
 				return
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)

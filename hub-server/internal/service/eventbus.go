@@ -36,7 +36,7 @@ type Bus struct {
 	pool     *ants.Pool
 }
 
-func NewBus() *Bus {
+func NewBus() (*Bus, error) {
 	pool, err := ants.NewPool(config.EventBusPoolSize,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
@@ -47,9 +47,9 @@ func NewBus() *Bus {
 		}),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}
+	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}, nil
 }
 
 func (b *Bus) Pending() int64 { return b.pending.Load() }
