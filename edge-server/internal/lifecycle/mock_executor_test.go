@@ -70,6 +70,16 @@ func (s *lifecycleOnlyStore) SetRunEvidenceGate(id, result string) (store.Run, b
 	return run, true
 }
 
+func (s *lifecycleOnlyStore) SetRunRetryCount(id string, count int) (store.Run, bool) {
+	run, ok := s.runs[id]
+	if !ok {
+		return store.Run{}, false
+	}
+	run.RetryCount = count
+	s.runs[id] = run
+	return run, true
+}
+
 func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
 	run := store.Run{
 		ID:        "run_test",
