@@ -377,7 +377,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("failed to write json response", "err", err)
+		slog.Error("failed to write json response", "error", err)
 	}
 }
 
@@ -1369,7 +1369,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		// Ensure the memory directory exists on first use (seeds project.md if new).
 		if req.WorkDir != "" {
 			if err := runnerctx.EnsureMemoryDir(req.WorkDir); err != nil {
-				slog.Warn("memory: failed to ensure memory directory", "workDir", req.WorkDir, "err", err)
+				slog.Warn("memory: failed to ensure memory directory", "workDir", req.WorkDir, "error", err)
 			}
 		}
 		if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
@@ -1494,10 +1494,15 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.Error("websocket upgrade failed", "err", err)
+		slog.Error("websocket upgrade failed", "error", err)
 		return
 	}
 	defer conn.Close()
+
+	// 2.3a: Limit maximum WebSocket frame read size to 64 KB for Edge
+	// connections.  Edge frames are command/control messages that are much
+	// smaller than Hub frames, so a tighter limit is appropriate.
+	conn.SetReadLimit(64 * 1024)
 
 	if h.Metrics != nil {
 		h.Metrics.RecordWSConnect()
@@ -1512,7 +1517,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	// Send replayed events.
 	for _, evt := range replay {
 		if err := conn.WriteJSON(evt); err != nil {
-			slog.Info("websocket write error during replay", "err", err)
+			slog.Info("websocket write error during replay", "error", err)
 			return
 		}
 	}
@@ -1564,7 +1569,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		case response := <-clientControl:
 			if err := conn.WriteJSON(response); err != nil {
-				slog.Info("websocket control write error", "err", err)
+				slog.Info("websocket control write error", "error", err)
 				return
 			}
 		case evt, ok := <-ch:
@@ -1580,12 +1585,12 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if err := conn.WriteJSON(evt); err != nil {
-				slog.Info("websocket write error", "err", err)
+				slog.Info("websocket write error", "error", err)
 				return
 			}
 		case <-heartbeat.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				slog.Info("websocket heartbeat error", "err", err)
+				slog.Info("websocket heartbeat error", "error", err)
 				return
 			}
 		}
@@ -1973,7 +1978,7 @@ func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
 
 	providers, err := h.CCSwitchReader.ReadProviders(appType)
 	if err != nil {
-		slog.Warn("cc-switch: failed to read providers", "err", err)
+		slog.Warn("cc-switch: failed to read providers", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to read cc-switch providers")))
 		return
 	}

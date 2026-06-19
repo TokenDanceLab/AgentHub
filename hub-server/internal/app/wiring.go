@@ -212,6 +212,10 @@ func (a *App) Run(ctx context.Context) error {
 	// Periodic metrics collection
 	a.startMetricsCollector(a.coreCtx)
 
+	// Wait for shutdown signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
 	// HTTP server
 	a.HTTPServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
@@ -227,13 +231,10 @@ func (a *App) Run(ctx context.Context) error {
 		slog.Info("server starting", "port", a.Config.Server.Port)
 		if err := a.HTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server failed", "error", err)
-			os.Exit(1)
+			quit <- syscall.SIGTERM
 		}
 	}()
 
-	// Wait for shutdown signal
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-quit:
 	case <-ctx.Done():

@@ -425,7 +425,7 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 
 		var event anthropicSSEEvent
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			slog.Debug("anthropic-sdk: failed to parse SSE event", "err", err, "data", data)
+			slog.Debug("anthropic-sdk: failed to parse SSE event", "error", err, "data", data)
 			continue
 		}
 
