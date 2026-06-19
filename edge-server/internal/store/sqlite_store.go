@@ -615,8 +615,8 @@ func persistAfterSQLiteWrite[T any](s *SQLiteStore, value T, err error) (T, erro
 	return value, nil
 }
 
-func (s *SQLiteStore) CreateProject(id, name string) (Project, error) {
-	project, err := s.store.CreateProject(id, name)
+func (s *SQLiteStore) CreateProject(id, name, ownerID string) (Project, error) {
+	project, err := s.store.CreateProject(id, name, ownerID)
 	if errors.Is(err, ErrProjectExists) {
 		return project, err
 	}

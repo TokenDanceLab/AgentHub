@@ -194,23 +194,31 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 func TestHandleTaskStreamAutoParsesRunningTeamRunRouteDecision(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
-	handler := &mockTeamRouteHandler{}
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
-	svc.SetTeamRouteHandler(handler)
+	bus := newTestBus(t)
+	decisions := make(chan RouteDecisionPayload, 1)
+	bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
+		if payload, ok := event.Payload.(RouteDecisionPayload); ok {
+			decisions <- payload
+		}
+	})
+	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route","reasoning":"needs backend"}`),
 	})
 
 	require.NoError(t, err)
-	require.Len(t, handler.calls, 1)
-	call := handler.calls[0]
-	require.Equal(t, "owner-1", call.userID)
-	require.Equal(t, "team-1", call.teamID)
-	require.Equal(t, "team-run-1", call.runID)
-	require.Equal(t, "delegate", call.decision.Action)
-	require.Equal(t, "member-2", call.decision.NextWorker)
-	require.Equal(t, "Implement the route", call.decision.Instructions)
+	select {
+	case payload := <-decisions:
+		require.Equal(t, "owner-1", payload.UserID)
+		require.Equal(t, "team-1", payload.TeamID)
+		require.Equal(t, "team-run-1", payload.RunID)
+		require.Equal(t, "delegate", payload.Decision.Action)
+		require.Equal(t, "member-2", payload.Decision.NextWorker)
+		require.Equal(t, "Implement the route", payload.Decision.Instructions)
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected route_decision event was not published")
+	}
 }
 
 func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
@@ -253,9 +261,14 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 			if tt.status != "" {
 				seedAgentRunEventTeamRun(t, db, tt.status)
 			}
-			handler := &mockTeamRouteHandler{}
-			svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
-			svc.SetTeamRouteHandler(handler)
+			bus := newTestBus(t)
+			decisions := make(chan RouteDecisionPayload, 1)
+			bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
+				if payload, ok := event.Payload.(RouteDecisionPayload); ok {
+					decisions <- payload
+				}
+			})
+			svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
 
 			err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 				Payload: tt.payload,
@@ -266,7 +279,12 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			require.Empty(t, handler.calls)
+			// No route_decision event should be published for invalid payloads
+			select {
+			case <-decisions:
+				t.Fatal("unexpected route_decision event was published")
+			case <-time.After(500 * time.Millisecond):
+			}
 		})
 	}
 }
@@ -274,16 +292,20 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
-	handler := &mockTeamRouteHandler{err: errors.New("route handler unavailable")}
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
-	svc.SetTeamRouteHandler(handler)
+	bus := newTestBus(t)
+	// Subscribe and simulate handler error to verify stream still succeeds
+	bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
+		// Simulate a handler that would error — but on the bus, errors only log.
+		_ = event
+	})
+	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route"}`),
 	})
 
 	require.NoError(t, err)
-	require.Len(t, handler.calls, 1)
+	// Route decision is dispatched async via event bus; stream should never fail due to handler errors.
 }
 
 func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {

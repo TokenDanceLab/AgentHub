@@ -13,12 +13,13 @@ import {
   fetchCurrentUser,
   type CreateThreadRequest,
 } from './edgeClient';
+import { edgeQueryKeys } from '@agenthub/shared';
 import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo, UserProfileInfo } from '@shared/types';
 
 export function useThreads(projectId?: string, options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   return useQuery<ListResponse<ThreadInfo>>({
-    queryKey: ['threads', projectId],
+    queryKey: edgeQueryKeys.threads.all(projectId),
     queryFn: () => fetchThreads(projectId),
     enabled,
     refetchInterval: enabled ? 10_000 : false,
@@ -28,7 +29,7 @@ export function useThreads(projectId?: string, options: { enabled?: boolean } = 
 export function useThreadItems(threadId?: string) {
   return useQuery<ListResponse<ThreadItemInfo>>({
     enabled: Boolean(threadId),
-    queryKey: ['threadItems', threadId],
+    queryKey: edgeQueryKeys.threads.items(threadId),
     queryFn: () => {
       if (!threadId) throw new Error('threadId is required');
       return fetchThreadItems(threadId);
@@ -43,7 +44,7 @@ export function useRenameThread() {
     mutationFn: ({ threadId, title }: { threadId: string; title: string }) =>
       renameThread(threadId, title),
     onMutate: async ({ threadId, title }) => {
-      await qc.cancelQueries({ queryKey: ['threads'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.threads.root });
       const prev = snapshotThreadQueries(qc);
       updateThreadsInCache(qc, (thread) =>
         thread.threadId === threadId ? { ...thread, title } : thread,
@@ -54,7 +55,7 @@ export function useRenameThread() {
       if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
@@ -64,7 +65,7 @@ export function useDeleteThread() {
   return useMutation({
     mutationFn: (threadId: string) => deleteThread(threadId),
     onMutate: async (threadId) => {
-      await qc.cancelQueries({ queryKey: ['threads'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.threads.root });
       const prev = snapshotThreadQueries(qc);
       setThreadStatusInCache(qc, threadId, 'archived');
       return { prev };
@@ -79,7 +80,7 @@ export function useDeleteThread() {
       if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
@@ -87,7 +88,7 @@ export function useDeleteThread() {
 type ThreadQuerySnapshot = Array<[readonly unknown[], ListResponse<ThreadInfo> | undefined]>;
 
 function snapshotThreadQueries(qc: QueryClient): ThreadQuerySnapshot {
-  return qc.getQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] });
+  return qc.getQueriesData<ListResponse<ThreadInfo>>({ queryKey: edgeQueryKeys.threads.root });
 }
 
 function restoreThreadQueries(qc: QueryClient, snapshot: ThreadQuerySnapshot) {
@@ -100,7 +101,7 @@ function updateThreadsInCache(
   qc: QueryClient,
   update: (thread: ThreadInfo) => ThreadInfo | null,
 ) {
-  qc.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+  qc.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: edgeQueryKeys.threads.root }, (current) => {
     if (!current) return current;
     return {
       ...current,
@@ -127,7 +128,7 @@ export function useArchiveThread() {
   return useMutation({
     mutationFn: (threadId: string) => archiveThread(threadId),
     onMutate: async (threadId) => {
-      await qc.cancelQueries({ queryKey: ['threads'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.threads.root });
       const prev = snapshotThreadQueries(qc);
       setThreadStatusInCache(qc, threadId, 'archived');
       return { prev };
@@ -136,7 +137,7 @@ export function useArchiveThread() {
       if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
@@ -146,7 +147,7 @@ export function useRestoreThread() {
   return useMutation({
     mutationFn: (threadId: string) => updateThreadStatus(threadId, 'active'),
     onMutate: async (threadId) => {
-      await qc.cancelQueries({ queryKey: ['threads'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.threads.root });
       const prev = snapshotThreadQueries(qc);
       setThreadStatusInCache(qc, threadId, 'active');
       return { prev };
@@ -155,7 +156,7 @@ export function useRestoreThread() {
       if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
@@ -166,14 +167,14 @@ export function useCreateThread() {
     mutationFn: (request: CreateThreadRequest | undefined) =>
       createThread(request),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
 
 export function useThreadMessages(threadId: string | null) {
   return useQuery({
-    queryKey: ['threadItems', threadId],
+    queryKey: edgeQueryKeys.threads.items(threadId ?? undefined),
     queryFn: () => {
       if (!threadId) throw new Error('threadId is required');
       return fetchThreadItems(threadId);
@@ -186,7 +187,7 @@ export function useThreadMessages(threadId: string | null) {
 
 export function useThreadPins(threadId: string | null) {
   return useQuery<ListResponse<ThreadPinInfo>>({
-    queryKey: ['threadPins', threadId],
+    queryKey: edgeQueryKeys.threads.pins(threadId),
     queryFn: () => {
       if (!threadId) throw new Error('threadId is required');
       return fetchThreadPins(threadId);
@@ -199,7 +200,7 @@ export function useThreadPins(threadId: string | null) {
 
 export function useCurrentUser(enabled = true) {
   return useQuery<UserProfileInfo>({
-    queryKey: ['currentUser'],
+    queryKey: edgeQueryKeys.currentUser.root,
     queryFn: () => fetchCurrentUser(),
     enabled,
     staleTime: 60_000,

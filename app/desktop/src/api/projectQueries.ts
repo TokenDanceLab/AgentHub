@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { hubQueryKeys } from '@agenthub/shared';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
@@ -16,7 +17,7 @@ function getHubClient() {
 
 export function useHubProjectThreads(projectId: string, opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'projects', projectId, 'threads'],
+    queryKey: hubQueryKeys.projects.threads(projectId),
     queryFn: () => getHubClient().listWorkspaceProjectThreads(projectId),
     enabled: opts?.enabled ?? false,
   });
@@ -33,7 +34,7 @@ export function useHubCreateProjectThread() {
       data: Parameters<ReturnType<typeof getHubClient>['createWorkspaceProjectThread']>[1];
     }) => getHubClient().createWorkspaceProjectThread(projectId, data),
     onSuccess: (_result, { projectId }) => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'projects', projectId, 'threads'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.threads(projectId) });
     },
   });
 }
@@ -46,7 +47,7 @@ export function useHubProjectThreadMessages(
   opts?: { enabled?: boolean },
 ) {
   return useQuery({
-    queryKey: ['hub', 'projects', projectId, 'threads', threadId, 'messages'],
+    queryKey: hubQueryKeys.projects.threadMessages(projectId, threadId),
     queryFn: () =>
       getHubClient().listWorkspaceProjectThreadMessages(projectId, threadId),
     enabled: opts?.enabled ?? false,
@@ -67,7 +68,7 @@ export function useHubSendProjectThreadMessage() {
     }) => getHubClient().sendWorkspaceProjectThreadMessage(projectId, threadId, data),
     onSuccess: (_result, { projectId, threadId }) => {
       void queryClient.invalidateQueries({
-        queryKey: ['hub', 'projects', projectId, 'threads', threadId, 'messages'],
+        queryKey: hubQueryKeys.projects.threadMessages(projectId, threadId),
       });
     },
   });

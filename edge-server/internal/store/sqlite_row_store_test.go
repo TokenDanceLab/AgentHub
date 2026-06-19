@@ -15,7 +15,7 @@ func TestSQLiteStoreRestoresContractRowsWhenSnapshotIsMissing(t *testing.T) {
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
 
-	project, err := s.CreateProject("proj_rows", "Rows Project")
+	project, err := s.CreateProject("proj_rows", "Rows Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}

@@ -149,8 +149,8 @@ func (f *FileStore) syncPersist() error {
 	return err
 }
 
-func (f *FileStore) CreateProject(id, name string) (Project, error) {
-	project, err := f.store.CreateProject(id, name)
+func (f *FileStore) CreateProject(id, name, ownerID string) (Project, error) {
+	project, err := f.store.CreateProject(id, name, ownerID)
 	if errors.Is(err, ErrProjectExists) {
 		return project, err
 	}

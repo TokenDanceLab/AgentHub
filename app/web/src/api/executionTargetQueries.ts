@@ -9,6 +9,7 @@ import type {
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@agenthub/shared';
 
 export interface UseHubExecutionTargetsOptions {
   enabled: boolean;
@@ -173,7 +174,7 @@ export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecuti
     : { enabled: enabledOrOptions.enabled, preferHub: enabledOrOptions.enabled, getToken: enabledOrOptions.getToken ?? getAccessToken };
 
   return useQuery<ExecutionTargetInventoryResponse>({
-    queryKey: ['execution-targets', options.preferHub ? 'hub' : 'signed-out'],
+    queryKey: hubQueryKeys.executionTargets.list(options.preferHub ? 'hub' : 'signed-out'),
     queryFn: () => fetchExecutionTargets(options.preferHub, options.getToken),
     enabled: options.enabled,
     refetchInterval: options.preferHub ? 10_000 : false,
@@ -192,7 +193,7 @@ export function usePingHubExecutionTarget(options: { getToken?: () => string | n
       await client.pingExecutionTarget(targetId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['execution-targets'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
     },
   });
 }

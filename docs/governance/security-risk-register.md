@@ -1,24 +1,24 @@
-# AgentHub Security Risk Register
+# AgentHub 安全风险登记表
 
-Last reviewed: 2026-06-17 (file path audit, branch alignment)
+最后审查：2026-06-17（文件路径审计、分支对齐）
 
-This register tracks security, privacy, reliability, network, disk, and logic risks for AgentHub. It is a living queue for audit loops; update status and evidence when a finding is fixed or intentionally accepted.
+本登记表追踪 AgentHub 的安全、隐私、可靠性、网络、磁盘和逻辑风险。它是审计循环的活跃队列；当某项发现被修复或有意接受时，更新状态和证据。
 
-## Scope
+## 范围
 
-- Hub Server: `hub-server/`
-- Edge Server: `edge-server/`
-- Desktop (Tauri): `app/desktop/` — system browser PKCE, Edge lifecycle, OS secure store, tray
-- Web (Hub-only): `app/web/` — Hub boundary, sessionStorage token, WS auth
-- Mobile: `app/mobile-rn/` — Expo AuthSession, SecureStore, notifications, OIDC deep-link callback
-- Shared client: `app/shared/`
-- API and deployment docs: `api/`, `docs/`, `hub-server/deployments/`
-- CI/governance: `scripts/`, `.github/workflows/`
-- Cross-repo identity docs: `../docs/identity/identity-auth.md`, `../docs/identity/authorization-model.md`, `../docs/identity/relying-party.md`
+- Hub Server：`hub-server/`
+- Edge Server：`edge-server/`
+- Desktop（Tauri）：`app/desktop/` — 系统浏览器 PKCE、Edge 生命周期、OS 安全存储、tray
+- Web（仅 Hub）：`app/web/` — Hub 边界、sessionStorage token、WS 认证
+- Mobile：`app/mobile-rn/` — Expo AuthSession、SecureStore、通知、OIDC 深链回调
+- 共享客户端：`app/shared/`
+- API 与部署文档：`api/`、`docs/`、`hub-server/deployments/`
+- CI/治理：`scripts/`、`.github/workflows/`
+- 跨仓库身份文档：`../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/identity/relying-party.md`
 
-## P0 / High
+## P0 / 高
 
-| ID | Severity | Status | Risk | Evidence | Next action |
+| ID | 严重度 | 状态 | 风险 | 证据 | 后续行动 |
 |---|---|---:|---|---|---|
 | AH-SR-001 | High | Mitigated in repo; config/deploy verification required | TokenDance ID bearer validation previously did not visibly enforce `iss` and `aud` before accepting RS256 tokens. Hub now requires configured issuer and AgentHub client audience for the TokenDance bearer compatibility path. | `hub-server/internal/jwtutil/tokendance.go:135`, `hub-server/internal/jwtutil/tokendance.go:181`, `hub-server/internal/middleware/auth.go:30`, `hub-server/internal/jwtutil/tokendance_test.go:16`, `hub-server/internal/middleware/auth_test.go:89` | Ensure `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` is configured for every environment that enables TokenDance bearer compatibility; then verify wrong-audience tokens are rejected in deployment. |
 | AH-SR-002 | High | Mitigated in repo; deploy/client verification required | TokenDance ID bearer auth previously mapped accepted users to hardcoded `device_type=desktop`, so normal OIDC identity tokens could satisfy desktop-only Edge route checks. The compatibility path now tags accepted users as `device_type=tokendance_bearer`, and Hub product APIs now require `auth_source=hub_local` after authentication, so TokenDance bearer tokens cannot authorize `/client/*`, `/web/*`, `/edge/*`, device routing, or Web task dispatch directly. The Hub OIDC authorize/callback path issues Hub-local sessions with explicit UUID device proof. | `hub-server/internal/middleware/auth.go:31`, `hub-server/internal/middleware/auth.go:100`, `hub-server/internal/router/router.go:61`, `hub-server/internal/router/router.go:75`, `hub-server/internal/router/router.go:141`, `hub-server/internal/router/router.go:153`, `hub-server/internal/middleware/auth_test.go:181`, `hub-server/internal/middleware/auth_test.go:513`, `hub-server/internal/service/oidc.go`, `hub-server/internal/service/oidc_test.go`, `hub-server/internal/handler/oidc_test.go` | Verify deployed Hub OIDC config and Desktop/Web clients using Hub-issued desktop/web sessions; keep TokenDance bearer auth as identity-only compatibility and do not use it as a Hub product session. |
@@ -46,9 +46,9 @@ This register tracks security, privacy, reliability, network, disk, and logic ri
 | AH-SR-048 | High | Mitigated in repo; runtime/log verification required | Edge process start logging no longer records full subprocess args. The executor now logs a redacted command name, arg count, safe flag/config-key summaries, and `argsRedacted=true`; adapter args can still contain prompts, system prompts, MCP config, config overrides, images, sessions, and local paths, so deployment log review is required before closing. | `edge-server/internal/lifecycle/process_executor.go:485`, `edge-server/internal/lifecycle/process_executor.go:486`, `edge-server/internal/lifecycle/process_executor.go:488`, `edge-server/internal/lifecycle/process_executor.go:491`, `edge-server/internal/lifecycle/process_executor.go:496`, `edge-server/internal/lifecycle/process_executor_test.go:441`, `edge-server/internal/lifecycle/process_executor_test.go:536`, `edge-server/internal/adapters/claude_code.go:67`, `edge-server/internal/adapters/codex.go:96` | Run a real Edge adapter smoke with debug logging enabled and verify runtime logs do not include prompt text, system prompts, MCP JSON, config values, image paths beyond accepted policy, or session identifiers before marking closed. |
 | AH-SR-049 | High | Open | Hub-Edge delivery still lacks a durable end-to-end delivery contract. Edge callbacks are asynchronous fire-and-forget, callback failures do not block run lifecycle, stream/done/fail callbacks are retried locally but not journaled as an outbox, and Hub-visible task state can still diverge from the Edge process when callbacks, control messages, cancellation, or offline replay fail. | `edge-server/internal/hub/callback.go:11`, `edge-server/internal/hub/callback.go:123`, `edge-server/internal/lifecycle/process_executor.go:1301`, `edge-server/internal/lifecycle/process_executor.go:1354`, `edge-server/internal/lifecycle/process_executor.go:1374`, `edge-server/internal/lifecycle/process_executor.go:1607`, `hub-server/internal/cache/client.go:193`, `hub-server/internal/ws/frame.go:51` | Design and implement a unified Hub-Edge delivery contract with Edge outbox/journal, event sequence IDs, idempotent Hub acks, device-bound routing, control acks, cancellation propagation, replay/cursor APIs, and failure reconciliation before claiming remote/cloud reliability. |
 
-## P1 / Medium
+## P1 / 中
 
-| ID | Severity | Status | Risk | Evidence | Next action |
+| ID | 严重度 | 状态 | 风险 | 证据 | 后续行动 |
 |---|---|---:|---|---|---|
 | AH-SR-008 | Medium | Mitigated in repo; remote dev opt-in remains operator-owned | Dev Docker compose now binds PostgreSQL, Redis, Hub API, and Hub admin/metrics ports to `127.0.0.1` by default through `AGENTHUB_BIND_HOST`, so default dev credentials and admin surfaces are not published to the LAN. Operators can still explicitly set `AGENTHUB_BIND_HOST=0.0.0.0` for remote debugging. | `docker-compose.yml:21`, `docker-compose.yml:36`, `docker-compose.yml:62`, `docker-compose.yml:111`, `docker-compose.yml:112`, `.env.example:8`, `.env.example:11`, `hub-server/deployments/docker-compose.prod.yml:117` | If remote dev debugging is needed, require explicit firewall/operator acknowledgement; keep production compose loopback/internal-only. |
 | AH-SR-009 | Medium | Mitigated in repo; MIME allowlist policy open | Attachment hash shape is validated before probe/upload/download path derivation, upload MIME metadata is sniffed from staged file bytes instead of trusting multipart headers, and downloads now normalize `Content-Type`, set `X-Content-Type-Options: nosniff`, and format `Content-Disposition` from a sanitized basename. The remaining question is product policy: whether AgentHub should restrict uploads to an explicit MIME allowlist. | `hub-server/internal/handler/attachment.go:44`, `hub-server/internal/handler/attachment.go:69`, `hub-server/internal/handler/attachment.go:133`, `hub-server/internal/handler/attachment.go:179`, `hub-server/internal/handler/attachment.go:224`, `hub-server/internal/handler/attachment.go:242`, `hub-server/internal/handler/attachment.go:250`, `hub-server/internal/service/attachment.go:76`, `hub-server/internal/service/attachment_test.go:16`, `hub-server/internal/handler/attachment_test.go:57`, `hub-server/internal/handler/attachment_test.go:190`, `hub-server/internal/handler/attachment_test.go:239` | Decide whether product requirements need a MIME allowlist or per-session file-type policy; otherwise keep byte-sniffed metadata plus forced attachment download as the default. |
@@ -72,16 +72,16 @@ This register tracks security, privacy, reliability, network, disk, and logic ri
 | AH-SR-043 | Medium | Open | Web preview/mock surfaces are labeled, but demo fallbacks and local-preview actions still share production UI paths. Release-quality Web must not report fake execution, fake private-chat success, or local catalog mutation as Hub-backed behavior. | `app/web/src/pages/mockConvergence.test.tsx`, `app/web/src/api/agentQueries.ts`, `app/web/src/api/hubClient.ts`, `app/web/src/i18n/locales/en/*.json` | Gate demo/mock surfaces behind explicit preview mode and route production run mutations through Hub `/web/agent-tasks` or team-run APIs; keep tests that fail on mock success states in authenticated flows. |
 | AH-SR-044 | Medium | Open | Runner compatibility health still leaks into Desktop/Web settings and workbench state, while the architecture has moved to Runtime adapters plus Execution Targets. This can mislead operators about what is actually dispatchable. | `edge-server/README.md`, `edge-server/internal/runners/`, `app/desktop/src/components/settings/sections/ExecutionTargetsSection.tsx`, `app/web/src/hooks/useWorkbenchProjection.ts` | Replace direct runner-centric UI assumptions with a compatibility adapter over Runtime inventory and Execution Target health; keep `/v1/runners` only as a documented legacy summary until clients stop depending on it. |
 
-## Observability / Hygiene
+## 可观测性 / 卫生
 
-| ID | Severity | Status | Risk | Evidence | Next action |
+| ID | 严重度 | 状态 | 风险 | 证据 | 后续行动 |
 |---|---|---:|---|---|---|
 | AH-SR-038 | Low | Mitigated | EventBus panic recovery: Hub EventBus subscribers have `defer/recover` wrappers. A panic in one subscriber does not crash the Hub or block other subscribers. | `hub-server/internal/eventbus/eventbus.go` | Keep recovery wrappers; add focused test for subscriber panic isolation. |
 | AH-SR-039 | Low | Mitigated | Edge race condition: concurrent workspace file access previously had a read/write race. The lifecycle manager now uses proper locking. | `edge-server/internal/lifecycle/lifecycle.go` | Keep lock ordering documented; add regression that concurrent run triggers do not race. |
 | AH-SR-040 | Low | Mitigated | Prometheus `/metrics` endpoint is wired on Edge Server for operational monitoring. | `edge-server/internal/middleware/metrics.go` | Keep metrics endpoint optionally auth-gated if Edge is exposed beyond localhost. |
 | AH-SR-041 | Low | Mitigated | Message/device/task/run payloads are capped at 1 MiB with UUID format validation before processing. CI enforces `govulncheck` as a hard block and `gosec` as warning-only. No known-vulnerable Go dependency can enter the build. | `hub-server/internal/middleware/bodylimit.go`, `hub-server/internal/validator/uuid.go`, `.github/workflows/ci.yml`, `scripts/` | Keep body limits and CI gates; bump body cap only with explicit design review for new upload/streaming endpoints; promote `gosec` to hard block after clearing current warnings. |
 
-## Recent Mitigation Evidence
+## 近期缓解证据
 
 - 2026-05-29: `AH-SR-027` Hub runtime event growth control was mitigated in repo. `HandleTaskStream` now persists `agent_run_events` through a capped transactional insert using `config.MaxRunEventsPerTask`; when the per-task cap is reached, the stream callback returns `BAD_REQUEST` and no projected `messages` row is inserted.
 - Fresh focused checks passed:
@@ -227,9 +227,9 @@ This register tracks security, privacy, reliability, network, disk, and logic ri
   - `cd hub-server; go test ./internal/repository ./internal/service ./internal/handler -count=1`
   - `cd hub-server; go test ./... -short -count=1`
 
-## Verification Queue
+## 验证队列
 
-Run these from `D:\Code\TokenDance\AgentHub`:
+从 `D:\Code\TokenDance\AgentHub` 运行以下命令：
 
 ```powershell
 git status --short --branch
@@ -237,37 +237,37 @@ git ls-files -- app/desktop/stats.html 'edge-server/$covPath' edge-server/cov_fu
 go test ./hub-server/internal/jwtutil ./hub-server/internal/middleware ./hub-server/internal/handler ./hub-server/internal/service
 go test ./hub-server/internal/jwtutil ./hub-server/internal/middleware -run "TestParseTokenDanceJWTRequiresExpectedIssuerAndAudience|TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience" -count=1
 go test ./edge-server/internal/httpserver ./edge-server/internal/api ./edge-server/internal/security
-# Backend full suite
+# 后端全量测试
 cd hub-server; go test ./... -short -count=1
 cd ..\edge-server; go test ./... -short -count=1
-# Frontend tests
+# 前端测试
 cd ..\app\desktop; pnpm test; pnpm typecheck
 cd ..\web; corepack.cmd pnpm typecheck
-# Return to repo root
+# 返回仓库根目录
 cd ..\..
-# Code searches
+# 代码搜索
 rg -n "ParseTokenDanceJWT|Issuer|Audience|ValidMethods|token.Valid" hub-server/internal/jwtutil hub-server/internal/middleware
 rg -n 'device_type", "desktop"|DeviceTypeCheck\("desktop"\)' hub-server/internal
 rg -n "AGENTHUB_ADDR|IsTrustedLocalOrigin|permissions/decide|PostRuns|exec.CommandContext" edge-server
 rg -n "dev_password|6379:6379|5432:5432|6060:6060|AGENTHUB_JWT_SECRET|127.0.0.1" docker-compose.yml hub-server/deployments/docker-compose.prod.yml
 rg -n 'PostForm\("hash"\)|PathFromHash|Content-Disposition|Content-Type' hub-server/internal/handler/attachment.go hub-server/internal/service/attachment.go
-# Git diff check
+# Git diff 检查
 git diff --check
 ```
 
-## Loop Notes
+## 循环笔记
 
-- Keep this file focused on active risks and verification decisions.
-- When a finding becomes a design decision, link the ADR or architecture section and mark it `Accepted`.
-- When a code fix lands, include the test command and commit/PR in the status note.
-- Hub session/auth, OIDC, Edge auth, or workspace boundary changes must update this register.
-- Critical/High risks in `Open` state block public release; see `../docs/security/security-risk.md` for release gates.
-- Production live endpoint, callback URL, client secret, session token, host path, backup path, and rotation evidence belong only in `C:\Users\Ding\server` or private ops docs.
-- Cross-repo identity/auth changes must also update `../docs/identity/identity-auth.md`, `../docs/identity/authorization-model.md`, and `../docs/identity/relying-party.md`.
-- Feishu/Lark Gateway security items should be added here when the integration skeleton lands.
-- 2026-06-04: Merged 17 findings from root `docs/security-risk-register.md` (reviewed 2026-06-03) as AH-SR-028 through AH-SR-044. Root copy can now be deleted.
-- 2026-06-17: Audit pass updated branch/worktree lists and removed stale backend slice references. ChatView migration worktree is current active branch.
-- 2026-06-08: Restored backend subagent findings `AH-SR-045` through `AH-SR-049` from the older governance register. Current dev reclassified `AH-SR-048` as mitigated in repo pending runtime/log verification; `AH-SR-045`, `AH-SR-046`, `AH-SR-047`, and `AH-SR-049` remain open because the residual remote Edge authorization, subprocess environment, and Hub-Edge delivery risks are not closed by the current code.
+- 保持本文件聚焦于活跃风险和验证决策。
+- 当某项发现变成设计决策时，链接 ADR 或架构章节并标记为 `Accepted`。
+- 当代码修复落地时，在状态备注中包含测试命令和 commit/PR。
+- Hub session/auth、OIDC、Edge auth 或 workspace 边界变更必须更新本登记表。
+- 处于 `Open` 状态的严重/高危风险阻断公开发布；发布门禁见 `../docs/security/security-risk.md`。
+- 生产环境实际端点、回调 URL、client secret、session token、主机路径、备份路径和轮换证据仅存放于 `C:\Users\Ding\server` 或私有运维文档。
+- 跨仓库身份/认证变更也必须更新 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md` 和 `../docs/identity/relying-party.md`。
+- 飞书/Lark 网关安全项应在集成骨架落地时添加至此。
+- 2026-06-04：从根 `docs/security-risk-register.md`（审查于 2026-06-03）合并了 17 项发现为 AH-SR-028 至 AH-SR-044。根副本现可删除。
+- 2026-06-17：审计轮次更新了分支/worktree 列表，移除过时的后端切片引用。ChatView 迁移 worktree 为当前活跃分支。
+- 2026-06-08：从旧治理登记表恢复了后端子 agent 发现 `AH-SR-045` 至 `AH-SR-049`。当前 dev 将 `AH-SR-048` 重新分类为"已在仓库中缓解，待运行时/日志验证"；`AH-SR-045`、`AH-SR-046`、`AH-SR-047` 和 `AH-SR-049` 保持开放，因为远程 Edge 授权、子进程环境和 Hub-Edge 投递方面的残余风险尚未被当前代码关闭。
 
 ## 2026-05-27 — Dependabot 上游漏洞（等待上游修复）
 

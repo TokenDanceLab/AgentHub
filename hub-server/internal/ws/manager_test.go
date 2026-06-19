@@ -450,3 +450,179 @@ func TestWebSocketManagerShutdownFullLifecycle(t *testing.T) {
 	}
 	conn.Close(websocket.StatusNormalClosure, "")
 }
+
+func TestWSReadTimeoutConstant(t *testing.T) {
+	expected := 2 * 30 * time.Second
+	if WSReadTimeout != expected {
+		t.Fatalf("WSReadTimeout = %v, want %v (2x 30s heartbeat)", WSReadTimeout, expected)
+	}
+}
+
+func TestReadMessageDeliversData(t *testing.T) {
+	// End-to-end: writeLoop + readLoop using ReadMessage.
+	manager := NewManager()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		wsConn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn := NewConn(wsConn)
+		_ = manager.Register(conn)
+
+		// Write a message, then close.
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		wsConn.Write(ctx, websocket.MessageText, []byte(`{"type":"hello"}`))
+		wsConn.Close(websocket.StatusNormalClosure, "")
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	wsURL := "ws" + srv.URL[4:] + "/ws"
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	wsConn := NewConn(conn)
+	data, err := wsConn.ReadMessage(context.Background())
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if string(data) != `{"type":"hello"}` {
+		t.Fatalf("ReadMessage data = %q, want %q", string(data), `{"type":"hello"}`)
+	}
+}
+
+func TestReadMessageDeadlineFires(t *testing.T) {
+	// Create a live WS pair.  The server never writes, so ReadMessage must
+	// time out per the caller-supplied context deadline.
+	manager := NewManager()
+
+	serverDone := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		defer close(serverDone)
+		wsConn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn := NewConn(wsConn)
+		_ = manager.Register(conn)
+		defer manager.Unregister(conn.ID)
+		defer conn.Close()
+
+		// Read one message (the client will send "ping" to confirm connection).
+		_, data, err := wsConn.Read(context.Background())
+		if err != nil {
+			return
+		}
+		if string(data) != "ping" {
+			return
+		}
+
+		// Then just block — never write.  The client's ReadMessage should time out.
+		select {
+		case <-time.After(5 * time.Second):
+		case <-r.Context().Done():
+		}
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	wsURL := "ws" + srv.URL[4:] + "/ws"
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	clientConn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer clientConn.Close(websocket.StatusNormalClosure, "")
+
+	// Confirm the connection is alive.
+	if err := clientConn.Write(ctx, websocket.MessageText, []byte("ping")); err != nil {
+		t.Fatalf("write ping: %v", err)
+	}
+
+	// Use a short deadline — 200ms — much shorter than the ws package default
+	// of 60s, but still shorter than the server's 5s block.
+	shortCtx, shortCancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer shortCancel()
+
+	wsConn := NewConn(clientConn)
+	_, err = wsConn.ReadMessage(shortCtx)
+	if err == nil {
+		t.Fatal("expected ReadMessage to time out, but got no error")
+	}
+	// The error should be a context deadline / close error from the websocket
+	// library after the deadline fires.
+}
+
+func TestReadMessageParentDeadlineWinsWhenShorter(t *testing.T) {
+	// WSReadTimeout is 60s.  Pass a parent context with a 10ms deadline and
+	// verify the shorter deadline wins (ReadMessage returns quickly).
+	manager := NewManager()
+
+	serverDone := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		defer close(serverDone)
+		wsConn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn := NewConn(wsConn)
+		_ = manager.Register(conn)
+		defer manager.Unregister(conn.ID)
+		defer conn.Close()
+
+		// Read the ping, then block forever.
+		_, _, err = wsConn.Read(context.Background())
+		if err != nil {
+			return
+		}
+		select {
+		case <-time.After(10 * time.Second):
+		case <-r.Context().Done():
+		}
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	wsURL := "ws" + srv.URL[4:] + "/ws"
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	clientConn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer clientConn.Close(websocket.StatusNormalClosure, "")
+
+	if err := clientConn.Write(ctx, websocket.MessageText, []byte("ping")); err != nil {
+		t.Fatalf("write ping: %v", err)
+	}
+
+	wsConn := NewConn(clientConn)
+
+	// Very short parent deadline — should fire well before the 60s default.
+	start := time.Now()
+	shortCtx, shortCancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer shortCancel()
+	_, err = wsConn.ReadMessage(shortCtx)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected ReadMessage to time out when parent deadline is very short")
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("ReadMessage took %v with 10ms parent deadline; expected fast failure", elapsed)
+	}
+}

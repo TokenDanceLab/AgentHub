@@ -45,6 +45,14 @@ export interface ProjectUpdatedEvent extends EventEnvelope {
   };
 }
 
+export interface ProjectDeletedEvent extends EventEnvelope {
+  type: 'project.deleted';
+  payload: {
+    projectId: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ThreadCreatedEvent extends EventEnvelope {
   type: 'thread.created';
   payload: {
@@ -57,6 +65,22 @@ export interface ThreadCreatedEvent extends EventEnvelope {
 
 export interface ThreadUpdatedEvent extends EventEnvelope {
   type: 'thread.updated';
+  payload: {
+    threadId: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ThreadDeletedEvent extends EventEnvelope {
+  type: 'thread.deleted';
+  payload: {
+    threadId: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ThreadArchivedEvent extends EventEnvelope {
+  type: 'thread.archived';
   payload: {
     threadId: string;
     [key: string]: unknown;
@@ -97,6 +121,15 @@ export interface ItemCreatedEvent extends EventEnvelope {
 
 export interface ItemUpdatedEvent extends EventEnvelope {
   type: 'item.updated';
+  payload: {
+    itemId: string;
+    threadId: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ItemDeletedEvent extends EventEnvelope {
+  type: 'item.deleted';
   payload: {
     itemId: string;
     threadId: string;
@@ -256,6 +289,153 @@ export interface PreviewStoppedEvent extends EventEnvelope {
   };
 }
 
+// ── Agent runtime events (P0) ──────────────────
+
+export interface AgentTextDeltaEvent extends EventEnvelope {
+  type: 'run.agent.text_delta';
+  payload: {
+    runId: string;
+    content: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentTextBlockEvent extends EventEnvelope {
+  type: 'run.agent.text_block';
+  payload: {
+    runId: string;
+    content: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentThinkingEvent extends EventEnvelope {
+  type: 'run.agent.thinking';
+  payload: {
+    runId: string;
+    content: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentToolCallEvent extends EventEnvelope {
+  type: 'run.agent.tool_call';
+  payload: {
+    runId: string;
+    toolName?: string;
+    toolInput?: Record<string, unknown>;
+    toolUseId?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentToolResultEvent extends EventEnvelope {
+  type: 'run.agent.tool_result';
+  payload: {
+    runId: string;
+    toolUseId?: string;
+    content?: string;
+    isError?: boolean;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentFileChangeEvent extends EventEnvelope {
+  type: 'run.agent.file_change';
+  payload: {
+    runId: string;
+    path?: string;
+    action?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentPermissionRequestedEvent extends EventEnvelope {
+  type: 'run.agent.permission_requested';
+  payload: {
+    runId: string;
+    requestId: string;
+    kind?: string;
+    summary?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentPermissionDecidedEvent extends EventEnvelope {
+  type: 'run.agent.permission_decided';
+  payload: {
+    runId: string;
+    requestId: string;
+    decision: 'allow' | 'deny';
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentRouteDecisionEvent extends EventEnvelope {
+  type: 'run.agent.route_decision';
+  payload: {
+    runId: string;
+    action?: string;
+    nextWorker?: string;
+    reasoning?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentResultEvent extends EventEnvelope {
+  type: 'run.agent.result';
+  payload: {
+    runId: string;
+    success: boolean;
+    content?: string;
+    error?: string;
+    [key: string]: unknown;
+  };
+}
+
+// ── Plan approval events (P1) ──────────────────
+
+export interface PlanProposedEvent extends EventEnvelope {
+  type: 'run.agent.plan_proposed';
+  payload: {
+    runId: string;
+    planId: string;
+    summary: string;
+    steps?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+}
+
+export interface PlanApprovedEvent extends EventEnvelope {
+  type: 'run.agent.plan_approved';
+  payload: {
+    runId: string;
+    planId: string;
+    approvedBy?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface PlanRejectedEvent extends EventEnvelope {
+  type: 'run.agent.plan_rejected';
+  payload: {
+    runId: string;
+    planId: string;
+    reason?: string;
+    rejectedBy?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface PlanExpiredEvent extends EventEnvelope {
+  type: 'run.agent.plan_expired';
+  payload: {
+    runId: string;
+    planId: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ErrorEvent extends EventEnvelope {
   type: 'error';
   payload: {
@@ -266,18 +446,33 @@ export interface ErrorEvent extends EventEnvelope {
   };
 }
 
+// ── System / infrastructure events ──────────────
+
+export interface SystemGapEvent extends EventEnvelope {
+  type: 'system.gap';
+  payload: {
+    firstDroppedSeq: number;
+    lastDroppedSeq: number;
+    droppedCount: number;
+  };
+}
+
 // ── Union ─────────────────────────────────────
 
 export type AnyEvent =
   // IM / Project
   | ProjectCreatedEvent
   | ProjectUpdatedEvent
+  | ProjectDeletedEvent
   | ThreadCreatedEvent
   | ThreadUpdatedEvent
+  | ThreadDeletedEvent
+  | ThreadArchivedEvent
   | MessageCreatedEvent
   | MessageDeltaEvent
   | ItemCreatedEvent
   | ItemUpdatedEvent
+  | ItemDeletedEvent
   // Execution / Runner
   | RunnerOnlineEvent
   | RunnerOfflineEvent
@@ -294,6 +489,24 @@ export type AnyEvent =
   | ArtifactCreatedEvent
   | PreviewReadyEvent
   | PreviewStoppedEvent
+  // Agent runtime
+  | AgentTextDeltaEvent
+  | AgentTextBlockEvent
+  | AgentThinkingEvent
+  | AgentToolCallEvent
+  | AgentToolResultEvent
+  | AgentFileChangeEvent
+  | AgentPermissionRequestedEvent
+  | AgentPermissionDecidedEvent
+  | AgentRouteDecisionEvent
+  | AgentResultEvent
+  // Plan approval
+  | PlanProposedEvent
+  | PlanApprovedEvent
+  | PlanRejectedEvent
+  | PlanExpiredEvent
+  // System / infrastructure
+  | SystemGapEvent
   // Common
   | ErrorEvent
   // Fallback

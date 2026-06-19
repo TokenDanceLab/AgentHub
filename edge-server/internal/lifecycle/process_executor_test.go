@@ -1852,7 +1852,7 @@ func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
 func TestSendSubAgentResult_Completed(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
-	_, _ = s.CreateProject("proj-agg", "agg-project")
+	_, _ = s.CreateProject("proj-agg", "agg-project", "")
 	_, _ = s.CreateThread("thread-agg", "proj-agg", "agg-thread", "", "", "")
 	_, _ = s.CreateRun("parent-run", "proj-agg", "thread-agg")
 	_, _ = s.CreateRun("child-run", "proj-agg", "thread-agg")
@@ -1912,7 +1912,7 @@ func TestSendSubAgentResult_Completed(t *testing.T) {
 func TestSendSubAgentResult_Error(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
-	_, _ = s.CreateProject("proj-err", "err-project")
+	_, _ = s.CreateProject("proj-err", "err-project", "")
 	_, _ = s.CreateThread("thread-err", "proj-err", "err-thread", "", "", "")
 	_, _ = s.CreateRun("parent-err", "proj-err", "thread-err")
 	_, _ = s.CreateRun("child-err", "proj-err", "thread-err")
@@ -1965,7 +1965,7 @@ func TestSendSubAgentResult_Error(t *testing.T) {
 func TestSendSubAgentResult_NoRegistryNoCrash(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
-	_, _ = s.CreateProject("proj-noreg", "no-reg-project")
+	_, _ = s.CreateProject("proj-noreg", "no-reg-project", "")
 	_, _ = s.CreateThread("thread-noreg", "proj-noreg", "no-reg-thread", "", "", "")
 	_, _ = s.CreateRun("run-noreg", "proj-noreg", "thread-noreg")
 
@@ -1985,7 +1985,7 @@ func TestSendSubAgentResult_NoRegistryNoCrash(t *testing.T) {
 func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
-	_, _ = s.CreateProject("proj-nosub", "nosub-project")
+	_, _ = s.CreateProject("proj-nosub", "nosub-project", "")
 	_, _ = s.CreateThread("thread-nosub", "proj-nosub", "nosub-thread", "", "", "")
 	_, _ = s.CreateRun("run-nosub", "proj-nosub", "thread-nosub")
 
@@ -2121,6 +2121,229 @@ started:
 			payload, _ := evt.Payload.(map[string]any)
 			errInfo := payload["error"]
 			t.Fatalf("run failed: %#v", errInfo)
+		}
+	}
+}
+
+// --- Process executor error path tests ---
+
+// TestProcessExecutorTooManyConcurrentRuns verifies that Start returns
+// ErrTooManyConcurrentRuns when the concurrency limit is reached.
+func TestProcessExecutorTooManyConcurrentRuns(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	executor := newTestProcessExecutor(t, bus, s, "sleep")
+
+	// Cap max concurrent runs at 2 for easy testing.
+	executor.mu.Lock()
+	executor.maxConcurrentRuns = 2
+	executor.mu.Unlock()
+
+	// Create 3 runs with explicit IDs (no nanosecond collision risk).
+	var runs []store.Run
+	for i := 0; i < 3; i++ {
+		suffix := fmt.Sprintf("conc_%d_%d", i, time.Now().UnixNano())
+		project, _ := s.CreateProject("proj_"+suffix, "Test", "")
+		thread, err := s.CreateThread("thread_"+suffix, project.ID, "Test", "", "", "")
+		if err != nil {
+			t.Fatalf("CreateThread: %v", err)
+		}
+		run, err := s.CreateRun("run_"+suffix, project.ID, thread.ID)
+		if err != nil {
+			t.Fatalf("CreateRun: %v", err)
+		}
+		runs = append(runs, run)
+	}
+
+	// Start the first 2 — should succeed.
+	for i := 0; i < 2; i++ {
+		if err := executor.Start(runs[i], RunProcessContext{}); err != nil {
+			t.Fatalf("Start run %d error = %v, want nil", i, err)
+		}
+	}
+
+	// The 3rd must fail with concurrency error.
+	err := executor.Start(runs[2], RunProcessContext{})
+	if !errors.Is(err, ErrTooManyConcurrentRuns) {
+		t.Fatalf("Start 3rd run error = %v, want ErrTooManyConcurrentRuns", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		executor.Cancel(runs[i].ID)
+	}
+}
+
+// TestProcessExecutorStartRespectsCustomMaxConcurrent verifies that a
+// custom maxConcurrentRuns is enforced correctly.
+func TestProcessExecutorStartRespectsCustomMaxConcurrent(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	executor := newTestProcessExecutor(t, bus, s, "sleep")
+
+	executor.mu.Lock()
+	executor.maxConcurrentRuns = 1
+	executor.mu.Unlock()
+
+	run1 := newExecutorTestRun(t, s)
+	run2 := newExecutorTestRun(t, s)
+
+	if err := executor.Start(run1, RunProcessContext{}); err != nil {
+		t.Fatalf("Start run1 error = %v", err)
+	}
+	err := executor.Start(run2, RunProcessContext{})
+	if !errors.Is(err, ErrTooManyConcurrentRuns) {
+		t.Fatalf("Start run2 error = %v, want ErrTooManyConcurrentRuns", err)
+	}
+
+	executor.Cancel(run1.ID)
+}
+
+// TestProcessExecutorContextCancellationMidRun verifies that cancelling
+// the context mid-run results in a run.cancelled event.
+func TestProcessExecutorContextCancellationMidRun(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command:    os.Args[0],
+		Args:       []string{processExecutorHelperRunFlag, "--", "sleep"},
+		Env:        append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		RunTimeout: 500 * time.Millisecond,
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.cancelled":
+			stored, ok := s.GetRun(run.ID)
+			if !ok {
+				t.Fatalf("run %q not stored after cancellation", run.ID)
+			}
+			if stored.Status != "cancelled" {
+				t.Fatalf("stored status = %q, want cancelled", stored.Status)
+			}
+			return
+		case "run.started":
+		case "run.output.batch":
+		default:
+			t.Fatalf("unexpected event: %s", evt.Type)
+		}
+	}
+}
+
+// TestProcessExecutorEmptyCommandPathRejection verifies that an empty
+// command produces a meaningful error at startup, not a crash.
+func TestProcessExecutorEmptyCommandPathRejection(t *testing.T) {
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+		Command: "",
+	}, nil, nil)
+	if err == nil {
+		t.Fatal("NewProcessExecutor returned nil error for empty command")
+	}
+}
+
+// TestProcessExecutorCommandNotFoundPublishesFailedEarly verifies that
+// starting a run with a non-existent command path fails immediately
+// with a descriptive error in the run.failed event payload.
+func TestProcessExecutorCommandNotFoundPublishesFailedEarly(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: filepath.Join(t.TempDir(), "definitely-missing-binary-12345"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	evt := nextEventWithin(t, ch, 20*time.Second)
+	for evt.Type == "message.created" || evt.Type == "item.created" {
+		evt = nextEventWithin(t, ch, 5*time.Second)
+	}
+	if evt.Type != "run.failed" {
+		t.Fatalf("event type = %q, want run.failed", evt.Type)
+	}
+	payload, ok := evt.Payload.(map[string]any)
+	if !ok {
+		t.Fatalf("payload = %T, want map", evt.Payload)
+	}
+	if payload["status"] != "failed" || payload["error"] == "" {
+		t.Fatalf("failed payload = %#v, want failed status and error", payload)
+	}
+}
+
+// TestProcessExecutorCancelAlreadyTerminalReturnsStatus verifies that
+// cancelling a run that is already in a terminal state returns the
+// current status without modifying it.
+func TestProcessExecutorCancelAlreadyTerminalReturnsStatus(t *testing.T) {
+	for _, terminalStatus := range []string{"finished", "failed", "cancelled"} {
+		t.Run(terminalStatus, func(t *testing.T) {
+			bus := events.NewBus(100)
+			s := store.New()
+			run := newExecutorTestRun(t, s)
+			_, ok := s.SetRunStatus(run.ID, terminalStatus)
+			if !ok {
+				t.Fatalf("SetRunStatus(%q) returned false", terminalStatus)
+			}
+
+			executor := newTestProcessExecutor(t, bus, s, "success")
+			result := executor.Cancel(run.ID)
+			if !result.Found || result.Status != terminalStatus {
+				t.Fatalf("Cancel result = %#v, want found with status %q", result, terminalStatus)
+			}
+
+			stored, ok := s.GetRun(run.ID)
+			if !ok || stored.Status != terminalStatus {
+				t.Fatalf("stored status = %q, want unchanged %q", stored.Status, terminalStatus)
+			}
+		})
+	}
+}
+
+// TestProcessExecutorStartWithRunTimeoutCancelsSlowRun verifies that
+// a very short RunTimeout causes the run to be cancelled when the
+// subprocess takes too long.
+func TestProcessExecutorStartWithRunTimeoutCancelsSlowRun(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	executor := newTestProcessExecutor(t, bus, s, "sleep")
+	executor.mu.Lock()
+	executor.runTimeout = 200 * time.Millisecond
+	executor.mu.Unlock()
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.cancelled":
+			return
+		case "run.started":
+		case "run.output.batch":
+		case "run.failed":
+			t.Fatal("run should be cancelled by timeout, not failed")
+		default:
+			t.Fatalf("unexpected event: %s", evt.Type)
 		}
 	}
 }

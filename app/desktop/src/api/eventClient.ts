@@ -10,6 +10,7 @@ import { WS_URL, getEdgeWsUrl } from '@/config';
 import { withEdgeAuthQuery } from './edgeAuth';
 import type { Transport, TransportStatus } from './transport';
 import type { EventEnvelope } from '@shared/events';
+import { reportApiError } from '@shared/errors';
 
 export type { EventEnvelope };
 export type EventHandler = (event: EventEnvelope) => void;
@@ -184,6 +185,10 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
         handleMessage(data);
       } catch (error) {
         console.error('[EventStream] Dropping malformed WebSocket frame', error);
+        reportApiError(
+          error instanceof Error ? error : new Error('Malformed WebSocket frame'),
+          { context: 'event_stream_parse' },
+        );
       }
     };
 
@@ -195,13 +200,20 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
     ws.onerror = () => {
       // onclose will fire after this, triggering reconnect
+      console.error('[EventStream] WebSocket error event fired — will trigger reconnect via onclose');
     };
   }
 
   function scheduleReconnect() {
     if (closed) return;
     if (retryCount >= MAX_RETRIES) {
-      console.error('[EventStream] Max retries reached, giving up');
+      const msg = `Max retries (${MAX_RETRIES}) reached, giving up`;
+      console.error(`[EventStream] ${msg}`);
+      reportApiError(new Error(msg), {
+        context: 'event_stream_reconnect',
+        retryCount,
+        baseUrl,
+      });
       notifyStatus('disconnected');
       return;
     }

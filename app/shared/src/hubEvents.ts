@@ -10,9 +10,12 @@ export const HUB_EVENTS = {
 
   // ── Message events ────────────────────────────
   MESSAGE_NEW: 'message.new',
+  MESSAGE_EDITED: 'message.edited',
   MESSAGE_RECALL: 'message.recall',
   MESSAGE_PIN: 'message.pin',
   MESSAGE_UNPIN: 'message.unpin',
+  MESSAGE_REACTION_ADDED: 'message.reaction_added',
+  MESSAGE_REACTION_REMOVED: 'message.reaction_removed',
   MESSAGE_READ: 'message.read',
 
   // ── Session events ────────────────────────────
@@ -50,6 +53,12 @@ export const HUB_EVENTS = {
   PLAN_APPROVED: 'run.agent.plan_approved',
   PLAN_REJECTED: 'run.agent.plan_rejected',
   PLAN_EXPIRED:  'run.agent.plan_expired',
+
+  // ── Team run events ───────────────────────────
+  TEAM_RUN_STARTED: 'team.run.started',
+  TEAM_EVENT: 'team.event',
+  TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
+  TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
 } as const;
 
 export type HubEventType = (typeof HUB_EVENTS)[keyof typeof HUB_EVENTS];
