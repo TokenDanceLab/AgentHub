@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -152,7 +153,11 @@ func (h *AgentHandler) TaskAck(c *gin.Context) {
 				Fail(c, errcode.ErrBadRequest)
 				return
 			}
+		} else {
+			slog.Warn("TaskAck received empty body", "task_id", c.Param("id"))
 		}
+	} else {
+		slog.Warn("TaskAck received nil body", "task_id", c.Param("id"))
 	}
 	taskID := c.Param("id")
 	edgeUserID := c.GetString("user_id")

@@ -208,3 +208,6 @@ const MaxPasswordLength = 64
 
 // MaxGroupNameLength is the maximum group session display name length.
 const MaxGroupNameLength = 64
+
+// MaxTeamNameLength is the maximum agent team name length.
+const MaxTeamNameLength = 100
