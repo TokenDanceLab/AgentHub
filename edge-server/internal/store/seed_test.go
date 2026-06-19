@@ -106,7 +106,7 @@ func TestSeedIfEmpty(t *testing.T) {
 func TestSeedIfEmpty_SkipNonEmpty(t *testing.T) {
 	repo := New()
 	// Pre-create a project so the store is non-empty
-	repo.CreateProject("existing-project", "Existing")
+	repo.CreateProject("existing-project", "Existing", "")
 
 	if err := SeedIfEmpty(repo); err != nil {
 		t.Fatalf("SeedIfEmpty on non-empty store: %v", err)

@@ -15,7 +15,7 @@ import (
 func newExecutorTestRun(t *testing.T, s store.Repository) store.Run {
 	t.Helper()
 	suffix := testID(t)
-	project, _ := s.CreateProject("proj_"+suffix, "Test Project")
+	project, _ := s.CreateProject("proj_"+suffix, "Test Project", "")
 	thread, err := s.CreateThread("thread_"+suffix, project.ID, "Test Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)

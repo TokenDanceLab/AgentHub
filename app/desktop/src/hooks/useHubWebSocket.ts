@@ -13,6 +13,8 @@ import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 
 export type HubWSFrameType =
   | 'auth'
+  | 'auth.ok'
+  | 'auth.fail'
   | 'typing'
   | 'message.new'
   | 'message.edited'
@@ -36,13 +38,20 @@ export type HubWSFrameType =
   | 'agent.failed'
   | 'agent.cancel'
   | 'agent.control'
+  | 'agent.regenerate'
   | 'team.run.started'
-  | 'team.run.event'
+  | 'team.event'
   | 'team.assignment.done'
   | 'team.assignment.failed'
   | 'notification.new'
   | 'friend.request'
-  | 'friend.accepted';
+  | 'friend.accepted'
+  | 'sync.request'
+  | 'sync.events'
+  | 'run.agent.plan_proposed'
+  | 'run.agent.plan_approved'
+  | 'run.agent.plan_rejected'
+  | 'run.agent.plan_expired';
 
 export interface HubWSEvent {
   type: HubWSFrameType;
@@ -81,6 +90,8 @@ const AGENT_EVENT_TYPES = new Set<string>([
   'agent.done',
   'agent.failed',
   'agent.cancel',
+  'agent.control',
+  'agent.regenerate',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -180,7 +191,7 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
 
         // Silently ignore auth handshake frames — the server already
         // validated the token via the query param.
-        if (frame.type === 'auth' || frame.type === ('auth.ok' as HubWSFrameType)) {
+        if (frame.type === 'auth' || frame.type === 'auth.ok' || frame.type === 'auth.fail') {
           return;
         }
 

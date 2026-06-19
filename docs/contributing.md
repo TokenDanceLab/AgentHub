@@ -238,7 +238,7 @@ hub-server/
     log/              # 结构化日志
     metrics/          # Prometheus 指标
     errcode/          # 错误码定义
-  migrations/         # 数据库迁移文件（50 对）
+  migrations/         # 数据库迁移文件（51 对）
   deployments/        # Docker 部署配置
 ```
 

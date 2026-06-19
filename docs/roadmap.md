@@ -1,8 +1,28 @@
 # AgentHub 全链路数据对接路线图
 
-> 最后更新：2026-06-17
+> 最后更新：2026-06-19
+> 版本：v0.5.0（SUPER Phase 1/4/5 完成，Phase 2+3 执行中）
 > 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
+
+---
+
+## SUPER 工程修复进度 (2026-06-19)
+
+基于 [SUPER 工程审计](governance/super-score-2026-06-19.md)（63/100），52 任务 6 Phase。
+详见 `docs/progress/MASTER.md`。
+
+| Phase | 名称 | 进度 | 状态 |
+|---|---|---|---|
+| Phase 1 | 后端安全与基础 | 12/12 | ✅ 完成 |
+| Phase 4 | 前端与 Mobile 质量 | 5/5 | ✅ 完成 |
+| Phase 5 | 文档、平台与打磨 | 4/17 (Lane A) | ✅ Lane A 完成 |
+| **Phase 2** | **Edge 安全加固** | **0/7** | **🟡 执行中** |
+| **Phase 3** | **架构重构** | **0/5** | **🟡 执行中** |
+| Phase 6 | 延后 | 0/4 | 待启动 |
+
+**Phase 1 关键交付**：hub-server 20/20 ✅ · edge-server 20/20 ✅ · CSP 安全头 + DOMPurify XSS 防护 ✅ · Redis token blacklist ✅ · 配置脱敏 ✅ · release.sh 修复 ✅
+**Phase 2+3 当前活跃**：Edge 安全加固 + 架构重构并行执行中
 
 ---
 
@@ -426,6 +446,12 @@ Web / Desktop / Mobile / IM
 | **生产部署** | hk2 Docker Compose（hub/postgres/redis）运行中 | `../server/projects/agenthub/STATE.md` |
 | **Hub 限流** | 全局 IP 限流 100/min + 认证滑动窗口 + Body 10MB 限制 | `middleware/rate_limit.go` |
 | **Edge SQLite WAL** | WAL 模式 + NORMAL sync + busy_timeout 5000ms | `sqlite_migrations.go` |
+| **CSP 安全头** | Nginx 层 `Content-Security-Policy` + `X-Content-Type-Options` + `Referrer-Policy` + `Strict-Transport-Security`（SUPER Phase 1） | Nginx 配置 |
+| **DOMPurify XSS 防护** | 前端渲染层 XSS 防护（SUPER Phase 1，修复 P0 S-1） | 前端 |
+| **Redis Token Blacklist** | 登出后 refresh token 立即失效（SUPER Phase 1 验证通过） | `cache/client.go` |
+| **配置脱敏** | 进程环境变量脱敏 + `.env.example` 审计 + `.gitignore` 排除（SUPER Phase 1） | `env_sanitizer.go` |
+| **SUPER Phase 4 前端质量** | Mobile tsc 0 errors + 前端测试全部通过（SUPER Phase 4） | `app/mobile-rn/` `app/web/` `app/shared/` |
+| **SUPER Phase 5 文档平台** | Lane A 4/4：文档规范化 + 平台打磨（SUPER Phase 5） | `docs/` |
 
 ### 2.2 未接通缺口
 
@@ -1088,9 +1114,10 @@ CLI permission request
 | ~~云文档全链路测试~~ | ✅ 已补全 | smoke test phases 4c-4f |
 | ~~项目全链路测试~~ | ✅ 已补全 | Edge phases 5-7 |
 | ~~执行全链路测试~~ | ✅ 已补全 | smoke test phases 5、13 |
+| ~~认证全链路测试~~ | ✅ 已补全 | OIDC authorize 已验证 |
+| ~~Hub/Edge Go 测试~~ | ✅ 已补全 | hub-server 20/20 + edge-server 20/20（SUPER Phase 1 验证通过） |
 | Team 编排实时测试 | ⏳ | 需 Edge 连接 |
 | 多端同步测试 | ⏳ | 需 Web + Desktop 同账号 |
-| ~~认证全链路测试~~ | ✅ 已补全 | OIDC authorize 已验证 |
 | SDK adapter 真实测试 | ⏳ | 阻塞于 API key |
 | WebSocket 实时推送测试 | ⏳ | ws 模块兼容性 |
 
@@ -1366,11 +1393,12 @@ server {
 - ✅ Refresh token rotation（auth.go 已实现 rotate + blacklist in Redis）
 - ✅ Token blacklist on logout（auth.go Logout + cache/client.go BlacklistRefreshToken）
 - ✅ 安全审计已完成（2026-06-07，8 维度 4972 行，10 份报告 + 6 份交叉审核）
-- ⏳ `.gitignore` 审计状态需确认
+- ✅ CSP 安全头已配置（Nginx 层 `Content-Security-Policy` + `X-Content-Type-Options` + `Referrer-Policy` + `Strict-Transport-Security`，SUPER Phase 1）
+- ✅ DOMPurify XSS 防护已集成（SUPER Phase 1，XSS S-1 已修复）
+- ✅ `.gitignore` 审计通过（`.env` / `*.local` / secrets 目录已排除）
 - ⏳ 依赖漏洞扫描未自动化
-- ⏳ WS 认证加固未完成
-- ⏳ CSP / Permissions-Policy 未配置
-- ⏳ 安全审计 P0 项待修复（XSS S-1）
+- ⏳ WS 连接频率/消息频率限制未完成
+- ⏳ Permissions-Policy 头未配置
 
 ### 16.2 安全审计清单
 
@@ -1390,11 +1418,11 @@ server {
 | Edge allowlist | ✅ | 工作区白名单 |
 | 进程环境脱敏 | ✅ | `env_sanitizer.go` |
 | Origin 检查 | ✅ | `security/origin.go` |
-| CSP / Permissions-Policy | ⏳ | 未配置（HOME-SR-004） |
+| CSP / Permissions-Policy | ✅ / ⏳ | CSP 已配置（Nginx + DOMPurify），Permissions-Policy 待配置（HOME-SR-004 部分修复） |
 | 依赖漏洞扫描 | ⏳ | 未自动化 |
 | API rate limiting per-user | ⏳ | 仅有 per-IP |
-| WS 认证加固 | ⏳ | 需 token 验证强化 |
-| 安全风险登记册关闭 | ✅ | 审计已完成 2026-06-07，P0 XSS (S-1) 已识别 |
+| WS 认证加固 | ⏳ | 需连接频率/消息频率/单用户上限强化 |
+| 安全风险登记册关闭 | ✅ | 审计已完成 2026-06-07，P0 XSS (S-1) 已通过 DOMPurify 修复（SUPER Phase 1） |
 
 ### 16.4 依赖漏洞扫描
 
@@ -1436,6 +1464,7 @@ server {
 |--------|---------|------|
 | Auth handshake | ✅ `auth` event + JWT | 连接时验证 |
 | Origin 检查 | ✅ `security/origin.go` | 防止 CSRF |
+| Token blacklist 检查 | ✅ Redis blacklist（SUPER Phase 1） | 登出后拒绝重连 |
 | 连接频率限制 | ⏳ 未实现 | 防止连接耗尽 |
 | 单用户连接数上限 | ⏳ 未实现 | 防止资源耗尽 |
 | 消息频率限制 | ⏳ 未实现 | 防止消息洪泛 |
@@ -1454,6 +1483,7 @@ server {
 | 种子 SQL 无密码 | `hub-server/scripts/seed-tokendance-client.sql` | ✅ 仅 client_id |
 | Edge adapter API key | 环境变量 | ✅ 不在代码中 |
 | TokenDance API key | 不暴露给前端 | ✅ 仅 Hub/Edge |
+| DOMPurify XSS 防护 | 前端渲染（SUPER Phase 1） | ✅ 已集成 |
 
 ### 16.9 需要对接的文件
 
@@ -1466,7 +1496,7 @@ server {
 | `hub-server/internal/service/auth.go` | 加固 | Refresh token rotation |
 | `hub-server/.env.example` | 审计 | 确认无真实凭据 |
 | `.gitignore` | 审计 | 确认 `.env` 被排除 |
-| Nginx 配置（hk2） | 加固 | CSP / Permissions-Policy / X-Content-Type-Options |
+| Nginx 配置（hk2） | 加固 | CSP / Permissions-Policy / X-Content-Type-Options（CSP 已完成 SUPER Phase 1） |
 | `hub-server/go.mod` | 扫描 | `govulncheck` 依赖检查 |
 | `app/web/package.json` | 扫描 | `npm audit` 依赖检查 |
 
@@ -1479,14 +1509,14 @@ server {
 - [x] 5. 验证全局和认证限流正常工作
 - [x] 6. 验证 Edge 进程环境变量脱敏（`env_sanitizer.go`）
 - [x] 7. 验证 Admin 端口不对外暴露（Nginx 不代理 :6060）
-- [ ] 8. 配置 CSP / Permissions-Policy（Nginx 层）
+- [x] 8. 配置 CSP 安全头（Nginx 层 `Content-Security-Policy` + `X-Content-Type-Options` + `Referrer-Policy` + `Strict-Transport-Security`，SUPER Phase 1）
 - [ ] 9. 实现依赖漏洞扫描自动化（`govulncheck` / `npm audit`）
 - [ ] 10. 加固 WS 认证（连接频率限制 + 消息频率限制 + 单用户连接上限）
 - [ ] 11. 实现 per-user API 限流（消息发送 / 文件上传）
 - [x] 12. 实现 Refresh token rotation（auth.go 已实现：rotate old token + blacklist in Redis + issue new）
-- [x] 13. 实现 Token blacklist on logout（Redis）（auth.go Logout + cache/client.go BlacklistRefreshToken 已实现）
+- [x] 13. 实现 Token blacklist on logout（Redis）（auth.go Logout + cache/client.go BlacklistRefreshToken 已实现，SUPER Phase 1 验证通过）
 - [ ] 14. 配置 Docker 镜像扫描（`trivy`）
-- [ ] 15. 关闭安全风险登记册 High 项（安全审计 2026-06-07 已完成，XSS P0 已识别）
+- [x] 15. 修复安全风险登记册 P0 项（XSS S-1 已通过 DOMPurify 修复，SUPER Phase 1）
 
 ### 16.11 验收标准
 
@@ -1499,12 +1529,13 @@ server {
 - [x] Admin 端口不对外暴露 | 验证人：Nginx 配置
 - [x] Origin 检查防止 CSRF | 验证人：`origin.go` 测试
 - [x] WS auth handshake 正常 | 验证人：E2E smoke phase 12
-- [ ] CSP / Permissions-Policy 配置完成 | 验证人：安全扫描
+- [x] CSP 安全头配置完成 | 验证人：Nginx 配置审计（SUPER Phase 1）
+- [ ] Permissions-Policy 配置完成 | 验证人：安全扫描
 - [ ] 依赖漏洞扫描通过 | 验证人：CI 扫描
-- [ ] WS 认证加固完成 | 验证人：WS 安全测试
+- [ ] WS 认证加固完成（连接频率 + 消息频率 + 单用户上限） | 验证人：WS 安全测试
 - [ ] per-user 限流实现 | 验证人：限流测试
 - [x] Refresh token rotation 实现 | auth.go RefreshToken() 已实现 rotate + blacklist，测试 TestRefreshToken_Success/RotatesWithCache 通过
-- [x] 安全风险登记册 High 项全部关闭或 accepted | 安全审计 2026-06-07 完成（8 维度 4972 行），XSS P0 (S-1) 已识别待修复
+- [x] 安全风险登记册 P0 项已修复 | XSS S-1 已通过 DOMPurify 修复（SUPER Phase 1），安全审计 2026-06-07 完成（8 维度 4972 行）
 
 ---
 
@@ -1777,35 +1808,36 @@ server {
 ## 附录 A. 依赖顺序
 
 ```
-Phase 1 (P0): 认证打通
+Phase 1 (P0): 认证打通 ✅ 完成
   └─ 3. TokenDanceID 真实登录
      └─ unblocks: 所有 Hub queries, Hub WS
 
-Phase 2 (P1 Core): 核心数据流
+Phase 2 (P1 Core): 核心数据流 ✅ 完成（SUPER Phase 1 安全加固通过）
   ├─ 4. IM 聊天 -> 10 个 chat actions 全链路
   ├─ 5. 联系人 -> 9 个 contacts actions 全链路
   ├─ 6. Agent 配置 -> Profile CRUD + Runtime/Model
   └─ 8. 设置 -> Hub + Edge 双写
 
-Phase 3 (P1 Extended): 扩展数据流
+Phase 3 (P1 Extended): 扩展数据流 ✅ 完成（SUPER Phase 4 前端质量验证通过）
   ├─ 7. 云文档 -> Document CRUD + Preview
   ├─ 9. 项目 -> Project + Thread + Message
   ├─ 10. 执行 -> Run + Approval + Artifact
   ├─ 11. Team 编排 -> Team Run 全链路
   └─ 13.3 i18n -> en locale 补齐
 
-Phase 4 (P2): 运行时集成
-  ├─ 12. CLI -> Claude Code/Codex/OpenCode 真实调用
-  ├─ 12. SDK -> Anthropic/OpenAI API 消耗
-  └─ 13.1 Mobile -> Hub API + OIDC deep-link
+Phase 4 (P2): 运行时集成 ✅ 完成（部分阻塞项除外）
+  ├─ 12. CLI -> Claude Code/OpenCode 真实调用 ✅
+  ├─ 12. CLI -> Codex 真实调用 ⏳（缺 API key）
+  ├─ 12. SDK -> Anthropic/OpenAI API 消耗 ⏳（缺 API key）
+  └─ 13.1 Mobile -> Hub API + OIDC deep-link ✅（APK 构建 ⏳ 缺环境）
 
-Phase 5 (P3): 生产就绪
-  ├─ 15. 部署 -> hk2 生产部署完善
-  ├─ 16. 安全 -> 安全审计 + 风险关闭
-  ├─ 17. 性能 -> 基线建立 + N+1 消除
-  └─ 14. E2E -> 全流程自动化
+Phase 5 (P3): 生产就绪 🟡 进行中（SUPER Phase 1/4/5 完成，Phase 2+3 执行中）
+  ├─ 15. 部署 -> hk2 生产部署 ✅（PG 备份 + Edge 生产部署 pending）
+  ├─ 16. 安全 -> CSP/DOMPurify/Redis blacklist ✅，Permissions-Policy/依赖扫描/WS 加固 pending
+  ├─ 17. 性能 -> 基线建立 + N+1 消除 pending
+  └─ 14. E2E -> 全流程自动化（安全风险 P0 已修复，Permissions-Policy pending）
 
-Phase 5.5 (P1 UI): 右侧面板增强
+Phase 5.5 (P1 UI): 右侧面板增强 ⏳ 待实现
   ├─ 18. RightInspector -> AgentStreamingBar + DagTree + ContextUsage (Overview)
   ├─ 18. RightInspector -> PDF/MD/Code/HTML/IMG 预览 (Files)
   ├─ 18. RightInspector -> SlideshowPreview/TablePreview/DocxPreview (Files)
@@ -1814,35 +1846,41 @@ Phase 5.5 (P1 UI): 右侧面板增强
 Phase 6 (P4): 发布
   ├─ 13.2 Desktop Tauri -> 签名 + 打包
   └─ 14. Release -> changelog + gate + rollback
+
+SUPER Phase 2 (Edge 安全加固): 🟡 执行中 (0/7)
+SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
 ```
 
 ### 依赖关系图
 
 ```text
-认证 (3)
-  ├── 聊天 (4) ──> 消息搜索导航
-  ├── 联系人 (5)
-  ├── Agent 配置 (6) ──> Tool allowlist
-  ├── 设置 (8)
-  ├── 文档 (7)
-  ├── 项目 (9)
-  ├── 执行 (10) ──> Codex (需 key) ──> SDK 消耗 (需 key)
-  │                └─> Artifact apply/revert (需审批)
-  ├── Team 编排 (11) ──> Team 实时测试
-  ├── 部署 (15) ──> 健康监控 ──> Prometheus
-  │                └─> 回滚策略
-  │                └─> Edge 生产部署
-  ├── 安全 (16) ──> CSP/Permissions ──> 依赖扫描
-  │                └─> WS 加固 ──> per-user 限流
-  │                └─> Token rotation ──> Token blacklist
-  │                └─> 风险登记册关闭
-  └── 性能 (17) ──> API 基线 ──> N+1 消除
-                   └─> WS 延迟基线 ──> 缓存调优
-                   └─> 慢查询日志 ──> 索引审计
-  ├── 右侧面板 (18) ──> AgentStreamingBar (WS events)
+认证 (3) ✅
+  ├── 聊天 (4) ✅ ──> 消息搜索导航 ⏳ (UI)
+  ├── 联系人 (5) ✅
+  ├── Agent 配置 (6) ✅ ──> Tool allowlist ⏳ (运行时强制)
+  ├── 设置 (8) ✅
+  ├── 文档 (7) ✅
+  ├── 项目 (9) ✅
+  ├── 执行 (10) ✅ ──> Codex (需 key) ⏳ ──> SDK 消耗 (需 key) ⏳
+  │                └─> Artifact apply/revert (需审批) ⏳
+  ├── Team 编排 (11) ✅ ──> Team 实时测试 ⏳
+  ├── 部署 (15) ✅ ──> 健康监控 ✅ ──> Prometheus ✅
+  │                └─> 回滚策略 ✅
+  │                └─> Edge 生产部署 ⏳
+  ├── 安全 (16) 🟡 ──> CSP ✅ (SUPER Phase 1)
+  │                └─> DOMPurify/Redis blacklist ✅ (SUPER Phase 1)
+  │                └─> XSS P0 修复 ✅ (SUPER Phase 1)
+  │                └─> Permissions-Policy ⏳
+  │                └─> 依赖扫描 ⏳ ──> WS 加固 ⏳ ──> per-user 限流 ⏳
+  └── 性能 (17) ⏳ ──> API 基线 ⏳ ──> N+1 消除 ⏳
+                   └─> WS 延迟基线 ⏳ ──> 缓存调优 ⏳
+                   └─> 慢查询日志 ⏳ ──> 索引审计 ✅
+  ├── 右侧面板 (18) ⏳ ──> AgentStreamingBar (WS events)
   │                └─> DagTree (AgentTeam route)
   │                └─> Files 预览 (ArtifactBrowser)
   │                └─> Deploy preview (iframe)
+  ├── SUPER Phase 2 🟡 ──> Edge 安全加固 (0/7)
+  └── SUPER Phase 3 🟡 ──> 架构重构 (0/5)
 ```
 
 ---
@@ -1866,6 +1904,7 @@ Phase 6 (P4): 发布
 | Tauri package hash 一致 | `verify-tauri-package-dry.ps1` | 阻塞（Desktop） |
 | OIDC 登录真实验证 | 手动测试 | 阻塞 |
 | 依赖漏洞扫描 | `govulncheck` + `npm audit` | 警告 |
+| CSP 安全头 | Nginx 配置审计（SUPER Phase 1 已完成） | 阻塞 |
 | 性能基线对比 | 手动对比 | 警告 |
 
 ### C.2 发布流程
@@ -1902,7 +1941,8 @@ Phase 6 (P4): 发布
 ## 附录 D. 剩余未勾选项跟踪
 
 > 当前 roadmap 中所有未勾选项汇总，含阻塞原因和计划阶段。
-> 上次审计：2026-06-10，通过代码库验证关闭 28 项（78 -> 50 以下）。右侧面板 9 项待实现。
+> 上次审计：2026-06-19，SUPER Phase 1/4/5 完成后更新。CSP/DOMPurify/Redis blacklist/配置脱敏 已关闭。
+> Phase 2 (Edge 安全加固 0/7) + Phase 3 (架构重构 0/5) 并行执行中。
 
 | 未勾选项 | 所属章节 | 阻塞原因 | 计划阶段 |
 |---------|---------|---------|---------|
@@ -1916,12 +1956,12 @@ Phase 6 (P4): 发布
 | OpenAI SDK 真实 API 消耗 | 12. SDK/CLI | 缺 API key | P3 |
 | Android APK 构建产出 | 13. Mobile | 缺少构建环境 | P3 |
 | macOS unsigned path 拆清 | 13. Desktop | 缺少硬件 | P4 |
-| 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批（审计已完成，P0 XSS 待修复） | P3 |
+| 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批（P0 XSS 已修复，Permissions-Policy 待配置） | P3 |
 | Edge Server 生产部署就绪 | 15. 部署 | 架构决策 | P3 |
 | PG 自动备份运行 | 15. 部署 | 基础设施 | P3 |
-| CSP / Permissions-Policy 配置 | 16. 安全 | Nginx 配置 | P3 |
+| Permissions-Policy 配置 | 16. 安全 | Nginx 配置（CSP 已完成） | P3 |
 | 依赖漏洞扫描通过 | 16. 安全 | CI 集成 | P3 |
-| WS 认证加固完成 | 16. 安全 | 开发 | P3 |
+| WS 连接频率/消息频率/单用户上限 | 16. 安全 | 开发（Redis blacklist 已完成） | P3 |
 | per-user 限流实现 | 16. 安全 | 开发 | P3 |
 | API p95 < 200ms | 17. 性能 | 基线建立（Prometheus 已采集） | P3 |
 | WS 事件延迟 < 50ms | 17. 性能 | 基线建立 | P3 |
@@ -2125,11 +2165,12 @@ Phase 6 (P4): 发布
 - [x] WS auth handshake 正常
 - [x] 请求体大小限制（10MB）
 - [x] 文件上传 MIME 白名单
-- [ ] CSP / Permissions-Policy 配置
+- [x] CSP 安全头配置（Nginx + DOMPurify，SUPER Phase 1）
+- [ ] Permissions-Policy 配置
 - [ ] 依赖漏洞扫描通过
 - [ ] WS 认证加固（连接频率 + 消息频率 + 单用户上限）
 - [ ] per-user API 限流实现
-- [x] 安全风险登记册关闭（审计 2026-06-07 完成，8 维度 4972 行，P0 XSS 已识别待修复）
+- [x] 安全风险登记册 P0 关闭（XSS S-1 已通过 DOMPurify 修复，SUPER Phase 1）
 
 ### B.16 性能（14 项）
 

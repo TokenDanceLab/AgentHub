@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { hubQueryKeys } from '@agenthub/shared';
 import type { FriendRequestInfo, SearchResult } from './hubClient';
 
-export const contactsQueryKey = ['web-v4', 'hub-contacts'] as const;
-export const friendRequestsQueryKey = ['web-v4', 'hub-friend-requests'] as const;
-export const sessionsQueryKey = ['web-v4', 'hub-sessions'] as const;
+export const contactsQueryKey = hubQueryKeys.contacts.list;
+export const friendRequestsQueryKey = hubQueryKeys.contacts.friendRequests;
+export const sessionsQueryKey = hubQueryKeys.threads.root;
 
 // ── Async helpers ──────────────────────────────────────────
 

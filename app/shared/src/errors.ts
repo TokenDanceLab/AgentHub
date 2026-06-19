@@ -183,3 +183,36 @@ export class ErrorReporter {
 }
 
 export const globalErrorReporter = new ErrorReporter();
+
+// ── API client error reporting utility ────────────
+
+/**
+ * Report an error caught in an API client to both console.error and the
+ * global error reporter.  The reporter deduplicates by category+code+message
+ * and throttles to once per second per unique error key.
+ *
+ * Use this in every .catch() handler throughout hubClient, edgeClient, and
+ * eventClient to ensure errors are surfaced to the user via the toast handler
+ * wired in errorReporting.ts.
+ */
+export function reportApiError(
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
+  if (error instanceof AppError) {
+    console.error(
+      `[API] ${error.code} (HTTP ${error.status}): ${error.message}`,
+      context ?? {},
+    );
+    globalErrorReporter.report(error, context);
+    return;
+  }
+  if (error instanceof Error) {
+    console.error(`[API] ${error.name}: ${error.message}`, context ?? {});
+    globalErrorReporter.report(error, context);
+    return;
+  }
+  const msg = String(error);
+  console.error(`[API] ${msg}`, context ?? {});
+  globalErrorReporter.report(new Error(msg), context);
+}

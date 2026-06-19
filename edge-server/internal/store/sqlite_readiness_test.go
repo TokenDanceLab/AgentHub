@@ -16,7 +16,7 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
 
-	project, err := s.CreateProject("proj_readiness", "Readiness Project")
+	project, err := s.CreateProject("proj_readiness", "Readiness Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}

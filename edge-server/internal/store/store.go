@@ -18,6 +18,7 @@ type Project struct {
 	ID        string `json:"projectId"`
 	Name      string `json:"name"`
 	Status    string `json:"status"`
+	OwnerID   string `json:"ownerId,omitempty"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -174,7 +175,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	CreateProject(id, name string) (Project, error)
+	CreateProject(id, name, ownerID string) (Project, error)
 	CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error)
 	UpdateThread(id string, title *string, status *string) (Thread, bool)
 	DeleteThread(id string) bool
@@ -359,7 +360,7 @@ func normalizeOrder[V any](order []string, items map[string]V) []string {
 	return append(normalized, missing...)
 }
 
-func (s *Store) CreateProject(id, name string) (Project, error) {
+func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -369,11 +370,13 @@ func (s *Store) CreateProject(id, name string) (Project, error) {
 	if name == "" {
 		name = "Local Project"
 	}
+	ownerID = strings.TrimSpace(ownerID)
 	now := nowString()
 	project := Project{
 		ID:        id,
 		Name:      name,
 		Status:    "active",
+		OwnerID:   ownerID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

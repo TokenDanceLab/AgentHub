@@ -71,6 +71,9 @@ var (
 	ErrDeployNoArtifacts    = New("deploy_no_artifacts", "run has no deployable artifacts", http.StatusBadRequest)
 	ErrDeployRunNotFinished = New("deploy_run_not_finished", "run must be in a terminal state before deploying", http.StatusBadRequest)
 
+	// Capability token (dual-token auth)
+	ErrCapabilityTokenInvalid = New("capability_token_invalid", "capability token is missing or invalid", http.StatusForbidden)
+
 	// Metrics
 	ErrNotConfigured = New("not_configured", "resource not configured", http.StatusServiceUnavailable)
 )

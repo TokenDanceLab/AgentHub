@@ -19,11 +19,12 @@ import (
 type WebSocketHandler struct {
 	manager     *ws.Manager
 	jwtSecret   string
+	env         string
 	onTyping    func(userID, sessionID string)
 	userLimiter *middleware.WSUserConnLimiter
 }
 
-func NewWebSocketHandler(manager *ws.Manager, jwtSecret string) *WebSocketHandler {
+func NewWebSocketHandler(manager *ws.Manager, jwtSecret string, env string) *WebSocketHandler {
 	limiter := middleware.NewWSUserConnLimiter(func(connID string) {
 		// Kick the oldest connection by closing it. The writeLoop/readLoop
 		// goroutines will detect the closure and unregister.
@@ -37,6 +38,7 @@ func NewWebSocketHandler(manager *ws.Manager, jwtSecret string) *WebSocketHandle
 	return &WebSocketHandler{
 		manager:     manager,
 		jwtSecret:   jwtSecret,
+		env:         env,
 		userLimiter: limiter,
 	}
 }
@@ -47,9 +49,19 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	opts := &websocket.AcceptOptions{}
-	if !isProductionEnv() {
-		// Dev: allow any loopback origin (localhost / 127.0.0.1 on any port)
-		opts.InsecureSkipVerify = true
+	if !h.isProductionEnv() {
+		// Dev: allow loopback origins (localhost / 127.0.0.1 / ::1 on any port).
+		// This replaces the previous InsecureSkipVerify (which disabled ALL origin
+		// checks) with explicit patterns so that non-loopback origins are still
+		// rejected even in development mode.
+		opts.OriginPatterns = []string{
+			"localhost",
+			"localhost:*",
+			"127.0.0.1",
+			"127.0.0.1:*",
+			"[::1]",
+			"[::1]:*",
+		}
 	}
 
 	wsConn, err := websocket.Accept(c.Writer, c.Request, opts)
@@ -258,11 +270,16 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 }
 
 // isProductionEnv returns true when running in production/release mode.
-func isProductionEnv() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("AGENTHUB_ENV"))) {
+// It uses the config-managed env when set; otherwise falls back to GIN_MODE.
+func (h *WebSocketHandler) isProductionEnv() bool {
+	env := h.env
+	if env == "" {
+		env = os.Getenv("GIN_MODE")
+	}
+	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "production", "prod", "release":
 		return true
 	default:
-		return os.Getenv("GIN_MODE") == "release"
+		return false
 	}
 }

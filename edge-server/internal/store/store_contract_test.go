@@ -239,7 +239,7 @@ func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
 
-	project, err := s.CreateProject("proj_contract", "Contract Project")
+	project, err := s.CreateProject("proj_contract", "Contract Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
 
-	project, err := s.CreateProject("proj_contract", "Contract Project")
+	project, err := s.CreateProject("proj_contract", "Contract Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
@@ -402,14 +402,14 @@ func runRepositoryLifecycleContract(t *testing.T, handle repositoryContractHandl
 	defer closeContractHandle(handle)
 	repo := handle.store
 
-	project, err := repo.CreateProject("proj_contract", "")
+	project, err := repo.CreateProject("proj_contract", "", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
 	if project.Name != "Local Project" || project.Status != "active" {
 		t.Fatalf("project = %#v, want default name and active status", project)
 	}
-	duplicate, err := repo.CreateProject(project.ID, "Renamed")
+	duplicate, err := repo.CreateProject(project.ID, "Renamed", "")
 	if !errors.Is(err, ErrProjectExists) {
 		t.Fatalf("duplicate CreateProject error = %v, want ErrProjectExists", err)
 	}
@@ -496,7 +496,7 @@ func runRepositoryPinsContract(t *testing.T, handle repositoryContractHandle) {
 	defer closeContractHandle(handle)
 	repo := handle.store
 
-	project, err := repo.CreateProject("proj_contract", "Contract Project")
+	project, err := repo.CreateProject("proj_contract", "Contract Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
@@ -555,7 +555,7 @@ func runRepositoryThreadDeleteCascadeContract(t *testing.T, handle repositoryCon
 	defer closeContractHandle(handle)
 	repo := handle.store
 
-	project, _ := repo.CreateProject("proj_contract", "Contract Project")
+	project, _ := repo.CreateProject("proj_contract", "Contract Project", "")
 	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
@@ -616,7 +616,7 @@ func runRepositoryCleanupCascadeContract(t *testing.T, handle repositoryContract
 	defer closeContractHandle(handle)
 	repo := handle.store
 
-	project, _ := repo.CreateProject("proj_contract", "Contract Project")
+	project, _ := repo.CreateProject("proj_contract", "Contract Project", "")
 	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
@@ -664,7 +664,7 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 		t.Fatalf("%s store does not implement artifact/diff/preview evidence contract", handle.name)
 	}
 
-	project, _ := repo.CreateProject("proj_contract", "Contract Project")
+	project, _ := repo.CreateProject("proj_contract", "Contract Project", "")
 	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
@@ -849,7 +849,7 @@ func runRepositoryRuntimeEvidenceCurrentContract(t *testing.T, handle repository
 		t.Fatalf("%s store does not implement runtime evidence contract", handle.name)
 	}
 
-	project, _ := repo.CreateProject("proj_evidence_current", "Evidence Current")
+	project, _ := repo.CreateProject("proj_evidence_current", "Evidence Current", "")
 	threadA, _ := repo.CreateThread("thread_evidence_a", project.ID, "Evidence A", "", "", "")
 	threadB, _ := repo.CreateThread("thread_evidence_b", project.ID, "Evidence B", "", "", "")
 	runA, err := repo.CreateRun("run_evidence_a", project.ID, threadA.ID)
@@ -1066,7 +1066,7 @@ func seedRepositoryReadinessParity(t *testing.T, repo repositoryContractStore) {
 		t.Fatalf("%T does not implement repository evidence store", repo)
 	}
 
-	project, err := repo.CreateProject("proj_parity", "Parity Project")
+	project, err := repo.CreateProject("proj_parity", "Parity Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
