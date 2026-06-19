@@ -198,9 +198,11 @@ func (h *SessionHandler) Leave(c *gin.Context) {
 	OK(c, nil)
 }
 
+// transferOwnerReq is the request body for POST /sessions/:id/transfer-owner.
+// Prefer new_owner_user_id; new_owner_id is accepted for backward compatibility.
 type transferOwnerReq struct {
-	NewOwnerID       string `json:"new_owner_id"`
-	NewOwnerUserID   string `json:"new_owner_user_id"`
+	NewOwnerUserID string `json:"new_owner_user_id"`
+	NewOwnerID     string `json:"new_owner_id"` // deprecated: prefer new_owner_user_id
 }
 
 func (r transferOwnerReq) resolveNewOwnerID() string {

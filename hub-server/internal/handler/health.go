@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,19 @@ type HealthHandler struct {
 	dbConfig    *config.DBConfig
 	startTime   time.Time
 	version     string
+
+	mu            sync.RWMutex
+	migCache      migrationCache
 }
+
+type migrationCache struct {
+	version  uint
+	dirty    bool
+	err      error
+	cachedAt time.Time
+}
+
+const migrationCacheTTL = 30 * time.Second
 
 // NewHealthHandler creates a HealthHandler tied to the running app instance.
 // startTime should be the moment App.Run was called; version is the build
@@ -107,17 +120,42 @@ func (h *HealthHandler) readinessReport(c *gin.Context) gin.H {
 	}
 
 	// Migrations – report version; if dirty or unreadable, flag error.
+	// Cache the result for 30s to avoid per-request DB round-trips to the
+	// migration metadata table.
 	if h.dbConfig == nil {
 		checks["migrations"] = "error"
 		overall = "degraded"
-	} else if version, dirty, err := repository.VerifyMigrations(h.dbConfig); err != nil {
-		checks["migrations"] = "error"
-		overall = "degraded"
-	} else if dirty {
-		checks["migrations"] = gin.H{"version": version, "dirty": true}
-		overall = "degraded"
 	} else {
-		checks["migrations"] = version
+		var version uint
+		var dirty bool
+		var migErr error
+
+		h.mu.RLock()
+		if time.Since(h.migCache.cachedAt) < migrationCacheTTL {
+			version, dirty, migErr = h.migCache.version, h.migCache.dirty, h.migCache.err
+			h.mu.RUnlock()
+		} else {
+			h.mu.RUnlock()
+			version, dirty, migErr = repository.VerifyMigrations(h.dbConfig)
+			h.mu.Lock()
+			h.migCache = migrationCache{
+				version:  version,
+				dirty:    dirty,
+				err:      migErr,
+				cachedAt: time.Now(),
+			}
+			h.mu.Unlock()
+		}
+
+		if migErr != nil {
+			checks["migrations"] = "error"
+			overall = "degraded"
+		} else if dirty {
+			checks["migrations"] = gin.H{"version": version, "dirty": true}
+			overall = "degraded"
+		} else {
+			checks["migrations"] = version
+		}
 	}
 
 	uptime := time.Since(h.startTime).Truncate(time.Second).String()

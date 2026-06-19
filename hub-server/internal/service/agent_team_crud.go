@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"unicode/utf8"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -13,6 +15,9 @@ import (
 func (s *AgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
 	if name == "" {
 		return nil, errcode.ErrBadRequest
+	}
+	if utf8.RuneCountInString(name) > config.MaxTeamNameLength {
+		return nil, errcode.ErrBadRequest.WithMessage("team name exceeds maximum length")
 	}
 	team := &model.AgentTeam{
 		OwnerID:     userID,

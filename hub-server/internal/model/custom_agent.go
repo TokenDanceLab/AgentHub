@@ -42,28 +42,33 @@ func (c *CustomAgent) BeforeSave(tx *gorm.DB) error {
 }
 
 func (c *CustomAgent) normalizeJSONB() error {
-	// Normalize JSONB fields by unmarshaling and re-marshaling to compact form.
-	if c.CapabilityTags != "" {
-		normalized, err := normalizeJSONValue(c.CapabilityTags)
-		if err != nil {
-			return fmt.Errorf("invalid JSON in capability_tags: %w", err)
-		}
-		c.CapabilityTags = normalized
+	fields := []struct {
+		ptr  *string
+		name string
+	}{
+		{&c.CapabilityTags, "capability_tags"},
+		{&c.ToolWhitelist, "tool_whitelist"},
+		{&c.ModelParams, "model_params"},
 	}
-	if c.ToolWhitelist != "" {
-		normalized, err := normalizeJSONValue(c.ToolWhitelist)
-		if err != nil {
-			return fmt.Errorf("invalid JSON in tool_whitelist: %w", err)
+	for _, f := range fields {
+		if err := normalizeJSONField(f.ptr, f.name); err != nil {
+			return err
 		}
-		c.ToolWhitelist = normalized
 	}
-	if c.ModelParams != "" {
-		normalized, err := normalizeJSONValue(c.ModelParams)
-		if err != nil {
-			return fmt.Errorf("invalid JSON in model_params: %w", err)
-		}
-		c.ModelParams = normalized
+	return nil
+}
+
+// normalizeJSONField normalizes a single JSON string field by unmarshaling and
+// re-marshaling to compact form. No-op when the field is empty.
+func normalizeJSONField(field *string, name string) error {
+	if *field == "" {
+		return nil
 	}
+	normalized, err := normalizeJSONValue(*field)
+	if err != nil {
+		return fmt.Errorf("invalid JSON in %s: %w", name, err)
+	}
+	*field = normalized
 	return nil
 }
 
