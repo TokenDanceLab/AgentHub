@@ -103,8 +103,7 @@ func Run(cfg Config) error {
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
 		slog.Debug("auto-generated local auth token for Edge Server API protection; "+
-			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections",
-			"token_prefix", cfg.LocalAuthToken[:8]+"...")
+			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections")
 	}
 
 	mux := http.NewServeMux()
@@ -163,7 +162,7 @@ func Run(cfg Config) error {
 		slog.Info("edge server listening", "addr", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
-			os.Exit(1)
+			stop <- syscall.SIGTERM
 		}
 	}()
 

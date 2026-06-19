@@ -174,7 +174,7 @@ func (h *WebSocketHandler) authenticatedReadLoop(conn *ws.Conn) {
 // limit are dropped and a warning is logged.
 func (h *WebSocketHandler) processIncoming(conn *ws.Conn) {
 	for {
-		_, data, err := conn.W.Read(context.Background())
+		data, err := conn.ReadMessage(context.Background())
 		if err != nil {
 			slog.Info("ws read error", "user_id", conn.UserID, "error", err)
 			return

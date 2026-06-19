@@ -93,13 +93,13 @@ func (c *CallbackClient) TaskStreamReader(ctx context.Context, taskID string, ru
 		if n > 0 {
 			chunk := string(buf[:n])
 			if streamErr := c.TaskStream(ctx, taskID, runID, chunk); streamErr != nil {
-				slog.Warn("hub callback stream chunk failed", "taskId", taskID, "runId", runID, "err", streamErr)
+				slog.Warn("hub callback stream chunk failed", "taskId", taskID, "runId", runID, "error", streamErr)
 				// Continue despite errors — best-effort streaming
 			}
 		}
 		if err != nil {
 			if err != io.EOF {
-				slog.Warn("hub callback stream read error", "taskId", taskID, "runId", runID, "err", err)
+				slog.Warn("hub callback stream read error", "taskId", taskID, "runId", runID, "error", err)
 			}
 			return nil // Read errors are not propagated — callbacks are best-effort
 		}
