@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — us1 Override
+# ──────────────────────────────────────────────
+# Overrides docker-compose.prod.yml for us1 deployment.
+# Public URL: https://hub.vectorcontrol.tech
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.us1.yml --env-file .env.us1 up -d --no-build
+#
+# This file contains ONLY us1-specific overrides.
+# All shared service definitions (postgres, redis, hub-server base config,
+# volumes, networks) live in docker-compose.prod.yml.
+# ──────────────────────────────────────────────
+
+services:
+  hub-server:
+    environment:
+      # CORS — allow Tauri Desktop dev origin alongside production
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech,https://tauri.localhost}
+      # TokenDance ID OIDC — additional redirect URIs beyond production defaults
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.vectorcontrol.tech/auth/tokendance/callback,http://127.0.0.1/callback,http://127.0.0.1:8400/callback}
+    ports:
+      - "127.0.0.1:8090:8080"   # Loopback only — nginx reverse proxy
+      - "127.0.0.1:6060:6060"   # pprof/metrics — localhost only

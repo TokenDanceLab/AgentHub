@@ -371,5 +371,17 @@
   "hub.error.autoLoginFailed": "自动登录失败",
   "hub.error.wsAuthFailed": "Hub WebSocket 鉴权失败: {{reason}}",
   "hub.error.streamRecoveryFailed": "流事件恢复失败",
-  "hub.error.recoveryFailed": "恢复失败"
+  "hub.error.recoveryFailed": "恢复失败",
+
+  "errorBoundary.chunkLoadDesc": "新版本可用，请重新加载以继续。",
+  "errorBoundary.chunkLoadTitle": "需要更新",
+  "errorBoundary.desc": "渲染此部分时发生意外错误。",
+  "errorBoundary.networkDesc": "与服务器的连接已断开。请检查网络并重新加载。",
+  "errorBoundary.networkTitle": "连接已断开",
+  "errorBoundary.reload": "重新加载",
+  "errorBoundary.retry": "重试",
+  "errorBoundary.stackTrace": "调用堆栈",
+  "errorBoundary.timeoutDesc": "服务响应超时，请重试。",
+  "errorBoundary.timeoutTitle": "服务超时",
+  "errorBoundary.title": "出了点问题"
 }

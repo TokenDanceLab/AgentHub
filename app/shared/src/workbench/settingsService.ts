@@ -58,9 +58,10 @@ export function createSettingsService(
         snapshot = { ...defaults, ...remote };
         ready = true;
         emit();
-      } catch {
+      } catch (err) {
         // Backend unreachable — keep defaults, still mark as initialized
         // so the UI doesn't hang. A retry can be triggered later.
+        console.error('settingsService.init failed:', err);
         ready = true;
         emit();
       }
@@ -80,8 +81,9 @@ export function createSettingsService(
       const serialized = serializeSettings({ [key]: value });
       Object.assign(patch, serialized);
 
-      port.writeSettings(patch).catch(() => {
+      port.writeSettings(patch).catch((err) => {
         // Roll back on failure
+        console.error('settingsService.write failed for key:', key, err);
         snapshot = { ...snapshot, [key]: prev };
         emit();
       });
@@ -93,7 +95,8 @@ export function createSettingsService(
       emit();
 
       const patch = serializeSettings(values);
-      port.writeSettings(patch).catch(() => {
+      port.writeSettings(patch).catch((err) => {
+        console.error('settingsService.writeBatch failed:', err);
         snapshot = prev;
         emit();
       });

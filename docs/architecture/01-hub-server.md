@@ -93,17 +93,21 @@ CORS、API Version、Body Limit (default 10MB)、Global Rate Limit、Request ID�
 
 Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件类型定义在 `app/shared/src/hubEvents.ts`（前端常量）和 `hub-server/internal/ws/frame.go`（后端定义）。
 
-共 26 个事件类型：
+共 33 个事件类型：
 
 | 分类 | 事件 | 常量 |
 |---|---|---|
 | **Auth** | `auth` | `AUTH` |
+| | `typing` | `TYPING` |
 | | `auth.ok` | `AUTH_OK` |
 | | `auth.fail` | `AUTH_FAIL` |
 | **Message** | `message.new` | `MESSAGE_NEW` |
+| | `message.edited` | `MESSAGE_EDITED` |
 | | `message.recall` | `MESSAGE_RECALL` |
 | | `message.pin` | `MESSAGE_PIN` |
 | | `message.unpin` | `MESSAGE_UNPIN` |
+| | `message.reaction_added` | `MESSAGE_REACTION_ADDED` |
+| | `message.reaction_removed` | `MESSAGE_REACTION_REMOVED` |
 | | `message.read` | `MESSAGE_READ` |
 | **Session** | `session.created` | `SESSION_CREATED` |
 | | `session.dissolved` | `SESSION_DISSOLVED` |
@@ -119,6 +123,10 @@ Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件�
 | | `agent.failed` | `AGENT_FAILED` |
 | | `agent.cancel` | `AGENT_CANCEL` |
 | | `agent.control` | `AGENT_CONTROL` |
+| **Team** | `team.run.started` | `TEAM_RUN_STARTED` |
+| | `team.event` | `TEAM_EVENT` |
+| | `team.assignment.done` | `TEAM_ASSIGNMENT_DONE` |
+| | `team.assignment.failed` | `TEAM_ASSIGNMENT_FAILED` |
 | **Notification** | `notification.new` | `NOTIFICATION_NEW` |
 | | `friend.request` | `FRIEND_REQUEST` |
 | | `friend.accepted` | `FRIEND_ACCEPTED` |

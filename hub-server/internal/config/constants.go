@@ -129,6 +129,12 @@ const AuthRateLimitWindow = time.Minute
 // sliding window so clients can compute Retry-After reliably.
 const RateLimitExpiryBuffer = 10 * time.Second
 
+// RateLimitFailOpenDefault controls the default behavior when Redis is unavailable
+// during rate limiting. When true (default), non-auth API requests are allowed
+// through with a warning log. Auth paths always fail-closed regardless of this
+// setting. Controlled by the AGENTHUB_RATE_LIMIT_FAIL_OPEN environment variable.
+const RateLimitFailOpenDefault = true
+
 // ── Messaging ────────────────────────────────────────────────────────────────
 
 // MessageRecallWindow is the non-owner recall window for messages.

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log/slog"
+
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/gin-gonic/gin"
@@ -32,7 +34,8 @@ func (h *UserSettingsHandler) GetSettings(c *gin.Context) {
 
 	settings, err := h.settingsService.GetSettings(userID)
 	if err != nil {
-		FailWithMessage(c, errcode.ErrInternal, err.Error())
+		slog.Error("GetSettings failed", "error", err)
+		Fail(c, errcode.ErrInternal)
 		return
 	}
 
@@ -62,7 +65,8 @@ func (h *UserSettingsHandler) PatchSettings(c *gin.Context) {
 
 	settings, err := h.settingsService.UpsertSettings(userID, req.Values)
 	if err != nil {
-		FailWithMessage(c, errcode.ErrInternal, err.Error())
+		slog.Error("PatchSettings failed", "error", err)
+		Fail(c, errcode.ErrInternal)
 		return
 	}
 
