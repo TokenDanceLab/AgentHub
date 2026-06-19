@@ -109,7 +109,7 @@ hub-server/
 │   ├── config.yaml              # 本地开发配置
 │   └── config.docker.yaml       # Docker 环境配置
 ├── deployments/                 # Dockerfile、生产 compose、部署脚本
-├── migrations/                  # SQL 迁移 (78+ 组 up/down)
+├── migrations/                  # SQL 迁移 (54 组 up/down)
 ├── uploads/                     # 文件存储目录
 ├── tests/                       # 集成测试
 ├── internal/
@@ -200,7 +200,7 @@ Hub 只做路由、队列、权限和状态持久化；Agent Runtime 进程仍�
 
 ## 数据库表
 
-迁移文件位于 `migrations/`，当前有 78+ 组 up/down：
+迁移文件位于 `migrations/`，当前有 54 组 up/down：
 
 | 迁移 | 用途 |
 |---|---|

@@ -25,8 +25,9 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 app/desktop/
 ├── src/
 │   ├── api/             # Edge / Hub REST 和 WebSocket client
-│   ├── components/      # Desktop 专用组件
-│   ├── views/           # 主视图 registry 和 IM view
+│   ├── components/      # Desktop 专用组件（platform adapter、host diagnostics）
+│   ├── layouts/         # Desktop 布局壳（DesktopLayout.tsx）
+│   ├── views/           # 主视图 registry 和 slot 配置
 │   ├── stores/          # Zustand 状态
 │   ├── hooks/           # 数据和交互 hooks
 │   ├── i18n/            # zh/en 文案
@@ -40,7 +41,7 @@ app/desktop/
 └── playwright.config.ts
 ```
 
-通用组件必须放在 `app/shared/src/ui/` 并通过 `@shared/ui` 导入；不要在 Desktop 内复制一套本地 shared UI。
+通用组件必须放在 `app/shared/src/ui/` 并通过 `@shared/ui` 导入；ChatView 消息卡片渲染系统在 `app/shared/src/chatview/`；共享工作台壳在 `app/shared/src/workbench/`。不要在 Desktop 内复制一套本地 shared UI。
 
 ## 本地运行
 

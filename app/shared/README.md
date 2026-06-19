@@ -1,6 +1,6 @@
 # @agenthub/shared
 
-`app/shared/` 是 Desktop 和 Web 共用的前端包，负责类型、事件、错误解析、树/Diff 工具、上下文统计和通用 UI 组件。它不是运行时控制面，不直接访问 Edge、Hub 或 Agent CLI。
+`app/shared/` 是 Desktop 和 Web 共用的前端包，负责类型、事件、错误解析、树/Diff 工具、上下文统计、ChatView 消息卡片渲染系统和通用 UI 组件。它不是运行时控制面，不直接访问 Edge、Hub 或 Agent CLI。
 
 ## 职责
 
@@ -14,6 +14,8 @@
 | `@shared/diff` | `src/diff.ts` | Diff 解析和展示辅助 |
 | `@shared/context/*` | `src/context/` | 上下文用量和 token breakdown 工具 |
 | `@shared/ui` | `src/ui/` | Desktop/Web 共用 UI 组件、测试和 Storybook story |
+| `@shared/chatview` | `src/chatview/` | ChatView 消息卡片渲染系统：adapter、TranscriptItem、RowItem 状态机、i18n、CSS tokens |
+| `@shared/workbench` | `src/workbench/` | v4 共享工作台 shell、状态管理、platform adapter 接口 |
 
 ## 使用
 
@@ -24,6 +26,7 @@ import type { AgentInfo, HealthResponse, RunInfo } from '@shared/types';
 import type { EventEnvelope } from '@shared/events';
 import { parseError } from '@shared/errors';
 import { Button, Card, Pill } from '@shared/ui';
+import { ChatViewTranscript } from '@shared/chatview';
 ```
 
 新增通用类型、组件或工具先放这里，再由 Desktop/Web 消费。不要在 `app/desktop/` 或 `app/web/` 内复制一套本地共享组件。

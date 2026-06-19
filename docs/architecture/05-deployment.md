@@ -6,17 +6,17 @@
 
 ## 概述
 
-AgentHub 当前阶段以 hk2 为主要生产部署节点。
+AgentHub 当前阶段以单节点 Docker Compose 为主要生产部署方式。
 
-## hk2 生产部署
+## 生产部署
 
-生产 Hub Server 部署在 hk2（核云 VPS，香港），公开地址 `https://hub.vectorcontrol.tech`。
+生产 Hub Server 公开地址 `https://hub.vectorcontrol.tech`。
 
 **技术栈**：Docker Compose + Nginx + Let's Encrypt SSL
 
 ### Docker Compose 服务
 
-配置文件：`hub-server/deployments/hk2/docker-compose.hk2.yml`
+配置文件：`hub-server/deployments/docker-compose.prod.yml`
 
 | 服务 | 镜像 | 资源限制 | 端口 |
 |---|---|---|---|
@@ -26,7 +26,7 @@ AgentHub 当前阶段以 hk2 为主要生产部署节点。
 
 ### Nginx 配置
 
-配置文件：`hub-server/deployments/hk2/nginx-hk2.conf`
+配置文件：`hub-server/deployments/nginx.prod.conf`
 
 | Location | 认证 | 后端 |
 |---|---|---|
@@ -48,9 +48,9 @@ AgentHub 当前阶段以 hk2 为主要生产部署节点。
 
 ### 网络
 
-- Docker 网络：`agenthub-net`（172.18.0.0/16 bridge），与 aihub-hk2 网络隔离
+- Docker 网络：`hub-network`（bridge），与其他服务网络隔离
 - 日志：JSON file driver，最大 10MB / 3 文件轮转
-- DNS：`hub.vectorcontrol.tech` A record 指向 hk2 公网 IP
+- DNS：`hub.vectorcontrol.tech` A record 指向生产主机公网 IP
 
 ## 开发环境
 

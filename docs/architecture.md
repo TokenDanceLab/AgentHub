@@ -59,7 +59,7 @@ Web shared workbench
 - **Edge Server（adapter registry、process lifecycle、EventStore）** → [architecture/02-edge-server.md](architecture/02-edge-server.md)
 - **Runtime Adapters（全部 adapter、事件映射、Preflight）** → [architecture/03-runtime-adapters.md](architecture/03-runtime-adapters.md)
 - **Frontend Data Flow（Platform adapter、React Query、Settings 回退、Profile 合并）** → [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)
-- **Deployment（hk2、Docker Compose、Nginx、SSL）** → [architecture/05-deployment.md](architecture/05-deployment.md)
+- **Deployment（Docker Compose、Nginx、SSL）** → [architecture/05-deployment.md](architecture/05-deployment.md)
 - **Auth & Identity（OIDC PKCE、JWT、TokenDance ID、设备注册）** → [architecture/06-auth-identity.md](architecture/06-auth-identity.md)
 
 ## 4. 数据流

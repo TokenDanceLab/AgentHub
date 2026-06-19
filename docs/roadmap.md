@@ -443,7 +443,7 @@ Web / Desktop / Mobile / IM
 | **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
 | **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
 | **OIDC Full PKCE Flow** | Hub authorize -> TokenDanceID -> callback -> JWT -> me -> sessions -> WS auth.ok | 真实验证 |
-| **生产部署** | hk2 Docker Compose（hub/postgres/redis）运行中 | `../server/projects/agenthub/STATE.md` |
+| **生产部署** | 生产 Docker Compose（hub/postgres/redis）运行中 | `../server/projects/agenthub/STATE.md` |
 | **Hub 限流** | 全局 IP 限流 100/min + 认证滑动窗口 + Body 10MB 限制 | `middleware/rate_limit.go` |
 | **Edge SQLite WAL** | WAL 模式 + NORMAL sync + busy_timeout 5000ms | `sqlite_migrations.go` |
 | **CSP 安全头** | Nginx 层 `Content-Security-Policy` + `X-Content-Type-Options` + `Referrer-Policy` + `Strict-Transport-Security`（SUPER Phase 1） | Nginx 配置 |
@@ -1138,8 +1138,8 @@ CLI permission request
 
 ### 15.1 当前状态
 
-- ✅ hk2 生产部署已运行（Docker Compose: hub + postgres + redis）
-- ✅ Docker 网络 `agenthub-net`（172.18.0.0/16）已创建
+- ✅ 生产部署已运行（Docker Compose: hub + postgres + redis）
+- ✅ Docker 网络已创建
 - ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
 - ✅ 部署流程已文档化（项目 `STATE.md`）
@@ -1152,17 +1152,17 @@ CLI permission request
 ### 15.2 部署架构
 
 ```text
-hk2 (生产主机)
+生产主机
 ├── Nginx (SSL termination + reverse proxy)
 │   ├── hub.vectorcontrol.tech -> agenthub-hub:8080
-│   └── 静态站 -> /opt/vectorcontrol-hk2-stack/agenthub-home/out/
-├── Docker Compose (agenthub-net: 172.18.0.0/16)
+│   └── 静态站 -> /opt/agenthub-production/agenthub-home/out/
+├── Docker Compose
 │   ├── agenthub-hub (Hub Server, :8080)
 │   ├── agenthub-postgres (PostgreSQL, :5432)
 │   └── agenthub-redis (Redis, :6379)
 └── 本地文件
     ├── /opt/agenthub-hub/hub-server/deployments/ (Compose + 配置)
-    └── /opt/vectorcontrol-hk2-stack/agenthub-home/out/ (静态站)
+    └── /opt/agenthub-production/agenthub-home/out/ (静态站)
 ```
 
 ### 15.3 API 端点（部署相关）
@@ -1220,7 +1220,7 @@ services:
         limits:
           memory: 256M
     networks:
-      - agenthub-net
+      - hub-network
     ports:
       - "127.0.0.1:8080:8080"  # 不直接对外
       - "127.0.0.1:6060:6060"  # admin 端口
@@ -1238,7 +1238,7 @@ services:
         limits:
           memory: 512M
     networks:
-      - agenthub-net
+      - hub-network
 
   agenthub-redis:
     image: redis:7-alpine
@@ -1247,10 +1247,10 @@ services:
         limits:
           memory: 384M
     networks:
-      - agenthub-net
+      - hub-network
 
 networks:
-  agenthub-net:
+  hub-network:
     ipam:
       config:
         - subnet: 172.18.0.0/16
@@ -1262,7 +1262,7 @@ volumes:
 ### 15.6 Nginx 反向代理配置要点
 
 ```nginx
-# hk2 nginx 配置概要
+# 生产 nginx 配置概要
 server {
     listen 443 ssl http2;
     server_name hub.vectorcontrol.tech;
@@ -1308,7 +1308,7 @@ server {
 
     # 静态站
     location / {
-        root /opt/vectorcontrol-hk2-stack/agenthub-home/out;
+        root /opt/agenthub-production/agenthub-home/out;
         try_files $uri $uri/ /index.html;
     }
 }
@@ -1337,14 +1337,14 @@ server {
 | `hub-server/.env.example` | 模板 | 环境变量参考 |
 | `hub-server/internal/config/constants.go` | 运行时常量 | 超时/限制/TTL |
 | `deployments/docker-compose.prod.yml` | 部署 | Docker Compose 编排 |
-| Nginx 配置（hk2） | 运维 | SSL + 反代 + 静态站 |
+| Nginx 配置（生产） | 运维 | SSL + 反代 + 静态站 |
 | 项目 `STATE.md` | 运维 | 部署状态文档 |
 
 ### 15.9 实施步骤
 
 - [x] 1. 配置 Docker Compose 编排（hub + postgres + redis）
 - [x] 2. 配置 Nginx 反向代理 + SSL 证书
-- [x] 3. 设置 Docker 网络隔离（`agenthub-net`）
+- [x] 3. 设置 Docker 网络隔离
 - [x] 4. 配置资源限制（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - [x] 5. 配置环境变量注入（`.env` 文件）
 - [x] 6. 验证 `curl -fsS https://hub.vectorcontrol.tech/health` 返回 200
@@ -1496,7 +1496,7 @@ server {
 | `hub-server/internal/service/auth.go` | 加固 | Refresh token rotation |
 | `hub-server/.env.example` | 审计 | 确认无真实凭据 |
 | `.gitignore` | 审计 | 确认 `.env` 被排除 |
-| Nginx 配置（hk2） | 加固 | CSP / Permissions-Policy / X-Content-Type-Options（CSP 已完成 SUPER Phase 1） |
+| Nginx 配置（生产） | 加固 | CSP / Permissions-Policy / X-Content-Type-Options（CSP 已完成 SUPER Phase 1） |
 | `hub-server/go.mod` | 扫描 | `govulncheck` 依赖检查 |
 | `app/web/package.json` | 扫描 | `npm audit` 依赖检查 |
 
@@ -1800,7 +1800,7 @@ server {
 16. **进程生命周期由 Edge lifecycle 管理，不暴露给前端**。
 17. **所有敏感配置通过环境变量注入**，不得硬编码在代码或配置文件中。
 18. **签名证书是生产发布的关键安全阻塞项**，无签名证书不可发布 stable。
-19. **`docker system prune -af` 在 hk2 禁止执行**（2026-05-28 事故）。
+19. **`docker system prune -af` 在生产主机禁止执行**（2026-05-28 事故）。
 20. **安全风险登记册 High 项未关闭前不发布 stable**。
 
 ---
@@ -1832,7 +1832,7 @@ Phase 4 (P2): 运行时集成 ✅ 完成（部分阻塞项除外）
   └─ 13.1 Mobile -> Hub API + OIDC deep-link ✅（APK 构建 ⏳ 缺环境）
 
 Phase 5 (P3): 生产就绪 🟡 进行中（SUPER Phase 1/4/5 完成，Phase 2+3 执行中）
-  ├─ 15. 部署 -> hk2 生产部署 ✅（PG 备份 + Edge 生产部署 pending）
+  ├─ 15. 部署 -> 生产部署 ✅（PG 备份 + Edge 生产部署 pending）
   ├─ 16. 安全 -> CSP/DOMPurify/Redis blacklist ✅，Permissions-Policy/依赖扫描/WS 加固 pending
   ├─ 17. 性能 -> 基线建立 + N+1 消除 pending
   └─ 14. E2E -> 全流程自动化（安全风险 P0 已修复，Permissions-Policy pending）
@@ -1916,9 +1916,9 @@ SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
 4. 运行完整测试套件
 5. 构建产物（Hub 镜像 + Desktop 包 + 静态站）
 6. 签名（如有证书）
-7. 部署到 hk2 staging
+7. 部署到 staging
 8. 验证 staging
-9. 部署到 hk2 production
+9. 部署到 production
 10. 验证 production
 11. 打 tag
 12. Push release
@@ -2145,7 +2145,7 @@ SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
 - [x] WS proxy 正确转发 upgrade
 - [x] CORS 白名单正确
 - [x] 环境变量注入无硬编码密码
-- [x] Docker 网络隔离（agenthub-net）
+- [x] Docker 网络隔离
 - [x] Admin 端口不对外暴露
 - [x] 健康监控自动化（Docker healthcheck 已配置 PG/Redis/Hub，外部告警 pending）
 - [x] 回滚策略文档完成（roadmap 15.7 已文档化）
