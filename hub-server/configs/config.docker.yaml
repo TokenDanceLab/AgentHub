@@ -3,6 +3,8 @@ server:
   log_level: info
   log_file: ""
   admin_port: 6060
+  # env: production|development|staging|... — overridden by AGENTHUB_ENV env var
+  env: ""
 db:
   host: postgres
   port: 5432

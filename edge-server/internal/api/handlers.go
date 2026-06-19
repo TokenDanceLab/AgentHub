@@ -22,8 +22,10 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/ccswitch"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -55,6 +57,9 @@ type Handler struct {
 	// When configured, Hub-issued tokens are accepted in addition to (or instead
 	// of) the local auth token.
 	HubJWTSecret string
+	// EdgeDeviceID is the local Edge device ID used to validate Hub-issued
+	// identity JWTs and capability tokens are scoped to this device.
+	EdgeDeviceID string
 
 	PermissionRegistry *PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
@@ -139,6 +144,103 @@ func isPathWithin(root, path string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
 }
 
+// hubUserFromRequest extracts the Hub-authenticated user ID from the request context.
+// Returns empty string if the request was not authenticated via Hub JWT.
+func hubUserFromRequest(r *http.Request) string {
+	return edgeidentity.FromContext(r.Context()).UserID
+}
+
+// filterProjectsByOwner filters a list of projects to those owned by the given user,
+// or all projects when userID is empty (local auth / unowned access).
+func filterProjectsByOwner(projects []store.Project, userID string) []store.Project {
+	if userID == "" {
+		return projects
+	}
+	filtered := make([]store.Project, 0, len(projects))
+	for _, p := range projects {
+		if p.OwnerID == "" || p.OwnerID == userID {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
+}
+
+// filterThreadsByOwner filters threads to those whose parent project is owned by the
+// given user (or is unowned). Pass userID="" to skip filtering (local auth).
+func filterThreadsByOwner(threads []store.Thread, repo store.Reader, userID string) []store.Thread {
+	if userID == "" {
+		return threads
+	}
+	filtered := make([]store.Thread, 0, len(threads))
+	for _, t := range threads {
+		proj, ok := repo.GetProject(t.ProjectID)
+		if !ok {
+			continue
+		}
+		if proj.OwnerID == "" || proj.OwnerID == userID {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
+// filterRunsByOwner filters runs to those whose parent project (via thread) is owned
+// by the given user (or is unowned). Pass userID="" to skip filtering (local auth).
+func filterRunsByOwner(runs []store.Run, repo store.Reader, userID string) []store.Run {
+	if userID == "" {
+		return runs
+	}
+	filtered := make([]store.Run, 0, len(runs))
+	for _, r := range runs {
+		proj, ok := repo.GetProject(r.ProjectID)
+		if !ok {
+			continue
+		}
+		if proj.OwnerID == "" || proj.OwnerID == userID {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
+}
+
+// isProjectOwnedBy checks if the project with the given ID is owned by the user.
+// Returns true if userID is empty (local auth), the project is unowned, or the project
+// is owned by the user.
+func isProjectOwnedBy(repo store.Reader, projectID, userID string) bool {
+	if userID == "" {
+		return true
+	}
+	proj, ok := repo.GetProject(projectID)
+	if !ok {
+		return false
+	}
+	return proj.OwnerID == "" || proj.OwnerID == userID
+}
+
+// isThreadOwnedBy checks if the thread with the given ID is accessible to the user.
+func isThreadOwnedBy(repo store.Reader, threadID, userID string) bool {
+	if userID == "" {
+		return true
+	}
+	thread, ok := repo.GetThread(threadID)
+	if !ok {
+		return false
+	}
+	return isProjectOwnedBy(repo, thread.ProjectID, userID)
+}
+
+// isRunOwnedBy checks if the run with the given ID is accessible to the user.
+func isRunOwnedBy(repo store.Reader, runID, userID string) bool {
+	if userID == "" {
+		return true
+	}
+	run, ok := repo.GetRun(runID)
+	if !ok {
+		return false
+	}
+	return isProjectOwnedBy(repo, run.ProjectID, userID)
+}
+
 func (h *Handler) validateWorkDirAllowed(workDir string) error {
 	// Empty workDir is allowed (no workspace path specified).
 	if workDir == "" {
@@ -182,7 +284,7 @@ func (h *Handler) ensureDefaults() {
 	if h.Store == nil {
 		return
 	}
-	_, _ = h.Store.CreateProject("proj_local", "Local Project")
+	_, _ = h.Store.CreateProject("proj_local", "Local Project", "")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct", "", "")
 }
 
@@ -249,7 +351,6 @@ func (h *Handler) installPermissionBrokerLocked() {
 	}
 	h.permissionBrokerInstalled = true
 }
-
 
 // ── Settings handlers ──────────────────────────────────────
 
@@ -442,7 +543,9 @@ func isAvailableRunnerStatus(status string) bool {
 // ---------------------------------------------------------------------------
 
 func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
-	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListProjects()))
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	writeSuccess(w, http.StatusOK, listResponse(filterProjectsByOwner(repo.ListProjects(), userID)))
 }
 
 func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
@@ -457,7 +560,9 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 	if req.ProjectID == "" {
 		req.ProjectID = genID("proj_")
 	}
-	project, err := ensureStore(h).CreateProject(req.ProjectID, req.Name)
+	// When authenticated via Hub JWT, set the Hub user as the project owner.
+	ownerID := hubUserFromRequest(r)
+	project, err := ensureStore(h).CreateProject(req.ProjectID, req.Name, ownerID)
 	if errors.Is(err, store.ErrProjectExists) {
 		writeSuccess(w, http.StatusOK, project)
 		return
@@ -468,7 +573,13 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimPrefix(r.URL.Path, "/v1/projects/")
-	if project, ok := ensureStore(h).GetProject(projectID); ok {
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if project, ok := repo.GetProject(projectID); ok {
+		if !isProjectOwnedBy(repo, project.ID, userID) {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
+			return
+		}
 		writeSuccess(w, http.StatusOK, project)
 		return
 	}
@@ -477,7 +588,9 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("projectId")
-	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListThreads(projectID)))
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	writeSuccess(w, http.StatusOK, listResponse(filterThreadsByOwner(repo.ListThreads(projectID), repo, userID)))
 }
 
 func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
@@ -510,7 +623,13 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 	threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
-	if thread, ok := ensureStore(h).GetThread(threadID); ok {
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if thread, ok := repo.GetThread(threadID); ok {
+		if !isThreadOwnedBy(repo, thread.ID, userID) {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+			return
+		}
 		writeSuccess(w, http.StatusOK, thread)
 		return
 	}
@@ -972,7 +1091,9 @@ func (h *Handler) DeleteAgentProfile(w http.ResponseWriter, r *http.Request, pro
 
 func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("threadId")
-	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListRuns(threadID)))
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	writeSuccess(w, http.StatusOK, listResponse(filterRunsByOwner(repo.ListRuns(threadID), repo, userID)))
 }
 
 // ---------------------------------------------------------------------------
@@ -1068,6 +1189,35 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
+	// Dual-token auth (AH-SR-046): when HubJWTSecret is configured, PostRuns
+	// requires BOTH a valid identity JWT (checked by middleware) AND a
+	// per-run capability token that binds user/device/target/project.
+	if h.HubJWTSecret != "" {
+		capToken := strings.TrimSpace(r.Header.Get("X-AgentHub-Capability-Token"))
+		if capToken == "" {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessage("missing capability token; dual-token auth requires X-AgentHub-Capability-Token header")))
+			return
+		}
+		capClaims, err := jwtutil.ValidateCapabilityToken(capToken, []byte(h.HubJWTSecret), h.EdgeDeviceID)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token validation failed: %v", err)))
+			return
+		}
+		// Cross-check capability claims against the request.
+		if capClaims.ProjectID != req.ProjectID {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token project_id %q does not match request project %q", capClaims.ProjectID, req.ProjectID)))
+			return
+		}
+		// Cross-check identity: if the middleware injected Hub identity into the
+		// context, verify the capability token binds the same user.
+		if id := edgeidentity.FromContext(r.Context()); id.UserID != "" {
+			if capClaims.UserID != id.UserID {
+				writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token user_id %q does not match identity user %q", capClaims.UserID, id.UserID)))
+				return
+			}
+		}
+	}
+
 	repository := ensureStore(h)
 	h.runCreateMu.Lock()
 	cleanupRuns(repository)
@@ -1097,11 +1247,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
 	}
-		// Auto-detect continue: when the thread has prior assistant messages,
-		// set ContinueLast = true so adapters can resume the conversation.
-		if !req.Continue && threadHasAssistantHistory(repository, req.ThreadID) {
-			req.Continue = true
-		}
+	// Auto-detect continue: when the thread has prior assistant messages,
+	// set ContinueLast = true so adapters can resume the conversation.
+	if !req.Continue && threadHasAssistantHistory(repository, req.ThreadID) {
+		req.Continue = true
+	}
 	// Each run creates a fresh CC conversation via --session-id.
 
 	if h.Executor == nil {
@@ -1471,7 +1621,6 @@ func runtimeSessionIDForThread(threadID string) string {
 		hex.EncodeToString(session[10:16]),
 	}, "-")
 }
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1882,9 +2031,9 @@ func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry, err := runnerctx.WriteMemoryEntry(runnerctx.MemoryWriteRequest{
-		WorkDir:   req.WorkDir,
-		ThreadID:  req.ThreadID,
-		AgentID:   req.AgentID,
+		WorkDir:  req.WorkDir,
+		ThreadID: req.ThreadID,
+		AgentID:  req.AgentID,
 		Entry: runnerctx.MemoryEntry{
 			ID:      req.ID,
 			Content: req.Content,
@@ -2023,7 +2172,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
-			if run, ok := ensureStore(h).GetRun(runID); ok {
+			repo := ensureStore(h)
+			userID := hubUserFromRequest(r)
+			if run, ok := repo.GetRun(runID); ok {
+				if !isRunOwnedBy(repo, run.ID, userID) {
+					writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+					return
+				}
 				writeSuccess(w, http.StatusOK, runToResponse(run))
 				return
 			}

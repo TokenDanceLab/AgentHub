@@ -13,7 +13,7 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	}
 	defer s.Close()
 
-	project, err := s.CreateProject("proj_projection", "Projection Project")
+	project, err := s.CreateProject("proj_projection", "Projection Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestSQLiteProjectionDiffIDDoesNotCollideOnColonDelimitedRunAndPath(t *testi
 	}
 	defer s.Close()
 
-	project, err := s.CreateProject("proj_collision", "Projection Collision")
+	project, err := s.CreateProject("proj_collision", "Projection Collision", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}

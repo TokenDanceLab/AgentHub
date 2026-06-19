@@ -60,6 +60,7 @@ type ServerConfig struct {
 	LogFile      string `mapstructure:"log_file"`
 	AdminPort    int    `mapstructure:"admin_port"`
 	AuditLogFile string `mapstructure:"audit_log_file"`
+	Env          string `mapstructure:"env"`
 }
 
 type DBConfig struct {
@@ -118,15 +119,19 @@ func (r RedisConfig) LogValue() slog.Value {
 }
 
 type JWTConfig struct {
-	Secret     string        `mapstructure:"secret"`
-	AccessTTL  time.Duration `mapstructure:"access_ttl"`
-	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
+	Secret      string            `mapstructure:"secret"`
+	Secrets     map[string]string `mapstructure:"-"` // parsed from AGENTHUB_JWT_SECRETS env var
+	ActiveKeyID string            `mapstructure:"-"` // parsed from AGENTHUB_JWT_ACTIVE_KEY_ID env var
+	AccessTTL   time.Duration     `mapstructure:"access_ttl"`
+	RefreshTTL  time.Duration     `mapstructure:"refresh_ttl"`
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
 func (j JWTConfig) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("secret", "[REDACTED]"),
+		slog.Any("secrets_count", len(j.Secrets)),
+		slog.String("active_key_id", j.ActiveKeyID),
 		slog.Duration("access_ttl", j.AccessTTL),
 		slog.Duration("refresh_ttl", j.RefreshTTL),
 	)
@@ -307,12 +312,38 @@ func Load(configPath string) (*Config, error) {
 		cfg.JWT.Secret = envSecret
 	}
 
+	// Parse AGENTHUB_JWT_SECRETS for multi-key support.
+	// Format: "kid1:secret1,kid2:secret2" where the first ':' in each pair
+	// separates the kid from the secret.
+	if envSecrets := os.Getenv("AGENTHUB_JWT_SECRETS"); envSecrets != "" {
+		secretsMap, activeFromSecrets := parseJWTSecrets(envSecrets)
+		cfg.JWT.Secrets = secretsMap
+		// Use env var active key id if set, otherwise use the implicitly-determined one.
+		if envActive := os.Getenv("AGENTHUB_JWT_ACTIVE_KEY_ID"); envActive != "" {
+			cfg.JWT.ActiveKeyID = envActive
+		} else {
+			cfg.JWT.ActiveKeyID = activeFromSecrets
+		}
+		// Also set Secret to the active key's secret for backward compat.
+		if secret, ok := secretsMap[cfg.JWT.ActiveKeyID]; ok {
+			cfg.JWT.Secret = secret
+		}
+	} else if cfg.JWT.Secret != "" {
+		// Backward compatibility: single secret gets key ID "default".
+		cfg.JWT.Secrets = map[string]string{"default": cfg.JWT.Secret}
+		cfg.JWT.ActiveKeyID = "default"
+	}
+
 	// Explicit env var overrides for Server settings.
 	if envLogLevel := os.Getenv("AGENTHUB_SERVER_LOG_LEVEL"); envLogLevel != "" {
 		cfg.Server.LogLevel = envLogLevel
 	}
 	if envLogFile := os.Getenv("AGENTHUB_SERVER_LOG_FILE"); envLogFile != "" {
 		cfg.Server.LogFile = envLogFile
+	}
+	// Env: legacy AGENTHUB_ENV takes precedence over server.env in config file.
+	if envEnv := os.Getenv("AGENTHUB_ENV"); envEnv != "" {
+		cfg.Server.Env = envEnv
 	}
 
 	// Explicit env var overrides for TokenDance ID.
@@ -377,6 +408,37 @@ func Load(configPath string) (*Config, error) {
 	return &cfg, nil
 }
 
+// parseJWTSecrets parses the AGENTHUB_JWT_SECRETS env var value.
+// Format: "kid1:secret1,kid2:secret2"
+// The first ':' in each pair separates the kid from the secret.
+// Returns the secrets map and the first kid (as default active).
+func parseJWTSecrets(value string) (map[string]string, string) {
+	pairs := strings.Split(value, ",")
+	result := make(map[string]string, len(pairs))
+	var firstKID string
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		// Split on first ':' only — secrets may contain colons.
+		idx := strings.Index(pair, ":")
+		if idx < 0 {
+			continue
+		}
+		kid := strings.TrimSpace(pair[:idx])
+		secret := pair[idx+1:] // preserve all chars after first ':'
+		if kid == "" || secret == "" {
+			continue
+		}
+		result[kid] = secret
+		if firstKID == "" {
+			firstKID = kid
+		}
+	}
+	return result, firstKID
+}
+
 func firstEnv(names ...string) string {
 	for _, name := range names {
 		if value := os.Getenv(name); value != "" {
@@ -397,6 +459,25 @@ func splitEnvList(value string) []string {
 	return result
 }
 
+// knownServerEnvs is the set of recognized AGENTHUB_ENV / server.env values.
+var knownServerEnvs = map[string]bool{
+	"production":  true,
+	"prod":        true,
+	"release":     true,
+	"development": true,
+	"dev":         true,
+	"staging":     true,
+	"test":        true,
+	"debug":       true,
+}
+
+// validServerEnv reports whether env is a recognized environment name.
+// The empty string is not validated here — it means "not explicitly set"
+// and falls back to GIN_MODE at the call site.
+func validServerEnv(env string) bool {
+	return knownServerEnvs[strings.ToLower(strings.TrimSpace(env))]
+}
+
 // RateLimitFailOpen returns whether rate limiters should fail-open (allow requests)
 // when Redis is unavailable for non-auth paths. Auth paths always fail-closed.
 // Controlled by the AGENTHUB_RATE_LIMIT_FAIL_OPEN environment variable.
@@ -414,6 +495,13 @@ func RateLimitFailOpen() bool {
 // It rejects insecure defaults, missing infrastructure addresses, and
 // missing directories that the server depends on.
 func (c *Config) Validate() error {
+	// Server: validate env value when explicitly set.
+	if c.Server.Env != "" {
+		if !validServerEnv(c.Server.Env) {
+			return fmt.Errorf("server.env has unknown value %q; accepted: production, prod, release, development, dev, staging, test, debug", c.Server.Env)
+		}
+	}
+
 	// DB: host and port must be plausible.
 	if c.DB.Host == "" {
 		return errors.New("db.host is required")
@@ -468,6 +556,22 @@ func (c *Config) Validate() error {
 	// JWT: enforce minimum length (32 chars = 256 bits for HS256).
 	if len(c.JWT.Secret) < 32 {
 		return fmt.Errorf("JWT secret too short: minimum 32 characters required (got %d)", len(c.JWT.Secret))
+	}
+
+	// JWT: validate multi-key configuration when AGENTHUB_JWT_SECRETS is set.
+	if len(c.JWT.Secrets) > 0 {
+		if c.JWT.ActiveKeyID == "" {
+			return fmt.Errorf("jwt.active_key_id is required when multi-key JWT secrets are configured")
+		}
+		if _, ok := c.JWT.Secrets[c.JWT.ActiveKeyID]; !ok {
+			return fmt.Errorf("jwt.active_key_id %q not found in configured secrets", c.JWT.ActiveKeyID)
+		}
+		// Validate all secrets meet minimum length.
+		for kid, secret := range c.JWT.Secrets {
+			if len(secret) < 32 {
+				return fmt.Errorf("JWT secret for key %q too short: minimum 32 characters required (got %d)", kid, len(secret))
+			}
+		}
 	}
 
 	// TokenDance ID config is optional; validate only when explicitly configured

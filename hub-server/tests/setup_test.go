@@ -95,10 +95,10 @@ func TestMain(m *testing.M) {
 	mgr.StartHeartbeat()
 
 	bus = service.NewBus()
-	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret)
+	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
-	deviceService := service.NewDeviceService(db)
+	deviceService := service.NewDeviceService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := service.NewContactService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
@@ -110,7 +110,7 @@ func TestMain(m *testing.M) {
 		MessageService: messageService,
 		reactions:      messageReactionService,
 	})
-	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
+	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := service.NewAttachmentService(db, cfg.Upload, service.NewLocalStorage(cfg.Upload.Dir))

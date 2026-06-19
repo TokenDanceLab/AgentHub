@@ -32,12 +32,12 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		// Remove expired entries (outside the sliding window).
 		pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprint(windowStart))
 
-		// Count current entries.
-		countCmd := pipe.ZCard(ctx, key)
-
-		// Add current request.
+		// Add current request before counting so the count includes it.
 		member := fmt.Sprintf("%d-%d", now, time.Now().UnixNano())
 		pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member})
+
+		// Count current entries (now includes the one just added).
+		countCmd := pipe.ZCard(ctx, key)
 
 		// Set key expiry (window + buffer).
 		pipe.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
@@ -66,7 +66,7 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 			return
 		}
 
-		if countCmd.Val() >= int64(limit) {
+		if countCmd.Val() > int64(limit) {
 			// Determine how long until the window resets.
 			ttl, _ := client.GetRDB().TTL(ctx, key).Result()
 			retryAfter := int(ttl.Seconds())

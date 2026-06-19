@@ -16,11 +16,14 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
 
@@ -46,9 +49,9 @@ type recordingRepository struct {
 	createProjectCalls int
 }
 
-func (r *recordingRepository) CreateProject(id, name string) (store.Project, error) {
+func (r *recordingRepository) CreateProject(id, name, ownerID string) (store.Project, error) {
 	r.createProjectCalls++
-	return r.Repository.CreateProject(id, name)
+	return r.Repository.CreateProject(id, name, ownerID)
 }
 
 type corruptPinRepository struct {
@@ -1652,7 +1655,7 @@ func TestThreadPinsRejectInvalidRequests(t *testing.T) {
 
 func TestThreadPinsSkipCrossThreadSnapshotPin(t *testing.T) {
 	base := store.New()
-	_, _ = base.CreateProject("proj_local", "Local")
+	_, _ = base.CreateProject("proj_local", "Local", "")
 	_, _ = base.CreateThread("thread_local", "proj_local", "Local", "", "", "")
 	_, _ = base.CreateThread("thread_other", "proj_local", "Other", "", "", "")
 	otherItem, err := base.CreateThreadMessage("item_other", "thread_other", "user", "other")
@@ -1749,7 +1752,7 @@ func TestPostRunsMethodNotAllowed(t *testing.T) {
 func TestPostCancelRun(t *testing.T) {
 	h := newTestHandler()
 	// Create project and thread first (required for CreateRun).
-	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateProject("proj_local", "Local", "")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "", "", "")
 	_, _ = h.Store.CreateRun("run_test123", "proj_local", "thread_local")
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_test123:cancel", nil)
@@ -2262,7 +2265,7 @@ func TestMuxGetRunsRoute(t *testing.T) {
 func TestMuxCancelRunRoute(t *testing.T) {
 	h := newTestHandler()
 	// Create project, thread, and run so the cancel route can find it.
-	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateProject("proj_local", "Local", "")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "", "", "")
 	_, _ = h.Store.CreateRun("run_abc", "proj_local", "thread_local")
 	mux := http.NewServeMux()
@@ -3040,4 +3043,247 @@ func unwrapSuccess(body map[string]any) map[string]any {
 		}
 	}
 	return body
+}
+
+// ---------------------------------------------------------------------------
+// Dual-token auth tests (AH-SR-046)
+// ---------------------------------------------------------------------------
+
+const testCapSecret = "my-secret-key-for-capability-test-32" // 32+ bytes for HMAC-SHA256
+
+// newCapToken generates a valid HS256 capability token for testing.
+func newCapToken(secret, userID, deviceID, projectID, purpose string, expiresIn time.Duration) string {
+	claims := jwtutil.CapabilityClaims{
+		UserID:    userID,
+		DeviceID:  deviceID,
+		ProjectID: projectID,
+		Purpose:   purpose,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-edge"},
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	s, _ := token.SignedString([]byte(secret))
+	return s
+}
+
+func TestRunStartDualToken(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"dual-token test"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_MissingCapabilityTokenReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	// Do NOT set X-AgentHub-Capability-Token
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WrongCapabilityTokenReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	// Use wrong secret for capability token
+	capToken := newCapToken("wrong-secret-that-is-also-32-bytes!!", "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+}
+
+func TestRunStartDualToken_ExpiredCapabilityTokenReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", -1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 for expired token, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+}
+
+func TestRunStartDualToken_MismatchedProjectReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	// Capability token is for proj_other, but request uses proj_local
+	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_other", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 for mismatched project, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+}
+
+func TestRunStartDualToken_MismatchedUserIdentityReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	// Capability token is for user-1, but the context identity will be user-2
+	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	// Inject a different user identity into context (simulating middleware)
+	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-2")
+	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 for mismatched user identity, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+}
+
+func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	// HubJWTSecret is empty — dual-token check is skipped entirely
+	h.HubJWTSecret = ""
+	h.EdgeDeviceID = ""
+	h.ensureDefaults()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"no dual token"}`))
+	// No capability token header
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	// When HubJWTSecret is empty, PostRuns behaves exactly as before (no dual-token gate).
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202 (no dual-token gate), got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WithMatchingIdentityContext(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := newCapToken(testCapSecret, "user-alice", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"matched identity"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	// Inject matching identity into context
+	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-alice")
+	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202 with matching identity, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WrongDeviceInCapabilityTokenReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	// Capability token is for device "other-device" but Edge expects "test-edge-001"
+	capToken := newCapToken(testCapSecret, "user-1", "other-device", "proj_local", "run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 for wrong device, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
 }

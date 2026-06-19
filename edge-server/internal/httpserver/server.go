@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
@@ -33,21 +34,10 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
-// ctxKey is a private context key type for injecting auth identity.
-type ctxKey string
-
-const (
-	ctxKeyHubUserID   ctxKey = "hub_user_id"
-	ctxKeyHubDeviceID ctxKey = "hub_device_id"
-)
-
 // HubUserIDFromContext extracts the Hub-authenticated user ID from context.
 // Returns empty string if the request was not authenticated via Hub JWT.
 func HubUserIDFromContext(ctx context.Context) string {
-	if v, ok := ctx.Value(ctxKeyHubUserID).(string); ok {
-		return v
-	}
-	return ""
+	return edgeidentity.FromContext(ctx).UserID
 }
 
 // Config holds server configuration.
@@ -55,19 +45,19 @@ type Config struct {
 	Addr               string
 	Store              store.Repository
 	ProcessExecutor    lifecycle.ProcessExecutorConfig
-	AdapterRegistry    *adapters.Registry // agent adapter registry; nil = none registered
-	AgentDefault       string             // default agent adapter ID; empty = raw stdout capture
-	LocalAuthToken     string             // optional local bearer token for non-health Edge APIs
-	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
-	EdgeDeviceID       string             // local Edge device ID expected in Edge-scoped Hub JWTs
-	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
-	HubToken           string             // JWT bearer token for Hub callback authentication
-	RemoteMode         bool               // allow non-loopback bind + remote origins (requires auth)
-	AllowedOrigins     []string           // explicit remote-mode browser origins allowed by CORS
-	Dev                bool               // dev mode disables auto-generated local auth token
-	WorkspaceAllowlist []string           // optional roots allowed for request workDir
-	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
-	EventLogPath       string             // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
+	AdapterRegistry    *adapters.Registry       // agent adapter registry; nil = none registered
+	AgentDefault       string                   // default agent adapter ID; empty = raw stdout capture
+	LocalAuthToken     string                   // optional local bearer token for non-health Edge APIs
+	HubJWTSecret       string                   // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID       string                   // local Edge device ID expected in Edge-scoped Hub JWTs
+	HubURL             string                   // Hub server base URL for Edge->Hub direct callbacks
+	HubToken           string                   // JWT bearer token for Hub callback authentication
+	RemoteMode         bool                     // allow non-loopback bind + remote origins (requires auth)
+	AllowedOrigins     []string                 // explicit remote-mode browser origins allowed by CORS
+	Dev                bool                     // dev mode disables auto-generated local auth token
+	WorkspaceAllowlist []string                 // optional roots allowed for request workDir
+	SkillsDirs         []string                 // optional SKILL.md search dirs; empty = use defaults
+	EventLogPath       string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
 }
 
@@ -319,6 +309,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		SkillRegistry:      skillReg,
 		MCPConfigStore:     cfg.MCPConfigStore,
 		PlanApprovalBroker: planBroker,
+		LocalAuthToken:     cfg.LocalAuthToken,
+		HubJWTSecret:       cfg.HubJWTSecret,
+		EdgeDeviceID:       cfg.EdgeDeviceID,
 	}
 
 	// Detect cc-switch and wire into handler for API endpoints and model
@@ -333,7 +326,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		// so model aliases are resolved through the transparent proxy mapping.
 		if cfg.AdapterRegistry != nil && ccReader != nil {
 			if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
-				if claudeAdapter, ok := a.(interface{ SetCCSwitchResolver(adapters.CCSwitchModelResolver) }); ok {
+				if claudeAdapter, ok := a.(interface {
+					SetCCSwitchResolver(adapters.CCSwitchModelResolver)
+				}); ok {
 					claudeAdapter.SetCCSwitchResolver(ccReader)
 					slog.Debug("cc-switch model resolver wired into claude-code adapter")
 				}
@@ -362,7 +357,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.
 	if cfg.Store != nil {
-		_, _ = cfg.Store.CreateProject("proj_local", "Local Project")
+		_, _ = cfg.Store.CreateProject("proj_local", "Local Project", "")
 		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct", "", "")
 	}
 	return h, nil
@@ -506,8 +501,8 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 			// 1. Try Hub JWT validation (TokenDance ID → Hub → Edge trust chain).
 			if hubJWTSecret != "" {
 				if claims, err := jwtutil.ValidateHubToken(got, []byte(hubJWTSecret), edgeDeviceID); err == nil {
-					ctx := context.WithValue(r.Context(), ctxKeyHubUserID, claims.UserID)
-					ctx = context.WithValue(ctx, ctxKeyHubDeviceID, claims.DeviceID)
+					ctx := context.WithValue(r.Context(), edgeidentity.HubUserIDKey, claims.UserID)
+					ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, claims.DeviceID)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
