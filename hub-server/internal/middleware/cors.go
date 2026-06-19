@@ -21,7 +21,7 @@ func CORS(env string) (gin.HandlerFunc, error) {
 	}
 	origins := splitAndTrim(raw)
 	if err := validateCORSOriginsForEnvironment(resolvedEnv, origins); err != nil {
-		slog.Error("invalid CORS configuration", "err", err)
+		slog.Error("invalid CORS configuration", "error", err)
 		return nil, fmt.Errorf("CORS configuration error: %w", err)
 	}
 	return cors.New(cors.Config{
