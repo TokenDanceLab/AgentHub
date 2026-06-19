@@ -172,7 +172,7 @@ func (h *SessionHandler) AddMembers(c *gin.Context) {
 func (h *SessionHandler) RemoveMember(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
-	targetID := c.Param("user_id")
+	targetID := c.Param("target_user_id")
 	if err := h.service.RemoveGroupMember(c.Request.Context(), userID, sessionID, targetID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

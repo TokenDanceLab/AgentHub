@@ -127,7 +127,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			sessions.POST("/private", sessionHandler.CreatePrivate)
 			sessions.POST("/group", sessionHandler.CreateGroup)
 			sessions.POST("/:id/members", sessionHandler.AddMembers)
-			sessions.DELETE("/:id/members/:user_id", sessionHandler.RemoveMember)
+			sessions.DELETE("/:id/members/:target_user_id", sessionHandler.RemoveMember)
 			sessions.POST("/:id/leave", sessionHandler.Leave)
 			sessions.POST("/:id/transfer-owner", sessionHandler.TransferOwner)
 			sessions.POST("/:id/dissolve", sessionHandler.Dissolve)

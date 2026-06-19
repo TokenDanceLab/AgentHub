@@ -54,8 +54,8 @@ func NewAgentTeamHandler(s AgentTeamService) *AgentTeamHandler {
 // --- Request types ---
 
 type createTeamReq struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description,omitempty"`
+	Name        string `json:"name" binding:"required,max=128"`
+	Description string `json:"description,omitempty" binding:"max=1024"`
 }
 
 type updateTeamReq struct {

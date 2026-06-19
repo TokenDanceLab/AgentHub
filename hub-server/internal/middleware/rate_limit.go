@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,11 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 )
+
+// rateLimitMemberID is an atomically incrementing counter used to guarantee
+// unique ZSET members — time.Now().UnixNano() alone is insufficient on
+// platforms with coarse timer resolution (e.g. ~15.6 ms on Windows).
+var rateLimitMemberID atomic.Int64
 
 // RateLimit returns a middleware that enforces a sliding-window rate limit
 // using Redis. limit is the maximum number of requests allowed within window.
@@ -36,7 +42,9 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		}
 
 		// Add current request before counting so the count includes it.
-		member := fmt.Sprintf("%d-%d", now, time.Now().UnixNano())
+		// The atomic counter guarantees unique members even when two
+		// requests land in the same nanosecond (essential on Windows).
+		member := fmt.Sprintf("%d-%d-%d", now, time.Now().UnixNano(), rateLimitMemberID.Add(1))
 		if err := rdb.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member}).Err(); err != nil {
 			handleRateLimitError(c, key, err)
 			return
