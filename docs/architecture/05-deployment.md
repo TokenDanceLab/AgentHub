@@ -6,17 +6,17 @@
 
 ## 概述
 
-AgentHub 当前阶段以 host-redacted 为主要生产部署节点。
+AgentHub 当前阶段以单节点 Docker Compose 为主要生产部署方式。
 
-## host-redacted 生产部署
+## 生产部署
 
-生产 Hub Server 部署在 host-redacted（核云 VPS，香港），公开地址 `https://hub.example.invalid`。
+生产 Hub Server 公开地址 `https://hub.example.invalid`。
 
 **技术栈**：Docker Compose + Nginx + Let's Encrypt SSL
 
 ### Docker Compose 服务
 
-配置文件：`hub-server/deployments/host-redacted/docker-compose.host-redacted.yml`
+配置文件：`hub-server/deployments/docker-compose.prod.yml`
 
 | 服务 | 镜像 | 资源限制 | 端口 |
 |---|---|---|---|
@@ -26,7 +26,7 @@ AgentHub 当前阶段以 host-redacted 为主要生产部署节点。
 
 ### Nginx 配置
 
-配置文件：`hub-server/deployments/host-redacted/nginx-host-redacted.conf`
+配置文件：`hub-server/deployments/nginx.prod.conf`
 
 | Location | 认证 | 后端 |
 |---|---|---|
@@ -48,9 +48,9 @@ AgentHub 当前阶段以 host-redacted 为主要生产部署节点。
 
 ### 网络
 
-- Docker 网络：`agenthub-net`（172.18.0.0/16 bridge），与 aihub-host-redacted 网络隔离
+- Docker 网络：`hub-network`（bridge），与其他服务网络隔离
 - 日志：JSON file driver，最大 10MB / 3 文件轮转
-- DNS：`hub.example.invalid` A record 指向 host-redacted 公网 IP
+- DNS：`hub.example.invalid` A record 指向生产主机公网 IP
 
 ## 开发环境
 
