@@ -64,7 +64,7 @@ func normalizeJSONField(field *string, name string) error {
 	if *field == "" {
 		return nil
 	}
-	normalized, err := normalizeJSONValue(*field)
+	normalized, err := NormalizeJSONValue(*field)
 	if err != nil {
 		return fmt.Errorf("invalid JSON in %s: %w", name, err)
 	}
@@ -72,7 +72,11 @@ func normalizeJSONField(field *string, name string) error {
 	return nil
 }
 
-func normalizeJSONValue(raw string) (string, error) {
+// NormalizeJSONValue normalizes a JSON string by unmarshaling and re-marshaling
+// to compact form. Returns the compact JSON string or an error if the input is
+// not valid JSON. This is the shared JSON normalization utility used by all
+// model types and handlers.
+func NormalizeJSONValue(raw string) (string, error) {
 	var v any
 	if err := json.Unmarshal([]byte(raw), &v); err != nil {
 		return "", err
@@ -82,6 +86,11 @@ func normalizeJSONValue(raw string) (string, error) {
 		return "", err
 	}
 	return string(normalized), nil
+}
+
+// Deprecated: use NormalizeJSONValue instead.
+func normalizeJSONValue(raw string) (string, error) {
+	return NormalizeJSONValue(raw)
 }
 
 func (c *CustomAgent) Validate() error {
