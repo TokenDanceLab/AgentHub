@@ -263,17 +263,20 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
 
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
       - name: Build Android APK via EAS
         working-directory: app/mobile-rn
         run: |
-          npx eas-cli build \
+          eas build \
             --platform android \
-            --profile production \
+            --profile preview \
             --non-interactive \
             --wait \
             --message "Release ${{ github.ref_name }}"
 
-          BUILD_LIST=$(npx eas-cli build:list \
+          BUILD_LIST=$(eas build:list \
             --platform android \
             --status FINISHED \
             --limit 1 \
@@ -284,7 +287,7 @@ jobs:
 
           mkdir -p ../../dist
 
-          BUILD_DETAIL=$(npx eas-cli build:view "$BUILD_ID" --json --non-interactive)
+          BUILD_DETAIL=$(eas build:view "$BUILD_ID" --json --non-interactive)
           APK_URL=$(echo "$BUILD_DETAIL" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // empty')
 
           if [ -z "$APK_URL" ] || [ "$APK_URL" = "null" ]; then
