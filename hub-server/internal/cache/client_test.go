@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1013,4 +1014,150 @@ func TestSetRoute_GetRoute_IsOnline_ConcurrentUsers(t *testing.T) {
 	online, err = c.IsOnline(ctx, "dave")
 	require.NoError(t, err)
 	assert.False(t, online)
+}
+
+// ==================== Concurrent Access Tests ====================
+
+// TestConcurrentRouteCRUD verifies that concurrent SetRoute/GetRoute/DeleteRoute
+// operations on different users do not race or corrupt the Redis hash.
+func TestConcurrentRouteCRUD(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			userID := fmt.Sprintf("user-conc-%d", idx%10)
+			device := fmt.Sprintf("device-%d", idx%3)
+			connID := fmt.Sprintf("conn-%d", idx)
+
+			// Set
+			require.NoError(t, c.SetRoute(ctx, userID, device, connID))
+
+			// Get
+			got, err := c.GetRoute(ctx, userID, device)
+			require.NoError(t, err)
+			assert.Equal(t, connID, got)
+
+			// Check online
+			online, err := c.IsOnline(ctx, userID)
+			require.NoError(t, err)
+			assert.True(t, online)
+
+			// Delete
+			require.NoError(t, c.DeleteRoute(ctx, userID, device))
+		}(i)
+	}
+	wg.Wait()
+}
+
+// TestConcurrentTaskQueue verifies that concurrent PushPendingTask and
+// PopPendingTasks across multiple users do not race.
+func TestConcurrentTaskQueue(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	const numUsers = 20
+	const tasksPerUser = 10
+
+	var wg sync.WaitGroup
+
+	// Push tasks concurrently
+	for u := 0; u < numUsers; u++ {
+		wg.Add(1)
+		go func(userIdx int) {
+			defer wg.Done()
+			userID := fmt.Sprintf("tq-user-%d", userIdx)
+			for j := 0; j < tasksPerUser; j++ {
+				payload := fmt.Sprintf(`{"task":%d,"user":%d}`, j, userIdx)
+				require.NoError(t, c.PushPendingTask(ctx, userID, payload))
+			}
+		}(u)
+	}
+	wg.Wait()
+
+	// Pop and verify each user
+	for u := 0; u < numUsers; u++ {
+		userID := fmt.Sprintf("tq-user-%d", u)
+		count, err := c.PendingTaskCount(ctx, userID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(tasksPerUser), count)
+
+		tasks, err := c.PopPendingTasks(ctx, userID)
+		require.NoError(t, err)
+		assert.Len(t, tasks, tasksPerUser)
+	}
+}
+
+// TestConcurrentCheckRateLimit verifies that the rate limit counter is
+// race-free under concurrent access.
+func TestConcurrentCheckRateLimit(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	const limit = int64(50)
+	var wg sync.WaitGroup
+	var allowed atomic.Int64
+	var blocked atomic.Int64
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, exceeded, err := c.CheckRateLimit(ctx, "rl-conc", limit)
+			require.NoError(t, err)
+			if exceeded {
+				blocked.Add(1)
+			} else {
+				allowed.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, int64(limit+1), allowed.Load(), "exactly limit+1 (51) should be allowed (count=51, 51>50)")
+	assert.Equal(t, int64(100-(limit+1)), blocked.Load(), "remaining should be blocked")
+}
+
+// TestConcurrentGetOrLoad verifies that GetOrLoad with singleflight correctly
+// deduplicates concurrent loader invocations and returns consistent results.
+func TestConcurrentGetOrLoad(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	lc := &loadCount{}
+
+	var wg sync.WaitGroup
+	results := make(chan int, 30)
+
+	// Release all goroutines at once
+	barrier := make(chan struct{})
+	var ready sync.WaitGroup
+	ready.Add(30)
+
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-barrier
+			ready.Done()
+			ready.Wait()
+			v, err := GetOrLoad(c, ctx, "sf-conc-key", 30*time.Second, func(ctx context.Context) (int, error) {
+				time.Sleep(50 * time.Millisecond)
+				return lc.inc(), nil
+			})
+			require.NoError(t, err)
+			results <- v
+		}()
+	}
+	close(barrier)
+	wg.Wait()
+	close(results)
+
+	assert.Equal(t, 1, lc.count, "loader should be called exactly once (singleflight)")
+	for v := range results {
+		assert.Equal(t, 1, v, "all goroutines should get the same cached result")
+	}
 }

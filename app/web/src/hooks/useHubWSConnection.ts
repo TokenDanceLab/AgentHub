@@ -30,6 +30,7 @@ export function useHubWSConnection(): HubWSConnectionState {
   const [justReconnected, setJustReconnected] = useState(false);
   const authFailToastRef = useRef(false);
   const prevStatusRef = useRef<TransportStatus>('disconnected');
+  const bridgeRef = useRef<ReturnType<typeof createWSEventBridge> | null>(null);
 
   useEffect(() => {
     void auth.tryAutoLogin().catch((error) => {
@@ -99,6 +100,8 @@ export function useHubWSConnection(): HubWSConnectionState {
     ws.connect();
 
     return () => {
+      bridgeRef.current?.destroy();
+      bridgeRef.current = null;
       unsubscribeStatus();
       ws.close();
       setHubWS((current) => (current === ws ? null : current));

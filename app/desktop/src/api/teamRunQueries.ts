@@ -7,7 +7,7 @@ import {
   type TeamRunState,
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import { hubQueryKeys } from '@agenthub/shared';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
