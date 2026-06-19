@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": ["nsis", "zip"],
     "externalBin": ["binaries/agenthub-edge"],
     "icon": [
       "icons/agenthub-icon-rounded-32.png",
@@ -42,7 +42,9 @@
         "displayLanguageSelector": true,
         "headerImage": "icons/installer-header.bmp",
         "sidebarImage": "icons/installer-sidebar.bmp",
-        "installerIcon": "icons/agenthub-icon-rounded.ico"
+        "installerIcon": "icons/agenthub-icon-rounded.ico",
+        "createDesktopShortcut": true,
+        "shortcutName": "AgentHub Desktop"
       }
     }
   },

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -589,7 +590,107 @@ func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmen
 		"session_id":    run.SessionID,
 		"reason":        reason,
 	})
+
+	// Fault escalation: when an assignment fails with escalation metadata,
+	// trigger Layer 2 (AI review) if configured.
+	if strings.Contains(reason, "[fault_escalation]") {
+		s.handleFaultEscalation(ctx, a, run, reason)
+	}
+
 	return nil
+}
+
+// handleFaultEscalation processes Layer 2 (AI review) and Layer 3 (replan)
+// of the fault escalation chain when an Edge run has exhausted all retries.
+//
+// Layer 2 (AI review): Creates a review assignment for the supervisor to
+// analyze the error output and suggest a fix or reassignment.
+//
+// Layer 3 (Replan): When the AI review determines the failure is not
+// recoverable, the team run is marked as failed with a replan indication
+// so the orchestrator can regenerate the plan with error context.
+func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.AgentTeamAssignment, run *model.AgentTeamRun, reason string) {
+	// Parse fault escalation metadata from reason.
+	// Format: "[fault_escalation] retries=N maxRetries=M error=..."
+	escalationCtx := parseFaultEscalationReason(reason)
+
+	members, err := repository.ListTeamMembers(s.db, run.TeamID)
+	if err != nil {
+		slog.Error("fault escalation: failed to list team members", "teamRunId", run.ID, "err", err)
+		return
+	}
+
+	// Find the supervisor for AI review.
+	var supervisor *model.AgentTeamMember
+	for i := range members {
+		if members[i].Role == model.TeamMemberRoleSupervisor {
+			supervisor = &members[i]
+			break
+		}
+	}
+
+	// Layer 2: AI review — the supervisor analyzes the error and decides next steps.
+	reviewInstructions := fmt.Sprintf(
+		"Fault escalation: review the following run failure and decide next steps.\n\n"+
+			"Failed assignment: %s\n"+
+			"Error context: %s\n"+
+			"Retry count: %s (max: %s)\n\n"+
+			"Actions:\n"+
+			"- If the error is recoverable (e.g., fixable bug), suggest a fix and reassign.\n"+
+			"- If a different agent would be better suited, suggest reassignment.\n"+
+			"- If the error is not recoverable, respond with action=finish and blocked_reason.",
+		a.ID, escalationCtx["error"], escalationCtx["retries"], escalationCtx["maxRetries"],
+	)
+
+	// Create a review decision for the supervisor.
+	decision := model.CoordinatorRouteDecision{
+		Action:       "review",
+		NextWorker:   supervisor.ID,
+		Instructions: reviewInstructions,
+		Reasoning:    fmt.Sprintf("Fault escalation Layer 2 triggered: assignment %s failed after %s retries", a.ID, escalationCtx["retries"]),
+		CorrelationID: a.ID,
+	}
+
+	if _, err := s.HandleRouteDecision(ctx, run.TriggerUserID, run.TeamID, run.ID, decision); err != nil {
+		slog.Error("fault escalation: failed to create review decision", "teamRunId", run.ID, "err", err)
+		return
+	}
+
+	s.appendTeamEvent(run.ID, "team.escalation.review", map[string]any{
+		"assignment_id": a.ID,
+		"phase":         "review",
+		"error":         escalationCtx["error"],
+		"retries":       escalationCtx["retries"],
+		"maxRetries":    escalationCtx["maxRetries"],
+	})
+
+	slog.Warn("fault escalation: AI review triggered",
+		"teamRunId", run.ID,
+		"assignmentId", a.ID,
+		"retries", escalationCtx["retries"],
+	)
+}
+
+// parseFaultEscalationReason extracts structured metadata from a fault
+// escalation reason string produced by the Edge server.
+//
+// Expected format: "[fault_escalation] retries=N maxRetries=M error=..."
+func parseFaultEscalationReason(reason string) map[string]string {
+	result := map[string]string{
+		"retries":    "0",
+		"maxRetries": "1",
+		"error":      reason,
+	}
+	// Strip prefix.
+	if idx := strings.Index(reason, "[fault_escalation]"); idx >= 0 {
+		rest := reason[idx+len("[fault_escalation]"):]
+		for _, part := range strings.Fields(rest) {
+			if kv := strings.SplitN(part, "=", 2); len(kv) == 2 {
+				result[kv[0]] = kv[1]
+			}
+		}
+	}
+	return result
 }
 
 func (s *AgentTeamService) ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error) {
