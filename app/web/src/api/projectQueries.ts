@@ -14,7 +14,7 @@ import type {
 } from './hubClient';
 
 export const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
-export const workspaceProjectThreadsQueryKey = ['hub', 'projects'] as const;
+export const workspaceProjectThreadsQueryKey = hubQueryKeys.projects.root;
 
 const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   items: [],

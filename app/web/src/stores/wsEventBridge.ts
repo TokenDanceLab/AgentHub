@@ -79,12 +79,36 @@ function onMessageNew(qc: QueryClient, payload: unknown) {
   }
 }
 
+function onMessageEdited(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; message_id?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
+  }
+}
+
 function onMessageRecall(qc: QueryClient, payload: unknown) {
   const data = payload as { session_id?: string; id?: string; message_id?: string };
   const sessionId = str(data?.session_id);
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
   }
+}
+
+function onMessagePin(_qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+}
+
+function onMessageUnpin(_qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+}
+
+function onMessageReactionAdded(_qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+}
+
+function onMessageReactionRemoved(_qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
 }
 
 function onMessageRead(_qc: QueryClient, _payload: unknown) {
@@ -104,6 +128,14 @@ function onSessionDissolved(qc: QueryClient, payload: unknown) {
     invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
   }
+  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+}
+
+function onSessionMemberJoined(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+}
+
+function onSessionMemberLeft(qc: QueryClient, _payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
@@ -210,6 +242,47 @@ function onAgentRegenerate(qc: QueryClient, payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
+function onAgentControl(_qc: QueryClient, _payload: unknown) {
+  // Agent control events (permission decisions from Hub relay)
+  // are processed by useHubIntegration — no cache invalidation needed
+}
+
+// ── Plan approval events ──────────────────────────────────────
+
+function onPlanProposed(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onPlanApproved(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onPlanRejected(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onPlanExpired(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+// ── Team run events ────────────────────────────────────────────
+
+function onTeamRunStarted(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onTeamEvent(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onTeamAssignmentDone(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
+function onTeamAssignmentFailed(qc: QueryClient, _payload: unknown) {
+  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
+}
+
 function onNotificationNew(qc: QueryClient, _payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.notifications.root);
 }
@@ -246,16 +319,24 @@ type WSEventHandler = (qc: QueryClient, payload: unknown) => void;
 
 const EVENT_HANDLERS: Record<string, WSEventHandler> = {
   [HUB_EVENTS.MESSAGE_NEW]: onMessageNew,
+  [HUB_EVENTS.MESSAGE_EDITED]: onMessageEdited,
   [HUB_EVENTS.MESSAGE_RECALL]: onMessageRecall,
+  [HUB_EVENTS.MESSAGE_PIN]: onMessagePin,
+  [HUB_EVENTS.MESSAGE_UNPIN]: onMessageUnpin,
+  [HUB_EVENTS.MESSAGE_REACTION_ADDED]: onMessageReactionAdded,
+  [HUB_EVENTS.MESSAGE_REACTION_REMOVED]: onMessageReactionRemoved,
   [HUB_EVENTS.MESSAGE_READ]: onMessageRead,
   [HUB_EVENTS.SESSION_CREATED]: onSessionCreated,
   [HUB_EVENTS.SESSION_DISSOLVED]: onSessionDissolved,
+  [HUB_EVENTS.SESSION_MEMBER_JOINED]: onSessionMemberJoined,
+  [HUB_EVENTS.SESSION_MEMBER_LEFT]: onSessionMemberLeft,
   [HUB_EVENTS.SESSION_INFO_UPDATED]: onSessionInfoUpdated,
   [HUB_EVENTS.AGENT_DISPATCH]: onAgentDispatch,
   [HUB_EVENTS.AGENT_STREAM]: onAgentStream,
   [HUB_EVENTS.AGENT_DONE]: onAgentDone,
   [HUB_EVENTS.AGENT_FAILED]: onAgentFailed,
   [HUB_EVENTS.AGENT_CANCEL]: onAgentCancel,
+  [HUB_EVENTS.AGENT_CONTROL]: onAgentControl,
   [HUB_EVENTS.AGENT_REGENERATE]: onAgentRegenerate,
   [HUB_EVENTS.NOTIFICATION_NEW]: onNotificationNew,
   [HUB_EVENTS.FRIEND_REQUEST]: onFriendRequest,
@@ -263,6 +344,14 @@ const EVENT_HANDLERS: Record<string, WSEventHandler> = {
   [HUB_EVENTS.DEVICE_ONLINE]: onDeviceOnline,
   [HUB_EVENTS.DEVICE_OFFLINE]: onDeviceOffline,
   [HUB_EVENTS.DEVICE_KICKED]: onDeviceKicked,
+  [HUB_EVENTS.PLAN_PROPOSED]: onPlanProposed,
+  [HUB_EVENTS.PLAN_APPROVED]: onPlanApproved,
+  [HUB_EVENTS.PLAN_REJECTED]: onPlanRejected,
+  [HUB_EVENTS.PLAN_EXPIRED]: onPlanExpired,
+  [HUB_EVENTS.TEAM_RUN_STARTED]: onTeamRunStarted,
+  [HUB_EVENTS.TEAM_EVENT]: onTeamEvent,
+  [HUB_EVENTS.TEAM_ASSIGNMENT_DONE]: onTeamAssignmentDone,
+  [HUB_EVENTS.TEAM_ASSIGNMENT_FAILED]: onTeamAssignmentFailed,
 };
 
 // ── Public API ───────────────────────────────────────────────────

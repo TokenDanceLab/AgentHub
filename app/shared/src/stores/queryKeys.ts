@@ -114,6 +114,16 @@ export const hubQueryKeys = {
     root: ['hub', 'relay-commands'] as const,
     detail: (commandId: string) => ['hub', 'relay-commands', commandId] as const,
   },
+
+  // Runs (Hub-originated — web preview runs, workspace runs)
+  runs: {
+    root: ['hub', 'runs'] as const,
+    all: (projectId?: string, threadId?: string) =>
+      projectId || threadId
+        ? (['hub', 'runs', projectId ?? '', threadId ?? ''] as const)
+        : (['hub', 'runs'] as const),
+    detail: (runId: string) => ['hub', 'runs', 'detail', runId] as const,
+  },
 } as const;
 
 // ── Edge (local desktop) query key factory ─────────────────────────

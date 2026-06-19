@@ -28,13 +28,13 @@ func GetAgentInstanceByID(db *gorm.DB, id string) (*model.AgentInstance, error) 
 
 func ListAgentInstancesBySession(db *gorm.DB, sessionID string) ([]model.AgentInstance, error) {
 	var agents []model.AgentInstance
-	err := db.Where("session_id = ?", sessionID).Find(&agents).Error
+	err := db.Where("session_id = ?", sessionID).Limit(200).Find(&agents).Error
 	return agents, err
 }
 
 func ListAgentInstancesByInviter(db *gorm.DB, sessionID, inviterID string) ([]model.AgentInstance, error) {
 	var agents []model.AgentInstance
-	err := db.Where("session_id = ? AND inviter_user_id = ?", sessionID, inviterID).Find(&agents).Error
+	err := db.Where("session_id = ? AND inviter_user_id = ?", sessionID, inviterID).Limit(100).Find(&agents).Error
 	return agents, err
 }
 
@@ -264,6 +264,11 @@ func ListAgentRunEventsByTaskIDFiltered(db *gorm.DB, taskID string, filter model
 	return events, err
 }
 
+// maxAgentRunEventsPerBatch caps the total events returned by
+// ListAgentRunEventsByTaskIDs to prevent unbounded memory consumption when
+// many tasks each have many events.
+const maxAgentRunEventsPerBatch = 50000
+
 func ListAgentRunEventsByTaskIDs(db *gorm.DB, taskIDs []string) ([]model.AgentRunEvent, error) {
 	var events []model.AgentRunEvent
 	if len(taskIDs) == 0 {
@@ -271,6 +276,7 @@ func ListAgentRunEventsByTaskIDs(db *gorm.DB, taskIDs []string) ([]model.AgentRu
 	}
 	err := db.Where("task_id IN ?", taskIDs).
 		Order("task_id ASC, event_seq ASC, created_at ASC, id ASC").
+		Limit(maxAgentRunEventsPerBatch).
 		Find(&events).Error
 	return events, err
 }
