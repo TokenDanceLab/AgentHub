@@ -73,17 +73,17 @@
 | ID | 亮点 | 验证 |
 |---|---|---|
 | AH-SR-020 | Edge 回调绑定 user_id+device_id+edge_run_id，错用户/错设备被拒 | `edge_callback_security_test.go` |
-| AH-SR-021/022 | 附件/消息 pin 校验 session 归属，跨 session 被拒；复合 FK 已部署 hk2 | `message_pin_security_test.go` |
+| AH-SR-021/022 | 附件/消息 pin 校验 session 归属，跨 session 被拒；复合 FK 已部署至生产 | `message_pin_security_test.go` |
 | AH-SR-023 | Execution Target 的 Get/Ping 校验 owner；dispatch 按 target owner device 路由，不回退 | `agent_test.go` |
 | AH-SR-034 | Profile/Skill/MCP/Target CRUD 校验 owner，跨 owner 写读返回 403 | 各 handler test |
 
-### 🟢 部署加固（已部署 hk2）
+### 🟢 部署加固（已部署至生产）
 
 | ID | 亮点 | 验证 |
 |---|---|---|
-| AH-SR-030 | CORS 锁定显式 origin，移除 wildcard 反射 | hk2 生产 smoke |
+| AH-SR-030 | CORS 锁定显式 origin，移除 wildcard 反射 | 生产 smoke |
 | AH-SR-031 | 限流中间件部署于 auth/token/API，per-IP bucket | `ratelimit.go` |
-| AH-SR-016 | 生产环境 loopback/localhost origin 启动即失败 | hk2 smoke |
+| AH-SR-016 | 生产环境 loopback/localhost origin 启动即失败 | 生产 smoke |
 | AH-SR-017 | admin pprof/metrics 独立 loopback 监听 + Basic Auth，公共路由返回 JSON 404 | 公共 404 验证 |
 
 ### 🔵 运行时安全
@@ -101,7 +101,7 @@
 |---|---|---|
 | 风险条目数 | 44+ 条 | 8 条 |
 | 每条证据 | 代码行号 + 测试命令 + 生产部署状态 | 风险等级 + 理论建议 |
-| 部署验证 | hk2 生产 smoke 多条已验证 | 多为理论 |
+| 部署验证 | 生产 smoke 多条已验证 | 多为理论 |
 | 审批执行 | permission_requested 一次性注册表 + 三级模式 | 无权限系统或后端逻辑 |
 
 ## 已知的待闭环项（诚实标注）

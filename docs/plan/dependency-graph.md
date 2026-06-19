@@ -12,7 +12,7 @@ graph TB
         T003[T003: error leak fix]
         T004[T004: Redis healthcheck leak]
         T005[T005: dev_password strip]
-        T006[T006: hk2 compose→override]
+        T006[T006: production compose→override]
         T007[T007: rate limiter fail-open]
         T008[T008: WS auth.ok race]
         T009[T009: OIDC redirect_uri validation]
