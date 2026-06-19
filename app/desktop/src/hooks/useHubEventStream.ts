@@ -68,6 +68,16 @@ function readSessionId(payload: unknown): string | undefined {
   return readString(rec.session_id) ?? readString(rec.sessionId);
 }
 
+// ── Debounce (high-frequency events) ──────────────
+
+const DEBOUNCE_MS = 50;
+
+/** Hub WS event types that fire at high frequency and should be debounced. */
+const DEBOUNCED_EVENT_TYPES = new Set<string>([
+  HUB_EVENTS.AGENT_STREAM,
+  HUB_EVENTS.TEAM_EVENT,
+]);
+
 // ── Hook ────────────────────────────────────────
 
 export function useHubEventStream(
@@ -111,9 +121,55 @@ export function useHubEventStream(
       }
     });
 
+    // ── High-frequency event debounce ─────────────────
+    const pendingByType = new Map<string, unknown>();
+    const timersByType = new Map<string, ReturnType<typeof setTimeout>>();
+
+    function flushDebounced(type: string) {
+      timersByType.delete(type);
+      const payload = pendingByType.get(type);
+      pendingByType.delete(type);
+
+      switch (type) {
+        case HUB_EVENTS.AGENT_STREAM:
+          if (payload) {
+            const taskId = readString(payload, 'task_id', 'taskId');
+            if (taskId) {
+              setLastAgentTask({
+                task_id: taskId,
+                session_id: readString(payload, 'session_id', 'sessionId') ?? '',
+                agent_instance_id: readString(payload, 'agent_instance_id', 'agentInstanceId') ?? '',
+                status: 'running',
+                content: readString(payload, 'content'),
+              } as HubAgentTask);
+            }
+          }
+          break;
+        case HUB_EVENTS.TEAM_EVENT:
+          if (payload) {
+            setLastSessionEvent({ type, payload });
+          }
+          break;
+      }
+    }
+
+    function enqueueHighFreq(type: string, payload: unknown) {
+      pendingByType.set(type, payload);
+      if (!timersByType.has(type)) {
+        timersByType.set(type, setTimeout(() => flushDebounced(type), DEBOUNCE_MS));
+      }
+    }
+
+    // ── Any-event handler ────────────────────────────
     const unsubAny = handle.onAny((type: string, payload: unknown) => {
       const frame: HubFrame = { type, payload };
       setLastFrame(frame);
+
+      // High-frequency events are debounced; skip immediate processing.
+      if (DEBOUNCED_EVENT_TYPES.has(type)) {
+        enqueueHighFreq(type, payload);
+        return;
+      }
 
       switch (type) {
         // ── Message events ──────────────────────
@@ -191,23 +247,6 @@ export function useHubEventStream(
           if (payload) setLastAgentTask(payload as HubAgentTask);
           break;
 
-        case HUB_EVENTS.AGENT_STREAM:
-          // Streaming content — track for active task context
-          if (payload) {
-            const taskId = readString(payload, 'task_id', 'taskId');
-            if (taskId) {
-              // Forward agent.stream payload so consumers can track streaming state
-              setLastAgentTask({
-                task_id: taskId,
-                session_id: readString(payload, 'session_id', 'sessionId') ?? '',
-                agent_instance_id: readString(payload, 'agent_instance_id', 'agentInstanceId') ?? '',
-                status: 'running',
-                content: readString(payload, 'content'),
-              } as HubAgentTask);
-            }
-          }
-          break;
-
         case HUB_EVENTS.AGENT_CONTROL:
           // Agent control events (e.g. permission decisions from Hub relay)
           // Processed by useHubIntegration — no state update needed here
@@ -283,7 +322,6 @@ export function useHubEventStream(
 
         // ── Team run events ────────────────────
         case HUB_EVENTS.TEAM_RUN_STARTED:
-        case HUB_EVENTS.TEAM_EVENT:
         case HUB_EVENTS.TEAM_ASSIGNMENT_DONE:
         case HUB_EVENTS.TEAM_ASSIGNMENT_FAILED:
           // Team run lifecycle — update the task bridge for team consumers
@@ -321,6 +359,9 @@ export function useHubEventStream(
     handle.connect();
 
     return () => {
+      for (const timer of timersByType.values()) clearTimeout(timer);
+      timersByType.clear();
+      pendingByType.clear();
       unsubStatus();
       unsubAny();
       bridgeHandleRef.current?.destroy();
