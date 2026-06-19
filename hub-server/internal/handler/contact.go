@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,8 @@ func (h *ContactHandler) SearchUser(c *gin.Context) {
 	}
 	result, err := h.service.SearchUser(c.Request.Context(), userID, targetID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -63,7 +65,8 @@ func (h *ContactHandler) SendFriendRequest(c *gin.Context) {
 	}
 	userID := c.GetString("user_id")
 	if err := h.service.SendFriendRequest(c.Request.Context(), userID, req.FriendID, req.Message); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -77,7 +80,8 @@ func (h *ContactHandler) ListFriendRequests(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListFriendRequests(c.Request.Context(), userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -91,7 +95,8 @@ func (h *ContactHandler) AcceptFriendRequest(c *gin.Context) {
 	userID := c.GetString("user_id")
 	requestID := c.Param("id")
 	if err := h.service.AcceptFriendRequest(c.Request.Context(), userID, requestID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -105,7 +110,8 @@ func (h *ContactHandler) RejectFriendRequest(c *gin.Context) {
 	userID := c.GetString("user_id")
 	requestID := c.Param("id")
 	if err := h.service.RejectFriendRequest(c.Request.Context(), userID, requestID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -119,7 +125,8 @@ func (h *ContactHandler) ListContacts(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListContacts(c.Request.Context(), userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -133,7 +140,8 @@ func (h *ContactHandler) RemoveContact(c *gin.Context) {
 	userID := c.GetString("user_id")
 	friendID := c.Param("user_id")
 	if err := h.service.RemoveContact(c.Request.Context(), userID, friendID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -147,7 +155,8 @@ func (h *ContactHandler) BlockContact(c *gin.Context) {
 	userID := c.GetString("user_id")
 	targetID := c.Param("user_id")
 	if err := h.service.BlockContact(c.Request.Context(), userID, targetID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -161,7 +170,8 @@ func (h *ContactHandler) UnblockContact(c *gin.Context) {
 	userID := c.GetString("user_id")
 	targetID := c.Param("user_id")
 	if err := h.service.UnblockContact(c.Request.Context(), userID, targetID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -184,7 +194,8 @@ func (h *ContactHandler) UpdateRemark(c *gin.Context) {
 	userID := c.GetString("user_id")
 	friendID := c.Param("user_id")
 	if err := h.service.UpdateRemark(c.Request.Context(), userID, friendID, req.Remark); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

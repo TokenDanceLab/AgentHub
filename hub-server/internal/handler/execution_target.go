@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -209,7 +210,8 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), userID, target)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -227,7 +229,8 @@ func (h *ExecutionTargetHandler) GetTarget(c *gin.Context) {
 	userID := c.GetString("user_id")
 	target, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -251,7 +254,8 @@ func (h *ExecutionTargetHandler) ListTargets(c *gin.Context) {
 
 	result, err := h.service.List(c.Request.Context(), userID, targetType, cursor, pageSize)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -307,7 +311,8 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 
 	target, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -322,7 +327,8 @@ func (h *ExecutionTargetHandler) DeleteTarget(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -337,7 +343,8 @@ func (h *ExecutionTargetHandler) PingTarget(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Ping(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

@@ -25,12 +25,6 @@ func (m *mockMsgCache) AllocateSeq(ctx context.Context, sessionID string) (int64
 	return m.seq, m.err
 }
 
-func newTestBus(t *testing.T) *Bus {
-	t.Helper()
-	bus := NewBus()
-	t.Cleanup(bus.Close)
-	return bus
-}
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains from newMockDB)
 const (

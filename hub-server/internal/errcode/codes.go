@@ -86,4 +86,5 @@ var (
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)
 
 		ErrUnauthorized = sharederr.ErrUnauthorized
+	ErrForbidden    = sharederr.ErrForbidden
 )

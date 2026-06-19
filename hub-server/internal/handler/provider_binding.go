@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -81,7 +82,8 @@ func (h *ProviderBindingHandler) Create(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), userID, pb)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -103,7 +105,8 @@ func (h *ProviderBindingHandler) Update(c *gin.Context) {
 
 	pb, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -118,7 +121,8 @@ func (h *ProviderBindingHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

@@ -235,7 +235,10 @@ func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -286,7 +289,10 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -328,7 +334,10 @@ func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 		mgr.Unregister(accepterConn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -372,7 +381,10 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -432,7 +444,10 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -514,7 +529,10 @@ func TestStartEventSubscriptionsPushesAgentTeamRunStartedToUserWithoutSession(t 
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -553,7 +571,10 @@ func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{mgr: mgr, bus: bus}
@@ -648,7 +669,10 @@ func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 
 	a := &App{
@@ -926,7 +950,10 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_run_id, edge_device_id, finished_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"task-timeout-race", "agent-1", "user-1", "msg-1", model.TaskStatusDone, "run-1", "dev-1", finishedAt, time.Now().Add(-time.Hour)).Error)
 
-	bus := service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 	timeoutEvents := make(chan service.Event, 1)
 	bus.Subscribe("agent.timeout", func(ctx context.Context, event service.Event) {
