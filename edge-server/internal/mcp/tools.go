@@ -3,13 +3,13 @@ package mcp
 import (
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -203,7 +203,7 @@ func (s *Server) callTool(name string, args json.RawMessage) (json.RawMessage, e
 // toolListProjects implements the list_projects tool.
 func (s *Server) toolListProjects(_ json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 	projects := s.store.ListProjects()
 	result := map[string]any{
@@ -216,7 +216,7 @@ func (s *Server) toolListProjects(_ json.RawMessage) (json.RawMessage, error) {
 // toolListThreads implements the list_threads tool.
 func (s *Server) toolListThreads(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 	var params struct {
 		ProjectID string `json:"projectId"`
@@ -225,7 +225,7 @@ func (s *Server) toolListThreads(args json.RawMessage) (json.RawMessage, error) 
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.ProjectID == "" {
-		return nil, errors.New("projectId is required")
+		return nil, errcode.ErrProjectIDRequired
 	}
 
 	// Verify project exists
@@ -244,7 +244,7 @@ func (s *Server) toolListThreads(args json.RawMessage) (json.RawMessage, error) 
 // toolGetThread implements the get_thread tool.
 func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 	var params struct {
 		ThreadID string `json:"threadId"`
@@ -253,7 +253,7 @@ func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.ThreadID == "" {
-		return nil, errors.New("threadId is required")
+		return nil, errcode.ErrThreadIDRequired
 	}
 
 	thread, ok := s.store.GetThread(params.ThreadID)
@@ -293,10 +293,10 @@ func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 // toolStartRun implements the start_run tool.
 func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 	if s.executor == nil {
-		return nil, errors.New("executor not configured")
+		return nil, errcode.ErrExecutorNotConfigured
 	}
 
 	var params struct {
@@ -311,20 +311,20 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.ProjectID == "" {
-		return nil, errors.New("projectId is required")
+		return nil, errcode.ErrProjectIDRequired
 	}
 	if params.ThreadID == "" {
-		return nil, errors.New("threadId is required")
+		return nil, errcode.ErrThreadIDRequired
 	}
 	if strings.TrimSpace(params.Prompt) == "" {
-		return nil, errors.New("prompt is required")
+		return nil, errcode.ErrPromptRequired
 	}
 
 	// Validate workDir against workspace allowlist (AH-SR-006).
 	// This mirrors the REST API validation in Handler.validateWorkDirAllowed.
 	if params.WorkDir != "" {
 		if len(s.workspaceAllowlist) == 0 {
-			return nil, errors.New("workspace allowlist is not configured; cannot accept workDir")
+			return nil, errcode.ErrWorkspaceAllowlistNotConfigured
 		}
 		allowed := false
 		candidate, err := filepath.Abs(params.WorkDir)
@@ -354,7 +354,7 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 			}
 		}
 		if !allowed {
-			return nil, errors.New("workDir is outside the Edge workspace allowlist")
+			return nil, errcode.ErrWorkspaceNotAllowed
 		}
 	}
 
@@ -449,7 +449,7 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 // toolGetRunStatus implements the get_run_status tool.
 func (s *Server) toolGetRunStatus(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 	var params struct {
 		RunID string `json:"runId"`
@@ -458,7 +458,7 @@ func (s *Server) toolGetRunStatus(args json.RawMessage) (json.RawMessage, error)
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.RunID == "" {
-		return nil, errors.New("runId is required")
+		return nil, errcode.ErrRunIDRequired
 	}
 
 	run, ok := s.store.GetRun(params.RunID)
@@ -481,7 +481,7 @@ func (s *Server) toolGetRunStatus(args json.RawMessage) (json.RawMessage, error)
 // toolApproveAction implements the approve_action tool.
 func (s *Server) toolApproveAction(args json.RawMessage) (json.RawMessage, error) {
 	if s.permissionRegistry == nil {
-		return nil, errors.New("permission registry not configured")
+		return nil, errcode.ErrPermissionRegistryNotConfigured
 	}
 
 	var params struct {
@@ -494,13 +494,13 @@ func (s *Server) toolApproveAction(args json.RawMessage) (json.RawMessage, error
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.RunID == "" {
-		return nil, errors.New("runId is required")
+		return nil, errcode.ErrRunIDRequired
 	}
 	if params.RequestID == "" {
-		return nil, errors.New("requestId is required")
+		return nil, errcode.ErrRequestIDRequired
 	}
 	if params.Decision != "allow" && params.Decision != "deny" {
-		return nil, errors.New("decision must be 'allow' or 'deny'")
+		return nil, errcode.ErrInvalidDecision
 	}
 
 	permission, ok := s.permissionRegistry.Consume(params.RunID, params.RequestID)
@@ -540,7 +540,7 @@ func (s *Server) toolApproveAction(args json.RawMessage) (json.RawMessage, error
 // toolCancelRun implements the cancel_run tool.
 func (s *Server) toolCancelRun(args json.RawMessage) (json.RawMessage, error) {
 	if s.executor == nil {
-		return nil, errors.New("executor not configured")
+		return nil, errcode.ErrExecutorNotConfigured
 	}
 
 	var params struct {
@@ -550,7 +550,7 @@ func (s *Server) toolCancelRun(args json.RawMessage) (json.RawMessage, error) {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.RunID == "" {
-		return nil, errors.New("runId is required")
+		return nil, errcode.ErrRunIDRequired
 	}
 
 	cancelResult := s.executor.Cancel(params.RunID)
@@ -568,7 +568,7 @@ func (s *Server) toolCancelRun(args json.RawMessage) (json.RawMessage, error) {
 // toolSendMessage implements the send_message tool.
 func (s *Server) toolSendMessage(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
-		return nil, errors.New("store not configured")
+		return nil, errcode.ErrStoreNotConfigured
 	}
 
 	var params struct {
@@ -580,10 +580,10 @@ func (s *Server) toolSendMessage(args json.RawMessage) (json.RawMessage, error) 
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.ThreadID == "" {
-		return nil, errors.New("threadId is required")
+		return nil, errcode.ErrThreadIDRequired
 	}
 	if strings.TrimSpace(params.Content) == "" {
-		return nil, errors.New("content is required")
+		return nil, errcode.ErrContentRequired
 	}
 
 	// Verify thread exists
@@ -597,7 +597,7 @@ func (s *Server) toolSendMessage(args json.RawMessage) (json.RawMessage, error) 
 		role = "user"
 	}
 	if role != "user" && role != "system" {
-		return nil, errors.New("role must be 'user' or 'system'")
+		return nil, errcode.ErrInvalidRole
 	}
 
 	itemID := generateID("item_")

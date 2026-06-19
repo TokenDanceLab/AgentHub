@@ -3,20 +3,86 @@ package middleware
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestAccessLogCapturesExplicitStatusAndRequestID(t *testing.T) {
+func TestNewRequestID(t *testing.T) {
+	id := NewRequestID()
+	if !strings.HasPrefix(id, "req_") {
+		t.Fatalf("NewRequestID = %q, want req_ prefix", id)
+	}
+	id2 := NewRequestID()
+	if id == id2 {
+		t.Fatal("NewRequestID returned duplicate IDs")
+	}
+}
+
+func TestWithGetRequestID(t *testing.T) {
+	ctx := WithRequestID(context.Background(), "req_test123")
+	if got := GetRequestID(ctx); got != "req_test123" {
+		t.Fatalf("GetRequestID = %q, want req_test123", got)
+	}
+	if got := GetRequestID(context.Background()); got != "" {
+		t.Fatalf("GetRequestID(nil) = %q, want empty", got)
+	}
+}
+
+func TestAccessLogGeneratesRequestIDWhenNoHeader(t *testing.T) {
 	var logs bytes.Buffer
 	restore := installTestLogger(&logs)
 	defer restore()
 
-	handler := AccessLog(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	var capturedID string
+	handler := AccessLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedID = GetRequestID(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/1", nil)
+	req.RemoteAddr = "127.0.0.1:4567"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+
+	// Request ID must be auto-generated and injected into context.
+	if !strings.HasPrefix(capturedID, "req_") {
+		t.Fatalf("captured request ID = %q, want req_ prefix", capturedID)
+	}
+
+	// Response must include X-Request-ID header.
+	respID := rec.Header().Get("X-Request-ID")
+	if respID != capturedID {
+		t.Fatalf("response X-Request-ID = %q, want %q", respID, capturedID)
+	}
+
+	// Log entry must include request_id.
+	entry := decodeLogEntry(t, logs.Bytes())
+	if entry["msg"] != "access" {
+		t.Fatalf("msg = %v, want access", entry["msg"])
+	}
+	if entry["request_id"] != capturedID {
+		t.Fatalf("request_id = %v, want %v", entry["request_id"], capturedID)
+	}
+}
+
+func TestAccessLogPropagatesRequestIDFromHeader(t *testing.T) {
+	var logs bytes.Buffer
+	restore := installTestLogger(&logs)
+	defer restore()
+
+	var capturedID string
+	handler := AccessLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedID = GetRequestID(r.Context())
 		w.WriteHeader(http.StatusTeapot)
 		_, _ = w.Write([]byte("short and stout"))
 	}))
@@ -25,12 +91,22 @@ func TestAccessLogCapturesExplicitStatusAndRequestID(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1:4567"
 	req.Header.Set("X-Request-ID", "req-test")
 	rec := httptest.NewRecorder()
-
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusTeapot {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusTeapot)
 	}
+
+	// Context must contain the propagated request ID.
+	if capturedID != "req-test" {
+		t.Fatalf("captured request ID = %q, want req-test", capturedID)
+	}
+
+	// Response header must echo the incoming request ID.
+	if got := rec.Header().Get("X-Request-ID"); got != "req-test" {
+		t.Fatalf("response X-Request-ID = %q, want req-test", got)
+	}
+
 	entry := decodeLogEntry(t, logs.Bytes())
 	if entry["msg"] != "access" {
 		t.Fatalf("msg = %v, want access", entry["msg"])
@@ -45,14 +121,14 @@ func TestAccessLogCapturesExplicitStatusAndRequestID(t *testing.T) {
 		t.Fatalf("status = %v, want %d", entry["status"], http.StatusTeapot)
 	}
 	if entry["remote_addr"] != "127.0.0.1:4567" {
-		t.Fatalf("remote_addr = %v, want request remote addr", entry["remote_addr"])
+		t.Fatalf("remote_addr = %v, want 127.0.0.1:4567", entry["remote_addr"])
 	}
 	if entry["request_id"] != "req-test" {
 		t.Fatalf("request_id = %v, want req-test", entry["request_id"])
 	}
 }
 
-func TestAccessLogDefaultsStatusOKWhenHandlerWritesBody(t *testing.T) {
+func TestAccessLogAlwaysIncludesRequestIDWhenNoHeader(t *testing.T) {
 	var logs bytes.Buffer
 	restore := installTestLogger(&logs)
 	defer restore()
@@ -63,18 +139,29 @@ func TestAccessLogDefaultsStatusOKWhenHandlerWritesBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
-
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
+
 	entry := decodeLogEntry(t, logs.Bytes())
 	if entry["status"] != float64(http.StatusOK) {
 		t.Fatalf("logged status = %v, want %d", entry["status"], http.StatusOK)
 	}
-	if _, ok := entry["request_id"]; ok {
-		t.Fatalf("request_id logged for request without header: %v", entry["request_id"])
+
+	// request_id must always be present, even when no X-Request-ID header is sent.
+	reqID, ok := entry["request_id"].(string)
+	if !ok || reqID == "" {
+		t.Fatalf("request_id missing or empty: %v", entry["request_id"])
+	}
+	if !strings.HasPrefix(reqID, "req_") {
+		t.Fatalf("request_id = %q, want req_ prefix", reqID)
+	}
+
+	// Response header must also be set.
+	if got := rec.Header().Get("X-Request-ID"); got != reqID {
+		t.Fatalf("response X-Request-ID = %q, want %q", got, reqID)
 	}
 }
 

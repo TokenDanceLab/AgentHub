@@ -458,7 +458,7 @@ func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string)
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			if !security.IsAllowedOrigin(origin, remoteMode, allowedOrigins) {
-				sharederr.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrForbidden.WithMessage("forbidden origin")))
+				sharederr.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(sharederr.ErrForbidden.WithMessage("forbidden origin")))
 				return
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -518,7 +518,7 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 		}
 
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agenthub-edge"`)
-		http.Error(w, "unauthorized\n", http.StatusUnauthorized)
+		sharederr.WriteJSON(w, http.StatusUnauthorized, errcode.ErrorBody(sharederr.ErrUnauthorized))
 	})
 }
 

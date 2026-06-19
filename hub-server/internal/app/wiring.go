@@ -75,7 +75,11 @@ func (a *App) Run(ctx context.Context) error {
 	a.setupWSManager()
 
 	// Event bus
-	a.bus = service.NewBus()
+	bus, err := service.NewBus()
+	if err != nil {
+		return fmt.Errorf("event bus init failed: %w", err)
+	}
+	a.bus = bus
 
 	// Service layer
 	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
@@ -190,7 +194,10 @@ func (a *App) Run(ctx context.Context) error {
 	a.PublicHandler = handler.NewPublicHandler(a.DB, a.startTime)
 
 	// Router
-	r := a.setupRouter()
+	r, err := a.setupRouter()
+	if err != nil {
+		return err
+	}
 
 	// Event subscriptions
 	a.startEventSubscriptions(a.coreCtx)
