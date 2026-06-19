@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"encoding/json"
 	"time"
 
@@ -75,7 +76,8 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 
 	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -167,7 +169,8 @@ func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 
 	device, err := h.deviceService.Register(deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

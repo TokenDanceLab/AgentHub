@@ -9,7 +9,10 @@ import (
 )
 
 func BenchmarkEventBusPublish(b *testing.B) {
-	bus := NewBus()
+	bus, err := NewBus()
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer bus.Close()
 
 	// Subscribe a no-op handler to make the benchmark realistic.

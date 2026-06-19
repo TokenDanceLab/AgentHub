@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -66,7 +67,8 @@ func (h *MCPServerHandler) CreateMCPServer(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), userID, srv)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -81,7 +83,8 @@ func (h *MCPServerHandler) GetMCPServer(c *gin.Context) {
 	userID := c.GetString("user_id")
 	srv, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -121,7 +124,8 @@ func (h *MCPServerHandler) ListMCPServers(c *gin.Context) {
 
 	result, err := h.service.List(c.Request.Context(), userID, q, transport, cursor, pageSize)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -146,7 +150,8 @@ func (h *MCPServerHandler) UpdateMCPServer(c *gin.Context) {
 
 	srv, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -161,7 +166,8 @@ func (h *MCPServerHandler) DeleteMCPServer(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -176,7 +182,8 @@ func (h *MCPServerHandler) PublishMCPServer(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -191,7 +198,8 @@ func (h *MCPServerHandler) UnpublishMCPServer(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Unpublish(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

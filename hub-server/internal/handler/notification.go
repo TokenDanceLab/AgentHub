@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -53,7 +54,8 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 
 	result, err := h.service.ListNotifications(c.Request.Context(), userID, unreadOnly, limit, offset)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -69,7 +71,8 @@ func (h *NotificationHandler) MarkRead(c *gin.Context) {
 	notifID := c.Param("id")
 
 	if err := h.service.MarkRead(c.Request.Context(), userID, notifID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -83,7 +86,8 @@ func (h *NotificationHandler) ReadAll(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.MarkAllRead(c.Request.Context(), userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

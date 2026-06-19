@@ -476,7 +476,10 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
 	svc := NewAgentTeamService(db, agentSvc, nil)
-	bus := NewBus()
+	bus, err := NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 	events := make(chan Event, 1)
 	bus.Subscribe("team.run.started", func(ctx context.Context, event Event) {
@@ -608,7 +611,10 @@ func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus := NewBus()
+	bus, err := NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 	events := make(chan Event, 1)
 	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event Event) {
@@ -642,7 +648,10 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus := NewBus()
+	bus, err := NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(bus.Close)
 	events := make(chan Event, 1)
 	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event Event) {
