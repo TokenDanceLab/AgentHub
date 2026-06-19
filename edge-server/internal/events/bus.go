@@ -146,7 +146,7 @@ func WithEventLogPath(path string) BusOption {
 		log, err := NewEventLog(path)
 		if err != nil {
 			slog.Error("failed to open event log, events will not be persisted to disk",
-				"path", path, "err", err)
+				"path", path, "error", err)
 			return
 		}
 		b.eventLog = log
@@ -228,7 +228,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	if b.persistFn != nil && b.shouldPersist(eventType) {
 		if err := b.persistFn(evt); err != nil {
 			slog.Error("event bus persist failed, dropping event",
-				"type", eventType, "seq", seq, "err", err)
+				"type", eventType, "seq", seq, "error", err)
 			// Return a minimal envelope so callers can detect the failure.
 			return EventEnvelope{Version: "v1", Type: eventType, Seq: seq}
 		}

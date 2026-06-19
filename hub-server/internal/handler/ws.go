@@ -66,13 +66,13 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 
 	wsConn, err := websocket.Accept(c.Writer, c.Request, opts)
 	if err != nil {
-		slog.Warn("ws upgrade failed", "err", err)
+		slog.Warn("ws upgrade failed", "error", err)
 		return
 	}
 
 	conn := ws.NewConn(wsConn)
 	if err := h.manager.Register(conn); err != nil {
-		slog.Error("ws register failed", "err", err)
+		slog.Error("ws register failed", "error", err)
 		wsConn.Close(websocket.StatusInternalError, "")
 		return
 	}
@@ -103,7 +103,7 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 	for data := range conn.Send {
 		err := conn.W.Write(ctx, websocket.MessageText, data)
 		if err != nil {
-			slog.Warn("ws write error", "conn_id", conn.ID, "err", err)
+			slog.Warn("ws write error", "conn_id", conn.ID, "error", err)
 			return
 		}
 	}
@@ -117,7 +117,7 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 
 	_, data, err := conn.W.Read(ctx)
 	if err != nil {
-		slog.Info("ws auth timeout or read error", "conn_id", conn.ID, "err", err)
+		slog.Info("ws auth timeout or read error", "conn_id", conn.ID, "error", err)
 		return
 	}
 
@@ -176,7 +176,7 @@ func (h *WebSocketHandler) processIncoming(conn *ws.Conn) {
 	for {
 		_, data, err := conn.W.Read(context.Background())
 		if err != nil {
-			slog.Info("ws read error", "user_id", conn.UserID, "err", err)
+			slog.Info("ws read error", "user_id", conn.UserID, "error", err)
 			return
 		}
 

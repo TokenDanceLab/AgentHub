@@ -106,9 +106,9 @@ func main() {
 
 	var handler slog.Handler
 	if strings.ToLower(getEnv("AGENTHUB_LOG_FORMAT", "text")) == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
 	} else {
-		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
 	}
 	slog.SetDefault(slog.New(handler))
 
