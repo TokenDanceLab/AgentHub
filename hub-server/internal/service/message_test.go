@@ -991,7 +991,7 @@ func TestListPinnedMessages_Empty(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	mock.ExpectQuery(sqlmPin).
-		WithArgs("sess-1").
+		WithArgs("sess-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"session_id", "message_id", "pinned_by_user_id", "pinned_at"}))
 
 	svc := &MessageService{db: db}
@@ -1010,7 +1010,7 @@ func TestListPinnedMessages_WithPins(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	mock.ExpectQuery(sqlmPin).
-		WithArgs("sess-1").
+		WithArgs("sess-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"session_id", "message_id", "pinned_by_user_id", "pinned_at"}).
 			AddRow("sess-1", "msg-1", "user-1", time.Now()))
 
@@ -1036,7 +1036,7 @@ func TestListPinnedMessages_FiltersMessagesOutsideSession(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	mock.ExpectQuery(sqlmPin).
-		WithArgs("sess-1").
+		WithArgs("sess-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"session_id", "message_id", "pinned_by_user_id", "pinned_at"}).
 			AddRow("sess-1", "msg-1", "user-1", time.Now()).
 			AddRow("sess-1", "msg-other", "user-1", time.Now()))

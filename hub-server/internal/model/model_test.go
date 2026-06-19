@@ -735,7 +735,7 @@ func TestTableNames(t *testing.T) {
 
 func TestValidActions(t *testing.T) {
 	actions := ValidActions()
-	expected := []string{"delegate", "review", "approve", "finish"}
+	expected := []string{"delegate", "review", "approve", "compete", "finish"}
 	for _, a := range expected {
 		if !actions[a] {
 			t.Errorf("ValidActions() missing %q", a)

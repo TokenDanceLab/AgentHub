@@ -86,6 +86,9 @@ type ProcessExecutor struct {
 	// Evidence gate configuration for post-run verification.
 	evidenceGateCfg EvidenceGateConfig
 
+	// Fault escalation configuration for 3-layer recovery on run failure.
+	faultEscalationCfg FaultEscalationConfig
+
 	mu          sync.Mutex
 	running     map[string]context.CancelFunc
 	stdins      map[string]io.Writer                       // runID to stdin (for adapter-aware interrupt)
@@ -130,6 +133,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	if shutdownFT <= 0 {
 		shutdownFT = defaultShutdownForceTimeout
 	}
+	faultEscalationCfg := FaultEscalationConfigFromEnv()
 	return &ProcessExecutor{
 		bus:                       bus,
 		store:                     store,
@@ -143,6 +147,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		shutdownGracePeriod:       shutdownGP,
 		shutdownForceTimeout:      shutdownFT,
 		evidenceGateCfg:           EvidenceGateConfigFromEnv(),
+		faultEscalationCfg:        faultEscalationCfg,
 		running:     make(map[string]context.CancelFunc),
 		stdins:      make(map[string]io.Writer),
 		processes:   make(map[string]*os.Process),
@@ -755,7 +760,53 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 
-	// Exhausted retries — report the last error.
+	// Exhausted retries — attempt fault escalation if configured.
+	if lastWaitErr != nil && e.faultEscalationCfg.Enabled && e.faultEscalationCfg.MaxRetries > 0 {
+		r, ok := e.store.GetRun(run.ID)
+		if ok && r.RetryCount < e.faultEscalationCfg.MaxRetries {
+			newCount := r.RetryCount + 1
+			e.store.SetRunRetryCount(run.ID, newCount)
+			run.RetryCount = newCount
+			if _, ok2 := e.store.SetRunStatusIf(run.ID, "queued", "failed"); ok2 {
+				run.Status = "queued"
+			}
+			// Clean up process tracking.
+			e.mu.Lock()
+			delete(e.processes, run.ID)
+			if s, ok3 := e.runOutputs[run.ID]; ok3 {
+				_ = s.Close()
+				delete(e.runOutputs, run.ID)
+			}
+			e.mu.Unlock()
+			e.bus.Publish("run.fault_escalation.retry", runScope(run), map[string]any{
+				"runId":      run.ID,
+				"retryCount": newCount,
+				"maxRetries": e.faultEscalationCfg.MaxRetries,
+			})
+			slog.Warn("process: fault escalation auto-retry",
+				"runId", run.ID,
+				"retryCount", newCount,
+				"maxRetries", e.faultEscalationCfg.MaxRetries,
+			)
+			// Create fresh context and retry from Start().
+			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
+			e.mu.Lock()
+			if oldCancel, ok4 := e.running[run.ID]; ok4 {
+				oldCancel()
+			}
+			e.running[run.ID] = cancel
+			e.mu.Unlock()
+			go e.run(newCtx, run, runCtx)
+			return
+		}
+		// Max retries reached — emit escalation exhausted event.
+		e.bus.Publish("run.fault_escalation.exhausted", runScope(run), map[string]any{
+			"runId":      run.ID,
+			"maxRetries": e.faultEscalationCfg.MaxRetries,
+		})
+		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
+	}
+	// Report the last error.
 	if lastWaitErr != nil {
 		e.publishFailed(run, errorWithRunOutput(lastWaitErr, nil))
 		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
