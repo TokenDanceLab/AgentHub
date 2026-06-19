@@ -368,7 +368,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 }
 
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
-	defer e.finish(run.ID)
+	// defer is set below — only finish once after all fault escalation attempts.
 
 	// Store Hub task ID for Edge→Hub direct callback reporting
 	if runCtx.HubTaskID != "" {
@@ -384,6 +384,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
 		if err != nil {
 			e.publishFailed(run, err)
+			e.finish(run.ID)
 			return
 		}
 		adapter = resolved
@@ -400,17 +401,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"err", err,
 			)
 			e.publishFailed(run, fmt.Errorf("adapter preflight failed: %w", err))
+			e.finish(run.ID)
 			return
-		}
-	}
-
-	// Resolve adapter label for Prometheus metrics
-	var adapterLabel string
-	if e.metrics != nil {
-		if adapter != nil {
-			adapterLabel = adapter.Metadata().ID
-		} else {
-			adapterLabel = "none"
 		}
 	}
 
@@ -424,6 +416,16 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			"agentId", runCtx.AgentID,
 		)
 		runCtx.PermissionMode = "default"
+	}
+
+	// Resolve adapter label for Prometheus metrics
+	var adapterLabel string
+	if e.metrics != nil {
+		if adapter != nil {
+			adapterLabel = adapter.Metadata().ID
+		} else {
+			adapterLabel = "none"
+		}
 	}
 
 	var runStartTime time.Time
@@ -440,327 +442,410 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}()
 	}
 
-	// Session retry loop: when CC exits quickly with a session conflict error
-	// ("Session ID ... is already in use" or "No conversation found with session ID"),
-	// generate a fresh random session ID and retry once. This handles the case where
-	// a stale CC process from a previous Edge instance still holds the session lock.
-	const maxSessionRetries = 2
-	var lastWaitErr error
-	for attempt := 0; attempt < maxSessionRetries; attempt++ {
-		var cmdPath string
-		var args, env []string
-		var workDir string
-		adapterCtx := adapters.RunProcessContext(runCtx)
+	// ── Fault escalation outer loop ──────────────────────────────────────
+	// Layer 1 (auto-retry): When fault escalation is enabled, a failed run
+	// is retried up to maxRetries times before escalating to Layer 2 (AI review)
+	// or Layer 3 (replan) at the Hub level.
+	maxFaultAttempts := 1
+	if e.faultEscalationEnabled {
+		maxFaultAttempts = e.maxRetries + 1
+	}
 
-		if adapter != nil {
-			// Adapter mode: BuildCommand provides full command configuration
-			cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
-		} else {
-			// Profile mode: use configured command template
-			var err error
-			args, env, err = e.profile.Template.Expand(runCtx)
+	var lastFaultErr error
+
+	for faultAttempt := 0; faultAttempt < maxFaultAttempts; faultAttempt++ {
+		if faultAttempt > 0 {
+			// Reset run state for retry.
+			run.RetryCount = faultAttempt
+			if _, ok := e.store.SetRunRetryCount(run.ID, faultAttempt); ok {
+				slog.Debug("process: fault escalation retry count updated",
+					"runId", run.ID, "retryCount", faultAttempt)
+			}
+			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "failed"); ok {
+				slog.Debug("process: fault escalation reset run to queued",
+					"runId", run.ID, "attempt", faultAttempt)
+			}
+			run.Status = "queued"
+
+			// Create a fresh context so the retry gets a full timeout budget.
+			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
+			e.mu.Lock()
+			if oldCancel, ok := e.running[run.ID]; ok {
+				oldCancel() // cancel the stale context from the failed attempt
+			}
+			e.running[run.ID] = cancel
+			e.mu.Unlock()
+			ctx = newCtx
+
+			e.bus.Publish("run.fault_escalation.retry", runScope(run), map[string]any{
+				"runId":      run.ID,
+				"attempt":    faultAttempt,
+				"maxRetries": e.maxRetries,
+			})
+			slog.Warn("process: fault escalation auto-retry",
+				"runId", run.ID,
+				"attempt", faultAttempt,
+				"maxRetries", e.maxRetries,
+			)
+
+			// Reset metrics start time for the retry.
+			runStartTime = time.Time{}
+		}
+
+		// ── Session retry loop ─────────────────────────────────────────
+		const maxSessionRetries = 2
+		var lastWaitErr error
+		sessionSuccess := false
+
+		for attempt := 0; attempt < maxSessionRetries; attempt++ {
+			var cmdPath string
+			var args, env []string
+			var workDir string
+			adapterCtx := adapters.RunProcessContext(runCtx)
+
+			if adapter != nil {
+				// Adapter mode: BuildCommand provides full command configuration
+				cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
+			} else {
+				// Profile mode: use configured command template
+				var err error
+				args, env, err = e.profile.Template.Expand(runCtx)
+				if err != nil {
+					lastFaultErr = err
+					e.publishFailed(run, err)
+					e.finish(run.ID)
+					return
+				}
+				cmdPath = e.profile.Command
+				workDir = e.profile.WorkDir
+			}
+			if adapter != nil {
+				plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
+				e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
+			}
+
+			// Take workdir snapshot for auto-surface detection (post-finish).
+			// Captures pre-run file state so we can detect new/modified files.
+			if workDir != "" {
+				snapshot := adapters.TakeWorkdirSnapshot(workDir)
+				e.mu.Lock()
+				e.workDirs[run.ID] = workDir
+				e.surfacers[run.ID] = snapshot
+				e.mu.Unlock()
+			}
+
+			_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
 			if err != nil {
+				lastFaultErr = err
 				e.publishFailed(run, err)
+				e.finish(run.ID)
 				return
 			}
-			cmdPath = e.profile.Command
-			workDir = e.profile.WorkDir
-		}
-		if adapter != nil {
-			plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
-			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
-		}
-
-		// Take workdir snapshot for auto-surface detection (post-finish).
-		// Captures pre-run file state so we can detect new/modified files.
-		if workDir != "" {
-			snapshot := adapters.TakeWorkdirSnapshot(workDir)
-			e.mu.Lock()
-			e.workDirs[run.ID] = workDir
-			e.surfacers[run.ID] = snapshot
-			e.mu.Unlock()
-		}
-
-		_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-		if err != nil {
-			e.publishFailed(run, err)
-			return
-		}
-		cmd := exec.CommandContext(ctx, cmdPath, args...)
-		cmd.Dir = workDir
-		if adapter != nil {
-			// Adapter mode: the adapter returns only auth env vars (e.g.
-			// ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL) that must be overlaid on
-			// top of the sanitized parent environment. Passing them as
-			// profileEnv would replace the entire child env with just those
-			// vars, stripping PATH, SYSTEMROOT and other OS essentials — which
-			// causes the CLI to fail immediately. Instead, merge adapter env
-			// into extraEnv so SanitizedEnv provides the full OS base plus the
-			// adapter's auth passthrough.
-			cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
-		} else {
-			cmd.Env = e.envForRun(run, env, extraEnv)
-		}
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
-			return
-		}
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			e.publishFailed(run, fmt.Errorf("open stderr pipe: %w", err))
-			return
-		}
-		var stdin io.WriteCloser
-		if adapter != nil && adapter.NeedsStdin() {
-			stdin, err = cmd.StdinPipe()
+			cmd := exec.CommandContext(ctx, cmdPath, args...)
+			cmd.Dir = workDir
+			if adapter != nil {
+				cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
+			} else {
+				cmd.Env = e.envForRun(run, env, extraEnv)
+			}
+			stdout, err := cmd.StdoutPipe()
 			if err != nil {
-				e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
+				lastFaultErr = fmt.Errorf("open stdout pipe: %w", err)
+				e.publishFailed(run, lastFaultErr)
+				e.finish(run.ID)
 				return
 			}
-			e.mu.Lock()
-			e.stdins[run.ID] = stdin
-			e.mu.Unlock()
-		}
-		setResourceLimits(cmd)
-		argSummary := summarizeProcessArgsForLog(args)
-		slog.Debug("executor.subprocess.starting",
-			"runId", run.ID,
-			"commandName", processCommandNameForLog(cmdPath),
-			"commandRedacted", true,
-			"argCount", len(args),
-			"argFlags", argSummary.ArgFlags,
-			"configKeys", argSummary.ConfigKeys,
-			"positionalArgCount", argSummary.PositionalArgCount,
-			"unknownFlagCount", argSummary.UnknownFlagCount,
-			"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
-			"argsRedacted", true,
-			"attempt", attempt,
-		)
-		subprocessStart := time.Now()
-		if err := cmd.Start(); err != nil {
+			stderr, err := cmd.StderrPipe()
+			if err != nil {
+				lastFaultErr = fmt.Errorf("open stderr pipe: %w", err)
+				e.publishFailed(run, lastFaultErr)
+				e.finish(run.ID)
+				return
+			}
+			var stdin io.WriteCloser
+			if adapter != nil && adapter.NeedsStdin() {
+				stdin, err = cmd.StdinPipe()
+				if err != nil {
+					lastFaultErr = fmt.Errorf("open stdin pipe: %w", err)
+					e.publishFailed(run, lastFaultErr)
+					e.finish(run.ID)
+					return
+				}
+				e.mu.Lock()
+				e.stdins[run.ID] = stdin
+				e.mu.Unlock()
+			}
+			setResourceLimits(cmd)
+			argSummary := summarizeProcessArgsForLog(args)
+			slog.Debug("executor.subprocess.starting",
+				"runId", run.ID,
+				"commandName", processCommandNameForLog(cmdPath),
+				"commandRedacted", true,
+				"argCount", len(args),
+				"argFlags", argSummary.ArgFlags,
+				"configKeys", argSummary.ConfigKeys,
+				"positionalArgCount", argSummary.PositionalArgCount,
+				"unknownFlagCount", argSummary.UnknownFlagCount,
+				"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
+				"argsRedacted", true,
+				"attempt", attempt,
+				"faultAttempt", faultAttempt,
+			)
+			subprocessStart := time.Now()
+			if err := cmd.Start(); err != nil {
+				if ctx.Err() != nil {
+					if cmd.Process != nil {
+						_, _ = cmd.Process.Wait()
+					}
+					e.publishCancelled(run)
+					e.finish(run.ID)
+					return
+				}
+				lastFaultErr = err
+				e.publishFailed(run, err)
+				e.finish(run.ID)
+				return
+			}
+			// If context was cancelled after Start but before we checked, kill the child.
 			if ctx.Err() != nil {
 				if cmd.Process != nil {
+					_ = cmd.Process.Kill()
 					_, _ = cmd.Process.Wait()
 				}
 				e.publishCancelled(run)
+				e.finish(run.ID)
 				return
 			}
-			e.publishFailed(run, err)
-			return
-		}
-		// If context was cancelled after Start but before we checked, kill the child.
-		if ctx.Err() != nil {
-			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
-				_, _ = cmd.Process.Wait()
-			}
-			e.publishCancelled(run)
-			return
-		}
 
-		slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
+			slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
 
-		// Track process for graceful shutdown signals (SIGTERM on Unix).
-		e.mu.Lock()
-		e.processes[run.ID] = cmd.Process
-		e.mu.Unlock()
-
-		// Close stdin unless the adapter needs it for the control protocol
-		// (permission responses) or a DecisionLoop is configured (force-finish
-		// via stdin interrupt). An open pipe with no data causes CLI agents
-		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
-		// eagerly when neither mechanism requires stdin.
-		if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
-			_ = stdin.Close()
+			// Track process for graceful shutdown signals (SIGTERM on Unix).
 			e.mu.Lock()
-			delete(e.stdins, run.ID)
+			e.processes[run.ID] = cmd.Process
 			e.mu.Unlock()
-		}
 
-		// Record metrics: run has started successfully
-		if e.metrics != nil {
-			e.metrics.RecordRunStart(adapterLabel)
-			runStartTime = time.Now()
-		}
-
-		started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-		if ok {
-			e.bus.Publish("run.started", runScope(started), RunResponse(started))
-			// Fire Hub TaskAck callback (Edge→Hub direct bridge)
-			e.fireHubAck(run.ID)
-		}
-		e.checkPersistError(run.ID)
-
-		// Create temp file for run output persistence and replay
-		outStore, err := runnerctx.NewRunOutputStore(run.ID)
-		if err != nil {
-			slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
-		} else {
-			e.mu.Lock()
-			e.runOutputs[run.ID] = outStore
-			e.mu.Unlock()
-		}
-
-		var wg sync.WaitGroup
-		outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
-		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
-
-		// Inject context budget for token tracking in stream parsers.
-		// Also inject RunProcessContext unconditionally — SDK adapters
-		// (anthropic-sdk, openai-sdk) need prompt, model, and messages
-		// regardless of whether a WorkDir is set.
-		parserCtx := ctx
-		if runCtx.Budget != nil {
-			parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
-		}
-		if runCtx.WorkDir != "" {
-			parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
-		}
-		parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
-
-		var parseErr error
-		if adapter != nil {
-			wg.Add(1)
-			go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
-		} else {
-			// Raw capture: stdout goes to run.output.batch events
-			wg.Add(1)
-			go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
-		}
-
-		// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
-		// descriptors; otherwise structured parsers can race with Wait and see
-		// transient "file already closed" read errors.
-		wg.Wait()
-		lastWaitErr = cmd.Wait()
-		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
-
-		// Context budget compaction check: after the stream completes, evaluate
-		// whether the context budget exceeded the auto-compaction threshold.
-		// When triggered, we log the budget state and emit a compaction event
-		// so upstream session managers can compact the actual message history.
-		if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
-			usagePct := runCtx.Budget.UsagePercent()
-			tokensUsed := runCtx.Budget.UsedTokens.Load()
-			remaining := runCtx.Budget.Remaining()
-			slog.Info("process: context compaction threshold reached",
-				"runId", run.ID,
-				"usagePercent", usagePct,
-				"tokensUsed", tokensUsed,
-				"tokensRemaining", remaining,
-			)
-			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
-				"runId":           run.ID,
-				"usagePercent":    usagePct,
-				"tokensUsed":      tokensUsed,
-				"tokensRemaining": remaining,
-				"threshold":       runnerctx.CompactionThreshold,
-			})
-		}
-
-		if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
-			e.publishCancelled(run)
-			e.sendSubAgentResult(run.ID, "cancelled", nil)
-			return
-		}
-
-		// Session conflict retry: if CC failed quickly with a session conflict
-		// error and this is the first attempt, reset the session ID and retry.
-		// On Windows, exec.ExitError.Error() does not include stderr content
-		// (stderr is read via StderrPipe in a separate goroutine and stored in
-		// outStore), so we also pass the captured stderr output.
-		var stderrCapture string
-		if outStore != nil {
-			stderrCapture, _ = outStore.ReadAll()
-		}
-		if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr, stderrCapture) && time.Since(subprocessStart) < sessionRetryWindow {
-			newSession := newRandomSessionID()
-			slog.Warn("process: session conflict detected, retrying with fresh session ID",
-				"runId", run.ID,
-				"oldSessionId", runCtx.SessionID,
-				"newSessionId", newSession,
-				"err", lastWaitErr,
-			)
-			runCtx.SessionID = newSession
-			runCtx.ContinueLast = false
-			// Clean up the tracked process from this attempt before retrying.
-			e.mu.Lock()
-			delete(e.processes, run.ID)
-			if s, ok := e.runOutputs[run.ID]; ok {
-				_ = s.Close()
-				delete(e.runOutputs, run.ID)
+			// Close stdin unless the adapter needs it for the control protocol
+			// (permission responses) or a DecisionLoop is configured (force-finish
+			// via stdin interrupt). An open pipe with no data causes CLI agents
+			// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
+			// eagerly when neither mechanism requires stdin.
+			if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
+				_ = stdin.Close()
+				e.mu.Lock()
+				delete(e.stdins, run.ID)
+				e.mu.Unlock()
 			}
-			e.mu.Unlock()
-			// Reset run status back to queued so the retry can transition to started.
-			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok {
-				slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
-			}
-			continue
-		}
 
-		// Not retrying — process the final result.
-		if lastWaitErr != nil {
-			e.publishFailed(run, errorWithRunOutput(lastWaitErr, outStore))
-			e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
-			return
-		}
-		// #179: handle structured output parse errors with recoverability distinction.
-		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
-		// Recoverable errors (malformed event, orphaned tool) emit a warning and
-		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-		if parseErr != nil {
-			var psErr *adapters.ParseStreamError
-			if errors.As(parseErr, &psErr) && psErr.Recoverable() {
-				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
-				e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
-					"runId":   run.ID,
-					"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
-					"warning": psErr.Error(),
-				})
+			// Record metrics: run has started successfully
+			if e.metrics != nil {
+				e.metrics.RecordRunStart(adapterLabel)
+				runStartTime = time.Now()
+			}
+
+			started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
+			if ok {
+				e.bus.Publish("run.started", runScope(started), RunResponse(started))
+				// Fire Hub TaskAck callback (Edge→Hub direct bridge)
+				e.fireHubAck(run.ID)
+			}
+			e.checkPersistError(run.ID)
+
+			// Create temp file for run output persistence and replay
+			outStore, err := runnerctx.NewRunOutputStore(run.ID)
+			if err != nil {
+				slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
 			} else {
-				e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
-				e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+				e.mu.Lock()
+				e.runOutputs[run.ID] = outStore
+				e.mu.Unlock()
+			}
+
+			var wg sync.WaitGroup
+			outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
+			wg.Add(1)
+			go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
+
+			// Inject context budget for token tracking in stream parsers.
+			parserCtx := ctx
+			if runCtx.Budget != nil {
+				parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
+			}
+			if runCtx.WorkDir != "" {
+				parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
+			}
+			parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
+
+			var parseErr error
+			if adapter != nil {
+				wg.Add(1)
+				go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
+			} else {
+				// Raw capture: stdout goes to run.output.batch events
+				wg.Add(1)
+				go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
+			}
+
+			// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
+			// descriptors; otherwise structured parsers can race with Wait and see
+			// transient "file already closed" read errors.
+			wg.Wait()
+			lastWaitErr = cmd.Wait()
+			slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt, "faultAttempt", faultAttempt)
+
+			// Context budget compaction check.
+			if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
+				usagePct := runCtx.Budget.UsagePercent()
+				tokensUsed := runCtx.Budget.UsedTokens.Load()
+				remaining := runCtx.Budget.Remaining()
+				slog.Info("process: context compaction threshold reached",
+					"runId", run.ID,
+					"usagePercent", usagePct,
+					"tokensUsed", tokensUsed,
+					"tokensRemaining", remaining,
+				)
+				e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
+					"runId":           run.ID,
+					"usagePercent":    usagePct,
+					"tokensUsed":      tokensUsed,
+					"tokensRemaining": remaining,
+					"threshold":       runnerctx.CompactionThreshold,
+				})
+			}
+
+			if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
+				e.publishCancelled(run)
+				e.sendSubAgentResult(run.ID, "cancelled", nil)
+				e.finish(run.ID)
 				return
 			}
-		}
-		// Evidence gate: run post-completion verification before marking finished.
-		// When enabled (default), the gate runs type-specific checks (Go build+vet,
-		// TypeScript typecheck+test, generic file existence) against the workDir.
-		// If verification fails, the run is marked as completed_with_issues instead
-		// of finished, and the full evidence output is stored in run metadata.
-		finalStatus := "finished"
-		if isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir) {
-			evidenceResult := runEvidenceGate(workDir)
-			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-			if !evidenceResult.Passed {
-				finalStatus = "completed_with_issues"
-				slog.Warn("process: evidence gate verification failed",
-					"runId", run.ID,
-					"projectType", evidenceResult.ProjectType,
-					"summary", evidenceResult.Summary,
-				)
+
+			// Session conflict retry.
+			var stderrCapture string
+			if outStore != nil {
+				stderrCapture, _ = outStore.ReadAll()
 			}
+			if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr, stderrCapture) && time.Since(subprocessStart) < sessionRetryWindow {
+				newSession := newRandomSessionID()
+				slog.Warn("process: session conflict detected, retrying with fresh session ID",
+					"runId", run.ID,
+					"oldSessionId", runCtx.SessionID,
+					"newSessionId", newSession,
+					"err", lastWaitErr,
+				)
+				runCtx.SessionID = newSession
+				runCtx.ContinueLast = false
+				// Clean up the tracked process from this attempt before retrying.
+				e.mu.Lock()
+				delete(e.processes, run.ID)
+				if s, ok := e.runOutputs[run.ID]; ok {
+					_ = s.Close()
+					delete(e.runOutputs, run.ID)
+				}
+				e.mu.Unlock()
+				// Reset run status back to queued so the retry can transition to started.
+				if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok {
+					slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
+				}
+				continue
+			}
+
+			// Not retrying — process the final result for this session attempt.
+			if lastWaitErr != nil {
+				lastFaultErr = errorWithRunOutput(lastWaitErr, outStore)
+				break // exit session retry loop; fault escalation decides next step
+			}
+			// #179: handle structured output parse errors with recoverability distinction.
+			if parseErr != nil {
+				var psErr *adapters.ParseStreamError
+				if errors.As(parseErr, &psErr) && psErr.Recoverable() {
+					slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
+					e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
+						"runId":   run.ID,
+						"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
+						"warning": psErr.Error(),
+					})
+				} else {
+					lastFaultErr = fmt.Errorf("structured output parse error: %w", parseErr)
+					break // exit session retry loop; fault escalation decides next step
+				}
+			}
+			// Evidence gate: run post-completion verification.
+			finalStatus := "finished"
+			if isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir) {
+				evidenceResult := runEvidenceGate(workDir)
+				e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
+				if !evidenceResult.Passed {
+					finalStatus = "completed_with_issues"
+					slog.Warn("process: evidence gate verification failed",
+						"runId", run.ID,
+						"projectType", evidenceResult.ProjectType,
+						"summary", evidenceResult.Summary,
+					)
+				}
+			}
+
+			finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
+			if ok {
+				e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
+				e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
+				// Fire Hub TaskDone callback (Edge→Hub direct bridge)
+				e.fireHubDone(run.ID, RunResponse(finished))
+			}
+			e.checkPersistError(run.ID)
+			sessionSuccess = true
+			break // success — exit session retry loop
 		}
 
-		finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
-		if ok {
-			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
-			e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
-			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
-			e.fireHubDone(run.ID, RunResponse(finished))
+		if sessionSuccess {
+			// Run completed successfully — clean up and return.
+			e.finish(run.ID)
+			return
 		}
-		e.checkPersistError(run.ID)
-		return
+
+		lastFaultErr = lastWaitErr
+
+		// Check if context was cancelled — don't retry.
+		if ctx.Err() != nil {
+			e.publishCancelled(run)
+			e.finish(run.ID)
+			return
+		}
+
+		// If fault escalation is not enabled or this was the last attempt, finalize.
+		if !e.faultEscalationEnabled || faultAttempt >= maxFaultAttempts-1 {
+			break // exit fault escalation loop; finalize failure below
+		}
+
+		// Will retry — clean up process state from this failed attempt.
+		e.mu.Lock()
+		delete(e.processes, run.ID)
+		if s, ok := e.runOutputs[run.ID]; ok {
+			_ = s.Close()
+			delete(e.runOutputs, run.ID)
+		}
+		e.mu.Unlock()
 	}
 
-	// Exhausted retries — report the last error.
-	if lastWaitErr != nil {
-		e.publishFailed(run, errorWithRunOutput(lastWaitErr, nil))
-		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
+	// ── All fault escalation attempts exhausted ────────────────────────
+	if e.faultEscalationEnabled && maxFaultAttempts > 1 {
+		e.bus.Publish("run.fault_escalation.exhausted", runScope(run), map[string]any{
+			"runId":         run.ID,
+			"totalAttempts": maxFaultAttempts,
+			"maxRetries":    e.maxRetries,
+		})
+		slog.Warn("process: fault escalation exhausted",
+			"runId", run.ID,
+			"totalAttempts", maxFaultAttempts,
+		)
 	}
+
+	if lastFaultErr != nil {
+		e.publishFailed(run, errorWithRunOutput(lastFaultErr, nil))
+		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastFaultErr.Error()})
+	}
+	e.finish(run.ID)
 }
+
 
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, reader io.Reader) {
 	defer wg.Done()
