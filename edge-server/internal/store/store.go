@@ -40,6 +40,7 @@ type Run struct {
 	ProjectID           string `json:"projectId"`
 	ThreadID            string `json:"threadId"`
 	Status              string `json:"status"`
+	RetryCount          int    `json:"retryCount"`
 	CreatedAt           string `json:"createdAt"`
 	StartedAt           string `json:"startedAt,omitempty"`
 	FinishedAt          string `json:"finishedAt,omitempty"`
@@ -207,6 +208,7 @@ type RunLifecycleStore interface {
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
 	SetRunEvidenceGate(id, result string) (Run, bool)
+	SetRunRetryCount(id string, count int) (Run, bool)
 }
 
 type RunCleaner interface {
@@ -909,6 +911,21 @@ func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
 		return Run{}, false
 	}
 	run.EvidenceGateResult = result
+	s.runs[id] = run
+	return run, true
+}
+
+// SetRunRetryCount updates the retry count on a run. Used by the fault
+// escalation chain to track auto-retry attempts before escalation.
+func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	run.RetryCount = count
 	s.runs[id] = run
 	return run, true
 }
