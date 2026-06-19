@@ -616,7 +616,7 @@ func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.A
 
 	members, err := repository.ListTeamMembers(s.db, run.TeamID)
 	if err != nil {
-		slog.Error("fault escalation: failed to list team members", "teamRunId", run.ID, "err", err)
+		slog.Error("fault escalation: failed to list team members", "teamRunId", run.ID, "error", err)
 		return
 	}
 
@@ -652,7 +652,7 @@ func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.A
 	}
 
 	if _, err := s.HandleRouteDecision(ctx, run.TriggerUserID, run.TeamID, run.ID, decision); err != nil {
-		slog.Error("fault escalation: failed to create review decision", "teamRunId", run.ID, "err", err)
+		slog.Error("fault escalation: failed to create review decision", "teamRunId", run.ID, "error", err)
 		return
 	}
 

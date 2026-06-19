@@ -72,18 +72,18 @@ func Run(cfg Config) error {
 	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid remote listen address", "err", err)
+			slog.Error("invalid remote listen address", "error", err)
 			return err
 		}
 	} else {
 		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid local listen address", "err", err)
+			slog.Error("invalid local listen address", "error", err)
 			return err
 		}
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {
-		slog.Error("failed to create handler from config", "err", err)
+		slog.Error("failed to create handler from config", "error", err)
 		return err
 	}
 
@@ -98,7 +98,7 @@ func Run(cfg Config) error {
 	if !cfg.Dev && cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
 		tokenBytes := make([]byte, 32)
 		if _, err := rand.Read(tokenBytes); err != nil {
-			slog.Error("failed to generate local auth token", "err", err)
+			slog.Error("failed to generate local auth token", "error", err)
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
@@ -162,7 +162,7 @@ func Run(cfg Config) error {
 	go func() {
 		slog.Info("edge server listening", "addr", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "err", err)
+			slog.Error("server error", "error", err)
 			os.Exit(1)
 		}
 	}()
@@ -179,7 +179,7 @@ func Run(cfg Config) error {
 
 	// Flush and close the event log so no events are lost on shutdown.
 	if err := handler.Bus.Close(); err != nil {
-		slog.Error("failed to close event bus event log", "err", err)
+		slog.Error("failed to close event bus event log", "error", err)
 	}
 	return nil
 }
@@ -293,7 +293,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	}
 	skillReg := skills.NewSkillRegistry(skillsDirs)
 	if err := skillReg.Discover(); err != nil {
-		slog.Warn("skill discovery failed; skills will not be injected", "err", err)
+		slog.Warn("skill discovery failed; skills will not be injected", "error", err)
 	} else if skillReg.Count() > 0 {
 		slog.Info("loaded skills", "count", skillReg.Count(), "dirs", skillsDirs)
 	}
