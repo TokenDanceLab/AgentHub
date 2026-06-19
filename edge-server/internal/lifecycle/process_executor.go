@@ -332,7 +332,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Lock()
 	if stdin, ok := e.stdins[runID]; ok {
 		if err := adapters.WriteInterrupt(stdin, "interrupt-"+runID); err != nil {
-			slog.Debug("process: interrupt write failed", "runId", runID, "err", err)
+			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
 	}
 	cancel, ok := e.running[runID]
@@ -402,7 +402,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			slog.Warn("process: adapter preflight check failed",
 				"runId", run.ID,
 				"agentId", runCtx.AgentID,
-				"err", err,
+				"error", err,
 			)
 			e.publishFailed(run, fmt.Errorf("adapter preflight failed: %w", err))
 			return
@@ -600,7 +600,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Create temp file for run output persistence and replay
 		outStore, err := runnerctx.NewRunOutputStore(run.ID)
 		if err != nil {
-			slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
+			slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
 		} else {
 			e.mu.Lock()
 			e.runOutputs[run.ID] = outStore
@@ -686,7 +686,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"runId", run.ID,
 				"oldSessionId", runCtx.SessionID,
 				"newSessionId", newSession,
-				"err", lastWaitErr,
+				"error", lastWaitErr,
 			)
 			runCtx.SessionID = newSession
 			runCtx.ContinueLast = false
@@ -718,7 +718,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		if parseErr != nil {
 			var psErr *adapters.ParseStreamError
 			if errors.As(parseErr, &psErr) && psErr.Recoverable() {
-				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
+				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
 				e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
 					"runId":   run.ID,
 					"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
@@ -836,7 +836,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 				}
 				if outStore != nil && len(allowed) > 0 {
 					if _, err := outStore.Write(text); err != nil {
-						slog.Warn("process: failed to write output store", "runId", run.ID, "err", err)
+						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 					}
 				}
 				if stream == "stdout" && text != "" {
@@ -1084,7 +1084,7 @@ func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string
 }
 
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
-	slog.Debug("executor.run.failed", "runId", run.ID, "err", err)
+	slog.Debug("executor.run.failed", "runId", run.ID, "error", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
 	if ok {
 		exitCode := ExitCodeFromErr(err)
@@ -1151,7 +1151,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 		Content:   content,
 	})
 	if err != nil {
-		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "err", err)
+		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "error", err)
 		return
 	}
 	scope := map[string]any{
@@ -1185,7 +1185,7 @@ func (e *ProcessExecutor) checkPersistError(runID string) {
 		return
 	}
 	if persistErr := pc.LastPersistError(); persistErr != nil {
-		slog.Error("file store persist failed during run status transition", "runId", runID, "err", persistErr)
+		slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
 		e.bus.Publish("run.persistence_error", map[string]any{"runId": runID}, map[string]any{
 			"runId": runID,
 			"error": persistErr.Error(),
@@ -1223,7 +1223,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.surfacers, runID)
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
-			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
+			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
 		delete(e.runOutputs, runID)
 	}
@@ -1369,7 +1369,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
-		slog.Error("structured output parse error", "runId", run.ID, "err", err)
+		slog.Error("structured output parse error", "runId", run.ID, "error", err)
 		*parseErr = err
 	}
 	if transcriptEmitter != nil {
@@ -1400,7 +1400,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 				"parentRunId", parentRun.ID,
 				"taskId", task.TaskID,
 				"depth", task.Depth,
-				"err", err,
+				"error", err,
 			)
 			return "", "", err
 		}
@@ -1422,7 +1422,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// Create the run in the store
 	run, err := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
 	if err != nil {
-		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "err", err)
+		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", err)
 		return "", "", err
 	}
 
@@ -1448,7 +1448,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		if err := e.agentRegistry.Register(inst); err != nil {
 			slog.Warn("failed to register sub-agent instance in registry",
 				"agentInstanceId", agentInstanceID,
-				"err", err,
+				"error", err,
 			)
 		}
 	}
@@ -1509,7 +1509,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 
 	// Start the run
 	if err := e.Start(run, runCtx); err != nil {
-		slog.Error("failed to start sub-agent run", "runId", runID, "err", err)
+		slog.Error("failed to start sub-agent run", "runId", runID, "error", err)
 		e.mu.Lock()
 		delete(e.runToAgent, runID)
 		e.mu.Unlock()
@@ -1608,7 +1608,7 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
 		if err := e.hubCallback.TaskAck(ctx, taskID, runID); err != nil {
-			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "err", err)
+			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()
 }
@@ -1665,7 +1665,7 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 			ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 			defer cancel()
 			if err := e.hubCallback.TaskStream(ctx, taskID, runID, chunk); err != nil {
-				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "err", err)
+				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "error", err)
 			}
 		}()
 	}
@@ -1693,7 +1693,7 @@ func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
 			FinalContent: content,
 		}
 		if err := e.hubCallback.TaskDone(ctx, taskID, result); err != nil {
-			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "err", err)
+			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()
 }
@@ -1786,7 +1786,7 @@ func (e *threadTranscriptEmitter) Flush() {
 		Content:   content,
 	})
 	if err != nil {
-		slog.Warn("process: failed to persist assistant transcript", "runId", e.run.ID, "err", err)
+		slog.Warn("process: failed to persist assistant transcript", "runId", e.run.ID, "error", err)
 		return
 	}
 	_ = item
@@ -1920,7 +1920,7 @@ func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
 		if err := e.hubCallback.TaskFail(ctx, taskID, runID, reason); err != nil {
-			slog.Warn("hub callback fail failed", "taskId", taskID, "runId", runID, "err", err)
+			slog.Warn("hub callback fail failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()
 }

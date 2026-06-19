@@ -69,7 +69,7 @@ func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 func (p *NDJSONStreamParser) parseLine(line []byte) {
 	var msg claudeSDKMessage
 	if err := json.Unmarshal(line, &msg); err != nil {
-		slog.Debug("ndjson: skipping unparseable line", "err", err)
+		slog.Debug("ndjson: skipping unparseable line", "error", err)
 		return
 	}
 
