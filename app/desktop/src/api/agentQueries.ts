@@ -1,7 +1,7 @@
 // TanStack Query hook for agents — replaces useAgents() setInterval polling.
 import { useQuery } from '@tanstack/react-query';
 import { fetchAgents } from './edgeClient';
-import { edgeQueryKeys } from '@agenthub/shared';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import type { AgentInfo, ListResponse } from '@shared/types';
 
 export function useAgentList(enabled: boolean) {

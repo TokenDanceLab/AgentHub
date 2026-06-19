@@ -24,6 +24,7 @@ import (
 // dispatchPayload is the payload sent to the edge for agent.dispatch
 type dispatchPayload struct {
 	TaskID           string `json:"task_id"`
+	DeliveryID       string `json:"delivery_id,omitempty"`
 	AgentInstanceID  string `json:"agent_instance_id"`
 	AgentType        string `json:"agent_type"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
@@ -75,6 +76,7 @@ type edgeRunRequest struct {
 	Model          string               `json:"model,omitempty"`
 	SystemPrompt   string               `json:"systemPrompt,omitempty"`
 	HubTaskID      string               `json:"hubTaskId"`
+	DeliveryID     string               `json:"deliveryId,omitempty"`
 	Messages       []dispatchMessage    `json:"messages,omitempty"`
 	PinnedMessages []dispatchMessage    `json:"pinnedMessages,omitempty"`
 }
@@ -105,6 +107,7 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 		Model:          "claude",
 		SystemPrompt:   dp.SystemPrompt,
 		HubTaskID:      task.ID,
+		DeliveryID:     dp.DeliveryID,
 		Messages:       dp.Messages,
 		PinnedMessages: dp.PinnedMessages,
 	}
@@ -399,7 +402,17 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	dp.Messages = s.loadThreadHistory(ai.SessionID, task.TriggerMessageID)
 	dp.PinnedMessages = s.loadPinnedMessages(ai.SessionID)
 
+	// Record delivery in outbox before dispatching (AH-SR-049).
 	payload, _ := json.Marshal(dp)
+	deliveryID, err := s.RecordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
+	if err != nil {
+		slog.Error("failed to record delivery outbox entry, continuing dispatch without tracking",
+			"task_id", task.ID, "error", err)
+	} else {
+		dp.DeliveryID = deliveryID
+		// Re-serialize with delivery_id included.
+		payload, _ = json.Marshal(dp)
+	}
 
 	// Try HTTP direct dispatch to local Edge server first.
 	// Only attempt when there is no explicit target binding (unbound tasks
@@ -409,6 +422,10 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			// Mark as dispatched with a synthetic device ID indicating HTTP dispatch.
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, "http-edge-local"); err != nil {
 				slog.Error("failed to mark http-dispatched task", "task_id", task.ID, "error", err)
+			}
+			// Mark delivery as sent.
+			if deliveryID != "" {
+				_ = s.MarkDeliverySent(ctx, deliveryID)
 			}
 			return
 		}
@@ -435,9 +452,15 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); err != nil {
 				slog.Error("failed to mark hub_relay task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			}
+			if deliveryID != "" {
+				_ = s.MarkDeliverySent(ctx, deliveryID)
+			}
 			return
 		}
 		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
+		if deliveryID != "" {
+			_ = s.MarkDeliverySent(ctx, deliveryID)
+		}
 		return
 	}
 
@@ -448,6 +471,9 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		if conn == nil {
 			if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 				slog.Error("failed to push agent task to offline queue (conn nil)", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			}
+			if deliveryID != "" {
+				_ = s.MarkDeliverySent(ctx, deliveryID)
 			}
 			return
 		}
@@ -463,12 +489,18 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 				slog.Error("failed to preserve agent task after websocket dispatch failure", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
 			}
 		}
+		if deliveryID != "" {
+			_ = s.MarkDeliverySent(ctx, deliveryID)
+		}
 		return
 	}
 
 	// offline: push to Redis pending queue
 	if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+	}
+	if deliveryID != "" {
+		_ = s.MarkDeliverySent(ctx, deliveryID)
 	}
 }
 

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
-import { edgeQueryKeys } from '@agenthub/shared';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
 type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;

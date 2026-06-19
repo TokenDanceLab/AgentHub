@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import { hubQueryKeys } from '@agenthub/shared';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { FriendRequestInfo, SearchResult } from './hubClient';
 
 export const contactsQueryKey = hubQueryKeys.contacts.list;

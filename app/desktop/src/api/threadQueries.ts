@@ -13,7 +13,7 @@ import {
   fetchCurrentUser,
   type CreateThreadRequest,
 } from './edgeClient';
-import { edgeQueryKeys } from '@agenthub/shared';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo, UserProfileInfo } from '@shared/types';
 
 export function useThreads(projectId?: string, options: { enabled?: boolean } = {}) {
