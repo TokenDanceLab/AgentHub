@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,6 +14,8 @@ import (
 const (
 	defaultMaxHistory           = 10000
 	subscriberChannelBufferSize = 256
+	defaultWorkerCount          = 4
+	observerJobBufferSize       = 1024
 )
 
 // GapEventType is the event type for a gap-detection control message sent to a
@@ -25,6 +28,12 @@ type GapPayload struct {
 	FirstDroppedSeq int64 `json:"firstDroppedSeq"`
 	LastDroppedSeq  int64 `json:"lastDroppedSeq"`
 	DroppedCount    int64 `json:"droppedCount"`
+}
+
+// observerJob is a unit of work dispatched to the observer worker pool.
+type observerJob struct {
+	fn  func(EventEnvelope)
+	evt EventEnvelope
 }
 
 // EventEnvelope is the standard event wrapper for all WebSocket events.
@@ -181,18 +190,43 @@ type Bus struct {
 	// persistOutputBatch controls whether run.output.batch events go through
 	// the persistence hook. Default true.
 	persistOutputBatch bool
+
+	// Observer worker pool — fixed goroutines with channel-based dispatch.
+	// stopCh is closed when the bus is shut down, signalling workers to exit.
+	stopCh    chan struct{}
+	jobs      chan observerJob
+	workersWg sync.WaitGroup
 }
 
 // NewBus creates a new event bus with the given maximum history size.
+// It reads AGENTHUB_EVENT_WORKERS from the environment (default 4) to
+// determine the number of observer worker goroutines.
 func NewBus(maxHistory int, opts ...BusOption) *Bus {
 	if maxHistory <= 0 {
 		maxHistory = defaultMaxHistory
 	}
+
+	workerCount := defaultWorkerCount
+	if s := os.Getenv("AGENTHUB_EVENT_WORKERS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= 256 {
+			workerCount = n
+		}
+	}
+
 	b := &Bus{
 		history:            make([]EventEnvelope, 0, maxHistory),
 		maxHistory:         maxHistory,
 		persistOutputBatch: true,
+		stopCh:             make(chan struct{}),
+		jobs:               make(chan observerJob, observerJobBufferSize),
 	}
+
+	// Start fixed-size observer worker pool.
+	for i := 0; i < workerCount; i++ {
+		b.workersWg.Add(1)
+		go b.runWorker()
+	}
+
 	for _, o := range opts {
 		o(b)
 	}
@@ -298,20 +332,46 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 
 	b.mu.Unlock()
 
-	// Notify observers asynchronously outside the lock so that
-	// slow or blocking observers do not stall event publishing.
-	for _, obs := range observers {
-		go func(fn func(EventEnvelope)) {
-			defer func() {
-				if recovered := recover(); recovered != nil {
-					slog.Error("event bus observer panic", "panic", recovered)
-				}
-			}()
-			fn(evt)
-		}(obs.fn)
+	// Dispatch to observer worker pool — no per-event goroutine creation.
+	// Each observer function is submitted as a job to the fixed-size pool.
+	// Jobs are dropped non-blockingly when the pool is saturated to avoid
+	// back-pressuring Publish().
+	if len(observers) > 0 {
+		for _, obs := range observers {
+			job := observerJob{fn: obs.fn, evt: evt}
+			select {
+			case b.jobs <- job:
+			default:
+				// Worker pool saturated; drop this observer notification.
+			}
+		}
 	}
 
 	return evt
+}
+
+// runWorker is a long-lived goroutine that processes observer jobs from the
+// shared job channel. It exits when the stop channel is closed.
+func (b *Bus) runWorker() {
+	defer b.workersWg.Done()
+	for {
+		select {
+		case job, ok := <-b.jobs:
+			if !ok {
+				return
+			}
+			func() {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						slog.Error("event bus observer panic", "panic", recovered)
+					}
+				}()
+				job.fn(job.evt)
+			}()
+		case <-b.stopCh:
+			return
+		}
+	}
 }
 
 // shouldPersist reports whether the given event type should go through the
@@ -402,9 +462,14 @@ func (b *Bus) DroppedCount() int64 {
 	return b.dropped.Load()
 }
 
-// Close flushes and closes the underlying event log if one was configured via
+// Close shuts down the observer worker pool, closes the job channel, and
+// flushes and closes the underlying event log if one was configured via
 // WithEventLogPath. It is safe to call Close on a Bus that has no event log.
 func (b *Bus) Close() error {
+	// Shut down the observer worker pool.
+	close(b.stopCh)
+	b.workersWg.Wait()
+
 	if b.eventLog != nil {
 		return b.eventLog.Close()
 	}

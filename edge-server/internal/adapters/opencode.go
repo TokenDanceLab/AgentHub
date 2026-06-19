@@ -243,7 +243,7 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 		}()
 		var evt opencodeEvent
 		if err := json.Unmarshal(line, &evt); err != nil {
-			slog.Debug("opencode: skipping unparseable line", "err", err)
+			slog.Debug("opencode: skipping unparseable line", "error", err)
 			return nil
 		}
 		a.dispatch(scope, emitter, &evt)
