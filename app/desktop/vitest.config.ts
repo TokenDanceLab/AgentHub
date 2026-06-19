@@ -14,6 +14,9 @@ export default defineConfig({
     },
   },
   server: { fs: { allow: ['..'] } },
+  ssr: {
+    noExternal: true,
+  },
   test: {
     globals: true,
     environment: 'jsdom',

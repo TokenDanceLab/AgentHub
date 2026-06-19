@@ -61,6 +61,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		r.GET("/health/ready", healthOK)
 	}
 
+	// Dev-only debug panic endpoint — deliberately panics to verify recovery middleware.
+	// Enabled only when log_level is "debug".
+	if cfg.Server.LogLevel == "debug" {
+		r.GET("/debug/panic", func(c *gin.Context) {
+			panic("deliberate test panic from /debug/panic")
+		})
+	}
+
 	// Public API — no auth required (official website hub.vectorcontrol.tech)
 	if publicHandler != nil {
 		public := r.Group("/api/public")

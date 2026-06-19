@@ -17,8 +17,11 @@ WORKDIR /app
 COPY --from=builder /app/hub-server/server-hub .
 COPY --from=builder /app/hub-server/configs/config.docker.yaml ./configs/config.yaml
 COPY --from=builder /app/hub-server/migrations ./migrations
+COPY hub-server/deployments/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 RUN chown -R agenthub:agenthub /app
 USER agenthub
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://localhost:8080/health || exit 1
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["./server-hub"]

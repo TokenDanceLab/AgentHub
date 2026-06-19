@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 
 // RateLimit returns a middleware that enforces a sliding-window rate limit
 // using Redis. limit is the maximum number of requests allowed within window.
+// When Redis is unavailable, auth paths always fail closed (reject the request
+// with 500). Non-auth paths respect AGENTHUB_RATE_LIMIT_FAIL_OPEN (default:
+// fail-open with a warning log).
 func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func(c *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := fmt.Sprintf("rate_limit:%s", keyFn(c))
@@ -39,6 +43,24 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		pipe.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
 
 		if _, err := pipe.Exec(ctx); err != nil {
+			if isAuthPath(c) {
+				// Auth paths always fail closed.
+				fail(c, errcode.ErrInternal)
+				c.Abort()
+				return
+			}
+			if config.RateLimitFailOpen() {
+				slog.Warn("rate limit Redis unavailable, failing open",
+					"path", c.Request.URL.Path,
+					"method", c.Request.Method,
+					"key", key,
+					"error", err,
+				)
+				c.Header("X-Rate-Limit-Degraded", "true")
+				c.Next()
+				return
+			}
+			// Fail closed for non-auth when explicitly configured.
 			fail(c, errcode.ErrInternal)
 			c.Abort()
 			return

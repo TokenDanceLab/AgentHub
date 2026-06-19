@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
+	"net/url"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -53,8 +57,14 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
 		return
 	}
+	redirectURI := strings.TrimSpace(req.RedirectURI)
+	if err := validateRedirectURI(redirectURI, deviceType); err != nil {
+		slog.Error("oidc authorize redirect_uri validation failed", "request_id", middleware.GetRequestID(c), "redirect_uri", redirectURI, "error", err)
+		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		return
+	}
 	result, err := h.service.GenerateAuthorizationURL(c.Request.Context(),
-		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
+		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, redirectURI)
 	if err != nil {
 		logOIDCServiceError(c, "oidc authorize service error", err)
 		handleOIDCServiceError(c, err)
@@ -126,8 +136,14 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, 
 		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
 		return
 	}
+	trimmedURI := strings.TrimSpace(redirectURI)
+	if err := validateRedirectURI(trimmedURI, dt); err != nil {
+		slog.Error("oidc callback redirect_uri validation failed", "request_id", middleware.GetRequestID(c), "redirect_uri", trimmedURI, "error", err)
+		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		return
+	}
 	result, err := h.service.HandleCallback(c.Request.Context(),
-		code, state, codeVerifier, dt, did, strings.TrimSpace(redirectURI))
+		code, state, codeVerifier, dt, did, trimmedURI)
 	if err != nil {
 		logOIDCServiceError(c, "oidc callback service error", err)
 		handleOIDCServiceError(c, err)
@@ -188,4 +204,126 @@ func detectLang(c *gin.Context) string {
 		return "zh"
 	}
 	return "en"
+}
+
+// validateRedirectURI performs handler-level defense-in-depth validation of
+// redirect_uri against AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS before
+// forwarding to the service layer. Returns nil if the URI is allowed or empty
+// (the service layer will apply its own fallback and comprehensive validation).
+func validateRedirectURI(redirectURI, deviceType string) error {
+	if redirectURI == "" {
+		return nil // service layer applies fallback RedirectURI
+	}
+
+	allowedURIs := handlerAllowedRedirectURIs()
+	if len(allowedURIs) == 0 {
+		return nil // no allowlist configured; defer to service layer
+	}
+
+	parsed, err := url.Parse(redirectURI)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.Fragment != "" {
+		return errors.New("redirect_uri must be an absolute http(s) URL without fragment")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("redirect_uri must use http or https")
+	}
+	normalized := parsed.String()
+
+	for _, allowed := range allowedURIs {
+		if allowed == normalized {
+			return nil
+		}
+		// For desktop and CLI, allow loopback redirect port variations.
+		if (deviceType == "desktop" || deviceType == "cli") && handlerLoopbackRedirectMatch(allowed, normalized) {
+			return nil
+		}
+	}
+
+	return errors.New("redirect_uri is not allowed for this TokenDance ID client")
+}
+
+// handlerAllowedRedirectURIs builds the list of allowed redirect URIs from
+// environment variables, matching the config-layer resolution order:
+// primary AGENTHUB_TOKENDANCE_ID_REDIRECT_URI plus the comma-separated
+// AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS (and legacy names).
+func handlerAllowedRedirectURIs() []string {
+	var candidates []string
+
+	// Include the primary fallback redirect URI first.
+	if fallback := os.Getenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI"); fallback != "" {
+		candidates = append(candidates, strings.TrimSpace(fallback))
+	}
+	if fallback := os.Getenv("AGENTHUB_TOKENDANCE_REDIRECT_URI"); fallback != "" {
+		candidates = append(candidates, strings.TrimSpace(fallback))
+	}
+
+	// Include the explicitly allowed redirect URIs.
+	if allowedRaw := os.Getenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS"); allowedRaw != "" {
+		candidates = append(candidates, splitCommaTrimmed(allowedRaw)...)
+	} else if allowedRaw := os.Getenv("AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); allowedRaw != "" {
+		candidates = append(candidates, splitCommaTrimmed(allowedRaw)...)
+	}
+
+	// Deduplicate.
+	seen := make(map[string]struct{}, len(candidates))
+	result := make([]string, 0, len(candidates))
+	for _, c := range candidates {
+		if _, ok := seen[c]; !ok {
+			seen[c] = struct{}{}
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// splitCommaTrimmed splits a comma-separated string and trims whitespace from each part.
+func splitCommaTrimmed(s string) []string {
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// handlerLoopbackRedirectMatch mirrors the service-layer oidcLoopbackRedirectMatch
+// for defense-in-depth validation at the handler level. It matches a registered
+// loopback redirect (e.g. http://127.0.0.1/callback) against a requested redirect
+// that differs only in port number (e.g. http://127.0.0.1:8400/callback).
+func handlerLoopbackRedirectMatch(registered, requested string) bool {
+	regURL, err := url.Parse(registered)
+	if err != nil {
+		return false
+	}
+	reqURL, err := url.Parse(requested)
+	if err != nil {
+		return false
+	}
+	if regURL.Scheme != "http" || reqURL.Scheme != "http" {
+		return false
+	}
+	if regURL.User != nil || reqURL.User != nil {
+		return false
+	}
+	if regURL.Fragment != "" || reqURL.Fragment != "" {
+		return false
+	}
+	if regURL.Port() != "" || reqURL.Port() == "" {
+		return false
+	}
+	port, err := strconv.Atoi(reqURL.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return false
+	}
+	if regURL.EscapedPath() != reqURL.EscapedPath() || regURL.RawQuery != reqURL.RawQuery {
+		return false
+	}
+	regIP := net.ParseIP(regURL.Hostname())
+	reqIP := net.ParseIP(reqURL.Hostname())
+	if regIP == nil || reqIP == nil || !regIP.IsLoopback() || !reqIP.IsLoopback() {
+		return false
+	}
+	return regIP.Equal(reqIP)
 }

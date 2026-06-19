@@ -109,3 +109,53 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - [ ] Scope `shell.open` in Tauri capabilities
 - [ ] Create new test files for WorkbenchShell, ConversationHost, ChatViewBridge
 - [ ] Archive this MASTER.md to docs/archive/
+
+## Adaptive Control State
+
+```yaml
+adaptive:
+  strategy: "bottom-up-risk-driven"
+  thresholds:
+    annotate: 3    # ceil(12 * 0.20) for Phase 1
+    replan: 5      # ceil(12 * 0.40)
+    rescope: 8     # ceil(12 * 0.60)
+phases:
+  - phase: 1
+    name: "Backend Safety & Foundation"
+    total_tasks: 12
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/2"
+  - phase: 2
+    name: "Edge Security Hardening"
+    total_tasks: 7
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/3"
+  - phase: 3
+    name: "Architecture Refactoring"
+    total_tasks: 5
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/4"
+  - phase: 4
+    name: "Frontend & Mobile Quality"
+    total_tasks: 7
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/5"
+  - phase: 5
+    name: "Docs, Platform & Polish"
+    total_tasks: 17
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/6"
+  - phase: 6
+    name: "Deferred"
+    total_tasks: 4
+    completed_tasks: 0
+    drift_score: 0
+    milestone_url: "https://github.com/TokenDanceLab/AgentHub/milestone/7"
+telemetry_log: []
+last_updated: "2026-06-19T14:32:00Z"
+```

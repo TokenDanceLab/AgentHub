@@ -7,7 +7,7 @@ db:
   host: postgres
   port: 5432
   user: agenthub
-  password: dev_password
+  password: ""  # MUST be set via AGENTHUB_DB_PASSWORD env var at runtime
   name: agenthub
 redis:
   host: redis
