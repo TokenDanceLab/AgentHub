@@ -34,3 +34,22 @@ func BenchmarkJWTParse(b *testing.B) {
 		_, _ = jwtutil.ParseToken(token, secret)
 	}
 }
+
+func BenchmarkJWTSign(b *testing.B) {
+	const secret = "bench-test-secret"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+	}
+}
+
+func BenchmarkJWTSignVerifyRoundTrip(b *testing.B) {
+	const secret = "bench-test-secret"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		token, _ := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+		_, _ = jwtutil.ParseToken(token, secret)
+	}
+}
