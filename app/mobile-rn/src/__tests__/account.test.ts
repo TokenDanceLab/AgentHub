@@ -358,39 +358,39 @@ describe('account menu sections', () => {
 
   it('first section is Identity and session', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    expect(sections[0].title).toBe('Identity and session');
-    expect(sections[0].items).toHaveLength(3);
+    expect(sections[0]!.title).toBe('Identity and session');
+    expect(sections[0]!.items).toHaveLength(3);
   });
 
   it('second section is Device and settings', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    expect(sections[1].title).toBe('Device and settings');
-    expect(sections[1].items).toHaveLength(4);
+    expect(sections[1]!.title).toBe('Device and settings');
+    expect(sections[1]!.items).toHaveLength(4);
   });
 
   it('third section is Agent Profiles', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    expect(sections[2].title).toBe('Agent Profiles');
-    expect(sections[2].items).toHaveLength(2);
+    expect(sections[2]!.title).toBe('Agent Profiles');
+    expect(sections[2]!.items).toHaveLength(2);
   });
 
   it('identity section includes TokenDance ID status', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    const tdItem = sections[0].items.find((i) => i.label === 'TokenDance ID');
+    const tdItem = sections[0]!.items.find((i) => i.label === 'TokenDance ID');
     expect(tdItem).toBeDefined();
     expect(tdItem!.status).toBe('signed_in');
   });
 
   it('identity section includes AgentHub hub session', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    const hubItem = sections[0].items.find((i) => i.label === 'AgentHub');
+    const hubItem = sections[0]!.items.find((i) => i.label === 'AgentHub');
     expect(hubItem).toBeDefined();
     expect(hubItem!.status).toBe('active');
   });
 
   it('device section includes notification status', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    const notifItem = sections[1].items.find((i) => i.label === 'Notification permission');
+    const notifItem = sections[1]!.items.find((i) => i.label === 'Notification permission');
     expect(notifItem).toBeDefined();
     expect(notifItem!.status).toBe('prompt');
   });
@@ -523,7 +523,7 @@ describe('theme mode handling', () => {
     let current: MobileThemeMode = 'system';
     const next = (mode: MobileThemeMode): MobileThemeMode => {
       const idx = themeModes.indexOf(mode);
-      return themeModes[(idx + 1) % themeModes.length];
+      return themeModes[(idx + 1) % themeModes.length]!;
     };
 
     current = next(current);

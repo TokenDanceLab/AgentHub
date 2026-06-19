@@ -395,7 +395,7 @@ describe('surface config generation', () => {
     for (const pane of config.panes) {
       const section = config.sections[pane.value];
       expect(section).toBeDefined();
-      expect(section.length).toBeGreaterThan(0);
+      expect(section!.length).toBeGreaterThan(0);
     }
   });
 
@@ -417,7 +417,7 @@ describe('surface config generation', () => {
     const config = buildSettingsConfig(0);
     const appearance = config.sections['appearance'] ?? [];
     expect(appearance).toHaveLength(1);
-    expect(appearance[0].rows).toHaveLength(3);
+    expect(appearance[0]!.rows).toHaveLength(3);
   });
 });
 
@@ -444,8 +444,8 @@ describe('surface search filtering', () => {
 
     const result = filterSections(sections, 'AgentHub');
     expect(result).toHaveLength(1);
-    expect(result[0].rows).toHaveLength(1);
-    expect(result[0].rows[0].title).toBe('AgentHub Chat');
+    expect(result[0]!.rows).toHaveLength(1);
+    expect(result[0]!.rows[0]!.title).toBe('AgentHub Chat');
   });
 
   it('filters by subtitle match', () => {
@@ -456,7 +456,7 @@ describe('surface search filtering', () => {
 
     const result = filterSections(sections, 'mobile');
     expect(result).toHaveLength(1);
-    expect(result[0].rows[0].title).toBe('Row 1');
+    expect(result[0]!.rows[0]!.title).toBe('Row 1');
   });
 
   it('filters by meta match', () => {
@@ -467,7 +467,7 @@ describe('surface search filtering', () => {
 
     const result = filterSections(sections, 'tokendance');
     expect(result).toHaveLength(1);
-    expect(result[0].rows[0].meta).toBe('TokenDance');
+    expect(result[0]!.rows[0]!.meta).toBe('TokenDance');
   });
 
   it('returns empty when no rows match', () => {
@@ -502,8 +502,8 @@ describe('surface search filtering', () => {
 
     const result = filterSections(sections, 'FindMe');
     expect(result).toHaveLength(2);
-    expect(result[0].rows).toHaveLength(1);
-    expect(result[1].rows).toHaveLength(1);
+    expect(result[0]!.rows).toHaveLength(1);
+    expect(result[1]!.rows).toHaveLength(1);
   });
 });
 
@@ -669,7 +669,7 @@ describe('surface fixture scenarios', () => {
 
   it('delta preview scenario has 7+ changed files', () => {
     const f = getMobileFixtureForScenario('diffPreview');
-    const run = f.runs[0];
+    const run = f.runs[0]!;
     expect(run.changedFiles.length).toBeGreaterThanOrEqual(7);
   });
 });

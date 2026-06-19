@@ -183,7 +183,7 @@ describe('filterThreads', () => {
   it('filters by title', () => {
     const result = filterThreads(threads, 'AgentHub Mobile');
     expect(result.length).toBeGreaterThanOrEqual(1);
-    expect(result[0].title).toMatch(/AgentHub Mobile/);
+    expect(result[0]!.title).toMatch(/AgentHub Mobile/);
   });
 
   it('filters by subtitle', () => {
@@ -458,8 +458,8 @@ describe('thread fixture scenarios', () => {
 
   it('sendError scenario has retryAvailable on thread', () => {
     const f = getMobileFixtureForScenario('sendError');
-    expect(f.threads[0].retryAvailable).toBe(true);
-    expect(f.threads[0].status).toBe('failed');
+    expect(f.threads[0]!.retryAvailable).toBe(true);
+    expect(f.threads[0]!.status).toBe('failed');
   });
 
   it('empty scenario has empty threads array', () => {

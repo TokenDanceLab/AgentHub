@@ -203,7 +203,7 @@ describe('runStatusPriority', () => {
       .map((s) => runStatusPriority(s));
     // Should be strictly increasing (lower number = higher priority)
     for (let i = 1; i < priorities.length; i++) {
-      expect(priorities[i]).toBeGreaterThan(priorities[i - 1]);
+      expect(priorities[i]!).toBeGreaterThan(priorities[i - 1]!);
     }
   });
 
@@ -212,9 +212,9 @@ describe('runStatusPriority', () => {
     const sorted = [...runs].sort(
       (a, b) => runStatusPriority(a.status) - runStatusPriority(b.status),
     );
-    expect(sorted[0].status).toBe('approval_required');
-    expect(sorted[1].status).toBe('failed');
-    expect(sorted[2].status).toBe('completed');
+    expect(sorted[0]!.status).toBe('approval_required');
+    expect(sorted[1]!.status).toBe('failed');
+    expect(sorted[2]!.status).toBe('completed');
   });
 });
 
@@ -226,7 +226,7 @@ describe('statusPriority', () => {
   it('orders tasks by review > in_progress > confirm > not_started > done', () => {
     const byPriority = taskStatusOrder.map((s) => statusPriority(s));
     for (let i = 1; i < byPriority.length; i++) {
-      expect(byPriority[i]).toBeGreaterThan(byPriority[i - 1]);
+      expect(byPriority[i]!).toBeGreaterThan(byPriority[i - 1]!);
     }
   });
 });
@@ -356,16 +356,16 @@ describe('createTasksFromRuns', () => {
 
   it('assigns pane based on index', () => {
     const tasks = createTasksFromRuns(mobileFixture.runs);
-    expect(tasks[0].pane).toBe('owned');
-    expect(tasks[1].pane).toBe('watching');
-    expect(tasks[2].pane).toBe('activity');
+    expect(tasks[0]!.pane).toBe('owned');
+    expect(tasks[1]!.pane).toBe('watching');
+    expect(tasks[2]!.pane).toBe('activity');
   });
 
   it('first task assignee is Delicious233', () => {
     const tasks = createTasksFromRuns(mobileFixture.runs);
-    expect(tasks[0].assignee).toBe('Delicious233');
-    expect(tasks[1].assignee).toBe('AgentHub');
-    expect(tasks[2].assignee).toBe('AgentHub');
+    expect(tasks[0]!.assignee).toBe('Delicious233');
+    expect(tasks[1]!.assignee).toBe('AgentHub');
+    expect(tasks[2]!.assignee).toBe('AgentHub');
   });
 
   it('tasks have non-empty titles and summaries', () => {
@@ -379,11 +379,11 @@ describe('createTasksFromRuns', () => {
   it('task statuses reflect run statuses', () => {
     const tasks = createTasksFromRuns(mobileFixture.runs);
     // run 0: approval_required -> review
-    expect(tasks[0].status).toBe('review');
+    expect(tasks[0]!.status).toBe('review');
     // run 1: completed -> done
-    expect(tasks[1].status).toBe('done');
+    expect(tasks[1]!.status).toBe('done');
     // run 2: failed -> confirm
-    expect(tasks[2].status).toBe('confirm');
+    expect(tasks[2]!.status).toBe('confirm');
   });
 });
 
@@ -401,13 +401,13 @@ describe('filterTasksByPane', () => {
   it('filters to owned tasks only', () => {
     const result = filterTasksByPane(tasks, 'owned');
     expect(result).toHaveLength(1);
-    expect(result[0].pane).toBe('owned');
+    expect(result[0]!.pane).toBe('owned');
   });
 
   it('returns empty when no tasks match pane', () => {
     const result = filterTasksByPane(tasks, 'watching');
     expect(result).toHaveLength(1);
-    expect(result[0].pane).toBe('watching');
+    expect(result[0]!.pane).toBe('watching');
   });
 });
 
@@ -420,9 +420,9 @@ describe('sortTasksByStatus', () => {
     const tasks = createTasksFromRuns(mobileFixture.runs);
     const sorted = sortTasksByStatus(tasks);
     // review comes first
-    expect(sorted[0].status).toBe('review');
+    expect(sorted[0]!.status).toBe('review');
     // done comes last
-    expect(sorted[sorted.length - 1].status).toBe('done');
+    expect(sorted[sorted.length - 1]!.status).toBe('done');
   });
 });
 
@@ -524,9 +524,9 @@ describe('dashboard view data', () => {
       (a, b) => runStatusPriority(a.status) - runStatusPriority(b.status),
     );
     // First: approval_required, Second: failed, Third: completed
-    expect(sorted[0].status).toBe('approval_required');
-    expect(sorted[1].status).toBe('failed');
-    expect(sorted[2].status).toBe('completed');
+    expect(sorted[0]!.status).toBe('approval_required');
+    expect(sorted[1]!.status).toBe('failed');
+    expect(sorted[2]!.status).toBe('completed');
   });
 
   it('each run in dashboard has changedFiles count', () => {
@@ -579,7 +579,7 @@ describe('task fixture scenarios', () => {
 
   it('diffPreview run has filePreview with selectedPath', () => {
     const f = getMobileFixtureForScenario('diffPreview');
-    const run = f.runs[0];
+    const run = f.runs[0]!;
     expect(run.filePreview).toBeDefined();
     expect(run.filePreview?.selectedPath).toBe('app/mobile-rn/src/screens/TasksScreen.tsx');
     expect(run.filePreview?.diffLines).toBeDefined();
