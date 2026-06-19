@@ -15,6 +15,11 @@ import type {
   HubFrame,
 } from '@/api/hubEvents';
 import { useNotificationStore } from '@/stores/notificationStore';
+import {
+  createDesktopHubEventBridge,
+  type DesktopHubEventBridgeHandle,
+} from '@/stores/hubEventBridge';
+import { queryClient } from '@/api/queryClient';
 
 // ── Public types ─────────────────────────────────
 
@@ -85,6 +90,8 @@ export function useHubEventStream(
     payload: unknown;
   } | null>(null);
 
+  const bridgeHandleRef = useRef<DesktopHubEventBridgeHandle | null>(null);
+
   useEffect(() => {
     const handle = createHubWS({
       getToken,
@@ -93,7 +100,16 @@ export function useHubEventStream(
     handleRef.current = handle;
     queueMicrotask(() => setHubWS(handle));
 
-    const unsubStatus = handle.onStatus(setStatus);
+    const unsubStatus = handle.onStatus((wsStatus: TransportStatus) => {
+      setStatus(wsStatus);
+      // Wire Hub WS events to React Query cache + store updates on connect
+      if (wsStatus === 'connected' && !bridgeHandleRef.current) {
+        bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient);
+      } else if (wsStatus === 'disconnected') {
+        bridgeHandleRef.current?.destroy();
+        bridgeHandleRef.current = null;
+      }
+    });
 
     const unsubAny = handle.onAny((type: string, payload: unknown) => {
       const frame: HubFrame = { type, payload };
@@ -307,6 +323,8 @@ export function useHubEventStream(
     return () => {
       unsubStatus();
       unsubAny();
+      bridgeHandleRef.current?.destroy();
+      bridgeHandleRef.current = null;
       handle.close();
       handleRef.current = null;
       queueMicrotask(() => setHubWS(null));

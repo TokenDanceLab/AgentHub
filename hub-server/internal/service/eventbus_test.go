@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {
@@ -196,4 +197,161 @@ func TestBusRunningCounter(t *testing.T) {
 		t.Fatal("expected Running() > 0 while handler is executing")
 	}
 	close(done)
+}
+
+// ── Concurrent Access Tests ──
+
+// TestBusConcurrentSubscribePublish verifies that concurrent Subscribe and
+// Publish operations do not race.
+func TestBusConcurrentSubscribePublish(t *testing.T) {
+	b := NewBus()
+	defer b.Close()
+
+	var total atomic.Int64
+	var wg sync.WaitGroup
+
+	// Subscribe 20 handlers for the same event type
+	for i := 0; i < 20; i++ {
+		b.Subscribe("concurrent.event", func(ctx context.Context, e Event) {
+			total.Add(1)
+			wg.Done()
+		})
+	}
+
+	// Publish 10 events concurrently
+	const numEvents = 10
+	wg.Add(20 * numEvents) // 20 handlers × 10 events
+	for i := 0; i < numEvents; i++ {
+		go func(idx int) {
+			b.Publish(context.Background(), Event{Type: "concurrent.event", Payload: idx})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Drain pool
+	for b.Running() > 0 || b.Pending() > 0 {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	assert.Equal(t, int64(20*numEvents), total.Load(), "all handlers should be called")
+}
+
+// TestBusConcurrentSubscribeWhilePublishing verifies that subscribing while
+// events are being published does not race.
+func TestBusConcurrentSubscribeWhilePublishing(t *testing.T) {
+	b := NewBus()
+	defer b.Close()
+
+	var total atomic.Int64
+	var wg sync.WaitGroup
+
+	// Start publishing continuously
+	pubDone := make(chan struct{})
+	go func() {
+		for i := 0; i < 50; i++ {
+			b.Publish(context.Background(), Event{Type: "race.event", Payload: nil})
+			time.Sleep(time.Millisecond)
+		}
+		close(pubDone)
+	}()
+
+	// Concurrently subscribe new handlers
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 5; j++ {
+				b.Subscribe("race.event", func(ctx context.Context, e Event) {
+					total.Add(1)
+				})
+				time.Sleep(2 * time.Millisecond)
+			}
+		}()
+	}
+
+	wg.Wait()
+	<-pubDone
+
+	// Drain pool
+	for b.Running() > 0 || b.Pending() > 0 {
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// TestBusConcurrentWildcardSubscribers verifies that concurrent wildcard
+// subscribers do not race with specific subscribers.
+func TestBusConcurrentWildcardSubscribers(t *testing.T) {
+	b := NewBus()
+	defer b.Close()
+
+	var wildcard atomic.Int64
+	var specific atomic.Int64
+	var wg sync.WaitGroup
+
+	// Register a wildcard handler
+	b.Subscribe("*", func(ctx context.Context, e Event) {
+		wildcard.Add(1)
+		wg.Done()
+	})
+
+	// Register 5 specific handlers concurrently
+	for i := 0; i < 5; i++ {
+		b.Subscribe("specific.event", func(ctx context.Context, e Event) {
+			specific.Add(1)
+			wg.Done()
+		})
+	}
+
+	// Publish 10 events — each fires: 1 wildcard + 5 specific = 6 handlers per event
+	const numEvents = 10
+	wg.Add(6 * numEvents)
+	for i := 0; i < numEvents; i++ {
+		go func() {
+			b.Publish(context.Background(), Event{Type: "specific.event", Payload: nil})
+		}()
+	}
+
+	wg.Wait()
+	for b.Running() > 0 || b.Pending() > 0 {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	assert.Equal(t, int64(10*1), wildcard.Load(), "wildcard called once per event")
+	assert.Equal(t, int64(10*5), specific.Load(), "specific called 5 times per event")
+}
+
+// TestBusHighConcurrencyPublish verifies the bus under high publish pressure.
+func TestBusHighConcurrencyPublish(t *testing.T) {
+	b := NewBus()
+	defer b.Close()
+
+	var total atomic.Int64
+	var wg sync.WaitGroup
+
+	b.Subscribe("pressure.event", func(ctx context.Context, e Event) {
+		total.Add(1)
+		wg.Done()
+	})
+
+	const numEvents = 200
+	wg.Add(numEvents)
+
+	var start sync.WaitGroup
+	start.Add(numEvents)
+
+	for i := 0; i < numEvents; i++ {
+		go func() {
+			start.Done()
+			start.Wait() // release all goroutines simultaneously
+			b.Publish(context.Background(), Event{Type: "pressure.event", Payload: nil})
+		}()
+	}
+
+	wg.Wait()
+	for b.Running() > 0 || b.Pending() > 0 {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	assert.Equal(t, int64(numEvents), total.Load(), "all events must be delivered")
 }

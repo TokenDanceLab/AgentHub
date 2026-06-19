@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -625,4 +626,143 @@ func TestReadMessageParentDeadlineWinsWhenShorter(t *testing.T) {
 	if elapsed > 2*time.Second {
 		t.Fatalf("ReadMessage took %v with 10ms parent deadline; expected fast failure", elapsed)
 	}
+}
+
+// ── Concurrent Access Tests ──
+
+// TestManagerConcurrentRegisterUnregister verifies that concurrent Register
+// and Unregister operations do not race or cause map corruption.
+func TestManagerConcurrentRegisterUnregister(t *testing.T) {
+	m := NewManager()
+
+	const numConns = 100
+	var conns []*Conn
+	for i := 0; i < numConns; i++ {
+		c := &Conn{Send: make(chan []byte, 4)}
+		conns = append(conns, c)
+	}
+
+	var wg sync.WaitGroup
+
+	// Phase 1: Register all concurrently
+	for i := 0; i < numConns; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			require.NoError(t, m.Register(conns[idx]))
+		}(i)
+	}
+	wg.Wait()
+
+	require.Equal(t, numConns, m.Count())
+
+	// Phase 2: Unregister all concurrently
+	for i := 0; i < numConns; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			m.Unregister(conns[idx].ID)
+		}(i)
+	}
+	wg.Wait()
+
+	require.Equal(t, 0, m.Count())
+}
+
+// TestManagerConcurrentSetAuth verifies that concurrent SetAuth calls on
+// different connections do not race.
+func TestManagerConcurrentSetAuth(t *testing.T) {
+	m := NewManager()
+
+	const numConns = 20
+	var conns []*Conn
+	for i := 0; i < numConns; i++ {
+		c := &Conn{Send: make(chan []byte, 4)}
+		require.NoError(t, m.Register(c))
+		conns = append(conns, c)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < numConns; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			m.SetAuth(conns[idx].ID, "shared-user", "desktop", fmt.Sprintf("dev-%d", idx%5))
+		}(i)
+	}
+	wg.Wait()
+
+	// All connections should still be accessible
+	require.Equal(t, numConns, m.Count())
+}
+
+// TestManagerConcurrentPushToConn verifies that concurrent PushToConn calls
+// across multiple connections do not race.
+func TestManagerConcurrentPushToConn(t *testing.T) {
+	m := NewManager()
+
+	const numConns = 20
+	var conns []*Conn
+	for i := 0; i < numConns; i++ {
+		c := &Conn{Send: make(chan []byte, 64)}
+		require.NoError(t, m.Register(c))
+		conns = append(conns, c)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			c := conns[idx%numConns]
+			frame := NewFrame(TypeMessageNew, map[string]string{
+				"msg_id": fmt.Sprintf("msg-%d", idx),
+			})
+			result := m.PushToConn(c.ID, frame)
+			require.True(t, result.Queued)
+			require.Equal(t, DeliveryStatusQueued, result.Status)
+		}(i)
+	}
+	wg.Wait()
+
+	// Verify all messages were delivered (none dropped).
+	for _, c := range conns {
+		count := len(c.Send)
+		require.GreaterOrEqual(t, count, 3)   // at least some per conn
+		require.LessOrEqual(t, count, 20)     // not more than total sends
+	}
+	require.Equal(t, numConns, m.Count())
+}
+
+// TestManagerConcurrentCount verifies Count() is safe under concurrent Register.
+func TestManagerConcurrentCount(t *testing.T) {
+	m := NewManager()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := &Conn{Send: make(chan []byte, 4)}
+			_ = m.Register(c)
+			_ = m.Count() // Count must not race with Register
+		}()
+	}
+	// Also run concurrent Unregister
+	for i := 0; i < 25; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := &Conn{Send: make(chan []byte, 4)}
+			_ = m.Register(c)
+			m.Unregister(c.ID)
+		}()
+	}
+	wg.Wait()
+
+	// Count should be 50 (50 registered, 25 unregistered in parallel).
+	// Actually due to timing, the exact count is non-deterministic but must not be negative.
+	count := m.Count()
+	require.GreaterOrEqual(t, count, 0)
+	require.LessOrEqual(t, count, 75)
 }

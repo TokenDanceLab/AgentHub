@@ -324,10 +324,12 @@ func TestOutbox_ScanRetryable(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
 
 	// Use raw INSERTs to avoid GORM autoCreateTime overriding our timestamps.
 	oldPendingTime := now.Add(-DeliveryPendingTimeout - time.Second)
-	_, err := db.DB().Exec(
+	_, err = rawDB.Exec(
 		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		"old-pending", "task-old-pending", "del-old-pending", `{}`, DeliveryStatusPending, DefaultMaxDeliveryAttempts, oldPendingTime, oldPendingTime,
 	)
@@ -346,7 +348,7 @@ func TestOutbox_ScanRetryable(t *testing.T) {
 
 	// Create a sent delivery older than DeliverySentTimeout.
 	oldSentTime := now.Add(-DeliverySentTimeout - time.Second)
-	_, err = db.DB().Exec(
+	_, err = rawDB.Exec(
 		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		"old-sent", "task-old-sent", "del-old-sent", `{}`, DeliveryStatusSent, DefaultMaxDeliveryAttempts, oldSentTime, oldSentTime,
 	)
@@ -354,7 +356,7 @@ func TestOutbox_ScanRetryable(t *testing.T) {
 
 	// Create a retrying delivery past its next_retry_at.
 	pastRetry := now.Add(-time.Second)
-	_, err = db.DB().Exec(
+	_, err = rawDB.Exec(
 		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"retrying-past", "task-retrying", "del-retrying", `{}`, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, pastRetry, now, now,
 	)
