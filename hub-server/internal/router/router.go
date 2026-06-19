@@ -350,6 +350,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", agentTeamHandler.FailAssignment)
 			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
+				// Compete summary (mobile-capable endpoint under /client).
+				client.POST("/team-runs/:id/compete-summary", agentTeamHandler.CompeteSummary)
+				// Human review gate (mobile-capable endpoint under /client).
+				client.POST("/team-runs/:id/review-decision", agentTeamHandler.ReviewDecision)
 			}
 		}
 }

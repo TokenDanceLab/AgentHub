@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -2025,6 +2027,7 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
 			target_id TEXT,
+			mode TEXT NOT NULL DEFAULT 'supervisor',
 			status TEXT NOT NULL DEFAULT 'queued',
 			created_at DATETIME,
 			updated_at DATETIME
@@ -2277,4 +2280,454 @@ func seedTeamRunSession(t *testing.T, db *gorm.DB, sessionID, userID string, exe
 		`INSERT INTO session_members (id, session_id, member_type, member_id, role, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		"session-member-agent", sessionID, model.MemberTypeAgent, "agent-executor", model.MemberRoleMember, now,
 	).Error)
+}
+
+// mockCompeteAggregator implements CompeteAggregator for tests.
+type mockCompeteAggregator struct {
+	summary string
+}
+
+func (m *mockCompeteAggregator) CompareResults(_ context.Context, _ string, entries []model.CompeteSummaryEntry) (string, error) {
+	if m.summary != "" {
+		return m.summary, nil
+	}
+	return "Comparison: " + strings.Join(entryMemberIDs(entries), " vs "), nil
+}
+
+func entryMemberIDs(entries []model.CompeteSummaryEntry) []string {
+	ids := make([]string, len(entries))
+	for i, e := range entries {
+		ids[i] = e.MemberID
+	}
+	return ids
+}
+
+func TestCompeteMode(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	aggregator := &mockCompeteAggregator{}
+	svc := NewAgentTeamService(db, nil, nil)
+	svc.SetCompeteAggregator(aggregator)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Compete Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+
+	supervisor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-supervisor"),
+		Role:           model.TeamMemberRoleSupervisor,
+	}
+	executor1 := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-executor-1"),
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	executor2 := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-executor-2"),
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, supervisor))
+	require.NoError(t, repository.AddTeamMember(db, executor1))
+	require.NoError(t, repository.AddTeamMember(db, executor2))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		SessionID:      "session-compete",
+		TriggerUserID:  "user-1",
+		TriggerMessage: "compare implementations of factorial",
+		Mode:           model.TeamRunModeCompete,
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, repository.CreateTeamRun(db, run))
+
+	// Submit a compete route decision targeting two executors.
+	workerIDs := executor1.ID + "," + executor2.ID
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "compete",
+		NextWorker:   workerIDs,
+		Instructions: "Implement factorial in your best style",
+		Reasoning:    "Let's see different approaches",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, assignment)
+	assert.Equal(t, model.AssignmentTypeCompete, assignment.Type)
+
+	// Both executors should have assignments.
+	assignments, err := svc.ListAssignments(context.Background(), "user-1", run.ID)
+	require.NoError(t, err)
+	assert.Len(t, assignments, 2)
+	assert.Equal(t, model.AssignmentTypeCompete, assignments[0].Type)
+	assert.Equal(t, model.AssignmentTypeCompete, assignments[1].Type)
+
+	// Complete both assignments with results.
+	as1 := &assignments[0]
+	as1.Status = model.AssignmentStatusRunning
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", as1.ID).Update("status", model.AssignmentStatusRunning).Error)
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", as1.ID, "func fact(n int) int { if n <= 1 { return 1 }; return n * fact(n-1) }"))
+
+	as2 := &assignments[1]
+	as2.Status = model.AssignmentStatusRunning
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", as2.ID).Update("status", model.AssignmentStatusRunning).Error)
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", as2.ID, "def factorial(n): return 1 if n <= 1 else n * factorial(n-1)"))
+
+	// Generate compete summary.
+	resp, err := svc.GenerateCompeteSummary(context.Background(), "user-1", run.ID, model.CompeteSummaryRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, run.ID, resp.TeamRunID)
+	assert.Contains(t, resp.Summary, "Comparison:")
+	assert.Len(t, resp.Entries, 2)
+
+	// Verify events include compete dispatched and aggregated.
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	hasCompeteDispatched := false
+	hasCompeteAggregated := false
+	for _, ev := range events {
+		if ev.Type == model.TeamEventCompeteDispatched {
+			hasCompeteDispatched = true
+		}
+		if ev.Type == model.TeamEventCompeteAggregated {
+			hasCompeteAggregated = true
+		}
+	}
+	assert.True(t, hasCompeteDispatched, "expected team.compete.dispatched event")
+	assert.True(t, hasCompeteAggregated, "expected team.compete.aggregated event")
+}
+
+func TestCompeteModeAutoSelectsExecutors(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	aggregator := &mockCompeteAggregator{}
+	svc := NewAgentTeamService(db, nil, nil)
+	svc.SetCompeteAggregator(aggregator)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Auto Compete Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+
+	supervisor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-supervisor"),
+		Role:           model.TeamMemberRoleSupervisor,
+	}
+	executor1 := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-executor-1"),
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	executor2 := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-executor-2"),
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, supervisor))
+	require.NoError(t, repository.AddTeamMember(db, executor1))
+	require.NoError(t, repository.AddTeamMember(db, executor2))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		SessionID:      "session-auto-compete",
+		TriggerUserID:  "user-1",
+		TriggerMessage: "auto compete",
+		Mode:           model.TeamRunModeCompete,
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, repository.CreateTeamRun(db, run))
+
+	// Submit compete decision with empty NextWorker — should pick both executors.
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "compete",
+		Instructions: "Write hello world",
+		Reasoning:    "Auto-select",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, assignment)
+
+	assignments, err := svc.ListAssignments(context.Background(), "user-1", run.ID)
+	require.NoError(t, err)
+	assert.Len(t, assignments, 2)
+	// Both should be executors (not supervisor).
+	for _, a := range assignments {
+		assert.NotEqual(t, supervisor.ID, a.ToMemberID)
+	}
+}
+
+func TestCompeteModeRejectsExceedingMaxAgents(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	svc.SetCompeteMaxAgents(2)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Max Compete Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+
+	supervisor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: strPtr("profile-supervisor"),
+		Role:           model.TeamMemberRoleSupervisor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, supervisor))
+
+	workerIDs := make([]string, 3)
+	for i := range 3 {
+		e := &model.AgentTeamMember{
+			TeamID:         team.ID,
+			AgentProfileID: strPtr(fmt.Sprintf("profile-executor-%d", i)),
+			Role:           model.TeamMemberRoleExecutor,
+		}
+		require.NoError(t, repository.AddTeamMember(db, e))
+		workerIDs[i] = e.ID
+	}
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		SessionID:      "session-max-compete",
+		TriggerUserID:  "user-1",
+		TriggerMessage: "too many",
+		Mode:           model.TeamRunModeCompete,
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, repository.CreateTeamRun(db, run))
+
+	_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "compete",
+		NextWorker:   strings.Join(workerIDs, ","),
+		Instructions: "Too many workers",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+// ── Human Review Gate (ADR-008) ────────────────────────────────
+
+func TestHumanReviewGate(t *testing.T) {
+	t.Run("disabled by default rejects review API", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		team, _, executor, run := seedAgentTeamRun(t, db)
+
+		// HandleRouteDecision should proceed normally (no pending_review).
+		assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, assignment)
+
+		// Verify the run is still in running state, not pending_review.
+		gotRun, err := repository.GetTeamRunByID(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusRunning, gotRun.Status)
+
+		// Calling ReviewDagPlan when disabled should fail.
+		_, err = svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action: model.ReviewActionApprove,
+		})
+		require.Error(t, err)
+		assert.Equal(t, errcode.ErrBadRequest, err)
+	})
+
+	t.Run("enabled sets pending_review after route decision", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, assignment)
+
+		// Verify the run is now pending_review.
+		gotRun, err := repository.GetTeamRunByID(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusPendingReview, gotRun.Status)
+
+		// Verify review_pending event was recorded.
+		events, err := repository.ListTeamEventsByRun(db, run.ID)
+		require.NoError(t, err)
+		foundPending := false
+		for _, e := range events {
+			if e.Type == model.TeamEventReviewPending {
+				foundPending = true
+				break
+			}
+		}
+		assert.True(t, foundPending, "expected team.review.pending event")
+	})
+
+	t.Run("enabled approve transitions back to running", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+
+		// Review: approve
+		state, err := svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action:  model.ReviewActionApprove,
+			Comment: "looks good",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, model.ReviewActionApprove, state.Action)
+		assert.Equal(t, "looks good", state.Comment)
+
+		// Verify the run is back to running.
+		gotRun, err := repository.GetTeamRunByID(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusRunning, gotRun.Status)
+
+		// Verify review_decided event was recorded.
+		events, err := repository.ListTeamEventsByRun(db, run.ID)
+		require.NoError(t, err)
+		foundDecided := false
+		for _, e := range events {
+			if e.Type == model.TeamEventReviewDecided {
+				foundDecided = true
+				break
+			}
+		}
+		assert.True(t, foundDecided, "expected team.review.decided event")
+	})
+
+	t.Run("enabled discuss cancels pending assignments", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+
+		// Verify assignment is pending before review.
+		assignments, err := repository.ListAssignmentsByTeamRun(db, run.ID)
+		require.NoError(t, err)
+		require.Len(t, assignments, 1)
+		assert.Equal(t, model.AssignmentStatusPending, assignments[0].Status)
+
+		// Review: discuss
+		state, err := svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action:  model.ReviewActionDiscuss,
+			Comment: "needs more thought",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, model.ReviewActionDiscuss, state.Action)
+
+		// Verify the run is back to running (so supervisor can re-plan).
+		gotRun, err := repository.GetTeamRunByID(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusRunning, gotRun.Status)
+
+		// Verify assignments were cancelled.
+		assignments, err = repository.ListAssignmentsByTeamRun(db, run.ID)
+		require.NoError(t, err)
+		require.Len(t, assignments, 1)
+		assert.Equal(t, model.AssignmentStatusCancelled, assignments[0].Status)
+	})
+
+	t.Run("enabled modify cancels pending assignments with changes recorded", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+
+		state, err := svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action: model.ReviewActionModify,
+			Changes: []model.HumanReviewChange{
+				{Field: "instructions", Value: "Do the other thing"},
+				{Field: "next_worker", Value: "worker-2"},
+			},
+			Comment: "change the target",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, model.ReviewActionModify, state.Action)
+		assert.Len(t, state.Changes, 2)
+		assert.Equal(t, "instructions", state.Changes[0].Field)
+
+		// Verify the run is back to running.
+		gotRun, err := repository.GetTeamRunByID(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusRunning, gotRun.Status)
+
+		// Verify assignments were cancelled.
+		assignments, err := repository.ListAssignmentsByTeamRun(db, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.AssignmentStatusCancelled, assignments[0].Status)
+	})
+
+	t.Run("review rejects invalid action", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+
+		_, err = svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action: "bogus",
+		})
+		require.Error(t, err)
+		assert.Equal(t, errcode.ErrBadRequest, err)
+	})
+
+	t.Run("review rejects non-pending_review status", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		_, _, _, run := seedAgentTeamRun(t, db) // run status is "running"
+
+		_, err := svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+			Action: model.ReviewActionApprove,
+		})
+		require.Error(t, err)
+		assert.Equal(t, errcode.ErrBadRequest, err)
+	})
+
+	t.Run("review rejects non-owner user", func(t *testing.T) {
+		db := setupAgentTeamStateSQLite(t)
+		svc := NewAgentTeamService(db, nil, nil)
+		svc.SetHumanReviewEnabled(true)
+		team, _ , executor, run := seedAgentTeamRun(t, db)
+
+		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+			Action:       "delegate",
+			NextWorker:   executor.ID,
+			Instructions: "Do the thing",
+		})
+		require.NoError(t, err)
+
+		_, err = svc.ReviewDagPlan(context.Background(), "intruder-user", run.ID, model.HumanReviewDecision{
+			Action: model.ReviewActionApprove,
+		})
+		require.Error(t, err)
+		assert.Equal(t, errcode.AgentTaskNotFound, err)
+	})
 }

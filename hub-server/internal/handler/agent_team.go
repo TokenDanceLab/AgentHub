@@ -35,6 +35,12 @@ type AgentTeamService interface {
 	CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error
 	FailAssignment(ctx context.Context, userID, assignmentID string, reason string) error
 	ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+
+	// Compete mode
+	GenerateCompeteSummary(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
+
+	// Human review gate
+	ReviewDagPlan(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
 }
 
 type AgentTeamHandler struct {
@@ -502,4 +508,46 @@ func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
 		return
 	}
 	OK(c, approval)
+}
+
+// CompeteSummary POST /client/team-runs/:id/compete-summary
+func (h *AgentTeamHandler) CompeteSummary(c *gin.Context) {
+	var req model.CompeteSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Allow empty body.
+		req = model.CompeteSummaryRequest{}
+	}
+	userID := c.GetString("user_id")
+	runID := c.Param("id")
+	resp, err := h.service.GenerateCompeteSummary(c.Request.Context(), userID, runID, req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, resp)
+}
+
+// ReviewDecision POST /client/team-runs/:id/review-decision
+func (h *AgentTeamHandler) ReviewDecision(c *gin.Context) {
+	var req model.HumanReviewDecision
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	runID := c.Param("id")
+	state, err := h.service.ReviewDagPlan(c.Request.Context(), userID, runID, req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, state)
 }

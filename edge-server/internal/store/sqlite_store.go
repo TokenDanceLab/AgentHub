@@ -712,6 +712,17 @@ func (s *SQLiteStore) SetRunStatusIf(id, status string, allowedCurrent ...string
 	return run, true
 }
 
+func (s *SQLiteStore) SetRunEvidenceGate(id, result string) (Run, bool) {
+	run, ok := s.store.SetRunEvidenceGate(id, result)
+	if !ok {
+		return Run{}, false
+	}
+	if err := s.syncPersist(); err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
 func (s *SQLiteStore) CreateItem(item Item) (Item, error) {
 	created, err := s.store.CreateItem(item)
 	return persistAfterSQLiteWrite(s, created, err)

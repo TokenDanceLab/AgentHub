@@ -36,13 +36,14 @@ type Thread struct {
 }
 
 type Run struct {
-	ID         string `json:"runId"`
-	ProjectID  string `json:"projectId"`
-	ThreadID   string `json:"threadId"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"createdAt"`
-	StartedAt  string `json:"startedAt,omitempty"`
-	FinishedAt string `json:"finishedAt,omitempty"`
+	ID                  string `json:"runId"`
+	ProjectID           string `json:"projectId"`
+	ThreadID            string `json:"threadId"`
+	Status              string `json:"status"`
+	CreatedAt           string `json:"createdAt"`
+	StartedAt           string `json:"startedAt,omitempty"`
+	FinishedAt          string `json:"finishedAt,omitempty"`
+	EvidenceGateResult  string `json:"evidenceGateResult,omitempty"`
 }
 
 type RunDiffFile struct {
@@ -205,6 +206,7 @@ type RunLifecycleStore interface {
 	GetRun(id string) (Run, bool)
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+	SetRunEvidenceGate(id, result string) (Run, bool)
 }
 
 type RunCleaner interface {
@@ -827,7 +829,7 @@ func filterIDs(ids []string, keep func(string) bool) []string {
 
 func isTerminalRunStatus(status string) bool {
 	switch status {
-	case "cancelled", "failed", "finished":
+	case "cancelled", "failed", "finished", "completed_with_issues":
 		return true
 	default:
 		return false
@@ -859,7 +861,7 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	switch status {
 	case "started":
 		run.StartedAt = nowString()
-	case "cancelled", "finished", "failed":
+	case "cancelled", "finished", "failed", "completed_with_issues":
 		run.FinishedAt = nowString()
 	}
 	run.Status = status
@@ -888,10 +890,25 @@ func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run
 	switch status {
 	case "started":
 		run.StartedAt = nowString()
-	case "finished", "failed", "cancelled":
+	case "finished", "failed", "cancelled", "completed_with_issues":
 		run.FinishedAt = nowString()
 	}
 	run.Status = status
+	s.runs[id] = run
+	return run, true
+}
+
+// SetRunEvidenceGate stores the evidence gate verification result on a run.
+// The result should be a JSON-encoded string.
+func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	run.EvidenceGateResult = result
 	s.runs[id] = run
 	return run, true
 }

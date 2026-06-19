@@ -83,6 +83,9 @@ type ProcessExecutor struct {
 	shutdownGracePeriod  time.Duration
 	shutdownForceTimeout time.Duration
 
+	// Evidence gate configuration for post-run verification.
+	evidenceGateCfg EvidenceGateConfig
+
 	mu          sync.Mutex
 	running     map[string]context.CancelFunc
 	stdins      map[string]io.Writer                       // runID to stdin (for adapter-aware interrupt)
@@ -139,6 +142,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		runTimeout:                runTimeout,
 		shutdownGracePeriod:       shutdownGP,
 		shutdownForceTimeout:      shutdownFT,
+		evidenceGateCfg:           EvidenceGateConfigFromEnv(),
 		running:     make(map[string]context.CancelFunc),
 		stdins:      make(map[string]io.Writer),
 		processes:   make(map[string]*os.Process),
@@ -721,10 +725,29 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				return
 			}
 		}
-		finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
+		// Evidence gate: run post-completion verification before marking finished.
+		// When enabled (default), the gate runs type-specific checks (Go build+vet,
+		// TypeScript typecheck+test, generic file existence) against the workDir.
+		// If verification fails, the run is marked as completed_with_issues instead
+		// of finished, and the full evidence output is stored in run metadata.
+		finalStatus := "finished"
+		if isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir) {
+			evidenceResult := runEvidenceGate(workDir)
+			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
+			if !evidenceResult.Passed {
+				finalStatus = "completed_with_issues"
+				slog.Warn("process: evidence gate verification failed",
+					"runId", run.ID,
+					"projectType", evidenceResult.ProjectType,
+					"summary", evidenceResult.Summary,
+				)
+			}
+		}
+
+		finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
 		if ok {
 			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
-			e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
+			e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
 			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
 			e.fireHubDone(run.ID, RunResponse(finished))
 		}

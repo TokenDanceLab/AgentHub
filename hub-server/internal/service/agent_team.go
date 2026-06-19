@@ -29,12 +29,15 @@ type agentTeamControlSvc interface {
 }
 
 type AgentTeamService struct {
-	db          *gorm.DB
-	agentSvc    agentTeamAgentSvc
-	cacheClient agentTeamCache
-	controlSvc  agentTeamControlSvc
-	bus         *Bus
-	guardrails  AgentTeamGuardrails
+	db                  *gorm.DB
+	agentSvc            agentTeamAgentSvc
+	cacheClient         agentTeamCache
+	controlSvc          agentTeamControlSvc
+	bus                 *Bus
+	guardrails          AgentTeamGuardrails
+	competeAggregator   CompeteAggregator
+	competeMaxAgents    int
+	humanReviewEnabled  bool
 }
 
 type AgentTeamGuardrails struct {
@@ -88,13 +91,13 @@ func (g AgentTeamGuardrails) normalized() AgentTeamGuardrails {
 func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client) *AgentTeamService {
 	return NewAgentTeamServiceWithGuardrails(db, agentSvc, cacheClient, DefaultAgentTeamGuardrails())
 }
-
 func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client, guardrails AgentTeamGuardrails) *AgentTeamService {
 	return &AgentTeamService{
-		db:          db,
-		agentSvc:    agentSvc,
-		cacheClient: resolveAgentTeamCache(cacheClient),
-		guardrails:  guardrails.normalized(),
+		db:               db,
+		agentSvc:         agentSvc,
+		cacheClient:      resolveAgentTeamCache(cacheClient),
+		guardrails:       guardrails.normalized(),
+		competeMaxAgents: model.CompeteMaxAgentsDefault,
 	}
 }
 
@@ -104,6 +107,18 @@ func (s *AgentTeamService) SetControlService(controlSvc agentTeamControlSvc) {
 
 func (s *AgentTeamService) SetBus(bus *Bus) {
 	s.bus = bus
+}
+
+// SetCompeteMaxAgents sets the maximum number of parallel agents in compete mode.
+func (s *AgentTeamService) SetCompeteMaxAgents(n int) {
+	if n > 0 {
+		s.competeMaxAgents = n
+	}
+}
+
+// SetHumanReviewEnabled sets whether the human review gate is active.
+func (s *AgentTeamService) SetHumanReviewEnabled(enabled bool) {
+	s.humanReviewEnabled = enabled
 }
 
 func resolveAgentTeamCache(c *cache.Client) agentTeamCache {
