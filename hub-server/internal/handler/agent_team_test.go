@@ -219,6 +219,8 @@ type mockAgentTeamService struct {
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	competeSummary      func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
+treviewDagPlan       func(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -370,6 +372,13 @@ func (m *mockAgentTeamService) DecideApproval(ctx context.Context, userID, teamI
 		return nil, nil
 	}
 	return m.decideApproval(ctx, userID, teamID, runID, approvalID, decision)
+}
+
+func (m *mockAgentTeamService) GenerateCompeteSummary(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error) {
+	if m.competeSummary == nil {
+		return nil, nil
+	}
+	return m.competeSummary(ctx, userID, runID, req)
 }
 
 func TestAgentTeamHandler_CreateTeam(t *testing.T) {

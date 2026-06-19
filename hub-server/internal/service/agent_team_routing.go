@@ -55,6 +55,20 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		return nil, s.finishRouteDecision(runID, decision)
 	}
 
+	// Compete mode: dispatch the same task to multiple workers in parallel.
+	if decision.Action == "compete" {
+		assignments, err := s.HandleCompeteRouteDecision(ctx, userID, teamID, runID, decision)
+		if err != nil {
+			return nil, err
+		}
+		if len(assignments) == 0 {
+			return nil, s.rejectRouteDecision(runID, decision, "no compete assignments created")
+		}
+		// Return the first assignment for API compatibility; the full list
+		// is available via ListAssignments.
+		return &assignments[0], nil
+	}
+
 	if strings.TrimSpace(decision.NextWorker) == "" {
 		return nil, s.rejectRouteDecision(runID, decision, "next_worker is required")
 	}
@@ -144,6 +158,15 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err := s.appendTeamEvent(runID, model.TeamEventTaskCreated, task); err != nil {
 		return nil, err
 	}
+
+	// Human review gate: when enabled, transition to pending_review
+	// instead of letting the assignment proceed immediately.
+	if s.humanReviewEnabled {
+		if err := s.setRunPendingReview(runID, decision); err != nil {
+			return nil, err
+		}
+	}
+
 	return assignment, nil
 }
 

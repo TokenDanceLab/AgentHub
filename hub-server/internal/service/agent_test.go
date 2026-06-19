@@ -269,6 +269,7 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
 			target_id TEXT,
+			mode TEXT NOT NULL DEFAULT 'supervisor',
 			status TEXT NOT NULL,
 			created_at DATETIME,
 			updated_at DATETIME

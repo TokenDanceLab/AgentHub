@@ -92,6 +92,7 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT,
 			target_id TEXT,
+			mode TEXT NOT NULL DEFAULT 'supervisor',
 			status TEXT NOT NULL,
 			created_at DATETIME,
 			updated_at DATETIME
