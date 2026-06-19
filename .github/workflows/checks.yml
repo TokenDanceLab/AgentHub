@@ -354,6 +354,35 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Type check (mobile)
+        run: pnpm --filter agenthub-mobile-rn typecheck
+
+      - name: Lint (mobile rules)
+        run: pnpm --filter agenthub-mobile-rn lint
+
+      - name: Test (mobile)
+        run: pnpm --filter agenthub-mobile-rn test
+
+      - name: E2E (mock hub)
+        run: |
+          node mobile-rn/scripts/mock-hub.mjs &
+          MOCK_HUB_PID=$!
+          # Wait for mock hub to accept connections
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8088/health > /dev/null 2>&1; then
+              echo "Mock hub ready at http://127.0.0.1:8088"
+              break
+            fi
+            sleep 1
+          done
+          # Run vitest with mock hub available
+          AGENTHUB_MOBILE_MOCK_HUB_PORT=8088 pnpm --filter agenthub-mobile-rn test
+          E2E_EXIT_CODE=$?
+          kill $MOCK_HUB_PID 2>/dev/null || true
+          wait $MOCK_HUB_PID 2>/dev/null || true
+          exit $E2E_EXIT_CODE
+
       - name: Verify Mobile RN
         run: pnpm --filter agenthub-mobile-rn verify
       - name: Expo Doctor
