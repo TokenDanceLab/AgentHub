@@ -371,5 +371,17 @@
   "hub.error.autoLoginFailed": "Failed to complete Hub login",
   "hub.error.wsAuthFailed": "Hub WebSocket auth failed: {{reason}}",
   "hub.error.streamRecoveryFailed": "Failed to recover stream events",
-  "hub.error.recoveryFailed": "Recovery failed"
+  "hub.error.recoveryFailed": "Recovery failed",
+
+  "errorBoundary.chunkLoadDesc": "A new version of the app is available. Please reload to continue.",
+  "errorBoundary.chunkLoadTitle": "Update Required",
+  "errorBoundary.desc": "An unexpected error occurred while rendering this section.",
+  "errorBoundary.networkDesc": "The connection to the server was lost. Check your network and try reloading.",
+  "errorBoundary.networkTitle": "Connection Lost",
+  "errorBoundary.reload": "Reload Page",
+  "errorBoundary.retry": "Retry",
+  "errorBoundary.stackTrace": "Stack Trace",
+  "errorBoundary.timeoutDesc": "The service took too long to respond. Please try again.",
+  "errorBoundary.timeoutTitle": "Service Timeout",
+  "errorBoundary.title": "Something went wrong"
 }

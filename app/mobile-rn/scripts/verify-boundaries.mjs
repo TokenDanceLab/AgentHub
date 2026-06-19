@@ -16,8 +16,14 @@ const runtimeSecretAllowlist = new Set([
 ]);
 
 const allowedSharedImports = new Set([
+  '@agenthub/shared/composer',
   '@agenthub/shared/designTokens',
+  '@agenthub/shared/hubClient',
+  '@agenthub/shared/hubEvents',
+  '@agenthub/shared/i18n',
+  '@agenthub/shared/platform',
   '@agenthub/shared/transcript',
+  '@agenthub/shared/types',
 ]);
 
 const forbiddenImportFragments = [
@@ -60,6 +66,10 @@ if (metroConfigSource === null) {
 
   if (!metroConfigSource.includes("path.join(__dirname, 'src'")) {
     failures.push('metro.config.cjs: Metro @/ alias must resolve into the mobile-rn src directory');
+  }
+
+  if (!metroConfigSource.includes('@agenthub/shared')) {
+    failures.push('metro.config.cjs: Metro must resolve @agenthub/shared workspace package imports');
   }
 }
 

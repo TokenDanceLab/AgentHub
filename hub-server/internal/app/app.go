@@ -403,7 +403,7 @@ func (a *App) setupRouter() *gin.Engine {
 	if err := r.SetTrustedProxies([]string{"127.0.0.0/8", "::1"}); err != nil {
 		panic(fmt.Errorf("failed to set trusted proxies: %w", err))
 	}
-	r.Use(gin.Recovery())
+	r.Use(middleware.CustomRecovery())
 	router.SetupRoutes(r, a.Config, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
@@ -807,7 +807,7 @@ func (a *App) startAdminServer() {
 
 	a.AdminServer = &http.Server{
 		Addr:              adminListenAddr(adminPort),
-		Handler:           adminMux,
+		Handler:           middleware.RecoveryHTTPHandler(adminMux),
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,

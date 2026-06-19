@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — host-redacted Override
+# ──────────────────────────────────────────────
+# Overrides docker-compose.prod.yml for host-redacted deployment.
+# Public URL: https://hub.example.invalid
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.host-redacted.yml --env-file .env.host-redacted up -d --no-build
+#
+# This file contains ONLY host-redacted-specific overrides.
+# All shared service definitions (postgres, redis, hub-server base config,
+# volumes, networks) live in docker-compose.prod.yml.
+# ──────────────────────────────────────────────
+
+services:
+  hub-server:
+    environment:
+      # CORS — allow Tauri Desktop dev origin alongside production
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.example.invalid,https://tauri.localhost}
+      # TokenDance ID OIDC — additional redirect URIs beyond production defaults
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.example.invalid/auth/tokendance/callback,http://127.0.0.1/callback,http://127.0.0.1:8400/callback}
+    ports:
+      - "127.0.0.1:8090:8080"   # Loopback only — nginx reverse proxy
+      - "127.0.0.1:6060:6060"   # pprof/metrics — localhost only

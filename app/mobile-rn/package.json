@@ -26,6 +26,7 @@
     "verify:qa": "pnpm verify && pnpm run doctor && pnpm run native:check && pnpm run mock:hub:check && pnpm visual:qa"
   },
   "dependencies": {
+    "@agenthub/shared": "workspace:*",
     "@expo/metro-runtime": "~56.0.14",
     "expo": "56.0.9",
     "expo-auth-session": "56.0.13",

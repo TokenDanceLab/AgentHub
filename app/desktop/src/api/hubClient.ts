@@ -961,11 +961,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ...((options.headers as Record<string, string>) || {}),
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     const url = `${base}${path}`;
     console.debug('[hubClient] request', options.method || 'GET', url);
     let res: Response;
     try {
-      res = await fetch(url, { ...options, headers });
+      res = await fetch(url, { ...options, headers, signal: controller.signal });
     } catch (fetchErr) {
       console.warn('[hubClient] fetch() failed, attempting Tauri proxy fallback', url, {
         name: (fetchErr as Error)?.name,
@@ -989,6 +992,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       });
       throw fetchErr;
     }
+    clearTimeout(timeoutId);
     console.debug('[hubClient] response', res.status, url);
     const body = res.status === 204 ? undefined : await readJsonBody(res);
 
@@ -1043,7 +1047,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
     const headers: Record<string, string> = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
-    const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: formData });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: formData, signal: controller.signal });
+    clearTimeout(timeoutId);
     const body = res.status === 204 ? undefined : await readJsonBody(res);
     if (!res.ok) {
       if (isSharedErrorBody(body)) {
