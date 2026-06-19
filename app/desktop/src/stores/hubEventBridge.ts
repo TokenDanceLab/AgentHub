@@ -7,13 +7,14 @@
 // 2. Hub WS (this bridge) — team/agent dispatch events from the Hub
 
 import type { QueryClient } from '@tanstack/react-query';
-import { HUB_EVENTS, hubQueryKeys } from '@agenthub/shared';
+import { HUB_EVENTS } from '@shared/hubEvents';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
   HubAgentFailedPayload,
   HubAgentCancelPayload,
-} from '@agenthub/shared';
+} from '@shared/hubClient';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ function onAgentFailed(qc: QueryClient, payload: unknown) {
   const error = str(data?.error || data?.error_message);
 
   if (taskId) {
-    getTaskBridge().updateTask(taskId, { status: 'failed', error: error || undefined });
+    getTaskBridge().updateTask(taskId, { status: 'failed', ...(error ? { error } : {}) });
   }
 
   invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);

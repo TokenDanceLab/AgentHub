@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -18,7 +19,8 @@ import (
 )
 
 // HandleTaskAck marks a task as running and optionally records the Edge run id
-// that is executing it.
+// that is executing it. It also auto-acks any pending delivery outbox entries
+// for this task (AH-SR-049: outbox delivery journal).
 func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
 		return err
@@ -40,6 +42,7 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 				return err
 			}
 			if rowsAffected > 0 {
+				s.autoAckDeliveriesForTask(ctx, taskID)
 				return nil
 			}
 			latestTask, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -50,10 +53,12 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 				return err
 			}
 			if latestTask.EdgeRunID == edgeRunID {
+				s.autoAckDeliveriesForTask(ctx, taskID)
 				return nil
 			}
 			return errcode.ErrBadRequest
 		}
+		s.autoAckDeliveriesForTask(ctx, taskID)
 		return nil
 	}
 	// #99: accept queued tasks for offline-replayed tasks, transitioning to running.
@@ -67,7 +72,28 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 	if rowsAffected == 0 {
 		return errcode.ErrBadRequest
 	}
+	s.autoAckDeliveriesForTask(ctx, taskID)
 	return nil
+}
+
+// autoAckDeliveriesForTask marks all pending/sent/retrying delivery outbox
+// entries for a task as delivered. This is called when the Edge acks the task.
+func (s *AgentService) autoAckDeliveriesForTask(ctx context.Context, taskID string) {
+	now := time.Now()
+	result := s.db.WithContext(ctx).
+		Model(&deliveryOutboxRecord{}).
+		Where("task_id = ? AND status IN ?", taskID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
+		Updates(map[string]interface{}{
+			"status":       DeliveryStatusDelivered,
+			"delivered_at": &now,
+		})
+	if result.Error != nil {
+		slog.Warn("failed to auto-ack deliveries for task", "task_id", taskID, "error", result.Error)
+		return
+	}
+	if result.RowsAffected > 0 {
+		slog.Debug("auto-acked deliveries for task", "task_id", taskID, "count", result.RowsAffected)
+	}
 }
 
 // HandleTaskStream records a typed runtime event and keeps the existing

@@ -9,7 +9,7 @@ import type {
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
-import { hubQueryKeys } from '@agenthub/shared';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 export interface UseHubExecutionTargetsOptions {
   enabled: boolean;

@@ -7,7 +7,8 @@
 // and the frontend state layer. All WS event → store wiring lives here.
 
 import type { QueryClient } from '@tanstack/react-query';
-import { HUB_EVENTS, hubQueryKeys } from '@agenthub/shared';
+import { HUB_EVENTS } from '@shared/hubEvents';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
@@ -20,7 +21,7 @@ import type {
   HubFriendEventPayload,
   HubDevicePresencePayload,
   HubDeviceKickedPayload,
-} from '@agenthub/shared';
+} from '@shared/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { useConnectionStore } from '@/stores/connectionStore';
