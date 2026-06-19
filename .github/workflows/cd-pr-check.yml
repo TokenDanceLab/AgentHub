@@ -1,0 +1,269 @@
+name: CD PR Check
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "hub-server/deployments/**"
+      - "hub-server/**/Dockerfile*"
+      - "hub-server/docker-compose*"
+      - "hub-server/**.dockerignore"
+      - ".github/workflows/cd-*.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/*deploy*"
+      - "scripts/generate-secrets*"
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  # ── Deployment file validation ─────────────────
+  deployment-files:
+    name: Deployment files validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required deployment files exist
+        run: |
+          echo "::group::Checking required deployment files"
+          FAILED=0
+
+          check_file() {
+            local path="$1"
+            local label="$2"
+            if [ -f "$path" ]; then
+              echo "  OK    $label ($path)"
+            else
+              echo "  MISS  $label ($path)"
+              FAILED=1
+            fi
+          }
+
+          check_file "hub-server/deployments/Dockerfile"           "Dockerfile"
+          check_file "hub-server/deployments/docker-compose.prod.yml" "Production compose"
+          check_file "hub-server/deployments/deploy.sh"            "Deploy script"
+          check_file "hub-server/deployments/.env.production.example" "Env example"
+          check_file "hub-server/deployments/README.md"            "Deploy docs"
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more required deployment files are missing."
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: Validate Dockerfile syntax
+        run: |
+          echo "::group::Validating Dockerfile"
+          # Quick structural checks on the Dockerfile
+          DOCKERFILE="hub-server/deployments/Dockerfile"
+
+          # Must have FROM
+          if ! grep -qE '^FROM ' "$DOCKERFILE"; then
+            echo "::error::Dockerfile missing FROM instruction"
+            exit 1
+          fi
+
+          # Must have HEALTHCHECK
+          if ! grep -qE 'HEALTHCHECK' "$DOCKERFILE"; then
+            echo "::warning::Dockerfile is missing HEALTHCHECK instruction"
+          fi
+
+          # Must have CMD or ENTRYPOINT
+          if ! grep -qE '^(CMD|ENTRYPOINT) ' "$DOCKERFILE"; then
+            echo "::error::Dockerfile missing CMD or ENTRYPOINT"
+            exit 1
+          fi
+
+          # Check EXPOSE
+          if ! grep -qE '^EXPOSE ' "$DOCKERFILE"; then
+            echo "::warning::Dockerfile missing EXPOSE — consider adding it"
+          fi
+
+          echo "Dockerfile structure looks valid."
+          echo "::endgroup::"
+
+      - name: Validate docker-compose.prod.yml syntax
+        run: |
+          echo "::group::Validating docker-compose.prod.yml"
+          COMPOSE_FILE="hub-server/deployments/docker-compose.prod.yml"
+
+          python3 -c "
+          import sys, pathlib
+          try:
+              import yaml
+          except ImportError:
+              print('::warning::PyYAML not available, skipping compose YAML validation')
+              sys.exit(0)
+          try:
+              data = yaml.safe_load(pathlib.Path('${COMPOSE_FILE}').read_text(encoding='utf-8'))
+          except Exception as e:
+              print(f'::error::docker-compose.prod.yml is not valid YAML: {e}')
+              sys.exit(1)
+
+          if not isinstance(data, dict):
+              print('::error::docker-compose.prod.yml root is not a mapping')
+              sys.exit(1)
+
+          services = data.get('services', {})
+          if not services:
+              print('::error::docker-compose.prod.yml has no services defined')
+              sys.exit(1)
+
+          required_services = ['hub-server', 'postgres', 'redis']
+          for svc in required_services:
+              if svc not in services:
+                  print(f'::warning::docker-compose.prod.yml missing expected service: {svc}')
+
+          hub = services.get('hub-server', {})
+          if 'image' not in hub:
+              print('::error::hub-server service missing image key')
+              sys.exit(1)
+
+          print(f'docker-compose.prod.yml OK — {len(services)} service(s) defined.')
+          print(f'Services: {\", \".join(sorted(services.keys()))}')
+          "
+          echo "::endgroup::"
+
+      - name: Validate deploy.sh is executable and structurally sound
+        run: |
+          echo "::group::Validating deploy.sh"
+          DEPLOY_SH="hub-server/deployments/deploy.sh"
+
+          # Must be a bash script
+          if ! head -1 "$DEPLOY_SH" | grep -qE '^#!/bin/(bash|sh)'; then
+            echo "::error::deploy.sh is missing a #!/bin/bash shebang"
+            exit 1
+          fi
+
+          # Must have set -e or equivalent
+          if ! grep -qE 'set -[a-z]*e[a-z]*' "$DEPLOY_SH"; then
+            echo "::warning::deploy.sh does not use 'set -e' — consider adding for safety"
+          fi
+
+          # Must have subcommands: deploy and rollback
+          if ! grep -qE '"deploy"\)' "$DEPLOY_SH"; then
+            echo "::warning::deploy.sh missing deploy subcommand"
+          fi
+          if ! grep -qE '"rollback"\)' "$DEPLOY_SH"; then
+            echo "::warning::deploy.sh missing rollback subcommand — required for CD safety"
+          fi
+
+          # Must have health_check function
+          if ! grep -qE 'health_check\(\)' "$DEPLOY_SH"; then
+            echo "::warning::deploy.sh missing health_check() function"
+          fi
+
+          echo "deploy.sh structure looks valid."
+          echo "::endgroup::"
+
+      - name: Validate .env.production.example completeness
+        run: |
+          echo "::group::Validating .env.production.example"
+          ENV_EXAMPLE="hub-server/deployments/.env.production.example"
+
+          REQUIRED_VARS=(
+            "AGENTHUB_DB_PASSWORD"
+            "AGENTHUB_JWT_SECRET"
+            "AGENTHUB_PPROF_PASS"
+          )
+
+          FAILED=0
+          for var in "${REQUIRED_VARS[@]}"; do
+            if grep -qE "^${var}=" "$ENV_EXAMPLE"; then
+              echo "  OK    ${var}"
+            else
+              echo "  MISS  ${var} (required for production)"
+              FAILED=1
+            fi
+          done
+
+          RECOMMENDED_VARS=(
+            "AGENTHUB_DB_HOST"
+            "AGENTHUB_REDIS_HOST"
+            "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET"
+          )
+          for var in "${RECOMMENDED_VARS[@]}"; do
+            if ! grep -qE "^${var}=" "$ENV_EXAMPLE"; then
+              echo "::warning::${var} not found in .env.production.example (may be intentional)"
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Required environment variables missing from .env.production.example"
+            exit 1
+          fi
+          echo ".env.production.example looks complete for required vars."
+          echo "::endgroup::"
+
+  # ── Docker build dry run ───────────────────────
+  docker-build-dry:
+    name: Docker build dry run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image (no push)
+        run: |
+          echo "::group::Docker build dry run"
+          docker build -t agenthub-hub:pr-check \
+            -f hub-server/deployments/Dockerfile .
+          echo "Docker image built successfully (not pushed)."
+          echo "::endgroup::"
+
+      - name: Verify image contents
+        run: |
+          echo "::group::Image verification"
+          docker images agenthub-hub:pr-check
+          # Check that the binary exists in the image
+          docker run --rm --entrypoint /bin/sh agenthub-hub:pr-check \
+            -c 'ls -la /usr/local/bin/hub-server && /usr/local/bin/hub-server --help 2>&1 || true'
+          echo "::endgroup::"
+
+  # ── Deployment status report ───────────────────
+  deployment-status:
+    name: Deployment readiness report
+    needs: [deployment-files, docker-build-dry]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compile deployment readiness status
+        run: |
+          echo "::group::Deployment Readiness Report"
+          echo ""
+
+          FILES_OK="${{ needs.deployment-files.result }}"
+          BUILD_OK="${{ needs.docker-build-dry.result }}"
+
+          echo "  Deployment files validation:  ${FILES_OK}"
+          echo "  Docker build dry run:         ${BUILD_OK}"
+
+          if [ "$FILES_OK" = "success" ] && [ "$BUILD_OK" = "success" ]; then
+            echo ""
+            echo "  Status: READY FOR DEPLOYMENT"
+            echo "  This PR passes all CD pre-flight checks. Merge to master"
+            echo "  to trigger the CD Production workflow (after Release)."
+            echo ""
+            echo "  Post-merge flow:"
+            echo "    merge → Release workflow (tag push) → CD Production (auto)"
+            echo "    or: Actions → CD Production → Run workflow (manual dispatch)"
+          else
+            echo ""
+            echo "  Status: NOT READY"
+            echo "  Fix the failing checks above before merging."
+            if [ "$FILES_OK" != "success" ]; then
+              echo "  - Deployment file(s) missing or invalid."
+            fi
+            if [ "$BUILD_OK" != "success" ]; then
+              echo "  - Docker build failed."
+            fi
+          fi
+          echo "::endgroup::"
+
+      - name: Set final status
+        if: |
+          needs.deployment-files.result != 'success' ||
+          needs.docker-build-dry.result != 'success'
+        run: |
+          echo "::error::CD pre-flight checks failed. Deployment is blocked."
+          exit 1

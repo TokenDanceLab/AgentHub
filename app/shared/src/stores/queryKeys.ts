@@ -1,0 +1,178 @@
+// Centralized query key factory for AgentHub frontend queries.
+// Defines stable, documented query key patterns for both Hub (web/desktop)
+// and Edge (desktop-local) data sources.
+//
+// Usage:
+//   import { hubQueryKeys, edgeQueryKeys } from '@agenthub/shared/stores/queryKeys';
+//   useQuery({ queryKey: hubQueryKeys.threads.all(projectId) });
+//   queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
+
+// ── Hub query key factory ──────────────────────────────────────────
+
+export const hubQueryKeys = {
+  // Auth / user profile
+  auth: {
+    user: ['hub', 'auth', 'user'] as const,
+    profile: (userId: string) => ['hub', 'auth', 'profile', userId] as const,
+  },
+
+  // Threads (sessions)
+  threads: {
+    root: ['hub', 'threads'] as const,
+    all: (projectId?: string) =>
+      projectId
+        ? (['hub', 'threads', projectId] as const)
+        : (['hub', 'threads'] as const),
+    detail: (threadId: string) => ['hub', 'threads', 'detail', threadId] as const,
+    messages: (threadId: string) => ['hub', 'threads', threadId, 'messages'] as const,
+    pins: (threadId: string) => ['hub', 'threads', threadId, 'pins'] as const,
+  },
+
+  // Agents / profiles
+  agents: {
+    root: ['hub', 'agents'] as const,
+    list: (context: 'hub' | 'signed-out' = 'hub') => ['hub', 'agents', context] as const,
+    detail: (agentId: string) => ['hub', 'agents', 'detail', agentId] as const,
+  },
+
+  // Agent teams
+  agentTeams: {
+    root: ['hub', 'agent-teams'] as const,
+    list: (context: 'hub' | 'signed-out' = 'hub') =>
+      ['hub', 'agent-teams', context] as const,
+    detail: (teamId: string) =>
+      ['hub', 'agent-teams', 'detail', teamId] as const,
+    runs: (teamId: string) =>
+      ['hub', 'agent-teams', teamId, 'runs'] as const,
+    runDetail: (teamId: string, runId: string) =>
+      ['hub', 'agent-teams', teamId, 'runs', runId] as const,
+    runState: (teamId: string, runId: string) =>
+      ['hub', 'agent-teams', teamId, 'runs', runId, 'state'] as const,
+    runEvents: (teamId: string, runId: string) =>
+      ['hub', 'agent-teams', teamId, 'runs', runId, 'events'] as const,
+    runTasks: (teamId: string, runId: string) =>
+      ['hub', 'agent-teams', teamId, 'runs', runId, 'tasks'] as const,
+  },
+
+  // Workspace projects
+  projects: {
+    root: ['hub', 'projects'] as const,
+    list: (context: 'hub' | 'signed-out' = 'hub') =>
+      ['hub', 'projects', context] as const,
+    detail: (projectId: string) =>
+      ['hub', 'projects', projectId] as const,
+    threads: (projectId: string) =>
+      ['hub', 'projects', projectId, 'threads'] as const,
+    threadMessages: (projectId: string, threadId: string) =>
+      ['hub', 'projects', projectId, 'threads', threadId, 'messages'] as const,
+  },
+
+  // Execution targets
+  executionTargets: {
+    root: ['hub', 'execution-targets'] as const,
+    list: (context: 'hub' | 'signed-out' = 'hub') =>
+      ['hub', 'execution-targets', context] as const,
+    detail: (targetId: string) =>
+      ['hub', 'execution-targets', 'detail', targetId] as const,
+  },
+
+  // Contacts / friends
+  contacts: {
+    root: ['hub', 'contacts'] as const,
+    list: ['hub', 'contacts', 'list'] as const,
+    friendRequests: ['hub', 'contacts', 'friend-requests'] as const,
+  },
+
+  // Notifications
+  notifications: {
+    root: ['hub', 'notifications'] as const,
+    list: (unreadOnly?: boolean) =>
+      unreadOnly
+        ? (['hub', 'notifications', 'unread'] as const)
+        : (['hub', 'notifications', 'all'] as const),
+  },
+
+  // Custom agents (shared between teams and profiles)
+  customAgents: {
+    root: ['hub', 'custom-agents'] as const,
+    list: ['hub', 'custom-agents', 'list'] as const,
+  },
+
+  // Skills / MCP servers (catalog)
+  catalog: {
+    skills: ['hub', 'catalog', 'skills'] as const,
+    mcpServers: ['hub', 'catalog', 'mcp-servers'] as const,
+  },
+
+  // Audit events
+  auditEvents: {
+    root: ['hub', 'audit-events'] as const,
+  },
+
+  // Relay commands
+  relayCommands: {
+    root: ['hub', 'relay-commands'] as const,
+    detail: (commandId: string) => ['hub', 'relay-commands', commandId] as const,
+  },
+} as const;
+
+// ── Edge (local desktop) query key factory ─────────────────────────
+
+export const edgeQueryKeys = {
+  threads: {
+    root: ['edge', 'threads'] as const,
+    all: (projectId?: string) =>
+      projectId
+        ? (['edge', 'threads', projectId] as const)
+        : (['edge', 'threads'] as const),
+    items: (threadId?: string) => ['edge', 'threadItems', threadId] as const,
+    pins: (threadId: string | null) => ['edge', 'threadPins', threadId] as const,
+  },
+
+  runs: {
+    root: ['edge', 'runs'] as const,
+    all: (projectId?: string, threadId?: string) =>
+      (['edge', 'runs', projectId, threadId] as const),
+  },
+
+  agents: {
+    root: ['edge', 'agents'] as const,
+    list: ['edge', 'agents', 'list'] as const,
+  },
+
+  runners: {
+    root: ['edge', 'runners'] as const,
+    list: ['edge', 'runners', 'list'] as const,
+    detail: (runnerId: string) => ['edge', 'runners', runnerId] as const,
+  },
+
+  // Health / connection
+  health: {
+    root: ['edge', 'health'] as const,
+  },
+
+  currentUser: {
+    root: ['edge', 'currentUser'] as const,
+  },
+} as const;
+
+// ── Helper: check if a query key matches a prefix ──────────────────
+
+/** Check if `candidate` starts with `prefix` (deep prefix match). */
+export function isQueryKeyPrefix(
+  candidate: readonly unknown[],
+  prefix: readonly unknown[],
+): boolean {
+  if (prefix.length > candidate.length) return false;
+  for (let i = 0; i < prefix.length; i += 1) {
+    if (candidate[i] !== prefix[i]) return false;
+  }
+  return true;
+}
+
+/** Get a broad invalidation key (root prefix) from a specific query key. */
+export function rootPrefix(key: readonly unknown[]): readonly unknown[] {
+  // Return the first 2-3 segments as a broad invalidation target
+  if (key.length <= 2) return key;
+  return key.slice(0, 2);
+}

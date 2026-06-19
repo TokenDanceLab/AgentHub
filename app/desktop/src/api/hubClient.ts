@@ -5,7 +5,7 @@
 // Uses the same error convention as edgeClient.ts: AppError from @shared/errors.
 
 import { HUB_URL } from '@/config';
-import { AppError } from '@shared/errors';
+import { AppError, reportApiError } from '@shared/errors';
 
 // 鈹€鈹€ Types 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -926,6 +926,13 @@ export interface HubClientOptions {
   baseUrl?: string;
   /** Returns the current JWT token (or null if not authenticated). */
   getToken?: () => string | null;
+  /**
+   * Called when a 401 response is received.  If provided, the client will:
+   * 1. Call onRefreshToken() to attempt a token refresh.
+   * 2. Retry the original request once with the new token.
+   * If not provided, 401 errors are thrown immediately.
+   */
+  onRefreshToken?: () => Promise<string | null>;
 }
 
 export function createHubClient(opts: HubClientOptions = {}) {
@@ -961,67 +968,176 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ...((options.headers as Record<string, string>) || {}),
     };
 
+    const timeoutMs = 30_000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const url = `${base}${path}`;
     console.debug('[hubClient] request', options.method || 'GET', url);
+
+    const doFetch = async (fetchHeaders: Record<string, string>): Promise<Response> => {
+      try {
+        const res = await fetch(url, { ...options, headers: fetchHeaders, signal: controller.signal });
+        return res;
+      } catch (fetchErr) {
+        console.warn('[hubClient] fetch() failed, attempting Tauri proxy fallback', url, {
+          name: (fetchErr as Error)?.name,
+          message: (fetchErr as Error)?.message,
+        });
+        const tauriResult = await tauriProxyFallback<T>(url, options, fetchHeaders, fetchErr);
+        if (tauriResult.used) {
+          // Wrap the result as a synthetic Response so the caller handles it uniformly
+          throw { __tauriResult: tauriResult.value as T };
+        }
+        console.error('[hubClient] fetch FAILED (no fallback)', url, {
+          name: (fetchErr as Error)?.name,
+          message: (fetchErr as Error)?.message,
+          cause: (fetchErr as Error)?.cause,
+          base,
+          isTauri: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
+          origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+        });
+        throw fetchErr;
+      }
+    };
+
     let res: Response;
     try {
-      res = await fetch(url, { ...options, headers, signal: controller.signal });
-    } catch (fetchErr) {
-      console.warn('[hubClient] fetch() failed, attempting Tauri proxy fallback', url, {
-        name: (fetchErr as Error)?.name,
-        message: (fetchErr as Error)?.message,
-      });
-      // In Tauri mode, fall back to the Rust backend HTTP proxy.
-      // WebView2 fetch() does not respect HTTP_PROXY/HTTPS_PROXY env vars;
-      // the Rust reqwest client does.
-      const tauriResult = await tauriProxyFallback<T>(url, options, headers, fetchErr);
-      if (tauriResult.used) {
-        return tauriResult.value as T;
+      res = await doFetch(headers);
+    } catch (fetchErr: unknown) {
+      clearTimeout(timeoutId);
+      // Handle Tauri proxy fallback result
+      if (fetchErr && typeof fetchErr === 'object' && '__tauriResult' in fetchErr) {
+        return (fetchErr as { __tauriResult: T }).__tauriResult;
       }
-      // Not in Tauri or fallback also failed — throw the original error
-      console.error('[hubClient] fetch FAILED (no fallback)', url, {
-        name: (fetchErr as Error)?.name,
-        message: (fetchErr as Error)?.message,
-        cause: (fetchErr as Error)?.cause,
-        base,
-        isTauri: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
-        origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
-      });
+      if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
+        const timeoutError = new AppError(
+          {
+            error: {
+              code: 'TIMEOUT',
+              message: `Hub request timed out after ${timeoutMs}ms: ${options.method ?? 'GET'} ${path}`,
+            },
+          },
+          0,
+        );
+        console.error(`[hubClient] ${timeoutError.message}`);
+        reportApiError(timeoutError, { path, method: options.method ?? 'GET', timeoutMs });
+        throw timeoutError;
+      }
+      if (fetchErr instanceof TypeError && String(fetchErr.message).includes('fetch')) {
+        const netError = new AppError(
+          {
+            error: {
+              code: 'NETWORK_ERROR',
+              message: `Network request failed: ${(fetchErr as Error).message}`,
+            },
+          },
+          0,
+        );
+        console.error(`[hubClient] ${netError.message}`);
+        reportApiError(netError, { path, method: options.method ?? 'GET' });
+        throw netError;
+      }
       throw fetchErr;
     }
     clearTimeout(timeoutId);
     console.debug('[hubClient] response', res.status, url);
     const body = res.status === 204 ? undefined : await readJsonBody(res);
 
-    if (!res.ok) {
-      if (isSharedErrorBody(body)) {
-        throw new AppError({ error: body.error }, res.status, body);
-      }
-      if (isHubEnvelope(body)) {
-        throw new AppError(
-          {
-            error: {
-              code: body.code || 'hub_error',
-              message: body.message || res.statusText || 'Hub request failed',
-            },
-          },
-          res.status,
-          body,
+    // ── Token refresh recovery on 401 ──────────────────
+    if (res.status === 401 && opts.onRefreshToken) {
+      try {
+        const newToken = await opts.onRefreshToken();
+        if (newToken) {
+          // Retry once with fresh token
+          headers.Authorization = `Bearer ${newToken}`;
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
+          let retryRes: Response;
+          try {
+            retryRes = await fetch(url, { ...options, headers, signal: retryController.signal });
+          } catch (retryFetchErr: unknown) {
+            clearTimeout(retryTimeoutId);
+            if (retryFetchErr && typeof retryFetchErr === 'object' && '__tauriResult' in retryFetchErr) {
+              return (retryFetchErr as { __tauriResult: T }).__tauriResult;
+            }
+            throw retryFetchErr;
+          }
+          clearTimeout(retryTimeoutId);
+          const retryBody = retryRes.status === 204 ? undefined : await readJsonBody(retryRes);
+
+          if (!retryRes.ok) {
+            if (isSharedErrorBody(retryBody)) {
+              throw new AppError({ error: retryBody.error }, retryRes.status, retryBody);
+            }
+            if (isHubEnvelope(retryBody)) {
+              throw new AppError(
+                {
+                  error: {
+                    code: retryBody.code || 'hub_error',
+                    message: retryBody.message || retryRes.statusText || 'Hub request failed',
+                  },
+                },
+                retryRes.status,
+                retryBody,
+              );
+            }
+            throw new AppError(
+              {
+                error: {
+                  code: retryRes.status >= 500 ? 'internal_error' : 'bad_request',
+                  message: `HTTP ${retryRes.status}: ${retryRes.statusText}`,
+                },
+              },
+              retryRes.status,
+              retryBody,
+            );
+          }
+
+          if (retryRes.status === 204) return undefined as T;
+          if (isHubEnvelope<T>(retryBody)) return retryBody.data as T;
+          return retryBody as T;
+        }
+      } catch (refreshErr) {
+        // If the retry itself threw (not the original 401), surface that
+        if (refreshErr instanceof AppError) {
+          reportApiError(refreshErr, { path, method: options.method ?? 'GET', context: 'token_refresh_retry' });
+          throw refreshErr;
+        }
+        console.error('[hubClient] Token refresh failed, proceeding with original 401', refreshErr);
+        reportApiError(
+          refreshErr instanceof Error ? refreshErr : new Error(String(refreshErr)),
+          { path, context: 'token_refresh' },
         );
       }
-      throw new AppError(
-        {
-          error: {
-            code: res.status >= 500 ? 'internal_error' : 'bad_request',
-            message: `HTTP ${res.status}: ${res.statusText}`,
-          },
-        },
-        res.status,
-        body,
-      );
+    }
+
+    if (!res.ok) {
+      const appErr = isSharedErrorBody(body)
+        ? new AppError({ error: body.error }, res.status, body)
+        : isHubEnvelope(body)
+          ? new AppError(
+              {
+                error: {
+                  code: body.code || 'hub_error',
+                  message: body.message || res.statusText || 'Hub request failed',
+                },
+              },
+              res.status,
+              body,
+            )
+          : new AppError(
+              {
+                error: {
+                  code: res.status >= 500 ? 'internal_error' : 'bad_request',
+                  message: `HTTP ${res.status}: ${res.statusText}`,
+                },
+              },
+              res.status,
+              body,
+            );
+      reportApiError(appErr, { path, method: options.method ?? 'GET' });
+      throw appErr;
     }
 
     // 204 No Content for void endpoints

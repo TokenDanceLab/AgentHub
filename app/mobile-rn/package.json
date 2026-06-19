@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "lint": "pnpm --dir .. exec eslint mobile-rn/src",
     "doctor": "expo-doctor",
     "native:check": "node scripts/native-readiness.mjs",

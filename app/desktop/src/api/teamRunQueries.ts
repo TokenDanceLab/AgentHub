@@ -7,6 +7,7 @@ import {
   type TeamRunState,
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { hubQueryKeys } from '@agenthub/shared';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
@@ -19,7 +20,7 @@ function listItems<T>(value: HubListResponse<T> | null | undefined): T[] {
 
 export function useAgentTeams(enabled: boolean) {
   return useQuery<AgentTeam[]>({
-    queryKey: ['hub', 'agent-teams'],
+    queryKey: hubQueryKeys.agentTeams.root,
     queryFn: async () => listItems(await hubClient.listAgentTeams()),
     enabled,
     staleTime: 15_000,
@@ -30,7 +31,7 @@ export function useAgentTeams(enabled: boolean) {
 
 export function useTeamRuns(teamId: string | null | undefined, enabled: boolean) {
   return useQuery<AgentTeamRun[]>({
-    queryKey: ['hub', 'agent-teams', teamId, 'runs'],
+    queryKey: hubQueryKeys.agentTeams.runs(teamId ?? ''),
     queryFn: async () => listItems(await hubClient.listTeamRuns(teamId ?? '')),
     enabled: enabled && Boolean(teamId),
     staleTime: 10_000,
@@ -42,7 +43,7 @@ export function useTeamRuns(teamId: string | null | undefined, enabled: boolean)
 export function useTeamRunsForTeams(teamIds: string[], enabled: boolean) {
   const queries = useQueries({
     queries: teamIds.map((teamId) => ({
-      queryKey: ['hub', 'agent-teams', teamId, 'runs'],
+      queryKey: hubQueryKeys.agentTeams.runs(teamId ?? ''),
       queryFn: async () => listItems(await hubClient.listTeamRuns(teamId)),
       enabled: enabled && Boolean(teamId),
       staleTime: 10_000,
@@ -65,7 +66,7 @@ export function useTeamRunState(
   enabled: boolean,
 ) {
   return useQuery<TeamRunState>({
-    queryKey: ['hub', 'agent-teams', teamId, 'runs', runId, 'state'],
+    queryKey: hubQueryKeys.agentTeams.runState(teamId ?? '', runId ?? ''),
     queryFn: () => hubClient.getTeamRunState(teamId ?? '', runId ?? ''),
     enabled: enabled && Boolean(teamId) && Boolean(runId),
     staleTime: 5_000,
@@ -80,7 +81,7 @@ export function useTeamEvents(
   enabled: boolean,
 ) {
   return useQuery<AgentTeamEvent[]>({
-    queryKey: ['hub', 'agent-teams', teamId, 'runs', runId, 'events'],
+    queryKey: hubQueryKeys.agentTeams.runEvents(teamId ?? '', runId ?? ''),
     queryFn: async () => listItems(await hubClient.listTeamEvents(teamId ?? '', runId ?? '')),
     enabled: enabled && Boolean(teamId) && Boolean(runId),
     staleTime: 10_000,

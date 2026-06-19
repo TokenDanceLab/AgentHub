@@ -168,10 +168,6 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 }
 
 func (s *AgentService) tryAutoParseRouteDecision(ctx context.Context, sessionID string, payload string) {
-	if s.teamRouteHandler == nil {
-		return
-	}
-
 	run, err := repository.GetTeamRunBySessionID(s.db, sessionID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -192,8 +188,16 @@ func (s *AgentService) tryAutoParseRouteDecision(ctx context.Context, sessionID 
 		return
 	}
 
-	if _, err := s.teamRouteHandler.HandleRouteDecision(ctx, run.TriggerUserID, run.TeamID, run.ID, decision); err != nil {
-		slog.Warn("auto route decision handling failed", "run_id", run.ID, "team_id", run.TeamID, "action", decision.Action, "error", err)
+	if s.bus != nil {
+		s.bus.Publish(ctx, Event{
+			Type: "agent.route_decision",
+			Payload: RouteDecisionPayload{
+				UserID:   run.TriggerUserID,
+				TeamID:   run.TeamID,
+				RunID:    run.ID,
+				Decision: decision,
+			},
+		})
 	}
 }
 

@@ -760,7 +760,7 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		coreCtx:      context.Background(),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"task-dev-b","target_id":"target-dev-b"}`))
 
@@ -830,7 +830,7 @@ func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		coreCtx:      context.Background(),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	const payload = `{"task_id":"task-dev-b-full","target_id":"target-dev-b"}`
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", payload))
@@ -878,7 +878,7 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		coreCtx:      context.Background(),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"missing-task","target_id":"target-dev-b"}`))
 
@@ -937,7 +937,7 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 		DB:           db,
 		bus:          bus,
 		coreCtx:      context.Background(),
-		AgentService: service.NewAgentService(db, bus, nil, nil),
+		AgentService: service.NewAgentService(db, bus, nil, nil, nil),
 	}
 	staleScannedTask := model.PendingAgentTask{
 		ID:              "task-timeout-race",

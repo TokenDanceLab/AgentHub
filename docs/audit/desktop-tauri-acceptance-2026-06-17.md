@@ -1,10 +1,11 @@
 # AgentHub Desktop -- Tauri Application Acceptance Report
 
-**Worktree**: `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`  
+**Worktree**: `<worktree>`
 **Branch**: `feat/chatview-tokendance-migration`  
 **Date**: 2026-06-17  
 **Scope**: Full Desktop Tauri application surface -- configuration, Edge embedding, IPC commands, build artifacts, platform readiness  
 **Status**: RELEASE-READINESS VERDICT  
+**历史清理标记**: 已对文档中出现的个人工作路径做脱敏处理（2026-06-19）。  
 
 ---
 
@@ -449,4 +450,4 @@ The Desktop Tauri application is **release-ready** for the Windows x86_64 platfo
 
 ---
 
-*This report was generated from a full audit of the `feat/chatview-tokendance-migration` worktree in `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration` on 2026-06-17. All findings are based on static analysis of the source code, configuration files, and build artifacts present at the time of audit.*
+*This report was generated from a full audit of the `feat/chatview-tokendance-migration` worktree on 2026-06-17. All findings are based on static analysis of the source code, configuration files, and build artifacts present at the time of audit.*

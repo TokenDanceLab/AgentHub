@@ -21,7 +21,7 @@ func newTestServer(t *testing.T) (*Server, *store.Store) {
 	t.Helper()
 	s := store.New()
 	// Create default project and thread
-	_, _ = s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateProject("proj_test", "Test Project", "")
 	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "", "", "")
 
 	bus := events.NewBus(100)
