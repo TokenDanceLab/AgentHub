@@ -7,7 +7,7 @@ db:
   host: localhost
   port: 5432
   user: agenthub
-  password: dev_password
+  password: ""  # set via AGENTHUB_DB_PASSWORD env var for non-localhost DB
   name: agenthub
 redis:
   host: localhost

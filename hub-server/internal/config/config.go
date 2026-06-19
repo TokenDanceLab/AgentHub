@@ -397,6 +397,19 @@ func splitEnvList(value string) []string {
 	return result
 }
 
+// RateLimitFailOpen returns whether rate limiters should fail-open (allow requests)
+// when Redis is unavailable for non-auth paths. Auth paths always fail-closed.
+// Controlled by the AGENTHUB_RATE_LIMIT_FAIL_OPEN environment variable.
+// Defaults to true when the variable is not set or not a recognized truthy value.
+func RateLimitFailOpen() bool {
+	switch strings.ToLower(os.Getenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN")) {
+	case "false", "0", "no", "off":
+		return false
+	default:
+		return RateLimitFailOpenDefault // true
+	}
+}
+
 // Validate checks that the loaded configuration is usable at startup.
 // It rejects insecure defaults, missing infrastructure addresses, and
 // missing directories that the server depends on.

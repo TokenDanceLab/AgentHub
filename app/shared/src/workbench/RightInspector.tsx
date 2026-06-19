@@ -907,7 +907,9 @@ function BrowserPanelFallback({
                     if (artifact.uri) {
                       onOpenUrl(artifact.uri);
                     } else if (canOpen) {
-                      void onOpenPreview?.(artifact).catch(() => {});
+                      void onOpenPreview?.(artifact).catch((err) => {
+                        console.error('RightInspector: onOpenPreview artifact failed:', err);
+                      });
                     }
                   }}
                   type="button"
@@ -993,7 +995,9 @@ function FilesPanel({
               disabled={!canOpen}
               onClick={() => {
                 if (!canOpen) return;
-                void onOpenPreview?.(file).catch(() => {});
+                void onOpenPreview?.(file).catch((err) => {
+                  console.error('RightInspector: onOpenPreview file failed:', err);
+                });
               }}
               type="button"
             >
@@ -1114,26 +1118,34 @@ function InteractiveDiffPreview({
 
   const handleApplyHunk = useCallback(
     async (decision: DiffHunkDecision) => {
-      await applyRunDiff(runId, {
-        file_path: decision.filePath,
-        hunk_index: decision.hunkIndex,
-        accepted: decision.accepted,
-        workDir,
-      });
+      try {
+        await applyRunDiff(runId, {
+          file_path: decision.filePath,
+          hunk_index: decision.hunkIndex,
+          accepted: decision.accepted,
+          workDir,
+        });
+      } catch (err) {
+        console.error('RightInspector: applyRunDiff failed for hunk:', decision.filePath, decision.hunkIndex, err);
+      }
     },
     [runId, workDir],
   );
 
   const handleApplyAllHunks = useCallback(
     async (decisions: DiffHunkDecision[]) => {
-      await applyAllRunDiffs(runId, {
-        decisions: decisions.map((d) => ({
-          file_path: d.filePath,
-          hunk_index: d.hunkIndex,
-          accepted: d.accepted,
-        })),
-        workDir,
-      });
+      try {
+        await applyAllRunDiffs(runId, {
+          decisions: decisions.map((d) => ({
+            file_path: d.filePath,
+            hunk_index: d.hunkIndex,
+            accepted: d.accepted,
+          })),
+          workDir,
+        });
+      } catch (err) {
+        console.error('RightInspector: applyAllRunDiffs failed:', decisions.length, 'hunks,', err);
+      }
     },
     [runId, workDir],
   );

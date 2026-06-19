@@ -70,8 +70,8 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	if userID := c.GetString("user_id"); userID != "" {
 		h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
 		h.userLimiter.Acquire(userID, conn.ID)
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 		go h.writeLoop(conn)
+		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 		go h.authenticatedReadLoop(conn)
 		return
 	}

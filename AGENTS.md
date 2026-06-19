@@ -350,7 +350,7 @@ feat/* → dev/delicious223 → master
 1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
-4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名。
+4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
 5. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次；`docs/` 目录结构每 7 天可做一次过期扫描。
 
 ## 6. 安全和隐私
@@ -465,3 +465,19 @@ scope: client|edge|api|docs|desktop|web
 - 摘要不超过 50 字。
 - 不要写 "added"、"fixed" 等英文动词——用中文。
 - hook 脚本在 `scripts/git-hooks/commit-msg`，clone 后运行 `scripts/setup.ps1` 启用。
+
+## 9. Spec-Driven Develop 治理
+
+本仓库采用 spec-driven-develop 工作流驱动大型复杂任务。规则如下：
+
+1. **进度追踪**：活跃进度以 `docs/progress/MASTER.md` 为准。spec-driven-develop 启动后，任务卡、阶段验收、阻塞项和里程碑状态统一写入该文件，不在 AGENTS.md 或 roadmap 中重复记录进度细节。
+2. **任务追踪模式**：`GITHUB_STANDARD` — 使用 GitHub Issues + Milestones + Labels 进行任务分解、分配和追踪。spec 产出的大型任务拆为 Milestone，子任务映射为 Issue，按 Label 区分方向（frontend/backend/client/docs/governance）。
+3. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
+4. **当前活跃 Phase 与分支**：
+   - Phase：`super-phase1-safety-foundation`
+   - 分支：`feat/super-phase1-safety-foundation`
+   - 入口文档：`docs/progress/MASTER.md`（不在本文件重复记录子任务进度）
+5. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
+   - 先加载 `.agents/skills/spec-driven-develop/SKILL.md`（如存在）或 `spec-driven-develop` skill。
+   - 产出 spec 文档、任务分解、验收标准后再进入实现。
+   - 短任务（单文件修复、typo、小改动）不受此约束，直接做。

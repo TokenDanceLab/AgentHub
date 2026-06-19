@@ -317,10 +317,15 @@ var dangerousPatternsRE = regexp.MustCompile(
 		`\btee\b[^|&;]*/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b`,
 )
 
-// init validates the regex compiles at package load time (mustCompile
-// would panic, but we use MustCompile semantics via the var initializer
-// above — this init block documents intent).
-func init() {
+// ValidateDangerousPatterns verifies the compiled dangerousPatternsRE
+// correctly matches known-dangerous inputs and rejects known-safe inputs.
+// It returns a multi-error describing all failures found. Callers should
+// check the result at startup and surface failures through their own
+// logging or health-check pipeline rather than allowing a silent invalid
+// regex to reach production.
+func ValidateDangerousPatterns() error {
+	var errs []string
+
 	// Verify key patterns match expected dangerous inputs.
 	for _, cmd := range []string{
 		"rm -rf /",
@@ -342,9 +347,10 @@ func init() {
 		"echo pwned > /dev/nvme0n1",
 	} {
 		if !dangerousPatternsRE.MatchString(cmd) {
-			panic("security_hooks: dangerousPatternsRE failed to match: " + cmd)
+			errs = append(errs, "dangerousPatternsRE failed to match: "+cmd)
 		}
 	}
+
 	// Verify safe inputs are NOT blocked.
 	for _, cmd := range []string{
 		"rm file.txt",
@@ -354,8 +360,47 @@ func init() {
 		"sudo systemctl restart nginx",
 	} {
 		if dangerousPatternsRE.MatchString(cmd) {
-			panic("security_hooks: dangerousPatternsRE false positive: " + cmd)
+			errs = append(errs, "dangerousPatternsRE false positive: "+cmd)
 		}
+	}
+
+	if len(errs) > 0 {
+		return &dangerousPatternsValidationError{errs: errs}
+	}
+	return nil
+}
+
+// dangerousPatternsValidationError aggregates validation failures so
+// callers can surface every failure in a single log entry.
+type dangerousPatternsValidationError struct {
+	errs []string
+}
+
+func (e *dangerousPatternsValidationError) Error() string {
+	return "dangerousPatternsRE validation failures: " + strings.Join(e.errs, "; ")
+}
+
+// Unwrap returns the individual validation errors for use with errors.Is/As.
+func (e *dangerousPatternsValidationError) Unwrap() []error {
+	out := make([]error, len(e.errs))
+	for i, s := range e.errs {
+		out[i] = strError(s)
+	}
+	return out
+}
+
+type strError string
+
+func (e strError) Error() string { return string(e) }
+
+// init validates the dangerousPatternsRE at package load time. Failures
+// are logged at ERROR level instead of panicking so a single miscompiled
+// regex does not crash the entire process. Operators should monitor the
+// startup log for "dangerous pattern" messages and fix the regex.
+func init() {
+	if err := ValidateDangerousPatterns(); err != nil {
+		slog.Error("dangerous pattern validation failed — security regex may be miscompiled; blocked-pattern protection is unreliable until this is fixed",
+			"error", err)
 	}
 }
 

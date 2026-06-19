@@ -161,6 +161,10 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
     case 'run.cancelled':
       return runCancelledBlock(event);
     default:
+      console.warn('normalizeEdgeEvents: unknown event type — silently dropped', {
+        type: event.type,
+        eventId: event.id,
+      });
       return null;
   }
 }
@@ -171,7 +175,10 @@ function runTextBlock(
   status: EvidenceRefStatus,
 ): TranscriptBlock | null {
   const runId = eventRunId(event);
-  if (!runId) return null;
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run lifecycle event missing runId', { type: event.type, eventId: event.id });
+    return null;
+  }
 
   return {
     ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, status)),
@@ -183,7 +190,10 @@ function runTextBlock(
 function runStatusBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
   const statusText = stringField(event.payload.status);
-  if (!runId || !statusText) return null;
+  if (!runId || !statusText) {
+    console.warn('normalizeEdgeEvents: run.status.changed missing required field', { runId: runId ?? '(missing)', statusText: statusText ?? '(missing)', eventId: event.id });
+    return null;
+  }
   const status = normalizeEvidenceStatus(statusText);
 
   return {
@@ -195,7 +205,10 @@ function runStatusBlock(event: EventEnvelope): TranscriptBlock | null {
 
 function runFailedBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
-  if (!runId) return null;
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.failed missing runId', { eventId: event.id });
+    return null;
+  }
   const reason =
     stringField(event.payload.reason) ??
     stringField(event.payload.error) ??
@@ -213,7 +226,10 @@ function runFailedBlock(event: EventEnvelope): TranscriptBlock | null {
 
 function runCancelledBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
-  if (!runId) return null;
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.cancelled missing runId', { eventId: event.id });
+    return null;
+  }
   const reason =
     stringField(event.payload.reason) ??
     stringField(event.payload.error) ??
@@ -231,7 +247,10 @@ function runCancelledBlock(event: EventEnvelope): TranscriptBlock | null {
 
 function runFinishedBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
-  if (!runId) return null;
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.finished missing runId', { eventId: event.id });
+    return null;
+  }
   const duration =
     stringField(event.payload.duration) ??
     durationLabel(numberField(event.payload.durationMs));
@@ -482,7 +501,10 @@ function contextUsageBlock(event: EventEnvelope): TranscriptBlock | null {
 function toolCallBlock(event: EventEnvelope): TranscriptBlock | null {
   const toolName = stringField(event.payload.toolName) ?? stringField(event.payload.name);
   const callId = stringField(event.payload.callId) ?? stringField(event.payload.id);
-  if (!toolName && !callId) return null;
+  if (!toolName && !callId) {
+    console.warn('normalizeEdgeEvents: tool_call missing both toolName and callId', { eventId: event.id });
+    return null;
+  }
   const status = normalizeEvidenceStatus(stringField(event.payload.status) ?? 'running');
   const runId = eventRunId(event);
   const label = toolName ?? callId ?? 'Tool call';
@@ -767,7 +789,10 @@ function previewStoppedBlock(event: EventEnvelope): TranscriptBlock | null {
 
 function agentResultBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
-  if (!runId) return null;
+  if (!runId) {
+    console.warn('normalizeEdgeEvents: run.agent.result missing runId', { eventId: event.id });
+    return null;
+  }
   const success = event.payload.success !== false;
   const status: EvidenceRefStatus = success ? 'completed' : 'failed';
   const error = stringField(event.payload.error);
