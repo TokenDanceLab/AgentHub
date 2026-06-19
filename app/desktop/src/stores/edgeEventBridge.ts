@@ -8,7 +8,7 @@
 
 import type { QueryClient } from '@tanstack/react-query';
 import type { StreamHandle } from '@/api/eventClient';
-import { edgeQueryKeys } from '@agenthub/shared';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useRunStore } from '@/stores/runStore';
 import type { RunState } from '@/utils/runStateMachine';

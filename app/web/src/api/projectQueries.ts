@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
-import { hubQueryKeys } from '@agenthub/shared';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { createHubClient } from './hubClient';
 import type {
   CreateWorkspaceProjectThreadRequest,

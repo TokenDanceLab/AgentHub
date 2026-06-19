@@ -27,48 +27,37 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		now := time.Now().UnixMilli()
 		windowStart := now - window.Milliseconds()
 
-		pipe := client.GetRDB().Pipeline()
+		rdb := client.GetRDB()
 
 		// Remove expired entries (outside the sliding window).
-		pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprint(windowStart))
-
-		// Add current request before counting so the count includes it.
-		member := fmt.Sprintf("%d-%d", now, time.Now().UnixNano())
-		pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member})
-
-		// Count current entries (now includes the one just added).
-		countCmd := pipe.ZCard(ctx, key)
-
-		// Set key expiry (window + buffer).
-		pipe.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
-
-		if _, err := pipe.Exec(ctx); err != nil {
-			if isAuthPath(c) {
-				// Auth paths always fail closed.
-				fail(c, errcode.ErrInternal)
-				c.Abort()
-				return
-			}
-			if config.RateLimitFailOpen() {
-				slog.Warn("rate limit Redis unavailable, failing open",
-					"path", c.Request.URL.Path,
-					"method", c.Request.Method,
-					"key", key,
-					"error", err,
-				)
-				c.Header("X-Rate-Limit-Degraded", "true")
-				c.Next()
-				return
-			}
-			// Fail closed for non-auth when explicitly configured.
-			fail(c, errcode.ErrInternal)
-			c.Abort()
+		if err := rdb.ZRemRangeByScore(ctx, key, "0", fmt.Sprint(windowStart)).Err(); err != nil {
+			handleRateLimitError(c, key, err)
 			return
 		}
 
-		if countCmd.Val() > int64(limit) {
+		// Add current request before counting so the count includes it.
+		member := fmt.Sprintf("%d-%d", now, time.Now().UnixNano())
+		if err := rdb.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member}).Err(); err != nil {
+			handleRateLimitError(c, key, err)
+			return
+		}
+
+		// Set key expiry (window + buffer). Expire error is non-critical — the
+		// key will still be cleaned eventually (or on next ZRemRangeByScore).
+		rdb.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
+
+		// Count current entries (now includes the one just added).
+		count, err := rdb.ZCard(ctx, key).Result()
+		if err != nil {
+			handleRateLimitError(c, key, err)
+			return
+		}
+
+		// Strict comparison (>): since ZCard counts after ZAdd, we reject when
+		// adding the current request would exceed the limit.
+		if count > int64(limit) {
 			// Determine how long until the window resets.
-			ttl, _ := client.GetRDB().TTL(ctx, key).Result()
+			ttl, _ := rdb.TTL(ctx, key).Result()
 			retryAfter := int(ttl.Seconds())
 			if retryAfter <= 0 {
 				retryAfter = int(window.Seconds())
@@ -81,6 +70,30 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 
 		c.Next()
 	}
+}
+
+// handleRateLimitError handles Redis errors during rate limiting.
+func handleRateLimitError(c *gin.Context, key string, err error) {
+	if isAuthPath(c) {
+		// Auth paths always fail closed.
+		fail(c, errcode.ErrInternal)
+		c.Abort()
+		return
+	}
+	if config.RateLimitFailOpen() {
+		slog.Warn("rate limit Redis unavailable, failing open",
+			"path", c.Request.URL.Path,
+			"method", c.Request.Method,
+			"key", key,
+			"error", err,
+		)
+		c.Header("X-Rate-Limit-Degraded", "true")
+		c.Next()
+		return
+	}
+	// Fail closed for non-auth when explicitly configured.
+	fail(c, errcode.ErrInternal)
+	c.Abort()
 }
 
 // IPKey returns the client IP for rate limiting.

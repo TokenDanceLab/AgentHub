@@ -5,6 +5,8 @@ import { createEventStream } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import { EVENT_LOG_MAX } from '@/config';
 import type { TransportStatus } from '@/api/transport';
+import { createEdgeEventBridge, type EdgeEventBridgeHandle } from '@/stores/edgeEventBridge';
+import { queryClient } from '@/api/queryClient';
 
 export interface LogEntry {
   seq: number;
@@ -46,10 +48,19 @@ export function useEventStream(online: boolean): EventStreamState {
     }
 
     const stream = createEventStream();
+    let bridgeHandle: EdgeEventBridgeHandle | null = null;
 
     const unsubStatus = stream.onStatusChange((status: TransportStatus) => {
       if (!mountedRef.current) return;
       setIsConnected(status === 'connected');
+      // Wire Edge events to React Query cache + store updates on connect
+      if (status === 'connected' && !bridgeHandle) {
+        bridgeHandle = createEdgeEventBridge(stream, queryClient);
+      }
+      if (status === 'disconnected') {
+        bridgeHandle?.destroy();
+        bridgeHandle = null;
+      }
     });
 
     const unsubEvents = stream.subscribe((event: EventEnvelope) => {
@@ -73,6 +84,7 @@ export function useEventStream(online: boolean): EventStreamState {
 
     return () => {
       mountedRef.current = false;
+      bridgeHandle?.destroy();
       unsubStatus();
       unsubEvents();
       stream.close();

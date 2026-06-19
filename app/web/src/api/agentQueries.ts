@@ -3,7 +3,7 @@ import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
-import { hubQueryKeys } from '@agenthub/shared';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { AgentCapabilities, AgentInfo, ListResponse } from '@shared/types';
 import type { AgentConfig } from '@shared/workbench';
 
