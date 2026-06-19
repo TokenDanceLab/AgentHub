@@ -72,7 +72,7 @@ function onMessageNew(qc: QueryClient, payload: unknown) {
   const sessionId = str(msg?.session_id || msg?.id);
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
-    invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
   }
 }
 
@@ -92,32 +92,55 @@ function onMessageRecall(qc: QueryClient, payload: unknown) {
   }
 }
 
-function onMessagePin(_qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+function onMessagePin(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; message_id?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+  }
 }
 
-function onMessageUnpin(_qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+function onMessageUnpin(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; message_id?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+  }
 }
 
-function onMessageReactionAdded(_qc: QueryClient, _payload: unknown) {
-  // Reactions are metadata — invalidate thread messages when they change
-  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+function onMessageReactionAdded(qc: QueryClient, payload: unknown) {
+  // Reactions are metadata on messages — invalidate messages for that session
+  const data = payload as { session_id?: string; message_id?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
+  }
 }
 
-function onMessageReactionRemoved(_qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+function onMessageReactionRemoved(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; message_id?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
+  }
 }
 
-function onMessageRead(_qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(_qc, hubQueryKeys.threads.root);
+function onMessageRead(qc: QueryClient, payload: unknown) {
+  // read receipts affect thread-level unread_count → invalidate thread detail
+  const data = payload as { session_id?: string; user_id?: string; last_read_seq?: number };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+  }
 }
 
 // ── Session events ─────────────────────────────────────────────
 
 function onSessionCreated(qc: QueryClient, _payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
-  invalidateAllWithPrefix(qc, hubQueryKeys.contacts.root);
+  invalidateQuery(qc, hubQueryKeys.contacts.list);
 }
 
 function onSessionDissolved(qc: QueryClient, payload: unknown) {
@@ -130,12 +153,20 @@ function onSessionDissolved(qc: QueryClient, payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
-function onSessionMemberJoined(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+function onSessionMemberJoined(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; member_id?: string; member_type?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+  }
 }
 
-function onSessionMemberLeft(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+function onSessionMemberLeft(qc: QueryClient, payload: unknown) {
+  const data = payload as { session_id?: string; member_id?: string; member_type?: string };
+  const sessionId = str(data?.session_id);
+  if (sessionId) {
+    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+  }
 }
 
 function onSessionInfoUpdated(qc: QueryClient, payload: unknown) {
@@ -144,7 +175,6 @@ function onSessionInfoUpdated(qc: QueryClient, payload: unknown) {
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
   }
-  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
 // ── Agent events ───────────────────────────────────────────────
@@ -167,7 +197,11 @@ function onAgentDispatch(qc: QueryClient, payload: unknown) {
   }
 
   invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-  invalidateAllWithPrefix(qc, hubQueryKeys.agents.root);
+  const agentId = str(data?.agent_instance_id);
+  if (agentId) {
+    invalidateQuery(qc, hubQueryKeys.agents.detail(agentId));
+  }
+  invalidateQuery(qc, hubQueryKeys.agents.list());
 }
 
 function onAgentStream(_qc: QueryClient, _payload: unknown) {
@@ -182,8 +216,17 @@ function onAgentDone(qc: QueryClient, payload: unknown) {
     getTaskBridge().updateTask(taskId, { status: 'done' });
   }
 
+  // Find the thread affected by the completed agent task
+  const task = taskId
+    ? getTaskBridge().tasks.find((t) => t.taskId === taskId)
+    : undefined;
+  const threadId = task?.threadId;
+  if (threadId) {
+    invalidateQuery(qc, hubQueryKeys.threads.detail(threadId));
+    invalidateQuery(qc, hubQueryKeys.threads.messages(threadId));
+  }
+
   invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
 function onAgentFailed(qc: QueryClient, payload: unknown) {
@@ -231,8 +274,18 @@ function onAgentRegenerate(qc: QueryClient, payload: unknown) {
     getTaskBridge().addTask(newTask);
   }
 
+  // Find the thread from the original task for targeted invalidation
+  const originalTaskId = str(data?.original_task_id);
+  const originalTask = originalTaskId
+    ? getTaskBridge().tasks.find((t) => t.taskId === originalTaskId)
+    : undefined;
+  const threadId = originalTask?.threadId;
+  if (threadId) {
+    invalidateQuery(qc, hubQueryKeys.threads.detail(threadId));
+    invalidateQuery(qc, hubQueryKeys.threads.messages(threadId));
+  }
+
   invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-  invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 }
 
 // ── Notification & social events ───────────────────────────────
@@ -279,7 +332,7 @@ function onFriendAccepted(qc: QueryClient, payload: unknown) {
       createdAt: new Date().toISOString(),
     });
   }
-  invalidateAllWithPrefix(qc, hubQueryKeys.contacts.root);
+  invalidateQuery(qc, hubQueryKeys.contacts.list);
   invalidateQuery(qc, hubQueryKeys.contacts.friendRequests);
 }
 
