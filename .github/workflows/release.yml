@@ -142,16 +142,23 @@ jobs:
           $sig = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse | Select-Object -First 1
           if ($sig) { Copy-Item $sig.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig" }
 
-      - name: Create portable zip
+      - name: Collect Tauri portable zip
         shell: pwsh
         run: |
           $ver = "${{ github.ref_name }}" -replace '^v',''
-          $exe = Get-ChildItem "app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" | Select-Object -First 1
-          $portableDir = "dist\AgentHub-portable"
-          New-Item -ItemType Directory $portableDir -Force
-          Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
-          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
-          @"
+          $zip = Get-ChildItem "app\desktop\src-tauri\target\release\bundle\zip" -Filter "*.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($zip) {
+            Copy-Item $zip.FullName "dist\AgentHub_${ver}_x64-portable.zip"
+            Write-Host "Collected Tauri zip: $($zip.Name)"
+          } else {
+            Write-Warning "No Tauri zip bundle found - falling back to manual assembly"
+            $exe = Get-ChildItem "app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" | Select-Object -First 1
+            if ($exe) {
+              $portableDir = "dist\AgentHub-portable"
+              New-Item -ItemType Directory $portableDir -Force
+              Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+              Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
+              @"
           AgentHub ${{ github.ref_name }} — Portable Edition
 
           No installation required. Double-click AgentHub.exe to run.
@@ -159,7 +166,12 @@ jobs:
 
           Full documentation: https://github.com/TokenDanceLab/AgentHub
           "@ | Out-File "$portableDir\README.txt" -Encoding UTF8
-          Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+              Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+            } else {
+              Write-Error "Neither Tauri zip nor release exe found"
+              exit 1
+            }
+          }
 
       - name: Upload Desktop artifacts
         uses: actions/upload-artifact@v4
@@ -229,9 +241,71 @@ jobs:
           name: desktop-macos-artifacts
           path: dist/
 
+  # ── Expo Android APK ─────────────────────────
+  build-mobile:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Android APK via EAS
+        working-directory: app/mobile-rn
+        run: |
+          npx eas-cli build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --message "Release ${{ github.ref_name }}"
+
+          BUILD_LIST=$(npx eas-cli build:list \
+            --platform android \
+            --status FINISHED \
+            --limit 1 \
+            --json \
+            --non-interactive)
+          BUILD_ID=$(echo "$BUILD_LIST" | jq -r '.[0].id')
+          echo "EAS build ID: $BUILD_ID"
+
+          mkdir -p ../../dist
+
+          BUILD_DETAIL=$(npx eas-cli build:view "$BUILD_ID" --json --non-interactive)
+          APK_URL=$(echo "$BUILD_DETAIL" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // empty')
+
+          if [ -z "$APK_URL" ] || [ "$APK_URL" = "null" ]; then
+            echo "ERROR: Could not resolve APK download URL from build $BUILD_ID"
+            echo "$BUILD_DETAIL" | jq .
+            exit 1
+          fi
+
+          echo "Downloading APK from $APK_URL"
+          curl -sSL -o ../../dist/agenthub-mobile.apk "$APK_URL"
+          ls -lh ../../dist/
+
+      - name: Upload Mobile artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-artifacts
+          path: dist/
+
   # ── GitHub Release ───────────────────────────
   release:
-    needs: [build-go, build-desktop, build-desktop-macos]
+    needs: [build-go, build-desktop, build-desktop-macos, build-mobile]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -252,6 +326,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: desktop-macos-artifacts
+          path: dist
+
+      - name: Download Mobile artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-artifacts
           path: dist
 
       - name: List assets
