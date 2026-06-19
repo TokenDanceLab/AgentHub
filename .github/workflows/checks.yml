@@ -361,8 +361,58 @@ jobs:
       - name: Lint (mobile rules)
         run: pnpm --filter agenthub-mobile-rn lint
 
-      - name: Test (mobile)
-        run: pnpm --filter agenthub-mobile-rn test
+      # ── Hardened: Test with coverage reporting ──
+      - name: Install coverage provider (mobile)
+        run: pnpm --filter agenthub-mobile-rn add -D @vitest/coverage-v8
+      - name: Test with coverage (mobile)
+        run: |
+          pnpm --filter agenthub-mobile-rn exec vitest run --coverage \
+            --coverage.thresholds.lines=40 \
+            --coverage.thresholds.branches=30 \
+            --coverage.thresholds.functions=30 \
+            --coverage.thresholds.statements=40
+          echo "::notice::Mobile coverage report generated. Raise thresholds as coverage improves."
+
+      # ── Hardened: Bundle size check (Expo web export) ──
+      - name: Bundle size check (mobile web export)
+        run: |
+          echo "=== Mobile bundle size check ==="
+          cd mobile-rn
+          npx expo export --platform web --output-dir dist/web-export 2>&1
+          if [ -d dist/web-export ]; then
+            BUNDLE_SIZE_KB=$(du -sk dist/web-export | cut -f1)
+            MAX_SIZE_KB=153600
+            echo "Web export bundle size: ${BUNDLE_SIZE_KB} KB (max: ${MAX_SIZE_KB} KB)"
+            if [ "${BUNDLE_SIZE_KB}" -gt "${MAX_SIZE_KB}" ]; then
+              echo "::error::Web export bundle size ${BUNDLE_SIZE_KB} KB exceeds ${MAX_SIZE_KB} KB threshold"
+              exit 1
+            fi
+            echo "::notice::Bundle size check passed: ${BUNDLE_SIZE_KB} KB under ${MAX_SIZE_KB} KB"
+          else
+            echo "::error::Web export did not produce output directory"
+            exit 1
+          fi
+
+      # ── Hardened: Screenshot diff testing (visual QA) ──
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Screenshot visual QA (mobile)
+        run: |
+          echo "=== Mobile screenshot visual QA ==="
+          cd mobile-rn
+          node scripts/visual-qa.mjs
+        env:
+          AGENTHUB_MOBILE_MOCK_HUB_PORT: '8088'
+          CI: 'true'
+
+      - name: Upload mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-visual-qa-screenshots
+          path: app/mobile-rn/screenshots/visual-qa/
+          retention-days: 7
 
       - name: E2E (mock hub)
         run: |
