@@ -253,6 +253,14 @@ func (f *FileStore) SetRunEvidenceGate(id, result string) (Run, bool) {
 	return run, ok
 }
 
+func (f *FileStore) SetRunRetryCount(id string, count int) (Run, bool) {
+	run, ok := f.store.SetRunRetryCount(id, count)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
 func (f *FileStore) CreateItem(item Item) (Item, error) {
 	created, err := f.store.CreateItem(item)
 	if err != nil {

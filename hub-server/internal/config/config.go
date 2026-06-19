@@ -94,12 +94,14 @@ func (d DBConfig) LogValue() slog.Value {
 }
 
 type RedisConfig struct {
-	Host         string `mapstructure:"host"`
-	Port         int    `mapstructure:"port"`
-	Password     string `mapstructure:"password"`
-	DB           int    `mapstructure:"db"`
-	PoolSize     int    `mapstructure:"pool_size"`
-	MinIdleConns int    `mapstructure:"min_idle_conns"`
+	Host            string `mapstructure:"host"`
+	Port            int    `mapstructure:"port"`
+	Password        string `mapstructure:"password"`
+	DB              int    `mapstructure:"db"`
+	PoolSize        int    `mapstructure:"pool_size"`
+	MinIdleConns    int    `mapstructure:"min_idle_conns"`
+	ReadTimeoutSec  int    `mapstructure:"read_timeout_sec"`
+	WriteTimeoutSec int    `mapstructure:"write_timeout_sec"`
 }
 
 func (r RedisConfig) Addr() string {
@@ -115,6 +117,8 @@ func (r RedisConfig) LogValue() slog.Value {
 		slog.Int("db", r.DB),
 		slog.Int("pool_size", r.PoolSize),
 		slog.Int("min_idle_conns", r.MinIdleConns),
+		slog.Int("read_timeout_sec", r.ReadTimeoutSec),
+		slog.Int("write_timeout_sec", r.WriteTimeoutSec),
 	)
 }
 

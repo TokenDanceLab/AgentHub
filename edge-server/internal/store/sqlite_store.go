@@ -723,6 +723,17 @@ func (s *SQLiteStore) SetRunEvidenceGate(id, result string) (Run, bool) {
 	return run, true
 }
 
+func (s *SQLiteStore) SetRunRetryCount(id string, count int) (Run, bool) {
+	run, ok := s.store.SetRunRetryCount(id, count)
+	if !ok {
+		return Run{}, false
+	}
+	if err := s.syncPersist(); err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
 func (s *SQLiteStore) CreateItem(item Item) (Item, error) {
 	created, err := s.store.CreateItem(item)
 	return persistAfterSQLiteWrite(s, created, err)

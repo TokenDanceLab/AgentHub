@@ -70,8 +70,10 @@ func publicCountBucket(count int64) int64 {
 		return count / 10 * 10
 	case count < 1000:
 		return count / 100 * 100
-	default:
+	case count < 10000:
 		return count / 1000 * 1000
+	default:
+		return count / 10000 * 10000
 	}
 }
 
