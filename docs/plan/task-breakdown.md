@@ -33,7 +33,7 @@
 |---|---|---|---|---|---|
 | T004 | Docker: Redis 密码健康检查泄漏修复（-a flag） | P0 | S | S | — |
 | T005 | Docker: 移除 config.docker.yaml 硬编码 dev_password | P0 | S | S | — |
-| T006 | Docker: hk2 compose 转为 override 文件 | P1 | M | E,R | T004, T005 |
+| T006 | Docker: production compose 转为 override 文件 | P1 | M | E,R | T004, T005 |
 
 ### Lane C: Auth & Rate Limiting
 

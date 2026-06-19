@@ -31,7 +31,7 @@
 | 右侧栏预览 | 14/14 ✅ |
 | 管线代码 | 12/12 (8 done + 4 code-written) |
 | 一键部署 | ✅ `*.pages.vectorcontrol.tech` |
-| hk2 生产 | ✅ Hub Docker + Edge systemd |
+| 生产 | ✅ Hub Docker + Edge systemd |
 | Desktop/Mobile/Web | ✅ 三端皆通 |
 | 测试 | 41/41 Go · 0 TS errors · 88/88 Gate |
 | APK | ✅ Release arm64-v8a 29.83 MB (2026-06-10) |
