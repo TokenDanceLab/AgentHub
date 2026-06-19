@@ -288,7 +288,7 @@ describe('getBlockTitle', () => {
   it('returns Thinking for thinking blocks', () => {
     const block: TranscriptBlock = {
       id: 'think1', kind: 'thinking', author: agentAuthor,
-      text: 'reasoning...', createdAt: '14:00',
+      content: 'reasoning...', createdAt: '14:00',
     };
     expect(getBlockTitle(block)).toBe('Thinking');
   });
@@ -304,13 +304,13 @@ describe('getBlockTitle', () => {
   it('handles context_usage blocks', () => {
     const block: TranscriptBlock = {
       id: 'cu1', kind: 'context_usage', author: agentAuthor,
-      contextTokens: 5000, contextPct: 50, createdAt: '14:00',
+      inputTokens: 5000, outputTokens: 1000, usagePercent: 50, createdAt: '14:00',
     };
     expect(getBlockTitle(block)).toBe('Context usage');
 
     const block2: TranscriptBlock = {
       id: 'cu2', kind: 'context_usage', author: agentAuthor,
-      contextTokens: 5000, contextPct: 50, modelLabel: 'Claude Opus', createdAt: '14:00',
+      inputTokens: 5000, outputTokens: 1000, usagePercent: 50, modelLabel: 'Claude Opus', createdAt: '14:00',
     };
     expect(getBlockTitle(block2)).toBe('Claude Opus');
   });
@@ -482,18 +482,18 @@ describe('chat delivery state', () => {
   it('returns sending when thread has sendPending previewIntent', () => {
     const fixture = getMobileFixtureForScenario('sendPending');
     const thread = fixture.threads[0];
-    expect(deriveDeliveryState(thread)).toBe('sending');
+    expect(deriveDeliveryState(thread!)).toBe('sending');
   });
 
   it('returns failed when thread has retryAvailable', () => {
     const fixture = getMobileFixtureForScenario('sendError');
     const thread = fixture.threads[0];
-    expect(deriveDeliveryState(thread)).toBe('failed');
+    expect(deriveDeliveryState(thread!)).toBe('failed');
   });
 
   it('returns idle for normal threads', () => {
     const thread = mobileFixture.threads[0];
-    expect(deriveDeliveryState(thread)).toBe('idle');
+    expect(deriveDeliveryState(thread!)).toBe('idle');
   });
 });
 
@@ -546,7 +546,7 @@ describe('chat fixture scenarios', () => {
       .flat()
       .filter((b) => b.kind === 'diff');
     expect(diffBlocks.length).toBeGreaterThan(0);
-    const diffBlock = diffBlocks[0];
+    const diffBlock = diffBlocks[0]!;
     if (diffBlock.kind === 'diff') {
       expect(diffBlock.files.length).toBeGreaterThanOrEqual(7);
     }
@@ -570,7 +570,7 @@ describe('chat fixture scenarios', () => {
   });
 
   it('chat fixture has active run with browser preview', () => {
-    const activeThread = mobileFixture.threads[0];
+    const activeThread = mobileFixture.threads[0]!;
     const run = getThreadRun(mobileFixture, activeThread.id);
     expect(run).toBeTruthy();
     expect(run?.browserPreview).toBeTruthy();
@@ -621,9 +621,9 @@ describe('message compacting logic', () => {
       { id: 'm2', kind: 'text', author: { id: 'agenthub', name: 'AgentHub', role: 'agent' }, text: 'Second', createdAt: '14:01' },
     ];
 
-    const shouldCompact = blocks[0].author.id === blocks[1].author.id
-      && blocks[0].kind === 'text'
-      && blocks[1].kind === 'text';
+    const shouldCompact = blocks[0]!.author.id === blocks[1]!.author.id
+      && blocks[0]!.kind === 'text'
+      && blocks[1]!.kind === 'text';
 
     expect(shouldCompact).toBe(true);
   });
@@ -634,9 +634,9 @@ describe('message compacting logic', () => {
       { id: 'm2', kind: 'approval', author: { id: 'agenthub', name: 'AgentHub', role: 'agent' }, title: 'Review', status: 'pending', risk: 'low', reason: 'x', createdAt: '14:01' },
     ];
 
-    const shouldCompact = blocks[0].author.id === blocks[1].author.id
-      && blocks[0].kind === 'text'
-      && blocks[1].kind === 'text';
+    const shouldCompact = blocks[0]!.author.id === blocks[1]!.author.id
+      && blocks[0]!.kind === 'text'
+      && blocks[1]!.kind === 'text';
 
     expect(shouldCompact).toBe(false);
   });
@@ -647,9 +647,9 @@ describe('message compacting logic', () => {
       { id: 'm2', kind: 'text', author: { id: 'alice', name: 'Alice', role: 'human' }, text: 'Second', createdAt: '14:01' },
     ];
 
-    const shouldCompact = blocks[0].author.id === blocks[1].author.id
-      && blocks[0].kind === 'text'
-      && blocks[1].kind === 'text';
+    const shouldCompact = blocks[0]!.author.id === blocks[1]!.author.id
+      && blocks[0]!.kind === 'text'
+      && blocks[1]!.kind === 'text';
 
     expect(shouldCompact).toBe(false);
   });

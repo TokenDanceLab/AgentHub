@@ -10,74 +10,35 @@ import (
 )
 
 type lifecycleOnlyStore struct {
-	runs      map[string]store.Run
+	*store.Store
 	statusSet []string
 }
 
 func newLifecycleOnlyStore(run store.Run) *lifecycleOnlyStore {
+	s := store.New()
+	s.CreateProject(run.ProjectID, "test-project", "owner")
+	s.CreateThread(run.ThreadID, run.ProjectID, "test-thread", "chat", "", "")
+	s.CreateRun(run.ID, run.ProjectID, run.ThreadID)
 	return &lifecycleOnlyStore{
-		runs: map[string]store.Run{run.ID: run},
+		Store:     s,
+		statusSet: nil,
 	}
-}
-
-func (s *lifecycleOnlyStore) GetRun(id string) (store.Run, bool) {
-	run, ok := s.runs[id]
-	return run, ok
 }
 
 func (s *lifecycleOnlyStore) SetRunStatus(id, status string) (store.Run, bool) {
-	run, ok := s.runs[id]
-	if !ok {
-		return store.Run{}, false
+	run, ok := s.Store.SetRunStatus(id, status)
+	if ok {
+		s.statusSet = append(s.statusSet, status)
 	}
-	run.Status = status
-	switch status {
-	case "started":
-		run.StartedAt = time.Now().UTC().Format(time.RFC3339)
-	case "finished", "failed", "cancelled":
-		run.FinishedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-	s.runs[id] = run
-	s.statusSet = append(s.statusSet, status)
-	return run, true
+	return run, ok
 }
 
 func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (store.Run, bool) {
-	run, ok := s.runs[id]
-	if !ok {
-		return store.Run{}, false
+	run, ok := s.Store.SetRunStatusIf(id, status, allowedCurrent...)
+	if ok {
+		s.statusSet = append(s.statusSet, status)
 	}
-	allowed := len(allowedCurrent) == 0
-	for _, current := range allowedCurrent {
-		if run.Status == current {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
-		return run, false
-	}
-	return s.SetRunStatus(id, status)
-}
-
-func (s *lifecycleOnlyStore) SetRunEvidenceGate(id, result string) (store.Run, bool) {
-	run, ok := s.runs[id]
-	if !ok {
-		return store.Run{}, false
-	}
-	run.EvidenceGateResult = result
-	s.runs[id] = run
-	return run, true
-}
-
-func (s *lifecycleOnlyStore) SetRunRetryCount(id string, count int) (store.Run, bool) {
-	run, ok := s.runs[id]
-	if !ok {
-		return store.Run{}, false
-	}
-	run.RetryCount = count
-	s.runs[id] = run
-	return run, true
+	return run, ok
 }
 
 func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
