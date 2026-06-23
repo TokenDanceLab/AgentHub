@@ -90,6 +90,11 @@
   color: var(--foreground);
 }
 
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .fullscreenBtn {
   display: flex;
   align-items: center;
@@ -113,6 +118,11 @@
 .fullscreenBtn:hover {
   background: var(--hover-overlay);
   color: var(--foreground);
+}
+
+.fullscreenBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .body {

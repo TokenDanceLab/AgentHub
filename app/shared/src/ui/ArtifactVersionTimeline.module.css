@@ -94,6 +94,11 @@
 
 .versionHeader:hover { opacity: 0.8; }
 
+.versionHeader:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .versionLabel {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -154,6 +159,11 @@
 }
 
 .actionBtn:hover { background: var(--hover-overlay); color: var(--foreground); }
+
+.actionBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 
 .actionBtnRevert {
   border-color: var(--warning);
