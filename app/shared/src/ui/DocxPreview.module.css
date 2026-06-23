@@ -181,7 +181,7 @@
 }
 
 .errorIcon {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
   opacity: 0.6;
 }
 
