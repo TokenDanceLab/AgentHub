@@ -173,3 +173,8 @@
 .actionBtnRevert:hover {
   background: color-mix(in oklch, var(--warning) 12%, transparent);
 }
+
+.actionBtnRevert:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
