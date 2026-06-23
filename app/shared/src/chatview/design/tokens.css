@@ -50,8 +50,10 @@
   --info: #5e8dcc; --info-bg: rgba(94,141,204,0.06);
 
   --state-running: #5e8dcc; --state-success: #409467; --state-failed: #d15252; --state-waiting: #c0883a;
+  /* ── Chatview-specific diff/visual tokens ─────────────────────────── */
   --diff-add: #f2faf5; --diff-del: #fdf5f5;
   --role-builder: #5e8dcc; --role-reviewer: #409467; --role-deployer: #2b8a9e; --role-researcher: #c0883a; --role-orch: #0071BC;
+  /* ── Chatview-specific visual tokens (guide lines, shadows) ───────── */
   --guide-line: rgba(0,0,0,0.07);
   --shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
