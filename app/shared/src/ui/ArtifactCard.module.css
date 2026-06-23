@@ -72,6 +72,11 @@
   color: var(--foreground);
 }
 
+.actionBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .applyBtn {
   display: inline-flex;
   align-items: center;
@@ -88,6 +93,11 @@
 
 .applyBtn:hover {
   background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+.applyBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .applyLabel {
