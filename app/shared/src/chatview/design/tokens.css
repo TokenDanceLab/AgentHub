@@ -8,6 +8,7 @@
   --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
   /* ── Chatview-specific typography (differs from base tokens) ───────── */
   --body: 400 0.8125rem/1.5 var(--font-sans);  /* smaller than base --body (0.875rem) */
+  --label: 500 0.75rem/1.5 var(--font-sans);
   --label-xs: 600 0.6875rem/1.5 var(--font-sans);  /* larger than base --label-xs (0.625rem) */
   --bubble-font: 400 0.875rem/1.5 var(--font-sans);  /* bubble message font, distinct from --body at 0.8125rem */
 
@@ -16,9 +17,10 @@
   --r-xs: 3px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 9999px;
   --dur: 160ms; --dur-slow: 400ms; --dur-pulse: 1.2s; --dur-route: 1.5s; --dur-bar: 0.5s;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* ── Chatview-specific sizing tokens ─────────────────────────────── */
   --think-max-h: 240px; --avatar-size: 32px; --icon-size: 18px;
 
-  /* Surfaces — platform-agnostic theme tokens */
+  /* Surfaces — re-declared under .chatview scope for isolation from themes.css :root */
   --app-bg: #f7f6f9;
   --surface: #ffffff;
   --surface-dim: #f1f0f5;
@@ -26,20 +28,22 @@
   --surface-high: #efedf5;
   --surface-highest: #e6e4ef;
 
-  /* Text — platform-agnostic */
+  /* Text — re-declared under .chatview scope for isolation from themes.css :root */
   --text-1: #1a1a2e;
   --text-2: #585870;
   --text-3: #9595ac;
 
-  /* Borders — platform-agnostic */
+  /* Borders — re-declared under .chatview scope for isolation from themes.css :root */
   --bdr: rgba(0, 0, 0, 0.055);
   --bdr-strong: rgba(0, 0, 0, 0.095);
 
+  /* Primary/Status — re-declared under .chatview scope for isolation from themes.css :root */
   --primary: #0071BC; --primary-bg: rgba(0,113,188,0.06);
   --on-primary: #ffffff;  /* text color on primary backgrounds */
+  /* ── Chatview-specific opacity tokens (animation keyframes) ───────── */
   --opacity-disabled: 0.4;  /* disabled state opacity */
---opacity-route-mid: 0.4;  /* routePulse mid-keyframe */
---opacity-dag-mid: 0.3;    /* dagPulse mid-keyframe */
+  --opacity-route-mid: 0.4;  /* routePulse mid-keyframe */
+  --opacity-dag-mid: 0.3;    /* dagPulse mid-keyframe */
   --success: #409467; --success-bg: rgba(64,148,103,0.06);
   --warning: #c0883a; --warning-bg: rgba(192,136,58,0.06);
   --danger: #d15252; --danger-bg: rgba(209,82,82,0.06);
