@@ -60,6 +60,11 @@
   --sp-md: 16px;
   --sp-lg: 24px;
   --sp-xl: 32px;
+  --sp-xxs: 6px;
+  --sp-2: 2px;
+  --sp-10: 10px;
+  --sp-14: 14px;
+  --sp-16: 16px;
 
   /* Backward-compat spacing (aliased to v4 where values match) */
   --space-0:   0;
@@ -134,6 +139,11 @@
   --dur-panel:  520ms;
   --dur-enter:  360ms;
   --dur-pop:    220ms;
+  --dur:        160ms;
+  --dur-slow:   400ms;
+  --dur-pulse:  1.2s;
+  --dur-route:  1.5s;
+  --dur-bar:    0.5s;
 
   /* Backward-compat duration (aliased to v4) */
   --duration-fast:    var(--dur-fast);
@@ -164,6 +174,19 @@
   --state-failed:     #d15252;
   --state-cancelled:  #858595;
 
+  /* ── Semantic Colors (theme-independent defaults — overridden in themes.css) */
+  --primary:      #0071BC;
+  --primary-bg:   rgba(0,113,188,0.06);
+  --on-primary:   #ffffff;
+  --success:      #409467;
+  --success-bg:   rgba(64,148,103,0.06);
+  --warning:      #c0883a;
+  --warning-bg:   rgba(192,136,58,0.06);
+  --danger:       #d15252;
+  --danger-bg:    rgba(209,82,82,0.06);
+  --info:         #5e8dcc;
+  --info-bg:      rgba(94,141,204,0.06);
+
   --accent-orange: #ff7a1a;
   --accent-orange-foreground: #ffffff;
   --qr-cell: #f2f2f5;
@@ -173,6 +196,7 @@
      v4 Role Colors
      ═══════════════════════════════════════════════════════════════════════ */
   --role-orchestrator: #0071BC;
+  --role-orch:         #0071BC;  /* short alias for --role-orchestrator */
   --role-builder:      #5e8dcc;
   --role-reviewer:     #409467;
   --role-deployer:     #2b8a9e;
