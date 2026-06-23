@@ -315,7 +315,7 @@
   padding: 0 var(--space-md) 0 var(--space-xs);
   white-space: pre;
   overflow-x: auto;
-  color: #e0e0e0;
+  color: var(--text-3);
 }
 
 /* Syntax highlighting token overrides — ensure no backgrounds bleed */
