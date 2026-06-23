@@ -5,3 +5,6 @@ build/
 .next/
 *.min.css
 coverage/
+**/tokens*.css
+**/themes*.css
+**/presets*.css

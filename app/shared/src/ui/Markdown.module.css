@@ -184,7 +184,7 @@
 .codeLang {
   display: block;
   padding: 3px 12px;
-  background: color-mix(in oklch, #1e1e2e 85%, #313244);
+  background: var(--surface-dim);
   font-size: 0.6875rem;
   font-family: var(--font-mono);
   text-transform: uppercase;

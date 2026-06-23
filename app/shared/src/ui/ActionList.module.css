@@ -15,6 +15,15 @@
   text-align: left;
 }
 
+.item:hover {
+  background: var(--hover-overlay);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .icon {
   display: inline-grid;
   place-items: center;
