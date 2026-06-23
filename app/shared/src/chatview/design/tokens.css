@@ -6,9 +6,9 @@
   display:flex; flex-direction:column; height:100%; overflow:hidden;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
-  --body: 400 0.8125rem/1.5 var(--font-sans);
-  --label: 500 0.75rem/1.5 var(--font-sans);
-  --label-xs: 600 0.6875rem/1.5 var(--font-sans);
+  /* ── Chatview-specific typography (differs from base tokens) ───────── */
+  --body: 400 0.8125rem/1.5 var(--font-sans);  /* smaller than base --body (0.875rem) */
+  --label-xs: 600 0.6875rem/1.5 var(--font-sans);  /* larger than base --label-xs (0.625rem) */
   --bubble-font: 400 0.875rem/1.5 var(--font-sans);  /* bubble message font, distinct from --body at 0.8125rem */
 
   --sp-xs: 4px; --sp-sm: 8px; --sp-md: 12px; --sp-lg: 20px; --sp-xl: 28px;
