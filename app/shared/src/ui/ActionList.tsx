@@ -52,7 +52,7 @@ export function ActionList({
     return (
       <div className={cx(styles.list, className)} role="alert">
         {typeof error === 'string' ? (
-          <span className={cx(styles.item, styles.title)} style={{ color: 'var(--destructive, #dc2626)' }}>{error}</span>
+          <span className={cx(styles.item, styles.title)} style={{ color: 'var(--danger)' }}>{error}</span>
         ) : (
           error
         )}
