@@ -104,6 +104,11 @@
   color: var(--foreground);
 }
 
+.toolbarBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .acceptAllBtn {
   border-color: var(--diff-added-border);
   color: var(--diff-added-border);
@@ -113,6 +118,11 @@
   background: var(--diff-added-bg);
 }
 
+.acceptAllBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .rejectAllBtn {
   border-color: var(--diff-removed-border);
   color: var(--diff-removed-border);
@@ -120,6 +130,11 @@
 
 .rejectAllBtn:hover {
   background: var(--diff-removed-bg);
+}
+
+.rejectAllBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* ── File tabs ────────────────────────────────────────────────── */
@@ -154,6 +169,11 @@
 
 .fileTab:hover {
   color: var(--foreground);
+}
+
+.fileTab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .fileTabActive {
@@ -342,6 +362,10 @@
   opacity: 1;
 }
 
+.diffRow:has(.lineActionBtn:focus-visible) .lineActions {
+  opacity: 1;
+}
+
 .lineActionBtn {
   display: flex;
   align-items: center;
@@ -373,6 +397,11 @@
   border-color: var(--diff-added-border);
 }
 
+.lineAcceptBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .lineAcceptBtnActive {
   background: var(--diff-added-bg);
   border-color: var(--diff-added-border);
@@ -385,6 +414,11 @@
 .lineRejectBtn:hover {
   background: var(--diff-removed-bg);
   border-color: var(--diff-removed-border);
+}
+
+.lineRejectBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .lineRejectBtnActive {
