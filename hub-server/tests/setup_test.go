@@ -27,6 +27,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -122,7 +123,7 @@ func TestMain(m *testing.M) {
 	notificationService := service.NewNotificationService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
-	publicHandler := handler.NewPublicHandler(db, time.Now())
+	publicHandler := handler.NewPublicHandler(service.NewPublicStatsService(db), time.Now())
 
 	// Phase 1-7 handlers
 	oidcService := service.NewOIDCService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
@@ -142,7 +143,7 @@ func TestMain(m *testing.M) {
 	auditHandler := handler.NewAuditHandler(auditService)
 	relayService := service.NewRelayService(cacheClient, mgr)
 	relayHandler := handler.NewRelayHandler(relayService)
-	agentTeamService := service.NewAgentTeamService(db, agentService, cacheClient)
+	agentTeamService := agentteam.NewAgentTeamService(db, agentService, cacheClient)
 	agentTeamHandler := handler.NewAgentTeamHandler(agentTeamService)
 
 	r := gin.New()
