@@ -16,6 +16,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
 func TestPublicStatsBucketsCountsAndUptime(t *testing.T) {
@@ -42,7 +43,8 @@ func TestPublicStatsBucketsCountsAndUptime(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/public/stats", nil)
-	h := handler.NewPublicHandler(db, time.Now().Add(-25*time.Hour-13*time.Minute))
+	statsSvc := service.NewPublicStatsService(db)
+	h := handler.NewPublicHandler(statsSvc, time.Now().Add(-25*time.Hour-13*time.Minute))
 
 	h.Stats(c)
 

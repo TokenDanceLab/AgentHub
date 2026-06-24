@@ -438,8 +438,9 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |
 | `agent.cancel` | Hub→Edge | 取消 agent 任务，payload: `{ task_id }` |
+| `agent.regenerate` | Client→Hub | 请求重新生成 agent 回复，payload: `{ task_id }` |
 | `agent.control` | Hub→Edge | 设备级控制命令，payload: `{ kind, agent_task_id?, target_id?, edge_device_id, team_id?, team_run_id?, team_task_id?, assignment_id?, member_id?, approval_id?, edge_control? }`。当前 `kind=permission.decide` 用于把 TeamRun approval decision 投递给拥有该 Edge run 的 exact Desktop/Edge；`edge_control` 可直接转为 Edge `POST /v1/permissions/decide` body。目标 device 离线时进入 user/device 专属控制队列，reconnect 只 replay 同一 device，禁止 fallback 到其它 Desktop。 |
-| `agent.timeout` | Hub→Edge | 任务超时，payload: `{ task_id }` |
+| `agent.timeout` | Hub→Edge | 任务超时（planned），payload: `{ task_id }` |
 
 #### Notification 事件（Hub→Client）
 
@@ -464,6 +465,22 @@ TeamRun WebSocket 事件由 Hub 在 TeamRun 生命周期中推送，覆盖运行
 | `team.event` | Hub→Client | 通用 TeamRun 事件日志条目，payload: `{ team_run_id, event_type, event_data }`；用于跨切片 TeamEvent 推送，event_type 可包含 `team.route.decided`、`team.route.rejected`、`team.task.created`、`team.approval.decided`、`team.conflict.resolved` 等 |
 | `team.assignment.done` | Hub→Client | TeamAssignment 已成功完成，payload: `{ team_run_id, assignment_id, result }` |
 | `team.assignment.failed` | Hub→Client | TeamAssignment 执行失败，payload: `{ team_run_id, assignment_id, error }` |
+
+#### Sync 事件（Client↔Hub）
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `sync.request` | Client→Hub | 客户端请求增量同步补齐离线事件，payload: `{ last_seq_id }` |
+| `sync.events` | Hub→Client | 服务端推送批量同步事件，payload: `{ events[], last_seq_id }` |
+
+#### Plan Approval 事件（Hub↔Client）
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `run.agent.plan_proposed` | Hub→Client | Agent 计划已提议，payload: `{ task_id, plan_id, content }` |
+| `run.agent.plan_approved` | Hub→Client | Agent 计划已批准，payload: `{ task_id, plan_id }` |
+| `run.agent.plan_rejected` | Hub→Client | Agent 计划已拒绝，payload: `{ task_id, plan_id, reason }` |
+| `run.agent.plan_expired` | Hub→Client | Agent 计划已过期，payload: `{ task_id, plan_id }` |
 
 ### 7.4 代码示例
 

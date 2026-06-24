@@ -1,13 +1,13 @@
 # AgentHub 当前状态
 
 最后更新：2026-06-24
-当前活跃分支：`feat/super-phase1-safety-foundation`（SUPER 修复全完成，待合并）
-当前 dev HEAD：`f4481fa6` (`dev/delicious233`)
+当前活跃分支：`dev/delicious233`（SUPER 修复已合入并删除 feature 分支）
+当前 dev HEAD：`455516b3` (`dev/delicious233`)
 Release tag：`v0.5.0`（master 最新）
 
 ## SUPER 工程修复 (2026-06-19 完成)
 
-52 任务 6 Phase 全部完成。34 提交领先 master，待合并到 dev → master。
+52 任务 6 Phase 全部完成。feature 分支已合入 dev 并删除，dev 已同步 master。
 详见 `docs/progress/MASTER.md`。
 
 | Phase | 名称 | 进度 | 状态 |
@@ -62,11 +62,11 @@ macOS 平台已放弃：CI 移除 macOS build job、Tauri DMG 不再构建。Des
 | 项目 | 当前事实 |
 |---|---|
 | 当前集成 dev | `dev/delicious233`，已同步 master（PR #300 ChatView migration）。 |
-| 活跃 feature 分支 | `feat/super-phase1-safety-foundation`（HEAD `cafef98d`），SUPER 52 任务全部完成，+34 提交领先 master，含 ui-polish-v4 merge。 |
+| 活跃 feature 分支 | （无）SUPER 52 任务全部完成，`feat/super-phase1-safety-foundation` 已合入并删除，含 ui-polish-v4 merge。 |
 | 上一条 dev | `origin/dev/delicious223`（已归档）。 |
 | RC tag | `v0.5.0`（master 最新），`v0.4.0`（unsigned release）。 |
 | master | `origin/master = 67f54228`，v0.5.0，CI/CD workflows 已就绪。 |
-| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `feat/super-phase1-safety-foundation`）。 |
+| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `dev/delicious233`）。 |
 | 已删除分支 | `feat/glm-frontend-integration`（仅 handoff prompt，无实现，2026-06-24 删除）。 |
 | macOS | 已放弃。CI 移除 macOS build matrix + DMG job，Desktop 仅 Windows。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/progress/MASTER.md` 写 SUPER 工程进度。 |
