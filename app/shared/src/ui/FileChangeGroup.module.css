@@ -110,7 +110,7 @@
 }
 
 .additions { color: var(--success); font-weight: var(--font-weight-medium); }
-.deletions { color: var(--danger, #ef4444); font-weight: var(--font-weight-medium); }
+.deletions { color: var(--danger); font-weight: var(--font-weight-medium); }
 
 .diffBtn {
   display: flex;

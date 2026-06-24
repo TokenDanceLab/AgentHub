@@ -3,11 +3,13 @@ server:
   log_level: info
   log_file: ""
   admin_port: 6060
+  # env: production|development|staging|... — overridden by AGENTHUB_ENV env var
+  env: ""
 db:
   host: postgres
   port: 5432
   user: agenthub
-  password: dev_password
+  password: ""  # MUST be set via AGENTHUB_DB_PASSWORD env var at runtime
   name: agenthub
 redis:
   host: redis

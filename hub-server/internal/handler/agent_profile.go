@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -115,7 +116,8 @@ func (h *AgentProfileHandler) CreateProfile(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), userID, profile)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -130,7 +132,8 @@ func (h *AgentProfileHandler) GetProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 	profile, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -180,7 +183,8 @@ func (h *AgentProfileHandler) UpdateProfile(c *gin.Context) {
 
 	profile, err := h.service.Update(c.Request.Context(), id, userID, updates)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -254,7 +258,8 @@ func (h *AgentProfileHandler) DeleteProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -269,7 +274,8 @@ func (h *AgentProfileHandler) PublishProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -285,7 +291,8 @@ func (h *AgentProfileHandler) InstallProfile(c *gin.Context) {
 
 	profile, err := h.service.Install(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

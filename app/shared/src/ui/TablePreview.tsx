@@ -126,7 +126,9 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   }, [fileUrl, fileBlob, parseSheet]);
 
   useEffect(() => {
-    void loadFile();
+    loadFile().catch((err) => {
+      console.error('TablePreview: loadFile failed:', err);
+    });
   }, [loadFile]);
 
   const handleSort = useCallback((colIndex: number) => {
@@ -161,26 +163,31 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
   const handleSheetSwitch = useCallback((sheetName: string) => {
     setActiveSheet(sheetName);
-    try {
-      if (fileBlob) {
-        /* Re-parse from the same blob — we already have it loaded */
-        void fileBlob.arrayBuffer().then(async (ab) => {
+    if (fileBlob) {
+      /* Re-parse from the same blob — we already have it loaded */
+      fileBlob.arrayBuffer().then(async (ab) => {
+        const XLSX = await getXLSX();
+        const wb = XLSX.read(ab, { type: 'array' });
+        parseSheet(wb, sheetName);
+      }).catch((err) => {
+        console.error('TablePreview: sheet switch (blob) failed:', sheetName, err);
+      });
+    } else {
+      fetch(fileUrl).then((response) => {
+        if (!response.ok) {
+          console.error('TablePreview: sheet switch fetch failed:', response.status, response.statusText);
+          return;
+        }
+        response.arrayBuffer().then(async (ab) => {
           const XLSX = await getXLSX();
           const wb = XLSX.read(ab, { type: 'array' });
           parseSheet(wb, sheetName);
+        }).catch((err) => {
+          console.error('TablePreview: sheet switch (fetch→arrayBuffer) failed:', sheetName, err);
         });
-      } else {
-        void fetch(fileUrl).then((response) => {
-          if (!response.ok) return;
-          void response.arrayBuffer().then(async (ab) => {
-            const XLSX = await getXLSX();
-            const wb = XLSX.read(ab, { type: 'array' });
-            parseSheet(wb, sheetName);
-          });
-        });
-      }
-    } catch {
-      /* Ignore sheet switch errors */
+      }).catch((err) => {
+        console.error('TablePreview: sheet switch fetch failed:', sheetName, err);
+      });
     }
   }, [fileBlob, fileUrl, parseSheet]);
 

@@ -57,12 +57,29 @@ func (AgentTeamMember) TableName() string {
 
 // AgentTeamRun status constants.
 const (
-	TeamRunStatusQueued    = "queued"
-	TeamRunStatusRunning   = "running"
-	TeamRunStatusCompleted = "completed"
-	TeamRunStatusFailed    = "failed"
-	TeamRunStatusCancelled = "cancelled"
+	TeamRunStatusQueued        = "queued"
+	TeamRunStatusRunning       = "running"
+	TeamRunStatusPendingReview = "pending_review"
+	TeamRunStatusCompleted     = "completed"
+	TeamRunStatusFailed        = "failed"
+	TeamRunStatusCancelled     = "cancelled"
 )
+
+// HumanReviewAction constants for POST /client/team-runs/{id}/review-decision.
+const (
+	ReviewActionApprove = "approve"
+	ReviewActionDiscuss = "discuss"
+	ReviewActionModify  = "modify"
+)
+
+// AgentTeamRun mode constants.
+const (
+	TeamRunModeSupervisor = "supervisor"
+	TeamRunModeCompete    = "compete"
+)
+
+// CompeteMaxAgentsDefault is the default cap on parallel agents in compete mode.
+const CompeteMaxAgentsDefault = 3
 
 // AgentTeamMember role constants.
 const (
@@ -79,6 +96,7 @@ type AgentTeamRun struct {
 	TriggerUserID  string    `gorm:"type:uuid;not null" json:"trigger_user_id"`
 	TriggerMessage string    `gorm:"type:text" json:"trigger_message,omitempty"`
 	TargetID       *string   `gorm:"type:uuid" json:"target_id,omitempty"`
+	Mode           string    `gorm:"type:varchar(20);not null;default:supervisor" json:"mode"`
 	Status         string    `gorm:"type:varchar(20);not null;default:queued" json:"status"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
@@ -109,6 +127,7 @@ const (
 	AssignmentTypeReview   = "review"
 	AssignmentTypeApprove  = "approve"
 	AssignmentTypeNotify   = "notify"
+	AssignmentTypeCompete  = "compete"
 )
 
 const (
@@ -244,6 +263,7 @@ func ValidActions() map[string]bool {
 		"delegate": true,
 		"review":   true,
 		"approve":  true,
+		"compete":  true,
 		"finish":   true,
 	}
 }
@@ -324,6 +344,8 @@ const (
 	TeamEventAgentMessage         = "agent.message"
 	TeamEventApprovalDecided      = "team.approval.decided"
 	TeamEventConflictResolved     = "team.conflict.resolved"
+	TeamEventReviewPending        = "team.review.pending"
+	TeamEventReviewDecided        = "team.review.decided"
 )
 
 // TeamRunState is the materialized view of a team run derived by replaying
@@ -342,6 +364,7 @@ type TeamRunState struct {
 	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
 	RouteAuditLog  []TeamRouteAuditState      `json:"route_audit_log"`
+	Reviews        []HumanReviewState         `json:"reviews,omitempty"`
 	Budget         *TeamBudget                `json:"budget,omitempty"`
 	TerminalReason string                     `json:"terminal_reason,omitempty"`
 }
@@ -533,4 +556,72 @@ type TeamBudget struct {
 	RunCount        int     `json:"run_count"`
 	ContextWarnings int     `json:"context_warnings,omitempty"`
 	Compactions     int     `json:"compactions,omitempty"`
+}
+
+// ── Compete mode types ────────────────────────────────────────────
+
+// CompeteSummaryRequest is the request body for POST /client/team-runs/{id}/compete-summary.
+type CompeteSummaryRequest struct {
+	// Prompt is an optional user-supplied prompt for the comparison LLM.
+	Prompt string `json:"prompt,omitempty"`
+}
+
+// CompeteSummaryResponse is the response for a compete-mode comparison summary.
+type CompeteSummaryResponse struct {
+	TeamRunID string                       `json:"team_run_id"`
+	Summary   string                       `json:"summary"`
+	Entries   []CompeteSummaryEntry        `json:"entries"`
+	CreatedAt time.Time                    `json:"created_at"`
+}
+
+// CompeteSummaryEntry represents one agent's result within a compete comparison.
+type CompeteSummaryEntry struct {
+	MemberID     string `json:"member_id"`
+	AssignmentID string `json:"assignment_id"`
+	TaskID       string `json:"task_id,omitempty"`
+	AgentTaskID  string `json:"agent_task_id,omitempty"`
+	Result       string `json:"result"`
+	Status       string `json:"status"`
+}
+
+// Compete aggregate event type constants.
+const (
+	TeamEventCompeteDispatched  = "team.compete.dispatched"
+	TeamEventCompeteAggregated  = "team.compete.aggregated"
+)
+
+// ── Human Review Gate (ADR-008) ──────────────────────────────────
+
+// HumanReviewDecision is the request body for POST /client/team-runs/{id}/review-decision.
+type HumanReviewDecision struct {
+	Action  string                   `json:"action"`  // "approve" | "discuss" | "modify"
+	Comment string                   `json:"comment,omitempty"`
+	Changes []HumanReviewChange      `json:"changes,omitempty"`
+}
+
+// HumanReviewChange represents a single modification in a "modify" review decision.
+type HumanReviewChange struct {
+	Field string `json:"field"` // e.g. "instructions", "next_worker"
+	Value string `json:"value"`
+}
+
+// HumanReviewState is a replay-friendly human review record in TeamRunState.
+type HumanReviewState struct {
+	ReviewID  string              `json:"review_id"`
+	RunID     string              `json:"run_id"`
+	Action    string              `json:"action"` // "approve" | "discuss" | "modify"
+	Comment   string              `json:"comment,omitempty"`
+	Changes   []HumanReviewChange `json:"changes,omitempty"`
+	DecidedBy string              `json:"decided_by,omitempty"`
+	CreatedAt time.Time           `json:"created_at"`
+	DecidedAt *time.Time          `json:"decided_at,omitempty"`
+}
+
+// ValidReviewActions returns the set of valid human review decision actions.
+func ValidReviewActions() map[string]bool {
+	return map[string]bool{
+		ReviewActionApprove: true,
+		ReviewActionDiscuss: true,
+		ReviewActionModify:  true,
+	}
 }

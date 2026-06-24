@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +47,8 @@ func (h *SessionHandler) CreatePrivate(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.CreatePrivateSession(c.Request.Context(), userID, req.TargetUserID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -72,6 +74,7 @@ func (h *SessionHandler) Create(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
+	var e *errcode.Error
 	switch req.Type {
 	case "private":
 		if req.TargetUserID == "" {
@@ -80,7 +83,7 @@ func (h *SessionHandler) Create(c *gin.Context) {
 		}
 		result, err := h.service.CreatePrivateSession(c.Request.Context(), userID, req.TargetUserID)
 		if err != nil {
-			if e, ok := err.(*errcode.Error); ok {
+			if errors.As(err, &e) {
 				Fail(c, e)
 				return
 			}
@@ -95,7 +98,7 @@ func (h *SessionHandler) Create(c *gin.Context) {
 		}
 		result, err := h.service.CreateGroupSession(c.Request.Context(), userID, req.Name, req.MemberIDs)
 		if err != nil {
-			if e, ok := err.(*errcode.Error); ok {
+			if errors.As(err, &e) {
 				Fail(c, e)
 				return
 			}
@@ -122,7 +125,8 @@ func (h *SessionHandler) CreateGroup(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.CreateGroupSession(c.Request.Context(), userID, req.Name, req.MemberIDs)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -136,7 +140,8 @@ func (h *SessionHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListSessions(c.Request.Context(), userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -159,7 +164,8 @@ func (h *SessionHandler) AddMembers(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.AddGroupMembers(c.Request.Context(), userID, sessionID, req.MemberIDs); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -172,9 +178,10 @@ func (h *SessionHandler) AddMembers(c *gin.Context) {
 func (h *SessionHandler) RemoveMember(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
-	targetID := c.Param("user_id")
+	targetID := c.Param("target_user_id")
 	if err := h.service.RemoveGroupMember(c.Request.Context(), userID, sessionID, targetID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -188,7 +195,8 @@ func (h *SessionHandler) Leave(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.LeaveGroup(c.Request.Context(), userID, sessionID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -198,9 +206,11 @@ func (h *SessionHandler) Leave(c *gin.Context) {
 	OK(c, nil)
 }
 
+// transferOwnerReq is the request body for POST /sessions/:id/transfer-owner.
+// Prefer new_owner_user_id; new_owner_id is accepted for backward compatibility.
 type transferOwnerReq struct {
-	NewOwnerID       string `json:"new_owner_id"`
-	NewOwnerUserID   string `json:"new_owner_user_id"`
+	NewOwnerUserID string `json:"new_owner_user_id"`
+	NewOwnerID     string `json:"new_owner_id"` // deprecated: prefer new_owner_user_id
 }
 
 func (r transferOwnerReq) resolveNewOwnerID() string {
@@ -224,7 +234,8 @@ func (h *SessionHandler) TransferOwner(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.TransferGroupOwnership(c.Request.Context(), userID, sessionID, newOwnerID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -238,7 +249,8 @@ func (h *SessionHandler) Dissolve(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.DissolveGroup(c.Request.Context(), userID, sessionID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -263,7 +275,8 @@ func (h *SessionHandler) UpdateGroupInfo(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.UpdateGroupInfo(c.Request.Context(), userID, sessionID, req.Name, req.AvatarURL, req.Announcement); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -288,7 +301,8 @@ func (h *SessionHandler) UpdateMemberSettings(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.UpdateMemberSettings(c.Request.Context(), userID, sessionID, req.Pinned, req.Archived, req.Muted); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -302,7 +316,8 @@ func (h *SessionHandler) DeleteForMe(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 	if err := h.service.DeleteForMe(c.Request.Context(), userID, sessionID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -322,7 +337,8 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 
 	result, err := h.service.SearchSessions(c.Request.Context(), userID, q)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

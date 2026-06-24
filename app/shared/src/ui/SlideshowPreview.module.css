@@ -151,7 +151,7 @@
 
 .slideText {
   margin: 0;
-  color: #1a1a2e;
+  color: var(--text-1);
   font-size: 0.875rem;
   line-height: 1.5;
   word-break: break-word;
@@ -163,7 +163,7 @@
 }
 
 .slideEmpty {
-  color: #999;
+  color: var(--text-3);
   font-style: italic;
   text-align: center;
 }
@@ -263,7 +263,7 @@
 }
 
 .errorIcon {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
   opacity: 0.6;
 }
 

@@ -6,10 +6,9 @@ import (
 )
 
 func TestCORSRejectsProductionLoopbackOrigin(t *testing.T) {
-	t.Setenv("AGENTHUB_ENV", "production")
 	t.Setenv("AGENTHUB_CORS_ORIGINS", "http://localhost:5173")
 
-	mw, err := CORS()
+	mw, err := CORS("production")
 	if err == nil {
 		t.Fatal("expected CORS() to return error for loopback in production")
 	}
@@ -22,10 +21,9 @@ func TestCORSRejectsProductionLoopbackOrigin(t *testing.T) {
 }
 
 func TestCORSReturnsMiddlewareOnValidConfig(t *testing.T) {
-	t.Setenv("AGENTHUB_ENV", "development")
 	t.Setenv("AGENTHUB_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 
-	mw, err := CORS()
+	mw, err := CORS("development")
 	if err != nil {
 		t.Fatalf("CORS() returned unexpected error: %v", err)
 	}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -51,7 +52,8 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 
 	result, err := h.service.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -69,7 +71,8 @@ func (h *MarketHandler) GetMarketProfile(c *gin.Context) {
 	id := c.Param("id")
 	profile, err := h.service.GetPublic(c.Request.Context(), id)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -86,7 +89,8 @@ func (h *MarketHandler) InstallMarketProfile(c *gin.Context) {
 
 	profile, err := h.service.Install(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -109,7 +113,8 @@ func (h *MarketHandler) RateMarketProfile(c *gin.Context) {
 
 	newAvg, newCount, err := h.service.Rate(c.Request.Context(), id, userID, req.Score)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

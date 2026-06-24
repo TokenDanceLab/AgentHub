@@ -85,5 +85,6 @@ var (
 	DocNotFound       = New("doc_not_found", "document not found", http.StatusNotFound)
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)
 
-		ErrUnauthorized = New("unauthorized", "authentication required", http.StatusUnauthorized)
+		ErrUnauthorized = sharederr.ErrUnauthorized
+	ErrForbidden    = sharederr.ErrForbidden
 )

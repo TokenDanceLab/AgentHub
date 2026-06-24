@@ -324,3 +324,276 @@ func searchSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+// ── Redirect URI handler-level validation ────────────────────────────
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_NotAllowed(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback")
+
+	called := false
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			called = true
+			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "desktop",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "https://evil.com/steal-tokens",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for non-allowed redirect_uri")
+	}
+	if !contains(w.Body.String(), "redirect_uri is not allowed") {
+		t.Fatalf("expected redirect_uri rejection message, got %s", w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_Allowed_ExactMatch(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback,http://127.0.0.1/callback")
+
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			if redirectURI != "https://hub.example.com/auth/tokendance/callback" {
+				t.Errorf("service received redirect_uri=%q, want %q", redirectURI, "https://hub.example.com/auth/tokendance/callback")
+			}
+			return &service.AuthorizationResult{
+				State:            "test-state",
+				AuthorizationURL: "https://id.example.com/oidc/auth",
+			}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "web",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "https://hub.example.com/auth/tokendance/callback",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_Allowed_LoopbackDesktop(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "http://127.0.0.1/callback")
+
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			return &service.AuthorizationResult{
+				State:            "test-state",
+				AuthorizationURL: "https://id.example.com/oidc/auth",
+			}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	// desktop loopback with port variation should be allowed
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "desktop",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "http://127.0.0.1:8400/callback",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for desktop loopback, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_LoopbackRejectedForWeb(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "http://127.0.0.1/callback")
+
+	called := false
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			called = true
+			return &service.AuthorizationResult{}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	// web device_type should NOT get loopback matching
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "web",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "http://127.0.0.1:8400/callback",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for web loopback, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for non-allowed redirect_uri from web")
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_IncludesFallback(t *testing.T) {
+	// The handler should also accept URIs from AGENTHUB_TOKENDANCE_ID_REDIRECT_URI
+	// (the service layer's fallback), even if not in ALLOWED_REDIRECT_URIS.
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://primary.example.com/callback")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "http://127.0.0.1/callback")
+
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			return &service.AuthorizationResult{
+				State:            "test-state",
+				AuthorizationURL: "https://id.example.com/oidc/auth",
+			}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "web",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "https://primary.example.com/callback",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for fallback redirect_uri, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCCallback_RedirectURI_NotAllowed(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback")
+
+	called := false
+	svc := &mockOIDCService{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+			called = true
+			return &service.CallbackResult{AccessToken: "bad"}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/callback", map[string]string{
+		"code":          "auth-code",
+		"state":         "state-123",
+		"code_verifier": "verifier",
+		"device_type":   "desktop",
+		"device_id":     testDeviceID,
+		"redirect_uri":  "https://evil.com/steal-tokens",
+	})
+	h.PostOIDCCallback(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for non-allowed redirect_uri in callback")
+	}
+	if !contains(w.Body.String(), "redirect_uri is not allowed") {
+		t.Fatalf("expected redirect_uri rejection message, got %s", w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCCallback_RedirectURI_Allowed(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback")
+
+	svc := &mockOIDCService{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+			return &service.CallbackResult{
+				AccessToken:  "access-token",
+				RefreshToken: "refresh-token",
+				ExpiresIn:    900,
+			}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/callback", map[string]string{
+		"code":          "auth-code",
+		"state":         "state-123",
+		"code_verifier": "verifier",
+		"device_type":   "desktop",
+		"device_id":     testDeviceID,
+		"redirect_uri":  "https://hub.example.com/auth/tokendance/callback",
+	})
+	h.PostOIDCCallback(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_InvalidURL(t *testing.T) {
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/callback")
+
+	called := false
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			called = true
+			return &service.AuthorizationResult{}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "desktop",
+		"device_id":             testDeviceID,
+		"redirect_uri":          "not-a-valid-url",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for invalid redirect_uri")
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_EmptyAllowed(t *testing.T) {
+	// Empty redirect_uri should always pass through (service applies fallback).
+	// No env var set — defer to service layer behavior.
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+			if redirectURI != "" {
+				t.Errorf("service received redirect_uri=%q, want empty", redirectURI)
+			}
+			return &service.AuthorizationResult{
+				State:            "test-state",
+				AuthorizationURL: "https://id.example.com/oidc/auth",
+			}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "desktop",
+		"device_id":             testDeviceID,
+		// redirect_uri intentionally omitted
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for empty redirect_uri, got %d: %s", w.Code, w.Body.String())
+	}
+}

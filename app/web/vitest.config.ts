@@ -13,6 +13,9 @@ export default defineConfig({
       'react-i18next': path.resolve(__dirname, 'node_modules', 'react-i18next'),
     },
   },
+  ssr: {
+    noExternal: true,
+  },
   test: {
     globals: true,
     environment: 'jsdom',

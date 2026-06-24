@@ -44,6 +44,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
 import { useHubWebSocket } from '@/hooks/useHubWebSocket';
 import { useQueryClient } from '@tanstack/react-query';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { fetchHealth } from '@/api/edgeClient';
 import { HEALTH_POLL_MS } from '@/config';
 
@@ -158,51 +159,17 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     getAgentActivityStore().getSnapshot,
   );
 
-  // Hub WebSocket — invalidate React Query caches when real-time events arrive.
+  // Hub WebSocket — establish connection for real-time event ingestion.
+  // Cache invalidation on reconnect fills the WS disconnection gap.
+  // Per-event invalidation is handled by the central hubEventBridge.
   const queryClient = useQueryClient();
-  const hubWS = useHubWebSocket({
+  useHubWebSocket({
     enabled: hubReady,
     onReconnect: () => {
-      // On reconnect, invalidate agent task queries so the REST refetch
-      // picks up any events missed during the WS disconnection gap.
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-tasks'] });
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
     },
   });
-
-  // When a Hub WS event arrives, invalidate the relevant query caches so
-  // React Query refetches fresh data from the Hub REST API.
-  useEffect(() => {
-    if (!hubWS.lastEvent) return;
-
-    const { type } = hubWS.lastEvent;
-    switch (type) {
-      case 'message.new':
-      case 'message.edited':
-      case 'message.recall':
-      case 'message.pin':
-      case 'message.unpin':
-      case 'message.reaction_added':
-      case 'message.reaction_removed':
-      case 'message.read':
-        void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
-        break;
-      case 'session.created':
-      case 'session.dissolved':
-      case 'session.member_joined':
-      case 'session.member_left':
-      case 'session.info_updated':
-        void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
-        break;
-      case 'friend.request':
-      case 'friend.accepted':
-        void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
-        break;
-      case 'notification.new':
-        void queryClient.invalidateQueries({ queryKey: ['hub', 'notifications'] });
-        break;
-    }
-  }, [hubWS.lastEvent, queryClient]);
 
   // Hub data queries — only active in live mode when Hub is authenticated.
   const contactsQuery = useHubContacts({ enabled: hubReady });

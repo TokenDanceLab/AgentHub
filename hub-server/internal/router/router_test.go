@@ -31,13 +31,15 @@ func TestNoRouteReturnsNotFound(t *testing.T) {
 	metrics.Register()
 
 	r := gin.New()
-	SetupRoutes(
+	if err := SetupRoutes(
 		r,
 		&config.Config{},
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, path := range []string{"/does-not-exist", "/metrics", "/debug/pprof/"} {
 		t.Run(path, func(t *testing.T) {
@@ -96,7 +98,7 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 	}, time.Now(), "router-test")
 
 	r := gin.New()
-	SetupRoutes(
+	if err := SetupRoutes(
 		r,
 		&config.Config{},
 		"",
@@ -104,7 +106,9 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		healthHandler,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		path string
@@ -188,7 +192,7 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 	metrics.Register()
 
 	r := gin.New()
-	SetupRoutes(
+	if err := SetupRoutes(
 		r,
 		&config.Config{},
 		"",
@@ -196,7 +200,9 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 		nil, nil, nil, nil, nil,
 		handler.NewMessageHandler(routerMessageServiceStub{}),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	req := httptest.NewRequest(http.MethodPut, "/client/messages/msg-1", nil)
 	w := httptest.NewRecorder()
@@ -218,7 +224,7 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 	metrics.Register()
 
 	r := gin.New()
-	SetupRoutes(
+	if err := SetupRoutes(
 		r,
 		&config.Config{},
 		"",
@@ -226,7 +232,9 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 		nil, nil, nil, nil, nil,
 		handler.NewMessageHandler(routerMessageServiceStub{}),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, tt := range []struct {
 		method string

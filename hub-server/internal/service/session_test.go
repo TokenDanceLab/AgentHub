@@ -277,7 +277,7 @@ func TestDeleteForMe_Success(t *testing.T) {
 
 	// #135: ListAgentInstancesByInviter — no agents for this user
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
-		WithArgs("sess-1", "user-1").
+		WithArgs("sess-1", "user-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	// SoftDeleteMember
@@ -309,7 +309,7 @@ func TestDeleteForMe_PublishesMemberLeftEvent(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
-		WithArgs("sess-1", "user-1").
+		WithArgs("sess-1", "user-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
@@ -629,7 +629,7 @@ func TestRemoveGroupMember_CleansUpInvitedAgents(t *testing.T) {
 
 	// ListAgentInstancesByInviter for target user
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
-		WithArgs("sess-1", "u2").
+		WithArgs("sess-1", "u2", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
 			AddRow("agent-1", "claude-code", "sess-1", "u2", "Claude"))
 

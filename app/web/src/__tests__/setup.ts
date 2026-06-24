@@ -31,3 +31,13 @@ vi.mock('@lobehub/icons', () => ({
 }));
 
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
+
+// Mock @lobehub/fluent-emoji (transitive peer dep of @lobehub/icons via @lobehub/ui)
+// to prevent vitest from processing its ESM directory import which Node.js cannot resolve.
+vi.mock('@lobehub/fluent-emoji', () => ({
+  default: () => null,
+  FluentEmoji: () => null,
+  getEmoji: () => undefined,
+  getEmojiNameByCharacter: () => undefined,
+  getFluentEmojiCDN: () => '',
+}));

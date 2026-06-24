@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -59,7 +60,8 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 	userID := c.GetString("user_id")
 	a, err := h.service.ProbeAttachment(c.Request.Context(), userID, req.Hash)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
