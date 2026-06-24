@@ -22,7 +22,7 @@ func GetTeamByID(db *gorm.DB, id string) (*model.AgentTeam, error) {
 
 func ListTeamsByOwner(db *gorm.DB, ownerID string) ([]model.AgentTeam, error) {
 	var teams []model.AgentTeam
-	err := db.Where("owner_id = ?", ownerID).Order("created_at DESC").Find(&teams).Error
+	err := db.Where("owner_id = ?", ownerID).Order("created_at DESC").Limit(200).Find(&teams).Error
 	return teams, err
 }
 
@@ -34,6 +34,7 @@ func ListTeamsReadableByUser(db *gorm.DB, userID string) ([]model.AgentTeam, err
 		Joins("LEFT JOIN custom_agents ON custom_agents.id = agent_team_members.agent_profile_id AND custom_agents.deleted_at IS NULL").
 		Where("agent_teams.owner_id = ? OR custom_agents.owner_user_id = ?", userID, userID).
 		Order("agent_teams.created_at DESC").
+		Limit(200).
 		Find(&teams).Error
 	return teams, err
 }
@@ -97,7 +98,7 @@ func GetTeamRunBySessionID(db *gorm.DB, sessionID string) (*model.AgentTeamRun, 
 
 func ListTeamRunsByTeam(db *gorm.DB, teamID string) ([]model.AgentTeamRun, error) {
 	var runs []model.AgentTeamRun
-	err := db.Where("team_id = ?", teamID).Order("created_at DESC").Find(&runs).Error
+	err := db.Where("team_id = ?", teamID).Order("created_at DESC").Limit(200).Find(&runs).Error
 	return runs, err
 }
 
@@ -119,7 +120,7 @@ func GetAssignmentByID(db *gorm.DB, id string) (*model.AgentTeamAssignment, erro
 
 func ListAssignmentsByTeamRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamAssignment, error) {
 	var as []model.AgentTeamAssignment
-	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&as).Error
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Limit(500).Find(&as).Error
 	return as, err
 }
 
@@ -213,7 +214,7 @@ func CreateTeamTask(db *gorm.DB, task *model.AgentTeamTask) error {
 
 func ListTeamTasksByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamTask, error) {
 	var tasks []model.AgentTeamTask
-	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&tasks).Error
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Limit(500).Find(&tasks).Error
 	return tasks, err
 }
 
@@ -246,7 +247,7 @@ func ReplaceTeamArtifactsForRun(db *gorm.DB, teamRunID string, artifacts []model
 
 func ListTeamArtifactsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamArtifact, error) {
 	var artifacts []model.AgentTeamArtifact
-	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC, id ASC").Find(&artifacts).Error
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC, id ASC").Limit(500).Find(&artifacts).Error
 	return artifacts, err
 }
 
@@ -269,8 +270,15 @@ func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
 	})
 }
 
+// maxTeamEventsPerRun caps the number of team events returned by
+// ListTeamEventsByRun. Team events are append-only and can grow
+// unboundedly over a long-running team run. The cap prevents
+// unbounded memory consumption while being high enough for realistic
+// team runs (1000 events = ~1-2 MB payload).
+const maxTeamEventsPerRun = 10000
+
 func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent, error) {
 	var events []model.AgentTeamEvent
-	err := db.Where("team_run_id = ?", teamRunID).Order("seq ASC, created_at ASC").Find(&events).Error
+	err := db.Where("team_run_id = ?", teamRunID).Order("seq ASC, created_at ASC").Limit(maxTeamEventsPerRun).Find(&events).Error
 	return events, err
 }

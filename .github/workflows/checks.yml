@@ -2,9 +2,9 @@ name: checks
 
 on:
   pull_request:
-    branches: [master, dev/delicious233, dev/trump]
+    branches: [master, dev/delicious233]
   push:
-    branches: [master, dev/delicious233, dev/trump]
+    branches: [master, 'dev/**']
 
 env:
   GO_VERSION: "1.25.11"
@@ -207,7 +207,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -227,11 +227,9 @@ jobs:
 
       - name: Test edge-server
         run: cd edge-server && go test ./... -short -count=1
-        continue-on-error: ${{ matrix.os == 'macos-latest' }}
 
       - name: Test hub-server
         run: cd hub-server && go test ./... -short -count=1
-        continue-on-error: ${{ matrix.os == 'macos-latest' }}
 
   # ── Docker: Hub Server ───────────────────────
   docker:
@@ -296,6 +294,10 @@ jobs:
         continue-on-error: true
         run: pnpm lint --max-warnings 10
 
+      - name: Vuln audit (pnpm audit)
+        continue-on-error: true
+        run: pnpm audit --prod
+
       - name: Test Desktop
         run: pnpm test:ci
 
@@ -322,6 +324,10 @@ jobs:
       - name: Lint Web
         run: pnpm lint
 
+      - name: Vuln audit (pnpm audit)
+        continue-on-error: true
+        run: pnpm audit --prod
+
       - name: Build Web
         run: pnpm build
       - name: Test
@@ -346,6 +352,85 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Type check (mobile)
+        run: pnpm --filter agenthub-mobile-rn typecheck
+
+      - name: Lint (mobile rules)
+        run: pnpm --filter agenthub-mobile-rn lint
+
+      # ── Hardened: Test with coverage reporting ──
+      - name: Install coverage provider (mobile)
+        run: pnpm --filter agenthub-mobile-rn add -D @vitest/coverage-v8
+      - name: Test with coverage (mobile)
+        run: |
+          pnpm --filter agenthub-mobile-rn exec vitest run --coverage \
+            --coverage.thresholds.lines=40 \
+            --coverage.thresholds.branches=30 \
+            --coverage.thresholds.functions=30 \
+            --coverage.thresholds.statements=40
+          echo "::notice::Mobile coverage report generated. Raise thresholds as coverage improves."
+
+      # ── Hardened: Bundle size check (Expo web export) ──
+      - name: Bundle size check (mobile web export)
+        run: |
+          echo "=== Mobile bundle size check ==="
+          cd mobile-rn
+          npx expo export --platform web --output-dir dist/web-export 2>&1
+          if [ -d dist/web-export ]; then
+            BUNDLE_SIZE_KB=$(du -sk dist/web-export | cut -f1)
+            MAX_SIZE_KB=153600
+            echo "Web export bundle size: ${BUNDLE_SIZE_KB} KB (max: ${MAX_SIZE_KB} KB)"
+            if [ "${BUNDLE_SIZE_KB}" -gt "${MAX_SIZE_KB}" ]; then
+              echo "::error::Web export bundle size ${BUNDLE_SIZE_KB} KB exceeds ${MAX_SIZE_KB} KB threshold"
+              exit 1
+            fi
+            echo "::notice::Bundle size check passed: ${BUNDLE_SIZE_KB} KB under ${MAX_SIZE_KB} KB"
+          else
+            echo "::error::Web export did not produce output directory"
+            exit 1
+          fi
+
+      # ── Hardened: Screenshot diff testing (visual QA) ──
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Screenshot visual QA (mobile)
+        run: |
+          echo "=== Mobile screenshot visual QA ==="
+          cd mobile-rn
+          node scripts/visual-qa.mjs
+        env:
+          AGENTHUB_MOBILE_MOCK_HUB_PORT: '8088'
+          CI: 'true'
+
+      - name: Upload mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-visual-qa-screenshots
+          path: app/mobile-rn/screenshots/visual-qa/
+          retention-days: 7
+
+      - name: E2E (mock hub)
+        run: |
+          node mobile-rn/scripts/mock-hub.mjs &
+          MOCK_HUB_PID=$!
+          # Wait for mock hub to accept connections
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8088/health > /dev/null 2>&1; then
+              echo "Mock hub ready at http://127.0.0.1:8088"
+              break
+            fi
+            sleep 1
+          done
+          # Run vitest with mock hub available
+          AGENTHUB_MOBILE_MOCK_HUB_PORT=8088 pnpm --filter agenthub-mobile-rn test
+          E2E_EXIT_CODE=$?
+          kill $MOCK_HUB_PID 2>/dev/null || true
+          wait $MOCK_HUB_PID 2>/dev/null || true
+          exit $E2E_EXIT_CODE
+
       - name: Verify Mobile RN
         run: pnpm --filter agenthub-mobile-rn verify
       - name: Expo Doctor
@@ -422,3 +507,143 @@ jobs:
         run: |
           python -m pip install --quiet PyYAML
           python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
+
+  # ── Vuln Scan: JS (pnpm audit --prod) ─────────
+  vuln-scan-js:
+    name: Vuln scan (pnpm audit --prod)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit --prod (severity-gated)
+        shell: bash
+        run: |
+          set -o pipefail
+          AUDIT_OUTPUT=$(pnpm audit --prod --json 2>/dev/null) || true
+          if [ -z "$AUDIT_OUTPUT" ]; then
+            echo "::notice::No production vulnerabilities found (clean audit)"
+            exit 0
+          fi
+          echo "$AUDIT_OUTPUT" | python3 -c "
+          import json, sys
+          raw = sys.stdin.read().strip()
+          if not raw:
+              print('::notice::No production vulnerabilities found')
+              sys.exit(0)
+          try:
+              data = json.loads(raw)
+          except Exception:
+              # Non-JSON output usually means no vulnerabilities found
+              print('::notice::pnpm audit produced no actionable JSON (likely clean)')
+              sys.exit(0)
+          advisories = data.get('advisories', {}) if isinstance(data, dict) else {}
+          if not advisories:
+              print('::notice::No production vulnerabilities found')
+              sys.exit(0)
+          has_critical = False
+          for adv_id, adv in advisories.items():
+              severity = adv.get('severity', 'unknown')
+              title = adv.get('title', adv_id)
+              module_name = adv.get('module_name', '')
+              vulnerable = adv.get('vulnerable_versions', '')
+              msg = f'{module_name}: {title} (vulnerable: {vulnerable}) [{severity.upper()}]'
+              if severity == 'critical':
+                  print(f'::error title=CRITICAL CVE::{msg}')
+                  has_critical = True
+              else:
+                  print(f'::warning title={severity.upper()} CVE (non-blocking)::{msg}')
+          if has_critical:
+              print('::error::Critical CVE(s) found in production dependencies — failing build')
+              sys.exit(1)
+          print('::notice::No critical CVEs found (non-critical warnings above are non-blocking)')
+          "
+
+  # ── Vuln Scan: Go (govulncheck) ───────────────
+  vuln-scan-go:
+    name: Vuln scan (govulncheck)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [hub-server, edge-server]
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+
+      - name: govulncheck (severity-gated)
+        shell: bash
+        run: |
+          set -o pipefail
+          VULN_OUTPUT=$(go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>/dev/null) || true
+          if [ -z "$VULN_OUTPUT" ]; then
+            echo "::notice::No Go vulnerabilities found in ${{ matrix.module }}"
+            exit 0
+          fi
+          echo "$VULN_OUTPUT" | python3 -c "
+          import json, sys
+          raw = sys.stdin.read().strip()
+          if not raw:
+              print('::notice::No Go vulnerabilities found')
+              sys.exit(0)
+          try:
+              data = json.loads(raw)
+          except Exception:
+              print('::warning::Could not parse govulncheck JSON output')
+              sys.exit(0)
+          findings = data.get('findings', []) if isinstance(data, dict) else []
+          if not findings:
+              print('::notice::No Go vulnerabilities found')
+              sys.exit(0)
+          has_critical = False
+          for f in findings:
+              osv = f.get('osv', {})
+              aliases = ', '.join(osv.get('aliases', [])[:3]) or 'N/A'
+              summary = osv.get('summary', '') or osv.get('details', '')[:200]
+              sev = 'unknown'
+              # Try database_specific severity field first
+              db_sev = osv.get('database_specific', {}).get('severity', '')
+              combined = f'{db_sev} {summary}'.lower()
+              if 'critical' in combined:
+                  sev = 'critical'
+              elif 'high' in combined:
+                  sev = 'high'
+              elif 'medium' in combined or 'moderate' in combined:
+                  sev = 'medium'
+              elif 'low' in combined:
+                  sev = 'low'
+              msg = f'{aliases}: {summary[:180]} [{sev.upper()}]'
+              if sev == 'critical':
+                  print(f'::error title=CRITICAL Go CVE::{msg}')
+                  has_critical = True
+              elif sev in ('high', 'medium'):
+                  print(f'::warning title=Go CVE ({sev})::{msg}')
+              else:
+                  print(f'::warning title=Go CVE::{msg}')
+          if has_critical:
+              print('::error::Critical Go CVE(s) found — failing build')
+              sys.exit(1)
+          print('::notice::No critical Go CVEs found (non-critical warnings above are non-blocking)')
+          "

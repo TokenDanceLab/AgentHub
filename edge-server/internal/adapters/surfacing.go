@@ -424,7 +424,7 @@ func emitSurfacedPreview(bus *events.Bus, writer store.Writer, scope map[string]
 		URL:      previewURL,
 		Status:   "ready",
 	}); err != nil {
-		slog.Warn("surfacing: failed to persist preview", "runId", run.ID, "path", sf.RelPath, "err", err)
+		slog.Warn("surfacing: failed to persist preview", "runId", run.ID, "path", sf.RelPath, "error", err)
 	}
 
 	// Also persist as artifact.
@@ -548,7 +548,7 @@ func emitSurfacedDiff(bus *events.Bus, writer store.Writer, scope map[string]any
 		Diff:   diff,
 		Status: "modified",
 	}); err != nil {
-		slog.Warn("surfacing: failed to persist surfaced diff", "runId", run.ID, "path", sf.RelPath, "err", err)
+		slog.Warn("surfacing: failed to persist surfaced diff", "runId", run.ID, "path", sf.RelPath, "error", err)
 	}
 }
 
@@ -563,7 +563,7 @@ func persistSurfacedArtifact(writer store.Writer, run store.Run, sf SurfacedFile
 		ContentSource: store.NewArtifactContentSource("", sf.AbsPath),
 	})
 	if err != nil {
-		slog.Warn("surfacing: failed to persist surfaced artifact", "runId", run.ID, "path", sf.RelPath, "err", err)
+		slog.Warn("surfacing: failed to persist surfaced artifact", "runId", run.ID, "path", sf.RelPath, "error", err)
 	}
 }
 

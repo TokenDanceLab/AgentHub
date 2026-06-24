@@ -1,11 +1,12 @@
 # Hub Server Deep Audit Report
 
-**Worktree**: `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`
+**Worktree**: `<worktree>`
 **Branch**: `feat/chatview-tokendance-migration`
 **Date**: 2026-06-17
 **Scope**: `hub-server/` -- handler, middleware, infrastructure, JWT, error codes, config, metrics, cache
 **Auditor**: Claude Code subagent (Opus Max Effort)
 **Status**: FINAL
+**历史清理标记**: 已对文档中出现的个人工作路径做脱敏处理（2026-06-19）。已修复项已在对应发现处标注。
 
 ---
 
@@ -81,6 +82,8 @@ All handlers follow a consistent pattern:
 
 #### C-1: `user_settings.go` leaks internal error messages to clients
 
+> **已修复 (2026-06-19)**: `user_settings.go` 不再使用 `FailWithMessage(c, errcode.ErrInternal, err.Error())`，已改为标准 `Fail(c, errcode.ErrInternal)` 模式，原始错误仅通过 `slog.Error` 记录在服务端日志中。
+
 **File**: `hub-server/internal/handler/user_settings.go:34-36`
 **Severity**: Critical (P0)
 **Category**: Error Handling / Information Disclosure
@@ -106,6 +109,8 @@ Both `GetSettings` (line 35) and `PatchSettings` (line 65) call `FailWithMessage
 ---
 
 #### C-2: WebSocket `auth.ok` sent via `sendFrame` bypasses buffer capacity check
+
+> **已修复 (2026-06-19)**: `go h.writeLoop(conn)` 现在在 `h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))` 之前启动，避免了 auth.ok 帧因发送缓冲区未就绪而被静默丢弃的竞态条件。
 
 **File**: `hub-server/internal/handler/ws.go:73`
 **Severity**: Critical (P0)

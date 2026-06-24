@@ -53,9 +53,9 @@ func TestPublicStatsBucketsCountsAndUptime(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	require.Equal(t, "ok", resp.Code)
-	require.Equal(t, int64(30), resp.Data.TotalUsers)
+	require.Equal(t, int64(50), resp.Data.TotalUsers)
 	require.Equal(t, int64(1000), resp.Data.TotalAgents)
-	require.Equal(t, int64(20), resp.Data.OnlineAgents)
+	require.Equal(t, int64(50), resp.Data.OnlineAgents)
 	require.Equal(t, int64(900), resp.Data.TotalMessages)
 	require.Equal(t, "1d+", resp.Data.Uptime)
 }

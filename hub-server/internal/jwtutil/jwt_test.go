@@ -220,3 +220,344 @@ func claimStringsContain(values jwt.ClaimStrings, want string) bool {
 	}
 	return false
 }
+
+// ── KeyManager / Key Rotation tests ──────────────────────────────────────────
+
+func TestKeyRotation(t *testing.T) {
+	// Create a KeyManager with two keys.
+	secrets := map[string]string{
+		"key-v1": "secret-for-key-v1-minimum-32-chars",
+		"key-v2": "secret-for-key-v2-minimum-32-chars",
+	}
+	km, err := NewKeyManager(secrets, "key-v1")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+	if km.ActiveKeyID() != "key-v1" {
+		t.Fatalf("active key = %q, want key-v1", km.ActiveKeyID())
+	}
+	if km.KeyCount() != 2 {
+		t.Fatalf("key count = %d, want 2", km.KeyCount())
+	}
+
+	// Sign a token with the active key (key-v1).
+	token1, err := km.SignAccessToken("user-1", "desktop", "dev-1", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("SignAccessToken failed: %v", err)
+	}
+	if token1 == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	// Parse the token — should succeed with key-v1.
+	claims1, err := km.ParseToken(token1)
+	if err != nil {
+		t.Fatalf("ParseToken failed: %v", err)
+	}
+	if claims1.UserID != "user-1" {
+		t.Errorf("user_id = %q, want user-1", claims1.UserID)
+	}
+
+	// Rotate to key-v2.
+	if err := km.SetActiveKey("key-v2"); err != nil {
+		t.Fatalf("SetActiveKey key-v2 failed: %v", err)
+	}
+	if km.ActiveKeyID() != "key-v2" {
+		t.Fatalf("active key after rotation = %q, want key-v2", km.ActiveKeyID())
+	}
+
+	// Old token (signed with key-v1) should still parse.
+	claimsOld, err := km.ParseToken(token1)
+	if err != nil {
+		t.Fatalf("ParseToken for old token after rotation failed: %v", err)
+	}
+	if claimsOld.UserID != "user-1" {
+		t.Errorf("old token user_id = %q, want user-1", claimsOld.UserID)
+	}
+
+	// Sign a new token with the new active key (key-v2).
+	token2, err := km.SignAccessToken("user-2", "web", "dev-2", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("SignAccessToken with new key failed: %v", err)
+	}
+	if token1 == token2 {
+		t.Fatal("tokens signed with different keys should differ")
+	}
+
+	claims2, err := km.ParseToken(token2)
+	if err != nil {
+		t.Fatalf("ParseToken for new-key token failed: %v", err)
+	}
+	if claims2.UserID != "user-2" {
+		t.Errorf("new token user_id = %q, want user-2", claims2.UserID)
+	}
+}
+
+func TestKeyRotation_RemoveOldKey(t *testing.T) {
+	secrets := map[string]string{
+		"key-v1": "secret-for-key-v1-minimum-32-chars",
+		"key-v2": "secret-for-key-v2-minimum-32-chars",
+	}
+	km, err := NewKeyManager(secrets, "key-v1")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+
+	// Cannot remove the active key.
+	if err := km.RemoveKey("key-v1"); err == nil {
+		t.Fatal("expected error removing active key")
+	}
+
+	// Rotate, then remove the old key.
+	if err := km.SetActiveKey("key-v2"); err != nil {
+		t.Fatalf("SetActiveKey failed: %v", err)
+	}
+	if err := km.RemoveKey("key-v1"); err != nil {
+		t.Fatalf("RemoveKey key-v1 failed: %v", err)
+	}
+	if km.HasKey("key-v1") {
+		t.Fatal("key-v1 should be removed")
+	}
+	if km.KeyCount() != 1 {
+		t.Fatalf("key count after removal = %d, want 1", km.KeyCount())
+	}
+
+	// Cannot remove the only remaining key (it is active).
+	if err := km.RemoveKey("key-v2"); err == nil {
+		t.Fatal("expected error removing the only key")
+	}
+}
+
+func TestKeyRotation_AddKeyDuringRuntime(t *testing.T) {
+	secrets := map[string]string{
+		"key-v1": "secret-for-key-v1-minimum-32-chars",
+	}
+	km, err := NewKeyManager(secrets, "key-v1")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+
+	// Add a new key at runtime.
+	if err := km.AddKey("key-v3", "secret-for-key-v3-minimum-32-chars"); err != nil {
+		t.Fatalf("AddKey failed: %v", err)
+	}
+	if !km.HasKey("key-v3") {
+		t.Fatal("key-v3 should exist after AddKey")
+	}
+	if km.KeyCount() != 2 {
+		t.Fatalf("key count after add = %d, want 2", km.KeyCount())
+	}
+
+	// Rotate to the new key.
+	if err := km.SetActiveKey("key-v3"); err != nil {
+		t.Fatalf("SetActiveKey key-v3 failed: %v", err)
+	}
+
+	token, err := km.SignAccessToken("user-3", "mobile", "dev-3", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("SignAccessToken with runtime-added key failed: %v", err)
+	}
+	claims, err := km.ParseToken(token)
+	if err != nil {
+		t.Fatalf("ParseToken with runtime-added key failed: %v", err)
+	}
+	if claims.UserID != "user-3" {
+		t.Errorf("user_id = %q, want user-3", claims.UserID)
+	}
+}
+
+func TestKeyRotation_JWKS(t *testing.T) {
+	secrets := map[string]string{
+		"key-v1": "secret-for-key-v1-minimum-32-chars",
+		"key-v2": "secret-for-key-v2-minimum-32-chars",
+	}
+	km, err := NewKeyManager(secrets, "key-v1")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+
+	jwks := km.JWKS()
+	if jwks == nil {
+		t.Fatal("JWKS returned nil")
+	}
+	if len(jwks.Keys) != 2 {
+		t.Fatalf("JWKS keys count = %d, want 2", len(jwks.Keys))
+	}
+
+	seen := make(map[string]bool)
+	for _, k := range jwks.Keys {
+		if k.KTY != "oct" {
+			t.Errorf("key %q kty = %q, want oct", k.Kid, k.KTY)
+		}
+		if k.Alg != "HS256" {
+			t.Errorf("key %q alg = %q, want HS256", k.Kid, k.Alg)
+		}
+		if k.Kid == "" {
+			t.Error("JWK missing kid")
+		}
+		if k.K == "" {
+			t.Errorf("key %q missing k (base64url secret)", k.Kid)
+		}
+		seen[k.Kid] = true
+	}
+	if !seen["key-v1"] || !seen["key-v2"] {
+		t.Fatal("JWKS missing expected key IDs")
+	}
+}
+
+func TestKeyRotation_TokenMissingKid(t *testing.T) {
+	// Token generated without KeyManager (old-style, no kid header).
+	secret := "old-style-secret-padded-to-minimum-32-chars!!"
+	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken failed: %v", err)
+	}
+
+	secrets := map[string]string{
+		"default": secret,
+	}
+	km, err := NewKeyManager(secrets, "default")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+
+	_, err = km.ParseToken(token)
+	if err == nil {
+		t.Fatal("expected error for token without kid header")
+	}
+}
+
+func TestKeyRotation_TokenUnknownKid(t *testing.T) {
+	secrets := map[string]string{
+		"key-v1": "secret-for-key-v1-minimum-32-chars",
+	}
+	km, err := NewKeyManager(secrets, "key-v1")
+	if err != nil {
+		t.Fatalf("NewKeyManager failed: %v", err)
+	}
+
+	// Sign with a different KeyManager having different keys.
+	otherKM, _ := NewKeyManager(map[string]string{
+		"other-key": "other-secret-for-other-key-32-chars!",
+	}, "other-key")
+	token, _ := otherKM.SignAccessToken("user-1", "desktop", "dev-1", 15*time.Minute)
+
+	_, err = km.ParseToken(token)
+	if err == nil {
+		t.Fatal("expected error for token with unknown kid")
+	}
+}
+
+func TestKeyRotation_NewKeyManagerErrors(t *testing.T) {
+	// Empty secrets.
+	_, err := NewKeyManager(map[string]string{}, "")
+	if err == nil {
+		t.Fatal("expected error for empty secrets")
+	}
+
+	// Empty kid.
+	_, err = NewKeyManager(map[string]string{"": "secret"}, "")
+	if err == nil {
+		t.Fatal("expected error for empty kid")
+	}
+
+	// Empty secret.
+	_, err = NewKeyManager(map[string]string{"kid": ""}, "")
+	if err == nil {
+		t.Fatal("expected error for empty secret")
+	}
+
+	// Active key not in secrets.
+	_, err = NewKeyManager(map[string]string{"key1": "secret-for-key1-minimum-32-chars!!!"}, "key2")
+	if err == nil {
+		t.Fatal("expected error for unknown active key")
+	}
+}
+
+func TestKeyRotation_SignEdgeToken(t *testing.T) {
+	secrets := map[string]string{
+		"edge-key": "edge-key-secret!!-padded-to-32-chars",
+	}
+	km, _ := NewKeyManager(secrets, "edge-key")
+
+	token, err := km.SignEdgeToken("user-1", "edge-dev-1", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("SignEdgeToken failed: %v", err)
+	}
+
+	// Parse with a fresh parser to check claims (not through KeyManager).
+	parser := jwt.NewParser()
+	unverified, _, err := parser.ParseUnverified(token, &Claims{})
+	if err != nil {
+		t.Fatalf("ParseUnverified failed: %v", err)
+	}
+
+	kid, ok := unverified.Header["kid"].(string)
+	if !ok || kid != "edge-key" {
+		t.Fatalf("kid = %q, want edge-key", kid)
+	}
+
+	// Full parse through KeyManager.
+	claims, err := km.ParseToken(token)
+	if err != nil {
+		t.Fatalf("ParseToken failed: %v", err)
+	}
+	if claims.Purpose != "edge-api" {
+		t.Errorf("purpose = %q, want edge-api", claims.Purpose)
+	}
+	if claims.DeviceType != "edge" {
+		t.Errorf("device_type = %q, want edge", claims.DeviceType)
+	}
+}
+
+func TestKeyRotation_ConcurrentAccess(t *testing.T) {
+	secrets := map[string]string{
+		"k1": "secret-for-k1-padded-to-minimum-32-chars!",
+		"k2": "secret-for-k2-padded-to-minimum-32-chars!",
+	}
+	km, _ := NewKeyManager(secrets, "k1")
+
+	done := make(chan bool, 10)
+	for i := 0; i < 5; i++ {
+		go func() {
+			for j := 0; j < 50; j++ {
+				token, _ := km.SignAccessToken("user", "desktop", "dev", 15*time.Minute)
+				km.ParseToken(token) //nolint:errcheck
+				km.ActiveKeyID()
+				km.KeyIDs()
+				km.JWKS()
+			}
+			done <- true
+		}()
+	}
+	// Rotate while signing/parsing.
+	go func() {
+		for j := 0; j < 50; j++ {
+			if j%2 == 0 {
+				km.SetActiveKey("k1") //nolint:errcheck
+			} else {
+				km.SetActiveKey("k2") //nolint:errcheck
+			}
+		}
+		done <- true
+	}()
+	for i := 0; i < 6; i++ {
+		<-done
+	}
+}
+
+func TestKeyRotation_GetSecret(t *testing.T) {
+	secrets := map[string]string{
+		"key-a": "secret-a-padded-to-minimum-32-chars!",
+		"key-b": "secret-b-padded-to-minimum-32-chars!",
+	}
+	km, _ := NewKeyManager(secrets, "key-a")
+
+	if s := km.GetSecret(); s != "secret-a-padded-to-minimum-32-chars!" {
+		t.Errorf("GetSecret = %q, want key-a secret", s)
+	}
+	km.SetActiveKey("key-b") //nolint:errcheck
+	if s := km.GetSecret(); s != "secret-b-padded-to-minimum-32-chars!" {
+		t.Errorf("GetSecret after rotation = %q, want key-b secret", s)
+	}
+}

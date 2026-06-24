@@ -37,7 +37,7 @@
 
 | # | 任务 | 完成时间 | 证据 |
 |---|------|----------|------|
-| W3-1 | hk2 服务器部署 | 2026-06-10 | Hub Docker + Edge systemd + nginx `/edge/` 反代 + SSL |
+| W3-1 | 见私有运维 SSOT | 2026-06-10 | Hub Docker + Edge systemd + nginx `/edge/` 反代 + SSL |
 | W3-2 | 安全扫描 + 文档 | 2026-06-10 | gitleaks 扫描零新增泄露、`tests/results/` 已 gitignore、API key 已轮换 |
 
 ## 基础设施
@@ -58,7 +58,7 @@
 | AgentStreamingBar | ✅ WS 事件订阅 |
 | DeployCard 前端 | ✅ commit `ae762531` — surfaced_deploy 事件渲染 |
 | Edge deploy handler | ✅ commit `3f363d9e` — POST /v1/deployments |
-| hk2 nginx pages | ✅ 通配符子域名 server block 已配 |
+| 见私有运维 SSOT nginx pages | ✅ 通配符子域名 server block 已配 |
 | Orchestrator 增强代码 | ✅ 4 文件已写（failure_degradation/sibling_context/plan_approval/context_compactor）— 待运行验证 |
 | 安全钩子 | ✅ 23-check 管线（363 行） |
 | 搜索跳转高亮 | ✅ scrollIntoView + 3秒黄色脉冲动画 + Ctrl+F快捷键 |

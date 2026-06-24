@@ -19,6 +19,14 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	if minIdleConns == 0 {
 		minIdleConns = 10
 	}
+	readTimeout := time.Duration(cfg.ReadTimeoutSec) * time.Second
+	if readTimeout == 0 {
+		readTimeout = 3 * time.Second
+	}
+	writeTimeout := time.Duration(cfg.WriteTimeoutSec) * time.Second
+	if writeTimeout == 0 {
+		writeTimeout = 3 * time.Second
+	}
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:            cfg.Addr(),
@@ -28,8 +36,8 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 		MinIdleConns:    minIdleConns,
 		MaxRetries:      3,
 		DialTimeout:     2 * time.Second,
-		ReadTimeout:     1 * time.Second,
-		WriteTimeout:    1 * time.Second,
+		ReadTimeout:     readTimeout,
+		WriteTimeout:    writeTimeout,
 		PoolTimeout:     4 * time.Second,
 		ConnMaxIdleTime: 10 * time.Minute,
 	})

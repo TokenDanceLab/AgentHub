@@ -62,6 +62,107 @@ func TestGlobalRateLimitBlocksAfterExceedingLimit(t *testing.T) {
 	assert.NotEmpty(t, w.Header().Get("Retry-After"))
 }
 
+// TestGlobalRateLimitFailOpen_NonAuthPath verifies that when Redis is down and the
+// request is on a non-auth path, the middleware fails open (allows the request)
+// and sets the X-Rate-Limit-Degraded header.
+func TestGlobalRateLimitFailOpen_NonAuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/test", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	GlobalRateLimit(client)(c)
+
+	assert.False(t, c.IsAborted(), "non-auth request should pass when Redis is down (fail-open)")
+	assert.Equal(t, "true", w.Header().Get("X-Rate-Limit-Degraded"))
+}
+
+// TestGlobalRateLimitFailClosed_AuthPath verifies that auth paths always fail
+// closed when Redis is unavailable, regardless of the fail-open env var.
+func TestGlobalRateLimitFailClosed_AuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+
+	tests := []string{
+		"/client/auth/refresh",
+		"/client/auth/oidc/authorize",
+		"/client/auth/oidc/callback",
+		"/client/auth/me",
+		"/client/auth/logout",
+	}
+
+	for _, path := range tests {
+		t.Run("path="+path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, path, nil)
+			c.Request.RemoteAddr = "10.0.0.99:12345"
+
+			GlobalRateLimit(client)(c)
+
+			assert.True(t, c.IsAborted(), "auth path %s should fail-closed when Redis is down", path)
+			assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+			assert.Contains(t, w.Body.String(), "RATE_LIMIT_UNAVAILABLE")
+		})
+	}
+}
+
+// TestGlobalRateLimitFailClosed_NonAuthWhenDisabled verifies that non-auth paths
+// fail closed when AGENTHUB_RATE_LIMIT_FAIL_OPEN is explicitly set to false.
+func TestGlobalRateLimitFailClosed_NonAuthWhenDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+	t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", "false")
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/contacts/search", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	GlobalRateLimit(client)(c)
+
+	assert.True(t, c.IsAborted(), "non-auth request should fail-closed when RATE_LIMIT_FAIL_OPEN=false")
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Contains(t, w.Body.String(), "RATE_LIMIT_UNAVAILABLE")
+}
+
+// TestIsAuthPath verifies the path classification helper.
+func TestIsAuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/client/auth/refresh", true},
+		{"/client/auth/oidc/authorize", true},
+		{"/client/auth/oidc/callback", true},
+		{"/client/auth/me", true},
+		{"/client/auth/logout", true},
+		{"/client/auth/", true},
+		{"/api/test", false},
+		{"/client/ws", false},
+		{"/client/sessions", false},
+		{"/client/contacts/search", false},
+		{"/health", false},
+		{"/edge/devices/register", false},
+		{"/web/agent-tasks", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, tt.path, nil)
+
+			assert.Equal(t, tt.expected, isAuthPath(c))
+		})
+	}
+}
+
 func TestRateLimitAllow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	client := miniredisClient(t)
@@ -128,6 +229,57 @@ func TestRateLimitRespectsKeyFn(t *testing.T) {
 	c2.Request.Header.Set("X-User-ID", "bob")
 	handler(c2)
 	assert.False(t, c2.IsAborted())
+}
+
+// TestRateLimitFailOpen_NonAuthPath verifies that the sliding-window rate limiter
+// fails open on non-auth paths when Redis is unavailable.
+func TestRateLimitFailOpen_NonAuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+
+	handler := RateLimit(client, 10, time.Minute, IPKey)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/messages/search", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	handler(c)
+
+	assert.False(t, c.IsAborted(), "non-auth sliding window should fail-open when Redis is down")
+	assert.Equal(t, "true", w.Header().Get("X-Rate-Limit-Degraded"))
+}
+
+// TestRateLimitFailClosed_AuthPath verifies that the sliding-window rate limiter
+// always fails closed on auth paths when Redis is unavailable.
+func TestRateLimitFailClosed_AuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+
+	handler := RateLimit(client, config.AuthLoginRateLimit, config.AuthRateLimitWindow, IPKey)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/auth/refresh", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	handler(c)
+
+	assert.True(t, c.IsAborted(), "auth path sliding window should fail-closed when Redis is down")
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// redisDownClient creates a cache client whose underlying Redis server is shut down
+// so that all Redis operations return connection errors.
+func redisDownClient(t *testing.T) *cache.Client {
+	t.Helper()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	client := cache.NewClient(rdb)
+	// Close the miniredis server so subsequent operations fail.
+	mr.Close()
+	return client
 }
 
 func TestIPKey(t *testing.T) {

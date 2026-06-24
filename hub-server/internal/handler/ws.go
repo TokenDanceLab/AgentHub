@@ -19,11 +19,12 @@ import (
 type WebSocketHandler struct {
 	manager     *ws.Manager
 	jwtSecret   string
+	env         string
 	onTyping    func(userID, sessionID string)
 	userLimiter *middleware.WSUserConnLimiter
 }
 
-func NewWebSocketHandler(manager *ws.Manager, jwtSecret string) *WebSocketHandler {
+func NewWebSocketHandler(manager *ws.Manager, jwtSecret string, env string) *WebSocketHandler {
 	limiter := middleware.NewWSUserConnLimiter(func(connID string) {
 		// Kick the oldest connection by closing it. The writeLoop/readLoop
 		// goroutines will detect the closure and unregister.
@@ -37,6 +38,7 @@ func NewWebSocketHandler(manager *ws.Manager, jwtSecret string) *WebSocketHandle
 	return &WebSocketHandler{
 		manager:     manager,
 		jwtSecret:   jwtSecret,
+		env:         env,
 		userLimiter: limiter,
 	}
 }
@@ -47,20 +49,30 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	opts := &websocket.AcceptOptions{}
-	if !isProductionEnv() {
-		// Dev: allow any loopback origin (localhost / 127.0.0.1 on any port)
-		opts.InsecureSkipVerify = true
+	if !h.isProductionEnv() {
+		// Dev: allow loopback origins (localhost / 127.0.0.1 / ::1 on any port).
+		// This replaces the previous InsecureSkipVerify (which disabled ALL origin
+		// checks) with explicit patterns so that non-loopback origins are still
+		// rejected even in development mode.
+		opts.OriginPatterns = []string{
+			"localhost",
+			"localhost:*",
+			"127.0.0.1",
+			"127.0.0.1:*",
+			"[::1]",
+			"[::1]:*",
+		}
 	}
 
 	wsConn, err := websocket.Accept(c.Writer, c.Request, opts)
 	if err != nil {
-		slog.Warn("ws upgrade failed", "err", err)
+		slog.Warn("ws upgrade failed", "error", err)
 		return
 	}
 
 	conn := ws.NewConn(wsConn)
 	if err := h.manager.Register(conn); err != nil {
-		slog.Error("ws register failed", "err", err)
+		slog.Error("ws register failed", "error", err)
 		wsConn.Close(websocket.StatusInternalError, "")
 		return
 	}
@@ -70,8 +82,8 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	if userID := c.GetString("user_id"); userID != "" {
 		h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
 		h.userLimiter.Acquire(userID, conn.ID)
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 		go h.writeLoop(conn)
+		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 		go h.authenticatedReadLoop(conn)
 		return
 	}
@@ -91,7 +103,7 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 	for data := range conn.Send {
 		err := conn.W.Write(ctx, websocket.MessageText, data)
 		if err != nil {
-			slog.Warn("ws write error", "conn_id", conn.ID, "err", err)
+			slog.Warn("ws write error", "conn_id", conn.ID, "error", err)
 			return
 		}
 	}
@@ -105,7 +117,7 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 
 	_, data, err := conn.W.Read(ctx)
 	if err != nil {
-		slog.Info("ws auth timeout or read error", "conn_id", conn.ID, "err", err)
+		slog.Info("ws auth timeout or read error", "conn_id", conn.ID, "error", err)
 		return
 	}
 
@@ -162,9 +174,9 @@ func (h *WebSocketHandler) authenticatedReadLoop(conn *ws.Conn) {
 // limit are dropped and a warning is logged.
 func (h *WebSocketHandler) processIncoming(conn *ws.Conn) {
 	for {
-		_, data, err := conn.W.Read(context.Background())
+		data, err := conn.ReadMessage(context.Background())
 		if err != nil {
-			slog.Info("ws read error", "user_id", conn.UserID, "err", err)
+			slog.Info("ws read error", "user_id", conn.UserID, "error", err)
 			return
 		}
 
@@ -258,11 +270,16 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 }
 
 // isProductionEnv returns true when running in production/release mode.
-func isProductionEnv() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("AGENTHUB_ENV"))) {
+// It uses the config-managed env when set; otherwise falls back to GIN_MODE.
+func (h *WebSocketHandler) isProductionEnv() bool {
+	env := h.env
+	if env == "" {
+		env = os.Getenv("GIN_MODE")
+	}
+	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "production", "prod", "release":
 		return true
 	default:
-		return os.Getenv("GIN_MODE") == "release"
+		return false
 	}
 }

@@ -63,12 +63,14 @@ services:
       --save 900 1
       --save 300 10
       --requirepass ${AGENTHUB_REDIS_PASSWORD:?AGENTHUB_REDIS_PASSWORD is required}
+    environment:
+      REDISCLI_AUTH: ${AGENTHUB_REDIS_PASSWORD:?AGENTHUB_REDIS_PASSWORD is required}
     expose:
       - "6379"
     volumes:
       - agenthub_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${AGENTHUB_REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10

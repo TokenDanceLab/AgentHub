@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"net/http"
 	"strconv"
@@ -55,7 +56,8 @@ func (h *WorkspaceHandler) CreateWorkspace(c *gin.Context) {
 		Description: req.Description,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -68,7 +70,8 @@ func (h *WorkspaceHandler) CreateWorkspace(c *gin.Context) {
 func (h *WorkspaceHandler) GetWorkspace(c *gin.Context) {
 	workspace, err := h.service.Get(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -88,7 +91,8 @@ func (h *WorkspaceHandler) ListWorkspaces(c *gin.Context) {
 	}
 	result, err := h.service.List(c.Request.Context(), c.GetString("user_id"), c.Query("q"), c.Query("pageCursor"), pageSize)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -113,7 +117,8 @@ func (h *WorkspaceHandler) UpdateWorkspace(c *gin.Context) {
 		Description: req.Description,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -130,7 +135,8 @@ type createProjectThreadReq struct {
 func (h *WorkspaceHandler) ListProjectThreads(c *gin.Context) {
 	threads, err := h.service.ListThreads(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -150,7 +156,8 @@ func (h *WorkspaceHandler) CreateProjectThread(c *gin.Context) {
 		Name: req.Name,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -176,7 +183,8 @@ func (h *WorkspaceHandler) CreateProjectThreadMessage(c *gin.Context) {
 	}
 	message, err := h.service.CreateThreadMessage(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), req)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -196,7 +204,8 @@ func (h *WorkspaceHandler) ListProjectThreadMessages(c *gin.Context) {
 	}
 	messages, err := h.service.ListThreadMessages(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), limit)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

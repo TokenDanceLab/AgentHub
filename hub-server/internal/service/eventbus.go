@@ -9,12 +9,22 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/panjf2000/ants/v2"
 )
 
 type Event struct {
 	Type    string
 	Payload interface{}
+}
+
+// RouteDecisionPayload carries the data needed to process a coordinator route
+// decision emitted by a supervisor agent stream.
+type RouteDecisionPayload struct {
+	UserID   string                       `json:"user_id"`
+	TeamID   string                       `json:"team_id"`
+	RunID    string                       `json:"run_id"`
+	Decision model.CoordinatorRouteDecision `json:"decision"`
 }
 
 type EventHandler func(ctx context.Context, event Event)
@@ -26,7 +36,7 @@ type Bus struct {
 	pool     *ants.Pool
 }
 
-func NewBus() *Bus {
+func NewBus() (*Bus, error) {
 	pool, err := ants.NewPool(config.EventBusPoolSize,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
@@ -37,9 +47,9 @@ func NewBus() *Bus {
 		}),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}
+	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}, nil
 }
 
 func (b *Bus) Pending() int64 { return b.pending.Load() }

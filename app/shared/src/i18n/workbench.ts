@@ -63,7 +63,7 @@ export const sharedWorkbenchResources = {
     transcript: {
       dateTime: '{{date}} · {{time}}',
       timeline: '运行时间线',
-      timelineItems: '{{count}} items',
+      timelineItems: '{{count}} 条',
       currentReasoning: '当前推理',
       reasoningSummary: '推理摘要',
       running: '运行中',
@@ -139,7 +139,7 @@ export const sharedWorkbenchResources = {
     },
     agents: {
       nav: { installed: '已安装', market: 'Agent 市场' },
-      installed: { title: 'Agent管理', search: '搜索已安装 Agent' },
+      installed: { title: 'Agent 管理', search: '搜索已安装 Agent' },
       detail: {
         runtime: '运行引擎', model: '默认模型', mode: '运行模式', status: '状态',
         skills: '技能', tools: '工具权限', approvalPolicy: '审批策略', recentRuns: '最近运行',

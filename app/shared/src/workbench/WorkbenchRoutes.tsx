@@ -690,7 +690,10 @@ export function WorkbenchRoutes({
     const unsub = settingsService.subscribe(() => {
       setSettings(settingsService.readAll() as typeof settings);
     });
-    settingsService.init().catch(() => { /* init failure: keep defaults */ });
+    settingsService.init().catch((err) => {
+      console.error('settingsService.init failed in WorkbenchRoutes:', err);
+      /* init failure: keep defaults */
+    });
     return unsub;
   }, [settingsService]);
 

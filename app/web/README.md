@@ -186,3 +186,5 @@ git diff --check
 - API 契约：[../../api/README.md](../../api/README.md)
 - Shared 包：[../shared/README.md](../shared/README.md)
 - 系统架构：[../../docs/architecture/system-design/system-architecture.md](../../docs/architecture/system-design/system-architecture.md)
+
+<!-- ci: trigger cd-web workflow v2 (Dockerfile path fix) -->

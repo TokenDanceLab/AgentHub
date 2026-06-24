@@ -15,6 +15,12 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// WSReadTimeout is the maximum time to wait for a single WebSocket message
+// read before the connection is considered stale.  Set at 2x the heartbeat
+// interval so idle connections are detected and closed cleanly without
+// interfering with normal heartbeat pings.
+const WSReadTimeout = 2 * config.WSHeartbeatInterval
+
 // Conn represents a single WebSocket connection tracked by the Manager.
 type Conn struct {
 	ID         string
@@ -122,12 +128,30 @@ func (m *Manager) Count() int {
 }
 
 func NewConn(ws *websocket.Conn) *Conn {
+	// 2.3a: Limit the maximum WebSocket frame read size to 512 KB for Hub
+	// connections.  This bounds per-message memory allocation regardless of
+	// message rate limiting.
+	ws.SetReadLimit(512 * 1024)
+
 	r := rate.Every(time.Second / time.Duration(config.WSMessageRateLimit))
 	return &Conn{
 		W:          ws,
 		Send:       make(chan []byte, config.WSSendBufferSize),
 		msgLimiter: rate.NewLimiter(r, config.WSMessageBurst),
 	}
+}
+
+// ReadMessage reads a single WebSocket message with a read deadline.  The
+// deadline is set to WSReadTimeout (2x heartbeat interval).  When the parent
+// context carries its own deadline, the earlier of the two applies.
+//
+// Callers should replace conn.W.Read(ctx) with conn.ReadMessage(ctx) to gain
+// idle-timeout protection.
+func (c *Conn) ReadMessage(ctx context.Context) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, WSReadTimeout)
+	defer cancel()
+	_, data, err := c.W.Read(ctx)
+	return data, err
 }
 
 func (m *Manager) Register(c *Conn) error {

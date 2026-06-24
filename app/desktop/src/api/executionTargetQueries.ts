@@ -11,6 +11,7 @@ import type {
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 export interface UseHubExecutionTargetsOptions {
   enabled: boolean;
@@ -190,7 +191,10 @@ export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecuti
       };
 
   return useQuery<ExecutionTargetInventoryResponse>({
-    queryKey: ['execution-targets', options.preferHub ? 'hub' : 'signed-out', options.baseUrl ?? 'default'],
+    queryKey: [
+      ...hubQueryKeys.executionTargets.list(options.preferHub ? 'hub' : 'signed-out'),
+      options.baseUrl ?? 'default',
+    ],
     queryFn: () => fetchExecutionTargets(options.preferHub, options.getToken, options.baseUrl),
     enabled: options.enabled,
     refetchInterval: options.preferHub ? 10_000 : false,
@@ -213,7 +217,7 @@ export function usePingHubExecutionTarget(options: { getToken?: () => string | n
       await client.pingExecutionTarget(targetId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['execution-targets'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
     },
   });
 }
@@ -267,7 +271,7 @@ export function useSyncLocalEdgeExecutionTarget(options: { getToken?: () => stri
       await client.createExecutionTarget(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['execution-targets'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
     },
   });
 }

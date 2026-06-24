@@ -1,0 +1,2 @@
+ALTER TABLE agent_team_runs
+    ADD COLUMN IF NOT EXISTS mode VARCHAR(20) NOT NULL DEFAULT 'supervisor';

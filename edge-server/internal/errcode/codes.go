@@ -30,6 +30,9 @@ var (
 	ErrTooManyRequests  = sharederr.ErrTooManyRequests
 	ErrInvalidJSON      = sharederr.ErrInvalidJSON
 	ErrContentRequired  = sharederr.ErrContentRequired
+	ErrForbidden        = sharederr.ErrForbidden
+	ErrUnauthorized     = sharederr.ErrUnauthorized
+	ErrConflict         = sharederr.ErrConflict
 )
 
 // --- Edge domain-specific codes ---
@@ -71,8 +74,21 @@ var (
 	ErrDeployNoArtifacts    = New("deploy_no_artifacts", "run has no deployable artifacts", http.StatusBadRequest)
 	ErrDeployRunNotFinished = New("deploy_run_not_finished", "run must be in a terminal state before deploying", http.StatusBadRequest)
 
+	// Capability token (dual-token auth)
+	ErrCapabilityTokenInvalid = New("capability_token_invalid", "capability token is missing or invalid", http.StatusForbidden)
+
 	// Metrics
 	ErrNotConfigured = New("not_configured", "resource not configured", http.StatusServiceUnavailable)
+
+	// MCP tool sentinels (used by edge-server/internal/mcp/tools.go)
+	ErrStoreNotConfigured              = New("store_not_configured", "store is not configured", http.StatusServiceUnavailable)
+	ErrExecutorNotConfigured           = New("executor_not_configured", "executor is not configured", http.StatusServiceUnavailable)
+	ErrProjectIDRequired               = New("project_id_required", "projectId is required", http.StatusBadRequest)
+	ErrThreadIDRequired                = New("thread_id_required", "threadId is required", http.StatusBadRequest)
+	ErrPromptRequired                  = New("prompt_required", "prompt is required", http.StatusBadRequest)
+	ErrWorkspaceAllowlistNotConfigured = New("workspace_allowlist_not_configured", "workspace allowlist is not configured; cannot accept workDir", http.StatusForbidden)
+	ErrPermissionRegistryNotConfigured = New("permission_registry_not_configured", "permission registry is not configured", http.StatusServiceUnavailable)
+	ErrInvalidRole                     = New("invalid_role", "role must be 'user' or 'system'", http.StatusBadRequest)
 )
 
 // ErrorBody returns the JSON error envelope for use with writeJSON.
