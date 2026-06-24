@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -1268,5 +1269,266 @@ func TestBuildConfigEnvVarEmptyStringNotUsed(t *testing.T) {
 	}
 	if cfg.StoreFile != "" {
 		t.Fatalf("StoreFile = %q, want empty when env is empty", cfg.StoreFile)
+	}
+}
+
+// --- pure utility function behavioral tests ---
+
+func TestParseDurationOrDefault(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		def     string
+		want    string
+	}{
+		{"30s literal", "30s", "5m", "30s"},
+		{"5m literal", "5m", "1s", "5m0s"},
+		{"1h30m", "1h30m", "1s", "1h30m0s"},
+		{"empty returns default", "", "5m", "5m0s"},
+		{"invalid returns default", "bad", "5m", "5m0s"},
+		{"negative duration", "-1s", "5s", "-1s"},
+		{"whitespace only returns default", "  ", "5m", "5m0s"},
+		{"zero duration", "0s", "5m", "0s"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			def, err := time.ParseDuration(tt.def)
+			if err != nil {
+				t.Fatalf("bad test data: cannot parse default %q: %v", tt.def, err)
+			}
+			got := parseDurationOrDefault(tt.input, def)
+			want, err := time.ParseDuration(tt.want)
+			if err != nil {
+				t.Fatalf("bad test data: cannot parse want %q: %v", tt.want, err)
+			}
+			if got != want {
+				t.Fatalf("parseDurationOrDefault(%q, %v) = %v, want %v", tt.input, def, got, want)
+			}
+		})
+	}
+}
+
+func TestResolveSDKAPIKey(t *testing.T) {
+	t.Run("ANTHROPIC_API_KEY set, value=env", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+		got := resolveSDKAPIKey("env", "ANTHROPIC_API_KEY")
+		if got != "sk-ant-test-key" {
+			t.Fatalf("resolveSDKAPIKey(env, ANTHROPIC_API_KEY) = %q, want sk-ant-test-key", got)
+		}
+	})
+
+	t.Run("ANTHROPIC_API_KEY set, value=ENV (case-insensitive)", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+		got := resolveSDKAPIKey("ENV", "ANTHROPIC_API_KEY")
+		if got != "sk-ant-test-key" {
+			t.Fatalf("resolveSDKAPIKey(ENV, ANTHROPIC_API_KEY) = %q, want sk-ant-test-key", got)
+		}
+	})
+
+	t.Run("ANTHROPIC_API_KEY set, value empty → reads env", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+		got := resolveSDKAPIKey("", "ANTHROPIC_API_KEY")
+		if got != "sk-ant-test-key" {
+			t.Fatalf("resolveSDKAPIKey(\"\", ANTHROPIC_API_KEY) = %q, want sk-ant-test-key", got)
+		}
+	})
+
+	t.Run("OPENAI_API_KEY set, value=env", func(t *testing.T) {
+		t.Setenv("OPENAI_API_KEY", "sk-openai-test-key")
+		got := resolveSDKAPIKey("env", "OPENAI_API_KEY")
+		if got != "sk-openai-test-key" {
+			t.Fatalf("resolveSDKAPIKey(env, OPENAI_API_KEY) = %q, want sk-openai-test-key", got)
+		}
+	})
+
+	t.Run("neither env var set, value=env → returns empty", func(t *testing.T) {
+		got := resolveSDKAPIKey("env", "ANTHROPIC_API_KEY")
+		if got != "" {
+			t.Fatalf("resolveSDKAPIKey(env, ANTHROPIC_API_KEY) with no env = %q, want empty", got)
+		}
+	})
+
+	t.Run("neither env var set, value empty → returns empty", func(t *testing.T) {
+		got := resolveSDKAPIKey("", "OPENAI_API_KEY")
+		if got != "" {
+			t.Fatalf("resolveSDKAPIKey(\"\", OPENAI_API_KEY) with no env = %q, want empty", got)
+		}
+	})
+
+	t.Run("literal value returned directly", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "sk-should-not-read")
+		got := resolveSDKAPIKey("direct-key-value", "ANTHROPIC_API_KEY")
+		if got != "direct-key-value" {
+			t.Fatalf("resolveSDKAPIKey(direct-key-value, ...) = %q, want direct-key-value", got)
+		}
+	})
+}
+
+func TestSplitPathList(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  nil,
+		},
+		{
+			name:  "single path",
+			input: "/a/b",
+			want:  []string{"/a/b"},
+		},
+		{
+			name:  "OS path list separator",
+			input: "/a/b" + string(os.PathListSeparator) + "/c/d",
+			want:  []string{"/a/b", "/c/d"},
+		},
+		{
+			name:  "trims whitespace",
+			input: " /a/b " + string(os.PathListSeparator) + " /c/d ",
+			want:  []string{"/a/b", "/c/d"},
+		},
+		{
+			name:  "skips empty parts",
+			input: "/a/b" + string(os.PathListSeparator) + string(os.PathListSeparator) + "/c/d",
+			want:  []string{"/a/b", "/c/d"},
+		},
+		{
+			name:  "trailing separator",
+			input: "/a/b" + string(os.PathListSeparator),
+			want:  []string{"/a/b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitPathList(tt.input)
+			if len(got) == 0 && len(tt.want) == 0 {
+				return // both nil/empty
+			}
+			if strings.Join(got, "\x00") != strings.Join(tt.want, "\x00") {
+				t.Fatalf("splitPathList(%q) = %#v, want %#v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSplitCommaList(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  nil,
+		},
+		{
+			name:  "single value",
+			input: "v1",
+			want:  []string{"v1"},
+		},
+		{
+			name:  "comma separated",
+			input: "v1,v2,v3",
+			want:  []string{"v1", "v2", "v3"},
+		},
+		{
+			name:  "trims whitespace",
+			input: " v1 , v2 , v3 ",
+			want:  []string{"v1", "v2", "v3"},
+		},
+		{
+			name:  "skips empty parts",
+			input: "v1,,v3",
+			want:  []string{"v1", "v3"},
+		},
+		{
+			name:  "trailing comma",
+			input: "v1,v2,",
+			want:  []string{"v1", "v2"},
+		},
+		{
+			name:  "leading comma",
+			input: ",v1,v2",
+			want:  []string{"v1", "v2"},
+		},
+		{
+			name:  "only commas",
+			input: ",,",
+			want:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitCommaList(tt.input)
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
+			if strings.Join(got, "\x00") != strings.Join(tt.want, "\x00") {
+				t.Fatalf("splitCommaList(%q) = %#v, want %#v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTrimRepeatedStrings(t *testing.T) {
+	tests := []struct {
+		name  string
+		input repeatedString
+		want  repeatedString
+	}{
+		{
+			name:  "empty",
+			input: repeatedString{},
+			want:  repeatedString{},
+		},
+		{
+			name:  "nil",
+			input: nil,
+			want:  nil,
+		},
+		{
+			name:  "single value no trim",
+			input: repeatedString{"val1"},
+			want:  repeatedString{"val1"},
+		},
+		{
+			name:  "trims whitespace",
+			input: repeatedString{" val1 ", " val2 "},
+			want:  repeatedString{"val1", "val2"},
+		},
+		{
+			name:  "filters empty strings",
+			input: repeatedString{"val1", "", "val2"},
+			want:  repeatedString{"val1", "val2"},
+		},
+		{
+			name:  "filters whitespace-only strings",
+			input: repeatedString{"val1", "  ", "val2"},
+			want:  repeatedString{"val1", "val2"},
+		},
+		{
+			name:  "all empty",
+			input: repeatedString{"", "", ""},
+			want:  repeatedString{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := trimRepeatedStrings(tt.input)
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
+			if strings.Join([]string(got), "\x00") != strings.Join([]string(tt.want), "\x00") {
+				t.Fatalf("trimRepeatedStrings(%#v) = %#v, want %#v", tt.input, got, tt.want)
+			}
+		})
 	}
 }
