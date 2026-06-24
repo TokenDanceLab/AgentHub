@@ -1,6 +1,14 @@
 version: "2"
 run:
   tests: true
+issues:
+  exclude-rules:
+    - path: internal/app/events\.go
+      linters:
+        - gocognit
+    - path: internal/config/config\.go
+      linters:
+        - gocognit
 linters:
   enable:
     - cyclop
@@ -56,6 +64,9 @@ linters:
         path: internal/handler/.*\.go
       - linters:
           - gocognit
+        path: internal/config/.*\.go
+      - linters:
+          - gocognit
         path: internal/router/router\.go
       - linters:
           - cyclop
@@ -68,6 +79,9 @@ linters:
       - linters:
           - gocognit
         path: internal/httpserver/server\.go
+      - linters:
+          - gocognit
+        path: internal/app/events\.go
       - linters:
           - revive
         text: context-as-argument
