@@ -55,7 +55,7 @@ export type {
   AnyEvent,
 } from './events';
 
-export { parseError, isErrorResponse, AppError, globalErrorReporter, ErrorReporter } from './errors';
+export { parseError, isErrorResponse, AppError, globalErrorReporter, ErrorReporter, reportApiError } from './errors';
 export type { ErrorBody, ErrorCategory, ErrorReport } from './errors';
 
 export { useErrorReporter, setToastHandler } from './errorReporting';
@@ -122,6 +122,8 @@ export type {
 
 export { HUB_EVENTS } from './hubEvents';
 export type { HubEventType } from './hubEvents';
+
+export { hubQueryKeys, edgeQueryKeys, isQueryKeyPrefix, rootPrefix } from './stores/queryKeys';
 
 export {
   createHubClient,

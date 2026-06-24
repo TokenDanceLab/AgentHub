@@ -19,6 +19,7 @@ import type {
   UserProfileInfo,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
+import { reportApiError } from '@shared/errors';
 import type { AppError } from '@shared/errors';
 import { edgeAuthHeaders, getEdgeAuthToken, refreshEdgeAuthToken } from './edgeAuth';
 import {
@@ -131,6 +132,37 @@ async function edgeFetch(url: string, init?: RequestInit): Promise<Response> {
   );
   if (retryHeaders) retryInit.headers = retryHeaders;
   return fetch(url, retryInit);
+}
+
+/**
+ * Wrapper around edgeFetch that reports network-level errors via the global
+ * error reporter.  Use this in every public API function to surface errors
+ * as toasts/notifications.
+ */
+async function edgeFetchWithReporting(url: string, init?: RequestInit, label?: string): Promise<Response> {
+  try {
+    const res = await edgeFetch(url, init);
+    return res;
+  } catch (error) {
+    if (error instanceof TypeError && String(error.message).includes('fetch')) {
+      const netError = new (await import('@shared/errors')).AppError(
+        {
+          error: {
+            code: 'NETWORK_ERROR',
+            message: `Edge request failed: ${(error as Error).message}`,
+          },
+        },
+        0,
+      );
+      reportApiError(netError, { url, label: label ?? 'edge_fetch' });
+      throw netError;
+    }
+    reportApiError(error instanceof Error ? error : new Error(String(error)), {
+      url,
+      label: label ?? 'edge_fetch',
+    });
+    throw error;
+  }
 }
 
 /**

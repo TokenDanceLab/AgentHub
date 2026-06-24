@@ -9,7 +9,10 @@ import (
 )
 
 func BenchmarkEventBusPublish(b *testing.B) {
-	bus := NewBus()
+	bus, err := NewBus()
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer bus.Close()
 
 	// Subscribe a no-op handler to make the benchmark realistic.
@@ -31,6 +34,25 @@ func BenchmarkJWTParse(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		_, _ = jwtutil.ParseToken(token, secret)
+	}
+}
+
+func BenchmarkJWTSign(b *testing.B) {
+	const secret = "bench-test-secret"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+	}
+}
+
+func BenchmarkJWTSignVerifyRoundTrip(b *testing.B) {
+	const secret = "bench-test-secret"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		token, _ := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
 		_, _ = jwtutil.ParseToken(token, secret)
 	}
 }

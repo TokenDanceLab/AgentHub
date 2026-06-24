@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListResponse, ThreadInfo } from '@shared/types';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import { useArchiveThread, useDeleteThread, useRenameThread, useRestoreThread } from '@/api/threadQueries';
 
 const {
@@ -69,8 +70,8 @@ describe('threadQueries', () => {
 
   it('renames matching threads across all cached thread query keys', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread({ title: 'Codex' })]));
-    queryClient.setQueryData(['threads', 'proj_local'], makeList([makeThread({ title: 'Codex' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread({ title: 'Codex' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all('proj_local'), makeList([makeThread({ title: 'Codex' })]));
     mockRenameThread.mockResolvedValue(makeThread({ title: 'Repair message ordering' }));
 
     const { result } = renderHook(() => useRenameThread(), { wrapper });
@@ -82,15 +83,15 @@ describe('threadQueries', () => {
       });
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items[0]?.title).toBe('Repair message ordering');
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', 'proj_local'])?.items[0]?.title).toBe('Repair message ordering');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items[0]?.title).toBe('Repair message ordering');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all('proj_local'))?.items[0]?.title).toBe('Repair message ordering');
     expect(mockRenameThread).toHaveBeenCalledWith('thread_one', 'Repair message ordering');
   });
 
   it('rolls back all cached thread query keys when rename fails', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread({ title: 'Codex' })]));
-    queryClient.setQueryData(['threads', 'proj_local'], makeList([makeThread({ title: 'Codex' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread({ title: 'Codex' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all('proj_local'), makeList([makeThread({ title: 'Codex' })]));
     mockRenameThread.mockRejectedValue(new Error('rename failed'));
 
     const { result } = renderHook(() => useRenameThread(), { wrapper });
@@ -102,14 +103,14 @@ describe('threadQueries', () => {
       })).rejects.toThrow('rename failed');
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items[0]?.title).toBe('Codex');
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', 'proj_local'])?.items[0]?.title).toBe('Codex');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items[0]?.title).toBe('Codex');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all('proj_local'))?.items[0]?.title).toBe('Codex');
   });
 
   it('archives matching threads across all cached thread query keys', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread()]));
-    queryClient.setQueryData(['threads', 'proj_local'], makeList([makeThread()]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread()]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all('proj_local'), makeList([makeThread()]));
     mockArchiveThread.mockResolvedValue(makeThread({ status: 'archived' }));
 
     const { result } = renderHook(() => useArchiveThread(), { wrapper });
@@ -118,14 +119,14 @@ describe('threadQueries', () => {
       await result.current.mutateAsync('thread_one');
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items[0]?.status).toBe('archived');
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', 'proj_local'])?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all('proj_local'))?.items[0]?.status).toBe('archived');
   });
 
   it('keeps a 405 delete fallback visible as archived instead of making it look deleted', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread()]));
-    queryClient.setQueryData(['threads', 'proj_local'], makeList([makeThread()]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread()]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all('proj_local'), makeList([makeThread()]));
     mockDeleteThread.mockResolvedValue('archived');
 
     const { result } = renderHook(() => useDeleteThread(), { wrapper });
@@ -134,13 +135,13 @@ describe('threadQueries', () => {
       await result.current.mutateAsync('thread_one');
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items[0]?.status).toBe('archived');
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', 'proj_local'])?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all('proj_local'))?.items[0]?.status).toBe('archived');
   });
 
   it('removes threads from cache when Edge confirms a real delete', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread()]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread()]));
     mockDeleteThread.mockResolvedValue('deleted');
 
     const { result } = renderHook(() => useDeleteThread(), { wrapper });
@@ -149,13 +150,13 @@ describe('threadQueries', () => {
       await result.current.mutateAsync('thread_one');
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items).toEqual([]);
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items).toEqual([]);
   });
 
   it('rolls back all cached thread query keys when restore fails', async () => {
     const { queryClient, wrapper } = setupClient();
-    queryClient.setQueryData(['threads', undefined], makeList([makeThread({ status: 'archived' })]));
-    queryClient.setQueryData(['threads', 'proj_local'], makeList([makeThread({ status: 'archived' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all(), makeList([makeThread({ status: 'archived' })]));
+    queryClient.setQueryData(edgeQueryKeys.threads.all('proj_local'), makeList([makeThread({ status: 'archived' })]));
     mockUpdateThreadStatus.mockRejectedValue(new Error('restore failed'));
 
     const { result } = renderHook(() => useRestoreThread(), { wrapper });
@@ -164,7 +165,7 @@ describe('threadQueries', () => {
       await expect(result.current.mutateAsync('thread_one')).rejects.toThrow('restore failed');
     });
 
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', undefined])?.items[0]?.status).toBe('archived');
-    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(['threads', 'proj_local'])?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all())?.items[0]?.status).toBe('archived');
+    expect(queryClient.getQueryData<ListResponse<ThreadInfo>>(edgeQueryKeys.threads.all('proj_local'))?.items[0]?.status).toBe('archived');
   });
 });

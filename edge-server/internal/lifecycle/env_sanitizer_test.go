@@ -96,15 +96,23 @@ func TestSanitizedEnvIncludesExtraEnv(t *testing.T) {
 func TestSanitizedEnvIncludesNonSensitiveAgentHubVars(t *testing.T) {
 	t.Setenv("AGENTHUB_RUN_ID", "run_test")
 	t.Setenv("AGENTHUB_PROJECT_ID", "proj_test")
+	t.Setenv("AGENTHUB_THREAD_ID", "thread_test")
+	// AGENTHUB_CUSTOM_SETTING is NOT in the explicit inherited allowlist and
+	// should NOT pass through from the parent environment.
 	t.Setenv("AGENTHUB_CUSTOM_SETTING", "custom-value")
 
 	env := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
-	for _, key := range []string{"AGENTHUB_RUN_ID", "AGENTHUB_PROJECT_ID", "AGENTHUB_CUSTOM_SETTING"} {
+	// Explicitly approved inherited AGENTHUB_* vars pass through.
+	for _, key := range []string{"AGENTHUB_RUN_ID", "AGENTHUB_PROJECT_ID", "AGENTHUB_THREAD_ID"} {
 		if _, ok := envMap[key]; !ok {
-			t.Errorf("non-sensitive AGENTHUB_* var %q not in sanitized env", key)
+			t.Errorf("safe inherited AGENTHUB_* var %q not in sanitized env", key)
 		}
+	}
+	// Non-allowlisted AGENTHUB_* var should NOT pass through from inherited env.
+	if _, ok := envMap["AGENTHUB_CUSTOM_SETTING"]; ok {
+		t.Errorf("non-allowlisted AGENTHUB_* var AGENTHUB_CUSTOM_SETTING leaked into sanitized env (should be filtered from inherited env)")
 	}
 }
 
@@ -178,6 +186,183 @@ func TestSanitizedEnvIncludesWindowsSpecificVars(t *testing.T) {
 	for key := range wantVars {
 		t.Errorf("Windows var %q not found in sanitized env (must be whitelisted)", key)
 	}
+}
+
+// TestEnvAllowlist is the acceptance test for AH-SR-047: Edge scoped env allowlist.
+// It validates that:
+//   1. Only explicitly approved AGENTHUB_* vars pass through from inherited env.
+//   2. Non-allowlisted AGENTHUB_* vars are blocked from inherited env.
+//   3. Sensitive vars (JWT_SECRET, REDIS_PASSWORD, etc.) are always blocked.
+//   4. Profile env (explicitly configured) is distinct from inherited env —
+//      it passes through verbatim while inherited env is strictly filtered.
+func TestEnvAllowlist(t *testing.T) {
+	t.Run("explicit safe AGENTHUB vars inherited", func(t *testing.T) {
+		t.Setenv("AGENTHUB_RUN_ID", "inherited-run-123")
+		t.Setenv("AGENTHUB_PROJECT_ID", "inherited-proj-456")
+		t.Setenv("AGENTHUB_THREAD_ID", "inherited-thread-789")
+
+		env := SanitizedEnv(nil, nil)
+		envMap := envToMap(env)
+
+		allowed := []string{"AGENTHUB_RUN_ID", "AGENTHUB_PROJECT_ID", "AGENTHUB_THREAD_ID"}
+		for _, key := range allowed {
+			if _, ok := envMap[key]; !ok {
+				t.Errorf("safe inherited AGENTHUB var %q not in sanitized env", key)
+			}
+		}
+	})
+
+	t.Run("non-allowlisted AGENTHUB vars blocked from inherited env", func(t *testing.T) {
+		// These AGENTHUB_* vars are NOT in the explicit inherited allowlist
+		// and should NOT leak from the parent process into child agent env.
+		t.Setenv("AGENTHUB_DB_URL", "postgres://localhost/agenthub")
+		t.Setenv("AGENTHUB_INTERNAL_PORT", "9999")
+		t.Setenv("AGENTHUB_ADMIN_TOKEN", "admin-secret-token")
+		t.Setenv("AGENTHUB_CUSTOM_SETTING", "some-value")
+
+		env := SanitizedEnv(nil, nil)
+		envMap := envToMap(env)
+
+		blocked := []string{
+			"AGENTHUB_DB_URL",
+			"AGENTHUB_INTERNAL_PORT",
+			"AGENTHUB_ADMIN_TOKEN",
+			"AGENTHUB_CUSTOM_SETTING",
+		}
+		for _, key := range blocked {
+			if _, ok := envMap[key]; ok {
+				t.Errorf("non-allowlisted AGENTHUB var %q leaked into sanitized env (should be filtered from inherited env)", key)
+			}
+		}
+	})
+
+	t.Run("sensitive AGENTHUB vars blocked from inherited env", func(t *testing.T) {
+		// Sensitive-looking AGENTHUB_* vars must be blocked regardless of allowlist.
+		// IsSensitiveEnvKey catches these before isWhitelistedEnvKey is consulted.
+		t.Setenv("AGENTHUB_JWT_SECRET", "jwt-secret-value")
+		t.Setenv("AGENTHUB_REDIS_PASSWORD", "redis-pass")
+		t.Setenv("AGENTHUB_HUB_TOKEN", "hub-token-value")
+		t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "edge-auth-token")
+		t.Setenv("AGENTHUB_DB_PASSWORD", "db-password")
+		t.Setenv("AGENTHUB_ENCRYPTION_KEY", "enc-key")
+		t.Setenv("AGENTHUB_SECRET", "some-secret")
+
+		env := SanitizedEnv(nil, nil)
+		envMap := envToMap(env)
+
+		sensitive := []string{
+			"AGENTHUB_JWT_SECRET",
+			"AGENTHUB_REDIS_PASSWORD",
+			"AGENTHUB_HUB_TOKEN",
+			"AGENTHUB_EDGE_AUTH_TOKEN",
+			"AGENTHUB_DB_PASSWORD",
+			"AGENTHUB_ENCRYPTION_KEY",
+			"AGENTHUB_SECRET",
+		}
+		for _, key := range sensitive {
+			if _, ok := envMap[key]; ok {
+				t.Errorf("sensitive AGENTHUB var %q leaked into sanitized env", key)
+			}
+		}
+	})
+
+	t.Run("profile env distinct from inherited env", func(t *testing.T) {
+		// Profile env: explicitly configured by administrator, passes verbatim.
+		// Inherited env: filtered aggressively via explicit allowlist.
+		//
+		// Set up inherited env with vars that should be blocked.
+		t.Setenv("AGENTHUB_DB_URL", "inherited-db-url")
+		t.Setenv("AGENTHUB_CUSTOM_SETTING", "inherited-custom")
+
+		// Profile env explicitly sets the same vars — should pass through.
+		profileEnv := []string{
+			"AGENTHUB_DB_URL=custom-db-url",
+			"AGENTHUB_CUSTOM_SETTING=custom-value",
+		}
+
+		env := SanitizedEnv(profileEnv, nil)
+		envMap := envToMap(env)
+
+		// Profile env vars pass through verbatim because the administrator
+		// explicitly configured them. They are NOT subject to the inherited
+		// allowlist because profileEnv is non-nil.
+		if envMap["AGENTHUB_DB_URL"] != "custom-db-url" {
+			t.Errorf("profile env AGENTHUB_DB_URL = %q, want custom-db-url", envMap["AGENTHUB_DB_URL"])
+		}
+		if envMap["AGENTHUB_CUSTOM_SETTING"] != "custom-value" {
+			t.Errorf("profile env AGENTHUB_CUSTOM_SETTING = %q, want custom-value", envMap["AGENTHUB_CUSTOM_SETTING"])
+		}
+	})
+
+	t.Run("profile env still warns on sensitive vars", func(t *testing.T) {
+		// Even though profile env passes through verbatim, sensitive vars
+		// should be detected by IsSensitiveEnvKey. The SanitizedEnv function
+		// doesn't strip them from profile env (that's the caller's job via
+		// envForRun which logs warnings), but IsSensitiveEnvKey should still
+		// classify them correctly.
+		sensitive := []string{
+			"JWT_SECRET",
+			"REDIS_PASSWORD",
+			"AGENTHUB_JWT_SECRET",
+			"AGENTHUB_REDIS_PASSWORD",
+			"DATABASE_URL",
+			"ANTHROPIC_API_KEY",
+			"OPENAI_API_KEY",
+		}
+		for _, key := range sensitive {
+			if !IsSensitiveEnvKey(key) {
+				t.Errorf("IsSensitiveEnvKey(%q) = false, want true", key)
+			}
+		}
+	})
+
+	t.Run("extra env always passes through", func(t *testing.T) {
+		// Extra env (runtime vars like AGENTHUB_RUN_ID added by envForRun)
+		// always passes through regardless of allowlist — it's explicitly
+		// appended after filtering.
+		extraEnv := []string{
+			"AGENTHUB_RUN_ID=extra-run-123",
+			"AGENTHUB_PROJECT_ID=extra-proj-456",
+			"AGENTHUB_CUSTOM_SETTING=extra-custom",
+		}
+		env := SanitizedEnv(nil, extraEnv)
+		envMap := envToMap(env)
+
+		for _, kv := range extraEnv {
+			key, val, _ := strings.Cut(kv, "=")
+			got, ok := envMap[key]
+			if !ok {
+				t.Errorf("extra env %q not found in sanitized env", key)
+			} else if got != val {
+				t.Errorf("extra env %q = %q, want %q", key, got, val)
+			}
+		}
+	})
+
+	t.Run("sensitive non-AGENTHUB vars also blocked", func(t *testing.T) {
+		// Non-AGENTHUB_* sensitive vars must also be blocked from inherited env.
+		t.Setenv("JWT_SECRET", "jwt-secret")
+		t.Setenv("REDIS_PASSWORD", "redis-pass")
+		t.Setenv("DATABASE_URL", "postgres://localhost/db")
+		t.Setenv("ANTHROPIC_API_KEY", "sk-ant-secret")
+		t.Setenv("GITHUB_TOKEN", "ghp-secret")
+
+		env := SanitizedEnv(nil, nil)
+		envMap := envToMap(env)
+
+		blocked := []string{
+			"JWT_SECRET",
+			"REDIS_PASSWORD",
+			"DATABASE_URL",
+			"ANTHROPIC_API_KEY",
+			"GITHUB_TOKEN",
+		}
+		for _, key := range blocked {
+			if _, ok := envMap[key]; ok {
+				t.Errorf("sensitive non-AGENTHUB var %q leaked into sanitized env", key)
+			}
+		}
+	})
 }
 
 // --- IsSensitiveEnvKey tests ---

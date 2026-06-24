@@ -94,11 +94,15 @@ func TestMain(m *testing.M) {
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat()
 
-	bus = service.NewBus()
-	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret)
+	b, err := service.NewBus()
+	if err != nil {
+		panic(fmt.Sprintf("NewBus failed: %v", err))
+	}
+	bus = b
+	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
-	deviceService := service.NewDeviceService(db)
+	deviceService := service.NewDeviceService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := service.NewContactService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
@@ -110,7 +114,7 @@ func TestMain(m *testing.M) {
 		MessageService: messageService,
 		reactions:      messageReactionService,
 	})
-	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
+	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := service.NewAttachmentService(db, cfg.Upload, service.NewLocalStorage(cfg.Upload.Dir))
@@ -143,7 +147,9 @@ func TestMain(m *testing.M) {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil)
+	if err := router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
+		panic(fmt.Sprintf("SetupRoutes failed: %v", err))
+	}
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()

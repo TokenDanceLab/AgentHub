@@ -906,3 +906,36 @@ func TestValidateS3ConfigDoesNotRequireLocalUploadDir(t *testing.T) {
 		t.Fatalf("Validate() error = %v, want nil when S3 is configured", err)
 	}
 }
+
+func TestRateLimitFailOpen(t *testing.T) {
+	t.Run("defaults to true when env not set", func(t *testing.T) {
+		if !RateLimitFailOpen() {
+			t.Error("RateLimitFailOpen() should default to true")
+		}
+	})
+
+	t.Run("true for truthy values", func(t *testing.T) {
+		for _, v := range []string{"true", "1", "yes", "anything-else"} {
+			t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", v)
+			if !RateLimitFailOpen() {
+				t.Errorf("RateLimitFailOpen() = false for env value %q, want true", v)
+			}
+		}
+	})
+
+	t.Run("false for falsy values", func(t *testing.T) {
+		for _, v := range []string{"false", "0", "no", "off", "FALSE", "NO"} {
+			t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", v)
+			if RateLimitFailOpen() {
+				t.Errorf("RateLimitFailOpen() = true for env value %q, want false", v)
+			}
+		}
+	})
+
+	t.Run("defaults to true when env is empty", func(t *testing.T) {
+		t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", "")
+		if !RateLimitFailOpen() {
+			t.Error("RateLimitFailOpen() should default to true when env is empty")
+		}
+	})
+}

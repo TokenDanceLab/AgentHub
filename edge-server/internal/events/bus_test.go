@@ -331,3 +331,150 @@ func TestConcurrentSubscribeUnsubscribe(t *testing.T) {
 	// Test that bus is still usable.
 	b.Publish("after", nil, "ok")
 }
+
+// TestConcurrentPublishWhileSubscribing verifies that Publish during concurrent
+// Subscribe/Unsubscribe does not race or cause data loss.
+func TestConcurrentPublishWhileSubscribing(t *testing.T) {
+	b := NewBus(1000)
+
+	var wg sync.WaitGroup
+
+	// Publishers
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				b.Publish("pressure.event", nil, nil)
+				time.Sleep(time.Microsecond)
+			}
+		}()
+	}
+
+	// Concurrent subscribers
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id, ch, _ := b.Subscribe(0)
+			time.Sleep(20 * time.Millisecond)
+			b.Unsubscribe(id)
+			for range ch {
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Verify event integrity
+	_, _, replay := b.Subscribe(0)
+	if len(replay) < 100 {
+		t.Errorf("history replay length = %d, want >= 100", len(replay))
+	}
+	seen := make(map[int64]bool)
+	for _, evt := range replay {
+		if seen[evt.Seq] {
+			t.Errorf("duplicate seq %d", evt.Seq)
+		}
+		seen[evt.Seq] = true
+	}
+}
+
+// TestConcurrentObserver verifies observer registration during concurrent
+// publishing does not race.
+func TestConcurrentObserver(t *testing.T) {
+	b := NewBus(1000)
+
+	var wg sync.WaitGroup
+
+	// Publisher
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			b.Publish("obs.event", nil, nil)
+		}
+	}()
+
+	// Concurrent observer add/remove
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cancel := b.AddObserver(func(evt EventEnvelope) {})
+			time.Sleep(5 * time.Millisecond)
+			cancel()
+		}()
+	}
+
+	wg.Wait()
+}
+
+// TestConcurrentHistoryLen verifies HistoryLen() is safe under concurrent Publish.
+func TestConcurrentHistoryLen(t *testing.T) {
+	b := NewBus(100)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b.Publish("test", nil, nil)
+			_ = b.HistoryLen()
+			_ = b.DroppedCount()
+		}()
+	}
+	wg.Wait()
+
+	// History should be populated
+	if b.HistoryLen() == 0 {
+		t.Error("history should not be empty after concurrent publish")
+	}
+}
+
+// TestGapDetection verifies that slow subscribers receive gap events
+// after the subscriber's channel frees up.
+func TestGapDetection(t *testing.T) {
+	b := NewBus(1000)
+
+	_, ch, _ := b.Subscribe(0)
+
+	// Fill the subscriber channel (buffer size 256) completely.
+	for i := 0; i < subscriberChannelBufferSize; i++ {
+		b.Publish("test", nil, i)
+	}
+
+	// Publish beyond capacity — these are dropped silently, gapDetected set.
+	for i := 0; i < 10; i++ {
+		b.Publish("test", nil, subscriberChannelBufferSize+i)
+	}
+
+	// Drain part of the channel so the gap event can be injected.
+	for i := 0; i < subscriberChannelBufferSize/2; i++ {
+		<-ch
+	}
+
+	// Publish one more event — this triggers gap event delivery since room exists.
+	b.Publish("test.gapcheck", nil, "final")
+
+	// Drain remaining events, looking for the gap event.
+	hasGap := false
+drain:
+	for {
+		select {
+		case evt, ok := <-ch:
+			if !ok {
+				break drain
+			}
+			if evt.Type == GapEventType {
+				hasGap = true
+			}
+		default:
+			break drain
+		}
+	}
+
+	if !hasGap {
+		t.Error("expected gap event for slow subscriber after channel freed up")
+	}
+}

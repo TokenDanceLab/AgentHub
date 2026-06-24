@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -60,7 +61,8 @@ func (h *SkillHandler) CreateSkill(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), userID, skill)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -75,7 +77,8 @@ func (h *SkillHandler) GetSkill(c *gin.Context) {
 	userID := c.GetString("user_id")
 	skill, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -136,7 +139,8 @@ func (h *SkillHandler) UpdateSkill(c *gin.Context) {
 
 	skill, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -151,7 +155,8 @@ func (h *SkillHandler) DeleteSkill(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -166,7 +171,8 @@ func (h *SkillHandler) PublishSkill(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -181,7 +187,8 @@ func (h *SkillHandler) UnpublishSkill(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.Unpublish(c.Request.Context(), id, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

@@ -149,8 +149,8 @@ func (f *FileStore) syncPersist() error {
 	return err
 }
 
-func (f *FileStore) CreateProject(id, name string) (Project, error) {
-	project, err := f.store.CreateProject(id, name)
+func (f *FileStore) CreateProject(id, name, ownerID string) (Project, error) {
+	project, err := f.store.CreateProject(id, name, ownerID)
 	if errors.Is(err, ErrProjectExists) {
 		return project, err
 	}
@@ -239,6 +239,22 @@ func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 
 func (f *FileStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	run, ok := f.store.SetRunStatusIf(id, status, allowedCurrent...)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
+func (f *FileStore) SetRunEvidenceGate(id, result string) (Run, bool) {
+	run, ok := f.store.SetRunEvidenceGate(id, result)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
+func (f *FileStore) SetRunRetryCount(id string, count int) (Run, bool) {
+	run, ok := f.store.SetRunRetryCount(id, count)
 	if ok {
 		f.schedulePersist()
 	}

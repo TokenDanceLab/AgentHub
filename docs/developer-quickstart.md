@@ -8,7 +8,7 @@
 
 | 工具 | 最低版本 | 用途 |
 |------|---------|------|
-| Go | 1.25+ | Hub Server 和 Edge Server |
+| Go | 1.25.0 | Hub Server 和 Edge Server |
 | Node.js | 20+ | 前端构建和开发 |
 | corepack | 启用 | pnpm 版本管理（`corepack enable`） |
 | PostgreSQL | 16+ | Hub 数据库 |
@@ -59,16 +59,16 @@ cd hub-server
 go run ./cmd/server-hub
 ```
 
-Hub Server 默认监听 `localhost:8080`，admin 端口 `localhost:6060`。
+Hub Server 默认监听 `127.0.0.1:8080`，admin 端口 `127.0.0.1:6060`。
 
 验证启动成功：
 
 ```bash
-curl http://localhost:8080/health
+curl http://127.0.0.1:8080/health
 # 期望：{"status":"ok"}
 ```
 
-首次启动会自动运行数据库迁移（`hub-server/migrations/` 下的 50 对迁移文件，共 100 文件）。
+首次启动会自动运行数据库迁移（`hub-server/migrations/` 下的 51 对迁移文件，共 102 文件）。
 
 ## 5. 启动 Edge Server
 
@@ -77,12 +77,12 @@ cd edge-server
 go run ./cmd/agenthub-edge
 ```
 
-Edge Server 默认监听 `localhost:3210`。
+Edge Server 默认监听 `127.0.0.1:3210`。
 
 验证启动成功：
 
 ```bash
-curl http://localhost:3210/health
+curl http://127.0.0.1:3210/health
 # 期望：{"status":"ok","..."}
 ```
 
@@ -115,9 +115,9 @@ corepack pnpm install
 corepack pnpm dev
 ```
 
-Web 前端监听 `localhost:5174`。
+Web 前端监听 `127.0.0.1:5174`。
 
-打开浏览器访问 `http://localhost:5174`。默认使用 mock 数据模式。
+打开浏览器访问 `http://127.0.0.1:5174`。默认使用 mock 数据模式。
 
 ## 7. 启动 Desktop 前端
 
@@ -128,7 +128,7 @@ corepack pnpm install
 corepack pnpm dev
 ```
 
-Desktop 前端监听 `localhost:5173`。
+Desktop 前端监听 `127.0.0.1:5173`。
 
 注意：完整的 Desktop 体验需要 Tauri 运行时。纯前端开发模式只提供 UI 预览，不含 Local Edge 进程管理、文件系统访问等 native 能力。
 
@@ -149,9 +149,9 @@ corepack pnpm tauri dev
    ```bash
    AGENTHUB_TOKENDANCE_ID_CLIENT_ID=<your-client-id>
    AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=<your-client-secret>
-   AGENTHUB_TOKENDANCE_ID_ISSUER=http://localhost:3000
+   AGENTHUB_TOKENDANCE_ID_ISSUER=http://127.0.0.1:3000
    ```
-3. 启动 Hub Server 后，访问 Web 前端 `http://localhost:5174`，点击登录按钮完成 OIDC 流程。
+3. 启动 Hub Server 后，访问 Web 前端 `http://127.0.0.1:5174`，点击登录按钮完成 OIDC 流程。
 4. 前端会自动获取并存储 JWT token。
 
 ### 方式二：通过 E2E 测试脚本自动创建
@@ -168,7 +168,7 @@ E2E smoke 脚本会自动签发测试 token：
 获取到 JWT 后，在 API 请求中携带：
 
 ```bash
-curl http://localhost:8080/client/auth/me \
+curl http://127.0.0.1:8080/client/auth/me \
   -H "Authorization: Bearer <your-jwt-token>"
 ```
 
@@ -232,7 +232,7 @@ npx playwright test
 确认 PostgreSQL 已启动且 `.env` 中的数据库连接信息正确：
 
 ```bash
-psql -h localhost -U agenthub -d agenthub
+psql -h 127.0.0.1 -U agenthub -d agenthub
 ```
 
 ### Q: Edge Server 启动报端口 3210 被占用

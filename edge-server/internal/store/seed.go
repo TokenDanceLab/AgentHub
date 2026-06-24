@@ -37,7 +37,7 @@ func SeedIfEmpty(repo Repository) error {
 	}
 
 	// 2. Project
-	if _, err := repo.CreateProject(seedProjectID, seedProjectName); err != nil {
+	if _, err := repo.CreateProject(seedProjectID, seedProjectName, ""); err != nil {
 		return err
 	}
 

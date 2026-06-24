@@ -1,5 +1,7 @@
 import type { TranscriptBlock } from '@agenthub/shared/transcript';
 
+export type { TranscriptBlock };
+
 export type MobileThemeMode = 'system' | 'light' | 'dark' | 'oled';
 
 export type MobileTab =

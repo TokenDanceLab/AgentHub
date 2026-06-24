@@ -50,15 +50,15 @@ PDF/MD/Code/HTML/图片/PPTX/Excel/DOCX/Deploy/TXT/DagTree/StreamingBar/ContextU
 
 ### 一键部署 ✅
 
-- Edge deploy handler：`POST /v1/deployments` → tar.gz → SCP → host-redacted nginx
-- Cloudflare DNS：`*.pages.example.invalid` A → <REDACTED-IP>
+- Edge deploy handler：`POST /v1/deployments` → tar.gz → SCP → 见私有运维 SSOT
+- Cloudflare DNS：`*.pages.example.invalid` A → 见私有运维 SSOT
 - SSL：Let's Encrypt 通配符证书 `pages.example.invalid`
 - 前端：DeployCard 组件 + surfaced_deploy 事件
 - 公网验证：`https://test.pages.example.invalid/` 200 OK
 
 ### 基础设施 ✅
 
-- host-redacted 生产部署：Hub Docker + Edge systemd + nginx SSL + 安全头 (HSTS/CSP)
+- 见私有运维 SSOT：Hub Docker + Edge systemd + nginx SSL + 安全头 (HSTS/CSP)
 - Tauri Desktop：`AgentHub_0.3.0-rc.7_x64-setup.exe` 14MB
 - Mobile RN：91 tests PASS · Hub 连接正确
 - Web E2E：130/130 tests · Desktop：1194 tests (1148 pass)
