@@ -1,15 +1,34 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-17 12:00 +08:00
-当前 dev HEAD：`5e653859` (`dev/delicious233`)
-Release tag：`v0.4.0`（unsigned release）
+最后更新：2026-06-24
+当前活跃分支：`feat/super-phase1-safety-foundation`（SUPER 修复全完成，待合并）
+当前 dev HEAD：`f4481fa6` (`dev/delicious233`)
+Release tag：`v0.5.0`（master 最新）
+
+## SUPER 工程修复 (2026-06-19 完成)
+
+52 任务 6 Phase 全部完成。34 提交领先 master，待合并到 dev → master。
+详见 `docs/progress/MASTER.md`。
+
+| Phase | 名称 | 进度 | 状态 |
+|---|---|---|---|
+| Phase 1 | 后端安全与基础 | 12/12 | ✅ |
+| Phase 2 | Edge 安全加固 | 7/7 | ✅ |
+| Phase 3 | 架构重构 | 5/5 | ✅ |
+| Phase 4 | 前端与 Mobile 质量 | 7/7 | ✅ |
+| Phase 5 | 文档、平台与打磨 | 17/17 | ✅ |
+| Phase 6 | 延后项 | 4/4 | ✅ |
+
+**阻塞项**：8 个 Open High 安全风险 + 签名证书 → release gate 不通过。
 
 ## Roadmap 最终状态
 
-224 个复选框中 216 个已勾选（96%）。剩余 8 项全部为平台发布阻塞项：
+224 个复选框中 216 个已勾选（96%）。剩余 7 项：
 - 消息搜索点击导航（UI）、按需未读清除（UI）、WS 重连事件（ws lib compat）、连接状态指示器（UI）
-- Tool allowlist（可通过 API 配置）、~~Android APK~~ ✅（2026-06-10 首次本地构建成功）、macOS（缺少硬件）
+- Tool allowlist（可通过 API 配置）、~~Android APK~~ ✅（2026-06-10 首次本地构建成功）、~~macOS~~ ❌（已放弃）
 - 安全风险登记册关闭（流程）
+
+macOS 平台已放弃：CI 移除 macOS build job、Tauri DMG 不再构建。Desktop 仅维护 Windows x64。
 
 右侧面板增强（Section 18）新增 9 个未勾选项（P1 UI 任务），独立于发布阻塞。
 
@@ -42,12 +61,15 @@ Release tag：`v0.4.0`（unsigned release）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233` HEAD `5e653859`，ChatView migration 进行中。 |
-| 上一条 dev | `origin/dev/delicious223 = 118bdd84`，v0.4.0 已归档，`dev/delicious233` 已吸收其提交。 |
-| RC tag | `v0.4.0`（指向 `ed4f6fda`，unsigned release） |
-| master | `origin/master = 8ac93e8b`，当前可信基线，指向 v0.4.0。 |
-| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `dev/delicious233`）。ChatView migration 工作树：`D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`（分支 `feat/chatview-tokendance-migration`，见 ChatView Migration 节）。 |
-| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/designs/right-panel-enhancement-design.md` 写右侧面板设计规范（right-panel 工作已于 2026-06-11 完成，见 P1 UI 节）；`docs/roadmap/` 写模块化路线图（3 个文件）。 |
+| 当前集成 dev | `dev/delicious233`，已同步 master（PR #300 ChatView migration）。 |
+| 活跃 feature 分支 | `feat/super-phase1-safety-foundation`（HEAD `cafef98d`），SUPER 52 任务全部完成，+34 提交领先 master，含 ui-polish-v4 merge。 |
+| 上一条 dev | `origin/dev/delicious223`（已归档）。 |
+| RC tag | `v0.5.0`（master 最新），`v0.4.0`（unsigned release）。 |
+| master | `origin/master = 67f54228`，v0.5.0，CI/CD workflows 已就绪。 |
+| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `feat/super-phase1-safety-foundation`）。 |
+| 已删除分支 | `feat/glm-frontend-integration`（仅 handoff prompt，无实现，2026-06-24 删除）。 |
+| macOS | 已放弃。CI 移除 macOS build matrix + DMG job，Desktop 仅 Windows。 |
+| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/progress/MASTER.md` 写 SUPER 工程进度。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
 ## 已合入能力
@@ -80,7 +102,7 @@ Release tag：`v0.4.0`（unsigned release）
 - Desktop Local Edge diagnostics、Hub task bridge、target 注册/同步和 sidecar readiness 已进入 dev。
 - Desktop sidecar observed fixture smoke 已覆盖 fixture/mock sidecar health、SQLite app-data path、stdout/stderr log path、health URL、preflight/readiness、no direct CLI spawn。
 - Desktop exact target observed bridge 已记录 expected/observed `target_id` / `edge_device_id`，能区分 matched、mismatch、offline、missing。
-- Tauri package smoke gate 已强化 Windows unsigned/dev package reproducibility、sidecar placement、Local Edge diagnostics、macOS unsigned policy boundary。
+- Tauri package smoke gate 已强化 Windows unsigned/dev package reproducibility、sidecar placement、Local Edge diagnostics。
 - Release gate 负责人线已补 `scripts/verify-release-gate.ps1` 和 `docs/audit/release-gate-2026-06-09.md`。
 - Desktop Agent Builder fixture evidence UI 已合入。
 
@@ -124,7 +146,7 @@ Release tag：`v0.4.0`（unsigned release）
 - 真实 Web/Mobile/IM 全部远控闭环的发布级验收。
 - Hub AgentProfile 市场安装/发布 mutation、真实头像 asset 管线和持久化配置闭环。
 - Artifact/Diff 的真实 apply/revert 文件写入。
-- 签名安装器、macOS notarization、release upload、updater metadata — **发布阻断项**。
+- 签名安装器、release upload、updater metadata — **发布阻断项**。
 - 生产部署、公开发布。
 - Codex CLI 真实执行（缺 `OPENAI_API_KEY`）。
 - Anthropic SDK / OpenAI SDK 的真实模型消耗——适配器已 E2E 验证，但面向最终用户的真实 API key 管理闭环未完成。
@@ -136,7 +158,7 @@ Release tag：`v0.4.0`（unsigned release）
 | Web/IM 主链 | 最新 dev 已合入 target health、agent mainchain actions、group orchestration fixtures、real-mode boundary、artifact/diff inspector、**10 个 chat actions 全部接入 Hub API** | 10/10 chat actions wired。 |
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
 | Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI、**auth token 管道、Hub WS 实时缓存失效、chatActions、Agent profile 融合、本地 Edge + CC CLI 集成** | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
-| Windows/Tauri packaging | Unsigned dry gate 已通过；NSIS installer + portable zip hash manifest 已产出 | **发布阻塞：签名证书**。macOS 仍是 future unsigned dry policy。 |
+| Windows/Tauri packaging | Unsigned dry gate 已通过；NSIS installer + portable zip hash manifest 已产出 | **发布阻塞：签名证书**。 |
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器（E2E verified）**、PreflightAdapter 接口、**cc-switch Edge 集成（模型别名路由）**、**AgentMemory 管道** | Codex 阻塞于 `OPENAI_API_KEY`；面向最终用户的 API key 管理闭环未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
 | Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | **Android APK 已产出**（2026-06-10，Release arm64-v8a，29.83 MB）。 |
@@ -233,6 +255,6 @@ Release tag：`v0.4.0`（unsigned release）
 - Web 只连接 Hub，不直接连接 Local Edge 或 raw runtime。
 - Desktop renderer 不获得 raw process execution 权限。
 - Mock、fixture、observed、approved-real、production 必须显式区分。
-- 未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload。
+- 未获明确审批，不跑真实登录、真实模型消耗、部署、签名、updater、release upload。
 - Roadmap 只写路线；当前事实写在本文。
 - **签名证书 = 关键的安全阻塞项**：无签名证书则无法发布。

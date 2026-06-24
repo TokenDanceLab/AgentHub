@@ -209,7 +209,7 @@ func newWebSocketTestServerWithHandler(t *testing.T, manager *hubws.Manager, con
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewWebSocketHandler(manager, testWSSecret)
+	h := handler.NewWebSocketHandler(manager, testWSSecret, "")
 	if configure != nil {
 		configure(h)
 	}
@@ -223,7 +223,7 @@ func newMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg 
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewWebSocketHandler(manager, testWSSecret)
+	h := handler.NewWebSocketHandler(manager, testWSSecret, "")
 	r.GET("/client/ws", middleware.WSAuthMiddleware(cfg), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)

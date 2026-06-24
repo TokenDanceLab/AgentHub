@@ -18,6 +18,7 @@ type Project struct {
 	ID        string `json:"projectId"`
 	Name      string `json:"name"`
 	Status    string `json:"status"`
+	OwnerID   string `json:"ownerId,omitempty"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -35,13 +36,15 @@ type Thread struct {
 }
 
 type Run struct {
-	ID         string `json:"runId"`
-	ProjectID  string `json:"projectId"`
-	ThreadID   string `json:"threadId"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"createdAt"`
-	StartedAt  string `json:"startedAt,omitempty"`
-	FinishedAt string `json:"finishedAt,omitempty"`
+	ID                  string `json:"runId"`
+	ProjectID           string `json:"projectId"`
+	ThreadID            string `json:"threadId"`
+	Status              string `json:"status"`
+	RetryCount          int    `json:"retryCount"`
+	CreatedAt           string `json:"createdAt"`
+	StartedAt           string `json:"startedAt,omitempty"`
+	FinishedAt          string `json:"finishedAt,omitempty"`
+	EvidenceGateResult  string `json:"evidenceGateResult,omitempty"`
 }
 
 type RunDiffFile struct {
@@ -174,7 +177,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	CreateProject(id, name string) (Project, error)
+	CreateProject(id, name, ownerID string) (Project, error)
 	CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error)
 	UpdateThread(id string, title *string, status *string) (Thread, bool)
 	DeleteThread(id string) bool
@@ -193,6 +196,8 @@ type Writer interface {
 	UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error)
 	DeleteAgentProfile(id string) error
 	UpsertSettings(patch map[string]string) UserSettings
+	SetRunEvidenceGate(id, result string) (Run, bool)
+	SetRunRetryCount(id string, count int) (Run, bool)
 }
 
 type Repository interface {
@@ -204,6 +209,8 @@ type RunLifecycleStore interface {
 	GetRun(id string) (Run, bool)
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+	SetRunEvidenceGate(id, result string) (Run, bool)
+	SetRunRetryCount(id string, count int) (Run, bool)
 }
 
 type RunCleaner interface {
@@ -359,7 +366,7 @@ func normalizeOrder[V any](order []string, items map[string]V) []string {
 	return append(normalized, missing...)
 }
 
-func (s *Store) CreateProject(id, name string) (Project, error) {
+func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -369,11 +376,13 @@ func (s *Store) CreateProject(id, name string) (Project, error) {
 	if name == "" {
 		name = "Local Project"
 	}
+	ownerID = strings.TrimSpace(ownerID)
 	now := nowString()
 	project := Project{
 		ID:        id,
 		Name:      name,
 		Status:    "active",
+		OwnerID:   ownerID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -824,7 +833,7 @@ func filterIDs(ids []string, keep func(string) bool) []string {
 
 func isTerminalRunStatus(status string) bool {
 	switch status {
-	case "cancelled", "failed", "finished":
+	case "cancelled", "failed", "finished", "completed_with_issues":
 		return true
 	default:
 		return false
@@ -856,7 +865,7 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	switch status {
 	case "started":
 		run.StartedAt = nowString()
-	case "cancelled", "finished", "failed":
+	case "cancelled", "finished", "failed", "completed_with_issues":
 		run.FinishedAt = nowString()
 	}
 	run.Status = status
@@ -885,10 +894,40 @@ func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run
 	switch status {
 	case "started":
 		run.StartedAt = nowString()
-	case "finished", "failed", "cancelled":
+	case "finished", "failed", "cancelled", "completed_with_issues":
 		run.FinishedAt = nowString()
 	}
 	run.Status = status
+	s.runs[id] = run
+	return run, true
+}
+
+// SetRunEvidenceGate stores the evidence gate verification result on a run.
+// The result should be a JSON-encoded string.
+func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	run.EvidenceGateResult = result
+	s.runs[id] = run
+	return run, true
+}
+
+// SetRunRetryCount updates the retry count on a run. Used by the fault
+// escalation chain to track auto-retry attempts before escalation.
+func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	run.RetryCount = count
 	s.runs[id] = run
 	return run, true
 }

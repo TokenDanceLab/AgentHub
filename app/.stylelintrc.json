@@ -1,7 +1,22 @@
 {
   "extends": "stylelint-config-standard",
+  "ignoreFiles": [
+    "**/tokens*.css",
+    "**/themes*.css",
+    "**/presets*.css"
+  ],
   "rules": {
     "color-no-hex": true,
-    "color-function-alias-notation": "modern"
-  }
+    "color-function-alias-notation": "modern",
+    "selector-class-pattern": null,
+    "property-no-vendor-prefix": null
+  },
+  "overrides": [
+    {
+      "files": ["**/tokens*.css", "**/themes*.css", "**/presets*.css"],
+      "rules": {
+        "color-no-hex": null
+      }
+    }
+  ]
 }

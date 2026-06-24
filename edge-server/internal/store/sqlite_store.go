@@ -37,11 +37,12 @@ const (
 )
 
 type SQLiteStore struct {
-	db        *sql.DB
-	store     *Store
-	persistMu sync.Mutex
-	closeOnce sync.Once
-	lastErr   error
+	db           *sql.DB
+	store        *Store
+	persistMu    sync.Mutex
+	closeOnce    sync.Once
+	lastErr      error
+	lastSnapshot fileSnapshot
 }
 
 func NewSQLite(path string) (*SQLiteStore, error) {
@@ -66,6 +67,7 @@ func NewSQLite(path string) (*SQLiteStore, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("verify sqlite store write: %w", err)
 	}
+	s.lastSnapshot = s.store.snapshot()
 	return s, nil
 }
 
@@ -159,12 +161,12 @@ ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded
 		s.lastErr = fmt.Errorf("write sqlite store snapshot: %w", err)
 		return s.lastErr
 	}
-	if err := replaceSQLiteRows(tx, snapshot); err != nil {
+	if err := deltaSQLiteRows(tx, s.lastSnapshot, snapshot); err != nil {
 		_ = tx.Rollback()
 		s.lastErr = fmt.Errorf("write sqlite store rows: %w", err)
 		return s.lastErr
 	}
-	if err := replaceSQLiteRelationalProjection(tx, snapshot); err != nil {
+	if err := deltaSQLiteRelationalProjection(tx, s.lastSnapshot, snapshot); err != nil {
 		_ = tx.Rollback()
 		s.lastErr = fmt.Errorf("write sqlite relational projection: %w", err)
 		return s.lastErr
@@ -173,6 +175,7 @@ ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded
 		s.lastErr = fmt.Errorf("commit sqlite store persist: %w", err)
 		return s.lastErr
 	}
+	s.lastSnapshot = cloneFileSnapshot(snapshot)
 	s.lastErr = nil
 	return nil
 }
@@ -321,128 +324,304 @@ func decodeSQLiteRowPayload(payload string, value any) error {
 	return nil
 }
 
-func replaceSQLiteRows(tx *sql.Tx, snapshot fileSnapshot) error {
-	if _, err := tx.Exec(`DELETE FROM agenthub_store_rows`); err != nil {
-		return fmt.Errorf("clear prior rows: %w", err)
-	}
+func deltaSQLiteRows(tx *sql.Tx, oldSnapshot, newSnapshot fileSnapshot) error {
 	now := nowString()
-	if err := insertSQLiteRows(tx, sqliteRowKindProject, snapshot.ProjectOrder, snapshot.Projects, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindProject, oldSnapshot.ProjectOrder, oldSnapshot.Projects, newSnapshot.ProjectOrder, newSnapshot.Projects, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindThread, snapshot.ThreadOrder, snapshot.Threads, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindThread, oldSnapshot.ThreadOrder, oldSnapshot.Threads, newSnapshot.ThreadOrder, newSnapshot.Threads, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindRun, snapshot.RunOrder, snapshot.Runs, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindRun, oldSnapshot.RunOrder, oldSnapshot.Runs, newSnapshot.RunOrder, newSnapshot.Runs, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindItem, snapshot.ItemOrder, snapshot.Items, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindItem, oldSnapshot.ItemOrder, oldSnapshot.Items, newSnapshot.ItemOrder, newSnapshot.Items, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindPin, snapshot.PinOrder, snapshot.Pins, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindPin, oldSnapshot.PinOrder, oldSnapshot.Pins, newSnapshot.PinOrder, newSnapshot.Pins, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindDiff, snapshot.DiffOrder, snapshot.Diffs, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindDiff, oldSnapshot.DiffOrder, oldSnapshot.Diffs, newSnapshot.DiffOrder, newSnapshot.Diffs, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindArtifact, snapshot.ArtifactOrder, snapshot.Artifacts, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindArtifact, oldSnapshot.ArtifactOrder, oldSnapshot.Artifacts, newSnapshot.ArtifactOrder, newSnapshot.Artifacts, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindPreview, snapshot.PreviewOrder, snapshot.Previews, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindPreview, oldSnapshot.PreviewOrder, oldSnapshot.Previews, newSnapshot.PreviewOrder, newSnapshot.Previews, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindAgentProfile, snapshot.AgentProfileOrder, snapshot.AgentProfiles, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindAgentProfile, oldSnapshot.AgentProfileOrder, oldSnapshot.AgentProfiles, newSnapshot.AgentProfileOrder, newSnapshot.AgentProfiles, now); err != nil {
 		return err
 	}
-	if err := insertSQLiteRows(tx, sqliteRowKindUserProfile, snapshot.UserProfileOrder, snapshot.UserProfiles, now); err != nil {
+	if err := deltaRowsOfKind(tx, sqliteRowKindUserProfile, oldSnapshot.UserProfileOrder, oldSnapshot.UserProfiles, newSnapshot.UserProfileOrder, newSnapshot.UserProfiles, now); err != nil {
 		return err
 	}
 	return nil
 }
 
-func insertSQLiteRows[V any](tx *sql.Tx, kind string, order []string, values map[string]V, updatedAt string) error {
-	for index, id := range normalizeOrder(order, values) {
-		payload, err := json.Marshal(values[id])
+func deltaRowsOfKind[V any](tx *sql.Tx, kind string, oldOrder []string, oldMap map[string]V, newOrder []string, newMap map[string]V, updatedAt string) error {
+	oldOrderNorm := normalizeOrder(oldOrder, oldMap)
+	newOrderNorm := normalizeOrder(newOrder, newMap)
+
+	oldPayloads := make(map[string]string, len(oldMap))
+	oldIndexes := make(map[string]int, len(oldOrderNorm))
+	for i, id := range oldOrderNorm {
+		payload, err := json.Marshal(oldMap[id])
 		if err != nil {
-			return fmt.Errorf("encode %s row %s: %w", kind, id, err)
+			return fmt.Errorf("encode old %s row %s: %w", kind, id, err)
+		}
+		oldPayloads[id] = string(payload)
+		oldIndexes[id] = i
+	}
+
+	newPayloads := make(map[string]string, len(newMap))
+	newIndexes := make(map[string]int, len(newOrderNorm))
+	for i, id := range newOrderNorm {
+		payload, err := json.Marshal(newMap[id])
+		if err != nil {
+			return fmt.Errorf("encode new %s row %s: %w", kind, id, err)
+		}
+		newPayloads[id] = string(payload)
+		newIndexes[id] = i
+	}
+
+	for id, newPayload := range newPayloads {
+		oldPayload, existed := oldPayloads[id]
+		oldIdx, oldIdxExists := oldIndexes[id]
+		newIdx := newIndexes[id]
+		if existed && oldPayload == newPayload && oldIdxExists && oldIdx == newIdx {
+			continue
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO agenthub_store_rows (row_kind, row_id, payload, order_index, updated_at)
-VALUES (?, ?, ?, ?, ?)`,
-			kind,
-			id,
-			string(payload),
-			index,
-			updatedAt,
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(row_kind, row_id) DO UPDATE SET payload = excluded.payload, order_index = excluded.order_index, updated_at = excluded.updated_at`,
+			kind, id, newPayload, newIdx, updatedAt,
 		); err != nil {
 			return fmt.Errorf("write %s row %s: %w", kind, id, err)
 		}
 	}
+
+	for id := range oldPayloads {
+		if _, ok := newPayloads[id]; !ok {
+			if _, err := tx.Exec(`DELETE FROM agenthub_store_rows WHERE row_kind = ? AND row_id = ?`, kind, id); err != nil {
+				return fmt.Errorf("delete %s row %s: %w", kind, id, err)
+			}
+		}
+	}
+
 	return nil
 }
 
-func replaceSQLiteRelationalProjection(tx *sql.Tx, snapshot fileSnapshot) error {
-	if _, err := tx.Exec(`DELETE FROM edge_owners WHERE owner_id = ?`, sqliteProjectionOwnerID); err != nil {
-		return fmt.Errorf("clear prior projection: %w", err)
-	}
+func deltaSQLiteRelationalProjection(tx *sql.Tx, oldSnapshot, newSnapshot fileSnapshot) error {
 	now := nowString()
+
 	if _, err := tx.Exec(
 		`INSERT INTO edge_owners (owner_id, source, display_name, created_at, updated_at)
-VALUES (?, 'snapshot', 'AgentHub snapshot projection', ?, ?)`,
-		sqliteProjectionOwnerID,
-		now,
-		now,
+VALUES (?, 'snapshot', 'AgentHub snapshot projection', ?, ?)
+ON CONFLICT(owner_id) DO UPDATE SET updated_at = excluded.updated_at`,
+		sqliteProjectionOwnerID, now, now,
 	); err != nil {
 		return fmt.Errorf("project owner: %w", err)
 	}
 
-	for _, project := range snapshot.Projects {
-		if project.ID == "" {
-			continue
-		}
-		createdAt := firstNonEmpty(project.CreatedAt, now)
-		updatedAt := firstNonEmpty(project.UpdatedAt, createdAt)
-		name := firstNonEmpty(project.Name, project.ID)
-		status := firstNonEmpty(project.Status, "active")
-		if _, err := tx.Exec(
-			`INSERT INTO edge_workspaces (workspace_id, owner_id, local_path, name, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			project.ID,
-			sqliteProjectionOwnerID,
-			project.ID,
-			name,
-			status,
-			createdAt,
-			updatedAt,
-		); err != nil {
-			return fmt.Errorf("project workspace %s: %w", project.ID, err)
-		}
+	oldWorkspaceIDs := make(map[string]string, len(oldSnapshot.Projects))
+	newWorkspaceIDs := make(map[string]string, len(newSnapshot.Projects))
+	for id, proj := range oldSnapshot.Projects {
+		payload, _ := json.Marshal(proj)
+		oldWorkspaceIDs[id] = string(payload)
+	}
+	for id, proj := range newSnapshot.Projects {
+		payload, _ := json.Marshal(proj)
+		newWorkspaceIDs[id] = string(payload)
+	}
+	if err := deltaProjectionMap(tx, "edge_workspaces", "workspace_id",
+		oldWorkspaceIDs, newWorkspaceIDs,
+		func(id string, payload string) error {
+			var proj Project
+			if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+				return err
+			}
+			if proj.ID == "" {
+				return nil
+			}
+			createdAt := firstNonEmpty(proj.CreatedAt, now)
+			updatedAt := firstNonEmpty(proj.UpdatedAt, createdAt)
+			name := firstNonEmpty(proj.Name, proj.ID)
+			status := firstNonEmpty(proj.Status, "active")
+			_, err := tx.Exec(
+				`INSERT INTO edge_workspaces (workspace_id, owner_id, local_path, name, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(workspace_id) DO UPDATE SET owner_id = excluded.owner_id, local_path = excluded.local_path, name = excluded.name, status = excluded.status, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+				proj.ID, sqliteProjectionOwnerID, proj.ID, name, status, createdAt, updatedAt,
+			)
+			return err
+		},
+		func(id string) error {
+			_, err := tx.Exec(`DELETE FROM edge_workspaces WHERE workspace_id = ?`, id)
+			return err
+		},
+	); err != nil {
+		return fmt.Errorf("project workspace delta: %w", err)
 	}
 
-	for _, run := range snapshot.Runs {
-		if run.ID == "" || run.ProjectID == "" {
-			continue
-		}
-		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
-			continue
-		}
-		createdAt := firstNonEmpty(run.CreatedAt, now)
-		if _, err := tx.Exec(
-			`INSERT INTO edge_runs (run_id, owner_id, workspace_id, thread_id, status, created_at, started_at, finished_at, metadata_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
-			run.ID,
-			sqliteProjectionOwnerID,
-			run.ProjectID,
-			nullString(run.ThreadID),
-			firstNonEmpty(run.Status, "queued"),
-			createdAt,
-			nullString(run.StartedAt),
-			nullString(run.FinishedAt),
-		); err != nil {
-			return fmt.Errorf("run %s: %w", run.ID, err)
-		}
+	oldRunPayloads := make(map[string]string, len(oldSnapshot.Runs))
+	newRunPayloads := make(map[string]string, len(newSnapshot.Runs))
+	for id, run := range oldSnapshot.Runs {
+		payload, _ := json.Marshal(run)
+		oldRunPayloads[id] = string(payload)
+	}
+	for id, run := range newSnapshot.Runs {
+		payload, _ := json.Marshal(run)
+		newRunPayloads[id] = string(payload)
+	}
+	if err := deltaProjectionMap(tx, "edge_runs", "run_id",
+		oldRunPayloads, newRunPayloads,
+		func(id string, payload string) error {
+			var run Run
+			if err := json.Unmarshal([]byte(payload), &run); err != nil {
+				return err
+			}
+			if run.ID == "" || run.ProjectID == "" {
+				return nil
+			}
+			if _, ok := newSnapshot.Projects[run.ProjectID]; !ok {
+				return nil
+			}
+			createdAt := firstNonEmpty(run.CreatedAt, now)
+			_, err := tx.Exec(
+				`INSERT INTO edge_runs (run_id, owner_id, workspace_id, thread_id, status, created_at, started_at, finished_at, metadata_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')
+ON CONFLICT(run_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, thread_id = excluded.thread_id, status = excluded.status, created_at = excluded.created_at, started_at = excluded.started_at, finished_at = excluded.finished_at, metadata_json = excluded.metadata_json`,
+				run.ID, sqliteProjectionOwnerID, run.ProjectID, nullString(run.ThreadID),
+				firstNonEmpty(run.Status, "queued"), createdAt,
+				nullString(run.StartedAt), nullString(run.FinishedAt),
+			)
+			return err
+		},
+		func(id string) error {
+			_, err := tx.Exec(`DELETE FROM edge_runs WHERE run_id = ?`, id)
+			return err
+		},
+	); err != nil {
+		return fmt.Errorf("run delta: %w", err)
 	}
 
-	for _, artifact := range snapshot.Artifacts {
+	oldArtifactProj := buildArtifactProjectionMap(oldSnapshot)
+	newArtifactProj := buildArtifactProjectionMap(newSnapshot)
+	if err := deltaProjectionMap(tx, "edge_artifacts", "artifact_id",
+		oldArtifactProj, newArtifactProj,
+		func(id string, payload string) error {
+			var proj artifactProjection
+			if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+				return err
+			}
+			if proj.ArtifactID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+				return nil
+			}
+			createdAt := firstNonEmpty(proj.CreatedAt, now)
+			updatedAt := firstNonEmpty(proj.UpdatedAt, createdAt)
+			_, err := tx.Exec(
+				`INSERT INTO edge_artifacts (artifact_id, owner_id, workspace_id, run_id, kind, path, status, created_at, updated_at, metadata_json, content_source_kind, content_source_path, content_source_readable)
+VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?)
+ON CONFLICT(artifact_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, run_id = excluded.run_id, kind = excluded.kind, path = excluded.path, status = excluded.status, created_at = excluded.created_at, updated_at = excluded.updated_at, metadata_json = excluded.metadata_json, content_source_kind = excluded.content_source_kind, content_source_path = excluded.content_source_path, content_source_readable = excluded.content_source_readable`,
+				proj.ArtifactID, sqliteProjectionOwnerID, proj.WorkspaceID, proj.RunID,
+				firstNonEmpty(proj.Kind, "file"), proj.Path, createdAt, updatedAt,
+				proj.MetadataJSON, proj.ContentSourceKind, proj.ContentSourcePath, proj.ContentSourceReadable,
+			)
+			return err
+		},
+		func(id string) error {
+			_, err := tx.Exec(`DELETE FROM edge_artifacts WHERE artifact_id = ?`, id)
+			return err
+		},
+	); err != nil {
+		return fmt.Errorf("artifact delta: %w", err)
+	}
+
+	oldDiffProj := buildDiffProjectionMap(oldSnapshot)
+	newDiffProj := buildDiffProjectionMap(newSnapshot)
+	if err := deltaProjectionMap(tx, "edge_diffs", "diff_id",
+		oldDiffProj, newDiffProj,
+		func(id string, payload string) error {
+			var proj diffProjection
+			if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+				return err
+			}
+			if proj.DiffID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+				return nil
+			}
+			createdAt := firstNonEmpty(proj.CreatedAt, now)
+			updatedAt := firstNonEmpty(proj.UpdatedAt, createdAt)
+			_, err := tx.Exec(
+				`INSERT INTO edge_diffs (diff_id, owner_id, workspace_id, run_id, summary_json, patch_path, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(diff_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, run_id = excluded.run_id, summary_json = excluded.summary_json, patch_path = excluded.patch_path, status = excluded.status, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+				proj.DiffID, sqliteProjectionOwnerID, proj.WorkspaceID, proj.RunID,
+				proj.SummaryJSON, proj.PatchPath, firstNonEmpty(proj.Status, "modified"),
+				createdAt, updatedAt,
+			)
+			return err
+		},
+		func(id string) error {
+			_, err := tx.Exec(`DELETE FROM edge_diffs WHERE diff_id = ?`, id)
+			return err
+		},
+	); err != nil {
+		return fmt.Errorf("diff delta: %w", err)
+	}
+
+	oldPreviewProj := buildPreviewProjectionMap(oldSnapshot)
+	newPreviewProj := buildPreviewProjectionMap(newSnapshot)
+	if err := deltaProjectionMap(tx, "edge_previews", "preview_id",
+		oldPreviewProj, newPreviewProj,
+		func(id string, payload string) error {
+			var proj previewProjection
+			if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+				return err
+			}
+			if proj.PreviewID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+				return nil
+			}
+			createdAt := firstNonEmpty(proj.CreatedAt, now)
+			updatedAt := firstNonEmpty(proj.UpdatedAt, createdAt)
+			_, err := tx.Exec(
+				`INSERT INTO edge_previews (preview_id, owner_id, workspace_id, run_id, url, status, created_at, updated_at, metadata_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')
+ON CONFLICT(preview_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, run_id = excluded.run_id, url = excluded.url, status = excluded.status, created_at = excluded.created_at, updated_at = excluded.updated_at, metadata_json = excluded.metadata_json`,
+				proj.PreviewID, sqliteProjectionOwnerID, proj.WorkspaceID, proj.RunID,
+				proj.URL, firstNonEmpty(proj.Status, "created"), createdAt, updatedAt,
+			)
+			return err
+		},
+		func(id string) error {
+			_, err := tx.Exec(`DELETE FROM edge_previews WHERE preview_id = ?`, id)
+			return err
+		},
+	); err != nil {
+		return fmt.Errorf("preview delta: %w", err)
+	}
+
+	return nil
+}
+
+type artifactProjection struct {
+	ArtifactID             string `json:"artifactId"`
+	RunID                  string `json:"runId"`
+	WorkspaceID            string `json:"workspaceId"`
+	Kind                   string `json:"kind"`
+	Path                   string `json:"path"`
+	CreatedAt              string `json:"createdAt"`
+	UpdatedAt              string `json:"updatedAt"`
+	MetadataJSON           string `json:"metadataJson"`
+	ContentSourceKind      string `json:"contentSourceKind"`
+	ContentSourcePath      string `json:"contentSourcePath"`
+	ContentSourceReadable  int    `json:"contentSourceReadable"`
+}
+
+func buildArtifactProjectionMap(snapshot fileSnapshot) map[string]string {
+	result := make(map[string]string, len(snapshot.Artifacts))
+	for id, artifact := range snapshot.Artifacts {
 		if artifact.ID == "" || artifact.RunID == "" {
 			continue
 		}
@@ -453,33 +632,43 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
 		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
 			continue
 		}
-		contentSourceKind, contentSourcePath, contentSourceReadable := sqliteArtifactContentSourceColumns(artifact.ContentSource)
+		csKind, csPath, csReadable := sqliteArtifactContentSourceColumns(artifact.ContentSource)
 		metadataJSON, err := sqliteArtifactMetadataJSON(artifact)
 		if err != nil {
-			return fmt.Errorf("artifact metadata %s: %w", artifact.ID, err)
+			continue
 		}
-		createdAt := firstNonEmpty(artifact.CreatedAt, now)
-		updatedAt := firstNonEmpty(artifact.UpdatedAt, createdAt)
-		if _, err := tx.Exec(
-			`INSERT INTO edge_artifacts (artifact_id, owner_id, workspace_id, run_id, kind, path, status, created_at, updated_at, metadata_json, content_source_kind, content_source_path, content_source_readable)
-VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?)`,
-			artifact.ID,
-			sqliteProjectionOwnerID,
-			run.ProjectID,
-			artifact.RunID,
-			firstNonEmpty(artifact.Kind, "file"),
-			artifact.Path,
-			createdAt,
-			updatedAt,
-			metadataJSON,
-			contentSourceKind,
-			contentSourcePath,
-			contentSourceReadable,
-		); err != nil {
-			return fmt.Errorf("artifact %s: %w", artifact.ID, err)
+		proj := artifactProjection{
+			ArtifactID:            id,
+			RunID:                 artifact.RunID,
+			WorkspaceID:           run.ProjectID,
+			Kind:                  artifact.Kind,
+			Path:                  artifact.Path,
+			CreatedAt:             artifact.CreatedAt,
+			UpdatedAt:             artifact.UpdatedAt,
+			MetadataJSON:          metadataJSON,
+			ContentSourceKind:     csKind,
+			ContentSourcePath:     csPath,
+			ContentSourceReadable: csReadable,
 		}
+		payload, _ := json.Marshal(proj)
+		result[id] = string(payload)
 	}
+	return result
+}
 
+type diffProjection struct {
+	DiffID      string `json:"diffId"`
+	RunID       string `json:"runId"`
+	WorkspaceID string `json:"workspaceId"`
+	SummaryJSON string `json:"summaryJson"`
+	PatchPath   string `json:"patchPath"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+func buildDiffProjectionMap(snapshot fileSnapshot) map[string]string {
+	result := make(map[string]string, len(snapshot.Diffs))
 	for _, diffFile := range snapshot.Diffs {
 		if diffFile.RunID == "" || diffFile.Path == "" {
 			continue
@@ -491,30 +680,40 @@ VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?)`,
 		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
 			continue
 		}
+		diffID := sqliteDiffProjectionID(diffFile)
 		summaryJSON, err := sqliteDiffSummaryJSON(diffFile)
 		if err != nil {
-			return fmt.Errorf("diff summary %s: %w", diffFile.Path, err)
+			continue
 		}
-		createdAt := firstNonEmpty(diffFile.CreatedAt, now)
-		updatedAt := firstNonEmpty(diffFile.UpdatedAt, createdAt)
-		if _, err := tx.Exec(
-			`INSERT INTO edge_diffs (diff_id, owner_id, workspace_id, run_id, summary_json, patch_path, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			sqliteDiffProjectionID(diffFile),
-			sqliteProjectionOwnerID,
-			run.ProjectID,
-			diffFile.RunID,
-			summaryJSON,
-			diffFile.Path,
-			firstNonEmpty(diffFile.Status, "modified"),
-			createdAt,
-			updatedAt,
-		); err != nil {
-			return fmt.Errorf("diff %s: %w", diffFile.Path, err)
+		proj := diffProjection{
+			DiffID:      diffID,
+			RunID:       diffFile.RunID,
+			WorkspaceID: run.ProjectID,
+			SummaryJSON: summaryJSON,
+			PatchPath:   diffFile.Path,
+			Status:      diffFile.Status,
+			CreatedAt:   diffFile.CreatedAt,
+			UpdatedAt:   diffFile.UpdatedAt,
 		}
+		payload, _ := json.Marshal(proj)
+		result[diffID] = string(payload)
 	}
+	return result
+}
 
-	for _, preview := range snapshot.Previews {
+type previewProjection struct {
+	PreviewID   string `json:"previewId"`
+	RunID       string `json:"runId"`
+	WorkspaceID string `json:"workspaceId"`
+	URL         string `json:"url"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+func buildPreviewProjectionMap(snapshot fileSnapshot) map[string]string {
+	result := make(map[string]string, len(snapshot.Previews))
+	for id, preview := range snapshot.Previews {
 		if preview.ID == "" || preview.RunID == "" {
 			continue
 		}
@@ -525,25 +724,73 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
 			continue
 		}
-		createdAt := firstNonEmpty(preview.CreatedAt, now)
-		updatedAt := firstNonEmpty(preview.UpdatedAt, createdAt)
-		if _, err := tx.Exec(
-			`INSERT INTO edge_previews (preview_id, owner_id, workspace_id, run_id, url, status, created_at, updated_at, metadata_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
-			preview.ID,
-			sqliteProjectionOwnerID,
-			run.ProjectID,
-			preview.RunID,
-			preview.URL,
-			firstNonEmpty(preview.Status, "created"),
-			createdAt,
-			updatedAt,
-		); err != nil {
-			return fmt.Errorf("preview %s: %w", preview.ID, err)
+		proj := previewProjection{
+			PreviewID:   id,
+			RunID:       preview.RunID,
+			WorkspaceID: run.ProjectID,
+			URL:         preview.URL,
+			Status:      preview.Status,
+			CreatedAt:   preview.CreatedAt,
+			UpdatedAt:   preview.UpdatedAt,
+		}
+		payload, _ := json.Marshal(proj)
+		result[id] = string(payload)
+	}
+	return result
+}
+
+func deltaProjectionMap(
+	tx *sql.Tx,
+	tableName, idColumn string,
+	oldMap, newMap map[string]string,
+	upsertFn func(id string, payload string) error,
+	deleteFn func(id string) error,
+) error {
+	for id, newPayload := range newMap {
+		oldPayload, existed := oldMap[id]
+		if existed && oldPayload == newPayload {
+			continue
+		}
+		if err := upsertFn(id, newPayload); err != nil {
+			return fmt.Errorf("upsert %s %s in %s: %w", idColumn, id, tableName, err)
 		}
 	}
-
+	for id := range oldMap {
+		if _, ok := newMap[id]; !ok {
+			if err := deleteFn(id); err != nil {
+				return fmt.Errorf("delete %s %s from %s: %w", idColumn, id, tableName, err)
+			}
+		}
+	}
 	return nil
+}
+
+func cloneFileSnapshot(snapshot fileSnapshot) fileSnapshot {
+	cloned := fileSnapshot{
+		Projects:          copyMap(snapshot.Projects),
+		Threads:           copyMap(snapshot.Threads),
+		Runs:              copyMap(snapshot.Runs),
+		Items:             copyMap(snapshot.Items),
+		Pins:              copyMap(snapshot.Pins),
+		Diffs:             copyMap(snapshot.Diffs),
+		Artifacts:         cloneArtifactMap(snapshot.Artifacts),
+		Previews:          copyMap(snapshot.Previews),
+		UserProfiles:      copyMap(snapshot.UserProfiles),
+		AgentProfiles:     copyMap(snapshot.AgentProfiles),
+		ProjectOrder:      append([]string(nil), snapshot.ProjectOrder...),
+		ThreadOrder:       append([]string(nil), snapshot.ThreadOrder...),
+		RunOrder:          append([]string(nil), snapshot.RunOrder...),
+		ItemOrder:         append([]string(nil), snapshot.ItemOrder...),
+		PinOrder:          append([]string(nil), snapshot.PinOrder...),
+		DiffOrder:         append([]string(nil), snapshot.DiffOrder...),
+		ArtifactOrder:     append([]string(nil), snapshot.ArtifactOrder...),
+		PreviewOrder:      append([]string(nil), snapshot.PreviewOrder...),
+		UserProfileOrder:  append([]string(nil), snapshot.UserProfileOrder...),
+		AgentProfileOrder: append([]string(nil), snapshot.AgentProfileOrder...),
+		Settings:          copyMap(snapshot.Settings),
+		SettingsMtime:     snapshot.SettingsMtime,
+	}
+	return cloned
 }
 
 func sqliteArtifactContentSourceColumns(source *ArtifactContentSource) (string, string, int) {
@@ -615,8 +862,8 @@ func persistAfterSQLiteWrite[T any](s *SQLiteStore, value T, err error) (T, erro
 	return value, nil
 }
 
-func (s *SQLiteStore) CreateProject(id, name string) (Project, error) {
-	project, err := s.store.CreateProject(id, name)
+func (s *SQLiteStore) CreateProject(id, name, ownerID string) (Project, error) {
+	project, err := s.store.CreateProject(id, name, ownerID)
 	if errors.Is(err, ErrProjectExists) {
 		return project, err
 	}
@@ -705,6 +952,28 @@ func (s *SQLiteStore) SetRunStatusIf(id, status string, allowedCurrent ...string
 	run, ok := s.store.SetRunStatusIf(id, status, allowedCurrent...)
 	if !ok {
 		return run, false
+	}
+	if err := s.syncPersist(); err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
+func (s *SQLiteStore) SetRunEvidenceGate(id, result string) (Run, bool) {
+	run, ok := s.store.SetRunEvidenceGate(id, result)
+	if !ok {
+		return Run{}, false
+	}
+	if err := s.syncPersist(); err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
+func (s *SQLiteStore) SetRunRetryCount(id string, count int) (Run, bool) {
+	run, ok := s.store.SetRunRetryCount(id, count)
+	if !ok {
+		return Run{}, false
 	}
 	if err := s.syncPersist(); err != nil {
 		return Run{}, false

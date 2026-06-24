@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,12 @@ type AgentTeamService interface {
 	CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error
 	FailAssignment(ctx context.Context, userID, assignmentID string, reason string) error
 	ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+
+	// Compete mode
+	GenerateCompeteSummary(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
+
+	// Human review gate
+	ReviewDagPlan(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
 }
 
 type AgentTeamHandler struct {
@@ -48,8 +55,8 @@ func NewAgentTeamHandler(s AgentTeamService) *AgentTeamHandler {
 // --- Request types ---
 
 type createTeamReq struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description,omitempty"`
+	Name        string `json:"name" binding:"required,max=128"`
+	Description string `json:"description,omitempty" binding:"max=1024"`
 }
 
 type updateTeamReq struct {
@@ -79,7 +86,8 @@ func (h *AgentTeamHandler) CreateTeam(c *gin.Context) {
 	userID := c.GetString("user_id")
 	team, err := h.service.CreateTeam(c.Request.Context(), userID, req.Name, req.Description)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -94,7 +102,8 @@ func (h *AgentTeamHandler) ListTeams(c *gin.Context) {
 	userID := c.GetString("user_id")
 	teams, err := h.service.ListTeams(c.Request.Context(), userID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -113,7 +122,8 @@ func (h *AgentTeamHandler) GetTeam(c *gin.Context) {
 	teamID := c.Param("id")
 	detail, err := h.service.GetTeamWithMembers(c.Request.Context(), userID, teamID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -133,7 +143,8 @@ func (h *AgentTeamHandler) UpdateTeam(c *gin.Context) {
 	userID := c.GetString("user_id")
 	teamID := c.Param("id")
 	if err := h.service.UpdateTeam(c.Request.Context(), userID, teamID, req.Name, req.Description); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -148,7 +159,8 @@ func (h *AgentTeamHandler) DeleteTeam(c *gin.Context) {
 	userID := c.GetString("user_id")
 	teamID := c.Param("id")
 	if err := h.service.DeleteTeam(c.Request.Context(), userID, teamID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -168,7 +180,8 @@ func (h *AgentTeamHandler) AddMember(c *gin.Context) {
 	userID := c.GetString("user_id")
 	teamID := c.Param("id")
 	if err := h.service.AddTeamMember(c.Request.Context(), userID, teamID, req.AgentProfileID, req.Role); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -184,7 +197,8 @@ func (h *AgentTeamHandler) RemoveMember(c *gin.Context) {
 	teamID := c.Param("id")
 	memberID := c.Param("member_id")
 	if err := h.service.RemoveTeamMember(c.Request.Context(), userID, teamID, memberID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -205,7 +219,8 @@ func (h *AgentTeamHandler) StartRun(c *gin.Context) {
 	teamID := c.Param("id")
 	run, err := h.service.StartTeamRun(c.Request.Context(), userID, teamID, req.TriggerMessage, req.TargetID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -221,7 +236,8 @@ func (h *AgentTeamHandler) ListRuns(c *gin.Context) {
 	teamID := c.Param("id")
 	runs, err := h.service.ListTeamRuns(c.Request.Context(), userID, teamID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -241,7 +257,8 @@ func (h *AgentTeamHandler) GetRun(c *gin.Context) {
 	runID := c.Param("run_id")
 	run, err := h.service.GetTeamRun(c.Request.Context(), userID, teamID, runID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -258,7 +275,8 @@ func (h *AgentTeamHandler) GetRunState(c *gin.Context) {
 	runID := c.Param("run_id")
 	state, err := h.service.GetTeamRunState(c.Request.Context(), userID, teamID, runID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -275,7 +293,8 @@ func (h *AgentTeamHandler) ListTeamTasks(c *gin.Context) {
 	runID := c.Param("run_id")
 	tasks, err := h.service.ListTeamTasks(c.Request.Context(), userID, teamID, runID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -292,7 +311,8 @@ func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 	runID := c.Param("run_id")
 	events, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -314,7 +334,8 @@ func (h *AgentTeamHandler) HandleRouteDecision(c *gin.Context) {
 	runID := c.Param("run_id")
 	assignment, err := h.service.HandleRouteDecision(c.Request.Context(), userID, teamID, runID, req)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -367,7 +388,8 @@ func (h *AgentTeamHandler) CreateAssignment(c *gin.Context) {
 	runID := c.Param("run_id")
 	a, err := h.service.CreateAssignment(c.Request.Context(), userID, runID, req.FromMemberID, req.ToMemberID, req.Type, req.TaskPrompt, req.Context)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -382,7 +404,8 @@ func (h *AgentTeamHandler) DispatchAssignment(c *gin.Context) {
 	userID := c.GetString("user_id")
 	assignmentID := c.Param("assignment_id")
 	if err := h.service.DispatchAssignment(c.Request.Context(), userID, assignmentID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -402,7 +425,8 @@ func (h *AgentTeamHandler) CompleteAssignment(c *gin.Context) {
 	userID := c.GetString("user_id")
 	assignmentID := c.Param("assignment_id")
 	if err := h.service.CompleteAssignment(c.Request.Context(), userID, assignmentID, req.Result); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -422,7 +446,8 @@ func (h *AgentTeamHandler) FailAssignment(c *gin.Context) {
 	userID := c.GetString("user_id")
 	assignmentID := c.Param("assignment_id")
 	if err := h.service.FailAssignment(c.Request.Context(), userID, assignmentID, req.Reason); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -438,7 +463,8 @@ func (h *AgentTeamHandler) ListAssignments(c *gin.Context) {
 	runID := c.Param("run_id")
 	as, err := h.service.ListAssignments(c.Request.Context(), userID, runID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -469,7 +495,8 @@ func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
 		Reason:              req.Reason,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -494,7 +521,8 @@ func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
 		Reason:   req.Reason,
 	})
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -502,4 +530,48 @@ func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
 		return
 	}
 	OK(c, approval)
+}
+
+// CompeteSummary POST /client/team-runs/:id/compete-summary
+func (h *AgentTeamHandler) CompeteSummary(c *gin.Context) {
+	var req model.CompeteSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Allow empty body.
+		req = model.CompeteSummaryRequest{}
+	}
+	userID := c.GetString("user_id")
+	runID := c.Param("id")
+	resp, err := h.service.GenerateCompeteSummary(c.Request.Context(), userID, runID, req)
+	if err != nil {
+		var e *errcode.Error
+		if errors.As(err, &e) {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, resp)
+}
+
+// ReviewDecision POST /client/team-runs/:id/review-decision
+func (h *AgentTeamHandler) ReviewDecision(c *gin.Context) {
+	var req model.HumanReviewDecision
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	runID := c.Param("id")
+	state, err := h.service.ReviewDagPlan(c.Request.Context(), userID, runID, req)
+	if err != nil {
+		var e *errcode.Error
+		if errors.As(err, &e) {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, state)
 }

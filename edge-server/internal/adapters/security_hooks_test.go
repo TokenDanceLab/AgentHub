@@ -639,14 +639,12 @@ func TestTruncateEmptyString(t *testing.T) {
 	}
 }
 
-// Test init validation — verify the original blocked patterns from init() match
+// TestDangerousPatternsREGInitValidation explicitly calls the exported
+// ValidateDangerousPatterns() so a miscompiled regex is caught by tests
+// rather than silently logged at init time.
 func TestDangerousPatternsREGInitValidation(t *testing.T) {
-	// The init() function panics if its test cases don't pass.
-	// This test simply confirms the package loaded successfully
-	// (which means init() passed validation).
-	h := newSecurityHook()
-	if h == nil {
-		t.Fatal("NewSecurityHook returned nil")
+	if err := ValidateDangerousPatterns(); err != nil {
+		t.Fatalf("ValidateDangerousPatterns() returned error (security regex is miscompiled): %v", err)
 	}
 }
 

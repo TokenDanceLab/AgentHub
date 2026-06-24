@@ -2,10 +2,11 @@
 
 **Branch**: `feat/chatview-tokendance-migration`
 **Base**: `origin/dev/delicious223` (HEAD `f2690631`)
-**Worktree**: `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`
+**Worktree**: `<worktree>`
 **Date**: 2026-06-17
 **Commits on branch**: 95
 **Files changed**: 371 (+21,412 / -13,863)
+**历史清理标记**: 已对文档中出现的个人工作路径做脱敏处理（2026-06-19）。
 
 ---
 
@@ -74,7 +75,7 @@ All 19 P2 items were addressed across commits `540c3c45` (R2Fix), `b53aaa2a` (R1
 |-------|-----|
 | AGENTS.md branch refs `233` not updated to `223` | `58e6a44a` |
 | STATE.md stale date / ChatView path references | `b7b58963` |
-| deploy-hk2.sh placeholder SSH user leak | `c87f0022` |
+| deploy-[生产].sh placeholder SSH user leak | `c87f0022` |
 | Error code casing inconsistency (`ERR_` prefixes) | `f2690631` chain -- pkg/errcode, edge-server errcode, Go tests, TypeScript verification |
 
 ---

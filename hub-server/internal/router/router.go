@@ -1,9 +1,11 @@
 package router
 
 import (
-	"net/http"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
+
+	sharederr "github.com/agenthub/pkg/errcode"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
@@ -12,14 +14,14 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) error {
 	var workspaceHandler *handler.WorkspaceHandler
 	if len(workspaceHandlers) > 0 {
 		workspaceHandler = workspaceHandlers[0]
 	}
-	corsMiddleware, err := middleware.CORS()
+	corsMiddleware, err := middleware.CORS(cfg.Server.Env)
 	if err != nil {
-		panic("CORS middleware init failed: " + err.Error())
+		return fmt.Errorf("CORS middleware init failed: %w", err)
 	}
 	r.Use(corsMiddleware)
 	r.Use(middleware.APIVersion())
@@ -30,20 +32,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": gin.H{
-				"code":    "not_found",
-				"message": "route not found",
-			},
-		})
+		handler.Fail(c, sharederr.ErrNotFound)
 	})
 	r.NoMethod(func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"error": gin.H{
-				"code":    "method_not_allowed",
-				"message": "method not allowed",
-			},
-		})
+		handler.Fail(c, sharederr.ErrMethodNotAllowed)
 	})
 
 	if healthHandler != nil {
@@ -59,6 +51,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			handler.OK(c, gin.H{"status": "ok", "live": true})
 		})
 		r.GET("/health/ready", healthOK)
+	}
+
+	// Dev-only debug endpoint — returns an intentional 500 to verify error handling.
+	// Enabled only when log_level is "debug".
+	if cfg.Server.LogLevel == "debug" {
+		r.GET("/debug/panic", func(c *gin.Context) {
+			handler.Fail(c, sharederr.ErrInternal.WithMessage("deliberate test error from /debug/panic"))
+		})
 	}
 
 	// Public API — no auth required (official website hub.vectorcontrol.tech)
@@ -119,7 +119,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			sessions.POST("/private", sessionHandler.CreatePrivate)
 			sessions.POST("/group", sessionHandler.CreateGroup)
 			sessions.POST("/:id/members", sessionHandler.AddMembers)
-			sessions.DELETE("/:id/members/:user_id", sessionHandler.RemoveMember)
+			sessions.DELETE("/:id/members/:target_user_id", sessionHandler.RemoveMember)
 			sessions.POST("/:id/leave", sessionHandler.Leave)
 			sessions.POST("/:id/transfer-owner", sessionHandler.TransferOwner)
 			sessions.POST("/:id/dissolve", sessionHandler.Dissolve)
@@ -342,6 +342,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", agentTeamHandler.FailAssignment)
 			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
+				// Compete summary (authenticated web endpoint).
+				web.GET("/team-runs/:id/compete-summary", agentTeamHandler.CompeteSummary)
+				// Human review gate (authenticated web endpoint).
+				web.POST("/team-runs/:id/review-decision", agentTeamHandler.ReviewDecision)
 			}
 		}
+	return nil
 }

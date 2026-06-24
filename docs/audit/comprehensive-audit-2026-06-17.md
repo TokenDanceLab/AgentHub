@@ -1,12 +1,13 @@
 # AgentHub Comprehensive Audit Report (chatview-migration)
 
-**Worktree**: `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`
+**Worktree**: `<worktree>`
 **Branch**: `feat/chatview-tokendance-migration`
 **Date**: 2026-06-17
 **Release**: v0.2.0
 **Base**: `dev/delicious223`
 **Audits merged**: Deployment Config, Historical Baggage, Test Quality, Dead Code, Error Handling, Data Flow Trace, Config Drift, Accessibility, Test Infrastructure, Documentation Freshness, Dependency Audit, Mobile Platform, Edge Packaging, Privacy Scan, CSS Audit
 **Status**: CANONICAL AUDIT REFERENCE -- this document is the single source of truth for all audit findings in the chatview-migration worktree. All 15 sub-audits have been merged into this report.
+**历史清理标记**: 已对文档中出现的服务器主机名、IP 地址、个人路径做脱敏处理（2026-06-19）。具体生产配置见私有运维 SSOT。
 
 ---
 
@@ -176,7 +177,7 @@ Bundle analysis (`analyze-bundle.cjs`) verified tree-shaking effectiveness and i
 
 | # | Fix | File / Component | Commit |
 |---|---|---|---|
-| 1 | **CSP headers added** | `app/desktop/vite.config.ts`, `app/web/vite.config.ts`, `app/desktop/index.html`, nginx hk2 config | `62a4bec4` |
+| 1 | **CSP headers added** | `app/desktop/vite.config.ts`, `app/web/vite.config.ts`, `app/desktop/index.html`, nginx [生产] config | `62a4bec4` |
 | 2 | **JWT secret minimum length** (32 chars) | `hub-server/internal/config/config.go` | `b53aaa2a` |
 | 3 | **X-Forwarded-For trusted proxies** (`gin.SetTrustedProxies()`) | `hub-server/internal/middleware/` | `b53aaa2a` |
 | 4 | **MCP endpoint authentication middleware** | `edge-server/internal/mcp/server.go` | `b53aaa2a` |
@@ -185,14 +186,17 @@ Bundle analysis (`analyze-bundle.cjs`) verified tree-shaking effectiveness and i
 | 7 | **Shell command safety** (`exec.Command` args) | `edge-server/internal/api/deploy.go` | `b53aaa2a` |
 | 8 | **Refresh token Redis blacklist** | `hub-server/internal/service/auth.go` | `62a4bec4` |
 | 9 | **DOMPurify integration** for DocxPreview | `app/shared/src/ui/DocxPreview.tsx` | `62a4bec4` |
-| 10 | **Nginx CSP hardening** for hk2 | `nginx-hk2*.conf` | `62a4bec4` |
+| 10 | **Nginx CSP hardening** for [生产] | `nginx-[生产]*.conf` | `62a4bec4` |
 
 ### Remaining Security Gaps (Open P0)
 
+> **已修复 (2026-06-19)**: P0-1 Redis password leak 已在 docker-compose 中修复（healthcheck 改用 `REDISCLI_AUTH` 环境变量替代 `-a` 明文传参）。SDK/backup 脚本中的 `-a` 调用仍存在但属运维脚本范围，不构成容器镜像泄露面。
+> **已修复 (2026-06-19)**: P0-2 不再在 Docker 镜像层硬编码 `dev_password`。
+
 | # | Finding | Risk |
 |---|---|---|
-| P0-1 | Redis password exposed in `ps aux` via `redis-cli -a` | Any user with Docker access can extract Redis password |
-| P0-2 | Hardcoded `dev_password` in `config.docker.yaml` baked into image layers | Anyone with registry access can extract credentials |
+| P0-1 | ~~Redis password exposed in `ps aux` via `redis-cli -a`~~ **已修复 (2026-06-19)** | ~~Any user with Docker access can extract Redis password~~ |
+| P0-2 | ~~Hardcoded `dev_password` in `config.docker.yaml` baked into image layers~~ **已修复 (2026-06-19)** | ~~Anyone with registry access can extract credentials~~ |
 
 ### Remaining Security Gaps (Open P1)
 
@@ -200,6 +204,9 @@ Bundle analysis (`analyze-bundle.cjs`) verified tree-shaking effectiveness and i
 |---|---|---|
 | P1-11 | No automated vulnerability scanning in CI | CVEs in transitive deps go undetected |
 | P2-17 | `dompurify` 5 patch versions behind (XSS sanitizer) | Missed XSS bypass fixes |
+
+> **已修复 (2026-06-19)**: UserSettings handler 不再通过 `FailWithMessage` 泄露原始 `err.Error()` 到客户端，现使用标准 `Fail(c, errcode.ErrInternal)` 模式。
+> **已修复 (2026-06-19)**: WebSocket auth.ok 竞态条件已修复，`writeLoop` goroutine 现在在 `sendFrame` 之前启动。详见 hub-server-deep-audit 中的 C-1、C-2 项。
 
 ---
 
@@ -222,7 +229,7 @@ A systematic privacy scan was conducted across the entire codebase. The followin
 
 | File | Leak | Fix | Commit |
 |---|---|---|---|
-| `deploy-hk2.sh` | Real placeholder SSH user | Sanitized | `c87f0022` |
+| `deploy-[生产].sh` | Real placeholder SSH user | Sanitized | `c87f0022` |
 | `app/desktop/src/components/settings/cliDiscovery.ts` | Hardcoded `C:\Users\Ding\...` paths | Changed to `<HOMEDIR>` placeholders | `b53aaa2a` |
 | `docs/roadmap.md` | Real user paths in examples | Sanitized | `62a4bec4` |
 | Multiple test files | `C:\Users\Ding\` in test fixtures | Changed to synthetic paths | `07e35352`, `1020d35f` |
@@ -257,8 +264,8 @@ A systematic privacy scan was conducted across the entire codebase. The followin
 | CSP headers (`frame-ancestors`, `script-src`) | Web + Desktop + nginx | `62a4bec4` |
 | Config dump redaction (secret masking) | Edge Server diagnostics | `62a4bec4` |
 | SQL query scrubber (sensitive param removal) | Hub Server GORM logger | `987cb990` |
-| Deploy script username sanitization | `deploy-hk2.sh` | `62a4bec4` |
-| Nginx CSP hardening | hk2 nginx config | `62a4bec4` |
+| Deploy script username sanitization | `deploy-[生产].sh` | `62a4bec4` |
+| Nginx CSP hardening | [生产] nginx config | `62a4bec4` |
 
 ---
 
@@ -359,7 +366,7 @@ A systematic privacy scan was conducted across the entire codebase. The followin
 | `docs/architecture/02-edge-server.md` | ~300 | **Still stale** -- lists 5 adapters (code has 6) | P2-16 OPEN |
 | `docs/architecture/03-runtime-adapters.md` | ~350 | **Still stale** -- v1 adapter diagram | P2-16 OPEN |
 | `docs/architecture/04-frontend-data-flow.md` | ~250 | **Still stale** -- references old TranscriptView | P2-16 OPEN |
-| `docs/architecture/05-deployment.md` | ~200 | **Still stale** -- missing hk2 override, PKCE | P2-16 OPEN |
+| `docs/architecture/05-deployment.md` | ~200 | **Still stale** -- missing [生产] override, PKCE | P2-16 OPEN |
 | `docs/roadmap.md` | 2149 | Event counts 26->33, migration 49->50, URL paths | `987cb990` |
 | `docs/designs/artifact-lifecycle-plan.md` | -- | Marked DEPRECATED | `987cb990` |
 | `docs/designs/enhanced-adapter-architecture.md` | -- | Marked DEPRECATED | `987cb990` |
@@ -399,7 +406,7 @@ A systematic privacy scan was conducted across the entire codebase. The followin
 
 | # | Issue | Effort |
 |---|---|---|
-| P1-1 | hk2/prod docker-compose near-duplicates (drift risk) | 2 hr |
+| P1-1 | [生产]/prod docker-compose near-duplicates (drift risk) | 2 hr |
 | P1-2 | No web frontend Dockerfile | 1 hr |
 | P1-8 | Settings write failures silently discarded | 30 min |
 | P1-9 | Attachment upload failures silently remove attachment | 30 min |
@@ -544,16 +551,20 @@ Four of seven architecture sub-documents still reference the deleted `Transcript
 
 ### P0-1. Redis password leaked in process list (Deployment Config #1)
 
+> **已修复 (2026-06-19)**: docker-compose healthcheck 已改用 `REDISCLI_AUTH` 环境变量替代 `-a` 传参。运维脚本中残留的 `-a` 调用属脚本范围，不构成容器镜像泄露面。
+
 **Source**: Deployment Config Audit, Finding 1
-**Files**: `docker-compose.prod.yml:69`, `docker-compose.hk2.yml:71`
+**Files**: `docker-compose.prod.yml`, `docker-compose.[生产].yml`
 **Risk**: The Redis healthcheck uses `redis-cli -a "${AGENTHUB_REDIS_PASSWORD}" ping`. The `-a` flag exposes the password in `ps aux` and `docker inspect` output. Any user with Docker access on the host can extract the Redis password.
 **Fix**: Replace `-a` with `REDISCLI_AUTH` environment variable (env var approach) or use a password file. The `REDISCLI_AUTH` env var is recognized by redis-cli without appearing in process listings.
-**Evidence**: Line in docker-compose.hk2.yml:
+**Evidence**: Line in docker-compose.[生产].yml:
 ```yaml
 test: ["CMD", "redis-cli", "-a", "${AGENTHUB_REDIS_PASSWORD}", "ping"]
 ```
 
 ### P0-2. Hardcoded `dev_password` baked into Docker image layers (Deployment Config #2)
+
+> **已修复 (2026-06-19)**: `config.docker.yaml` 不再硬编码 `dev_password`。配置通过 compose env injection 在运行时注入。
 
 **Source**: Deployment Config Audit, Finding 2
 **File**: `hub-server/configs/config.docker.yaml:10`
@@ -608,26 +619,26 @@ Some drops are legitimate (no runId = truly meaningless event), but `fileChangeB
 
 ## P1: Fix This Sprint
 
-### P1-1. hk2/prod docker-compose are near-duplicates with drift risk (Deployment Config #4)
+### P1-1. [生产]/prod docker-compose are near-duplicates with drift risk (Deployment Config #4)
 
 **Source**: Deployment Config Audit, Finding 4
-**Files**: `docker-compose.prod.yml` vs `docker-compose.hk2.yml`
-**Risk**: The hk2 compose is a full copy-paste of prod, not an override file. Drift already present: hk2 includes `https://tauri.localhost` in CORS default and `http://127.0.0.1:8400/callback` in redirect URIs; prod does not. Any change to prod must be manually propagated.
-**Fix**: Convert hk2 to an override: `docker compose -f docker-compose.prod.yml -f docker-compose.hk2.yml`. Delete duplicate sections from hk2, keeping only hk2-specific overrides.
+**Files**: `docker-compose.prod.yml` vs `docker-compose.[生产].yml`
+**Risk**: The [生产] compose is a full copy-paste of prod, not an override file. Drift already present: [生产] includes `https://tauri.localhost` in CORS default and `http://127.0.0.1:8400/callback` in redirect URIs; prod does not. Any change to prod must be manually propagated.
+**Fix**: Convert [生产] to an override: `docker compose -f docker-compose.prod.yml -f docker-compose.[生产].yml`. Delete duplicate sections from [生产], keeping only [生产]-specific overrides.
 
 ### P1-2. No web frontend Dockerfile -- manual deploy risk (Deployment Config #5)
 
 **Source**: Deployment Config Audit, Finding 5
 **Files**: No `app/web/Dockerfile` exists
-**Risk**: The nginx config serves SPA from a host path `/opt/vectorcontrol-hk2-stack/agenthub-web/dist/`. There is no containerized build or serve for the frontend. Deploy requires manual `scp` of dist -- error-prone and unrepeatable.
+**Risk**: The nginx config serves SPA from a host path `见私有运维 SSOT`. There is no containerized build or serve for the frontend. Deploy requires manual `scp` of dist -- error-prone and unrepeatable.
 **Fix**: Add a multi-stage `Dockerfile` for the web frontend: build stage (`pnpm build`) -> output stage (nginx:alpine serving dist).
 
-### P1-3. Ambiguous active nginx version on hk2 -- v1 (oauth2-proxy) and v2 (SPA PKCE) both present (Deployment Config #6)
+### P1-3. Ambiguous active nginx version on [生产] -- v1 (oauth2-proxy) and v2 (SPA PKCE) both present (Deployment Config #6)
 
 **Source**: Deployment Config Audit, Finding 6
-**Files**: `nginx-hk2.conf` (v1), `nginx-hk2-v2.conf` (v2)
+**Files**: `nginx-[生产].conf` (v1), `nginx-[生产]-v2.conf` (v2)
 **Risk**: Two nginx configs exist with different auth architectures. No documentation or deploy script indicates which is active, and no migration script exists to switch.
-**Fix**: Document the active version in `hk2/deploy-notes.md`. Remove the inactive config or archive it. Add a migration script if switching is needed.
+**Fix**: Document the active version in `[生产]/deploy-notes.md`. Remove the inactive config or archive it. Add a migration script if switching is needed.
 
 ### P1-4. `AGENTHUB_PPROF_PASS` required in prod but missing from dev docs (Config Drift)
 
@@ -772,7 +783,7 @@ All fix commits are on branch `feat/chatview-tokendance-migration` in this workt
 | `ccfd194f` | 2026-06-17 12:10 | W16 (privacy scan fix), W22 (release prep), W24 (sanitization), W21 (Edge packaging audit) | `chatviewFixtures.ts`, `mobileFixtures.ts`, `CHANGELOG.md`, `release.sh`, `edge-packaging-2026-06-17.md` |
 | `c16480c9` | 2026-06-17 12:08 | Release notes v0.2.0 | `docs/release-notes-2026-06-17.md` |
 | `1020d35f` | 2026-06-17 12:06 | Sanitize test fixtures | Test files across `app/shared/`, `app/mobile-rn/` |
-| `c87f0022` | 2026-06-17 12:05 | Sanitize deploy-hk2.sh + AGENTS.md refs | `deploy-hk2.sh`, `AGENTS.md` |
+| `c87f0022` | 2026-06-17 12:05 | Sanitize deploy-[生产].sh + AGENTS.md refs | `deploy-[生产].sh`, `AGENTS.md` |
 | `62a4bec4` | 2026-06-17 12:05 | W15 (CSP, auth blacklist, test fixes, doc cleanup) | `vite.config.ts`, `DocxPreview.tsx`, `auth.go`, `deploy.go` |
 | `076eb310` | 2026-06-17 11:56 | W10+W13 tail (perf items, test fixes, cleanup) | Various perf + test files |
 | `7cfee6f5` | 2026-06-17 11:55 | W10+W13 (lazy loading, bundle optimization, tests, a11y) | `TablePreview.tsx`, `AgentHubWorkbench.tsx`, a11y components |
@@ -786,7 +797,7 @@ All fix commits are on branch `feat/chatview-tokendance-migration` in this workt
 
 To view full diffs for any fix:
 ```bash
-cd "D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration"
+cd "<worktree>"
 git show <commit>
 ```
 
@@ -802,7 +813,7 @@ git show <commit>
 | 4 | P0 | Add WorkbenchErrorBoundary at root workbench level | Error Handling | 1 hr |
 | 5 | P0 | Add timeout/AbortController to HubClient.request() | Error Handling | 1 hr |
 | 6 | P0 | Add .catch() handlers to TablePreview floating promises; wrap diff apply in try/catch | Error Handling | 30 min |
-| 7 | P1 | Convert hk2 compose to override file (eliminate duplication) | Deploy Config | 2 hr |
+| 7 | P1 | Convert [生产] compose to override file (eliminate duplication) | Deploy Config | 2 hr |
 | 8 | P1 | Add automated vulnerability scanning to CI (npm audit + govulncheck) | Dependency Audit | 1 hr |
 | 9 | P1 | Write screen-level rendering tests for 5 mobile-rn screens (3,864 lines untested) | Mobile Platform | 4 hr |
 | 10 | P1 | Update `dompurify` to 3.4.10 (XSS sanitizer 5 versions behind) | Dependency Audit | 15 min |
@@ -813,11 +824,11 @@ git show <commit>
 
 | Action | Files |
 |--------|-------|
-| **Security fixes** | `docker-compose.prod.yml`, `docker-compose.hk2.yml`, `config.docker.yaml`, `Dockerfile` |
+| **Security fixes** | `docker-compose.prod.yml`, `docker-compose.[生产].yml`, `config.docker.yaml`, `Dockerfile` |
 | **Data flow fixes** | `normalizeEdgeEvents.ts` |
 | **Error handling** | `AgentHubWorkbench.tsx`, `apiClient.ts`, `settingsService.ts`, `hubClient.ts`, `TablePreview.tsx`, `RightInspector.tsx`, `UnifiedComposer.tsx`, `WorkbenchRoutes.tsx`, `attachments.ts` |
 | **Config hygiene** | `config.go` (add Env field), `cors.go` (use config), `ws.go` (use config), all 4 `.env.example` files, `config.yaml`, `config.docker.yaml` |
-| **Deploy hygiene** | New `Dockerfile` in `app/web/`, convert `docker-compose.hk2.yml` to override |
+| **Deploy hygiene** | New `Dockerfile` in `app/web/`, convert `docker-compose.[生产].yml` to override |
 | **Accessibility** | `Transcript.tsx`, `RowItem.tsx`, `RowItem.css`, `AgentGroup.tsx`, `UserMessage.tsx`, `OrchestratorCard.tsx`, `Icons.tsx`, `tokens.css` |
 | **Doc cleanup** | 10 stale doc files (see P3-1); 4 architecture sub-docs (P2-16); 4 per-package READMEs (P3-13); new `docs/reference/projects/README.md` (P3-14) |
 | **Dependency security** | `app/shared/package.json` (dompurify, diff), CI workflow (npm audit + govulncheck) |

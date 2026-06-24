@@ -33,6 +33,15 @@
   opacity: 0.58;
 }
 
+.option:hover:not(.optionActive) {
+  background: var(--surface-high);
+}
+
+.option:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .optionActive {
   background: color-mix(in oklch, var(--foreground) 8%, transparent);
   color: var(--foreground);

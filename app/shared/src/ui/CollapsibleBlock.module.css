@@ -34,6 +34,11 @@
   background: oklch(0 0 0 / 0.04);
 }
 
+.header:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .headerLeft {
   display: flex;
   align-items: center;

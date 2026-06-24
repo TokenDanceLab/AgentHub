@@ -119,7 +119,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// We collect files from the workspace that match artifact paths.
 	tmpFile, err := os.CreateTemp("", "agenthub-deploy-*.tar.gz")
 	if err != nil {
-		slog.Error("deploy: failed to create temp file", "err", err)
+		slog.Error("deploy: failed to create temp file", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create temp archive")))
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	defer os.Remove(tmpPath)
 
 	if err := buildArtifactArchive(artifacts, tmpFile); err != nil {
-		slog.Error("deploy: failed to build archive", "err", err)
+		slog.Error("deploy: failed to build archive", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error())))
 		return
 	}
@@ -139,20 +139,20 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure remote directory exists and is clean.
 	if err := runSSHCommand(targetHost, "sudo", "mkdir", "-p", remotePath); err != nil {
-		slog.Error("deploy: failed to create remote dir", "err", err, "host", targetHost, "path", remotePath)
+		slog.Error("deploy: failed to create remote dir", "error", err, "host", targetHost, "path", remotePath)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create remote directory")))
 		return
 	}
 
 	// Clear previous deployment content.
 	if err := runSSHCommand(targetHost, "sudo", "rm", "-rf", remotePath+"/*"); err != nil {
-		slog.Warn("deploy: failed to clear previous deployment", "err", err)
+		slog.Warn("deploy: failed to clear previous deployment", "error", err)
 	}
 
 	// SCP the tar.gz to a temp location on the remote.
 	remoteTmp := remotePath + "/deploy.tar.gz"
 	if err := runSCP(tmpPath, targetHost+":"+remoteTmp); err != nil {
-		slog.Error("deploy: scp failed", "err", err, "host", targetHost)
+		slog.Error("deploy: scp failed", "error", err, "host", targetHost)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to transfer archive")))
 		return
 	}
@@ -160,15 +160,15 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// Extract on remote and clean up tar.
 	// Use separate SSH invocations instead of bash -c to avoid shell injection risk.
 	if err := runSSHCommand(targetHost, "sudo", "tar", "-xzf", remoteTmp, "-C", remotePath); err != nil {
-		slog.Error("deploy: remote extract failed", "err", err)
+		slog.Error("deploy: remote extract failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to extract on remote")))
 		return
 	}
 	if err := runSSHCommand(targetHost, "sudo", "rm", "-f", remoteTmp); err != nil {
-		slog.Warn("deploy: failed to remove remote temp archive", "err", err, "path", remoteTmp)
+		slog.Warn("deploy: failed to remove remote temp archive", "error", err, "path", remoteTmp)
 	}
 	if err := runSSHCommand(targetHost, "sudo", "chown", "-R", "www-data:www-data", remotePath); err != nil {
-		slog.Warn("deploy: failed to chown deployed files", "err", err, "path", remotePath)
+		slog.Warn("deploy: failed to chown deployed files", "error", err, "path", remotePath)
 	}
 
 	url := fmt.Sprintf("https://%s.%s", req.Slug, PagesDomain())
@@ -218,7 +218,7 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 
 		f, err := os.Open(sourcePath)
 		if err != nil {
-			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "err", err)
+			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "error", err)
 			continue
 		}
 		info, err := f.Stat()
@@ -231,7 +231,7 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 			// If it's a directory, walk and add all files.
 			f.Close()
 			if err := addDirToArchive(tw, sourcePath); err != nil {
-				slog.Warn("deploy: failed to add directory", "path", sourcePath, "err", err)
+				slog.Warn("deploy: failed to add directory", "path", sourcePath, "error", err)
 			}
 			continue
 		}

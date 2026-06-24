@@ -56,19 +56,19 @@ func (l *slogGormLogger) LogMode(level gormlogger.LogLevel) gormlogger.Interface
 
 func (l *slogGormLogger) Info(_ context.Context, msg string, data ...any) {
 	if l.LogLevel >= gormlogger.Info {
-		slog.Info(fmt.Sprintf(msg, data...))
+		slog.Info(msg, "gorm_values", fmt.Sprint(data...))
 	}
 }
 
 func (l *slogGormLogger) Warn(_ context.Context, msg string, data ...any) {
 	if l.LogLevel >= gormlogger.Warn {
-		slog.Warn(fmt.Sprintf(msg, data...))
+		slog.Warn(msg, "gorm_values", fmt.Sprint(data...))
 	}
 }
 
 func (l *slogGormLogger) Error(_ context.Context, msg string, data ...any) {
 	if l.LogLevel >= gormlogger.Error {
-		slog.Error(fmt.Sprintf(msg, data...))
+		slog.Error(msg, "gorm_values", fmt.Sprint(data...))
 	}
 }
 
@@ -83,7 +83,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		sql, rows := fc()
 		sql = scrubSQLContent(sql)
 		slog.Error("gorm error",
-			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"elapsed_ms", float64(elapsed.Nanoseconds())/1e6,
 			"rows", rows,
 			"sql", sql,
 			"error", err,
@@ -92,7 +92,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		sql, rows := fc()
 		sql = scrubSQLContent(sql)
 		slog.Warn("slow query",
-			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"elapsed_ms", float64(elapsed.Nanoseconds())/1e6,
 			"threshold", l.SlowThreshold.String(),
 			"rows", rows,
 			"sql", sql,
@@ -101,7 +101,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		sql, rows := fc()
 		sql = scrubSQLContent(sql)
 		slog.Info("gorm trace",
-			"elapsed", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"elapsed_ms", float64(elapsed.Nanoseconds())/1e6,
 			"rows", rows,
 			"sql", sql,
 		)

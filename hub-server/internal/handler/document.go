@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -55,7 +56,8 @@ func (h *DocumentHandler) CreateDocument(c *gin.Context) {
 	}
 	doc, err := h.service.CreateDocument(c.Request.Context(), userID, req.Title, req.Type, req.Location, req.Tag, req.Content)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -71,7 +73,8 @@ func (h *DocumentHandler) GetDocument(c *gin.Context) {
 	docID := c.Param("id")
 	doc, err := h.service.GetDocument(c.Request.Context(), userID, docID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -88,7 +91,8 @@ func (h *DocumentHandler) ListDocuments(c *gin.Context) {
 	_ = c.ShouldBindQuery(&filter)
 	items, err := h.service.ListDocuments(c.Request.Context(), userID, filter)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -112,7 +116,8 @@ func (h *DocumentHandler) UpdateDocument(c *gin.Context) {
 	}
 	doc, err := h.service.UpdateDocument(c.Request.Context(), userID, docID, req.Title, req.Type, req.Tag, req.Content)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -127,7 +132,8 @@ func (h *DocumentHandler) DeleteDocument(c *gin.Context) {
 	userID := c.GetString("user_id")
 	docID := c.Param("id")
 	if err := h.service.DeleteDocument(c.Request.Context(), userID, docID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

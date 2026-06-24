@@ -97,13 +97,18 @@ func IsSensitiveEnvKey(key string) bool {
 }
 
 // isWhitelistedEnvKey returns true when key is safe to pass through to child
-// agent processes.
+// agent processes from the inherited (parent process) environment.
+//
+// AGENTHUB_* vars are NOT broadly whitelisted. Only explicitly approved vars
+// listed in isSafeInheritedAgentHubEnvKey pass through from the parent env.
+// Profile-configured env (profileEnv non-nil in SanitizedEnv) bypasses this
+// check entirely — those vars are explicitly configured by the administrator.
 func isWhitelistedEnvKey(key string) bool {
 	upperKey := strings.ToUpper(key)
 
-	// AgentHub-managed vars always pass through.
+	// AgentHub-managed vars: only explicit safe vars pass through from inherited env.
 	if strings.HasPrefix(upperKey, "AGENTHUB_") {
-		return true
+		return isSafeInheritedAgentHubEnvKey(upperKey)
 	}
 
 	// XDG base directories (XDG_*).
@@ -221,6 +226,34 @@ func isWhitelistedEnvKey(key string) bool {
 		}
 	}
 
+	return false
+}
+
+// isSafeInheritedAgentHubEnvKey returns true when an AGENTHUB_* env var is safe
+// to inherit from the parent process environment into child agent processes.
+//
+// This is an explicit allowlist — only specific vars are approved. The broad
+// AGENTHUB_ prefix is NOT a free pass. Vars not listed here are silently
+// dropped from the inherited environment.
+//
+// Profile-configured env vars (passed via SanitizedEnv's profileEnv parameter)
+// bypass this check entirely: those are explicitly configured by the administrator
+// and pass through verbatim (with a warning for sensitive-looking keys).
+func isSafeInheritedAgentHubEnvKey(upperKey string) bool {
+	// Only explicitly listed AGENTHUB_* vars may be inherited from the parent
+	// process environment. This prevents accidental leakage of internal Edge
+	// server config vars (e.g., AGENTHUB_DB_URL, AGENTHUB_HUB_TOKEN, etc.)
+	// into child agent subprocesses.
+	safeVars := []string{
+		"AGENTHUB_RUN_ID",
+		"AGENTHUB_PROJECT_ID",
+		"AGENTHUB_THREAD_ID",
+	}
+	for _, safe := range safeVars {
+		if upperKey == safe {
+			return true
+		}
+	}
 	return false
 }
 

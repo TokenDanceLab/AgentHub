@@ -6,6 +6,8 @@ import type { TransportStatus } from '@/api/transport';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
+import { createWSEventBridge } from '@/stores/wsEventBridge';
+import { queryClient } from '@/api/queryClient';
 
 interface HubWSConnectionState {
   hubWS: HubWSHandle | null;
@@ -28,6 +30,7 @@ export function useHubWSConnection(): HubWSConnectionState {
   const [justReconnected, setJustReconnected] = useState(false);
   const authFailToastRef = useRef(false);
   const prevStatusRef = useRef<TransportStatus>('disconnected');
+  const bridgeRef = useRef<ReturnType<typeof createWSEventBridge> | null>(null);
 
   useEffect(() => {
     void auth.tryAutoLogin().catch((error) => {
@@ -64,6 +67,9 @@ export function useHubWSConnection(): HubWSConnectionState {
         if (prevStatusRef.current === 'reconnecting' || prevStatusRef.current === 'disconnected') {
           setJustReconnected(true);
         }
+        // Wire WS events to React Query cache + store updates
+        bridgeRef.current?.destroy();
+        bridgeRef.current = createWSEventBridge(ws, queryClient);
       },
       onAuthFail: (reason) => {
         setAuthenticated(false);
@@ -94,6 +100,8 @@ export function useHubWSConnection(): HubWSConnectionState {
     ws.connect();
 
     return () => {
+      bridgeRef.current?.destroy();
+      bridgeRef.current = null;
       unsubscribeStatus();
       ws.close();
       setHubWS((current) => (current === ws ? null : current));

@@ -1,6 +1,6 @@
 # AgentHub 架构文档
 
-> 最后更新：2026-06-17 | ChatView 迁移 HARDENING (Round 6 完成)，37 commits，45 tests，0 TS errors。Phase 1-4/6 完成，Phase 5/7 进行中。
+> 最后更新：2026-06-19 | ChatView 迁移 HARDENING (Round 6 完成)，37 commits，45 tests，0 TS errors。Phase 1-4 完成，Phase 5-7 推进中。
 >
 > **详细子文档**：[docs/architecture/](architecture/) 目录包含 6 份独立模块文档，本文档保留核心概览并链接到各子文档。
 
@@ -59,7 +59,7 @@ Web shared workbench
 - **Edge Server（adapter registry、process lifecycle、EventStore）** → [architecture/02-edge-server.md](architecture/02-edge-server.md)
 - **Runtime Adapters（全部 adapter、事件映射、Preflight）** → [architecture/03-runtime-adapters.md](architecture/03-runtime-adapters.md)
 - **Frontend Data Flow（Platform adapter、React Query、Settings 回退、Profile 合并）** → [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)
-- **Deployment（hk2、Docker Compose、Nginx、SSL）** → [architecture/05-deployment.md](architecture/05-deployment.md)
+- **Deployment（Docker Compose、Nginx、SSL）** → [architecture/05-deployment.md](architecture/05-deployment.md)
 - **Auth & Identity（OIDC PKCE、JWT、TokenDance ID、设备注册）** → [architecture/06-auth-identity.md](architecture/06-auth-identity.md)
 
 ## 4. 数据流
@@ -455,7 +455,7 @@ ChatView 卡片树不自己管理滚动。滚动由外层 Workbench 的 `.transc
 |---|---|---|
 | Phase 1-2 | 审计、P0 阻塞修复（attachment block、adapter 测试、fixtures） | 已完成 |
 | Phase 3 | P1 高优先级修复（空状态、rich fixtures、CSS/i18n 去重、死代码） | 已完成 |
-| Phase 4 | P2 中优先级（adapter 字段透传、streaming harness、normalization 测试） | 基本完成（3 项 P2/P3 未完成） |
+| Phase 4 | P2 中优先级（adapter 字段透传、streaming harness、normalization 测试） | 已完成 |
 | Phase 5 | P3 低优先级（stale docs 清理、命名一致性、Desktop 验证） | 进行中 |
 | Phase 6 | HARDENING Round 6（dark mode、i18n 统一、CSS 打磨、React key 去重） | 已完成 |
 | Phase 7 | Edge Runtime 集成（WS streaming、真实 agent 数据、roundtrip 验证） | 未开始 |
