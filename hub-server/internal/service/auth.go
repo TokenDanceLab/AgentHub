@@ -175,7 +175,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
-	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
+	_ = resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return user, nil
 }
 

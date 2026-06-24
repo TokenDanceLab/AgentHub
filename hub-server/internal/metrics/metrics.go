@@ -108,7 +108,7 @@ func Register() {
 		prometheus.MustRegister(EventBusQueueLen)
 		prometheus.MustRegister(EventBusPanics)
 		// Built-in collectors may already be registered; ignore if so.
-		prometheus.Register(collectors.NewGoCollector())
-		prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		_ = prometheus.Register(collectors.NewGoCollector())
+		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	})
 }
