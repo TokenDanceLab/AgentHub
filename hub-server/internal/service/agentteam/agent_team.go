@@ -1,4 +1,4 @@
-package service
+package agentteam
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
 // This file is the thin facade. Logic split into:
@@ -33,7 +34,7 @@ type AgentTeamService struct {
 	agentSvc            agentTeamAgentSvc
 	cacheClient         agentTeamCache
 	controlSvc          agentTeamControlSvc
-	bus                 *Bus
+	bus                 *service.Bus
 	guardrails          AgentTeamGuardrails
 	competeAggregator   CompeteAggregator
 	competeMaxAgents    int
@@ -105,7 +106,7 @@ func (s *AgentTeamService) SetControlService(controlSvc agentTeamControlSvc) {
 	s.controlSvc = controlSvc
 }
 
-func (s *AgentTeamService) SetBus(bus *Bus) {
+func (s *AgentTeamService) SetBus(bus *service.Bus) {
 	s.bus = bus
 }
 

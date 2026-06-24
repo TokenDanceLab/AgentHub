@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -73,7 +74,7 @@ type App struct {
 		DocumentHandler        *handler.DocumentHandler
 
 	// AgentTeam
-	AgentTeamService *service.AgentTeamService
+	AgentTeamService *agentteam.AgentTeamService
 
 	// Relay
 	RelayService *service.RelayService
