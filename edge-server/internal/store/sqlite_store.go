@@ -740,7 +740,7 @@ func buildPreviewProjectionMap(snapshot fileSnapshot) map[string]string {
 }
 
 func deltaProjectionMap(
-	tx *sql.Tx,
+	_ *sql.Tx,
 	tableName, idColumn string,
 	oldMap, newMap map[string]string,
 	upsertFn func(id string, payload string) error,
