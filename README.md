@@ -7,7 +7,7 @@
 
   [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [文档](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
-  ![version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
+  ![version](https://img.shields.io/badge/version-0.5.1-blue?style=flat-square)
   ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
   ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
