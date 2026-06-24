@@ -1,30 +1,51 @@
 # AgentHub 全链路数据对接路线图
 
-> 最后更新：2026-06-19
-> 版本：v0.5.0（SUPER Phase 1/4/5 完成，Phase 2+3 执行中）
+> 最后更新：2026-06-24
+> 版本：v0.5.1（SUPER 全完成 + CI 全模块 lint/typecheck 修复）
 > 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
 
 ---
 
-## SUPER 工程修复进度 (2026-06-24 全部完成)
+## 当前优先级（2026-06-24）
 
-基于 [SUPER 工程审计](governance/super-score-2026-06-19.md)（63→~67/100），52 任务 6 Phase 全部完成，已合并到 master（PR #316）。
-详见 `docs/archives/super-remediation/progress/MASTER.md`。
+### P1 — 安全问题关闭
 
-| Phase | 名称 | 进度 | 状态 |
+| ID | 风险 | 分类 | 预计 |
 |---|---|---|---|
-| Phase 1 | 后端安全与基础 | 12/12 | ✅ 完成 |
-| Phase 2 | Edge 安全加固 | 7/7 | ✅ 完成 |
-| Phase 3 | 架构重构 | 5/5 | ✅ 完成 |
-| Phase 4 | 前端与 Mobile 质量 | 7/7 | ✅ 完成 |
-| Phase 5 | 文档、平台与打磨 | 17/17 | ✅ 完成 |
-| Phase 6 | 延后项 | 4/4 | ✅ 完成 |
+| AH-SR-045 | Edge 远程读取缺少范围鉴权 | 代码 | 2d |
+| AH-SR-046 | Edge run-start 缺少 capability token | 代码 | 1d |
+| AH-SR-047 | Edge 子进程 env 缺少最小 allowlist | 代码 | 1d |
+| AH-SR-049 | Hub-Edge 交付缺少持久化契约 | 架构 | 1w |
+| AH-SR-035 | OIDC 浏览器完整登录证据 | 验证 | 半天 |
+| AH-SR-036 | Desktop login/logout 证据 | 验证 | 半天 |
+| AH-SR-037 | Web 服务端 session 姿势 | 架构 | 1w |
+| AH-SR-042 | Mobile 设备证明 | 验证 | 半天 |
 
-### CI 修复（v0.5.1, 2026-06-24）
+### P2 — 质量
 
-lint/typecheck 全模块清零，go-hub 测试修复，Docker 修复。覆盖率 64.9%→65.8%。
-详见 `docs/analysis/ci-remediation-analysis.md`。
+| 项目 | 当前 | 目标 |
+|---|---|---|
+| edge-server 覆盖率 | 66.5% | 75% |
+| E2E Smoke | ❌ | ✅ |
+| Desktop test | ❌ 部分 | ✅ |
+| pnpm audit | 24 vulns | 0 |
+
+### P3 — 技术债
+
+| 项目 |
+|---|
+| golangci.yml v2 格式统一 |
+| docs/analysis/ docs/plan/ docs/progress/ → archives |
+| 签名证书（暂不处理） |
+
+### 发布阻断
+
+| 阻断 | 状态 |
+|---|---|
+| 8 Open High 安全风险 | 🔴 待关闭 |
+| 签名证书 | ⛔ 暂不采购 |
+| Updater 元数据 | ⛔ 依赖签名 |
 
 ---
 
