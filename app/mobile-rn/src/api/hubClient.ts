@@ -514,12 +514,12 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     searchMessages: (params) => shared.searchMessages(params),
     searchSessionMessages: (sessionId, params) => shared.searchSessionMessages(sessionId, params),
     addMessageReaction: (messageId, sessionId, reaction) =>
-      shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+      shared.request<unknown>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'POST',
         body: JSON.stringify({ session_id: sessionId, ...reaction }),
       }),
     removeMessageReaction: (messageId, sessionId, reaction) =>
-      shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+      shared.request<unknown>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'DELETE',
         body: JSON.stringify({ session_id: sessionId, ...reaction }),
       }),
@@ -633,7 +633,7 @@ function extractInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
-    return (parts[0]![0] ?? '') + (parts[1]![0] ?? '');
+    return (parts[0][0] ?? '') + (parts[1][0] ?? '');
   }
   return name.slice(0, 2).toUpperCase();
 }
