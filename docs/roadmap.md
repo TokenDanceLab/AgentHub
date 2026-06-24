@@ -7,22 +7,24 @@
 
 ---
 
-## SUPER 工程修复进度 (2026-06-19)
+## SUPER 工程修复进度 (2026-06-24 全部完成)
 
-基于 [SUPER 工程审计](governance/super-score-2026-06-19.md)（63/100），52 任务 6 Phase。
-详见 `docs/progress/MASTER.md`。
+基于 [SUPER 工程审计](governance/super-score-2026-06-19.md)（63→~67/100），52 任务 6 Phase 全部完成，已合并到 master（PR #316）。
+详见 `docs/archives/super-remediation/progress/MASTER.md`。
 
 | Phase | 名称 | 进度 | 状态 |
 |---|---|---|---|
 | Phase 1 | 后端安全与基础 | 12/12 | ✅ 完成 |
-| Phase 4 | 前端与 Mobile 质量 | 5/5 | ✅ 完成 |
-| Phase 5 | 文档、平台与打磨 | 4/17 (Lane A) | ✅ Lane A 完成 |
-| **Phase 2** | **Edge 安全加固** | **0/7** | **🟡 执行中** |
-| **Phase 3** | **架构重构** | **0/5** | **🟡 执行中** |
-| Phase 6 | 延后 | 0/4 | 待启动 |
+| Phase 2 | Edge 安全加固 | 7/7 | ✅ 完成 |
+| Phase 3 | 架构重构 | 5/5 | ✅ 完成 |
+| Phase 4 | 前端与 Mobile 质量 | 7/7 | ✅ 完成 |
+| Phase 5 | 文档、平台与打磨 | 17/17 | ✅ 完成 |
+| Phase 6 | 延后项 | 4/4 | ✅ 完成 |
 
-**Phase 1 关键交付**：hub-server 20/20 ✅ · edge-server 20/20 ✅ · CSP 安全头 + DOMPurify XSS 防护 ✅ · Redis token blacklist ✅ · 配置脱敏 ✅ · release.sh 修复 ✅
-**Phase 2+3 当前活跃**：Edge 安全加固 + 架构重构并行执行中
+### CI 修复（v0.5.1, 2026-06-24）
+
+lint/typecheck 全模块清零，go-hub 测试修复，Docker 修复。覆盖率 64.9%→65.8%。
+详见 `docs/analysis/ci-remediation-analysis.md`。
 
 ---
 
