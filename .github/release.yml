@@ -1,0 +1,64 @@
+# .github/release.yml — Release notes template for auto-generated GitHub Release notes
+#
+# Used by softprops/action-gh-release@v2 with generate_release_notes: true.
+# GitHub categorizes merged PRs by label and groups them under each section.
+# PRs without a matching label land under "Other Changes".
+
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - no-release-notes
+      - internal
+    authors:
+      - dependabot
+      - codex-app[bot]
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - feat
+        - feature
+        - enhancement
+        - "type: feat"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - fix
+        - bug
+        - bugfix
+        - hotfix
+        - "type: fix"
+    - title: "🔒 Security"
+      labels:
+        - security
+        - "type: security"
+    - title: "📚 Documentation"
+      labels:
+        - docs
+        - documentation
+        - "type: docs"
+    - title: "⚡ Performance"
+      labels:
+        - perf
+        - performance
+        - "type: perf"
+    - title: "🔄 Refactoring"
+      labels:
+        - refactor
+        - "type: refactor"
+    - title: "🧪 Testing"
+      labels:
+        - test
+        - testing
+        - "type: test"
+    - title: "🔧 Maintenance"
+      labels:
+        - chore
+        - ci
+        - build
+        - deps
+        - dependencies
+        - "type: chore"
+        - "type: ci"
+    - title: "📦 Other Changes"
+      labels:
+        - "*"

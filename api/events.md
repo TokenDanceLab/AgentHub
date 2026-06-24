@@ -362,6 +362,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 ### 7.3 Hub 事件类型
 
+`hub-server/internal/ws/frame.go` 定义了 33 个事件类型常量。以下为完整事件目录。
+
 #### Auth 事件（Client↔Hub）
 
 | type | 方向 | 说明 |

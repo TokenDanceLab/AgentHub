@@ -59,6 +59,7 @@ Edge 维护一个 adapter registry，根据 runtime type 分发到对应 adapter
 
 - CLI Adapters：Claude Code、Codex、OpenCode
 - SDK HTTP Adapters：Anthropic SDK、OpenAI SDK
+- Orchestrator Adapter：群聊编排、子 Agent 调度
 
 详见 [03-runtime-adapters.md](03-runtime-adapters.md)。
 

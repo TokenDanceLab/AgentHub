@@ -51,7 +51,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 自动发现已注册的子 Agent（`claude-code`、`codex`、`opencode`、`anthropic-sdk`、`openai-sdk`），生成调度提示
 - 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
 
-## Runtime Manifest / Fixture Adapter
+## Runtime Manifest / Fixture（测试/开发辅助，不计入生产 adapter 数）
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|

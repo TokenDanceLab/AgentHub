@@ -21,7 +21,9 @@ import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import type { EventEnvelope } from '@shared/events';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
+import { queryClient } from '@/api/queryClient';
 
 export type { AgentTask };
 export { useTaskBridgeStore };
@@ -622,6 +624,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
             store.getState().updateTask(taskId, {
               status: 'done',
             });
+            void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
           } else {
             const error =
               typeof payload.error === 'string' ? payload.error : 'Agent reported failure';
@@ -630,6 +633,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
               status: 'failed',
               error,
             });
+            void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
           }
           forgetOutput(runId);
           break;
@@ -694,6 +698,9 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       const targetBinding = buildDispatchTargetBinding(data, dispatchTarget);
       const dispatchPayload = bindDispatchPayload(data, targetBinding);
       const targetError = validateDispatchTarget(data, dispatchTarget);
+
+      // Invalidate team-related caches on dispatch
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
       if (targetError) {
         store.getState().addTask({
           taskId,

@@ -2,7 +2,9 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"sync"
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/store"
@@ -138,6 +140,81 @@ func TestValidateCLIAdapterID(t *testing.T) {
 	for _, id := range []string{"", "claude", "openai", "agenthub-runner-mock", "unknown-runtime"} {
 		if err := ValidateCLIAdapterID(id); err == nil {
 			t.Fatalf("ValidateCLIAdapterID(%q) returned nil, want error", id)
+		}
+	}
+}
+
+func TestRegistrySetDefaultOverwrites(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubAdapter{id: "first"})
+	r.Register(&stubAdapter{id: "second"})
+
+	r.SetDefault("default", "first")
+	r.SetDefault("default", "second")
+
+	resolved, err := r.Resolve("")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if resolved.Metadata().ID != "second" {
+		t.Fatalf("got %q, want second (overwritten default)", resolved.Metadata().ID)
+	}
+}
+
+func TestRegistrySetDefaultRoleSpecific(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubAdapter{id: "worker-a"})
+	r.Register(&stubAdapter{id: "worker-b"})
+
+	r.SetDefault("worker", "worker-a")
+	r.SetDefault("reviewer", "worker-b")
+
+	got, ok := r.Default("worker")
+	if !ok || got.Metadata().ID != "worker-a" {
+		t.Fatalf("Default(worker) = %v, %v; want worker-a", got, ok)
+	}
+	got, ok = r.Default("reviewer")
+	if !ok || got.Metadata().ID != "worker-b" {
+		t.Fatalf("Default(reviewer) = %v, %v; want worker-b", got, ok)
+	}
+}
+
+func TestRegistryConcurrentRegisterAndGet(t *testing.T) {
+	r := NewRegistry()
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			r.Register(&stubAdapter{id: fmt.Sprintf("concurrent-%d", id)})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < 20; i++ {
+		if _, ok := r.Get(fmt.Sprintf("concurrent-%d", i)); !ok {
+			t.Fatalf("concurrent-%d not found after concurrent registration", i)
+		}
+	}
+}
+
+func TestValidateCLIAdapterIDSDKAdapters(t *testing.T) {
+	for _, id := range []string{"anthropic-sdk", "openai-sdk"} {
+		if err := ValidateCLIAdapterID(id); err != nil {
+			t.Fatalf("ValidateCLIAdapterID(%q) should accept SDK adapter: %v", id, err)
+		}
+	}
+}
+
+func TestIsSDKAdapter(t *testing.T) {
+	for _, id := range []string{"anthropic-sdk", "openai-sdk"} {
+		if !IsSDKAdapter(id) {
+			t.Fatalf("IsSDKAdapter(%q) = false, want true", id)
+		}
+	}
+	for _, id := range []string{"claude-code", "codex", "opencode", ""} {
+		if IsSDKAdapter(id) {
+			t.Fatalf("IsSDKAdapter(%q) = true, want false", id)
 		}
 	}
 }

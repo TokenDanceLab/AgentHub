@@ -414,7 +414,8 @@ export function AgentHubWorkbench({
       .then((discovery) => {
         if (!cancelled) setLocalCliDiscovery(discovery);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('localCliDiscovery failed:', err);
         if (!cancelled) setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
       });
 

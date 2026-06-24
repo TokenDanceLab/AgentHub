@@ -74,7 +74,7 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 
 	result, err := h.applySingleHunk(repository, runID, req)
 	if err != nil {
-		slog.Error("diff apply failed", "runId", runID, "filePath", req.FilePath, "hunkIndex", req.HunkIndex, "err", err)
+		slog.Error("diff apply failed", "runId", runID, "filePath", req.FilePath, "hunkIndex", req.HunkIndex, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
 		return
 	}
@@ -128,7 +128,7 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 			WorkDir:   req.WorkDir,
 		})
 		if err != nil {
-			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "err", err)
+			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "error", err)
 			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessagef("failed to apply %s hunk %d: %v", decision.FilePath, decision.HunkIndex, err)))
 			return
 		}

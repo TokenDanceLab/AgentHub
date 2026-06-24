@@ -13,14 +13,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CORS() (gin.HandlerFunc, error) {
+func CORS(env string) (gin.HandlerFunc, error) {
+	resolvedEnv := resolveCORSEnv(env)
 	raw := os.Getenv("AGENTHUB_CORS_ORIGINS")
 	if raw == "" {
-		raw = defaultCORSOrigins(corsEnvironment())
+		raw = defaultCORSOrigins(resolvedEnv)
 	}
 	origins := splitAndTrim(raw)
-	if err := validateCORSOriginsForEnvironment(corsEnvironment(), origins); err != nil {
-		slog.Error("invalid CORS configuration", "err", err)
+	if err := validateCORSOriginsForEnvironment(resolvedEnv, origins); err != nil {
+		slog.Error("invalid CORS configuration", "error", err)
 		return nil, fmt.Errorf("CORS configuration error: %w", err)
 	}
 	return cors.New(cors.Config{
@@ -33,6 +34,15 @@ func CORS() (gin.HandlerFunc, error) {
 	}), nil
 }
 
+// resolveCORSEnv returns the effective environment for CORS decisions.
+// It uses the config-managed env when set; otherwise falls back to GIN_MODE.
+func resolveCORSEnv(env string) string {
+	if env != "" {
+		return env
+	}
+	return os.Getenv("GIN_MODE")
+}
+
 func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
 		// Allow Web app + Tauri Desktop (origin: https://tauri.localhost)
@@ -40,13 +50,6 @@ func defaultCORSOrigins(env string) string {
 	}
 	// Dev: TokenDance ID/local web (3000), Desktop Vite (5173), Web Vite (5174), Tauri Desktop
 	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
-}
-
-func corsEnvironment() string {
-	if env := strings.TrimSpace(os.Getenv("AGENTHUB_ENV")); env != "" {
-		return env
-	}
-	return os.Getenv("GIN_MODE")
 }
 
 func validateCORSOriginsForEnvironment(env string, origins []string) error {

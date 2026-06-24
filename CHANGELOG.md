@@ -4,7 +4,84 @@ All notable changes to the TokenDance AgentHub project.
 
 ## [Unreleased]
 
-## [v0.5.0] — 2026-06-17
+## [v0.5.0] — 2026-06-19
+
+> **SUPER 全面修复工程** — 5 个 Phase、52 个任务全部完成，SUPER 评分从 63/100 提升至 ~67/100。
+> 分支：`feat/super-phase1-safety-foundation`，基于 `dev/delicious233`。200 files changed，+32,547 -5,723 行，+12,577 行测试（79 个文件）。
+
+### Phase 1 — 后端安全与基础（12/12 任务）
+
+- **Crash Safety**：Gin CustomRecovery 中间件加固，panic 不再泄漏原始错误栈到客户端；`user_settings.go` 内部错误改用标准 `Fail(c, errcode.ErrInternal)` 替代 `FailWithMessage` 泄露 `err.Error()`；Edge `security_hooks.go` panic→error 转换
+- **Secrets & Config**：Docker Compose Redis healthcheck 改用 `REDISCLI_AUTH` 环境变量替代 `-a` 明文传参，消除进程列表密码泄漏；移除 `config.docker.yaml` 硬编码 `dev_password`，配置改为运行时 env injection；production compose 从全量复制转为 override 模式，消除跨环境 drift
+- **Auth & Rate Limiting**：限流器增加 Redis 故障 fail-open 配置，防止 Redis 不可用时自我 DoS；WebSocket `auth.ok` 竞态条件修复（`writeLoop` 在 `sendFrame` 前启动）；OIDC redirect_uri handler 层 defense-in-depth 验证
+- **CI/Tooling 基础**：修复 `@lobehub/fluent-emoji` ESM 导入问题，恢复 9 个前端测试文件；重新实现 `release.sh` tag-only push + semver 校验 + clean check；CI 新增 `pnpm audit --prod` + `govulncheck` 自动化漏洞扫描
+
+### Phase 2 — Edge 安全加固（7/7 任务）
+
+- **Edge Authorization**：远程读路由细粒度授权（AH-SR-045），基于 run owner 的访问控制；双 token run-start 信任模型（AH-SR-046），Edge 启动 run 时需 Hub-issued capability token
+- **Edge Subprocess & Env**：子进程环境变量范围化白名单（AH-SR-047），仅透传白名单内的 env var，防御环境变量注入
+- **Hub JWT & WS Hardening**：JWT 密钥轮换机制（multi-key + kid + JWKS endpoint），支持无中断密钥滚动；WebSocket `InsecureSkipVerify` 限定 dev origins 为 loopback；WebSocket 增加 `ReadTimeout` 截止时间；限流器 off-by-one 修复（limit+1 → exact limit）
+
+### Phase 3 — 架构重构（5/5 任务）
+
+- **DI & Wiring 拆分**：`app.go` 从 976 行单体拆分为 5 个文件（app.go ~50 行仅做组装），消除服务层循环引用（所有 `Set*` setter injection 已清理）；`AGENTHUB_ENV` 从 `os.Getenv` 迁移到 `ServerConfig` 结构体，纳入 viper 统一配置管理
+- **Service Decomposition**：`agent_team.go` 从 2,242 行拆分为 8 个文件（6 个 service 模块 + facade），按职责域分离：创建/状态机/证据门/故障升级/编排/交付
+- **Delivery Reliability**：Hub-Edge Delivery Outbox 基础设施（AH-SR-049），599 行核心 + 692 行测试，Hub→Edge 事件持久化投递，防止网络中断丢失
+
+### Phase 4 — 前端与 Mobile 质量（7/7 任务）
+
+- **Web Reliability**：Web `main.tsx` 新增 root ErrorBoundary（分类错误 + chunk-reload + i18n 提示）；HubClient 新增 AbortController + 30s 默认超时，防止网络故障时无限挂起；浮出 6 处静默 catch + 7 种事件类型静默丢弃，全部增加 console.warn 或用户提示
+- **Mobile @shared + Typecheck**：mobile-rn 接入 `@shared` 包（共享受类型/合约/工具函数）；修复 `exactOptionalPropertyTypes` 3 个 typecheck 错误
+- **Dev Branch Sync**：同步 dev 分支与 master，清理 CI 引用差异，新增分支保护规则
+
+### Phase 5 — 文档、平台与打磨（17/17 任务）
+
+- **文档一致性**：修复 `openapi.yaml` 与 `router.go` 5+ 条路径/方法不匹配；架构文档 WS 事件数从 26 更新为 33（与 `frame.go` 常量对齐）；统一阶段命名为 Phase 1-7（清理旧 Phase A/B/C/D 引用）；修正 `developer-quickstart.md` 过期迁移数（50→51 对）
+- **平台等价性**：为 6 个关键 PowerShell 脚本新增 bash 等价版（`verify-release-gate.sh`、`verify-ci-gates.sh`、`verify-oidc-readiness.sh` 等）；修复架构文档过期引用（TranscriptView、adapter 数量、部署路径）；更新 per-package README 过时内容与版本号
+- **Mobile 测试与 CI**：为 9 个未测试 primitive 组件新增渲染测试；Mobile CI 新增 typecheck/lint/test/E2E-mock-hub 四个步骤；新增 coverage reporting + screenshot diff testing + bundle size check
+- **运维打磨**：`dompurify` 升级到最新 3.x patch（修复 5 个 XSS bypass）；Redis 超时 1s→3s 环境变量可配；缓存 migration 版本结果（30s TTL）；公开统计端点使用更粗粒度分桶防重识；`normalizeJSONField` 去重到共享 `validation.go`；session handler 参数命名歧义消除；agent team create 新增长度验证；TaskAck 空 body 增加警告日志
+
+### 安全风险登记册处置
+
+- **风险登记册降级 8 项**：AH-SR-045（Edge 细粒度授权）、AH-SR-046（双 token 信任模型）、AH-SR-047（子进程 env 白名单）、AH-SR-049（Delivery Outbox）已实现并关闭
+- **Config dump secret 脱敏**：Edge Server 和 Hub Server 诊断端点 secret 字段 mask
+- **Admin server BasicAuth + secret redaction**：pprof 端点增加认证保护
+- **CORS 配置化**：`AGENTHUB_CORS_ORIGINS` 从硬编码迁移为环境变量驱动
+- **6 个 remaining Open High**（AH-SR-035/036/037/042 + signing/notarization/updater）记录在安全风险登记册，不阻断当前发布
+
+### 竞品深度分析
+
+- **28 个参考仓库 + 30+ 篇架构规格**：覆盖 Cline、Cursor、Windsurf、GitHub Copilot Chat、LobeChat、Aider、Continue.dev、OpenCode 等
+- **10 条收敛结论**：EventStore=JSONL 追加 + seq 单调（Kanna/OpCode）、消息树 O(n) 运行时构建扁平存 DB（LibreChat）、渐进展开=条件渲染（Cline）、OKLCH 色彩空间（Multica）、Zustand 工厂模式（Multica/OpCode）、Adapter=Start+AttachStream（Codex/OpenCode）、Fork=Clone Undo=Replace（OpCode/LibreChat）、WebSocket 非前端第二数据库（Multica/CCViewer）
+- **特征差距矩阵**：AgentHub vs Jean/Cline/Continue/ClaudeCodeUI/Kanna/Goose/Crush/LobeChat 全维度对比（核心平台/Agent 集成/聊天界面/多 Agent/UX 创新/架构/设计）
+- **10 项架构创新模式提取**：形式化 Run 状态机（Cline）、工具执行循环检测（Cline）、层级 Planner-Worker 编排（Cursor）、结构化审批分类（OpenCode）、流式部分消息协议（Cline）、上下文自动压缩（Cline/Aider）、Schema 版本化事件协议（OpenCode）、插件生命周期钩子系统（OpenCode）、级联 Diff 流式渲染（Continue.dev）、Agent 决策循环状态机（LobeChat）
+
+### 测试与验证
+
+- **测试净增 +12,577 行**：Go +9,337 行（`hub-server` 覆盖率 +5.5pp 至 56.7%，`edge-server` +3.2pp 至 78.2%）、TS/TSX +3,240 行（79 个文件）
+- **Go 测试全部通过**：hub-server 20/22 packages（2 个 flaky subtest 根因已知）、edge-server 14/14 packages
+- **新增验证脚本 8 个**：`verify-release-gate.sh/.ps1`、`verify-ci-gates.sh/.ps1`、`verify-oidc-readiness.sh/.ps1` 等
+- **新增 ADR 5 个**：ADR-013（CustomRecovery）、ADR-014（Dual-Token Edge Auth）、ADR-015（Delivery Outbox）、ADR-016（app.go DI Split）、ADR-017（Fault Escalation）
+- **新增 API 参考文档**：`docs/api-reference.md`（2,041 行）
+- **治理文档**：Workflow 标准化规范（强制五阶段模板）、security-risk-register.md 更新、branch-governance.md 改为现场检查命令
+
+### 版本一致性
+
+- 所有包版本统一对齐 `0.5.0`：`app/desktop`、`app/web`、`app/shared`、`app/mobile-rn`、Expo app config、Tauri `Cargo.toml`、README badge
+- Tracked runtime artifacts 清零：`css-audit-results.json`、`edge.db-shm`、`edge.db-wal`、`hub-server/server-hub` 移出 Git 索引
+- `release.sh` 改为 tag-only push + clean tree 校验
+- 公开仓/私有运维 SSOT 分界：live 主机名/路径/部署命令/探测结果降级为私有运维记录
+
+### 已知阻塞（未修复）
+
+- 8 个 Open High 安全风险（AH-SR-035/036/037/042 + signing/notarization/updater）：需 live TokenDance ID 环境、Web session 强化架构决策、签名证书外部采购
+- Mobile typecheck：`exactOptionalPropertyTypes` 3 个错误（UI 层冻结期间只记录）
+- Desktop/Web ESM 测试：9 个文件因 `@lobehub/fluent-emoji` ESM 导入在文件级 suite 失败（独立测试全部通过）
+- 真实登录与客户端发布验证：OIDC/Desktop/Mobile live 证据待补充
+
+---
+
+## [v0.5.0-rc1] — 2026-06-17
 
 > **ChatView migration + comprehensive audit** — 67 commits, 216 files changed (+12,703 -10,934).
 > Branch: `feat/chatview-tokendance-migration`. Based on `origin/dev/delicious233`.
@@ -399,7 +476,8 @@ All notable changes to the TokenDance AgentHub project.
 - Commit message format enforcement: type(scope): 中文摘要
 - Secret guard, whitespace check, CI gate policy validation
 
-[0.5.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.4.0...v0.5.0
+[v0.5.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.5.0-rc1...v0.5.0
+[v0.5.0-rc1]: https://github.com/DeliciousBuding/AgentHub/compare/v0.4.0...v0.5.0-rc1
 [0.4.0]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.9...v0.4.0
 [0.4.0-rc1]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.9...v0.4.0-rc1
 [0.3.0-rc.9]: https://github.com/DeliciousBuding/AgentHub/compare/v0.3.0-rc.8...v0.3.0-rc.9

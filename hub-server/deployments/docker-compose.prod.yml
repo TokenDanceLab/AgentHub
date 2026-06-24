@@ -60,13 +60,15 @@ services:
       --save 900 1
       --save 300 10
       --requirepass ${AGENTHUB_REDIS_PASSWORD:?必须设置 AGENTHUB_REDIS_PASSWORD}
+    environment:
+      REDISCLI_AUTH: ${AGENTHUB_REDIS_PASSWORD:?必须设置 AGENTHUB_REDIS_PASSWORD}
     # 不暴露端口到宿主机 — 仅 Docker 网络内部访问
     expose:
       - "6379"
     volumes:
       - agenthub_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${AGENTHUB_REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10

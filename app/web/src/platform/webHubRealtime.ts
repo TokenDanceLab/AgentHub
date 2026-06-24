@@ -22,9 +22,12 @@ const SESSION_EVENTS = new Set<string>([
 
 const MESSAGE_EVENTS = new Set<string>([
   HUB_EVENTS.MESSAGE_NEW,
+  HUB_EVENTS.MESSAGE_EDITED,
   HUB_EVENTS.MESSAGE_RECALL,
   HUB_EVENTS.MESSAGE_PIN,
   HUB_EVENTS.MESSAGE_UNPIN,
+  HUB_EVENTS.MESSAGE_REACTION_ADDED,
+  HUB_EVENTS.MESSAGE_REACTION_REMOVED,
   HUB_EVENTS.MESSAGE_READ,
 ]);
 
@@ -34,6 +37,37 @@ const AGENT_EVENTS = new Set<string>([
   HUB_EVENTS.AGENT_DONE,
   HUB_EVENTS.AGENT_FAILED,
   HUB_EVENTS.AGENT_CANCEL,
+  HUB_EVENTS.AGENT_CONTROL,
+  HUB_EVENTS.AGENT_REGENERATE,
+]);
+
+const DEVICE_EVENTS = new Set<string>([
+  HUB_EVENTS.DEVICE_ONLINE,
+  HUB_EVENTS.DEVICE_OFFLINE,
+  HUB_EVENTS.DEVICE_KICKED,
+]);
+
+const CONTACT_EVENTS = new Set<string>([
+  HUB_EVENTS.FRIEND_REQUEST,
+  HUB_EVENTS.FRIEND_ACCEPTED,
+]);
+
+const NOTIFICATION_EVENTS = new Set<string>([
+  HUB_EVENTS.NOTIFICATION_NEW,
+]);
+
+const TEAM_EVENTS = new Set<string>([
+  HUB_EVENTS.TEAM_RUN_STARTED,
+  HUB_EVENTS.TEAM_EVENT,
+  HUB_EVENTS.TEAM_ASSIGNMENT_DONE,
+  HUB_EVENTS.TEAM_ASSIGNMENT_FAILED,
+]);
+
+const PLAN_EVENTS = new Set<string>([
+  HUB_EVENTS.PLAN_PROPOSED,
+  HUB_EVENTS.PLAN_APPROVED,
+  HUB_EVENTS.PLAN_REJECTED,
+  HUB_EVENTS.PLAN_EXPIRED,
 ]);
 
 export interface WebHubRealtimeOptions {
@@ -146,23 +180,77 @@ export function invalidateWebWorkbenchHubQueries(
   eventType: string,
   payload: unknown,
 ): void {
-  const touchesSessions = SESSION_EVENTS.has(eventType) || MESSAGE_EVENTS.has(eventType) || AGENT_EVENTS.has(eventType);
-  if (!touchesSessions) return;
+  // ── Session-scoped events (sessions + messages + agents) ──
+  const touchesSessions =
+    SESSION_EVENTS.has(eventType) ||
+    MESSAGE_EVENTS.has(eventType) ||
+    AGENT_EVENTS.has(eventType);
 
-  if (AGENT_EVENTS.has(eventType)) {
-    recordRealtimeAgentTaskIndex(queryClient, eventType, payload);
+  if (touchesSessions) {
+    if (AGENT_EVENTS.has(eventType)) {
+      recordRealtimeAgentTaskIndex(queryClient, eventType, payload);
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+
+    if (MESSAGE_EVENTS.has(eventType) || AGENT_EVENTS.has(eventType)) {
+      const sessionId = readSessionId(payload);
+      void queryClient.invalidateQueries({
+        queryKey: sessionId
+          ? ['web-v4', 'hub-messages', sessionId]
+          : ['web-v4', 'hub-messages'],
+      });
+    }
   }
 
-  void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+  // ── Device events ──────────────────────────────
+  if (DEVICE_EVENTS.has(eventType)) {
+    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'execution-targets'] });
+    void queryClient.invalidateQueries({ queryKey: ['hub', 'execution-targets'] });
+  }
 
-  if (!MESSAGE_EVENTS.has(eventType) && !AGENT_EVENTS.has(eventType)) return;
+  // ── Contact events ─────────────────────────────
+  if (CONTACT_EVENTS.has(eventType)) {
+    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'contacts'] });
+    void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+  }
 
-  const sessionId = readSessionId(payload);
-  void queryClient.invalidateQueries({
-    queryKey: sessionId
-      ? ['web-v4', 'hub-messages', sessionId]
-      : ['web-v4', 'hub-messages'],
-    });
+  // ── Notification events ────────────────────────
+  if (NOTIFICATION_EVENTS.has(eventType)) {
+    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'notifications'] });
+    void queryClient.invalidateQueries({ queryKey: ['hub', 'notifications'] });
+  }
+
+  // ── Team events ────────────────────────────────
+  if (TEAM_EVENTS.has(eventType)) {
+    const teamId = readString(payload, 'team_id', 'teamId');
+    const teamRunId = readString(payload, 'team_run_id', 'teamRunId', 'run_id', 'runId');
+    if (teamId && teamRunId) {
+      void queryClient.invalidateQueries({
+        queryKey: ['web-v4', 'agent-teams', teamId, 'runs', teamRunId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['hub', 'agent-teams', teamId, 'runs', teamRunId],
+      });
+    }
+    if (teamId) {
+      void queryClient.invalidateQueries({
+        queryKey: ['web-v4', 'agent-teams', teamId, 'runs'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-teams', teamId, 'runs'] });
+    }
+    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-teams'] });
+    void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
+  }
+
+  // ── Plan events ────────────────────────────────
+  if (PLAN_EVENTS.has(eventType)) {
+    const runId = readString(payload, 'run_id', 'runId');
+    const taskId = readString(payload, 'task_id', 'taskId');
+    if (taskId) {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
+    }
+  }
 }
 
 function recordRealtimeAgentTaskIndex(
@@ -197,6 +285,8 @@ function realtimeTaskStatus(eventType: string): string {
       return 'failed';
     case HUB_EVENTS.AGENT_CANCEL:
       return 'cancelled';
+    case HUB_EVENTS.AGENT_CONTROL:
+      return 'awaiting_approval';
     default:
       return 'running';
   }
@@ -250,6 +340,22 @@ function hubTerminalRuntimeEventFromPayload(
       session_id: sessionId,
       event_type: 'run.cancelled',
       payload: { error: reason, success: false },
+      ...(createdAt ? { created_at: createdAt } : {}),
+    });
+  }
+
+  if (eventType === HUB_EVENTS.AGENT_CONTROL) {
+    const kind = readString(payload, 'kind');
+    return compactRuntimeEvent({
+      task_id: taskId,
+      ...(edgeRunId ? { edge_run_id: edgeRunId } : {}),
+      session_id: sessionId,
+      event_type: 'run.agent.permission_requested',
+      payload: {
+        kind,
+        edge_control: readPayloadValue(payload, 'edge_control'),
+        edgeControl: readPayloadValue(payload, 'edgeControl'),
+      },
       ...(createdAt ? { created_at: createdAt } : {}),
     });
   }

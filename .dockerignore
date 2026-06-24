@@ -1,0 +1,140 @@
+# ──────────────────────────────────────────────
+# AgentHub — Docker build context ignore
+# Used when building from the repo root:
+#   docker build -f hub-server/deployments/Dockerfile .
+# ──────────────────────────────────────────────
+
+# ── Git ───────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── CI/CD ─────────────────────────────────────
+.github
+
+# ── Docs (excluded from Docker context) ───────
+docs
+*.md
+!README.md
+
+# ── Tests ─────────────────────────────────────
+*_test.go
+**/tests/
+**/testdata/
+**/coverage.out
+**/coverage.html
+**/coverage
+coverage*
+.cov
+
+# ── Build artifacts ──────────────────────────
+*.out
+*.exe
+*.test
+*.tgz
+dist/
+build/
+output/
+.next/
+.vite/
+**/tsc-output.txt
+**/eslint-*.txt
+
+# ── IDE and editor ───────────────────────────
+.vscode
+.idea
+.cursor
+.continue
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Secrets and local env ────────────────────
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.hk2.example
+.envrc
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+private/
+*.secret.*
+credentials*.json
+
+# ── Node / Frontend (not needed for Go build) ─
+node_modules
+.pnpm-store
+app/
+vendor/
+package-lock.json
+app/desktop/pnpm-lock.yaml
+app/shared/pnpm-lock.yaml
+app/web/pnpm-lock.yaml
+
+# ── Rust / Tauri (not needed for Go build) ────
+target/
+
+# ── Reference repos ───────────────────────────
+reference/
+
+# ── Local ops state ───────────────────────────
+.ops
+.tmp
+tmp/
+.worktrees
+.agenthub
+.agenthub-runtime
+.claude
+.codex
+.agents
+.backup
+backups/
+
+# ── Logs ──────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Databases ─────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.dump
+*.bak
+*.backup
+*.sql.gz
+
+# ── Deployment state (local only) ─────────────
+hub-server/deployments/.env.production
+hub-server/deployments/.env
+hub-server/deployments/backups/
+hub-server/uploads/
+hub-server/tests/uploads/
+
+# ── Screenshots and raster images ─────────────
+screenshots/
+**/screenshots/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# ── Generated / temp reports ──────────────────
+.handoff.md
+css-audit-results.json
+test_store.json

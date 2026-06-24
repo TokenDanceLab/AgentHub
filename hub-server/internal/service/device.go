@@ -25,12 +25,8 @@ type desktopTargetRegistrar interface {
 }
 
 // NewDeviceService creates a new DeviceService backed by the given database.
-func NewDeviceService(db *gorm.DB) *DeviceService {
-	return &DeviceService{db: db}
-}
-
-func (s *DeviceService) SetDesktopTargetRegistrar(registrar desktopTargetRegistrar) {
-	s.desktopTargetRegistrar = registrar
+func NewDeviceService(db *gorm.DB, registrar desktopTargetRegistrar) *DeviceService {
+	return &DeviceService{db: db, desktopTargetRegistrar: registrar}
 }
 
 // Register creates or updates a device record for the given user and returns it.

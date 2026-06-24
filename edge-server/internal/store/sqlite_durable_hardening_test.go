@@ -17,7 +17,7 @@ func TestSQLiteDurableHardeningRestoresApprovalArtifactReplayAndPins(t *testing.
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
 
-	project, err := s.CreateProject("proj_durable_hardening", "Durable Hardening")
+	project, err := s.CreateProject("proj_durable_hardening", "Durable Hardening", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}

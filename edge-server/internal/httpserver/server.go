@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
@@ -26,28 +27,19 @@ import (
 	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
 	debugpkg "github.com/agenthub/pkg/debug"
+	sharederr "github.com/agenthub/pkg/errcode"
 	"github.com/agenthub/pkg/reqlog"
-)
-
-// ctxKey is a private context key type for injecting auth identity.
-type ctxKey string
-
-const (
-	ctxKeyHubUserID   ctxKey = "hub_user_id"
-	ctxKeyHubDeviceID ctxKey = "hub_device_id"
 )
 
 // HubUserIDFromContext extracts the Hub-authenticated user ID from context.
 // Returns empty string if the request was not authenticated via Hub JWT.
 func HubUserIDFromContext(ctx context.Context) string {
-	if v, ok := ctx.Value(ctxKeyHubUserID).(string); ok {
-		return v
-	}
-	return ""
+	return edgeidentity.FromContext(ctx).UserID
 }
 
 // Config holds server configuration.
@@ -55,19 +47,19 @@ type Config struct {
 	Addr               string
 	Store              store.Repository
 	ProcessExecutor    lifecycle.ProcessExecutorConfig
-	AdapterRegistry    *adapters.Registry // agent adapter registry; nil = none registered
-	AgentDefault       string             // default agent adapter ID; empty = raw stdout capture
-	LocalAuthToken     string             // optional local bearer token for non-health Edge APIs
-	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
-	EdgeDeviceID       string             // local Edge device ID expected in Edge-scoped Hub JWTs
-	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
-	HubToken           string             // JWT bearer token for Hub callback authentication
-	RemoteMode         bool               // allow non-loopback bind + remote origins (requires auth)
-	AllowedOrigins     []string           // explicit remote-mode browser origins allowed by CORS
-	Dev                bool               // dev mode disables auto-generated local auth token
-	WorkspaceAllowlist []string           // optional roots allowed for request workDir
-	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
-	EventLogPath       string             // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
+	AdapterRegistry    *adapters.Registry       // agent adapter registry; nil = none registered
+	AgentDefault       string                   // default agent adapter ID; empty = raw stdout capture
+	LocalAuthToken     string                   // optional local bearer token for non-health Edge APIs
+	HubJWTSecret       string                   // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID       string                   // local Edge device ID expected in Edge-scoped Hub JWTs
+	HubURL             string                   // Hub server base URL for Edge->Hub direct callbacks
+	HubToken           string                   // JWT bearer token for Hub callback authentication
+	RemoteMode         bool                     // allow non-loopback bind + remote origins (requires auth)
+	AllowedOrigins     []string                 // explicit remote-mode browser origins allowed by CORS
+	Dev                bool                     // dev mode disables auto-generated local auth token
+	WorkspaceAllowlist []string                 // optional roots allowed for request workDir
+	SkillsDirs         []string                 // optional SKILL.md search dirs; empty = use defaults
+	EventLogPath       string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
 }
 
@@ -80,18 +72,18 @@ func Run(cfg Config) error {
 	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid remote listen address", "err", err)
+			slog.Error("invalid remote listen address", "error", err)
 			return err
 		}
 	} else {
 		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid local listen address", "err", err)
+			slog.Error("invalid local listen address", "error", err)
 			return err
 		}
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {
-		slog.Error("failed to create handler from config", "err", err)
+		slog.Error("failed to create handler from config", "error", err)
 		return err
 	}
 
@@ -106,13 +98,12 @@ func Run(cfg Config) error {
 	if !cfg.Dev && cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
 		tokenBytes := make([]byte, 32)
 		if _, err := rand.Read(tokenBytes); err != nil {
-			slog.Error("failed to generate local auth token", "err", err)
+			slog.Error("failed to generate local auth token", "error", err)
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
 		slog.Debug("auto-generated local auth token for Edge Server API protection; "+
-			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections",
-			"token_prefix", cfg.LocalAuthToken[:8]+"...")
+			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections")
 	}
 
 	mux := http.NewServeMux()
@@ -170,8 +161,8 @@ func Run(cfg Config) error {
 	go func() {
 		slog.Info("edge server listening", "addr", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "err", err)
-			os.Exit(1)
+			slog.Error("server error", "error", err)
+			stop <- syscall.SIGTERM
 		}
 	}()
 
@@ -187,7 +178,7 @@ func Run(cfg Config) error {
 
 	// Flush and close the event log so no events are lost on shutdown.
 	if err := handler.Bus.Close(); err != nil {
-		slog.Error("failed to close event bus event log", "err", err)
+		slog.Error("failed to close event bus event log", "error", err)
 	}
 	return nil
 }
@@ -301,7 +292,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	}
 	skillReg := skills.NewSkillRegistry(skillsDirs)
 	if err := skillReg.Discover(); err != nil {
-		slog.Warn("skill discovery failed; skills will not be injected", "err", err)
+		slog.Warn("skill discovery failed; skills will not be injected", "error", err)
 	} else if skillReg.Count() > 0 {
 		slog.Info("loaded skills", "count", skillReg.Count(), "dirs", skillsDirs)
 	}
@@ -319,6 +310,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		SkillRegistry:      skillReg,
 		MCPConfigStore:     cfg.MCPConfigStore,
 		PlanApprovalBroker: planBroker,
+		LocalAuthToken:     cfg.LocalAuthToken,
+		HubJWTSecret:       cfg.HubJWTSecret,
+		EdgeDeviceID:       cfg.EdgeDeviceID,
 	}
 
 	// Detect cc-switch and wire into handler for API endpoints and model
@@ -333,7 +327,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		// so model aliases are resolved through the transparent proxy mapping.
 		if cfg.AdapterRegistry != nil && ccReader != nil {
 			if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
-				if claudeAdapter, ok := a.(interface{ SetCCSwitchResolver(adapters.CCSwitchModelResolver) }); ok {
+				if claudeAdapter, ok := a.(interface {
+					SetCCSwitchResolver(adapters.CCSwitchModelResolver)
+				}); ok {
 					claudeAdapter.SetCCSwitchResolver(ccReader)
 					slog.Debug("cc-switch model resolver wired into claude-code adapter")
 				}
@@ -362,7 +358,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.
 	if cfg.Store != nil {
-		_, _ = cfg.Store.CreateProject("proj_local", "Local Project")
+		_, _ = cfg.Store.CreateProject("proj_local", "Local Project", "")
 		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct", "", "")
 	}
 	return h, nil
@@ -461,7 +457,7 @@ func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string)
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			if !security.IsAllowedOrigin(origin, remoteMode, allowedOrigins) {
-				http.Error(w, "forbidden origin", http.StatusForbidden)
+				sharederr.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(sharederr.ErrForbidden.WithMessage("forbidden origin")))
 				return
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -506,8 +502,8 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 			// 1. Try Hub JWT validation (TokenDance ID → Hub → Edge trust chain).
 			if hubJWTSecret != "" {
 				if claims, err := jwtutil.ValidateHubToken(got, []byte(hubJWTSecret), edgeDeviceID); err == nil {
-					ctx := context.WithValue(r.Context(), ctxKeyHubUserID, claims.UserID)
-					ctx = context.WithValue(ctx, ctxKeyHubDeviceID, claims.DeviceID)
+					ctx := context.WithValue(r.Context(), edgeidentity.HubUserIDKey, claims.UserID)
+					ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, claims.DeviceID)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
@@ -521,7 +517,7 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 		}
 
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agenthub-edge"`)
-		http.Error(w, "unauthorized\n", http.StatusUnauthorized)
+		sharederr.WriteJSON(w, http.StatusUnauthorized, errcode.ErrorBody(sharederr.ErrUnauthorized))
 	})
 }
 

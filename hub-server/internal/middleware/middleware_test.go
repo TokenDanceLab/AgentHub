@@ -65,26 +65,21 @@ func TestDefaultCORSOriginsIncludesWebDevPortOutsideProduction(t *testing.T) {
 	}
 }
 
-func TestCorsEnvironment(t *testing.T) {
-	t.Run("AGENTHUB_ENV takes precedence", func(t *testing.T) {
-		os.Setenv("AGENTHUB_ENV", "production")
-		defer os.Unsetenv("AGENTHUB_ENV")
-		os.Setenv("GIN_MODE", "debug")
-		defer os.Unsetenv("GIN_MODE")
-		assert.Equal(t, "production", corsEnvironment())
+func TestResolveCORSEnv(t *testing.T) {
+	t.Run("uses config env when set", func(t *testing.T) {
+		os.Unsetenv("GIN_MODE")
+		assert.Equal(t, "production", resolveCORSEnv("production"))
 	})
 
 	t.Run("falls back to GIN_MODE", func(t *testing.T) {
-		os.Unsetenv("AGENTHUB_ENV")
 		os.Setenv("GIN_MODE", "release")
 		defer os.Unsetenv("GIN_MODE")
-		assert.Equal(t, "release", corsEnvironment())
+		assert.Equal(t, "release", resolveCORSEnv(""))
 	})
 
 	t.Run("empty when both unset", func(t *testing.T) {
-		os.Unsetenv("AGENTHUB_ENV")
 		os.Unsetenv("GIN_MODE")
-		assert.Equal(t, "", corsEnvironment())
+		assert.Equal(t, "", resolveCORSEnv(""))
 	})
 }
 

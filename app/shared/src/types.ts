@@ -13,6 +13,7 @@ export interface HealthResponse {
 
 export interface HealthCheck {
   status: string;
+  detail?: string;
   message?: string;
 }
 
@@ -25,11 +26,12 @@ export interface RunnerHealthItem {
 
 export interface RunnerHealthCheck {
   status: string;
-  message?: string;
-  runnerIds?: string[];
-  items?: RunnerHealthItem[];
-  available?: number;
+  detail?: string;
   total?: number;
+  available?: number;
+  unavailable?: number;
+  statuses?: Record<string, number>;
+  items?: RunnerHealthItem[];
 }
 
 export interface HealthChecks {
@@ -214,12 +216,20 @@ export interface ThreadItemInfo {
   updatedAt: string;
 }
 
+export interface RunnerMessage {
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
 export interface StartRunRequest {
   projectId?: string;
   threadId?: string;
   prompt?: string;
   agentId?: string;
+  profileId?: string;
   model?: string;
+  provider?: string;
   modelAlias?: string;
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
@@ -241,6 +251,8 @@ export interface StartRunRequest {
   mcpConfig?: string;
   ephemeral?: boolean;
   hubTaskId?: string;
+  messages?: RunnerMessage[];
+  pinnedMessages?: RunnerMessage[];
 }
 
 export interface AgentDefinition {
