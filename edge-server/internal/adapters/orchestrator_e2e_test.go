@@ -61,7 +61,7 @@ func (f *failingSpawner) SpawnSubAgent(store.Run, SubAgentTask) (string, string,
 func newTestStore(t *testing.T) store.RunLifecycleStore {
 	t.Helper()
 	s := store.New()
-	_, err := s.CreateProject("proj-1", "test-project")
+	_, err := s.CreateProject("proj-1", "test-project", "")
 	if err != nil {
 		t.Fatalf("CreateProject: %v", err)
 	}

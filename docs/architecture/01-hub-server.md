@@ -18,19 +18,19 @@ Hub Server（`hub-server/`）是 AgentHub 的云端中枢：
 ## 在架构中的位置
 
 ```text
-Desktop shared workbench
+Desktop 共享工作台
   -> Desktop platform adapter
-  -> Local Edge Server
+  -> 本地 Edge Server
   -> Hub Server              <-- 本文档（认证 / 联系人 / 会话 / 消息）
   -> AgentAdapter
   -> Claude Code / Codex / OpenCode
 ```
 
 ```text
-Web shared workbench
+Web 共享工作台
   -> Web platform adapter
   -> Hub Server              <-- 本文档（全量 API）
-  -> Edge routing / relay
+  -> Edge 路由 / 中继
   -> Edge Server
   -> AgentAdapter
 ```
@@ -41,29 +41,29 @@ Hub Server（`hub-server/internal/router/router.go`）使用 Gin 框架，所有
 
 ### 全局中间件
 
-CORS、API Version、Body Limit (default 10MB)、Global Rate Limit、Request ID、Access Log、Prometheus Metrics、Request Timeout。
+CORS、API Version、Body Limit（默认 10MB）、全局限流、Request ID、访问日志、Prometheus Metrics、请求超时。
 
 ### 路由组
 
 | 路由前缀 | 认证 | 说明 |
 |---|---|---|
 | `GET /health` `/health/live` `/health/ready` | 无 | 健康检查 |
-| `GET /api/public/stats` | 无 | 公开统计 |
+| `GET /api/public/stats` | 无 | 公开统计（计数桶化，不暴露精确值） |
 | `GET /client/ws` | WS Auth | WebSocket 连接 |
-| `POST /client/auth/refresh` | IP Rate Limit | JWT 刷新 |
-| `POST /client/auth/oidc/authorize` | IP Rate Limit | OIDC 授权启动 |
-| `POST /client/auth/oidc/callback` | IP Rate Limit | OIDC 回调（code exchange） |
-| `GET /client/auth/oidc/callback` | IP Rate Limit | OIDC 回调（browser redirect） |
+| `POST /client/auth/refresh` | IP 限流 | JWT 刷新 |
+| `POST /client/auth/oidc/authorize` | IP 限流 | OIDC 授权启动 |
+| `POST /client/auth/oidc/callback` | IP 限流 | OIDC 回调（code 兑换） |
+| `GET /client/auth/oidc/callback` | IP 限流 | OIDC 回调（浏览器跳转） |
 | `GET /client/auth/me` `POST /client/auth/logout` `PUT /client/auth/profile` | Hub Session | 认证管理 |
 | `/client/contacts/*` | Hub Session | 联系人：搜索、好友请求、列表、删除、拉黑、备注 |
 | `/client/sessions/*` | Hub Session | 会话：列表、创建、成员管理、消息、置顶、已读、搜索 |
 | `/client/messages/*` | Hub Session | 消息操作：撤回、编辑、置顶、表情回复、转发、搜索 |
 | `/client/attachments/*` | Hub Session | 附件：探测、上传、下载 |
 | `/client/notifications/*` | Hub Session | 通知：列表、标记已读 |
-| `GET/PATCH /client/settings` | Hub Session | 用户设置（key-value store） |
-| `/edge/*` | Hub Session + Desktop only | Edge 设备注册、Agent Task 回调 |
-| `POST /cloud/edge/register` | Hub Session | Cloud Edge 注册 |
-| `/web/*` | Hub Session + Web only | Web 端专用 API |
+| `GET/PATCH /client/settings` | Hub Session | 用户设置（键值存储） |
+| `/edge/*` | Hub Session + 仅 Desktop | Edge 设备注册、Agent Task 回调 |
+| `POST /cloud/edge/register` | Hub Session | 云端 Edge 注册 |
+| `/web/*` | Hub Session + 仅 Web | Web 端专用 API |
 
 ### Web 端路由 (`/web/*`)
 
@@ -93,24 +93,28 @@ CORS、API Version、Body Limit (default 10MB)、Global Rate Limit、Request ID�
 
 Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件类型定义在 `app/shared/src/hubEvents.ts`（前端常量）和 `hub-server/internal/ws/frame.go`（后端定义）。
 
-共 26 个事件类型：
+共 33 个事件类型：
 
 | 分类 | 事件 | 常量 |
 |---|---|---|
-| **Auth** | `auth` | `AUTH` |
+| **认证** | `auth` | `AUTH` |
+| | `typing` | `TYPING` |
 | | `auth.ok` | `AUTH_OK` |
 | | `auth.fail` | `AUTH_FAIL` |
-| **Message** | `message.new` | `MESSAGE_NEW` |
+| **消息** | `message.new` | `MESSAGE_NEW` |
+| | `message.edited` | `MESSAGE_EDITED` |
 | | `message.recall` | `MESSAGE_RECALL` |
 | | `message.pin` | `MESSAGE_PIN` |
 | | `message.unpin` | `MESSAGE_UNPIN` |
+| | `message.reaction_added` | `MESSAGE_REACTION_ADDED` |
+| | `message.reaction_removed` | `MESSAGE_REACTION_REMOVED` |
 | | `message.read` | `MESSAGE_READ` |
-| **Session** | `session.created` | `SESSION_CREATED` |
+| **会话** | `session.created` | `SESSION_CREATED` |
 | | `session.dissolved` | `SESSION_DISSOLVED` |
 | | `session.member_joined` | `SESSION_MEMBER_JOINED` |
 | | `session.member_left` | `SESSION_MEMBER_LEFT` |
 | | `session.info_updated` | `SESSION_INFO_UPDATED` |
-| **Device** | `device.online` | `DEVICE_ONLINE` |
+| **设备** | `device.online` | `DEVICE_ONLINE` |
 | | `device.offline` | `DEVICE_OFFLINE` |
 | | `device.kicked` | `DEVICE_KICKED` |
 | **Agent** | `agent.dispatch` | `AGENT_DISPATCH` |
@@ -119,17 +123,21 @@ Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件�
 | | `agent.failed` | `AGENT_FAILED` |
 | | `agent.cancel` | `AGENT_CANCEL` |
 | | `agent.control` | `AGENT_CONTROL` |
-| **Notification** | `notification.new` | `NOTIFICATION_NEW` |
+| **团队** | `team.run.started` | `TEAM_RUN_STARTED` |
+| | `team.event` | `TEAM_EVENT` |
+| | `team.assignment.done` | `TEAM_ASSIGNMENT_DONE` |
+| | `team.assignment.failed` | `TEAM_ASSIGNMENT_FAILED` |
+| **通知** | `notification.new` | `NOTIFICATION_NEW` |
 | | `friend.request` | `FRIEND_REQUEST` |
 | | `friend.accepted` | `FRIEND_ACCEPTED` |
 
 ## Auth Token 管道模式
 
-Desktop 的所有 Hub API 查询统一通过 `getToken` 回调注入 auth token：
+Desktop 的所有 Hub API 查询统一通过 `getToken` 回调注入认证 token：
 
 ```text
 Desktop Tauri keyring/session
-  -> getAccessToken() callback
+  -> getAccessToken() 回调
   -> { getToken: getAccessToken }
   -> hubQueries / sessionQueries / documentQueries / projectQueries
   -> Hub REST API Authorization: Bearer <token>
@@ -140,8 +148,8 @@ Desktop Tauri keyring/session
 ## WebSocket 实时缓存失效模式
 
 ```text
-Hub WS event (message.new / session.updated / ...)
-  -> useHubWebSocket event handler
+Hub WS 事件（message.new / session.updated / …）
+  -> useHubWebSocket 事件处理器
   -> React Query queryClient.invalidateQueries([queryKey])
   -> UI 自动重新获取最新数据
 ```

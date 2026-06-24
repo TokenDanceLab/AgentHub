@@ -2,6 +2,8 @@
 // Hides connection details behind a common interface with built-in
 // offline queue, exponential backoff reconnection, and localStorage persistence.
 
+import { reportApiError } from '@shared/errors';
+
 export type TransportStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 export type TransportEvent = 'message' | 'status';
 export type TransportMessageHandler = (data: unknown) => void;
@@ -96,9 +98,14 @@ export class WebSocketTransport implements Transport {
 
       this.ws.onerror = () => {
         // onclose will fire after this, triggering reconnect
+        console.error('[WebSocketTransport] WebSocket error — will reconnect via onclose');
       };
     } catch {
       // Construction failed (e.g. invalid URL)
+      console.error('[WebSocketTransport] Failed to construct WebSocket for', targetUrl);
+      reportApiError(new Error(`WebSocket construction failed: ${targetUrl}`), {
+        context: 'transport_connect',
+      });
       this.setStatus('disconnected');
       if (!this.closed) {
         this.scheduleReconnect();

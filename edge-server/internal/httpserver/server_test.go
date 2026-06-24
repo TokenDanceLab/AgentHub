@@ -3,6 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,8 +11,12 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/runners"
+	"github.com/agenthub/edge-server/internal/store"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -1216,8 +1221,300 @@ func TestHubUserIDFromContext(t *testing.T) {
 		t.Fatalf("empty context should return empty user ID, got %q", id)
 	}
 
-	ctx = context.WithValue(ctx, ctxKeyHubUserID, "test-user")
+	ctx = context.WithValue(ctx, edgeidentity.HubUserIDKey, "test-user")
 	if id := HubUserIDFromContext(ctx); id != "test-user" {
 		t.Fatalf("expected test-user, got %q", id)
 	}
+}
+
+
+// ── Remote Read Auth Tests (AH-SR-045) ──
+
+const testRemoteReadJWTSecret = "remote-read-secret-at-least-32!!"
+const testRemoteReadEdgeDevice = "test-edge-1"
+
+func setupRemoteReadFixture(t *testing.T) (*api.Handler, *http.ServeMux, store.Repository) {
+	t.Helper()
+	s := store.New()
+	reg := runners.NewRegistry()
+	reg.Upsert(runners.RunnerInfo{ID: "mock-runner", Name: "Mock Runner", Status: "online"})
+	bus := events.NewBus(1000)
+	h := &api.Handler{
+		Bus: bus, Registry: reg, Store: s,
+		Executor: lifecycle.NewMockExecutor(bus, s),
+	}
+	s.CreateProject("proj_default", "Default Project", "")
+	s.CreateProject("proj_user1", "User 1 Project", "user-1")
+	s.CreateProject("proj_user2", "User 2 Project", "user-2")
+	s.CreateThread("thread_default", "proj_default", "Default Thread", "direct", "", "")
+	s.CreateThread("thread_1", "proj_user1", "User 1 Thread", "direct", "", "")
+	s.CreateThread("thread_2", "proj_user2", "User 2 Thread", "direct", "", "")
+	s.CreateRun("run_default", "proj_default", "thread_default")
+	s.CreateRun("run_1", "proj_user1", "thread_1")
+	s.CreateRun("run_2", "proj_user2", "thread_2")
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	return h, mux, s
+}
+
+func wrapWithHubJWT(t *testing.T, mux *http.ServeMux) http.Handler {
+	t.Helper()
+	return localAuthMiddleware(mux, "", testRemoteReadJWTSecret, testRemoteReadEdgeDevice)
+}
+
+func wrapWithLocalAuth(t *testing.T, mux *http.ServeMux, token string) http.Handler {
+	t.Helper()
+	return localAuthMiddleware(mux, token, "", "")
+}
+
+func TestRemoteRead_ValidHubJWT_SeesOwnProjects(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, 1*time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	body = unwrapSuccess(body)
+	items := body["items"].([]any)
+	ids := projectIDs(items)
+	if !contains(ids, "proj_default") {
+		t.Error("missing proj_default")
+	}
+	if !contains(ids, "proj_user1") {
+		t.Error("missing proj_user1")
+	}
+	if contains(ids, "proj_user2") {
+		t.Error("should not see proj_user2")
+	}
+}
+
+func TestRemoteRead_ValidHubJWT_SeesOwnThreads(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, 1*time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	body = unwrapSuccess(body)
+	items := body["items"].([]any)
+	ids := threadIDs(items)
+	if !contains(ids, "thread_default") {
+		t.Error("missing thread_default")
+	}
+	if !contains(ids, "thread_1") {
+		t.Error("missing thread_1")
+	}
+	if contains(ids, "thread_2") {
+		t.Error("should not see thread_2")
+	}
+}
+
+func TestRemoteRead_ValidHubJWT_SeesOwnRuns(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, 1*time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	body = unwrapSuccess(body)
+	items := body["items"].([]any)
+	ids := runIDs(items)
+	if !contains(ids, "run_default") {
+		t.Error("missing run_default")
+	}
+	if !contains(ids, "run_1") {
+		t.Error("missing run_1")
+	}
+	if contains(ids, "run_2") {
+		t.Error("should not see run_2")
+	}
+}
+
+func TestRemoteRead_CrossUserAccess_Returns404(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, 1*time.Hour)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/v1/projects/proj_user2"},
+		{http.MethodGet, "/v1/threads/thread_2"},
+		{http.MethodGet, "/v1/runs/run_2"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s %s status = %d, want 404", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
+func TestRemoteRead_ExpiredHubJWT_Returns401(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, -1*time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestRemoteRead_LocalAuthToken_SeesAllProjects(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithLocalAuth(t, mux, "local-secret-token")
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer local-secret-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	body = unwrapSuccess(body)
+	items := body["items"].([]any)
+	ids := projectIDs(items)
+	if !contains(ids, "proj_user2") {
+		t.Error("local auth should see all projects including proj_user2")
+	}
+}
+
+func TestRemoteRead_WrongDeviceJWT_Returns401(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", "other-edge-device", 1*time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestRemoteRead_User2_SeesTheirOwnData(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-2", testRemoteReadEdgeDevice, 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	body = unwrapSuccess(body)
+	items := body["items"].([]any)
+	ids := projectIDs(items)
+	if !contains(ids, "proj_user2") {
+		t.Error("user-2 should see proj_user2")
+	}
+	if contains(ids, "proj_user1") {
+		t.Error("user-2 should NOT see proj_user1")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/projects/proj_user2", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("own project: %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/runs/run_2", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("own run: %d", rec.Code)
+	}
+}
+
+func TestRemoteRead_NoAuthToken_Returns401(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+func projectIDs(items []any) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["projectId"].(string); ok {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
+func threadIDs(items []any) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["threadId"].(string); ok {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
+func runIDs(items []any) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["runId"].(string); ok {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
+func contains(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
+}
+
+func unwrapSuccess(body map[string]any) map[string]any {
+	if body["code"] == "OK" {
+		if data, ok := body["data"].(map[string]any); ok {
+			return data
+		}
+	}
+	return body
 }

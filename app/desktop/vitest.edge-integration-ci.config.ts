@@ -14,6 +14,9 @@ export default defineConfig({
     },
   },
   server: { fs: { allow: ['..'] } },
+  ssr: {
+    noExternal: true,
+  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -22,5 +25,12 @@ export default defineConfig({
     execArgv: ['--max-old-space-size=4096'],
     memoryLimit: '512MB',
     maxWorkers: 1,
+    deps: {
+      optimizer: {
+        client: {
+          include: ['@lobehub/fluent-emoji'],
+        },
+      },
+    },
   },
 });

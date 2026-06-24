@@ -1,4 +1,5 @@
 import type { EventEnvelope, AnyEvent } from './events';
+import { reportApiError } from './errors';
 
 export type EventListener = (event: AnyEvent) => void;
 export type EventConnectionStatus =
@@ -97,8 +98,12 @@ export class EventClient {
         }
         const event = raw as AnyEvent;
         this.dispatch(event);
-      } catch {
-        // Ignore unparseable frames.
+      } catch (parseErr) {
+        console.error('[EventClient] Failed to parse WebSocket frame', parseErr);
+        reportApiError(
+          parseErr instanceof Error ? parseErr : new Error('Failed to parse WebSocket frame'),
+          { context: 'event_client_parse' },
+        );
       }
     };
 
@@ -111,6 +116,7 @@ export class EventClient {
     };
 
     this.ws.onerror = () => {
+      console.error('[EventClient] WebSocket error — closing connection');
       this.dispatchConnection('error', 'Edge event stream error');
       this.ws?.close();
     };
@@ -186,7 +192,14 @@ export class EventClient {
   private scheduleReconnect(): void {
     if (this.destroyed) return;
     if (this.reconnect.maxRetries !== Infinity && this.retryCount >= this.reconnect.maxRetries) {
-      this.dispatchConnection('disconnected', 'Max reconnect retries exceeded');
+      const msg = 'Max reconnect retries exceeded';
+      console.error(`[EventClient] ${msg} (${this.retryCount} attempts)`);
+      reportApiError(new Error(msg), {
+        context: 'event_client_reconnect',
+        retryCount: this.retryCount,
+        baseUrl: this.baseUrl,
+      });
+      this.dispatchConnection('disconnected', msg);
       return;
     }
 

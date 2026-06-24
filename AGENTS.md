@@ -285,21 +285,19 @@ feat/* → dev/maintainer → master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/maintainer** | 当前集成开发分支 (HEAD 118bdd84)，从 dev/maintainer 创建 | ✅ 活跃 |
-| **dev/maintainer** | 上一版集成主线 (v0.3.0, 1e03b7ec) | ✅ 已归档 |
-| master | PR-only 稳定快照 | ✅ 当前 |
-| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
+| **dev/maintainer** | 当前集成开发分支 | ✅ 活跃 |
+| **feat/super-phase1-safety-foundation** | SUPER 工程修复（52 任务全完成，待合并） | 🔥 活跃 |
+| master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
+| ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
+| ~~dev/maintainer~~ | 旧集成主线 | ✅ 已归档 |
 | ~~origin/dev/contributor-b~~ | 已归档 | ✅ 已清理 |
 | ~~origin/dev/contributor-a~~ | 已归档 | ✅ 已清理 |
-| ~~feat/web-desktop-parity~~ | 已导出 patch 并删除远端 | ✅ 已归档 |
-| ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
-| ~~feat/team-hub-authz~~ | 授权修复 | ✅ 已合入并删除 |
 
 接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/maintainer`（差距较大），始终从 `dev/maintainer` 开始工作。
+- 始终从 `dev/maintainer` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/maintainer`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
@@ -350,7 +348,7 @@ feat/* → dev/maintainer → master
 1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
-4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名。
+4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
 5. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次；`docs/` 目录结构每 7 天可做一次过期扫描。
 
 ## 6. 安全和隐私
@@ -465,3 +463,19 @@ scope: client|edge|api|docs|desktop|web
 - 摘要不超过 50 字。
 - 不要写 "added"、"fixed" 等英文动词——用中文。
 - hook 脚本在 `scripts/git-hooks/commit-msg`，clone 后运行 `scripts/setup.ps1` 启用。
+
+## 9. Spec-Driven Develop 治理
+
+本仓库采用 spec-driven-develop 工作流驱动大型复杂任务。规则如下：
+
+1. **进度追踪**：活跃进度以 `docs/progress/MASTER.md` 为准。spec-driven-develop 启动后，任务卡、阶段验收、阻塞项和里程碑状态统一写入该文件，不在 AGENTS.md 或 roadmap 中重复记录进度细节。
+2. **任务追踪模式**：`GITHUB_STANDARD` — 使用 GitHub Issues + Milestones + Labels 进行任务分解、分配和追踪。spec 产出的大型任务拆为 Milestone，子任务映射为 Issue，按 Label 区分方向（frontend/backend/client/docs/governance）。
+3. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
+4. **当前活跃 Phase 与分支**：
+   - Phase：`super-phase1-safety-foundation`
+   - 分支：`feat/super-phase1-safety-foundation`
+   - 入口文档：`docs/progress/MASTER.md`（不在本文件重复记录子任务进度）
+5. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
+   - 先加载 `.agents/skills/spec-driven-develop/SKILL.md`（如存在）或 `spec-driven-develop` skill。
+   - 产出 spec 文档、任务分解、验收标准后再进入实现。
+   - 短任务（单文件修复、typo、小改动）不受此约束，直接做。

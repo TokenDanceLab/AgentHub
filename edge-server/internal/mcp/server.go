@@ -303,7 +303,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	if v != nil {
 		if err := json.NewEncoder(w).Encode(v); err != nil {
-			slog.Error("mcp: failed to encode response", "err", err)
+			slog.Error("mcp: failed to encode response", "error", err)
 		}
 	}
 }

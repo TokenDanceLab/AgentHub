@@ -81,6 +81,31 @@ func AgentProfileFromAgentSpecV1(ownerID string, spec AgentHubAgentSpecV1) (*Age
 		},
 	}
 
+	modelMappingJSON, err := mustAgentSpecJSON(modelMapping)
+	if err != nil {
+		return nil, fmt.Errorf("marshal model_mapping: %w", err)
+	}
+	skillsJSON, err := mustAgentSpecJSON(spec.Skills)
+	if err != nil {
+		return nil, fmt.Errorf("marshal skills: %w", err)
+	}
+	mcpJSON, err := mustAgentSpecJSON(spec.MCPServers)
+	if err != nil {
+		return nil, fmt.Errorf("marshal mcp_servers: %w", err)
+	}
+	toolAllowlistJSON, err := mustAgentSpecJSON(spec.ToolAllowlist)
+	if err != nil {
+		return nil, fmt.Errorf("marshal tool_allowlist: %w", err)
+	}
+	approvalPolicyJSON, err := mustAgentSpecJSON(spec.ApprovalPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("marshal approval_policy: %w", err)
+	}
+	targetPrefsJSON, err := mustAgentSpecJSON(spec.TargetPreference)
+	if err != nil {
+		return nil, fmt.Errorf("marshal target_preference: %w", err)
+	}
+
 	profile := &AgentProfile{
 		OwnerID:                ownerID,
 		Name:                   strings.TrimSpace(spec.Name),
@@ -89,13 +114,13 @@ func AgentProfileFromAgentSpecV1(ownerID string, spec AgentHubAgentSpecV1) (*Age
 		Model:                  strings.TrimSpace(spec.Runtime.Model),
 		Provider:               strings.TrimSpace(spec.Runtime.Provider),
 		ReasoningEffort:        strings.TrimSpace(spec.Runtime.ReasoningEffort),
-		ModelMapping:           mustAgentSpecJSON(modelMapping),
-		Skills:                 mustAgentSpecJSON(spec.Skills),
-		MCPServers:             mustAgentSpecJSON(spec.MCPServers),
-		ToolAllowlist:          mustAgentSpecJSON(spec.ToolAllowlist),
-		ApprovalPolicy:         mustAgentSpecJSON(spec.ApprovalPolicy),
+		ModelMapping:           modelMappingJSON,
+		Skills:                 skillsJSON,
+		MCPServers:             mcpJSON,
+		ToolAllowlist:          toolAllowlistJSON,
+		ApprovalPolicy:         approvalPolicyJSON,
 		PermissionMode:         firstAgentSpecMapString(spec.ApprovalPolicy, "mode"),
-		TargetPreferences:      mustAgentSpecJSON(spec.TargetPreference),
+		TargetPreferences:      targetPrefsJSON,
 		ContextBudgetMaxTokens: int(spec.Runtime.MaxOutputTokens),
 		Version:                1,
 	}
@@ -114,12 +139,12 @@ func AgentProfileFromAgentSpecV1(ownerID string, spec AgentHubAgentSpecV1) (*Age
 	return profile, nil
 }
 
-func mustAgentSpecJSON(value any) string {
+func mustAgentSpecJSON(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return string(data)
+	return string(data), nil
 }
 
 func firstAgentSpecMapString(values map[string]any, key string) string {

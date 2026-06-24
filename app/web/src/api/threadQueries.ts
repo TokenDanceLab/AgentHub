@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { hubMessageToChatMessage, sessionToThreadInfo } from '@/utils/hubAdapters';
 import type { ListResponse, ThreadInfo } from '@shared/types';
 
@@ -14,7 +15,7 @@ function page<T>(items: T[]): ListResponse<T> {
 export function useThreads(projectId?: string) {
   const authenticated = useHubStore((s) => s.authenticated);
   return useQuery<ListResponse<ThreadInfo>>({
-    queryKey: ['threads', projectId, authenticated],
+    queryKey: hubQueryKeys.threads.all(projectId),
     queryFn: async () => {
       if (!authenticated || !getAccessToken()) return page([]);
       const sessions = await hubClient.listSessions();
@@ -34,7 +35,7 @@ export function useRenameThread() {
     mutationFn: ({ threadId, title }: { threadId: string; title: string }) =>
       hubClient.updateSessionInfo(threadId, { name: title }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      void qc.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
     },
   });
 }
@@ -44,7 +45,7 @@ export function useDeleteThread() {
   return useMutation({
     mutationFn: (threadId: string) => hubClient.deleteSession(threadId),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      void qc.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
     },
   });
 }
@@ -69,14 +70,15 @@ export function useCreateThread() {
       };
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
+      void qc.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
+      void qc.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
 
 export function useThreadMessages(threadId: string | null) {
   return useQuery({
-    queryKey: ['threadItems', threadId],
+    queryKey: hubQueryKeys.threads.messages(threadId ?? ''),
     queryFn: async () => {
       const messages = await hubClient.getMessages(threadId!, { limit: 80 });
       return page(

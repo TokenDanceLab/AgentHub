@@ -64,14 +64,14 @@ func publicCountBucket(count int64) int64 {
 	switch {
 	case count <= 0:
 		return 0
-	case count < 10:
-		return 0
 	case count < 100:
-		return count / 10 * 10
+		return 50 // coarse mid-point for <100
 	case count < 1000:
 		return count / 100 * 100
-	default:
+	case count < 10000:
 		return count / 1000 * 1000
+	default:
+		return count / 10000 * 10000
 	}
 }
 

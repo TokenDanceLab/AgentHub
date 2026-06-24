@@ -238,7 +238,7 @@ hub-server/
     log/              # 结构化日志
     metrics/          # Prometheus 指标
     errcode/          # 错误码定义
-  migrations/         # 数据库迁移文件（50 对）
+  migrations/         # 数据库迁移文件（51 对）
   deployments/        # Docker 部署配置
 ```
 
@@ -735,7 +735,7 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture/`、`docs/roadmap.md` 中对应章节。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
-4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名（M1/M3a/P0-1/Phase 0/Phase 1）。
+4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D、M1/M3a/P0-1/Phase 0/Phase 1）。
 5. **时间戳快照删除**：文件名含日期的快照文档完成任务后直接删除，不留在活跃目录。
 6. **不新增根级文档**：新增长期说明先考虑合并进主文档（`docs/architecture/`、`docs/roadmap.md`），不要随手新增根级文档。
 7. **详细调研放 `docs/reference/`**：第三方调研和源码分析放 `docs/reference/`，不混入主文档。

@@ -114,14 +114,14 @@ func Detect() CCSwitchStatus {
 	// Read proxy_config to determine routing state.
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		slog.Warn("cc-switch: failed to open database", "err", err)
+		slog.Warn("cc-switch: failed to open database", "error", err)
 		return status
 	}
 	defer db.Close()
 
 	rows, err := db.Query(`SELECT app_type, proxy_enabled, listen_port FROM proxy_config`)
 	if err != nil {
-		slog.Debug("cc-switch: failed to query proxy_config", "err", err)
+		slog.Debug("cc-switch: failed to query proxy_config", "error", err)
 		return status
 	}
 	defer rows.Close()

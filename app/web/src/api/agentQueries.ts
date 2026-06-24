@@ -3,6 +3,7 @@ import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { AgentCapabilities, AgentInfo, ListResponse } from '@shared/types';
 import type { AgentConfig } from '@shared/workbench';
 
@@ -323,7 +324,7 @@ export function useAgentList(enabled: boolean) {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
 
   return useQuery<ListResponse<AgentInfo>>({
-    queryKey: ['agents', hubAuthenticated ? 'hub' : 'preview'],
+    queryKey: hubQueryKeys.agents.list(hubAuthenticated ? 'hub' : 'signed-out'),
     queryFn: () => fetchAgentList(hubAuthenticated),
     refetchInterval: 10_000,
     enabled,
@@ -337,7 +338,7 @@ export function useCreateAgentProfile() {
     mutationFn: (agent: AgentConfig) =>
       hubClient.createAgentProfile(agentConfigToCreateAgentProfileRequest(agent)),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agents.root });
     },
   });
 }
@@ -348,7 +349,7 @@ export function useUpdateAgentProfile() {
     mutationFn: ({ agent }: { agent: AgentConfig }) =>
       hubClient.updateAgentProfile(agent.id, agentConfigToUpdateAgentProfileRequest(agent)),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agents.root });
     },
   });
 }
@@ -358,7 +359,7 @@ export function useDeleteAgentProfile() {
   return useMutation({
     mutationFn: (agentId: string) => hubClient.deleteAgentProfile(agentId),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agents.root });
     },
   });
 }

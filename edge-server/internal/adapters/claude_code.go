@@ -281,7 +281,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	if ctx.MCPConfig != "" {
 		if mcpPath, err := WriteMCPConfigTempFile(ctx.MCPConfig); err != nil {
 			slog.Warn("mcp: failed to write temp config file, passing inline",
-				"err", err)
+				"error", err)
 			args = append(args, "--mcp-config", ctx.MCPConfig)
 		} else {
 			args = append(args, "--mcp-config", mcpPath)

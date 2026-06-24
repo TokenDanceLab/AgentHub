@@ -134,3 +134,23 @@ func TestFailHelper(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
+
+// TestRateLimitFailClosed_NonAuthWhenDisabled verifies that the sliding-window rate
+// limiter fails closed on non-auth paths when AGENTHUB_RATE_LIMIT_FAIL_OPEN=false.
+func TestRateLimitFailClosed_NonAuthWhenDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+	t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", "false")
+
+	handler := RateLimit(client, 10, time.Minute, IPKey)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/contacts/search", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	handler(c)
+
+	assert.True(t, c.IsAborted(), "non-auth sliding window should fail-closed when RATE_LIMIT_FAIL_OPEN=false")
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}

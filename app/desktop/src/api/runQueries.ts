@@ -5,16 +5,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
+import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
 type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;
 
 export function snapshotRunQueries(qc: QueryClient): RunQuerySnapshot {
-  return qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] });
+  return qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: edgeQueryKeys.runs.root });
 }
 
 export function upsertRunInQueries(qc: QueryClient, run: RunInfo) {
-  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: edgeQueryKeys.runs.root }, (current) => {
     if (!current) return { items: [run], page: { hasMore: false } };
     const idx = current.items.findIndex((r) => r.runId === run.runId);
     if (idx >= 0) {
@@ -39,7 +40,7 @@ export function updateRunStatusInQueries(
   status: string,
   overrides?: Partial<RunInfo>,
 ) {
-  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: edgeQueryKeys.runs.root }, (current) => {
     if (!current) return current;
     return {
       ...current,
@@ -52,7 +53,7 @@ export function updateRunStatusInQueries(
 
 export function useRuns(projectId?: string, threadId?: string, options: { enabled?: boolean } = {}) {
   return useQuery<ListResponse<RunInfo>>({
-    queryKey: ['runs', projectId, threadId],
+    queryKey: edgeQueryKeys.runs.all(projectId, threadId),
     queryFn: async () => {
       const raw = await fetchRuns(projectId, threadId);
       return safeParse(listResponseSchema(RunInfoSchema), raw, 'runs');
@@ -67,7 +68,7 @@ export function useCreateRun() {
   return useMutation({
     mutationFn: (req?: StartRunRequest) => startRun(req),
     onMutate: async (req) => {
-      await qc.cancelQueries({ queryKey: ['runs'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.runs.root });
       const prev = snapshotRunQueries(qc);
       if (req) {
         const optimistic: RunInfo = {
@@ -88,9 +89,8 @@ export function useCreateRun() {
       restoreRunsSnapshot(qc, ctx?.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['runs'] });
-      qc.invalidateQueries({ queryKey: ['threads'] });
-      qc.invalidateQueries({ queryKey: ['threadItems'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
@@ -100,7 +100,7 @@ export function useCancelRun() {
   return useMutation({
     mutationFn: (runId: string) => cancelRun(runId),
     onMutate: async (runId) => {
-      await qc.cancelQueries({ queryKey: ['runs'] });
+      await qc.cancelQueries({ queryKey: edgeQueryKeys.runs.root });
       const prev = snapshotRunQueries(qc);
       updateRunStatusInQueries(qc, runId, 'cancelled', { finishedAt: new Date().toISOString() });
       return { prev };
@@ -112,8 +112,8 @@ export function useCancelRun() {
       restoreRunsSnapshot(qc, ctx?.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['runs'] });
-      qc.invalidateQueries({ queryKey: ['threadItems'] });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
 }
