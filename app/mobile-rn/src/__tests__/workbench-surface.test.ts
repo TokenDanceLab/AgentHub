@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * WorkbenchSurfaceScreen data-level logic tests.
  *
