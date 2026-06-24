@@ -1673,7 +1673,7 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 
 // fireHubDone sends a TaskDone callback to Hub. Called when the run finishes successfully.
 // Errors are logged but never block the run lifecycle.
-func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
+func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 	if e.hubCallback == nil {
 		return
 	}

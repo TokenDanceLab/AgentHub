@@ -320,7 +320,7 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 			return err
 		}
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
 	for _, member := range joinedMembers {
 		s.publishEvent(ctx, "session.member_joined", map[string]interface{}{
 			"session_id":  sessionID,
@@ -369,7 +369,7 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
 	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
 		"session_id": sessionID,
 		"member_id":  targetUserID,
@@ -416,7 +416,7 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
 	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
 		"session_id": sessionID,
 		"member_id":  currentUserID,
@@ -452,7 +452,7 @@ func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUser
 	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
 	return nil
 }
 
@@ -477,7 +477,7 @@ func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessi
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
 	s.publishEvent(ctx, "session.dissolved", map[string]interface{}{
 		"session_id": sessionID,
 	})
@@ -518,7 +518,7 @@ func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, ses
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:meta:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:meta:"+sessionID)
 	s.publishEvent(ctx, "session.info_updated", map[string]interface{}{
 		"session_id": sessionID,
 		"changes":    changes,
@@ -576,7 +576,7 @@ func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, session
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
 	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
 		"session_id": sessionID,
 		"member_id":  currentUserID,

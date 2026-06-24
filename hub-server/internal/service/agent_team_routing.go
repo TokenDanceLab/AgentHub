@@ -656,7 +656,7 @@ func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.A
 		return
 	}
 
-	s.appendTeamEvent(run.ID, "team.escalation.review", map[string]any{
+	_ = s.appendTeamEvent(run.ID, "team.escalation.review", map[string]any{
 		"assignment_id": a.ID,
 		"phase":         "review",
 		"error":         escalationCtx["error"],

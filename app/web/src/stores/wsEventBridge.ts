@@ -16,11 +16,7 @@ import type {
   HubAgentCancelPayload,
   HubAgentRegeneratePayload,
   HubMessage,
-  HubNotification,
   HubSession,
-  HubFriendEventPayload,
-  HubDevicePresencePayload,
-  HubDeviceKickedPayload,
 } from '@shared/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
@@ -348,15 +344,13 @@ function onFriendAccepted(qc: QueryClient, _payload: unknown) {
   invalidateQuery(qc, hubQueryKeys.contacts.friendRequests);
 }
 
-function onDeviceOnline(qc: QueryClient, payload: unknown) {
-  const data = payload as HubDevicePresencePayload;
+function onDeviceOnline(qc: QueryClient, _payload: unknown) {
   getConnection().setOnline(true, null);
   // Invalidate targets to reflect online status
   invalidateAllWithPrefix(qc, hubQueryKeys.executionTargets.root);
 }
 
-function onDeviceOffline(qc: QueryClient, payload: unknown) {
-  const data = payload as HubDevicePresencePayload;
+function onDeviceOffline(qc: QueryClient, _payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.executionTargets.root);
 }
 
