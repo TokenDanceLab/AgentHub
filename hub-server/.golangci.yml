@@ -1,14 +1,5 @@
-version: "2"
 run:
   tests: true
-issues:
-  exclude-rules:
-    - path: internal/app/events\.go
-      linters:
-        - gocognit
-    - path: internal/config/config\.go
-      linters:
-        - gocognit
 linters:
   enable:
     - cyclop
