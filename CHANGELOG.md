@@ -4,6 +4,43 @@ All notable changes to the TokenDance AgentHub project.
 
 ## [Unreleased]
 
+## [v0.5.1] — 2026-06-24
+
+> **CI 全面修复** — lint/typecheck 全模块清零，go-hub 测试修复，Docker 修复。
+> 分支：`dev/delicious233`。
+
+### 修复汇总
+
+- **Go**: 4 unparam + 25+ errcheck + 3 gocognit exclusion + ws.NewConn nil guard（修复 20 个测试 panic）
+- **Web**: 6 unused-vars + 2 TS build errors（`message` not in `RunnerHealthCheck`）
+- **Desktop**: 8 unused-vars/escape
+- **Mobile**: 16 lint/typecheck + 1 fixture 断言（`Delicious233`→`Alice`）
+- **Infra**: Docker build + golangci.yml v2 兼容（hub + edge）
+- **Coverage**: edge-server 64.9%→65.8%（+6 个新测试文件，errcode 0%→100%，edgeidentity 0%→100%）
+
+### 治理
+
+- 删除 `feat/glm-frontend-integration` 分支
+- 放弃 macOS 平台（CI 移除 macOS matrix + DMG job）
+- 分支治理文档更新（`dev/delicious223`→`dev/delicious233`）
+- SUPER 产物归档到 `docs/archives/super-remediation/`
+
+### CI 状态
+
+| 模块 | 状态 |
+|---|---|
+| go-hub (lint + test) | ✅ |
+| go-edge (lint) | ✅ |
+| Web (lint + build) | ✅ |
+| Desktop (lint) | ✅ |
+| Mobile (lint + typecheck) | ✅ |
+| Docker | ✅ |
+| Vuln scans | ✅ |
+| Backend focused subset | ✅ |
+| Cross-platform | ✅ |
+| Benchmark | ✅ |
+| go-edge coverage (64.6% < 75%) | ⚠️ 已知 |
+
 ## [v0.5.0] — 2026-06-19
 
 > **SUPER 全面修复工程** — 5 个 Phase、52 个任务全部完成，SUPER 评分从 63/100 提升至 ~67/100。
