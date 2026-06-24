@@ -418,6 +418,27 @@ corepack.cmd pnpm exec vite build
 - 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
 - Desktop/Edge 执行链路改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
 
+### 7.1 测试质量红线
+
+以下类型测试**禁止提交**，CR 时直接 reject：
+
+| 反模式 | 示例 | 为什么禁止 |
+|---|---|---|
+| **JUDGE+JURY** | `classifyFile("a.html")` → 断言返回 `kindPreview`，与 switch 实现同构 | 测试和实现是同一份逻辑的副本。改实现必改测试，但测试不会发现 bug——它只是重复实现。 |
+| **SIGNATURE** | `TestRiskLow == "low"` 测常量值 | 常量值由编译器保证。测它不增加任何保护。 |
+| **硬编码错误字符串** | `err.Error()` → 断言 `== "parse stream error: ..."` | 错误文案是 UI，随时可能调整。测行为（`err != nil`），不测文案。 |
+| **纯 mirror mock** | Mock 返回值和实现一模一样，没有任何外部输入 | Mock 应该模拟外部系统（HTTP、DB、文件系统），不是模拟被测函数自己。 |
+
+**正确做法**：
+
+| 层级 | 怎么做 | 示例 |
+|---|---|---|
+| **E2E / 集成测试** | httptest.NewServer → 真实 SSE 流 → adapter 解析 → 验证输出事件 | `anthropic_sdk_e2e_test.go` |
+| **行为测试** | 给输入，验证输出行为，不碰内部状态 | `secure_emitter_test.go`（mock hook → emitter → 验证事件） |
+| **边界测试** | nil/空输入、超时、取消、畸形数据 | `TestTakeWorkdirSnapshot` 测空路径返回 nil |
+
+**Go 适配器优先用 `httptest.NewServer`** mock 外部 API，不 mock 内部接口。
+
 ## 8. 质量治理
 
 ### 测试覆盖率
