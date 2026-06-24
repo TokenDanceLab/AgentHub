@@ -1,4 +1,4 @@
-package service
+package agentteam
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"gorm.io/gorm"
 )
@@ -565,7 +566,7 @@ func (s *AgentTeamService) publishTeamEvent(ctx context.Context, eventType strin
 	if s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, Event{
+	s.bus.Publish(ctx, service.Event{
 		Type:    eventType,
 		Payload: payload,
 	})
