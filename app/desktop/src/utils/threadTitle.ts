@@ -96,7 +96,7 @@ function normalizeTitleLine(line: string): string {
     .replace(/https?:\/\/\S+/gi, '')
     .replace(/^\s*[-*+]\s+/, '')
     .replace(/^#{1,6}\s+/, '')
-    .replace(/[`*_>#\[\]()]/g, '')
+    .replace(/[`*_>#[]()]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/[.!?;:,，。！？；：]+$/g, '')

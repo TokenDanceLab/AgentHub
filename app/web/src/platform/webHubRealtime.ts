@@ -245,7 +245,6 @@ export function invalidateWebWorkbenchHubQueries(
 
   // ── Plan events ────────────────────────────────
   if (PLAN_EVENTS.has(eventType)) {
-    const runId = readString(payload, 'run_id', 'runId');
     const taskId = readString(payload, 'task_id', 'taskId');
     if (taskId) {
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
