@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * E2E: Tasks screen — interaction, error, and loading state tests.
  *
