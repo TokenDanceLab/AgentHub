@@ -463,7 +463,7 @@ Web / Desktop / Mobile / IM
 | 连接状态指示器 | 用户无法感知 WS 连接状态 | UI 渲染（workbenchState.ts 状态机已实现） | 4 |
 | Tool allowlist 运行时强制 | Edge 不强制过滤工具调用 | 运行时强制过滤（data path verified） | 6 |
 | Android APK 构建 | Mobile 缺少 Android 构建产出 | 缺少构建环境 | 13 |
-| macOS unsigned path | Desktop macOS 打包路径未拆清 | 缺少硬件 | 13 |
+| ~~macOS~~ | ~~已放弃，CI 移除 macOS~~ | ❌ | — |
 | Codex CLI 真实执行 | 适配器已实现但无法调用 | 缺 `OPENAI_API_KEY` | 10 |
 | SDK 真实 API 消耗 | SDK adapter 已实现但无法调用 | 缺 API key | 12 |
 | Artifact/Diff apply/revert | 只读展示，写文件未实现 | 需审批 | 10 |
@@ -1067,7 +1067,6 @@ CLI permission request
 - ✅ Desktop 共享 Web workbench UI
 - ✅ Desktop 全端点 hooks 已实现
 - ✅ Desktop chatActions 已接线
-- ⏳ macOS unsigned path 未拆清
 
 #### 验收标准
 
@@ -1075,7 +1074,6 @@ CLI permission request
 - [x] Edge 健康状态在 UI 显示 | 验证人：E2E smoke
 - [x] Windows unsigned package hash 一致 | 验证人：`verify-tauri-package-dry.ps1`
 - [x] sidecar 正确放置 | 验证人：`verify-tauri-package-dry.ps1`
-- [ ] macOS unsigned path 拆清 | 验证人：CI 构建（需硬件）
 
 ### 13.3 i18n
 
@@ -1955,7 +1953,7 @@ SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
 | Anthropic SDK 真实 API 消耗 | 12. SDK/CLI | 缺 API key | P3 |
 | OpenAI SDK 真实 API 消耗 | 12. SDK/CLI | 缺 API key | P3 |
 | Android APK 构建产出 | 13. Mobile | 缺少构建环境 | P3 |
-| macOS unsigned path 拆清 | 13. Desktop | 缺少硬件 | P4 |
+| ~~macOS unsigned path 拆清~~ | ~~已放弃~~ | ❌ | — |
 | 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批（P0 XSS 已修复，Permissions-Policy 待配置） | P3 |
 | Edge Server 生产部署就绪 | 15. 部署 | 架构决策 | P3 |
 | PG 自动备份运行 | 15. 部署 | 基础设施 | P3 |
