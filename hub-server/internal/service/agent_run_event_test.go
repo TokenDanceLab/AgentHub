@@ -591,7 +591,7 @@ func TestListTaskApprovalsProjectsPendingAndDecidedRuntimeEvents(t *testing.T) {
 	require.Equal(t, "target-1", result.Pending[0].TargetID)
 	require.Equal(t, "dev-1", result.Pending[0].EdgeDeviceID)
 	require.Equal(t, int64(1), result.Pending[0].EventSeq)
-	require.Equal(t, "req-2", result.Decided[0].ApprovalID)
+	require.Equal(t, "tool-2", result.Decided[0].ApprovalID)
 	require.Equal(t, "allow", result.Decided[0].Status)
 	require.Equal(t, "safe", result.Decided[0].Reason)
 	require.NotNil(t, result.Decided[0].DecidedAt)
