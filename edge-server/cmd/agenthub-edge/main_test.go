@@ -459,7 +459,7 @@ func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 		t.Fatalf("repository type = %T, want *store.FileStore", repository)
 	}
 
-	_, _ = fileStore.CreateProject("proj_test", "Test Project")
+	_, _ = fileStore.CreateProject("proj_test", "Test Project", "")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("store file was not written: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestNewStoreFromConfigUsesSQLiteStore(t *testing.T) {
 	}
 	defer sqliteStore.Close()
 
-	_, _ = sqliteStore.CreateProject("proj_test", "Test Project")
+	_, _ = sqliteStore.CreateProject("proj_test", "Test Project", "")
 	restored, err := store.NewSQLite(path)
 	if err != nil {
 		t.Fatalf("NewSQLite restored returned error: %v", err)
@@ -515,7 +515,7 @@ func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
 		t.Fatalf("repository type = %T, want *store.SQLiteStore", repository)
 	}
 
-	project, err := sqliteStore.CreateProject("proj_observed_fixture", "Observed Fixture Project")
+	project, err := sqliteStore.CreateProject("proj_observed_fixture", "Observed Fixture Project", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
@@ -587,7 +587,7 @@ func TestRunStoreReadinessPrintsSQLiteManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
-	project, err := repository.CreateProject("proj_readiness_report", "Readiness Report")
+	project, err := repository.CreateProject("proj_readiness_report", "Readiness Report", "")
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}

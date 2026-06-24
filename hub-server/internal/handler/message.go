@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 
@@ -58,7 +59,8 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 
 	result, err := h.service.SendMessage(c.Request.Context(), sessionID, userID, req)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -103,7 +105,8 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 
 	result, err := h.service.GetMessages(c.Request.Context(), sessionID, userID, beforeSeq, limit)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -148,7 +151,8 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 
 	result, err := h.service.GetMessagesIncremental(c.Request.Context(), sessionID, userID, afterSeq, limit)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -170,7 +174,8 @@ func (h *MessageHandler) EditMessage(c *gin.Context) {
 
 	result, err := h.service.EditMessage(c.Request.Context(), msgID, userID, req)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -185,7 +190,8 @@ func (h *MessageHandler) RecallMessage(c *gin.Context) {
 	msgID := c.Param("id")
 
 	if err := h.service.RecallMessage(c.Request.Context(), msgID, userID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -208,7 +214,8 @@ func (h *MessageHandler) PinMessage(c *gin.Context) {
 	}
 
 	if err := h.service.PinMessage(c.Request.Context(), userID, req.SessionID, msgID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -231,7 +238,8 @@ func (h *MessageHandler) UnpinMessage(c *gin.Context) {
 	}
 
 	if err := h.service.UnpinMessage(c.Request.Context(), userID, req.SessionID, msgID); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -263,7 +271,8 @@ func (h *MessageHandler) AddMessageReaction(c *gin.Context) {
 
 	result, err := h.service.AddMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -295,7 +304,8 @@ func (h *MessageHandler) RemoveMessageReaction(c *gin.Context) {
 
 	result, err := h.service.RemoveMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -316,7 +326,8 @@ func (h *MessageHandler) ListMessageReactions(c *gin.Context) {
 
 	result, err := h.service.ListMessageReactions(c.Request.Context(), userID, sessionID, msgID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -332,7 +343,8 @@ func (h *MessageHandler) ListPins(c *gin.Context) {
 
 	result, err := h.service.ListPinnedMessages(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -355,7 +367,8 @@ func (h *MessageHandler) ForwardMessage(c *gin.Context) {
 	}
 
 	if err := h.service.ForwardMessage(c.Request.Context(), userID, msgID, req.TargetSessionIDs); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -378,7 +391,8 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 	}
 
 	if err := h.service.MarkRead(c.Request.Context(), userID, sessionID, req.LastReadSeq); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -403,7 +417,8 @@ func (h *MessageHandler) SearchMessages(c *gin.Context) {
 
 	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
@@ -428,7 +443,8 @@ func (h *MessageHandler) SearchSessionMessages(c *gin.Context) {
 
 	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}

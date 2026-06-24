@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { createHubClient } from './hubClient';
 import type {
   CreateWorkspaceProjectThreadRequest,
@@ -12,8 +13,8 @@ import type {
   WorkspaceProjectThreadMessage,
 } from './hubClient';
 
-export const workspaceProjectsQueryKey = ['web-v4', 'hub-projects'] as const;
-export const workspaceProjectThreadsQueryKey = ['web-v4', 'hub-project-threads'] as const;
+export const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
+export const workspaceProjectThreadsQueryKey = hubQueryKeys.projects.root;
 
 const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   items: [],
@@ -118,7 +119,7 @@ export function useHubWorkspaceProjects(options: {
   getToken?: () => string | null;
 }) {
   return useQuery<WorkspaceProjectListResponse>({
-    queryKey: [...workspaceProjectsQueryKey, options.enabled ? 'hub' : 'signed-out'],
+    queryKey: hubQueryKeys.projects.list(options.enabled ? 'hub' : 'signed-out'),
     queryFn: () => fetchWorkspaceProjects(options.enabled, options.getToken ?? getAccessToken),
     enabled: options.enabled,
     staleTime: 10_000,
@@ -132,7 +133,7 @@ export function useHubWorkspaceProject(options: {
   getToken?: () => string | null;
 }) {
   return useQuery<WorkspaceProject | undefined>({
-    queryKey: ['web-v4', 'hub-project', options.projectId],
+    queryKey: hubQueryKeys.projects.detail(options.projectId ?? ''),
     queryFn: () => fetchWorkspaceProject(options.projectId, options.getToken ?? getAccessToken),
     enabled: options.enabled && Boolean(options.projectId),
     staleTime: 10_000,
@@ -159,8 +160,8 @@ export function useUpdateHubWorkspaceProject(options: { getToken?: () => string 
     mutationFn: ({ projectId, draft }: { projectId: string; draft: UpdateWorkspaceProjectRequest }) =>
       updateWorkspaceProject(projectId, draft, options.getToken ?? getAccessToken),
     onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: workspaceProjectsQueryKey });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-project', variables.projectId] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.root });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.detail(variables.projectId) });
     },
   });
 }
@@ -171,7 +172,7 @@ export function useHubWorkspaceProjectThreads(options: {
   getToken?: () => string | null;
 }) {
   return useQuery<WorkspaceProjectThread[]>({
-    queryKey: [...workspaceProjectThreadsQueryKey, options.projectId ?? 'none'],
+    queryKey: [...hubQueryKeys.projects.threads(options.projectId ?? 'none')],
     queryFn: () => fetchWorkspaceProjectThreads(options.projectId, options.getToken ?? getAccessToken),
     enabled: options.enabled && Boolean(options.projectId),
     staleTime: 10_000,
@@ -187,10 +188,7 @@ export function useHubWorkspaceProjectThreadMessages(options: {
 }) {
   return useQuery<WorkspaceProjectThreadMessage[]>({
     queryKey: [
-      'web-v4',
-      'hub-project-thread-messages',
-      options.projectId ?? 'none',
-      options.threadId ?? 'none',
+      ...hubQueryKeys.projects.threadMessages(options.projectId ?? 'none', options.threadId ?? 'none'),
     ],
     queryFn: () => fetchWorkspaceProjectThreadMessages(
       options.projectId,
@@ -210,7 +208,7 @@ export function useCreateHubWorkspaceProjectThread(options: { getToken?: () => s
     mutationFn: ({ projectId, draft }: { projectId: string; draft: CreateWorkspaceProjectThreadRequest }) =>
       createWorkspaceProjectThread(projectId, draft, options.getToken ?? getAccessToken),
     onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: [...workspaceProjectThreadsQueryKey, variables.projectId] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.threads(variables.projectId) });
     },
   });
 }
@@ -228,7 +226,7 @@ export function useSendHubWorkspaceProjectThreadMessage(options: { getToken?: ()
     ) => sendWorkspaceProjectThreadMessage(projectId, threadId, draft, options.getToken ?? getAccessToken),
     onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ['web-v4', 'hub-project-thread-messages', variables.projectId, variables.threadId],
+        queryKey: hubQueryKeys.projects.threadMessages(variables.projectId, variables.threadId),
       });
     },
   });

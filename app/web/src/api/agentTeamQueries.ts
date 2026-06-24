@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { createHubClient } from './hubClient';
 import type {
   AgentTeam,
@@ -153,12 +154,11 @@ export function useHubAgentTeams(enabledOrOptions: boolean | UseHubAgentTeamsOpt
 
   return useQuery<AgentTeamOverview>({
     queryKey: [
-      'agent-teams',
-      options.preferHub ? 'hub' : 'signed-out',
+      ...hubQueryKeys.agentTeams.list(options.preferHub ? 'hub' : 'signed-out'),
       options.baseUrl ?? 'default',
       options.selectedTeamId ?? 'auto-team',
       options.selectedRunId ?? 'auto-run',
-    ],
+    ] as const,
     queryFn: () => fetchAgentTeamOverview(
       options.preferHub,
       options.getToken,
@@ -185,7 +185,7 @@ export function useCreateAgentTeam(options: { getToken?: () => string | null; ba
       return client.createAgentTeam(input);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -203,7 +203,7 @@ export function useAddAgentTeamMember(options: { getToken?: () => string | null;
       return client.addAgentTeamMember(input.teamId, input.member);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -221,7 +221,7 @@ export function useStartTeamRun(options: { getToken?: () => string | null; baseU
       return client.startTeamRun(input.teamId, input.run);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -244,7 +244,7 @@ export function useDecideTeamApproval(options: { getToken?: () => string | null;
       return client.decideTeamApproval(input.teamId, input.runId, input.approvalId, input.decision);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -267,7 +267,7 @@ export function useResolveTeamConflict(options: { getToken?: () => string | null
       return client.resolveTeamConflict(input.teamId, input.runId, input.conflictId, input.resolution);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }

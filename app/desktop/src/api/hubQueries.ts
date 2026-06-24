@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
@@ -16,7 +17,7 @@ export function getHubClient() {
 
 export function useHubContacts(opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'contacts'],
+    queryKey: hubQueryKeys.contacts.root,
     queryFn: () => getHubClient().listContacts(),
     enabled: opts?.enabled ?? false,
   });
@@ -34,7 +35,7 @@ export function useHubSendFriendRequest() {
     mutationFn: ({ userId, message }: { userId: string; message?: string }) =>
       getHubClient().sendFriendRequest(userId, message),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -44,7 +45,7 @@ export function useHubAcceptFriendRequest() {
   return useMutation({
     mutationFn: (requestId: string) => getHubClient().acceptFriendRequest(requestId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -54,7 +55,7 @@ export function useHubRejectFriendRequest() {
   return useMutation({
     mutationFn: (requestId: string) => getHubClient().rejectFriendRequest(requestId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -64,7 +65,7 @@ export function useHubRemoveContact() {
   return useMutation({
     mutationFn: (userId: string) => getHubClient().removeContact(userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -74,7 +75,7 @@ export function useHubBlockContact() {
   return useMutation({
     mutationFn: (userId: string) => getHubClient().blockContact(userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -84,7 +85,7 @@ export function useHubUnblockContact() {
   return useMutation({
     mutationFn: (userId: string) => getHubClient().unblockContact(userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -95,7 +96,7 @@ export function useHubUpdateContactRemark() {
     mutationFn: ({ userId, remark }: { userId: string; remark: string }) =>
       getHubClient().updateContactRemark(userId, remark),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
     },
   });
 }
@@ -116,7 +117,7 @@ export interface WorkspaceProjectPage {
 
 export function useHubWorkspaceProjects(opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'workspace-projects'],
+    queryKey: hubQueryKeys.projects.root,
     queryFn: () => getHubClient().listWorkspaceProjects(),
     enabled: opts?.enabled ?? false,
   });

@@ -246,7 +246,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 		if jsonlMode {
 			var evt codexExecEvent
 			if err := json.Unmarshal(line, &evt); err != nil {
-				slog.Debug("codex: JSON parse error in stream, falling back to raw text", "err", err)
+				slog.Debug("codex: JSON parse error in stream, falling back to raw text", "error", err)
 				emitter.Emit(BusEventTextDelta, scope, map[string]any{
 					"content": string(line),
 					"offset":  offset,
@@ -409,7 +409,7 @@ func (a *CodexAdapter) dispatchItemStarted(scope map[string]any, emitter EventEm
 	}
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: item.started base unmarshal failed", "err", err)
+		slog.Debug("codex: item.started base unmarshal failed", "error", err)
 		return
 	}
 	switch base.Type {
@@ -436,7 +436,7 @@ func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter Event
 	}
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: item.completed base unmarshal failed", "err", err)
+		slog.Debug("codex: item.completed base unmarshal failed", "error", err)
 		return
 	}
 	switch base.Type {
@@ -471,7 +471,7 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 	}
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: item.updated base unmarshal failed", "err", err)
+		slog.Debug("codex: item.updated base unmarshal failed", "error", err)
 		return
 	}
 	switch base.Type {
@@ -498,7 +498,7 @@ func (a *CodexAdapter) emitTextBlock(raw json.RawMessage, scope map[string]any, 
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitTextBlock unmarshal failed", "err", err)
+		slog.Debug("codex: emitTextBlock unmarshal failed", "error", err)
 		return
 	}
 	if item.Text != "" {
@@ -513,7 +513,7 @@ func (a *CodexAdapter) emitThinking(raw json.RawMessage, scope map[string]any, e
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitThinking unmarshal failed", "err", err)
+		slog.Debug("codex: emitThinking unmarshal failed", "error", err)
 		return
 	}
 	if item.Text != "" {
@@ -527,7 +527,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 	payload := map[string]any{"status": status}
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: emitToolCallFromItem base unmarshal failed", "err", err)
+		slog.Debug("codex: emitToolCallFromItem base unmarshal failed", "error", err)
 	}
 	payload["callId"] = base.ID
 
@@ -537,7 +537,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 			Command string `json:"command"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolCallFromItem command_execution unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolCallFromItem command_execution unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "shell_command"
 		payload["input"] = map[string]any{"command": item.Command}
@@ -548,7 +548,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 			Arguments json.RawMessage `json:"arguments"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolCallFromItem mcp_tool_call unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolCallFromItem mcp_tool_call unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 		if item.Arguments != nil {
@@ -563,7 +563,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 			Action string `json:"action"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolCallFromItem web_search unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolCallFromItem web_search unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "web_search"
 		payload["input"] = map[string]any{"query": item.Query, "action": item.Action}
@@ -581,7 +581,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 	payload := map[string]any{}
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: emitToolResultFromItem base unmarshal failed", "err", err)
+		slog.Debug("codex: emitToolResultFromItem base unmarshal failed", "error", err)
 	}
 	payload["callId"] = base.ID
 
@@ -594,7 +594,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			Status           string `json:"status"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolResultFromItem command_execution unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolResultFromItem command_execution unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "shell_command"
 		payload["output"] = item.AggregatedOutput
@@ -611,7 +611,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			ItemError *codexItemError `json:"error"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolResultFromItem mcp_tool_call unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolResultFromItem mcp_tool_call unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 		payload["status"] = item.Status
@@ -630,7 +630,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			Action string `json:"action"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolResultFromItem web_search unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolResultFromItem web_search unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "web_search"
 		payload["kind"] = "web_search"
@@ -653,7 +653,7 @@ func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any,
 		} `json:"changes"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitFileChange unmarshal failed", "err", err)
+		slog.Debug("codex: emitFileChange unmarshal failed", "error", err)
 		return
 	}
 	files := make([]map[string]any, 0, len(item.Changes))
@@ -769,7 +769,7 @@ func codexPathVolumeName(path string) string {
 func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
 	var base itemBase
 	if err := json.Unmarshal(raw, &base); err != nil {
-		slog.Debug("codex: emitToolProgress base unmarshal failed", "err", err)
+		slog.Debug("codex: emitToolProgress base unmarshal failed", "error", err)
 	}
 
 	payload := map[string]any{
@@ -785,7 +785,7 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			AggregatedOutput string `json:"aggregated_output"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolProgress command_execution unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolProgress command_execution unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "shell_command"
 		payload["output"] = item.AggregatedOutput
@@ -795,7 +795,7 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			Tool   string `json:"tool"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolProgress mcp_tool_call unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolProgress mcp_tool_call unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 	case "web_search":
@@ -804,7 +804,7 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			Action string `json:"action"`
 		}
 		if err := json.Unmarshal(raw, &item); err != nil {
-			slog.Debug("codex: emitToolProgress web_search unmarshal failed", "err", err)
+			slog.Debug("codex: emitToolProgress web_search unmarshal failed", "error", err)
 		}
 		payload["toolName"] = "web_search"
 		payload["kind"] = "web_search"
@@ -827,7 +827,7 @@ func (a *CodexAdapter) emitTaskStarted(raw json.RawMessage, scope map[string]any
 		Status            string                     `json:"status"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitTaskStarted unmarshal failed", "err", err)
+		slog.Debug("codex: emitTaskStarted unmarshal failed", "error", err)
 		return
 	}
 	emitter.Emit(BusEventTaskStarted, scope, map[string]any{
@@ -851,7 +851,7 @@ func (a *CodexAdapter) emitTaskNotification(raw json.RawMessage, scope map[strin
 		Status            string                     `json:"status"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitTaskNotification unmarshal failed", "err", err)
+		slog.Debug("codex: emitTaskNotification unmarshal failed", "error", err)
 		return
 	}
 	notification := map[string]any{
@@ -879,7 +879,7 @@ func (a *CodexAdapter) emitErrorItem(raw json.RawMessage, scope map[string]any, 
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitErrorItem unmarshal failed", "err", err)
+		slog.Debug("codex: emitErrorItem unmarshal failed", "error", err)
 		return
 	}
 	emitter.Emit(BusEventResult, scope, map[string]any{
@@ -897,7 +897,7 @@ func (a *CodexAdapter) emitTodoList(raw json.RawMessage, scope map[string]any, e
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(raw, &item); err != nil {
-		slog.Debug("codex: emitTodoList unmarshal failed", "err", err)
+		slog.Debug("codex: emitTodoList unmarshal failed", "error", err)
 		return
 	}
 	tasks := make([]map[string]any, 0, len(item.Items))

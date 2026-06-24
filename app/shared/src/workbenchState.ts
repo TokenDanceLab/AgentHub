@@ -1,4 +1,4 @@
-import type { AnyEvent, EventEnvelope } from './events';
+import type { AnyEvent } from './events';
 import type {
   Approval,
   Artifact,
@@ -149,20 +149,18 @@ export function workbenchReducer(
 }
 
 function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
-  const envelope = event as EventEnvelope;
-
-  if (envelope.seq && envelope.seq <= state.lastSeq) {
+  if (event.seq && event.seq <= state.lastSeq) {
     return state;
   }
 
-  const nextSeq = envelope.seq || state.lastSeq;
-  const payload = event.payload ?? {};
-  const sentAt = envelope.sentAt || new Date().toISOString();
+  const nextSeq = event.seq || state.lastSeq;
+  const sentAt = event.sentAt || new Date().toISOString();
 
   switch (event.type) {
     case 'project.created':
     case 'project.updated': {
-      const projectId = text(payload.projectId) ?? text(envelope.scope?.projectId);
+      const payload = event.payload;
+      const projectId = text(payload.projectId) ?? text(event.scope?.projectId);
       if (!projectId) return withSeq(state, nextSeq);
 
       return {
@@ -179,7 +177,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     }
     case 'thread.created':
     case 'thread.updated': {
-      const threadId = text(payload.threadId) ?? text(envelope.scope?.threadId);
+      const payload = event.payload;
+      const threadId = text(payload.threadId) ?? text(event.scope?.threadId);
       if (!threadId) return withSeq(state, nextSeq);
 
       return {
@@ -189,7 +188,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           id: threadId,
           projectId:
             text(payload.projectId) ??
-            text(envelope.scope?.projectId) ??
+            text(event.scope?.projectId) ??
             current?.projectId ??
             '',
           status: threadStatus(payload.status) ?? current?.status ?? 'active',
@@ -201,6 +200,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'message.created': {
+      const payload = event.payload;
       const item = threadItemFromMessage(payload, sentAt);
       if (!item) return withSeq(state, nextSeq);
 
@@ -211,6 +211,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'message.delta': {
+      const payload = event.payload;
       const itemId = text(payload.messageId);
       const threadId = text(payload.threadId);
       const delta = text(payload.delta) ?? '';
@@ -231,8 +232,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     }
     case 'item.created':
     case 'item.updated': {
+      const payload = event.payload;
       const itemId = text(payload.itemId);
-      const threadId = text(payload.threadId) ?? text(envelope.scope?.threadId);
+      const threadId = text(payload.threadId) ?? text(event.scope?.threadId);
       if (!itemId || !threadId) return withSeq(state, nextSeq);
 
       return {
@@ -250,6 +252,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     }
     case 'runner.online':
     case 'runner.offline': {
+      const payload = event.payload;
       const runnerId = text(payload.runnerId);
       if (!runnerId) return withSeq(state, nextSeq);
 
@@ -270,7 +273,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     case 'run.finished':
     case 'run.failed':
     case 'run.cancelled': {
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
+      const payload = event.payload;
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
       if (!runId) return withSeq(state, nextSeq);
 
       return {
@@ -280,12 +284,12 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           runId,
           projectId:
             text(payload.projectId) ??
-            text(envelope.scope?.projectId) ??
+            text(event.scope?.projectId) ??
             current?.projectId ??
             '',
           threadId:
             text(payload.threadId) ??
-            text(envelope.scope?.threadId) ??
+            text(event.scope?.threadId) ??
             current?.threadId ??
             '',
           status: runStatus(event.type, payload.status) ?? current?.status ?? 'queued',
@@ -297,7 +301,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     }
     case 'run.output':
     case 'run.output.batch': {
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
+      const payload = event.payload;
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
       if (!runId) return withSeq(state, nextSeq);
 
       const current = state.runLogs[runId] ?? {
@@ -327,9 +332,10 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'approval.requested': {
+      const payload = event.payload;
       const approvalId = text(payload.approvalId);
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
-      const threadId = text(payload.threadId) ?? text(envelope.scope?.threadId);
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
+      const threadId = text(payload.threadId) ?? text(event.scope?.threadId);
       if (!approvalId || !runId || !threadId) return withSeq(state, nextSeq);
 
       return {
@@ -349,6 +355,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'approval.decided': {
+      const payload = event.payload;
       const approvalId = text(payload.approvalId);
       if (!approvalId) return withSeq(state, nextSeq);
 
@@ -367,9 +374,10 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'artifact.created': {
+      const payload = event.payload;
       const artifactId = text(payload.artifactId);
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
-      const threadId = text(payload.threadId) ?? text(envelope.scope?.threadId);
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
+      const threadId = text(payload.threadId) ?? text(event.scope?.threadId);
       if (!artifactId || !runId || !threadId) return withSeq(state, nextSeq);
 
       return {
@@ -387,8 +395,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'preview.ready': {
+      const payload = event.payload;
       const previewId = text(payload.previewId);
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
       if (!previewId || !runId) return withSeq(state, nextSeq);
       const run = state.runs.find((candidate) => candidate.runId === runId);
 
@@ -406,8 +415,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
     }
     case 'preview.stopped': {
+      const payload = event.payload;
       const previewId = text(payload.previewId);
-      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
+      const runId = text(payload.runId) ?? text(event.scope?.runId);
       if (!previewId || !runId) return withSeq(state, nextSeq);
       const run = state.runs.find((candidate) => candidate.runId === runId);
 
@@ -423,7 +433,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
         })),
       };
     }
-    case 'error':
+    case 'error': {
+      const payload = event.payload;
       return {
         ...state,
         lastSeq: nextSeq,
@@ -432,6 +443,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           error: text(payload.message) ?? text(payload.code) ?? 'Unknown Edge error',
         },
       };
+    }
     default:
       return withSeq(state, nextSeq);
   }

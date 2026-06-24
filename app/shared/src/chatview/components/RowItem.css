@@ -25,6 +25,7 @@
   width:100%;
 }
 .row-hd:hover { background:var(--surface-high) }
+.row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .row-item.running > .row-hd,
 .row-item:not(.collapsible) > .row-hd { cursor:default; pointer-events:none }
 .row-item.running > .row-hd:hover,
@@ -98,6 +99,7 @@
 .ap-actions { display:flex; gap:var(--sp-sm) }
 .ap-actions button { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:none; transition:opacity var(--dur) }
 .ap-actions button:hover { opacity:0.85 }
+.ap-actions button:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .ap-approve { background:var(--success); color:var(--on-primary) }
 .ap-deny { background:var(--surface); color:var(--danger); border:1px solid var(--danger-bg) }
 
@@ -105,6 +107,7 @@
 .retry-bar { display:flex; padding:var(--sp-xs) var(--sp-10) var(--sp-xs) var(--sp-10); border-top:1px solid var(--danger-bg) }
 .retry-btn { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:1px solid var(--danger); background:var(--danger-bg); color:var(--danger); transition:opacity var(--dur) }
 .retry-btn:hover { opacity:0.85 }
+.retry-btn:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 
 /* Route — dispatch indicator */
 .row-item.route { margin:var(--sp-xs) 0; animation:routeSlideIn var(--dur-slow) var(--ease) both }
@@ -167,6 +170,7 @@
   font:var(--label-xs); padding:var(--sp-2) var(--sp-xxs); border-radius:var(--r-xs);
 }
 .code-copy:hover { background:var(--surface-high); color:var(--text-1) }
+.code-copy:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .code-lines { padding:var(--sp-sm) 0; overflow-x:auto }
 .code-line { display:flex; padding:0 var(--sp-md); white-space:pre }
 .code-line:hover { background:var(--surface-low) }

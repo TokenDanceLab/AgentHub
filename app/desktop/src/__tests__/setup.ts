@@ -40,3 +40,13 @@ vi.mock('@lobehub/icons', () => ({
 
 vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: LobeIconMock }));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: LobeIconMock }));
+
+// Mock @lobehub/fluent-emoji (transitive peer dep of @lobehub/icons via @lobehub/ui)
+// to prevent vitest from processing its ESM directory import which Node.js cannot resolve.
+vi.mock('@lobehub/fluent-emoji', () => ({
+  default: LobeIconMock,
+  FluentEmoji: LobeIconMock,
+  getEmoji: () => undefined,
+  getEmojiNameByCharacter: () => undefined,
+  getFluentEmojiCDN: () => '',
+}));

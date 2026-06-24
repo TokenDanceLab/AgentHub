@@ -13,7 +13,7 @@
 
 | 能力 | v1 状态 | 目标 |
 |---|---|---|
-| 多轮会话 | 仅透传 SessionID | 完整的 Start/Resume/List/Fork |
+| 多轮会话 | 仅透传 SessionID | 完整的启动/恢复/列表/分叉 |
 | 子 Agent 管理 | 仅 system prompt（Orchestrator） | 事件拦截、生命周期追踪 |
 | 权限拦截 | 默认自动批准处理器 | 策略引擎集成 |
 | 结构化 diff 追踪 | 载荷结构不正确 | 工具感知的 diff 提取 |

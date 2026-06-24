@@ -11,28 +11,28 @@
 
 ## Execution Plan
 
-### Phase 3A — Complete Running Audits (no new work, just wait + commit)
+### Phase 3A — 完成运行中的审计（无新工作，仅等待 + 提交）
 
-| Lane | Task | Workflow | Status |
+| Lane | 任务 | 工作流 | 状态 |
 |------|------|----------|--------|
-| A1 | Docs finalization + stale archive | W19 | 🔄 |
-| A2 | Desktop Tauri acceptance report | W20 | 🔄 |
-| A3 | API contract verification (frontend↔backend) | W25 | 🔄 |
-| A4 | Hub Server deep audit (handlers + infra) | W26 | 🔄 |
-| A5 | CSS dead code elimination | W27 | 🔄 |
+| A1 | 文档定稿 + 过时归档 | W19 | 🔄 |
+| A2 | Desktop Tauri 验收报告 | W20 | 🔄 |
+| A3 | API 契约验证（前端↔后端） | W25 | 🔄 |
+| A4 | Hub Server 深度审计（handler + 基础设施） | W26 | 🔄 |
+| A5 | CSS 死代码清理 | W27 | 🔄 |
 
-**S.U.P.E.R compliance**: All are analysis tasks (read-only except cleanup) — no architectural risk.
+**S.U.P.E.R 合规**：全部为分析任务（除清理外只读）—— 无架构风险。
 
 ---
 
-### Phase 3B — P0 Blocker Resolution (new, parallel lanes)
+### Phase 3B — P0 阻塞项解决（新增，并行 Lane）
 
-| Lane | Task | S.U.P.E.R | Design Driver | Est. Agents |
+| Lane | 任务 | S.U.P.E.R | 设计驱动 | 预估 Agent 数 |
 |------|------|-----------|---------------|-------------|
-| B1 | **Version alignment** — bump all package.json + tauri.conf.json to 0.4.1, verify consistency | **E**nvironment-Agnostic | Must pass `verify-tauri-package-readiness.ps1` | 2 |
-| B2 | **OpenAPI generation** — add swaggo annotations to Hub handlers, generate `openapi.yaml`, verify frontend types match | **P**orts over Implementation | Schema-defined I/O for every endpoint | 4 |
-| B3 | **AgentHubWorkbench split** — extract into: `WorkbenchShell`, `ConversationHost`, `ChatViewBridge`, `useWorkbenchCallbacks` | **S**ingle Purpose | Each <200 lines, single responsibility | 3 |
-| B4 | **Full test suite retry** — re-run all vitest, fix failures, verify 100% pass | **R**eplaceable Parts | All components must have passing tests | 3 |
+| B1 | **版本对齐** — 将所有 package.json + tauri.conf.json 统一升至 0.4.1，验证一致性 | **E**nvironment-Agnostic | 必须通过 `verify-tauri-package-readiness.ps1` | 2 |
+| B2 | **OpenAPI 生成** — 为 Hub handler 添加 swaggo 注解，生成 `openapi.yaml`，验证前端类型匹配 | **P**orts over Implementation | 每个端点的 schema 定义 I/O | 4 |
+| B3 | **AgentHubWorkbench 拆分** — 拆分为：`WorkbenchShell`、`ConversationHost`、`ChatViewBridge`、`useWorkbenchCallbacks` | **S**ingle Purpose | 每个 <200 行，单一职责 | 3 |
+| B4 | **全量测试重跑** — 重新运行所有 vitest，修复失败，验证 100% 通过 | **R**eplaceable Parts | 所有组件必须有通过测试 | 3 |
 
 **S.U.P.E.R Code Review Checklist** (each task must pass before marking complete):
 - [ ] S1: Does each new file have ONE clear purpose?
@@ -48,66 +48,66 @@
 
 ---
 
-### Phase 3C — Pre-Merge Finalization
+### Phase 3C — 合并前定稿
 
-| Lane | Task | Driver |
+| Lane | 任务 | 驱动 |
 |------|------|--------|
-| C1 | Production build verification (web + desktop) | Both must pass |
-| C2 | Final privacy re-scan (zero leaks) | `grep -rn "C:\\\\Users\\\\Ding\|Delicious233\|user-ding"` |
-| C3 | Git history squash prep (single commit message) | Summary of all changes |
-| C4 | AGENTS.md / CLAUDE.md update | Reflect new module structure |
+| C1 | 生产构建验证（web + desktop） | 两者必须通过 |
+| C2 | 最终隐私重新扫描（零泄露） | `grep -rn "C:\\\\Users\\\\Ding\|Delicious233\|user-ding"` |
+| C3 | Git history squash 准备（单一 commit message） | 所有变更摘要 |
+| C4 | AGENTS.md / CLAUDE.md 更新 | 反映新模块结构 |
 
 ---
 
-## Adaptive Control Baseline
+## 自适应控制基线
 
-| Metric | Baseline | Target | Drift Budget |
+| 指标 | 基线 | 目标 | 偏差预算 |
 |--------|----------|--------|--------------|
-| Commits on branch | 67 | Squash to 1 | — |
-| Test pass rate | Unknown | 100% | 0 failures allowed |
-| Build (web) | ❌ Failed | ✅ Pass | Must pass |
-| Build (desktop) | ❌ Failed | ✅ Pass | Must pass |
-| Privacy leaks | 0 remaining | 0 | No new leaks |
-| S.U.P.E.R avg | 15/25 | 18/25 | +3 improvement |
+| 分支提交数 | 67 | Squash 为 1 | — |
+| 测试通过率 | 未知 | 100% | 不允许失败 |
+| 构建（web） | ❌ 失败 | ✅ 通过 | 必须通过 |
+| 构建（desktop） | ❌ 失败 | ✅ 通过 | 必须通过 |
+| 隐私泄露 | 0 剩余 | 0 | 无新增泄露 |
+| S.U.P.E.R 均分 | 15/25 | 18/25 | +3 提升 |
 
-**Drift threshold**: If any P0 task introduces >2 new files without matching tests → MILD (annotate). If build still fails after B1-B4 → SIGNIFICANT (halt, re-decompose).
+**偏差阈值**：若任何 P0 任务引入 >2 个新文件且无对应测试 → 轻微（标注）。若 B1-B4 后构建仍然失败 → 显著（暂停，重新拆解）。
 
 ---
 
-## GitHub-Native Tracking
+## GitHub-Native 追踪
 
 Branch: `feat/chatview-tokendance-migration`
 Base: `origin/dev/delicious233`
-Mode: LOCAL_ONLY (no `gh` Issue creation — manual task tracking)
+Mode: LOCAL_ONLY（无 `gh` Issue 创建——手动任务追踪）
 
-**Merge target**: Squash merge into `dev/delicious233`
-**Squash commit message template**:
+**合并目标**：Squash merge 到 `dev/delicious233`
+**Squash commit message 模板**：
 ```
-feat: ChatView migration + comprehensive hardening
+feat: ChatView 迁移 + 全面加固
 
-ChatView Design System:
-- 25 TranscriptBlock kinds → 10 RowItem cards via adapter.ts
-- DAG Orchestrator visualization with topological sort
-- Tool call/result FIFO merge, agent group/direct message layout
-- react-i18next unified (90+ keys zh/en), CSS tokens scoped to .chatview
+ChatView 设计系统:
+- 25 种 TranscriptBlock → 10 种 RowItem 卡片（通过 adapter.ts）
+- DAG Orchestrator 可视化（拓扑排序）
+- 工具调用/结果 FIFO 合并，Agent 群聊/私聊布局
+- react-i18next 统一（90+ key 中/英），CSS token 限定 .chatview 作用域
 
-Performance: React.memo all components, lazy-loaded pages, dynamic imports
-Security: JWT 32-char minimum, gin.SetTrustedProxies, GORM SQL scrubber
-         MCP Bearer auth, exec.Command args, CSP headers, DOMPurify
-Privacy: 18+ leaks fixed — all real paths/names replaced with placeholders
-Architecture: 54 pipeline tests, 694 total tests, dead code removal
-Documentation: 30+ docs updated, CHANGELOG, release notes, audit reports
+性能: React.memo 覆盖所有组件，页面懒加载，动态导入
+安全: JWT 最低 32 字符，gin.SetTrustedProxies，GORM SQL 清洗器
+      MCP Bearer 认证，exec.Command args，CSP 头，DOMPurify
+隐私: 18+ 处泄露已修复 — 所有真实路径/名称替换为占位符
+架构: 54 个管线测试，694 个总测试，死代码移除
+文档: 30+ 文档已更新，CHANGELOG，发布说明，审计报告
 ```
 
 ---
 
-## Phase Gates
+## 阶段门禁
 
 ```
-Phase 3A (Audits) ──┐
-                    ├──▶ Gate 1: All audit reports written, no critical findings left
-Phase 3B (P0 Fix) ──┤
-                    ├──▶ Gate 2: Builds pass, tests pass, versions aligned
-Phase 3C (Finalize)─┘
-                         ▶ Gate 3: Merge to dev/delicious233
+Phase 3A（审计）──┐
+                  ├──▶ Gate 1: 所有审计报告已撰写，无未关闭严重发现
+Phase 3B（P0修复）─┤
+                  ├──▶ Gate 2: 构建通过，测试通过，版本对齐
+Phase 3C（定稿）──┘
+                       ▶ Gate 3: 合并到 dev/delicious233
 ```

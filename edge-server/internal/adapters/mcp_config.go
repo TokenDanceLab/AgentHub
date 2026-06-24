@@ -73,7 +73,7 @@ func (s *MCPConfigStore) ConfigJSON() string {
 	cfg := MCPServerConfigFile{MCPServers: servers}
 	data, err := json.Marshal(cfg)
 	if err != nil {
-		slog.Error("mcp: failed to marshal config JSON", "err", err)
+		slog.Error("mcp: failed to marshal config JSON", "error", err)
 		return ""
 	}
 	return string(data)
@@ -98,11 +98,11 @@ func MergeConfigJSON(runConfig string, hubStore *MCPConfigStore) string {
 	// Both present: merge, run-level wins on key conflicts.
 	var runCfg, hubCfg MCPServerConfigFile
 	if err := json.Unmarshal([]byte(runConfig), &runCfg); err != nil {
-		slog.Warn("mcp: failed to parse run MCPConfig, using hub config only", "err", err)
+		slog.Warn("mcp: failed to parse run MCPConfig, using hub config only", "error", err)
 		return hubJSON
 	}
 	if err := json.Unmarshal([]byte(hubJSON), &hubCfg); err != nil {
-		slog.Warn("mcp: failed to parse hub MCP config, using run config only", "err", err)
+		slog.Warn("mcp: failed to parse hub MCP config, using run config only", "error", err)
 		return runConfig
 	}
 	if runCfg.MCPServers == nil {
@@ -203,7 +203,7 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		slog.Warn("mcp-sync: failed to create request", "err", err)
+		slog.Warn("mcp-sync: failed to create request", "error", err)
 		return
 	}
 	if s.authToken != "" {
@@ -213,7 +213,7 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		slog.Warn("mcp-sync: request failed", "err", err)
+		slog.Warn("mcp-sync: request failed", "error", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -238,7 +238,7 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		slog.Warn("mcp-sync: decode failed", "err", err)
+		slog.Warn("mcp-sync: decode failed", "error", err)
 		return
 	}
 

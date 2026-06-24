@@ -9,7 +9,7 @@ import (
 
 func TestFakePreviewRunnerStartReadyStopContract(t *testing.T) {
 	repository := store.New()
-	project, _ := repository.CreateProject("proj_preview", "Preview Project")
+	project, _ := repository.CreateProject("proj_preview", "Preview Project", "")
 	thread, _ := repository.CreateThread("thread_preview", project.ID, "Preview Thread", "", "", "")
 	run, err := repository.CreateRun("run_preview", project.ID, thread.ID)
 	if err != nil {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ListResponse, RunInfo } from '@shared/types';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 async function fetchRunsStub(_projectId?: string, _threadId?: string): Promise<ListResponse<RunInfo>> {
   return { items: [], page: { hasMore: false } };
@@ -7,7 +8,7 @@ async function fetchRunsStub(_projectId?: string, _threadId?: string): Promise<L
 
 export function useRuns(projectId?: string, threadId?: string) {
   return useQuery<ListResponse<RunInfo>>({
-    queryKey: ['runs', projectId, threadId],
+    queryKey: hubQueryKeys.runs.all(projectId, threadId),
     queryFn: () => fetchRunsStub(projectId, threadId),
     refetchInterval: 10_000,
   });
@@ -24,7 +25,7 @@ export function useCancelRun() {
       finishedAt: new Date().toISOString(),
     }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['runs'] });
+      qc.invalidateQueries({ queryKey: hubQueryKeys.runs.root });
     },
   });
 }

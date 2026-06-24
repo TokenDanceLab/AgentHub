@@ -470,7 +470,7 @@ func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID s
 
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Debug("execution target ping failed", "target_id", targetID, "addr", addr, "err", err)
+		slog.Debug("execution target ping failed", "target_id", targetID, "addr", addr, "error", err)
 		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
 		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
 	}

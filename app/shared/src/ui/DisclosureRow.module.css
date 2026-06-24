@@ -33,6 +33,11 @@
   color: var(--foreground);
 }
 
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .button:disabled {
   cursor: default;
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"strconv"
 	"time"
@@ -60,7 +61,8 @@ func (h *AuditHandler) ListAuditEvents(c *gin.Context) {
 		c.Query("event_type"), c.Query("severity"),
 		since, until, c.Query("pageCursor"), pageSize)
 	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
+		var e *errcode.Error
+		if errors.As(err, &e) {
 			Fail(c, e)
 			return
 		}
