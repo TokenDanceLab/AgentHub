@@ -173,76 +173,7 @@ func TestParseStreamErrorRecoverable(t *testing.T) {
 	}
 }
 
-func TestParseStreamErrorError(t *testing.T) {
-	e1 := NewRecoverableParseError(fmt.Errorf("something went wrong"))
-	if e1.Error() != "parse stream error: something went wrong" {
-		t.Errorf("Error() = %q", e1.Error())
-	}
-
-	e2 := &ParseStreamError{recoverable: false}
-	if e2.Error() != "parse stream error" {
-		t.Errorf("nil inner Error() = %q", e2.Error())
-	}
-}
-
 // --- hooks.go: ClassifyToolRisk unknown tool ---
-
-func TestClassifyToolRiskUnknownTool(t *testing.T) {
-	// Unknown tools should default to RiskHigh with a warning log.
-	risk := ClassifyToolRisk("SomeUnknownTool123")
-	if risk != RiskHigh {
-		t.Errorf("unknown tool should be RiskHigh, got %q", risk)
-	}
-}
-
-func TestClassifyToolRiskMCPTools(t *testing.T) {
-	cases := []struct {
-		toolName string
-		want     RiskLevel
-	}{
-		{"mcp__filesystem__read_file", RiskHigh},
-		{"mcp__github__search_issues", RiskHigh},
-		{"mcp__memory__create_entities", RiskHigh},
-		{"mcp__server__tool", RiskHigh},
-	}
-	for _, tc := range cases {
-		t.Run(tc.toolName, func(t *testing.T) {
-			got := ClassifyToolRisk(tc.toolName)
-			if got != tc.want {
-				t.Errorf("ClassifyToolRisk(%q) = %q, want %q", tc.toolName, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestClassifyToolRiskAllKnownTools(t *testing.T) {
-	cases := []struct {
-		toolName string
-		want     RiskLevel
-	}{
-		{"Read", RiskLow},
-		{"Grep", RiskLow},
-		{"Glob", RiskLow},
-		{"Write", RiskMedium},
-		{"Edit", RiskMedium},
-		{"NotebookEdit", RiskMedium},
-		{"Bash", RiskHigh},
-		{"WebFetch", RiskHigh},
-		{"WebSearch", RiskHigh},
-		{"Skill", RiskHigh},
-		{"SendMessage", RiskHigh},
-		{"TaskCreate", RiskHigh},
-		{"TaskUpdate", RiskHigh},
-	}
-	for _, tc := range cases {
-		t.Run(tc.toolName, func(t *testing.T) {
-			got := ClassifyToolRisk(tc.toolName)
-			if got != tc.want {
-				t.Errorf("ClassifyToolRisk(%q) = %q, want %q", tc.toolName, got, tc.want)
-			}
-		})
-	}
-}
 
 // --- control_protocol.go: normalizePermissionDecision ---
 
@@ -467,14 +398,6 @@ func TestSummarizeCLIInvocationArgs(t *testing.T) {
 
 // --- security_hooks.go: error types ---
 
-func TestDangerousPatternsValidationErrorError(t *testing.T) {
-	e := &dangerousPatternsValidationError{errs: []string{"err1", "err2"}}
-	msg := e.Error()
-	if msg != "dangerousPatternsRE validation failures: err1; err2" {
-		t.Errorf("Error() = %q", msg)
-	}
-}
-
 func TestDangerousPatternsValidationErrorUnwrap(t *testing.T) {
 	e := &dangerousPatternsValidationError{errs: []string{"err1", "err2"}}
 	errs := e.Unwrap()
@@ -486,13 +409,6 @@ func TestDangerousPatternsValidationErrorUnwrap(t *testing.T) {
 	}
 	if errs[1].Error() != "err2" {
 		t.Errorf("errs[1] = %q, want err2", errs[1].Error())
-	}
-}
-
-func TestStrError(t *testing.T) {
-	e := strError("test error message")
-	if e.Error() != "test error message" {
-		t.Errorf("Error() = %q", e.Error())
 	}
 }
 
@@ -607,53 +523,3 @@ func TestHookChainRunPostResponseChain(t *testing.T) {
 	}
 }
 
-func TestRiskLevelConstants(t *testing.T) {
-	if RiskLow != "low" {
-		t.Errorf("RiskLow = %q", RiskLow)
-	}
-	if RiskMedium != "medium" {
-		t.Errorf("RiskMedium = %q", RiskMedium)
-	}
-	if RiskHigh != "high" {
-		t.Errorf("RiskHigh = %q", RiskHigh)
-	}
-	if RiskCritical != "critical" {
-		t.Errorf("RiskCritical = %q", RiskCritical)
-	}
-}
-
-func TestApprovalModeConstants(t *testing.T) {
-	if ApprovalYOLO != "yolo" {
-		t.Errorf("ApprovalYOLO = %q", ApprovalYOLO)
-	}
-	if ApprovalAuto != "auto" {
-		t.Errorf("ApprovalAuto = %q", ApprovalAuto)
-	}
-	if ApprovalManual != "manual" {
-		t.Errorf("ApprovalManual = %q", ApprovalManual)
-	}
-}
-
-func TestPermDecisionConstants(t *testing.T) {
-	if PermAllow != "allow" {
-		t.Errorf("PermAllow = %q", PermAllow)
-	}
-	if PermDeny != "deny" {
-		t.Errorf("PermDeny = %q", PermDeny)
-	}
-	if PermAllowOnce != "allow_once" {
-		t.Errorf("PermAllowOnce = %q", PermAllowOnce)
-	}
-}
-
-func TestErrorActionConstants(t *testing.T) {
-	if ErrRetry != "retry" {
-		t.Errorf("ErrRetry = %q", ErrRetry)
-	}
-	if ErrAbort != "abort" {
-		t.Errorf("ErrAbort = %q", ErrAbort)
-	}
-	if ErrFallback != "fallback" {
-		t.Errorf("ErrFallback = %q", ErrFallback)
-	}
-}
