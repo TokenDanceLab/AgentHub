@@ -3,26 +3,20 @@ import { useTranslation } from 'react-i18next';
 import {
   Users,
   Play,
-  CheckSquare,
   Clock,
   Plus,
   RefreshCw,
   Shield,
   ListChecks,
-  Settings,
-  ChevronRight,
   Circle,
 } from 'lucide-react';
 import { useHubAgentTeams } from '@/api/agentTeamQueries';
 import { useCreateAgentTeam, useStartTeamRun, useDecideTeamApproval } from '@/api/agentTeamQueries';
 import {
   createHubClient,
-  type AgentTeam,
   type AgentTeamDetail,
   type AgentTeamRun,
   type AgentTeamTask,
-  type TeamApprovalState,
-  type TeamConflictState,
   type TeamMemberState,
   type TeamRunState,
 } from '@/api/hubClient';
@@ -42,8 +36,6 @@ interface TeamRunConsoleProps {
 }
 
 // ── helpers ──
-
-type TeamRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 function statusLabelKey(status: string): string {
   return `settings.teamRunStatus.${status}`;

@@ -398,7 +398,7 @@ func SurfaceAndEmit(bus *events.Bus, writer store.Writer, snapshot *WorkdirSnaps
 	}
 }
 
-func emitSurfacedPreview(bus *events.Bus, writer store.Writer, scope map[string]any, run store.Run, sf SurfacedFile, snapshot *WorkdirSnapshot) {
+func emitSurfacedPreview(bus *events.Bus, writer store.Writer, scope map[string]any, run store.Run, sf SurfacedFile, _ *WorkdirSnapshot) {
 	artifactID := surfacedArtifactID(run.ID, sf.RelPath)
 
 	// Build preview URL — localhost-relative for Edge-served previews.
