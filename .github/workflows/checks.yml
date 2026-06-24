@@ -265,6 +265,10 @@ jobs:
           cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
 
   # ── Frontend: Desktop ────────────────────────
+  # Known debt: 15 pre-existing test failures (97.8% pass rate: 679/694).
+  # Tracked in docs/audit/comprehensive-audit-2026-06-17.md, Test Quality section.
+  # Failures are in desktop integration/edge-real tests and a few component tests.
+  # These are low-priority pre-existing issues, not regressions.
   frontend-desktop:
     runs-on: ubuntu-latest
     defaults:
@@ -464,7 +468,12 @@ jobs:
         run: pnpm build
         working-directory: ./app/desktop
       - name: Smoke test
-        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
+        # Only smoke.spec.ts runs in CI (static page checks).
+        # chat-real.spec.ts requires live Hub (port 8080) + Edge (port 3210)
+        # services which are not available in the CI sandbox.
+        # Run chat-real.spec.ts locally with all services up:
+        #   pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium chat-real.spec.ts
+        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium smoke.spec.ts
         working-directory: ./app
 
   # ── Validation ───────────────────────────────

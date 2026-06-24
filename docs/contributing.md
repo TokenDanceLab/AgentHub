@@ -524,6 +524,13 @@ go test ./... -short -count=1
 | edge-server | 75% |
 | hub-server | 40% |
 
+**后端 E2E fixture 状态**：
+
+| 测试 | CI 运行？ | 说明 |
+|------|----------|------|
+| `hub-server/tests/teamrun/TestTeamRunSmoke` | 是 | TeamRun 编排全生命周期 smoke（in-memory SQLite + httptest.Server，无需外部服务）。 |
+| `edge-server/tests/hub_e2e_test.go` | 否 | Edge→Hub 回调桥接 E2E。通过 `testing.Short()` 跳过（需要子进程启动）。CI 使用 `-short` 标志。本地运行：`go test ./tests -count=1 -run "^TestHubE2E_" -v` |
+
 ### 5.2 前端测试
 
 ```bash
@@ -541,6 +548,8 @@ corepack pnpm typecheck
 cd app/web
 corepack pnpm exec vite build
 ```
+
+**已知债务**：Desktop 有 15 个已有测试失败（97.8% 通过率，679/694），主要为集成/edge-real 测试和少量组件测试。这些是 chatview-migration 分支重构前已存在的问题，非回归。详见 `docs/audit/comprehensive-audit-2026-06-17.md` 测试质量部分。
 
 ### 5.3 Mobile 测试
 
@@ -561,6 +570,13 @@ npx playwright install
 cd app/e2e
 npx playwright test
 ```
+
+**CI 状态**：
+
+| 测试文件 | CI 运行？ | 说明 |
+|----------|----------|------|
+| `app/e2e/smoke.spec.ts` | 是 | 静态页面检查（加载、标题、无 Vite 错误覆盖层）。只需 Web dev server，CI 自动启动。 |
+| `app/e2e/chat-real.spec.ts` | 否 | 需要 live Hub (port 8080) + Edge (port 3210)。CI sandbox 无这些服务。本地手动运行。 |
 
 #### 集成 Smoke 测试
 
