@@ -14,7 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -305,7 +305,7 @@ func errPathTeamSetup(t *testing.T) *errPathTeamState {
 	mockAgent := &errPathMockAgentService{}
 
 	// Use tight guardrails for error path testing.
-	guardrails := service.AgentTeamGuardrails{
+	guardrails := agentteam.AgentTeamGuardrails{
 		MaxDelegationDepth:       3,
 		MaxActiveSubAgentsPerRun: 2,
 		MaxRouteRepeats:          3,
@@ -315,7 +315,7 @@ func errPathTeamSetup(t *testing.T) *errPathTeamState {
 		MaxTeamRunBudgetUsagePct: 5.0,
 	}
 
-	teamSvc := service.NewAgentTeamServiceWithGuardrails(db, mockAgent, nil, guardrails)
+	teamSvc := agentteam.NewAgentTeamServiceWithGuardrails(db, mockAgent, nil, guardrails)
 	teamHandler := handler.NewAgentTeamHandler(teamSvc)
 
 	r := gin.New()
