@@ -160,7 +160,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		if taskID != "" {
 			task, err := a.AgentService.GetPendingTaskByID(taskID)
 			if err == nil && task != nil {
-				a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
+				_ = a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
 					"task_id":           payload["task_id"],
 					"agent_instance_id": payload["agent_instance_id"],
 					"session_id":        payload["session_id"],
@@ -237,7 +237,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		}
 		receiverID, _ := payload["receiver_id"].(string)
 		if receiverID != "" {
-			a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload)
+			_ = a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload)
 		}
 	})
 
@@ -313,7 +313,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	ctx := a.coreCtx
 
 	if oldConnID != "" && oldConnID != connID {
-		a.CacheClient.MarkKicked(ctx, oldConnID)
+		_ = a.CacheClient.MarkKicked(ctx, oldConnID)
 		a.mgr.PushToConn(oldConnID, ws.NewFrame(ws.TypeDeviceKicked, map[string]string{
 			"reason": "logged_in_elsewhere",
 		}))
@@ -326,7 +326,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	if deviceID != "" {
 		routeField = deviceType + ":" + deviceID
 	}
-	a.CacheClient.SetRoute(ctx, userID, routeField, connID)
+	_ = a.CacheClient.SetRoute(ctx, userID, routeField, connID)
 
 	if wasOffline {
 		go a.broadcastOnlineStatus(ctx, userID, true)
@@ -438,7 +438,7 @@ func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
 		if deviceID != "" {
 			routeField = deviceType + ":" + deviceID
 		}
-		a.CacheClient.DeleteRoute(ctx, userID, routeField)
+		_ = a.CacheClient.DeleteRoute(ctx, userID, routeField)
 		online, _ := a.CacheClient.IsOnline(ctx, userID)
 		if !online {
 			go a.broadcastOnlineStatus(ctx, userID, false)

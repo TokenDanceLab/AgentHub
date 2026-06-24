@@ -113,7 +113,7 @@ func (w *timeoutWriter) flush() {
 	if wrote {
 		// Safe to read buf without lock: after handler done and not timedOut,
 		// no other goroutine writes to buf.
-		w.buf.WriteTo(w.ResponseWriter)
+		_ = w.buf.WriteTo(w.ResponseWriter)
 	}
 }
 
