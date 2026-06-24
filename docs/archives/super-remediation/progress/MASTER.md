@@ -1,8 +1,47 @@
 # AgentHub SUPER 修复 — MASTER.md
 
-> 最后更新：2026-06-19（最终）
+> 最后更新：2026-06-24
 > 追踪模式：**GITHUB_STANDARD**（Issues + Milestones + Labels）
 > 仓库：`TokenDanceLab/AgentHub`
+
+## 任务概述
+
+基于 [SUPER 工程审计](../governance/super-score-2026-06-19.md)（基线 63/100）的全面修复计划。
+
+**全部完成。已合并到 master（PR #316 + #317）。产物归档到 `docs/archives/super-remediation/`。**
+
+## CI 修复（v0.5.1, 2026-06-24）
+
+SUPER 合并后 CI 遗留问题修复。详见 `docs/analysis/ci-remediation-analysis.md`。
+
+| 模块 | 修复项 | 数量 | 状态 |
+|---|---|---|---|
+| Go edge | unparam + coverage tests | 4 + 6 files | ✅ |
+| Go hub | errcheck + gocognit + ws nil guard | 25+ + 3 + 20 tests | ✅ |
+| Web | lint unused-vars + TS build | 6 + 2 | ✅ |
+| Desktop | lint unused-vars/escape | 8 | ✅ |
+| Mobile | lint/typecheck + fixture | 16 + 1 | ✅ |
+| Infra | Docker + golangci.yml | 3 | ✅ |
+
+### CI 最终状态
+
+| 作业 | 状态 |
+|---|---|
+| 全模块 lint/typecheck | ✅ 0 errors |
+| 全模块 vuln scan | ✅ |
+| go-hub test | ✅ |
+| Backend focused subset | ✅ |
+| Cross-platform | ✅ |
+| Docker | ✅ |
+| go-edge coverage | ⚠️ 65.8% (< 75%) |
+| E2E/Smoke | ⚠️ 预存（需基础设施） |
+
+## 治理清理
+
+- 删除 `feat/glm-frontend-integration`
+- 放弃 macOS
+- 分支治理更新：`dev/delicious223`→`dev/delicious233`
+- 文档版本 badge：v0.4.0→v0.5.1
 > 分支：`feat/super-phase1-safety-foundation`（基于 `dev/delicious233`）
 
 ## 任务概述

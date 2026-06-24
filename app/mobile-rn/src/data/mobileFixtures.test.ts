@@ -102,7 +102,7 @@ describe('Mobile workflow fixtures', () => {
     ).toBe(true);
 
     const fixtureText = JSON.stringify(fixtures);
-    expect(fixtureText).toContain('Delicious233');
+    expect(fixtureText).toContain('Alice');
     expect(fixtureText).toContain('TokenDance');
     expect(fixtureText).toContain('AgentHub');
   });
