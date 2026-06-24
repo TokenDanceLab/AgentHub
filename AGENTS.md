@@ -232,7 +232,7 @@ git status --short --branch       # 确认只改了允许的路径
 开始工作前先同步：
 
 ```powershell
-git checkout dev/delicious223
+git checkout dev/delicious233
 git pull --ff-only
 ```
 
@@ -240,7 +240,7 @@ git pull --ff-only
 
 ```powershell
 git fetch origin
-git rebase origin/dev/delicious223
+git rebase origin/dev/delicious233
 ```
 
 Commit message 使用英文 type/scope + 中文摘要：
@@ -280,30 +280,28 @@ fix/short-topic
 当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
-feat/* → dev/delicious223 → master
+feat/* → dev/delicious233 → master
 ```
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/delicious223** | 当前集成开发分支 (HEAD 118bdd84)，从 dev/delicious233 创建 | ✅ 活跃 |
-| **dev/delicious233** | 上一版集成主线 (v0.3.0, 1e03b7ec) | ✅ 已归档 |
-| master | PR-only 稳定快照 | ✅ 当前 |
-| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
+| **dev/delicious233** | 当前集成开发分支 | ✅ 活跃 |
+| **feat/super-phase1-safety-foundation** | SUPER 工程修复（52 任务全完成，待合并） | 🔥 活跃 |
+| master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
+| ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
+| ~~dev/delicious223~~ | 旧集成主线 | ✅ 已归档 |
 | ~~origin/dev/trump~~ | 已归档 | ✅ 已清理 |
 | ~~origin/dev/johnny~~ | 已归档 | ✅ 已清理 |
-| ~~feat/web-desktop-parity~~ | 已导出 patch 并删除远端 | ✅ 已归档 |
-| ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
-| ~~feat/team-hub-authz~~ | 授权修复 | ✅ 已合入并删除 |
 
 接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/delicious223`（差距较大），始终从 `dev/delicious223` 开始工作。
+- 始终从 `dev/delicious233` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
-- `feat/*` 合并前需要 rebase 到最新 `dev/delicious223`，解决冲突后再开 PR。
+- `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
-- Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious223`，除非先单独审查并拆成可验证的小 patch。
+- Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
@@ -324,7 +322,7 @@ feat/* → dev/delicious223 → master
 
 - 项目级 worktree 固定放在 `.worktrees/`，已写入 `.gitignore`，不得提交。
 - 一个 worktree = 一个短分支 = 一个 PR。不要多个 Agent 共用同一 worktree。
-- 创建前同步 `dev/delicious223`：`git checkout dev/delicious223 && git pull --ff-only`。
+- 创建前同步 `dev/delicious223`：`git checkout dev/delicious233 && git pull --ff-only`。
 - 创建示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
 - 每个 worktree 必须绑定任务卡和写入范围；范围变化先更新任务卡或 PR 说明。
 - DeepSeek、Codex、Claude 等可在 worktree 内调度 subagent，但 subagent 只能在当前 worktree 的指定路径内工作。
