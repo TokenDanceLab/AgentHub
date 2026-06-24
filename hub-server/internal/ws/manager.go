@@ -128,12 +128,10 @@ func (m *Manager) Count() int {
 }
 
 func NewConn(ws *websocket.Conn) *Conn {
-	// 2.3a: Limit the maximum WebSocket frame read size to 512 KB for Hub
-	// connections.  This bounds per-message memory allocation regardless of
-	// message rate limiting.
-	ws.SetReadLimit(512 * 1024)
-
 	r := rate.Every(time.Second / time.Duration(config.WSMessageRateLimit))
+	if ws != nil {
+		ws.SetReadLimit(512 * 1024)
+	}
 	return &Conn{
 		W:          ws,
 		Send:       make(chan []byte, config.WSSendBufferSize),
