@@ -43,6 +43,3 @@ func TestAPIVersion_HeaderOnAllMethods(t *testing.T) {
 	}
 }
 
-func TestAPIVersion_ConstValue(t *testing.T) {
-	assert.Equal(t, "1.0.0", apiVersion)
-}

@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 )
 
 type messageServiceWithReactions struct {
@@ -149,7 +150,7 @@ func (a *App) Run(ctx context.Context) error {
 	middleware.AuditPermissionFn = auditSvc.RecordPermissionDecision
 
 	// AgentTeam service
-	a.AgentTeamService = service.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, service.AgentTeamGuardrails{
+	a.AgentTeamService = agentteam.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, agentteam.AgentTeamGuardrails{
 		MaxDelegationDepth:       a.Config.AgentTeam.MaxDelegationDepth,
 		MaxActiveSubAgentsPerRun: int64(a.Config.AgentTeam.MaxActiveSubAgentsPerRun),
 		MaxRouteRepeats:          a.Config.AgentTeam.MaxRouteRepeats,
@@ -191,7 +192,8 @@ func (a *App) Run(ctx context.Context) error {
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
 	a.NotificationHandler = handler.NewNotificationHandler(a.NotificationService)
 	a.HealthHandler = handler.NewHealthHandler(a.DB, a.CacheClient, &a.Config.DB, a.startTime, a.Version)
-	a.PublicHandler = handler.NewPublicHandler(a.DB, a.startTime)
+	pubStatsSvc := service.NewPublicStatsService(a.DB)
+	a.PublicHandler = handler.NewPublicHandler(pubStatsSvc, a.startTime)
 
 	// Router
 	r, err := a.setupRouter()

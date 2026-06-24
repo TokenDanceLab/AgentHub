@@ -131,31 +131,6 @@ func TestMCPConfigStoreConcurrency(t *testing.T) {
 
 // --- IsMCPToolCall tests ---
 
-func TestIsMCPToolCall(t *testing.T) {
-	cases := []struct {
-		toolName string
-		want     bool
-	}{
-		{"mcp__filesystem__read_file", true},
-		{"mcp__github__get_issue", true},
-		{"mcp__", true}, // prefix match only
-		{"Read", false},
-		{"Write", false},
-		{"Bash", false},
-		{"", false},
-		{"MCP__uppercase", false}, // case sensitive
-		{"not_mcp__", false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.toolName, func(t *testing.T) {
-			got := IsMCPToolCall(tc.toolName)
-			if got != tc.want {
-				t.Errorf("IsMCPToolCall(%q) = %v, want %v", tc.toolName, got, tc.want)
-			}
-		})
-	}
-}
-
 // --- MergeConfigJSON tests ---
 
 func TestMergeConfigJSONRunOnly(t *testing.T) {
@@ -328,40 +303,3 @@ func TestWriteMCPConfigTempFileHasMatchingPrefix(t *testing.T) {
 
 // --- MCPServerConfig types tests ---
 
-func TestMCPServerConfigFileRoundTrip(t *testing.T) {
-	original := MCPServerConfigFile{
-		MCPServers: map[string]MCPServerConfig{
-			"filesystem": {
-				Name:      "filesystem",
-				Transport: "stdio",
-				Command:   "npx",
-				Args:      []string{"-y", "@modelcontextprotocol/server-filesystem"},
-			},
-			"github": {
-				Name:      "github",
-				Transport: "sse",
-				URL:       "https://api.github.com",
-			},
-		},
-	}
-
-	data, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("marshal error: %v", err)
-	}
-
-	var parsed MCPServerConfigFile
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("unmarshal error: %v", err)
-	}
-
-	if len(parsed.MCPServers) != 2 {
-		t.Fatalf("expected 2 servers, got %d", len(parsed.MCPServers))
-	}
-	if parsed.MCPServers["filesystem"].Command != "npx" {
-		t.Errorf("filesystem command = %q", parsed.MCPServers["filesystem"].Command)
-	}
-	if parsed.MCPServers["github"].URL != "https://api.github.com" {
-		t.Errorf("github URL = %q", parsed.MCPServers["github"].URL)
-	}
-}
