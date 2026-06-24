@@ -13,7 +13,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -321,7 +321,7 @@ func TestTeamRunSmoke(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	teamSvc := service.NewAgentTeamService(db, &mockTeamAgentService{}, nil)
+	teamSvc := agentteam.NewAgentTeamService(db, &mockTeamAgentService{}, nil)
 	teamHandler := handler.NewAgentTeamHandler(teamSvc)
 
 	r := gin.New()
