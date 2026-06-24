@@ -99,7 +99,7 @@ func (f *FileStore) Close() {
 
 // Flush writes the current in-memory state to disk synchronously.
 func (f *FileStore) Flush() {
-	f.syncPersist()
+	_ = f.syncPersist()
 }
 
 func (f *FileStore) LastPersistError() error {
