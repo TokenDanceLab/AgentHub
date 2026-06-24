@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -418,7 +419,13 @@ func TestSanitizedEnv_Behavior_ProxyVars_PassThrough(t *testing.T) {
 
 func TestSanitizedEnv_Behavior_LowercaseProxyVars_PassThrough(t *testing.T) {
 	// Lowercase proxy variants are whitelisted separately from their uppercase
-	// counterparts (both appear in the commonWhitelist).
+	// counterparts (both appear in the commonWhitelist). On case-insensitive
+	// platforms (Windows), os.Environ() normalizes to the existing canonical
+	// case, so lowercase variants are unreachable there; this test is for Unix.
+	if runtime.GOOS == "windows" {
+		t.Skip("lowercase proxy variants are unreachable on case-insensitive Windows")
+	}
+
 	t.Setenv("http_proxy", "http://proxy:8080")
 	t.Setenv("https_proxy", "http://proxy:8080")
 	t.Setenv("no_proxy", "localhost,127.0.0.1")

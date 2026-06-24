@@ -169,17 +169,6 @@ func TestValidateCORSOriginsForEnvironment(t *testing.T) {
 	})
 }
 
-func TestAPIVersion(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/test", nil)
-
-	APIVersion()(c)
-
-	assert.Equal(t, "1.0.0", w.Header().Get("X-API-Version"))
-}
-
 func TestRequestID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

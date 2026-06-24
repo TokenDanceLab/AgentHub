@@ -2,6 +2,7 @@ package events
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -687,4 +688,268 @@ done:
 		t.Errorf("DroppedCount() = %d, want %d (published=%d, drained=%d)",
 			dropped, expectedDrops, totalPublish, drained)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Worker pool backpressure
+// ---------------------------------------------------------------------------
+
+// TestBus_WorkerPoolBackpressure verifies that publishing faster than observer
+// workers can consume does not cause panics and does not drop events from
+// history. Observer notifications may be dropped non-blockingly when the
+// worker pool is saturated, but the event bus itself remains operational.
+func TestBus_WorkerPoolBackpressure(t *testing.T) {
+	b := NewBus(5000)
+
+	// Block all observer workers to saturate the job channel.
+	blockCh := make(chan struct{})
+	cancel := b.AddObserver(func(evt EventEnvelope) {
+		<-blockCh // block until released
+	})
+	defer cancel()
+
+	const totalEvents = 3000 // > observerJobBufferSize (1024) to force drops
+
+	// Publish faster than workers can consume — observer jobs are dropped
+	// non-blockingly when the pool is saturated.
+	for i := 0; i < totalEvents; i++ {
+		b.Publish("backpressure", nil, i)
+	}
+
+	// Release the observers so they drain what remains in the job channel.
+	close(blockCh)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify all events are retained in history (replay).
+	_, _, replay := b.Subscribe(0)
+	if len(replay) != totalEvents {
+		t.Errorf("history has %d events, want %d", len(replay), totalEvents)
+	}
+
+	// Verify no sequence gaps in history.
+	seen := make(map[int64]bool, len(replay))
+	for _, evt := range replay {
+		if seen[evt.Seq] {
+			t.Errorf("duplicate seq %d in history", evt.Seq)
+		}
+		seen[evt.Seq] = true
+	}
+	for seq := int64(1); seq <= int64(totalEvents); seq++ {
+		if !seen[seq] {
+			t.Errorf("missing seq %d in history", seq)
+		}
+	}
+
+	// Bus must still be operational after backpressure.
+	evt := b.Publish("post.backpressure", nil, "ok")
+	if evt.Seq <= int64(totalEvents) {
+		t.Error("bus should still publish events after backpressure")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Persist error resilience
+// ---------------------------------------------------------------------------
+
+// TestBus_PersistErrorDoesNotCrashBus verifies that when the persistence hook
+// returns an error, the bus remains fully operational for subsequent publishes.
+func TestBus_PersistErrorDoesNotCrashBus(t *testing.T) {
+	var failNext atomic.Bool
+	failNext.Store(true)
+
+	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
+		if failNext.CompareAndSwap(true, false) {
+			return assertAnError
+		}
+		return nil
+	}))
+
+	_, ch, _ := b.Subscribe(0)
+
+	// First publish: persist fails, event dropped.
+	evt1 := b.Publish("should.fail", nil, "dropped")
+	if evt1.ID != "" {
+		t.Errorf("failed-persist event should have empty ID, got %s", evt1.ID)
+	}
+
+	// Second publish: persist succeeds, event must be delivered.
+	evt2 := b.Publish("should.succeed", nil, "delivered")
+	if evt2.ID == "" {
+		t.Error("successful event should have non-empty ID")
+	}
+
+	// Subscriber receives only the successful event.
+	select {
+	case received := <-ch:
+		if received.Type != "should.succeed" {
+			t.Errorf("received Type = %q, want should.succeed", received.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for successful event after persist error")
+	}
+
+	// No extra events.
+	select {
+	case evt := <-ch:
+		t.Errorf("unexpected event on subscriber channel: %s (seq=%d)", evt.Type, evt.Seq)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// History contains only the successful event (failed one was dropped).
+	_, _, replay := b.Subscribe(0)
+	if len(replay) != 1 {
+		t.Errorf("history has %d events, want 1 (failed event must not appear)", len(replay))
+	}
+
+	// Seq counter still increments through failures.
+	if evt2.Seq != 2 {
+		t.Errorf("successful event seq = %d, want 2 (seq increments through failures)", evt2.Seq)
+	}
+
+	// Bus remains operational — additional publishes work.
+	evt3 := b.Publish("still.operational", nil, "ok")
+	if evt3.Seq != 3 {
+		t.Errorf("third event seq = %d, want 3", evt3.Seq)
+	}
+	select {
+	case received := <-ch:
+		if received.Type != "still.operational" {
+			t.Errorf("received Type = %q, want still.operational", received.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for event after persist recovery")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Unsubscribe during active publish
+// ---------------------------------------------------------------------------
+
+// TestBus_UnsubscribeDuringPublish verifies that unsubscribing while events
+// are being published does not cause a panic, the unsubscribed channel is
+// closed, and the bus remains operational.
+func TestBus_UnsubscribeDuringPublish(t *testing.T) {
+	b := NewBus(2000)
+
+	id, ch, _ := b.Subscribe(0)
+
+	var wg sync.WaitGroup
+	stopCh := make(chan struct{})
+
+	// Publisher goroutines that run continuously until stopped.
+	const numPublishers = 3
+	for i := 0; i < numPublishers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stopCh:
+					return
+				default:
+					b.Publish("concurrent", nil, nil)
+				}
+			}
+		}()
+	}
+
+	// Drain subscriber in background to prevent subscriber-side drops from
+	// confusing the channel-close assertion.
+	var drained atomic.Int64
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range ch {
+			drained.Add(1)
+		}
+	}()
+
+	// Let publishers run briefly to build up activity.
+	time.Sleep(5 * time.Millisecond)
+
+	// Unsubscribe while publishers are actively publishing.
+	b.Unsubscribe(id)
+
+	// Stop publishers.
+	close(stopCh)
+	wg.Wait()
+
+	// Verify subscriber channel is closed (drain goroutine exited).
+	if drained.Load() == 0 {
+		t.Error("subscriber should have received at least some events before unsubscribe")
+	}
+
+	// Bus must still be operational.
+	evt := b.Publish("after.unsubscribe", nil, "ok")
+	if evt.Seq <= 0 {
+		t.Error("bus must still publish events after unsubscribe during publish")
+	}
+	if evt.Type != "after.unsubscribe" {
+		t.Errorf("Type = %q, want after.unsubscribe", evt.Type)
+	}
+
+	// A new subscriber can still receive events.
+	_, ch2, _ := b.Subscribe(0)
+	b.Publish("to.new.sub", nil, "hello")
+	select {
+	case received := <-ch2:
+		if received.Type != "to.new.sub" {
+			t.Errorf("new subscriber Type = %q, want to.new.sub", received.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for event on new subscriber")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Observer with many events
+// ---------------------------------------------------------------------------
+
+// TestBus_ObserverWithMultipleEvents verifies that an observer receives all
+// published events (100+) via the asynchronous worker pool without loss.
+func TestBus_ObserverWithMultipleEvents(t *testing.T) {
+	b := NewBus(500)
+
+	var mu sync.Mutex
+	var received []EventEnvelope
+
+	cancel := b.AddObserver(func(evt EventEnvelope) {
+		mu.Lock()
+		received = append(received, evt)
+		mu.Unlock()
+	})
+	defer cancel()
+
+	const totalEvents = 150
+	for i := 0; i < totalEvents; i++ {
+		b.Publish("obs.many", nil, i)
+	}
+
+	// Give observer workers time to process all jobs (async dispatch).
+	time.Sleep(200 * time.Millisecond)
+
+	mu.Lock()
+	count := len(received)
+	mu.Unlock()
+
+	if count != totalEvents {
+		t.Errorf("observer received %d events, want %d", count, totalEvents)
+	}
+
+	// Verify no duplicate sequences were delivered to the observer.
+	mu.Lock()
+	seen := make(map[int64]bool, count)
+	for _, evt := range received {
+		if seen[evt.Seq] {
+			t.Errorf("duplicate seq %d delivered to observer", evt.Seq)
+		}
+		seen[evt.Seq] = true
+	}
+	// Verify all sequences 1..totalEvents were delivered.
+	for seq := int64(1); seq <= int64(totalEvents); seq++ {
+		if !seen[seq] {
+			t.Errorf("observer missed seq %d", seq)
+		}
+	}
+	mu.Unlock()
 }

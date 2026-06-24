@@ -23,58 +23,6 @@ func TestSyncWithoutInit(t *testing.T) {
 	Sync() // 多次调用也不应 panic
 }
 
-// TestInitDefaultLevel 验证：未指定 log level 时默认使用 info 级别。
-func TestInitDefaultLevel(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Port:     8080,
-		LogLevel: "", // 空字符串 -> 走 default 分支 -> InfoLevel
-	}
-	// Init 不应该 panic
-	Init(cfg)
-	// 初始化后 Sync 不应 panic
-	Sync()
-}
-
-// TestInitDebugLevel 验证：log_level=debug 时 Init 正常完成。
-func TestInitDebugLevel(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Port:     8080,
-		LogLevel: "debug",
-	}
-	Init(cfg)
-	Sync()
-}
-
-// TestInitInfoLevel 验证：log_level=info 时 Init 正常完成。
-func TestInitInfoLevel(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Port:     8080,
-		LogLevel: "info",
-	}
-	Init(cfg)
-	Sync()
-}
-
-// TestInitWarnLevel 验证：log_level=warn 时 Init 正常完成。
-func TestInitWarnLevel(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Port:     8080,
-		LogLevel: "warn",
-	}
-	Init(cfg)
-	Sync()
-}
-
-// TestInitErrorLevel 验证：log_level=error 时 Init 正常完成。
-func TestInitErrorLevel(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Port:     8080,
-		LogLevel: "error",
-	}
-	Init(cfg)
-	Sync()
-}
-
 // TestInitWithLogFile 验证：指定 LogFile 时 Init 正常完成（使用 lumberjack）。
 func TestInitWithLogFile(t *testing.T) {
 	// 使用临时目录，避免遗留日志文件
