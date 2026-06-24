@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { createHubClient } from './hubClient';
 import type {
   AgentTeam,
@@ -164,8 +165,7 @@ export function useHubAgentTeams(enabledOrOptions: boolean | UseHubAgentTeamsOpt
 
   return useQuery<AgentTeamOverview>({
     queryKey: [
-      'agent-teams',
-      options.preferHub ? 'hub' : 'signed-out',
+      ...hubQueryKeys.agentTeams.list(options.preferHub ? 'hub' : 'signed-out'),
       options.baseUrl ?? 'default',
       options.selectedTeamId ?? 'auto-team',
       options.selectedRunId ?? 'auto-run',
@@ -196,7 +196,7 @@ export function useCreateAgentTeam(options: { getToken?: () => string | null; ba
       return client.createAgentTeam(input);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -214,7 +214,7 @@ export function useAddAgentTeamMember(options: { getToken?: () => string | null;
       return client.addAgentTeamMember(input.teamId, input.member);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -232,7 +232,7 @@ export function useStartTeamRun(options: { getToken?: () => string | null; baseU
       return client.startTeamRun(input.teamId, input.run);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -255,7 +255,7 @@ export function useDecideTeamApproval(options: { getToken?: () => string | null;
       return client.decideTeamApproval(input.teamId, input.runId, input.approvalId, input.decision);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -278,7 +278,7 @@ export function useResolveTeamConflict(options: { getToken?: () => string | null
       return client.resolveTeamConflict(input.teamId, input.runId, input.conflictId, input.resolution);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -298,7 +298,7 @@ export function useUpdateAgentTeam(options: { getToken?: () => string | null; ba
       return client.updateAgentTeam(input.teamId, input.data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -316,7 +316,7 @@ export function useDeleteAgentTeam(options: { getToken?: () => string | null; ba
       return client.deleteAgentTeam(teamId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -336,7 +336,7 @@ export function useRemoveAgentTeamMember(options: { getToken?: () => string | nu
       return client.removeAgentTeamMember(input.teamId, input.memberId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -356,7 +356,7 @@ export function usePostTeamRouteDecision(options: { getToken?: () => string | nu
       return client.postTeamRouteDecision(input.teamId, input.runId, input.decision);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
     },
   });
 }
@@ -368,7 +368,7 @@ export function useAgentTeamDetail(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', 'detail', teamId],
+    queryKey: hubQueryKeys.agentTeams.detail(teamId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
@@ -386,7 +386,7 @@ export function useTeamRuns(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', teamId, 'runs'],
+    queryKey: hubQueryKeys.agentTeams.runs(teamId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
@@ -405,7 +405,7 @@ export function useTeamRun(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', teamId, 'runs', runId],
+    queryKey: hubQueryKeys.agentTeams.runDetail(teamId ?? '', runId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
@@ -424,7 +424,7 @@ export function useTeamRunState(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', teamId, 'runs', runId, 'state'],
+    queryKey: hubQueryKeys.agentTeams.runState(teamId ?? '', runId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
@@ -443,7 +443,7 @@ export function useTeamEvents(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', teamId, 'runs', runId, 'events'],
+    queryKey: hubQueryKeys.agentTeams.runEvents(teamId ?? '', runId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
@@ -462,7 +462,7 @@ export function useTeamTasks(
   opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
 ) {
   return useQuery({
-    queryKey: ['agent-teams', teamId, 'runs', runId, 'tasks'],
+    queryKey: hubQueryKeys.agentTeams.runTasks(teamId ?? '', runId ?? ''),
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');

@@ -341,7 +341,7 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 
 		var chunk openaiChatChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			slog.Debug("openai-sdk: failed to parse SSE chunk", "err", err, "data", data)
+			slog.Debug("openai-sdk: failed to parse SSE chunk", "error", err, "data", data)
 			continue
 		}
 

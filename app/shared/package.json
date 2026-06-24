@@ -27,6 +27,7 @@
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
     "./mock": "./src/mock.ts",
+    "./stores/queryKeys": "./src/stores/queryKeys.ts",
     "./components": "./src/components/index.ts",
     "./ui": "./src/ui/index.ts",
     "./ui/*": "./src/ui/*.tsx",
@@ -46,16 +47,14 @@
   },
   "dependencies": {
     "@lobehub/icons": "5.10.0",
-    "devicon": "^2.17.0",
     "diff": "^8.0.2",
-    "dompurify": "^3.4.5",
+    "dompurify": "^3.4.11",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
-    "prismjs": "^1.30.0",
+    "refractor": "^5.0.0",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
-    "simple-icons": "^16.23.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

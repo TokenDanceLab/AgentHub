@@ -232,7 +232,7 @@ export function ChatScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.panel }}>
-      <ChatHeader activeRun={activeRun} showBack={showBack} onBack={onBack} thread={thread} onToggleInspector={onToggleInspector} />
+      <ChatHeader activeRun={activeRun} showBack={showBack} onBack={onBack} thread={thread} {...(onToggleInspector ? { onToggleInspector } : {})} />
       <ChatTabs />
       <ScrollView
         contentContainerStyle={{
@@ -366,7 +366,7 @@ function ChatHeader({
         </Text>
       </View>
       <View style={{ width: 48, alignItems: 'flex-end' }}>
-        <IconButton accessibilityLabel={t.openMenu} icon="more" onPress={onToggleInspector} />
+        <IconButton accessibilityLabel={t.openMenu} icon="more" {...(onToggleInspector ? { onPress: onToggleInspector } : {})} />
       </View>
     </View>
   );

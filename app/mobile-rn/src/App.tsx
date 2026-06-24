@@ -194,7 +194,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
           showBack={false}
           onBack={() => setActiveTab('chat')}
           onOpenRuns={() => setActiveTab('tasks')}
-          onToggleInspector={useInspectorPane ? () => setInspectorCollapsed((c) => !c) : undefined}
+          {...(useInspectorPane ? { onToggleInspector: () => setInspectorCollapsed((c) => !c) } : {})}
         />
       </View>
       {showInspector ? (

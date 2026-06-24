@@ -40,14 +40,6 @@ jobs:
           GOARCH: amd64
         run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-windows-amd64.exe ./cmd/agenthub-edge/
 
-      - name: Build Edge Server (macOS arm64)
-        working-directory: edge-server
-        env:
-          GOOS: darwin
-          GOARCH: arm64
-          CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-arm64 ./cmd/agenthub-edge/
-
       - name: Upload Go artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -151,85 +143,10 @@ jobs:
           name: desktop-windows-artifacts
           path: dist/
 
-  # ── macOS Desktop (DMG) ──────────────────────
-  build-desktop-macos:
-    name: Build macOS Desktop
-    needs: build-go
-    runs-on: macos-latest
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-
-      - name: Install dependencies
-        working-directory: app
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Download Go binaries for sidecar
-        uses: actions/download-artifact@v4
-        with:
-          name: go-binaries
-          path: go-binaries
-
-      - name: Prepare edge-server sidecar binary
-        run: |
-          mkdir -p app/desktop/src-tauri/binaries
-          cp go-binaries/agenthub-edge-darwin-arm64 app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin
-
-      - name: Build Tauri (DMG)
-        working-directory: app/desktop
-        run: pnpm tauri build
-
-      - name: Determine version
-        id: version
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            ver="${GITHUB_REF_NAME#v}"
-            echo "version=$ver" >> $GITHUB_OUTPUT
-            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            ver=$(node -p "require('./app/desktop/package.json').version")
-            echo "version=$ver" >> $GITHUB_OUTPUT
-            echo "tag=v$ver" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create dist directory
-        run: mkdir -p dist
-
-      - name: Collect DMG
-        run: |
-          ver="${{ steps.version.outputs.version }}"
-          dmg=$(find app/desktop/src-tauri/target/release/bundle/dmg -name "*.dmg" -type f | head -1)
-          if [ -z "$dmg" ]; then
-            echo "ERROR: No DMG found"
-            find app/desktop/src-tauri/target/release/bundle -type f 2>/dev/null || echo "bundle dir not found"
-            exit 1
-          fi
-          cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-macos-artifacts
-          path: dist/
-
   # ── GitHub Release ──────────────────────────
   release:
     name: Create GitHub Release
-    needs: [build-desktop-windows, build-desktop-macos]
+    needs: [build-desktop-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -250,12 +167,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: desktop-windows-artifacts
-          path: dist
-
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: desktop-macos-artifacts
           path: dist
 
       - name: List assets

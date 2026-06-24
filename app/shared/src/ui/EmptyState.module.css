@@ -80,6 +80,11 @@
   box-shadow: 0 0 16px color-mix(in oklch, var(--primary) 18%, transparent);
 }
 
+.action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* ── Shortcut kbd badge ─────────────────────────────────────────────── */
 .shortcut {
   display: inline-flex;

@@ -190,7 +190,7 @@
   text-align: center;
 }
 
-.errorIcon { color: var(--danger, #ef4444); opacity: 0.6; }
+.errorIcon { color: var(--danger); opacity: 0.6; }
 .errorMessage { max-width: 480px; word-break: break-word; }
 
 .retryBtn {

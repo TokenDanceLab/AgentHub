@@ -366,7 +366,7 @@ func normalizePermissionDecision(decision PermissionDecision) PermissionDecision
 func WriteInterrupt(stdin io.Writer, requestID string) error {
 	inner, err := json.Marshal(ControlRequestInner{Subtype: "interrupt"})
 	if err != nil {
-		slog.Debug("control: marshal interrupt inner failed", "err", err)
+		slog.Debug("control: marshal interrupt inner failed", "error", err)
 		return err
 	}
 	msg := ControlMessage{
@@ -387,7 +387,7 @@ func WriteInterrupt(stdin io.Writer, requestID string) error {
 func WriteSetModel(stdin io.Writer, requestID, model string) error {
 	inner, err := json.Marshal(ControlRequestInner{Subtype: "set_model", Model: model})
 	if err != nil {
-		slog.Debug("control: marshal set_model inner failed", "err", err)
+		slog.Debug("control: marshal set_model inner failed", "error", err)
 		return err
 	}
 	msg := ControlMessage{
@@ -408,7 +408,7 @@ func WriteSetModel(stdin io.Writer, requestID, model string) error {
 func WriteSetPermissionMode(stdin io.Writer, requestID, mode string) error {
 	inner, err := json.Marshal(ControlRequestInner{Subtype: "set_permission_mode", Mode: mode})
 	if err != nil {
-		slog.Debug("control: marshal set_permission_mode inner failed", "err", err)
+		slog.Debug("control: marshal set_permission_mode inner failed", "error", err)
 		return err
 	}
 	msg := ControlMessage{
@@ -429,7 +429,7 @@ func WriteSetPermissionMode(stdin io.Writer, requestID, mode string) error {
 func WriteStopTask(stdin io.Writer, requestID, taskID string) error {
 	inner, err := json.Marshal(ControlRequestInner{Subtype: "stop_task", TaskID: taskID})
 	if err != nil {
-		slog.Debug("control: marshal stop_task inner failed", "err", err)
+		slog.Debug("control: marshal stop_task inner failed", "error", err)
 		return err
 	}
 	msg := ControlMessage{

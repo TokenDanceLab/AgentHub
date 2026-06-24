@@ -62,7 +62,7 @@ func (e *runtimeEvidenceEmitter) persistRunDiffFile(payload map[string]any) {
 		Diff:   diff,
 		Status: status,
 	}); err != nil {
-		slog.Warn("process: failed to persist runtime diff evidence", "runId", e.run.ID, "path", filePath, "err", err)
+		slog.Warn("process: failed to persist runtime diff evidence", "runId", e.run.ID, "path", filePath, "error", err)
 	}
 }
 
@@ -82,7 +82,7 @@ func (e *runtimeEvidenceEmitter) persistArtifact(payload map[string]any) {
 		ContentSource: store.NewArtifactContentSource("", artifactPath),
 	}
 	if _, err := e.writer.UpsertArtifact(artifact); err != nil {
-		slog.Warn("process: failed to persist runtime artifact evidence", "runId", e.run.ID, "artifactId", id, "err", err)
+		slog.Warn("process: failed to persist runtime artifact evidence", "runId", e.run.ID, "artifactId", id, "error", err)
 	}
 }
 
@@ -99,7 +99,7 @@ func (e *runtimeEvidenceEmitter) persistPreview(payload map[string]any) {
 		Status:   payloadString(payload, "status"),
 	}
 	if _, err := e.writer.UpsertPreview(preview); err != nil {
-		slog.Warn("process: failed to persist runtime preview evidence", "runId", e.run.ID, "previewId", id, "err", err)
+		slog.Warn("process: failed to persist runtime preview evidence", "runId", e.run.ID, "previewId", id, "error", err)
 	}
 }
 
@@ -115,7 +115,7 @@ func (e *runtimeEvidenceEmitter) persistPreviewStopped(payload map[string]any) {
 		Status:   "stopped",
 	}
 	if _, err := e.writer.UpsertPreview(preview); err != nil {
-		slog.Warn("process: failed to persist runtime preview stopped evidence", "runId", e.run.ID, "previewId", id, "err", err)
+		slog.Warn("process: failed to persist runtime preview stopped evidence", "runId", e.run.ID, "previewId", id, "error", err)
 	}
 }
 

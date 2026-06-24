@@ -1,4 +1,4 @@
-import { AppError, isErrorResponse } from './errors';
+import { AppError, isErrorResponse, reportApiError } from './errors';
 import { HUB_EVENTS, type HubEventType } from './hubEvents';
 
 export interface HubResponseEnvelope<T = unknown> {
@@ -13,6 +13,15 @@ export interface HubClientOptions {
   baseUrl?: string;
   getToken?: () => string | null | undefined;
   fetch?: typeof fetch;
+  /** Request timeout in milliseconds. Default: 30000 (30s). */
+  timeoutMs?: number;
+  /**
+   * Called when a 401 response is received.  If provided, the client will:
+   * 1. Call onRefreshToken() to attempt a token refresh.
+   * 2. Retry the original request once with the new token.
+   * If not provided, 401 errors are thrown immediately.
+   */
+  onRefreshToken?: () => Promise<string | null>;
 }
 
 export interface HubRegisterRequest {
@@ -39,7 +48,10 @@ export interface HubUserProfile {
   username: string;
   nickname: string;
   avatar_url?: string;
+  tokendance_sub?: string;
+  tokendance_sub_linked_at?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface HubUpdateProfileRequest {
@@ -124,9 +136,12 @@ export interface HubSession {
   avatar_url?: string;
   announcement?: string;
   owner_user_id?: string;
+  workspace_id?: string;
   pinned?: boolean;
   archived?: boolean;
   muted?: boolean;
+  dissolved?: boolean;
+  next_seq?: number;
   last_message_at?: string;
   unread_count?: number;
   member_count?: number;
@@ -143,6 +158,11 @@ export interface HubSessionMember {
   member_type: 'user' | 'agent' | string;
   member_id: string;
   role: HubSessionRole;
+  pinned?: boolean;
+  archived?: boolean;
+  muted?: boolean;
+  last_read_seq?: number;
+  joined_at?: string;
   left_at?: string;
 }
 
@@ -212,7 +232,7 @@ export interface HubMessageAttachment {
   size: number;
   mime_type: string;
   original_name?: string;
-  uploader_user_id?: string;
+  uploader_user_id: string;
   metadata?: string;
   created_at?: string;
 }
@@ -229,6 +249,8 @@ export interface HubMessage {
   reply_to_message_id?: string;
   reply_to?: HubReplyToInfo;
   recalled?: boolean;
+  edited?: boolean;
+  edited_at?: string;
   attachments?: HubMessageAttachment[];
   created_at?: string;
 }
@@ -246,7 +268,7 @@ export interface HubDevice {
   user_id: string;
   device_type: string;
   app_version?: string;
-  capabilities?: string | string[] | Record<string, unknown>;
+  capabilities?: string[];
   last_active_at?: string;
   created_at?: string;
 }
@@ -315,7 +337,7 @@ export interface HubWorkspaceProject {
   id: string;
   name: string;
   description?: string;
-  owner_id?: string;
+  owner_id: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -652,16 +674,97 @@ export type HubFriendAcceptedFrame = HubFrame<
   typeof HUB_EVENTS.FRIEND_ACCEPTED
 >;
 
+// ── WS frame types matching hub-server/internal/ws/frame.go ──
+
+export interface HubMessageEditedPayload {
+  id: string;
+  session_id: string;
+  seq_id: number;
+  content_type: string;
+  content: string;
+  edited: boolean;
+  edited_at?: string;
+}
+
+export type HubMessageEditedFrame = HubFrame<
+  HubMessageEditedPayload,
+  typeof HUB_EVENTS.MESSAGE_EDITED
+>;
+
+export interface HubMessagePinPayload {
+  session_id: string;
+  message_id: string;
+  pinned_by_user_id: string;
+  pinned_at: string;
+}
+
+export type HubMessagePinFrame = HubFrame<
+  HubMessagePinPayload,
+  typeof HUB_EVENTS.MESSAGE_PIN
+>;
+
+export interface HubMessageUnpinPayload {
+  session_id: string;
+  message_id: string;
+}
+
+export type HubMessageUnpinFrame = HubFrame<
+  HubMessageUnpinPayload,
+  typeof HUB_EVENTS.MESSAGE_UNPIN
+>;
+
+export interface HubMessageReactionPayload {
+  action: string;
+  user_id: string;
+  message_id: string;
+  session_id: string;
+  reaction: string;
+  count: number;
+}
+
+export type HubMessageReactionAddedFrame = HubFrame<
+  HubMessageReactionPayload,
+  typeof HUB_EVENTS.MESSAGE_REACTION_ADDED
+>;
+
+export type HubMessageReactionRemovedFrame = HubFrame<
+  HubMessageReactionPayload,
+  typeof HUB_EVENTS.MESSAGE_REACTION_REMOVED
+>;
+
+export interface HubSessionMemberEventPayload {
+  session_id: string;
+  member_id: string;
+  member_type?: string;
+}
+
+export type HubSessionMemberJoinedFrame = HubFrame<
+  HubSessionMemberEventPayload,
+  typeof HUB_EVENTS.SESSION_MEMBER_JOINED
+>;
+
+export type HubSessionMemberLeftFrame = HubFrame<
+  HubSessionMemberEventPayload,
+  typeof HUB_EVENTS.SESSION_MEMBER_LEFT
+>;
+
 export type HubKnownFrame =
   | HubAuthFrame
   | HubAuthOkFrame
   | HubAuthFailFrame
   | HubMessageNewFrame
+  | HubMessageEditedFrame
   | HubMessageRecallFrame
+  | HubMessagePinFrame
+  | HubMessageUnpinFrame
   | HubMessageReadFrame
+  | HubMessageReactionAddedFrame
+  | HubMessageReactionRemovedFrame
   | HubSessionCreatedFrame
   | HubSessionInfoUpdatedFrame
   | HubSessionDissolvedFrame
+  | HubSessionMemberJoinedFrame
+  | HubSessionMemberLeftFrame
   | HubAgentDispatchFrame
   | HubAgentStreamFrame
   | HubAgentDoneFrame
@@ -772,19 +875,102 @@ export function createHubClient(opts: HubClientOptions = {}) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
-      ...options,
-      headers,
-    });
+    const timeoutMs = opts.timeoutMs ?? 30_000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = controller.signal;
 
-    if (!response.ok) {
-      throw await parseHubError(response);
-    }
-    if (response.status === 204) {
-      return undefined as T;
-    }
+    try {
+      const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
+        ...options,
+        headers,
+        signal,
+      });
+      clearTimeout(timeoutId);
 
-    return unwrapHubResponse<T>(await readJson(response), response.status);
+      // ── Token refresh recovery on 401 ──────────────────
+      if (response.status === 401 && opts.onRefreshToken) {
+        try {
+          const newToken = await opts.onRefreshToken();
+          if (newToken) {
+            // Retry once with fresh token
+            headers.set('Authorization', `Bearer ${newToken}`);
+            const retryController = new AbortController();
+            const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
+            try {
+              const retryResponse = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
+                ...options,
+                headers,
+                signal: retryController.signal,
+              });
+              clearTimeout(retryTimeoutId);
+              if (!retryResponse.ok) {
+                throw await parseHubError(retryResponse);
+              }
+              if (retryResponse.status === 204) {
+                return undefined as T;
+              }
+              return unwrapHubResponse<T>(await readJson(retryResponse), retryResponse.status);
+            } catch (retryErr) {
+              clearTimeout(retryTimeoutId);
+              throw retryErr;
+            }
+          }
+        } catch (refreshErr) {
+          console.error('[HubClient] Token refresh failed', refreshErr);
+          reportApiError(refreshErr instanceof Error ? refreshErr : new Error(String(refreshErr)), {
+            path,
+            context: 'token_refresh',
+          });
+        }
+      }
+
+      if (!response.ok) {
+        throw await parseHubError(response);
+      }
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      return unwrapHubResponse<T>(await readJson(response), response.status);
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Surface timeout as a distinct error
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        const timeoutError = new AppError(
+          {
+            error: {
+              code: 'TIMEOUT',
+              message: `Request timed out after ${timeoutMs}ms: ${options.method ?? 'GET'} ${path}`,
+            },
+          },
+          0,
+        );
+        console.error(`[HubClient] ${timeoutError.message}`);
+        reportApiError(timeoutError, { path, method: options.method ?? 'GET', timeoutMs });
+        throw timeoutError;
+      }
+
+      // Report all other errors
+      if (error instanceof AppError) {
+        reportApiError(error, { path, method: options.method ?? 'GET' });
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        const netError = new AppError(
+          {
+            error: {
+              code: 'NETWORK_ERROR',
+              message: `Network request failed: ${error.message}`,
+            },
+          },
+          0,
+        );
+        console.error(`[HubClient] ${netError.message}`);
+        reportApiError(netError, { path, method: options.method ?? 'GET' });
+        throw netError;
+      }
+      throw error;
+    }
   }
 
   async function requestWithFallback<T>(
@@ -916,12 +1102,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/sessions/search?q=${encodeURIComponent(q)}`,
       ),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
-      request<HubSession>('/client/sessions/private', {
+      request<HubCreateSessionResponse>('/client/sessions/private', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
-      request<HubSession>('/client/sessions/group', {
+      request<HubCreateSessionResponse>('/client/sessions/group', {
         method: 'POST',
         body: JSON.stringify(body),
       }),

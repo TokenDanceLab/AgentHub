@@ -4,41 +4,8 @@ import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
-import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
-import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
-import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
-import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
-import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
-import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
-import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
-import diff from 'react-syntax-highlighter/dist/esm/languages/prism/diff';
-import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
-import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
-import go from 'react-syntax-highlighter/dist/esm/languages/prism/go';
-import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import './prismRegistry'; // registers all languages on shared refractor instance
 import styles from './Markdown.module.css';
-
-// ── Register common languages (light build) ────────
-SyntaxHighlighter.registerLanguage('tsx', tsx);
-SyntaxHighlighter.registerLanguage('typescript', typescript);
-SyntaxHighlighter.registerLanguage('javascript', javascript);
-SyntaxHighlighter.registerLanguage('js', javascript);
-SyntaxHighlighter.registerLanguage('bash', bash);
-SyntaxHighlighter.registerLanguage('sh', bash);
-SyntaxHighlighter.registerLanguage('shell', bash);
-SyntaxHighlighter.registerLanguage('json', json);
-SyntaxHighlighter.registerLanguage('css', css);
-SyntaxHighlighter.registerLanguage('python', python);
-SyntaxHighlighter.registerLanguage('py', python);
-SyntaxHighlighter.registerLanguage('markdown', markdown);
-SyntaxHighlighter.registerLanguage('md', markdown);
-SyntaxHighlighter.registerLanguage('diff', diff);
-SyntaxHighlighter.registerLanguage('yaml', yaml);
-SyntaxHighlighter.registerLanguage('yml', yaml);
-SyntaxHighlighter.registerLanguage('rust', rust);
-SyntaxHighlighter.registerLanguage('go', go);
-SyntaxHighlighter.registerLanguage('sql', sql);
 
 // ── CodeBlock component ───────────────────────────
 function CodeBlock({
