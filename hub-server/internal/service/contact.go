@@ -136,7 +136,7 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 		return err
 	}
 
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
 			"request_id":   f.ID,
@@ -213,7 +213,7 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 		return err
 	}
 
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
 			"friendship_id": r.ID,
@@ -235,7 +235,7 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if err := repository.DeleteFriendship(s.db, r); err != nil {
 		return err
 	}
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -288,7 +288,7 @@ func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, frien
 	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
 		return err
 	}
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
 	return nil
 }
 
@@ -310,7 +310,7 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 	}); err != nil {
 		return err
 	}
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
@@ -322,7 +322,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err := repository.DeleteFriendship(s.db, f); err != nil {
 		return err
 	}
-	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
