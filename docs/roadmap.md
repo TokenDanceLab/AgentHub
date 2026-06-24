@@ -1852,7 +1852,7 @@ Phase 4 (P2): 运行时集成 ✅ 完成（部分阻塞项除外）
   ├─ 12. SDK -> Anthropic/OpenAI API 消耗 ⏳（缺 API key）
   └─ 13.1 Mobile -> Hub API + OIDC deep-link ✅（APK 构建 ⏳ 缺环境）
 
-Phase 5 (P3): 生产就绪 🟡 进行中（SUPER Phase 1/4/5 完成，Phase 2+3 执行中）
+Phase 5 (P3): 生产就绪 🟡 进行中（SUPER Phase 1-6 全部完成）
   ├─ 15. 部署 -> 生产部署 ✅（PG 备份 + Edge 生产部署 pending）
   ├─ 16. 安全 -> CSP/DOMPurify/Redis blacklist ✅，Permissions-Policy/依赖扫描/WS 加固 pending
   ├─ 17. 性能 -> 基线建立 + N+1 消除 pending
@@ -1868,8 +1868,8 @@ Phase 6 (P4): 发布
   ├─ 13.2 Desktop Tauri -> 签名 + 打包
   └─ 14. Release -> changelog + gate + rollback
 
-SUPER Phase 2 (Edge 安全加固): 🟡 执行中 (0/7)
-SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
+SUPER Phase 2 (Edge 安全加固): ✅ 完成 (7/7)
+SUPER Phase 3 (架构重构): ✅ 完成 (5/5)
 ```
 
 ### 依赖关系图
@@ -1900,8 +1900,8 @@ SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
   │                └─> DagTree (AgentTeam route)
   │                └─> Files 预览 (ArtifactBrowser)
   │                └─> Deploy preview (iframe)
-  ├── SUPER Phase 2 🟡 ──> Edge 安全加固 (0/7)
-  └── SUPER Phase 3 🟡 ──> 架构重构 (0/5)
+  ├── SUPER Phase 2 ✅ ──> Edge 安全加固 (7/7)
+  └── SUPER Phase 3 ✅ ──> 架构重构 (5/5)
 ```
 
 ---
@@ -1963,7 +1963,7 @@ SUPER Phase 3 (架构重构): 🟡 执行中 (0/5)
 
 > 当前 roadmap 中所有未勾选项汇总，含阻塞原因和计划阶段。
 > 上次审计：2026-06-19，SUPER Phase 1/4/5 完成后更新。CSP/DOMPurify/Redis blacklist/配置脱敏 已关闭。
-> Phase 2 (Edge 安全加固 0/7) + Phase 3 (架构重构 0/5) 并行执行中。
+> Phase 2 (Edge 安全加固 7/7) + Phase 3 (架构重构 5/5) 已完成；SUPER 6 Phase 全部完成。
 
 | 未勾选项 | 所属章节 | 阻塞原因 | 计划阶段 |
 |---------|---------|---------|---------|
