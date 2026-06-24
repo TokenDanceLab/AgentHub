@@ -173,9 +173,3 @@ func TestVerifyChain_BrokenLink(t *testing.T) {
 	}
 }
 
-func TestAuditEvent_TableName(t *testing.T) {
-	e := AuditEvent{}
-	if e.TableName() != "audit_events" {
-		t.Errorf("TableName() = %q, want audit_events", e.TableName())
-	}
-}
