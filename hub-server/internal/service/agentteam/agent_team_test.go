@@ -1,4 +1,4 @@
-package service
+package agentteam
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -476,13 +477,13 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
 	svc := NewAgentTeamService(db, agentSvc, nil)
-	bus, err := NewBus()
+	bus, err := service.NewBus()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(bus.Close)
-	events := make(chan Event, 1)
-	bus.Subscribe("team.run.started", func(ctx context.Context, event Event) {
+	events := make(chan service.Event, 1)
+	bus.Subscribe("team.run.started", func(ctx context.Context, event service.Event) {
 		events <- event
 	})
 	svc.SetBus(bus)
@@ -611,13 +612,13 @@ func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus, err := NewBus()
+	bus, err := service.NewBus()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(bus.Close)
-	events := make(chan Event, 1)
-	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event Event) {
+	events := make(chan service.Event, 1)
+	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event service.Event) {
 		events <- event
 	})
 	svc.SetBus(bus)
@@ -648,13 +649,13 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus, err := NewBus()
+	bus, err := service.NewBus()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(bus.Close)
-	events := make(chan Event, 1)
-	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event Event) {
+	events := make(chan service.Event, 1)
+	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event service.Event) {
 		events <- event
 	})
 	svc.SetBus(bus)
@@ -1182,7 +1183,7 @@ func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 
 func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	agentSvc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-dispatch-1"}
 	svc := NewAgentTeamService(db, agentSvc, nil)
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
@@ -1214,6 +1215,17 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	require.NoError(t, db.Where("id = ?", assignment.ID).First(&reloadedAssignment).Error)
 	require.NotNil(t, reloadedAssignment.RunID)
 	assert.Equal(t, model.AssignmentStatusDispatched, reloadedAssignment.Status)
+
+	// Seed the pending task that the mock agent service would have created.
+	triggerMsgID := "msg-trigger-dispatch"
+	require.NoError(t, db.Exec(
+		"INSERT INTO pending_agent_tasks (id, agent_instance_id, trigger_message_id, triggered_by_user_id, status, expire_at) VALUES (?, ?, ?, ?, ?, ?)",
+		*reloadedAssignment.RunID, "agent-executor", triggerMsgID, "user-1", model.TaskStatusRunning, time.Now().Add(1*time.Hour),
+	).Error)
+	require.NoError(t, db.Exec(
+		"INSERT INTO messages (id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, created_at) VALUES (?, ?, 1, ?, 'user', ?, 'text', ?, ?)",
+		triggerMsgID, run.SessionID, triggerMsgID, "user-1", "Task: Implement replay\nContext: include events", time.Now(),
+	).Error)
 
 	var reloadedTask model.AgentTeamTask
 	require.NoError(t, db.Where("id = ?", teamTask.ID).First(&reloadedTask).Error)
@@ -1993,7 +2005,7 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
-func readAgentTeamEvent(t *testing.T, events <-chan Event) Event {
+func readAgentTeamEvent(t *testing.T, events <-chan service.Event) service.Event {
 	t.Helper()
 	select {
 	case event := <-events:
@@ -2001,7 +2013,7 @@ func readAgentTeamEvent(t *testing.T, events <-chan Event) Event {
 	case <-time.After(time.Second):
 		t.Fatal("agent team event was not published")
 	}
-	return Event{}
+	return service.Event{}
 }
 
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
