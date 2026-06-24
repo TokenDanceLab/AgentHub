@@ -7,11 +7,9 @@ export const webHubOnlyHealth: HealthResponse = {
   checks: {
     executor: {
       status: 'stubbed',
-      message: 'Web connects through Hub and does not open a desktop runtime bridge.',
     },
     runners: {
       status: 'stubbed',
-      message: 'Runtime readiness is reported by Hub Agent Profiles and registered execution targets.',
       total: 0,
       available: 0,
       items: [],
