@@ -10,6 +10,11 @@ import { test, expect } from '@playwright/test';
  *
  * Run:
  *   npx playwright test --config e2e/playwright.config.ts
+ *
+ * CI status: This spec is excluded from CI (e2e-smoke job only runs
+ * smoke.spec.ts). These tests require live Hub + Edge servers which are not
+ * available in the GitHub Actions sandbox. Run locally with all services up
+ * before pushing production changes.
  */
 
 test.describe('AgentHub real E2E', () => {
