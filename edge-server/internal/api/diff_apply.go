@@ -218,10 +218,7 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	}
 
 	// Apply the hunk to the original content.
-	modified, err := applyHunkToContent(original, hunk)
-	if err != nil {
-		return fmt.Errorf("failed to apply hunk: %w", err)
-	}
+	modified := applyHunkToContent(original, hunk)
 
 	// Write the modified content back.
 	if err := os.WriteFile(targetPath, []byte(modified), 0); err != nil {
@@ -377,7 +374,7 @@ func parseRangeSpec(spec string) (start, count int) {
 
 // applyHunkToContent applies a single hunk to the original file content
 // and returns the modified content.
-func applyHunkToContent(original string, hunk unifiedHunk) (string, error) {
+func applyHunkToContent(original string, hunk unifiedHunk) string {
 	origLines := strings.SplitAfter(original, "\n")
 	// Fix: if the last element is empty due to trailing newline split, remove it.
 	if len(origLines) > 0 && origLines[len(origLines)-1] == "" {
@@ -425,7 +422,7 @@ func applyHunkToContent(original string, hunk unifiedHunk) (string, error) {
 		origIdx++
 	}
 
-	return strings.Join(result, ""), nil
+	return strings.Join(result, "")
 }
 
 // createBackup creates a .bak copy of the file before modification.
