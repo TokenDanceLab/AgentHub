@@ -285,21 +285,19 @@ feat/* → dev/maintainer → master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/maintainer** | 当前集成开发分支 (HEAD 118bdd84)，从 dev/maintainer 创建 | ✅ 活跃 |
-| **dev/maintainer** | 上一版集成主线 (v0.3.0, 1e03b7ec) | ✅ 已归档 |
-| master | PR-only 稳定快照 | ✅ 当前 |
-| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
+| **dev/maintainer** | 当前集成开发分支 | ✅ 活跃 |
+| **feat/super-phase1-safety-foundation** | SUPER 工程修复（52 任务全完成，待合并） | 🔥 活跃 |
+| master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
+| ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
+| ~~dev/maintainer~~ | 旧集成主线 | ✅ 已归档 |
 | ~~origin/dev/contributor-b~~ | 已归档 | ✅ 已清理 |
 | ~~origin/dev/contributor-a~~ | 已归档 | ✅ 已清理 |
-| ~~feat/web-desktop-parity~~ | 已导出 patch 并删除远端 | ✅ 已归档 |
-| ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
-| ~~feat/team-hub-authz~~ | 授权修复 | ✅ 已合入并删除 |
 
 接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/maintainer`（差距较大），始终从 `dev/maintainer` 开始工作。
+- 始终从 `dev/maintainer` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/maintainer`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。

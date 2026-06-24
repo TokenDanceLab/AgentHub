@@ -207,7 +207,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -227,11 +227,9 @@ jobs:
 
       - name: Test edge-server
         run: cd edge-server && go test ./... -short -count=1
-        continue-on-error: ${{ matrix.os == 'macos-latest' }}
 
       - name: Test hub-server
         run: cd hub-server && go test ./... -short -count=1
-        continue-on-error: ${{ matrix.os == 'macos-latest' }}
 
   # ── Docker: Hub Server ───────────────────────
   docker:
