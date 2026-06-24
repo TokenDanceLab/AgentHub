@@ -513,7 +513,7 @@ describe('surface search filtering', () => {
 // ---------------------------------------------------------------------------
 
 describe('pane state transitions', () => {
-  const initialPanes: Record<WorkbenchSurface, SurfacePane> = {
+  const initialPanes: Record<string, string> = {
     contacts: 'members',
     docs: 'recent',
     agents: 'installed',
