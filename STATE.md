@@ -2,12 +2,14 @@
 
 最后更新：2026-06-25
 当前活跃分支：`dev/delicious233`
-当前 dev HEAD：`4ac5e4b7` (`dev/delicious233`)
+当前 dev HEAD：`47083eed` (`dev/delicious233`)
 Release tag：`v0.5.0`（master 最新）
 
 ## MASTER-SYNTHESIS 修复 (2026-06-25 完成)
 
-基于 `../docs/Research/MASTER-SYNTHESIS.md` 的 138 项发现，三波共修复 **25 项**（Tier1: 10, Tier2: 15）。
+基于 `../docs/Research/MASTER-SYNTHESIS.md` 的 138 项发现，五波共修复 **32 项**（Tier1: 12, Tier2: 20）。
+
+外加全局审查发现 40 项问题全部修复（5 critical + 15 major + 20 minor）。
 
 ### Wave 1 — 手动修复 (5 项)
 
@@ -39,6 +41,33 @@ Release tag：`v0.5.0`（master 最新）
 | 2 | WF-Subagent-Safety | T1-A05 结果净化 + T2-D06 spawn 限流 + T1-A06 Plan fallback | `fix/w3-subagent-safety` |
 | 3 | WF-Schema-Router | T2-D10 Output Schema 扩展 + T2-D14 复杂度分类器 | `fix/w3-schema-router` |
 
+### Wave 4 — 可靠性增强 (4 项)
+
+| 编号 | 修复 | 文件 |
+|------|------|------|
+| T1-D02 | 隐性失败检测 — hasRepeatedPattern 连续3次同 tool+args 检测 | orchestrator_failure.go |
+| T1-D03 | 重试上下文净化 — retryDirective 注入不同策略提示 | orchestrator.go |
+| T2-I07 | Memory TTL — ExpiresAt/LastAccessed + 30天默认过期 | runnerctx/memory.go |
+| T2-I04 | Prompt 版本化 — PromptVersion struct + SHA-256 checksum | runnerctx/prompt_version.go (新) |
+
+### Wave 5 — 协议+基准 (3 项)
+
+| 编号 | 修复 | 文件 |
+|------|------|------|
+| T2-A16 | Agent Protocol 兼容层 — API 端点映射文档 | docs/reference/agent-protocol-compat.md (新) |
+| T1-E06 | 延迟断言基线 — 3 个 Go benchmark + latency baseline 测试 | adapter_latency_test.go (新) |
+| T2-I01 | MCP 协议升级 2024-11-05 → 2025-06-18 (stateless spec) | mcp/server.go |
+
+### Global Review — 审查发现修复 (40 项)
+
+| 严重度 | 数量 | 状态 |
+|--------|:--:|:--:|
+| Critical | 5 | ✅ 全部修复 |
+| Major | 15 | ✅ 全部修复 |
+| Minor | 20 | ✅ 全部修复 |
+
+审查发现跨 Wave 集成问题（double-decrement race、registration leak、circuit breaker bypass、system-prompt discard、CJK dead code），per-WF review 未覆盖的跨文件交互路径被独立全局审查捕获。
+
 ### CI 修复 (3 项)
 
 - golangci-lint v2 config: 加 `version: "2"` 到 `edge-server/.golangci.yml` + `hub-server/.golangci.yml`
@@ -50,9 +79,9 @@ Release tag：`v0.5.0`（master 最新）
 
 | 指标 | Wave 1 | Wave 2 | Wave 3 | 合计 |
 |------|:--:|:--:|:--:|:--:|
-| 修复项 | 5 | 13 | 8 | **25** |
-| 代码变更 | +369/-754 | +5,337/-187 | +2,869/-112 | **+8,575/-1,053** |
-| 测试新增 | 少量 | ~2,900 行 | ~1,300 行 | **~4,200+ 行** |
+| 修复项 | 5 | 13 | 8+4+3 | **32** |
+| 代码变更 | +369/-754 | +5,337/-187 | +3,440/-149 + review fixes | **+10,000+/-1,200** |
+| 测试新增 | 少量 | ~2,900 行 | ~2,500 行 | **~5,500+ 行** |
 | CI go-edge | ❌ | ✅ | ✅ | ✅ |
 | CI go-hub | ✅ | ✅ | ✅ | ✅ |
 
@@ -112,7 +141,7 @@ macOS 平台已放弃：CI 移除 macOS build job、Tauri DMG 不再构建。Des
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233`，已同步 master。Wave 1+2 共 18 项修复已合入，CI go-edge ✅ go-hub ✅。 |
+| 当前集成 dev | `dev/delicious233` @ `47083eed`，已同步 master。Wave 1-5 共 32 项修复 + 全局审查 40 项全部合入，CI go-edge ✅ go-hub ✅。43/43 测试包。 |
 | 活跃 feature 分支 | （无）SUPER 52 任务全部完成；Wave 1+2 修复分支已合入并删除。 |
 | 上一条 dev | `origin/dev/delicious223`（已归档）。 |
 | RC tag | `v0.5.0`（master 最新），`v0.4.0`（unsigned release）。 |
