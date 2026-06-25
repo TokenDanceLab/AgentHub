@@ -1064,7 +1064,18 @@ func appendUniqueString(values []string, value string) []string {
 func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
 	var env []string
 	if profileEnv == nil {
-		env = SanitizedEnv(nil, extraEnv)
+		var audit EnvFilterAudit
+		env, audit = SanitizedEnv(nil, extraEnv)
+		// Log run-scoped audit context when vars were filtered.
+		if audit.SensitiveVars > 0 || audit.NotWhitelisted > 0 {
+			slog.Info("env sanitized for run",
+				"runId", run.ID,
+				"total", audit.TotalVars,
+				"passed", audit.PassedVars,
+				"sensitive", audit.SensitiveVars,
+				"not_whitelisted", audit.NotWhitelisted,
+			)
+		}
 	} else {
 		// Administrator explicitly configured the environment, respect it,
 		// but still warn about any sensitive-looking variables it includes.
