@@ -39,6 +39,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 无外部 SDK 依赖，纯 `net/http`
 - Key 缺失时 `Available=false`，不阻塞 Edge 启动
 - 属于 `sdkAdapterIDs`，`IsSDKAdapter()` 返回 true
+- 重试机制：指数退避 + jitter（最大 3 次，1s/2s/4s (±25%)），匹配 `anthropic_sdk.go` 的 `doRequestWithRetry` 模式（v0.5.2+）
 
 ## Orchestrator Adapter
 
