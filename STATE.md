@@ -2,12 +2,12 @@
 
 最后更新：2026-06-25
 当前活跃分支：`dev/delicious233`
-当前 dev HEAD：`ce113a17` (`dev/delicious233`)
+当前 dev HEAD：`4ac5e4b7` (`dev/delicious233`)
 Release tag：`v0.5.0`（master 最新）
 
 ## MASTER-SYNTHESIS 修复 (2026-06-25 完成)
 
-基于 `../docs/Research/MASTER-SYNTHESIS.md` 的 138 项发现，两波共修复 **18 项**（Tier1: 7, Tier2: 11）。
+基于 `../docs/Research/MASTER-SYNTHESIS.md` 的 138 项发现，三波共修复 **25 项**（Tier1: 10, Tier2: 15）。
 
 ### Wave 1 — 手动修复 (5 项)
 
@@ -31,6 +31,14 @@ Release tag：`v0.5.0`（master 最新）
 | 6 | WF-Orch | T2-A10 回溯深度 + T2-A11 熔断器 | `fix/w2-orch-guard` |
 | 7 | WF-SkillsMCP | T2-I10 Trigger + T2-I12 MCP + T2-I09 HotReload | `fix/w2-skills-mcp` |
 
+### Wave 3 — 3 Workflow 并行修复 (8 项)
+
+| # | Workflow | 修复项 | 分支 |
+|:--:|------|------|------|
+| 1 | WF-Orch-Intel | T2-A09 Reflexion + T2-A08 规则引擎 + T2-I11 Prompt 重构 | `fix/w3-orch-intel` |
+| 2 | WF-Subagent-Safety | T1-A05 结果净化 + T2-D06 spawn 限流 + T1-A06 Plan fallback | `fix/w3-subagent-safety` |
+| 3 | WF-Schema-Router | T2-D10 Output Schema 扩展 + T2-D14 复杂度分类器 | `fix/w3-schema-router` |
+
 ### CI 修复 (3 项)
 
 - golangci-lint v2 config: 加 `version: "2"` 到 `edge-server/.golangci.yml` + `hub-server/.golangci.yml`
@@ -40,13 +48,13 @@ Release tag：`v0.5.0`（master 最新）
 
 ### 统计
 
-| 指标 | Wave 1 | Wave 2 | 合计 |
-|------|:--:|:--:|:--:|
-| 修复项 | 5 | 13 | **18** |
-| 代码变更 | +369/-754 | +5,337/-187 | **+5,706/-941** |
-| 测试新增 | 少量 | ~2,900 行 | **~3,000+ 行** |
-| CI go-edge | ❌ | ✅ | ✅ |
-| CI go-hub | ✅ | ✅ | ✅ |
+| 指标 | Wave 1 | Wave 2 | Wave 3 | 合计 |
+|------|:--:|:--:|:--:|:--:|
+| 修复项 | 5 | 13 | 8 | **25** |
+| 代码变更 | +369/-754 | +5,337/-187 | +2,869/-112 | **+8,575/-1,053** |
+| 测试新增 | 少量 | ~2,900 行 | ~1,300 行 | **~4,200+ 行** |
+| CI go-edge | ❌ | ✅ | ✅ | ✅ |
+| CI go-hub | ✅ | ✅ | ✅ | ✅ |
 
 ## SUPER 工程修复 (2026-06-19 完成)
 
