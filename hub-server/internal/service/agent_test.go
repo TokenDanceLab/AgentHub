@@ -320,6 +320,242 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 	require.Empty(t, payload.ModelParams)
 }
 
+// ==================== T2-D10: OutputSchema dispatch tests ====================
+
+func TestDispatchTaskIncludesOutputSchema(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	// Add custom_agents table (not part of the default target contract schema).
+	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS custom_agents (
+		id TEXT PRIMARY KEY,
+		owner_user_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		avatar_url TEXT DEFAULT '',
+		agent_type TEXT NOT NULL,
+		system_prompt TEXT NOT NULL,
+		capability_tags TEXT DEFAULT '[]',
+		tool_whitelist TEXT DEFAULT '[]',
+		model_params TEXT DEFAULT '{}',
+		output_schema TEXT DEFAULT NULL,
+		deleted_at DATETIME,
+		created_at DATETIME,
+		updated_at DATETIME
+	)`).Error)
+
+	now := time.Now()
+	outputSchema := `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`
+	require.NoError(t, db.Exec(
+		`INSERT INTO custom_agents (id, owner_user_id, name, agent_type, system_prompt, capability_tags, tool_whitelist, model_params, output_schema, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"profile-outputschema", "user-1", "Structured Agent", "claude-code", "You produce structured JSON.", "[]", "[]", `{"model":"claude-sonnet-4-6"}`, outputSchema, now, now,
+	).Error)
+
+	// Build a *model.CustomAgent with OutputSchema populated for direct dispatchTask call.
+	raw := json.RawMessage(outputSchema)
+	customAgent := &model.CustomAgent{
+		ID:           "profile-outputschema",
+		OwnerUserID:  "user-1",
+		Name:         "Structured Agent",
+		AgentType:    "claude-code",
+		SystemPrompt: "You produce structured JSON.",
+		ModelParams:  `{"model":"claude-sonnet-4-6"}`,
+		OutputSchema: &raw,
+	}
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-output-schema",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	profileID := "profile-outputschema"
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		CustomAgentID: &profileID,
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Structured Agent",
+	}
+
+	// Point Edge dispatch at a dead port so it always falls back to Redis.
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
+
+	// Dispatch WITH the CustomAgent (non-TeamRun scenario).
+	svc.dispatchTask(context.Background(), task, agent, "Give me a summary", "", "", customAgent)
+
+	snapshot := cache.snapshot()
+	require.Len(t, snapshot.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
+
+	// Verify OutputSchema is present in the dispatch payload.
+	require.NotNil(t, payload.OutputSchema, "OutputSchema should be set when CustomAgent has OutputSchema")
+	require.Equal(t, outputSchema, string(*payload.OutputSchema))
+	// Verify the CustomAgent fields are also passed.
+	require.Equal(t, "profile-outputschema", payload.CustomAgentID)
+	require.Equal(t, "You produce structured JSON.", payload.SystemPrompt)
+	require.Equal(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
+}
+
+func TestDispatchTaskIncludesOutputSchemaWithTeamRunContext(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	for _, ddl := range []string{
+		`CREATE TABLE IF NOT EXISTS custom_agents (
+			id TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			avatar_url TEXT DEFAULT '',
+			agent_type TEXT NOT NULL,
+			system_prompt TEXT NOT NULL,
+			capability_tags TEXT DEFAULT '[]',
+			tool_whitelist TEXT DEFAULT '[]',
+			model_params TEXT DEFAULT '{}',
+			output_schema TEXT DEFAULT NULL,
+			deleted_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE IF NOT EXISTS agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE IF NOT EXISTS agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL,
+			position INTEGER DEFAULT 0,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE IF NOT EXISTS agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			target_id TEXT,
+			mode TEXT NOT NULL DEFAULT 'supervisor',
+			status TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+	} {
+		require.NoError(t, db.Exec(ddl).Error)
+	}
+
+	now := time.Now()
+	outputSchema := `{"type":"object","properties":{"action":{"type":"string","enum":["delegate","finish"]}},"required":["action"]}`
+
+	// Insert CustomAgent with OutputSchema.
+	require.NoError(t, db.Exec(
+		`INSERT INTO custom_agents (id, owner_user_id, name, agent_type, system_prompt, capability_tags, tool_whitelist, model_params, output_schema, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"profile-supervisor", "user-1", "Supervisor", "claude-code", "Coordinate the team", "[]", "[]", `{"model":"claude-sonnet-4-6"}`, outputSchema, now, now,
+	).Error)
+
+	// Insert TeamRun context.
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_teams (id, owner_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"team-1", "user-1", "Backend Team", now, now).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_team_members (id, team_id, agent_profile_id, role, position, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"member-supervisor", "team-1", "profile-supervisor", model.TeamMemberRoleSupervisor, 0, now).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_team_runs (id, team_id, session_id, trigger_user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"run-team-1", "team-1", "sess-1", "user-1", model.TeamRunStatusRunning, now, now).Error)
+
+	// Build the CustomAgent model for direct dispatchTask call.
+	raw := json.RawMessage(outputSchema)
+	customAgent := &model.CustomAgent{
+		ID:           "profile-supervisor",
+		OwnerUserID:  "user-1",
+		Name:         "Supervisor",
+		AgentType:    "claude-code",
+		SystemPrompt: "Coordinate the team",
+		ModelParams:  `{"model":"claude-sonnet-4-6"}`,
+		OutputSchema: &raw,
+	}
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-teamrun-outputschema",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	profileID := "profile-supervisor"
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		CustomAgentID: &profileID,
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Supervisor",
+	}
+
+	// Point Edge dispatch at a dead port so it always falls back to Redis.
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
+
+	// Dispatch WITH the CustomAgent (TeamRun scenario — backward compatibility).
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "", customAgent)
+
+	snapshot := cache.snapshot()
+	require.Len(t, snapshot.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
+
+	// TeamRun context is preserved (backward compatibility).
+	require.Equal(t, "team-1", payload.TeamID)
+	require.Equal(t, "run-team-1", payload.TeamRunID)
+	require.Equal(t, "member-supervisor", payload.TeamMemberID)
+	require.Equal(t, model.TeamMemberRoleSupervisor, payload.TeamMemberRole)
+	require.Equal(t, "profile-supervisor", payload.CustomAgentID)
+
+	// OutputSchema is also present (new behavior, backward compatible).
+	require.NotNil(t, payload.OutputSchema, "OutputSchema should be set for TeamRun agents when CustomAgent has it")
+	require.Equal(t, outputSchema, string(*payload.OutputSchema))
+	require.Equal(t, "Coordinate the team", payload.SystemPrompt)
+	require.Equal(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
+}
+
+func TestDispatchTaskWithoutCustomAgentOmitsOutputSchema(t *testing.T) {
+	// Verify that OutputSchema is NOT set when the agent has no CustomAgent.
+	db, _, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-no-ca",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Claude",
+		// CustomAgentID is nil — no CustomAgent.
+	}
+
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
+	svc.dispatchTask(context.Background(), task, agent, "Run without custom agent", "", "", nil)
+
+	snapshot := cache.snapshot()
+	require.Len(t, snapshot.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
+
+	// OutputSchema MUST be nil when no CustomAgent is associated.
+	require.Nil(t, payload.OutputSchema, "OutputSchema should be nil when no CustomAgent exists")
+	require.Empty(t, payload.CustomAgentID)
+}
+
 func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	mgr := ws.NewManager()

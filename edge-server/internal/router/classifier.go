@@ -1,6 +1,25 @@
-// Package router provides task-level routing logic for the Edge Server,
-// including prompt complexity classification used to select execution
-// strategies (e.g. single-agent vs. orchestrated TeamRun).
+// Package router provides task-level routing logic for the Edge Server.
+//
+// # Prompt Complexity Classification
+//
+// ClassifyComplexity heuristically determines the execution complexity of a
+// user prompt using regex and keyword matching only — no LLM is called.
+// The resulting ComplexityLevel feeds into the orchestration layer:
+//
+//   - ComplexitySimple: direct single-agent execution, skip orchestration
+//     and planning overhead entirely.
+//   - ComplexityMedium: single-agent execution with standard defaults.
+//   - ComplexityComplex: may trigger multi-agent TeamRun planning,
+//     supervisor routing, or human-in-the-loop approval gates.
+//
+// Classification is deterministic, runs in microseconds, and is called at
+// the Edge /v1/runs handler before the lifecycle executor starts, so routing
+// decisions happen before any CLI process is spawned.
+//
+// # Orchestrator Routing
+//
+// This package also provides the orchestration dispatch helpers that route
+// sub-agent tasks to the appropriate adapters based on the TeamRun plan.
 package router
 
 import (
@@ -9,9 +28,17 @@ import (
 )
 
 // ComplexityLevel classifies a user prompt by expected execution difficulty.
-// The level informs routing decisions: Simple tasks can skip orchestration
-// and run directly on a single agent; Complex tasks may benefit from
-// multi-agent planning or human-in-the-loop approval.
+//
+// The level informs routing and orchestration decisions downstream:
+//
+//   - ComplexitySimple: direct single-agent execution with no orchestration
+//     overhead — the prompt is a single, clearly-scoped task.
+//   - ComplexityMedium: single-agent execution with standard defaults.
+//   - ComplexityComplex: may benefit from multi-agent planning, orchestrated
+//     TeamRun with supervisor routing, or human-in-the-loop approval gates.
+//
+// The classifier is deterministic (regex + keyword matching, zero LLM cost) and
+// runs at the Edge /v1/runs entry point before the lifecycle executor starts.
 type ComplexityLevel string
 
 const (
@@ -69,24 +96,32 @@ var (
 // user prompt using regex and keyword matching. It does NOT call any LLM —
 // classification is deterministic and runs in microseconds.
 //
+// Called at the Edge /v1/runs handler before the lifecycle executor starts
+// a CLI process, so routing decisions (single-agent vs. orchestrated TeamRun)
+// happen with zero added latency.
+//
 // Heuristics are applied in priority order. Keyword signals (complex, then
 // medium) take precedence over word count; word count acts as a fallback when
 // no keyword signal matches. When multiple signals conflict, the highest
 // complexity wins.
 //
-// Heuristics (all regex/keyword, zero LLM):
-//  1. Word count: >100 words → Complex (hard rule)
-//  2. Cross-module keywords: "refactor", "migrate", "restructure", "architecture"
-//     → Complex
-//  3. Dependency indicators: "depends on", "requires", "blocked by" → Complex
-//  4. File count indicators: "all files", "every module", "entire codebase"
-//     → Complex
-//  5. Multi-step indicators: "first...then", "step 1", "after that", "finally"
-//     → at least Medium
-//  6. Simple command patterns: "fix typo", "run test", "check status", "show me"
-//     → Simple (only when no stronger signal matched)
-//  7. Word count: <20 words → Simple (fallback)
-//  8. Default: Medium
+// Rules (all regex/keyword, zero LLM):
+//
+//  1. Word-count hard rule: >100 words → ComplexityComplex
+//  2. Rune-count fallback (CJK): <20 words && >200 runes → at least Medium;
+//     >800 runes → ComplexityComplex
+//  3. Cross-module keywords: "refactor", "migrate", "restructure",
+//     "architecture", "redesign", "overhaul" → ComplexityComplex
+//  4. Dependency indicators: "depends on", "requires", "blocked by"
+//     → ComplexityComplex
+//  5. File-count indicators: "all files", "every module", "entire codebase"
+//     → ComplexityComplex
+//  6. Multi-step indicators: "first…then", "step N", "after that", "finally"
+//     → at least ComplexityMedium
+//  7. Simple command patterns: "fix typo", "run test", "check status",
+//     "show me" → ComplexitySimple (only when no stronger signal matched)
+//  8. Word-count fallback: <20 words → ComplexitySimple
+//  9. Default: ComplexityMedium
 func ClassifyComplexity(prompt string) ComplexityLevel {
 	words := countWords(prompt)
 	runes := len([]rune(prompt))
