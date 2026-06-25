@@ -288,25 +288,44 @@ type dispatchInterceptor struct {
 	// Failure degradation: classifies sub-agent errors and drives recovery
 	// (retry / switch / skip / fail).
 	failureRecovery *FailureRecoveryManager
+
+	// textBuffer accumulates streamed text deltas to prevent dispatch JSON
+	// fragmentation across BusEventTextDelta events (ISSUE 3.2).
+	// Reset on BusEventTextBlock or after successful dispatch detection.
+	textBuffer strings.Builder
 }
 
 func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, payload any) {
 	d.inner.Emit(eventType, scope, payload)
 	switch eventType {
-	case BusEventTextBlock, BusEventTextDelta:
+	case BusEventTextBlock:
+		d.textBuffer.Reset()
 		d.scanForDispatch(payload, scope)
+	case BusEventTextDelta:
+		text := extractTextContent(payload)
+		if text != "" {
+			d.textBuffer.WriteString(text)
+		}
+		// Scan the FULL accumulated buffer to catch JSON lines split
+		// across deltas (ISSUE 3.2).
+		d.scanTextForDispatch(d.textBuffer.String(), scope)
 	}
 }
 
-// scanForDispatch collects dispatch events and fans out multiple dispatches concurrently.
-// When the plan approval gate is enabled (planBroker != nil), it first pauses,
-// emits a plan.proposed event, and waits for user approval before proceeding.
+// scanForDispatch collects dispatch events from a payload and fans out
+// multiple dispatches concurrently. Used for BusEventTextBlock (complete blocks).
 func (d *dispatchInterceptor) scanForDispatch(payload any, scope map[string]any) {
 	text := extractTextContent(payload)
 	if text == "" {
 		return
 	}
+	d.scanTextForDispatch(text, scope)
+}
 
+// scanTextForDispatch scans pre-extracted text for dispatch events.
+// Used directly for buffered TextDelta accumulation to prevent JSON
+// lines split across deltas from being silently skipped (ISSUE 3.2).
+func (d *dispatchInterceptor) scanTextForDispatch(text string, scope map[string]any) {
 	// T2-A08: Rule engine pre-processing layer — intercept simple
 	// termination/completion signals before JSON dispatch parsing.
 	if d.applyRuleEngine(text, scope) {
@@ -390,16 +409,20 @@ func (d *dispatchInterceptor) applyRuleEngine(text string, scope map[string]any)
 }
 
 // matchCompletion checks for known orchestrator termination signals.
-// Multi-word phrases match on any-length text; single-word signals
-// only match on short text (<= 80 chars) to avoid false positives.
+// Multi-word phrases match on short text (<= 200 chars) to prevent false
+// positives when completion phrases appear inside longer orchestrator
+// output that is not a termination signal (ISSUE 3.11).
+// Single-word signals only match on very short text (<= 80 chars).
 func (d *dispatchInterceptor) matchCompletion(textLower string) bool {
-	// Multi-word phrases — match on any text length.
-	for _, phrase := range []string{
-		"all tasks done", "all done", "all tasks complete",
-		"all sub-agent tasks have completed",
-	} {
-		if strings.Contains(textLower, phrase) {
-			return true
+	// Multi-word phrases — only match on reasonably short text.
+	if len(textLower) <= 200 {
+		for _, phrase := range []string{
+			"all tasks done", "all done", "all tasks complete",
+			"all sub-agent tasks have completed",
+		} {
+			if strings.Contains(textLower, phrase) {
+				return true
+			}
 		}
 	}
 	// Single-word signals — only match on short text to avoid false positives.
@@ -922,7 +945,7 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 		// Without this check, context cancellation is indistinguishable
 		// from DecisionSkip — the caller continues processing further
 		// sub-agent results instead of stopping all work.
-		if fErr != nil && errors.Is(fErr, context.Canceled) {
+		if fErr != nil && (errors.Is(fErr, context.Canceled) || errors.Is(fErr, context.DeadlineExceeded)) {
 			return
 		}
 
@@ -1006,6 +1029,17 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 			return
 
 		case DecisionFail:
+			// Inject reflexion critique before falling through to the
+			// normal error injection, so the orchestrator SEES the
+			// failure analysis even when depth limit prevents retry.
+			failureErr := fmt.Errorf("%s", errMsg)
+			category, reason := ClassifyFailure(failureErr, nil)
+			critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
+			failMsg := fmt.Sprintf("[Sub-agent: %s] unrecoverable failure\nError: %s\nCritique: %s", agentName, errMsg, critique)
+			d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+				"text":   failMsg,
+				"source": "sub_agent_fail",
+			})
 			// Fall through to the normal error injection below.
 		}
 	}
