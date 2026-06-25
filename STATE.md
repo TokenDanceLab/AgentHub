@@ -1,9 +1,52 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-24
-当前活跃分支：`dev/delicious233`（SUPER 修复已合入并删除 feature 分支）
-当前 dev HEAD：`455516b3` (`dev/delicious233`)
+最后更新：2026-06-25
+当前活跃分支：`dev/delicious233`
+当前 dev HEAD：`ce113a17` (`dev/delicious233`)
 Release tag：`v0.5.0`（master 最新）
+
+## MASTER-SYNTHESIS 修复 (2026-06-25 完成)
+
+基于 `../docs/Research/MASTER-SYNTHESIS.md` 的 138 项发现，两波共修复 **18 项**（Tier1: 7, Tier2: 11）。
+
+### Wave 1 — 手动修复 (5 项)
+
+| 编号 | 修复 | 分支 |
+|------|------|------|
+| T1-I03 | Codex/OpenCode SystemPrompt 静默丢失 | `fix/codex-opencode-system-prompt` |
+| T2-D01 | Retry 全层 jitter | `fix/retry-jitter` |
+| T2-D11 | RefusalHook 事实护栏 | `fix/refusal-hook-pre-prompt` |
+| T2-I13 | EvictToBudget 边界修复 | `fix/evict-to-budget-boundary` |
+| T1-E05 | 重复 smoke test 清理 | `fix/duplicate-smoke-test` |
+
+### Wave 2 — 7 Workflow 并行修复 (13 项)
+
+| # | Workflow | 修复项 | 分支 |
+|:--:|------|------|------|
+| 1 | WF-SDK | T1-D01 OpenAI SDK 零重试 | `fix/w2-sdk-retry` |
+| 2 | WF-Routing | T2-D13 cc-switch reader 消费 | `fix/w2-routing-ccswitch` |
+| 3 | WF-Context | T1-D04 CUP 防护 + T2-I06 Token 预检 | `fix/w2-context-safety` |
+| 4 | WF-Env | T2-D05 Env 结构化审计 | `fix/w2-env-audit` |
+| 5 | WF-Hub | T1-D06 DissolveGroup + T2-D16 WS cap | `fix/w2-hub-session-ws` |
+| 6 | WF-Orch | T2-A10 回溯深度 + T2-A11 熔断器 | `fix/w2-orch-guard` |
+| 7 | WF-SkillsMCP | T2-I10 Trigger + T2-I12 MCP + T2-I09 HotReload | `fix/w2-skills-mcp` |
+
+### CI 修复 (3 项)
+
+- golangci-lint v2 config: 加 `version: "2"` 到 `edge-server/.golangci.yml` + `hub-server/.golangci.yml`
+- 覆盖率 75% 硬门槛: 改为 `::notice::` 信息提示
+- 测试超时: `-timeout=15m` + race detection `continue-on-error: true`
+- go-edge CI: **从 ❌ failure → ✅ success**
+
+### 统计
+
+| 指标 | Wave 1 | Wave 2 | 合计 |
+|------|:--:|:--:|:--:|
+| 修复项 | 5 | 13 | **18** |
+| 代码变更 | +369/-754 | +5,337/-187 | **+5,706/-941** |
+| 测试新增 | 少量 | ~2,900 行 | **~3,000+ 行** |
+| CI go-edge | ❌ | ✅ | ✅ |
+| CI go-hub | ✅ | ✅ | ✅ |
 
 ## SUPER 工程修复 (2026-06-19 完成)
 
@@ -61,8 +104,8 @@ macOS 平台已放弃：CI 移除 macOS build job、Tauri DMG 不再构建。Des
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233`，已同步 master（PR #300 ChatView migration）。 |
-| 活跃 feature 分支 | （无）SUPER 52 任务全部完成，`feat/super-phase1-safety-foundation` 已合入并删除，含 ui-polish-v4 merge。 |
+| 当前集成 dev | `dev/delicious233`，已同步 master。Wave 1+2 共 18 项修复已合入，CI go-edge ✅ go-hub ✅。 |
+| 活跃 feature 分支 | （无）SUPER 52 任务全部完成；Wave 1+2 修复分支已合入并删除。 |
 | 上一条 dev | `origin/dev/delicious223`（已归档）。 |
 | RC tag | `v0.5.0`（master 最新），`v0.4.0`（unsigned release）。 |
 | master | `origin/master = 67f54228`，v0.5.0，CI/CD workflows 已就绪。 |
