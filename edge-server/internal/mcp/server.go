@@ -30,14 +30,11 @@
 package mcp
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
@@ -46,7 +43,10 @@ import (
 )
 
 // MCP protocol version supported by this server.
-const protocolVersion = "2024-11-05"
+// "2025-06-18" is the stateless HTTP-based spec that replaced the
+// session-based "2024-11-05" transport. This server uses per-request
+// stateless design (ServeHTTP), which aligns with the newer spec.
+const protocolVersion = "2025-06-18"
 
 // Server name reported during initialize handshake.
 const serverName = "agenthub-edge"
@@ -104,8 +104,7 @@ type jsonrpcError struct {
 //   - permissionRegistry: resolves permission approval/deny decisions
 //   - workspaceAllowlist: validates workDir in start_run requests
 //
-// Thread-safety: the sessionID field is protected by mu; all other fields are
-// set during initialization and are read-only thereafter.
+// All fields are set during initialization and are read-only thereafter.
 type Server struct {
 	store              store.Repository
 	executor           lifecycle.RunExecutor
@@ -116,11 +115,6 @@ type Server struct {
 	// authToken, if non-empty, is required as Bearer token on every MCP request.
 	// When empty (default), MCP inherits the global Edge auth middleware.
 	authToken string
-
-	// sessionID is generated on initialize and returned to clients.
-	// For simplicity, this implementation uses a single-session model.
-	mu        sync.Mutex
-	sessionID string
 }
 
 // NewServer creates a new MCP server with the given dependencies.
@@ -239,7 +233,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //
 // Method dispatch table:
 //
-//	initialize               → handleInitialize (session setup + capabilities)
+//	initialize               → handleInitialize (capabilities announcement)
 //	notifications/initialized → nil (client acknowledgement, no response)
 //	ping                     → handlePing (liveness check)
 //	tools/list               → handleToolsList (discovery)
@@ -268,22 +262,16 @@ func (s *Server) handleRequest(req jsonrpcRequest) *jsonrpcResponse {
 }
 
 // handleInitialize processes the MCP initialize request.
-// Generates a random session ID, reports protocol version 2024-11-05,
-// announces the tools capability, and returns server metadata.
-// The session ID is stored for potential future session-scoped state.
+// Reports protocol version 2025-06-18 (stateless), announces the tools
+// capability, and returns server metadata. No session is created — the
+// server uses a per-request stateless design (ServeHTTP) aligned with the
+// 2025 MCP spec which dropped session-based transport in favor of
+// stateless HTTP.
 func (s *Server) handleInitialize(req jsonrpcRequest) *jsonrpcResponse {
-	// Generate a session ID for this connection
-	s.mu.Lock()
-	s.sessionID = generateSessionID()
-	sessionID := s.sessionID
-	s.mu.Unlock()
-
 	result := map[string]any{
 		"protocolVersion": protocolVersion,
 		"capabilities": map[string]any{
-			"tools": map[string]any{
-				"listChanged": false,
-			},
+			"tools": map[string]any{},
 		},
 		"serverInfo": map[string]any{
 			"name":    serverName,
@@ -292,7 +280,6 @@ func (s *Server) handleInitialize(req jsonrpcRequest) *jsonrpcResponse {
 		"instructions": "AgentHub Edge MCP Server — manage projects, threads, and agent runs.",
 	}
 
-	slog.Info("mcp.initialize", "sessionID", sessionID, "protocolVersion", protocolVersion)
 	return successResponse(req.ID, result)
 }
 
@@ -389,15 +376,4 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 			slog.Error("mcp: failed to encode response", "error", err)
 		}
 	}
-}
-
-// generateSessionID creates a random 16-hex-digit session identifier.
-// Uses crypto/rand; falls back to a static value if crypto/rand fails.
-func generateSessionID() string {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		// Fallback to a static value if crypto/rand fails
-		return "mcp_sess_fallback"
-	}
-	return "mcp_sess_" + hex.EncodeToString(b)
 }
