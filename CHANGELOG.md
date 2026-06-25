@@ -6,9 +6,9 @@ All notable changes to the TokenDance AgentHub project.
 
 ## [v0.5.2] — 2026-06-25
 
-> **合成报告修复** — 基于 MASTER-SYNTHESIS.md 138 项发现补齐 18 项可靠性/正确性缺口。
-> 两波修复：Wave 1 单线程 5 项 + Wave 2 七 Workflow 并行 13 项。
-> 分支：`dev/delicious233`。CI go-edge ✅ go-hub ✅。
+> **合成报告修复** — 基于 MASTER-SYNTHESIS.md 138 项发现补齐 25 项可靠性/正确性缺口。
+> 三波修复：Wave 1 单线程 5 项 + Wave 2 七 Workflow 并行 13 项 + Wave 3 三 Workflow 并行 8 项。
+> 分支：`dev/delicious233`。CI go-edge ✅ go-hub ✅。43/43 测试包全绿。
 
 ### Wave 1 — 手动速赢 (5 项)
 
@@ -53,12 +53,29 @@ All notable changes to the TokenDance AgentHub project.
 - edge-server 测试超时：`timeout-minutes: 20` + `-timeout=15m`
 - race detection：`continue-on-error: true`（fsnotify 集成测试的 goroutine race 存于 CI 环境）
 
+### Wave 3 — 三 Workflow 并行 (8 项)
+
+**编排器智能**
+- **T2-A09**: buildReflexionCritique() — 子Agent失败后注入结构化反思提示，输出到事件总线+日志
+- **T2-A08**: 两层规则引擎 — pre-JSON-parse 完成信号检测 + post-JSON-parse 同Agent顺序化调度（7个新方法）
+- **T2-I11**: DefaultOrchestratorPrompt 重构为 XML-wrapped 5 部分 Anthropic 黄金模板（ROLE/LIMITS/WORKFLOW/OUTPUT/CONSTRAINTS）
+
+**子Agent安全**
+- **T1-A05**: SanitizeSubAgentResult() — 过滤stack trace/文件路径/API key pattern/调试噪声，32KB上限+递归净化
+- **T2-D06**: MaxChildrenPerAgent (默认5) per-parent spawn 限流，agent registry 跟踪活跃子Agent计数
+- **T1-A06**: ParsePlanRobust() — JSON 修复（括号/引号/空白修复+markdown围栏剥离）+ 启发式fallback（关键词行提取）
+
+**Schema + 路由**
+- **T2-D10**: OutputSchema 从 TeamRun-only 扩展到所有 agent 类型（Hub模型字段+dispatch布线+迁移）
+- **T2-D14**: 新 edge-server/internal/router/ 包，ClassifyComplexity() 启发式分类（Simple/Medium/Complex），零LLM成本
+
 ### 统计
 
 | 指标 | 数值 |
 |------|-----|
-| 代码变更 | +5,706 / -941 |
-| 测试新增 | ~3,000+ 行 |
+| 代码变更 | +8,575 / -1,053 |
+| 测试新增 | ~4,200+ 行 |
+| 测试包 | 43/43 PASS |
 | CI go-edge | ✅ success |
 | CI go-hub | ✅ success |
 
