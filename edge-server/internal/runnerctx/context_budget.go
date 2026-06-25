@@ -277,17 +277,25 @@ func EvictToBudget(messages []Message, maxTokens int) []Message {
 	}
 
 	// Evict from the front (oldest), after the preserved system message.
+	// Subtract the preserved system message tokens from the budget so the
+	// eviction loop correctly accounts for the already-reserved space.
 	result := make([]Message, 0, len(messages))
+	remainingBudget := maxTokens
 	if startIdx > 0 {
 		result = append(result, messages[0])
+		remainingBudget -= EstimateTokens(messages[0].Content)
+		if remainingBudget < 0 {
+			remainingBudget = 0
+		}
 	}
 
-	// Work backwards: figure out how many messages from the end we can keep.
+	// Work backwards: figure out how many messages from the end we can keep
+	// within the remaining budget (after system message reservation).
 	keptTokens := 0
 	keepFromEnd := 0
 	for i := len(messages) - 1; i >= startIdx; i-- {
 		t := EstimateTokens(messages[i].Content)
-		if keptTokens+t > maxTokens {
+		if keptTokens+t > remainingBudget {
 			break
 		}
 		keptTokens += t
