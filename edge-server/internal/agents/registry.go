@@ -22,17 +22,31 @@ var (
 )
 
 const (
-	// DefaultMaxConcurrent is the default maximum number of concurrent sub-agents
-	// per parent, matching Codex's default spawn limit.
+	// DefaultMaxConcurrent is the default GLOBAL maximum number of concurrent
+	// sub-agents across all parents. It is the configurable system-wide default
+	// (override per-registry via WithMaxConcurrent) that limits how many sub-agents
+	// can be in non-terminal (active) state simultaneously across the entire
+	// registry.
+	//
+	// The value 6 is intentionally one higher than MaxChildrenPerAgent (5).
+	// This reserves one slot for orchestrator self-dispatch: when the orchestrator
+	// delegates work back to itself, it occupies a concurrent slot without
+	// consuming a per-parent child slot, leaving 5 slots for real sub-agents.
 	DefaultMaxConcurrent = 6
 	// MaxAgentDepth is the hard limit on delegation depth. Depth 0 = root,
 	// depth 1 = direct child, depth 2 = grandchild. Depth >= MaxAgentDepth
 	// is rejected to prevent runaway recursion.
 	MaxAgentDepth = 3
-	// MaxChildrenPerAgent is the maximum number of sub-agents a single parent
-	// can have active concurrently. This is a per-parent hard cap that operates
-	// alongside the global maxConcurrent slot limit to prevent a compromised
-	// orchestrator from spawning unlimited children even within global slot limits.
+	// MaxChildrenPerAgent is the PER-PARENT hard cap on the number of sub-agents
+	// a single parent can have active concurrently. Unlike DefaultMaxConcurrent
+	// (which is global and configurable), this is a non-configurable safety
+	// ceiling that prevents a compromised or buggy orchestrator from spawning
+	// unlimited children even within the global slot limit.
+	//
+	// DefaultMaxConcurrent (6) > MaxChildrenPerAgent (5) is intentional:
+	// the global pool has one reserved slot beyond the per-parent cap, allowing
+	// the orchestrator to self-dispatch without reducing the effective per-parent
+	// budget.
 	MaxChildrenPerAgent = 5
 )
 

@@ -102,6 +102,13 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 		edgeURL = "http://127.0.0.1:3210"
 	}
 
+	// AH-SR-053: Warn when AGENTHUB_EDGE_URL is non-loopback and non-HTTPS —
+	// dispatch payloads contain user prompts and system instructions sent in
+	// cleartext over the network.
+	if !strings.HasPrefix(edgeURL, "https://") && !isLoopback(edgeURL) {
+		slog.Warn("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", edgeURL)
+	}
+
 	// Build the Edge run request from the dispatch payload.
 	reqBody := edgeRunRequest{
 		ProjectID:      "proj_local",
@@ -167,6 +174,13 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	runID := edgeResp.Data.RunID
 	slog.Info("edge http dispatch: task dispatched to local Edge", "task_id", task.ID, "edge_run_id", runID, "url", url)
 	return runID
+}
+
+// isLoopback reports whether url contains a loopback address.
+func isLoopback(url string) bool {
+	return strings.Contains(url, "127.0.0.1") ||
+		strings.Contains(url, "localhost") ||
+		strings.Contains(url, "[::1]")
 }
 
 func normalizeRuntimeAgentType(agentType string) string {

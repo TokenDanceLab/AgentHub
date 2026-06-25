@@ -160,9 +160,6 @@ func TestClassifyComplexity_ChineseSimple(t *testing.T) {
 		{"   ", ComplexitySimple},
 		// CJK exactly 200 runes (word count <20, runes not >200) → Simple.
 		{makeCJKPrompt(200), ComplexitySimple},
-		// CJK with refactor-like text: \brefactor\b does NOT match CJK "重构"
-		// because \b is an ASCII word boundary and CJK chars are not \w in Go regex.
-		{"需要重构整个支付模块的架构，将单体服务拆分为微服务架构", ComplexitySimple},
 	}
 	for _, tt := range tests {
 		got := ClassifyComplexity(tt.prompt)
@@ -184,8 +181,9 @@ func TestClassifyComplexity_ChineseMedium(t *testing.T) {
 		// CJK 900 runes: the "runes > 800" check fires first (fixed ordering),
 		// correctly classifying lengthy CJK prompts as Complex.
 		{makeCJKPrompt(900), ComplexityComplex},
-		// CJK with multi-step indicator "after that" (English keyword) → Medium.
-		{"完成数据库迁移 after that 更新 API handler 和前端页面", ComplexityMedium},
+		// CJK with "迁移" (cross-module CJK keyword) + multi-step "after that".
+		// crossModuleCJK (Complex) takes priority over multiStepRE (Medium).
+		{"完成数据库迁移 after that 更新 API handler 和前端页面", ComplexityComplex},
 	}
 	for _, tt := range tests {
 		got := ClassifyComplexity(tt.prompt)
@@ -204,6 +202,10 @@ func TestClassifyComplexity_ChineseComplex(t *testing.T) {
 		{"需要 migrate 所有数据库查询从原始 SQL 改为 repository 模式", ComplexityComplex},
 		// CJK with "refactor" keyword mixed in English → Complex.
 		{"我们计划 refactor 整个认证系统，改用 RS256 替代 HS256", ComplexityComplex},
+		// Pure CJK with 重构 keyword → Complex (crossModuleCJK, no \b needed).
+		{"需要重构整个支付模块的架构，将单体服务拆分为微服务架构", ComplexityComplex},
+		// Pure CJK with 重构 as the only cross-module signal → Complex.
+		{"请重构这个项目的认证模块", ComplexityComplex},
 	}
 	for _, tt := range tests {
 		got := ClassifyComplexity(tt.prompt)
@@ -306,9 +308,9 @@ func TestClassifyComplexity_EdgeCases(t *testing.T) {
 			want:   ComplexitySimple,
 		},
 		{
-			name:   "CJK with after that phrase → medium via multiStepRE",
+			name:   "CJK with 迁移 cross-module keyword → Complex (crossModuleCJK > multiStepRE priority)",
 			prompt: "完成数据库迁移 after that 更新 API handler",
-			want:   ComplexityMedium,
+			want:   ComplexityComplex,
 		},
 		{
 			name: "CJK with first...then pattern → medium",
