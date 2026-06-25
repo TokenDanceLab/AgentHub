@@ -972,3 +972,205 @@ func TestOpenAISDK_E2E_ParseStream_HTTPError(t *testing.T) {
 		t.Fatalf("expected 1 session_init event, got %d", len(sessionInits))
 	}
 }
+
+// =============================================================================
+// Retry behavior tests (doRequestWithRetry)
+// =============================================================================
+//
+// These tests exercise doRequestWithRetry directly via httptest.NewServer,
+// verifying the retry policy: 429 and 5xx are retried with exponential backoff;
+// 4xx auth errors are NOT retried; exhausted retries return an error.
+//
+// Note: exponential backoff delays (1s, 2s, 4s) are incurred during these tests.
+// Run with -run "TestOpenAISDK_Retry" to isolate.
+
+// TestOpenAISDK_RetryOn429 verifies that the adapter retries on 429 Too Many
+// Requests. The mock server returns 429 twice, then 200 on the third attempt.
+func TestOpenAISDK_RetryOn429(t *testing.T) {
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount <= 2 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: [DONE]\n"))
+	}))
+	defer srv.Close()
+
+	adapter := &OpenAISDKAdapter{
+		apiKey:    "test-key",
+		baseURL:   srv.URL,
+		model:     "gpt-5.5",
+		available: true,
+	}
+
+	emitter := &testEventEmitter{}
+	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
+
+	ctx := context.Background()
+	resp, err := adapter.doRequestWithRetry(ctx, []byte(`{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}]}`), emitter, scope)
+	if err != nil {
+		t.Fatalf("doRequestWithRetry returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	if requestCount != 3 {
+		t.Errorf("expected 3 total requests (2 x 429 + 1 x 200), got %d", requestCount)
+	}
+
+	// Verify retry events were emitted for each retry attempt.
+	retryEvents := emitter.eventsOfType(BusEventAPIRetry)
+	if len(retryEvents) != 2 {
+		t.Errorf("expected 2 retry events (attempts 1 and 2), got %d", len(retryEvents))
+	}
+	for i, re := range retryEvents {
+		if re.Payload["provider"] != "openai" {
+			t.Errorf("retry[%d] provider = %q, want %q", i, re.Payload["provider"], "openai")
+		}
+	}
+}
+
+// TestOpenAISDK_RetryOn503 verifies that the adapter retries on 503 Service
+// Unavailable. The mock server returns 503 twice, then 200 on the third attempt.
+func TestOpenAISDK_RetryOn503(t *testing.T) {
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: [DONE]\n"))
+	}))
+	defer srv.Close()
+
+	adapter := &OpenAISDKAdapter{
+		apiKey:    "test-key",
+		baseURL:   srv.URL,
+		model:     "gpt-5.5",
+		available: true,
+	}
+
+	emitter := &testEventEmitter{}
+	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
+
+	ctx := context.Background()
+	resp, err := adapter.doRequestWithRetry(ctx, []byte(`{}`), emitter, scope)
+	if err != nil {
+		t.Fatalf("doRequestWithRetry returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	if requestCount != 3 {
+		t.Errorf("expected 3 total requests (2 x 503 + 1 x 200), got %d", requestCount)
+	}
+
+	// Verify retry events.
+	retryEvents := emitter.eventsOfType(BusEventAPIRetry)
+	if len(retryEvents) != 2 {
+		t.Errorf("expected 2 retry events, got %d", len(retryEvents))
+	}
+}
+
+// TestOpenAISDK_Retry_NotOn401 verifies that the adapter does NOT retry on
+// authentication errors (401). Auth errors are non-retriable per the
+// doRequestWithRetry policy: only 429 and >=500 are retried.
+func TestOpenAISDK_Retry_NotOn401(t *testing.T) {
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	adapter := &OpenAISDKAdapter{
+		apiKey:    "bad-key",
+		baseURL:   srv.URL,
+		model:     "gpt-5.5",
+		available: true,
+	}
+
+	emitter := &testEventEmitter{}
+	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
+
+	ctx := context.Background()
+	resp, err := adapter.doRequestWithRetry(ctx, []byte(`{}`), emitter, scope)
+	if err != nil {
+		t.Fatalf("doRequestWithRetry returned unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+	if requestCount != 1 {
+		t.Errorf("expected exactly 1 request (no retries on 401), got %d", requestCount)
+	}
+
+	// Verify no retry events were emitted.
+	retryEvents := emitter.eventsOfType(BusEventAPIRetry)
+	if len(retryEvents) != 0 {
+		t.Errorf("expected 0 retry events for 401, got %d", len(retryEvents))
+	}
+}
+
+// TestOpenAISDK_RetryExhausted verifies that after maxRetries (3) server errors
+// (503), the adapter gives up and returns a non-recoverable error. The mock
+// server returns 503 on all four attempts (1 initial + 3 retries).
+func TestOpenAISDK_RetryExhausted(t *testing.T) {
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	adapter := &OpenAISDKAdapter{
+		apiKey:    "test-key",
+		baseURL:   srv.URL,
+		model:     "gpt-5.5",
+		available: true,
+	}
+
+	emitter := &testEventEmitter{}
+	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
+
+	ctx := context.Background()
+	resp, err := adapter.doRequestWithRetry(ctx, []byte(`{}`), emitter, scope)
+	if err == nil {
+		resp.Body.Close()
+		t.Fatal("expected error after exhausting retries, got nil")
+	}
+	if requestCount != 4 {
+		t.Errorf("expected 4 total attempts (1 initial + 3 retries), got %d", requestCount)
+	}
+
+	// Verify a failure result event was emitted.
+	results := emitter.eventsOfType(BusEventResult)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result event after exhausting retries, got %d", len(results))
+	}
+	if results[0].Payload["success"] != false {
+		t.Errorf("result success = %v, want false", results[0].Payload["success"])
+	}
+	if results[0].Payload["provider"] != "openai" {
+		t.Errorf("result provider = %q, want %q", results[0].Payload["provider"], "openai")
+	}
+
+	// Verify retry events for all 3 retry attempts.
+	retryEvents := emitter.eventsOfType(BusEventAPIRetry)
+	if len(retryEvents) != 3 {
+		t.Errorf("expected 3 retry events (attempts 1, 2, 3), got %d", len(retryEvents))
+	}
+}
