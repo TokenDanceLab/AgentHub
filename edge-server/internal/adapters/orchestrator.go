@@ -117,8 +117,12 @@ func (a *OrchestratorAdapter) Capabilities() AgentCapabilities {
 func (a *OrchestratorAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	cmdPath, args, env, workDir := a.inner.BuildCommand(ctx)
 	a.parentModel = ctx.Model
+	// Use --append-system-prompt (not --system-prompt) to avoid silently
+	// discarding the agent profile's system prompt. Claude Code concatenates
+	// multiple --append-system-prompt values, so both the agent's profile
+	// prompt AND the orchestrator's orchestration instructions are included.
 	if a.systemPrompt != "" {
-		args = append(args, "--system-prompt", a.systemPrompt)
+		args = append(args, "--append-system-prompt", a.systemPrompt)
 	}
 	return cmdPath, args, env, workDir
 }
@@ -575,8 +579,8 @@ func (d *dispatchInterceptor) fanOutDispatches(events []dispatchEvent, scope map
 	wg.Wait()
 }
 
-// handleDispatch validates the agent name (O-01), registers the sub-agent,
-// spawns a run, sends a message, and emits events.
+// handleDispatch validates the agent name (O-01), checks the circuit breaker,
+// registers the sub-agent, spawns a run, sends a message, and emits events.
 func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string]any) {
 	if d.adapterRegistry != nil {
 		if _, ok := d.adapterRegistry.Get(evt.Agent); !ok {
@@ -591,8 +595,30 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		}
 	}
 
+	// Check circuit breaker BEFORE registration and spawning.
+	// Without this gate, a tripped breaker stops retries of existing failures
+	// but does NOT prevent new dispatches to the same failing agent — the
+	// orchestrator keeps spawning sub-agents to a known-broken target, each
+	// one failing independently and consuming slots until per-parent cap.
+	if d.failureRecovery != nil {
+		if cbErr := d.failureRecovery.checkCircuitBreaker(evt.Agent); cbErr != nil {
+			d.inner.Emit(BusEventTaskNotification, scope, map[string]any{
+				"action":    "dispatch_rejected",
+				"agent":     evt.Agent,
+				"task":      evt.Task,
+				"error":     "circuit breaker open: " + cbErr.Error(),
+				"subtaskId": evt.SubtaskID,
+			})
+			return
+		}
+	}
+
 	agentID := genAgentID()
 	now := time.Now().UTC()
+
+	// err is declared early so the deferred Unregister closure (below)
+	// can capture it. It is set by SpawnSubAgent on the error path.
+	var err error
 
 	role := evt.Role
 	if role == "" {
@@ -624,6 +650,15 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 			})
 			return
 		}
+		// CRITICAL: orchestrator agentID (genAgentID) is a different identity
+		// than SpawnSubAgent internal agentInstanceID. SpawnSubAgent cleanup
+		// only covers its own registration -- not the orchestrator's. Leaking
+		// this entry accumulates stale agents in the registry until restart.
+		defer func() {
+			if err != nil {
+				d.registry.Unregister(agentID)
+			}
+		}()
 	}
 
 	threadID := evt.ThreadID
@@ -649,7 +684,6 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 			Budget:       d.budget,
 			SiblingAgents: evt.siblings,
 		}
-		var err error
 		_, runID, err = d.spawner.SpawnSubAgent(d.parentRun, task)
 		if err != nil {
 			d.inner.Emit(BusEventTaskNotification, scope, map[string]any{
