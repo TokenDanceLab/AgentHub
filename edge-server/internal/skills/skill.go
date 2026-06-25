@@ -364,7 +364,7 @@ func (r *SkillRegistry) StartWatch(skillsDir string) error {
 	r.watchStarted = true
 	r.debounceMu.Unlock()
 
-	go r.watchLoop(skillsDir)
+	go r.watchLoop(watcher)
 
 	slog.Info("skills: hot reload started", "dir", skillsDir)
 	return nil
@@ -400,17 +400,17 @@ func (r *SkillRegistry) StopWatch() error {
 // It processes file-system events from the fsnotify watcher and triggers
 // debounced reloads or removes. The loop exits when stopCh is closed or
 // the watcher's event/error channels are closed.
-func (r *SkillRegistry) watchLoop(skillsDir string) {
+func (r *SkillRegistry) watchLoop(watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case <-r.stopCh:
 			return
-		case event, ok := <-r.watcher.Events:
+		case event, ok := <-watcher.Events:
 			if !ok {
 				return
 			}
 			r.handleWatchEvent(event)
-		case err, ok := <-r.watcher.Errors:
+		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
