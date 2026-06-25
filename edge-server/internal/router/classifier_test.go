@@ -181,10 +181,9 @@ func TestClassifyComplexity_ChineseMedium(t *testing.T) {
 		{makeCJKPrompt(201), ComplexityMedium},
 		// CJK 800 runes (exact boundary, still below >800 threshold) → Medium.
 		{makeCJKPrompt(800), ComplexityMedium},
-		// CJK >200 runes: the "words < 20 && runes > 200" rule fires first,
-		// returning Medium. The standalone "runes > 800" check is only reached
-		// when words >= 20 (e.g. long repetitive English text with few meaningful words).
-		{makeCJKPrompt(900), ComplexityMedium},
+		// CJK 900 runes: the "runes > 800" check fires first (fixed ordering),
+		// correctly classifying lengthy CJK prompts as Complex.
+		{makeCJKPrompt(900), ComplexityComplex},
 		// CJK with multi-step indicator "after that" (English keyword) → Medium.
 		{"完成数据库迁移 after that 更新 API handler 和前端页面", ComplexityMedium},
 	}
@@ -292,14 +291,14 @@ func TestClassifyComplexity_EdgeCases(t *testing.T) {
 			want:   ComplexityMedium,
 		},
 		{
-			name: "CJK 800 runes (still medium: words<20 check fires before runes>800)",
+			name: "CJK 800 runes (medium: runes>800 threshold not yet reached)",
 			prompt: makeCJKPrompt(800),
 			want:   ComplexityMedium,
 		},
 		{
-			name: "CJK 900 runes (still medium: words<20&&runes>200 fires first, runes>800 not reached)",
+			name: "CJK 900 runes (complex: runes>800 fires before words<20 fallback, fixed in critical 2.5)",
 			prompt: makeCJKPrompt(900),
-			want:   ComplexityMedium,
+			want:   ComplexityComplex,
 		},
 		{
 			name:   "only CJK with simple keyword → simple keyword wins",
