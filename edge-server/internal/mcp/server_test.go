@@ -143,7 +143,7 @@ func (e *recordingRunExecutor) Cancel(runID string) lifecycle.CancelResult {
 func TestInitialize(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rec := doJSONRPC(t, srv, "initialize", 1, map[string]any{
-		"protocolVersion": "2024-11-05",
+		"protocolVersion": "2025-06-18",
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "test-client", "version": "1.0"},
 	})
