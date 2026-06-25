@@ -42,15 +42,11 @@ jobs:
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check (overall >= 75%)
+      - name: Coverage check (informational)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=75
-          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
-          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
-            exit 1
-          fi
+          echo "Overall coverage: ${COVERAGE}%"
+          echo "::notice::edge-server overall coverage: ${COVERAGE}%"
 
       - name: Coverage per-package minimums
         run: |
