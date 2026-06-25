@@ -138,10 +138,9 @@ func (r *SkillRegistry) Discover() error {
 //
 // Returns false if the skill is not found or the file cannot be read.
 func (r *SkillRegistry) LoadBody(name string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
+	r.mu.RLock()
 	s, ok := r.skills[name]
+	r.mu.RUnlock()
 	if !ok {
 		return "", false
 	}
@@ -149,11 +148,18 @@ func (r *SkillRegistry) LoadBody(name string) (string, bool) {
 		return s.Body, true
 	}
 
+	r.mu.Lock()
+	if s.Body != "" {
+		defer r.mu.Unlock()
+		return s.Body, true
+	}
 	body, err := ParseBody(s.Path)
 	if err != nil {
+		r.mu.Unlock()
 		return "", false
 	}
 	s.Body = body
+	r.mu.Unlock()
 	return body, true
 }
 

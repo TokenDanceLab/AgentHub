@@ -279,10 +279,10 @@ type dispatchInterceptor struct {
 	planBroker *PlanApprovalBroker
 
 	// Sub-agent result injection and status tracking.
-	ctx                context.Context    // set from ParseStream; cancelled when run ends
-	resultListenerOnce sync.Once         // ensures result listener starts exactly once
+	ctx                context.Context // set from ParseStream; cancelled when run ends
+	resultListenerOnce sync.Once       // ensures result listener starts exactly once
 	dispatchedMu       sync.Mutex
-	dispatchedCount    int               // total sub-agents dispatched by this interceptor
+	dispatchedCount    int                      // total sub-agents dispatched by this interceptor
 	dispatched         map[string]dispatchEvent // agentID -> original dispatch event for result injection
 
 	// Failure degradation: classifies sub-agent errors and drives recovery
@@ -649,16 +649,16 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 	}
 
 	inst := &agents.AgentInstance{
-		ID:         agentID,
-		Name:       evt.Agent,
-		Role:       role,
-		Status:     agents.StatusIdle,
-		ParentID:   d.parentRun.ID,
-		Depth:      d.depth + 1,
-		AgentPath:  fmt.Sprintf("/orchestrator/%s", evt.Agent),
-		AdapterID:  evt.Agent,
-		CreatedAt:  now,
-		LastSeen:   now,
+		ID:        agentID,
+		Name:      evt.Agent,
+		Role:      role,
+		Status:    agents.StatusIdle,
+		ParentID:  d.parentRun.ID,
+		Depth:     d.depth + 1,
+		AgentPath: fmt.Sprintf("/orchestrator/%s", evt.Agent),
+		AdapterID: evt.Agent,
+		CreatedAt: now,
+		LastSeen:  now,
 	}
 
 	if d.registry != nil {
@@ -696,15 +696,15 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 	var runID string
 	if d.spawner != nil {
 		task := SubAgentTask{
-			TaskID:       "task_" + genHexID(),
-			Description:  evt.Task,
-			AgentID:      evt.Agent,
-			Prompt:       evt.Task,
-			Depth:        d.depth + 1,
-			ParentRunID:  d.parentRun.ID,
-			ThreadID:     threadID,
-			Model:        model,
-			Budget:       d.budget,
+			TaskID:        "task_" + genHexID(),
+			Description:   evt.Task,
+			AgentID:       evt.Agent,
+			Prompt:        evt.Task,
+			Depth:         d.depth + 1,
+			ParentRunID:   d.parentRun.ID,
+			ThreadID:      threadID,
+			Model:         model,
+			Budget:        d.budget,
 			SiblingAgents: evt.siblings,
 		}
 		_, runID, err = d.spawner.SpawnSubAgent(d.parentRun, task)
@@ -960,7 +960,15 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 			failureErr := fmt.Errorf("%s", errMsg)
 			category, reason := ClassifyFailure(failureErr, nil)
 			critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
-			retryMsg := fmt.Sprintf("[Sub-agent: %s] transient failure, retrying with analysis...\nError: %s\nCritique: %s", agentName, errMsg, critique)
+			// T1-D03: Retry context purification — inject a directive marker
+			// into the task description that will flow back to the retried
+			// sub-agent via the orchestrator's text stream. This prevents
+			// the orchestrator from repeating the same failing approach.
+			retryDirective := fmt.Sprintf(
+				"[Previous attempt failed: %s. Use a DIFFERENT strategy. Do NOT repeat the same approach.]",
+				truncateError(failureErr, 200),
+			)
+			retryMsg := fmt.Sprintf("[Sub-agent: %s] transient failure, retrying with analysis...\nError: %s\n%s\nCritique: %s", agentName, errMsg, retryDirective, critique)
 			d.inner.Emit(BusEventTextBlock, scope, map[string]any{
 				"text":   retryMsg,
 				"source": "sub_agent_retry",
@@ -1145,12 +1153,12 @@ func (d *dispatchInterceptor) emitProgressSummary(scope map[string]any) {
 	}
 
 	d.inner.Emit(BusEventTaskProgress, scope, map[string]any{
-		"summary":    summary,
-		"completed":  completed,
-		"errored":    errored,
-		"running":    running,
-		"waiting":    waiting,
-		"total":      len(children),
+		"summary":   summary,
+		"completed": completed,
+		"errored":   errored,
+		"running":   running,
+		"waiting":   waiting,
+		"total":     len(children),
 	})
 }
 
