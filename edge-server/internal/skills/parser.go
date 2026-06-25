@@ -157,12 +157,12 @@ func parseTriggersValue(value string) []string {
 		for _, p := range parts {
 			p = strings.TrimSpace(p)
 			if p != "" {
-				result = append(result, p)
+				result = append(result, strings.ToLower(p))
 			}
 		}
 		return result
 	}
-	return []string{value}
+	return []string{strings.ToLower(value)}
 }
 
 // ParseFull reads and parses the entire SKILL.md file at path into a Skill
