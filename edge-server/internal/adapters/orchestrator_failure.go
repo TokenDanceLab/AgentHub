@@ -44,7 +44,7 @@ const (
 type FailureDecision string
 
 const (
-	DecisionRetry       FailureDecision = "retry"       // retry same agent with backoff
+	DecisionRetry       FailureDecision = "retry"        // retry same agent with backoff
 	DecisionSwitchAgent FailureDecision = "switch_agent" // re-dispatch to alternate agent
 	DecisionSkip        FailureDecision = "skip"         // skip task, notify parent
 	DecisionFail        FailureDecision = "fail"         // give up, propagate error
@@ -321,18 +321,18 @@ func DefaultFailurePolicies() map[FailureCategory]FailurePolicy {
 // FailureClassifiedEvent is emitted when a sub-agent failure is classified.
 // It carries the category, decision, and retry state for observability.
 type FailureClassifiedEvent struct {
-	RunID       string           `json:"runId"`
-	AgentID     string           `json:"agentId"`
-	AgentName   string           `json:"agentName"`
-	TaskID      string           `json:"taskId"`
-	Category    FailureCategory  `json:"category"`
-	Decision    FailureDecision  `json:"decision"`
-	RetryCount  int              `json:"retryCount"`
-	MaxRetries  int              `json:"maxRetries"`
-	Error       string           `json:"error"`
-	Critique    string           `json:"critique,omitempty"`
-	AlternateID string           `json:"alternateAgentId,omitempty"`
-	Timestamp   time.Time        `json:"timestamp"`
+	RunID       string          `json:"runId"`
+	AgentID     string          `json:"agentId"`
+	AgentName   string          `json:"agentName"`
+	TaskID      string          `json:"taskId"`
+	Category    FailureCategory `json:"category"`
+	Decision    FailureDecision `json:"decision"`
+	RetryCount  int             `json:"retryCount"`
+	MaxRetries  int             `json:"maxRetries"`
+	Error       string          `json:"error"`
+	Critique    string          `json:"critique,omitempty"`
+	AlternateID string          `json:"alternateAgentId,omitempty"`
+	Timestamp   time.Time       `json:"timestamp"`
 }
 
 // BusEventFailureClassified is the typed event name for failure classification.
@@ -470,12 +470,56 @@ func ClassifyFailure(err error, runErr *RunError) (FailureCategory, string) {
 		}
 	}
 
+	// Priority 7: Repeated identical action — sub-agent stuck in a deterministic
+	// loop, repeating the same tool+args pattern. Classify as cancel to prevent
+	// the orchestrator from retrying an agent that will keep failing identically.
+	if isRepeatedAction(err) {
+		return FailureCancel, "repeated_identical_action"
+	}
+
 	// Default: transient — optimistic assumption that retry may succeed.
 	return FailureTransient, "default: assuming transient"
 }
 
 // RunError is a mirror of lifecycle.RunError for use in the adapters package
 // without creating a circular dependency. It carries a classified error code.
+
+// isRepeatedAction checks if the error message contains repeated identical
+// lines, indicating a sub-agent stuck in a deterministic loop repeating the
+// same tool+args pattern. Returns true when any non-trivial line appears 3+
+// times in the error message.
+//
+// This is used by ClassifyFailure to detect silent failure loops where the
+// sub-agent keeps retrying the same failing action identically. Without this
+// detection, the orchestrator's retry loop would also retry identically,
+// wasting budget on a doomed task.
+func isRepeatedAction(err error) bool {
+	if err == nil {
+		return false
+	}
+	return hasRepeatedPattern(err.Error(), 3)
+}
+
+// hasRepeatedPattern counts identical non-trivial lines in text and returns
+// true when any line repeats at least minRepeat times. Lines shorter than 10
+// characters are skipped to avoid false positives on punctuation and short
+// tokens. Also skips lines that are all whitespace.
+func hasRepeatedPattern(text string, minRepeat int) bool {
+	lines := strings.Split(text, "\n")
+	counts := make(map[string]int, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) < 10 {
+			continue
+		}
+		counts[line]++
+		if counts[line] >= minRepeat {
+			return true
+		}
+	}
+	return false
+}
+
 type RunError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -800,11 +844,11 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 			"category", string(category),
 		)
 
-		case DecisionFail:
-			// Record circuit failure so repeated definitive failures trip the breaker.
-			// cbKey is computed in Step 0 above (agentName with agentID fallback).
-			m.recordCircuitFailure(cbKey)
-			if updatedState.RetryCount >= MaxRetryDepth {
+	case DecisionFail:
+		// Record circuit failure so repeated definitive failures trip the breaker.
+		// cbKey is computed in Step 0 above (agentName with agentID fallback).
+		m.recordCircuitFailure(cbKey)
+		if updatedState.RetryCount >= MaxRetryDepth {
 			slog.Warn("retry depth limit exceeded, failing task",
 				"taskId", taskID,
 				"agentId", agentID,

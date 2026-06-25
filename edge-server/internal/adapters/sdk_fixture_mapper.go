@@ -671,8 +671,8 @@ var (
 )
 
 func sanitizeSDKText(value string) string {
-	if value == "" {
-		return ""
+	if len(value) < 2 {
+		return value
 	}
 	sanitized := sdkAuthHeaderPattern.ReplaceAllString(value, "${1}[redacted-token]")
 	sanitized = sdkBearerPattern.ReplaceAllString(sanitized, "Bearer [redacted-token]")

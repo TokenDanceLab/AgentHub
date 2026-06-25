@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+var (
+	reDoubleEscapedQuotes = regexp.MustCompile(`([:,\[\{])\s*\\"`)
+)
+
 // --- Plan types ---
 
 // TaskStatus represents the execution status of a plan task.
@@ -314,8 +318,7 @@ func balanceDelimiters(text string) string {
 func fixDoubleEscapedQuotes(text string) string {
 	// Match \": only when preceded by a structural JSON character
 	// (colon, comma, open-brace, open-bracket), allowing optional whitespace.
-	re := regexp.MustCompile(`([:,\[\{])\s*\\"`)
-	return re.ReplaceAllString(text, `${1}"`)
+	return reDoubleEscapedQuotes.ReplaceAllString(text, `${1}"`)
 }
 
 // heuristicParsePlan constructs a single-task plan from unstructured text by

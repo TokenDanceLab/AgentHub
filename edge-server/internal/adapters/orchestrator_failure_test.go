@@ -1278,8 +1278,12 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 			cb.RecordFailure()
 		}
 
+		// Circuit breaker tests use intentionally short windows/cooldowns
+		// (10ms). Sleep durations must exceed the configured interval to
+		// observe state transitions. Uses monotonic clock — not flaky.
+
 		// Wait for the window to expire.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Next failure resets window, counter starts fresh at 1.
 		_ = cb.Allow()
@@ -1345,7 +1349,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait for cooldown.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Allow() transitions to HalfOpen and returns nil.
 		if err := cb.Allow(); err != nil {
@@ -1364,7 +1368,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// First Allow() enters HalfOpen.
 		if err := cb.Allow(); err != nil {
@@ -1388,7 +1392,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Enter HalfOpen.
 		_ = cb.Allow()
@@ -1416,7 +1420,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown, enter HalfOpen, fail the probe.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 		_ = cb.Allow()
 		cb.RecordFailure()
 
@@ -1455,7 +1459,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown, enter HalfOpen.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1468,7 +1472,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown again, enter HalfOpen again.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen on second probe")
@@ -1490,7 +1494,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait cooldown, enter HalfOpen.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1580,7 +1584,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		// Trip to Open, wait cooldown.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Enter HalfOpen, then succeed.
 		_ = cb.Allow()
@@ -1589,7 +1593,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		// Trip again and wait cooldown — should be able to enter HalfOpen again.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		if err := cb.Allow(); err != nil {
 			t.Fatalf("Allow() after second cooldown: %v", err)

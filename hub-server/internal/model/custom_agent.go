@@ -117,6 +117,9 @@ func (c *CustomAgent) validateJSONB() error {
 		if field.value == "" {
 			continue
 		}
+		if len(field.value) > MaxOutputSchemaSize {
+			return fmt.Errorf("%s exceeds maximum size of %d bytes", field.name, MaxOutputSchemaSize)
+		}
 		var decoded any
 		if err := json.Unmarshal([]byte(field.value), &decoded); err != nil {
 			return fmt.Errorf("invalid JSON in %s: %w", field.name, err)
