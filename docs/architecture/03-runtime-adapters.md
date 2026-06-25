@@ -52,6 +52,35 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 自动发现已注册的子 Agent（`claude-code`、`codex`、`opencode`、`anthropic-sdk`、`openai-sdk`），生成调度提示
 - 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
 
+### Dispatch Interceptor 内部组件
+
+Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchInterceptor`，负责拦截文本事件、解析 dispatch JSON、执行分发和结果回注。Interceptor 内部包含以下子层：
+
+| 子层 | 位置 | 职责 |
+|------|------|------|
+| **Rule Engine** (T2-A08) | `orchestrator.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
+| **Plan Approval Gate** (P0 #3) | `plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
+| **Fan-Out Pool** | `orchestrator.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
+| **Result Listener** | `orchestrator.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
+| **Failure Recovery** | `orchestrator_failure.go` `FailureRecoveryManager` | 错误分类（transient/capability/cancel 三分类 + 模式匹配）、恢复决策（retry 指数退避/switch agent/skip/fail）、per-agentName 断路器（Closed/Open/Half-Open 三态）、Reflexion 批判生成用于学习性重试 |
+
+**Rule Engine 规则说明**（按评估顺序）：
+
+1. **完成信号检测**：匹配独立完成信号（`done`、`finish`、`all tasks done` 等），短路跳过 JSON 解析并发出进度汇总。多词短语在任意长度文本匹配；单词信号仅在 80 字符内匹配以避免误触发。
+2. **审批决策关键词**：当 `PlanApprovalBroker` 存在且文本 ≤40 字符时，匹配独立决策关键词（`yes`/`no`/`approve`/`reject`/`deny` 等），短路跳过 JSON 解析。
+3. **单 finish dispatch 跳过**：当 orchestrator 发出仅含完成语义描述的单个 dispatch 时，跳过 fanOut 直接发出进度汇总。
+4. **同 Agent 顺序执行**：当所有 dispatch 都指向同一 Agent 时，自动从并发 fanOut 降级为顺序执行，避免单个 adapter 的实例内竞争。
+
+**Failure Recovery 决策矩阵**：
+
+| 分类 | 策略 | 断路器行为 |
+|------|------|-----------|
+| `transient`（超时/限流/网络） | 指数退避重试（1s 起，±25% jitter，最大 30s），最多 3 次 | 不触发 |
+| `capability`（工具缺失/权限/不可用） | 切换到可用替代 Agent；无替代时 fail | 不触发 |
+| `cancel`（无效输入/深度超限/取消） | skip + 通知父 orchestrator | 不触发 |
+| 断路器 Open | 直接 skip，不分类 | 30s cooldown 后允许一次 Half-Open 探测 |
+| 累计重试超 `MaxRetryDepth`(3) | 强制 fail | 记录断路器失败 |
+
 ## Runtime Manifest / Fixture（测试/开发辅助，不计入生产 adapter 数）
 
 | Adapter | 注册 ID | 文件 | 功能 |

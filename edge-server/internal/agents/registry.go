@@ -15,9 +15,10 @@ import (
 
 // Sentinel errors for spawn slot enforcement (Codex AgentTree parity).
 var (
-	ErrAgentSlotFull     = errors.New("agent slot full: max concurrent sub-agents reached for parent")
-	ErrAgentDepthExceeded = errors.New("agent depth exceeded: max delegation depth reached")
-	ErrAgentNotFound      = errors.New("agent instance not found")
+	ErrAgentSlotFull              = errors.New("agent slot full: max concurrent sub-agents reached for parent")
+	ErrAgentDepthExceeded         = errors.New("agent depth exceeded: max delegation depth reached")
+	ErrMaxChildrenPerAgentReached = errors.New("per-parent child limit reached: max children spawned for this parent")
+	ErrAgentNotFound              = errors.New("agent instance not found")
 )
 
 const (
@@ -28,6 +29,11 @@ const (
 	// depth 1 = direct child, depth 2 = grandchild. Depth >= MaxAgentDepth
 	// is rejected to prevent runaway recursion.
 	MaxAgentDepth = 3
+	// MaxChildrenPerAgent is the maximum number of sub-agents a single parent
+	// can have active concurrently. This is a per-parent hard cap that operates
+	// alongside the global maxConcurrent slot limit to prevent a compromised
+	// orchestrator from spawning unlimited children even within global slot limits.
+	MaxChildrenPerAgent = 5
 )
 
 // Status represents the runtime status of an agent instance.
@@ -68,13 +74,15 @@ type AgentInstance struct {
 type Registry struct {
 	mu            sync.RWMutex
 	agents        map[string]*AgentInstance
-	maxConcurrent int // max sub-agents per parent; 0 means use DefaultMaxConcurrent
+	maxConcurrent int            // max sub-agents per parent; 0 means use DefaultMaxConcurrent
+	childrenCount map[string]int // per-parent active child count for MaxChildrenPerAgent enforcement
 }
 
 // NewRegistry creates an empty agent registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		agents:        make(map[string]*AgentInstance),
+		childrenCount: make(map[string]int),
 		maxConcurrent: DefaultMaxConcurrent,
 	}
 }
@@ -106,14 +114,24 @@ func (r *Registry) Register(inst *AgentInstance) error {
 }
 
 // Unregister removes an agent instance by ID.
+// If the instance has a non-empty ParentID, the parent's active child count
+// is decremented automatically. Callers that have already called DecrChildCount
+// separately should set decrChild=false to avoid double-decrement.
 func (r *Registry) Unregister(id string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, ok := r.agents[id]
-	if ok {
-		delete(r.agents, id)
+	inst, ok := r.agents[id]
+	if !ok {
+		return false
 	}
-	return ok
+	if inst.ParentID != "" {
+		r.childrenCount[inst.ParentID]--
+		if r.childrenCount[inst.ParentID] <= 0 {
+			delete(r.childrenCount, inst.ParentID)
+		}
+	}
+	delete(r.agents, id)
+	return true
 }
 
 // Get returns an agent instance by ID.
@@ -344,6 +362,25 @@ func (r *Registry) MaxConcurrent() int {
 	return r.maxConcurrent
 }
 
+// IncrChildCount increments the active child count for the given parent.
+// It must only be called after a child agent is successfully registered.
+func (r *Registry) IncrChildCount(parentID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.childrenCount[parentID]++
+}
+
+// DecrChildCount decrements the active child count for the given parent.
+// It must be called when a child agent completes, fails, or is cancelled.
+func (r *Registry) DecrChildCount(parentID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.childrenCount[parentID]--
+	if r.childrenCount[parentID] <= 0 {
+		delete(r.childrenCount, parentID)
+	}
+}
+
 // CountActiveByParent returns the number of non-terminal agents whose ParentID
 // matches the given parent. Terminal states (completed, error, disconnected)
 // are excluded from the count because they no longer consume a spawn slot.
@@ -365,9 +402,63 @@ func (r *Registry) CountActiveByParent(parentID string) int {
 	return count
 }
 
-// CanSpawn checks whether a new child can be spawned under the given parent.
-// It enforces both the concurrent slot limit (maxConcurrent) and the maximum
-// delegation depth (MaxAgentDepth).
+// TryReserveSlot atomically checks spawn constraints (concurrent slot limit,
+// per-parent child cap, depth limit) and, if all pass, reserves a slot by
+// incrementing childrenCount[parentID] under the same write lock.
+//
+// This replaces the separate CanSpawn + IncrChildCount call pattern which had
+// a TOCTOU race: two concurrent goroutines could both pass CanSpawn (seeing
+// count=4) and both subsequently increment, exceeding MaxChildrenPerAgent=5.
+//
+// Returns nil if the slot is reserved. Callers MUST pair a successful
+// TryReserveSlot with DecrChildCount when the child terminates, even if
+// registration subsequently fails.
+func (r *Registry) TryReserveSlot(parentID string, childDepth int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	maxConc := r.maxConcurrent
+	if maxConc <= 0 {
+		maxConc = DefaultMaxConcurrent
+	}
+
+	active := 0
+	for _, inst := range r.agents {
+		if inst.ParentID != parentID {
+			continue
+		}
+		switch inst.Status {
+		case StatusCompleted, StatusError, StatusDisconnected:
+			continue
+		default:
+			active++
+		}
+	}
+	if active >= maxConc {
+		return ErrAgentSlotFull
+	}
+
+	// Per-parent spawn limit: prevent a single parent from spawning more than
+	// MaxChildrenPerAgent children concurrently, even within global slot limits.
+	if r.childrenCount[parentID] >= MaxChildrenPerAgent {
+		return ErrMaxChildrenPerAgentReached
+	}
+
+	if childDepth >= MaxAgentDepth {
+		return ErrAgentDepthExceeded
+	}
+
+	// All constraints pass — reserve the slot atomically.
+	r.childrenCount[parentID]++
+	return nil
+}
+
+// CanSpawn checks whether a new child can be spawned under the given parent
+// WITHOUT reserving a slot. This is a read-only diagnostic method — it does
+// not increment childrenCount and therefore has a TOCTOU race if used for
+// slot enforcement. Production code should use TryReserveSlot instead.
+//
+// Kept for testing and diagnostic use where a side-effect-free check is needed.
 func (r *Registry) CanSpawn(parentID string, childDepth int) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -391,6 +482,10 @@ func (r *Registry) CanSpawn(parentID string, childDepth int) error {
 	}
 	if active >= maxConc {
 		return ErrAgentSlotFull
+	}
+
+	if r.childrenCount[parentID] >= MaxChildrenPerAgent {
+		return ErrMaxChildrenPerAgentReached
 	}
 
 	if childDepth >= MaxAgentDepth {

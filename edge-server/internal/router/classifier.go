@@ -1,0 +1,161 @@
+// Package router provides task-level routing logic for the Edge Server,
+// including prompt complexity classification used to select execution
+// strategies (e.g. single-agent vs. orchestrated TeamRun).
+package router
+
+import (
+	"regexp"
+	"strings"
+)
+
+// ComplexityLevel classifies a user prompt by expected execution difficulty.
+// The level informs routing decisions: Simple tasks can skip orchestration
+// and run directly on a single agent; Complex tasks may benefit from
+// multi-agent planning or human-in-the-loop approval.
+type ComplexityLevel string
+
+const (
+	// ComplexitySimple describes a single, clearly-scoped task with no
+	// inter-file dependencies. Examples: "fix typo in README", "run npm install".
+	ComplexitySimple ComplexityLevel = "simple"
+
+	// ComplexityMedium describes a multi-step task that requires moderate
+	// reasoning and may span a few files or modules. Example: "add auth
+	// middleware with JWT validation".
+	ComplexityMedium ComplexityLevel = "medium"
+
+	// ComplexityComplex describes a cross-module, multi-file task that
+	// benefits from upfront planning or team orchestration. Example:
+	// "design and implement a real-time notification system with WebSocket".
+	ComplexityComplex ComplexityLevel = "complex"
+)
+
+var (
+	// multiStepRE matches step-sequence phrases ("step 1", "step 2",
+	// "after that", "finally,") that indicate multi-step tasks.
+	// Note: "first ... then" is handled separately via a co-occurrence
+	// check (hasFirstThen) which is faster, handles multi-line prompts,
+	// and avoids regex scanning across long prompts.
+	multiStepRE = regexp.MustCompile(
+		`(?i)\b(?:step\s*\d+|after\s+that|finally[,.])`,
+	)
+
+	// crossModuleRE matches keywords that imply changes across module
+	// boundaries or architectural restructuring.
+	crossModuleRE = regexp.MustCompile(
+		`(?i)\b(?:refactor|migrate|restructure|architecture|redesign|overhaul)\b`,
+	)
+
+	// dependencyRE matches phrases that signal the task cannot start until
+	// another piece of work is complete.
+	dependencyRE = regexp.MustCompile(
+		`(?i)\b(?:depends\s+on|requires\s+(?:that\s+)?|blocked\s+by)\b`,
+	)
+
+	// fileCountRE matches phrases that scope the task to an entire codebase
+	// or large set of files.
+	fileCountRE = regexp.MustCompile(
+		`(?i)\b(?:all\s+files|every\s+module|entire\s+codebase)\b`,
+	)
+
+	// simpleCmdRE matches command-like phrases that indicate a trivial,
+	// single-operation task.
+	simpleCmdRE = regexp.MustCompile(
+		`(?i)\b(?:fix\s+typo|run\s+test|check\s+status|show\s+me)\b`,
+	)
+)
+
+// ClassifyComplexity heuristically determines the execution complexity of a
+// user prompt using regex and keyword matching. It does NOT call any LLM —
+// classification is deterministic and runs in microseconds.
+//
+// Heuristics are applied in priority order. Keyword signals (complex, then
+// medium) take precedence over word count; word count acts as a fallback when
+// no keyword signal matches. When multiple signals conflict, the highest
+// complexity wins.
+//
+// Heuristics (all regex/keyword, zero LLM):
+//  1. Word count: >100 words → Complex (hard rule)
+//  2. Cross-module keywords: "refactor", "migrate", "restructure", "architecture"
+//     → Complex
+//  3. Dependency indicators: "depends on", "requires", "blocked by" → Complex
+//  4. File count indicators: "all files", "every module", "entire codebase"
+//     → Complex
+//  5. Multi-step indicators: "first...then", "step 1", "after that", "finally"
+//     → at least Medium
+//  6. Simple command patterns: "fix typo", "run test", "check status", "show me"
+//     → Simple (only when no stronger signal matched)
+//  7. Word count: <20 words → Simple (fallback)
+//  8. Default: Medium
+func ClassifyComplexity(prompt string) ComplexityLevel {
+	words := countWords(prompt)
+	runes := len([]rune(prompt))
+
+	// Hard rule: very long prompts are complex regardless of keywords.
+	if words > 100 {
+		return ComplexityComplex
+	}
+
+	// Rune-count fallback for CJK and other non-whitespace-delimited languages.
+	// When word count is low but the prompt is substantial in rune length,
+	// upgrade the classification to avoid misclassifying lengthy CJK prompts
+	// as "Simple" simply because they lack whitespace-separated words.
+	if words < 20 && runes > 200 {
+		return ComplexityMedium
+	}
+	if runes > 800 {
+		return ComplexityComplex
+	}
+
+	// Complex keyword signals take highest priority after extreme word count.
+	if crossModuleRE.MatchString(prompt) {
+		return ComplexityComplex
+	}
+	if dependencyRE.MatchString(prompt) {
+		return ComplexityComplex
+	}
+	if fileCountRE.MatchString(prompt) {
+		return ComplexityComplex
+	}
+
+	// Multi-step signals imply at least medium complexity.
+	if multiStepRE.MatchString(prompt) || hasFirstThen(prompt) {
+		return ComplexityMedium
+	}
+
+	// Simple command patterns: only apply when no stronger signal matched.
+	if simpleCmdRE.MatchString(prompt) {
+		return ComplexitySimple
+	}
+
+	// Word-count fallback: very short prompts with no keyword signals
+	// are likely trivial one-liners.
+	if words < 20 {
+		return ComplexitySimple
+	}
+
+	// Default: medium complexity when the prompt is between 20-100 words
+	// with no strong signal in either direction.
+	return ComplexityMedium
+}
+
+// countWords returns the number of whitespace-delimited tokens in s.
+// It is a lightweight approximation: no Unicode segmentation, no
+// punctuation stripping. For non-whitespace-delimited languages (CJK),
+// ClassifyComplexity supplements this with a rune-count fallback —
+// when word count is low but the prompt has >200 runes, it is bumped
+// to at least Medium; >800 runes bumps to Complex.
+func countWords(s string) int {
+	return len(strings.Fields(s))
+}
+
+// hasFirstThen checks whether both "first" and "then" appear as whole words
+// in the prompt, indicating a multi-step task. This replaces the previous
+// regex `first\b.*\bthen` which was fragile (did not match across newlines)
+// and wasted work scanning from "first" to end-of-string in long prompts.
+// The co-occurrence check is O(n), handles multi-line, and is simpler to
+// reason about than the combined regex.
+func hasFirstThen(prompt string) bool {
+	lower := strings.ToLower(prompt)
+	return strings.Contains(lower, "first") && strings.Contains(lower, "then")
+}

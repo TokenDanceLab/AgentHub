@@ -3,6 +3,8 @@ package adapters
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -36,6 +38,19 @@ type ExecutionPlan struct {
 	Summary string     `json:"summary,omitempty"` // one-line description of the overall plan
 	Mode    string     `json:"mode"`              // "parallel", "sequential", "pipeline"
 	Tasks   []PlanTask `json:"tasks"`
+}
+
+// PlanParseError is returned when all plan parsing strategies fail.
+// It wraps the original text and all errors encountered during parsing,
+// allowing callers to handle parse failures gracefully instead of crashing.
+type PlanParseError struct {
+	Text   string   // original text that failed to parse
+	Errors []string // errors from each parsing strategy
+}
+
+// Error implements the error interface.
+func (e *PlanParseError) Error() string {
+	return fmt.Sprintf("plan parse failed after %d strategies: %s", len(e.Errors), strings.Join(e.Errors, "; "))
 }
 
 // structuredPlanEnvelope is the legacy top-level JSON envelope the orchestrator
@@ -161,7 +176,183 @@ func scanForPlanBlock(text string) *ExecutionPlan {
 	return nil
 }
 
-// --- Plan validation ---
+// --- Robust plan parsing with JSON repair and heuristic fallback ---
+
+// ParsePlanRobust attempts to parse an execution plan from text with progressive
+// fallbacks. It first tries the standard ParsePlan, then attempts JSON repair
+// on the raw text, and finally falls back to heuristic line-by-line parsing.
+// Each fallback is logged at WARN level so operators can monitor parse quality.
+//
+// Returns the parsed plan, or a *PlanParseError wrapping all failures if every
+// strategy is exhausted.
+func ParsePlanRobust(text string) (*ExecutionPlan, error) {
+	// Strategy 1: Standard ParsePlan (handles flat, nested, and embedded JSON).
+	plan, err := ParsePlan(text)
+	if err == nil {
+		return plan, nil
+	}
+	origErr := err.Error()
+
+	// Strategy 2: JSON repair — fix common LLM formatting issues then retry.
+	repaired := repairJSON(text)
+	if repaired != text {
+		slog.Warn("plan parse: attempting JSON repair",
+			"originalLength", len(text),
+			"repairedLength", len(repaired),
+			"originalError", origErr,
+		)
+		plan, err = ParsePlan(repaired)
+		if err == nil {
+			slog.Warn("plan parse: JSON repair succeeded")
+			return plan, nil
+		}
+		slog.Warn("plan parse: JSON repair failed",
+			"error", err,
+		)
+	}
+
+	// Strategy 3: Heuristic fallback — treat input as a single task.
+	slog.Warn("plan parse: attempting heuristic fallback",
+		"originalError", origErr,
+		"textLength", len(text),
+	)
+	plan = heuristicParsePlan(text)
+	if plan != nil {
+		slog.Warn("plan parse: heuristic fallback succeeded, created single-task plan")
+		return plan, nil
+	}
+
+	// All strategies exhausted.
+	return nil, &PlanParseError{
+		Text:   text,
+		Errors: []string{origErr},
+	}
+}
+
+// repairJSON attempts to fix common JSON formatting issues in LLM outputs:
+//   - Strips markdown code fences (```json ... ```)
+//   - Fixes trailing commas in arrays and objects
+//   - Unescapes double-escaped quotes (\\\" -> \")
+//   - Balances unmatched braces and brackets
+//
+// This is a best-effort repair; the result is re-parsed by ParsePlan and
+// failures are handled gracefully by the caller.
+func repairJSON(text string) string {
+	t := strings.TrimSpace(text)
+
+	// Step 1: Strip markdown code fences.
+	t = stripMarkdownFences(t)
+
+	// Step 2: Fix trailing commas (common LLM JSON mistake).
+	t = fixTrailingCommas(t)
+
+	// Step 3: Unescape double-escaped quotes only at JSON structural positions.
+	// Blind global replacement of \" → " is destructive to valid JSON that
+	// contains escaped literal quotes inside string values (e.g.
+	// {"text": "he said \"hello\""} would be corrupted to {"text": "he said "hello""}).
+	// Instead, we only fix double-escaped quotes appearing after JSON structural
+	// characters (: { , [) where they indicate incorrectly escaped string delimiters.
+	t = fixDoubleEscapedQuotes(t)
+
+	// Step 4: Balance unmatched braces and brackets.
+	t = balanceDelimiters(t)
+
+	return t
+}
+
+// stripMarkdownFences removes opening and closing markdown code fence markers
+// (```json, ```, or bare ```) from the text.
+func stripMarkdownFences(text string) string {
+	t := strings.TrimSpace(text)
+	if strings.HasPrefix(t, "```json") {
+		t = strings.TrimPrefix(t, "```json")
+	} else if strings.HasPrefix(t, "```") {
+		t = strings.TrimPrefix(t, "```")
+	}
+	t = strings.TrimSpace(t)
+	if strings.HasSuffix(t, "```") {
+		t = strings.TrimSuffix(t, "```")
+	}
+	return strings.TrimSpace(t)
+}
+
+// fixTrailingCommas removes trailing commas before closing brackets and braces,
+// a common LLM JSON formatting mistake (e.g., [a, b,] or {"x": 1,}).
+func fixTrailingCommas(text string) string {
+	s := strings.ReplaceAll(text, ",]", "]")
+	s = strings.ReplaceAll(s, ",}", "}")
+	return s
+}
+
+// balanceDelimiters appends missing closing braces and brackets so that
+// the JSON has a chance to parse. This is a best-effort heuristic: it
+// naively appends at the end and does not handle nested mismatch.
+func balanceDelimiters(text string) string {
+	t := text
+	openBraces := strings.Count(t, "{")
+	closeBraces := strings.Count(t, "}")
+	openBrackets := strings.Count(t, "[")
+	closeBrackets := strings.Count(t, "]")
+
+	if closeBraces < openBraces {
+		t += strings.Repeat("}", openBraces-closeBraces)
+	}
+	if closeBrackets < openBrackets {
+		t += strings.Repeat("]", openBrackets-closeBrackets)
+	}
+	return t
+}
+
+// fixDoubleEscapedQuotes unescapes double-escaped quotes (\" → ") only at
+// JSON structural positions. Unlike a blind global replace, this preserves
+// valid escaped quotes inside string values (e.g., "he said \"hello\"").
+//
+// It matches \" when preceded by : { , [  — characters that appear at JSON
+// structural boundaries. This catches the common LLM output pattern where the
+// entire JSON is double-escaped ({\"key\": \"value\"}) without corrupting
+// properly escaped quotes inside string literals.
+func fixDoubleEscapedQuotes(text string) string {
+	// Match \": only when preceded by a structural JSON character
+	// (colon, comma, open-brace, open-bracket), allowing optional whitespace.
+	re := regexp.MustCompile(`([:,\[\{])\s*\\"`)
+	return re.ReplaceAllString(text, `${1}"`)
+}
+
+// heuristicParsePlan constructs a single-task plan from unstructured text by
+// treating the entire input as a task description. This is the last-resort
+// fallback when both standard parsing and JSON repair fail. It picks the
+// first non-empty, non-code-fence line as the summary and creates a single
+// pending task with that description.
+func heuristicParsePlan(text string) *ExecutionPlan {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	desc := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") {
+			continue
+		}
+		desc = trimmed
+		break
+	}
+	if desc == "" {
+		return nil
+	}
+
+	return &ExecutionPlan{
+		Summary: desc,
+		Mode:    "sequential",
+		Tasks: []PlanTask{
+			{
+				ID:          "task-1",
+				Description: desc,
+				Status:      TaskPending,
+			},
+		},
+	}
+}
 
 // ValidatePlan checks a plan for structural correctness:
 //   - at least one task

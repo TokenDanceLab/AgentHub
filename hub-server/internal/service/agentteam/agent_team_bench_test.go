@@ -97,6 +97,7 @@ func setupBenchDB(b *testing.B) *gorm.DB {
 			name TEXT NOT NULL,
 			agent_type TEXT NOT NULL DEFAULT '',
 			system_prompt TEXT DEFAULT '',
+			output_schema TEXT DEFAULT NULL,
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
