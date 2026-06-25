@@ -697,10 +697,14 @@ func TestClaudeCodeAuthEnvPassthrough(t *testing.T) {
 			}
 
 			if managed {
-				// cc-switch managed: Edge must NOT inject any auth env vars,
-				// CC reads everything from settings.json.
-				if len(envKeys) > 0 {
-					t.Errorf("cc-switch managed: expected no auth env vars, got: %v", envKeys)
+				// cc-switch managed: Edge must NOT inject any auth env vars.
+				// The child receives filtered parent env (excluding auth vars)
+				// so CC reads everything from settings.json.
+				authKeys := []string{"ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"}
+				for _, ak := range authKeys {
+					if _, ok := envKeys[ak]; ok {
+						t.Errorf("cc-switch managed: unexpected auth env var %q in returned env", ak)
+					}
 				}
 				return
 			}
