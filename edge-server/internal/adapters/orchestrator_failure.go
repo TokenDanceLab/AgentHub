@@ -63,7 +63,7 @@ const (
 // Integration: the depth threshold aligns with process_executor.go's
 // SpawnSubAgent depth propagation — each sub-agent dispatch increments
 // the delegation depth (dispatchInterceptor.handleDispatch sets depth+1),
-// and the agent registry enforces a separate slot/depth limit via CanSpawn.
+// and the agent registry enforces a separate slot/depth limit via TryReserveSlot.
 // MaxRetryDepth is the retry-axis counterpart to the dispatch-axis depth cap.
 //
 // Not configurable — enforced at DecideRecovery level for safety.
@@ -330,6 +330,7 @@ type FailureClassifiedEvent struct {
 	RetryCount  int              `json:"retryCount"`
 	MaxRetries  int              `json:"maxRetries"`
 	Error       string           `json:"error"`
+	Critique    string           `json:"critique,omitempty"`
 	AlternateID string           `json:"alternateAgentId,omitempty"`
 	Timestamp   time.Time        `json:"timestamp"`
 }
@@ -400,7 +401,11 @@ var cancelPatterns = []string{
 //  5. Default → Transient (optimistic: assume recoverable)
 func ClassifyFailure(err error, runErr *RunError) (FailureCategory, string) {
 	if err == nil && runErr == nil {
-		return FailureCancel, "no error to classify"
+		// No error to classify: default to transient per the optimistic
+		// assumption that the retry may succeed. FailureCancel would imply
+		// the task was cancelled/aborted, which is misleading when there
+		// is genuinely no error information available.
+		return FailureTransient, "no error to classify — assuming transient"
 	}
 
 	// Build a unified message for pattern matching.
@@ -495,6 +500,13 @@ func DecideRecovery(
 	policies map[FailureCategory]FailurePolicy,
 	alternateAvailable bool,
 ) (FailureDecision, *RecoveryState) {
+	// Nil guard: although the only internal caller (HandleSubAgentFailure)
+	// always provides a non-nil state, DecideRecovery is exported and could
+	// be called from external code with nil, causing a panic at line 509.
+	if state == nil {
+		return DecisionFail, &RecoveryState{}
+	}
+
 	if policies == nil {
 		policies = DefaultFailurePolicies()
 	}
@@ -540,9 +552,9 @@ func DecideRecovery(
 }
 
 // BackoffDuration calculates the exponential backoff wait time for a retry
-// with jitter. Uses the formula: base * 2^(retryCount-1) + ±25% jitter,
-// capped at 30 seconds. Jitter prevents thundering herd when multiple
-// sub-agent retries fire simultaneously.
+// with true ±25% jitter (0.75d to 1.25d), capped at 30 seconds. Jitter
+// spreads retries in both directions to prevent thundering herds when
+// multiple sub-agent retries fire simultaneously.
 func BackoffDuration(base time.Duration, retryCount int) time.Duration {
 	if retryCount <= 0 {
 		if base <= 0 {
@@ -555,8 +567,11 @@ func BackoffDuration(base time.Duration, retryCount int) time.Duration {
 	}
 	multiplier := math.Pow(2, float64(retryCount-1))
 	d := time.Duration(float64(base) * multiplier)
-	// Apply ±25% jitter before capping to avoid synchronized retry storms.
-	d = d + time.Duration(rand.Int63n(int64(d/4)))
+	// Apply true ±25% jitter: randomly shift in [-d/4, +d/4] so the
+	// resulting delay ranges from 0.75d to 1.25d, spreading retries
+	// symmetrically around the base duration.
+	jitter := time.Duration(rand.Int63n(int64(d/2))) - time.Duration(d/4)
+	d = d + jitter
 	if d > 30*time.Second {
 		d = 30 * time.Second
 	}
@@ -592,9 +607,12 @@ func BackoffDuration(base time.Duration, retryCount int) time.Duration {
 //     Each sub-agent dispatch increments the delegation depth via
 //     dispatchInterceptor.handleDispatch (depth+1). process_executor.go
 //     SpawnSubAgent enforces a separate slot/depth limit through the agent
-//     registry's CanSpawn check. The retry depth (FailureRecoveryManager.totalDepth
-//     + RecoveryState.RetryCount) is orthogonal to dispatch depth — retries
-//     keep the same dispatch depth but count toward MaxRetryDepth.
+//     registry's TryReserveSlot (atomic check-and-reserve). CanSpawn exists
+//     as a read-only diagnostic method but does not reserve slots and has a
+//     TOCTOU race if used for enforcement. The retry depth
+//     (FailureRecoveryManager.totalDepth + RecoveryState.RetryCount) is
+//     orthogonal to dispatch depth — retries keep the same dispatch depth
+//     but count toward MaxRetryDepth.
 //
 //   BUDGET LINK: process_executor.go childBudget (line ~1527)
 //     Sub-agent context budget is allocated from the parent budget via
@@ -694,6 +712,12 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 	// Step 1: Classify.
 	category, reason := ClassifyFailure(err, runErr)
 
+	// T2-A09: Reflexion — generate a structured critique prompt that the
+	// orchestrator can inject before retrying the sub-agent. This turns a
+	// blind retry into a learning opportunity by asking the orchestrator to
+	// analyze the failure and propose a different strategy.
+	critique := BuildReflexionCritique(agentName, taskID, category, reason, err)
+
 	// Step 2: Get or create recovery state (hold lock across DecideRecovery
 	// to prevent TOCTOU race — a concurrent HandleSubAgentFailure for the same
 	// agentID could modify the state between our read and write-back).
@@ -726,6 +750,7 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 		"decision", string(decision),
 		"reason", reason,
 		"retryCount", updatedState.RetryCount,
+		"critique", critique,
 	)
 
 	// Step 5: Emit classified event for observability.
@@ -739,6 +764,7 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 		RetryCount: updatedState.RetryCount,
 		MaxRetries: m.policies[category].MaxRetries,
 		Error:      truncateError(err, 500),
+		Critique:   critique,
 		Timestamp:  time.Now().UTC(),
 	}
 
@@ -760,7 +786,7 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 		}
 
 	case DecisionSwitchAgent:
-		altID := m.findAlternateAgentID(agentName)
+		altID := m.FindAlternateAgentID(agentName)
 		evt.AlternateID = altID
 		if altID != "" {
 			slog.Info("orchestrator: switching to alternate agent",
@@ -885,9 +911,10 @@ func (m *FailureRecoveryManager) findAlternateAgent(failedAgentName string) bool
 	return false
 }
 
-// findAlternateAgentID returns the first available alternate agent adapter ID
-// that differs from the failed agent.
-func (m *FailureRecoveryManager) findAlternateAgentID(failedAgentName string) string {
+// FindAlternateAgentID returns the first available alternate agent adapter ID
+// that differs from the failed agent. Exported so the dispatch interceptor can
+// construct a re-dispatch to the alternate agent on DecisionSwitchAgent.
+func (m *FailureRecoveryManager) FindAlternateAgentID(failedAgentName string) string {
 	if m.adapterRegistry == nil {
 		return ""
 	}
@@ -913,4 +940,31 @@ func truncateError(err error, maxLen int) string {
 		return msg
 	}
 	return msg[:maxLen] + "..."
+}
+
+// BuildReflexionCritique generates a structured reflection prompt for the
+// orchestrator to inject before retrying a failed sub-agent. The critique
+// asks the orchestrator to analyze why the failure occurred and propose a
+// different strategy, turning a blind retry into a learning opportunity.
+//
+// The prompt follows the Reflexion pattern (Shinn et al., 2023): verbal
+// self-reflection on failure before re-attempt, so the next dispatch can
+// incorporate lessons from the previous failure.
+//
+// Exported so the dispatch interceptor can include it in retry injection
+// messages when the orchestrator needs to learn from sub-agent failures.
+func BuildReflexionCritique(agentName, taskID string, category FailureCategory, reason string, err error) string {
+	// Sanitize the error message: truncate to 200 chars and collapse
+	// newlines/control characters to prevent them from polluting the
+	// formatted critique string and downstream log/UI renderers.
+	errMsg := truncateError(err, 200)
+	errMsg = strings.ReplaceAll(errMsg, "\n", " ")
+	errMsg = strings.ReplaceAll(errMsg, "\r", " ")
+	errMsg = strings.ReplaceAll(errMsg, "\t", " ")
+	return fmt.Sprintf(
+		"[Previous attempt failed: agent=%s category=%s reason=%s error=%s]. "+
+			"Analyze why this sub-agent task failed and propose a different strategy before retrying. "+
+			"What should be done differently next time to avoid this failure?",
+		agentName, string(category), reason, errMsg,
+	)
 }

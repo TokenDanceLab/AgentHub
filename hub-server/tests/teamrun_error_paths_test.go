@@ -76,6 +76,7 @@ func errPathTeamDB(t *testing.T) *gorm.DB {
 			capability_tags TEXT DEFAULT '[]',
 			tool_whitelist TEXT DEFAULT '[]',
 			model_params TEXT DEFAULT '{}',
+			output_schema TEXT DEFAULT NULL,
 			deleted_at DATETIME,
 			created_at DATETIME,
 			updated_at DATETIME
