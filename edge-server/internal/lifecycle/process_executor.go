@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +30,35 @@ var ErrProcessBusRequired = errors.New("process event bus is required")
 var ErrProcessCommandRequired = errors.New("process command is required")
 var ErrProcessStoreRequired = errors.New("process store is required")
 var ErrTooManyConcurrentRuns = errors.New("too many concurrent runs")
+
+// Pre-compiled regex patterns for SanitizeSubAgentResult.
+// These are compiled at package init time and are safe for concurrent use.
+var (
+	// reStackTrace matches lines containing stack trace markers:
+	//   - "\tat " prefixed lines (Java/Python/Go traces)
+	//   - "goroutine" prefixed lines (Go runtime traces)
+	//   - "...path/file.go:line" file references in traces
+	reStackTrace = regexp.MustCompile(`(?m)^\s*(?:\t+at\s.*|goroutine\s+\d+.*|\.\.\.[/\w.\-]+\.go:\d+(?:\s+.*)?)$`)
+
+	// reFilePath matches absolute file paths that reveal project directory
+	// structure, e.g. "D:/Code/TokenDance/..." or "/home/user/...".
+	// The trailing character class includes backslash for Windows paths.
+	// Directory set includes common project roots: Code, Users, home, tmp,
+	// Projects, Work, Data, Documents, Desktop.
+	reFilePath = regexp.MustCompile(`[A-Za-z]:[/\\](?:Code|Users|home|tmp|Projects|Work|Data|Documents|Desktop)[/\\\w.\-]*|/(?:home|Users|tmp)/[\w.\-/]*`)
+
+	// reAPIKey matches common API key patterns:
+	//   - "sk-" prefix (OpenAI, Anthropic, etc.)
+	//   - "api-key-" prefix (various providers)
+	//   - Google API keys (AIza...)
+	//   - GitHub personal access tokens (ghp_..., github_pat_...)
+	//   - GitLab tokens (glpat-...)
+	//   - HuggingFace tokens (hf_...)
+	//   - JWT tokens (eyJ... base64url with dots)
+	//   - AWS access keys (AKIA...)
+	//   - Bearer token headers
+	reAPIKey = regexp.MustCompile(`(?:sk-[a-zA-Z0-9_\-\^=]{20,}|api-key-[a-zA-Z0-9_\-]{16,}|AIza[0-9A-Za-z\-_]{35}|ghp_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{22,}|glpat-[0-9A-Za-z\-_]{20,}|hf_[0-9A-Za-z]{34}|eyJ[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}|AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9_\-\\.=]{20,})`)
+)
 
 type ProcessExecutorConfig struct {
 	Command  string
@@ -101,6 +132,15 @@ type ProcessExecutor struct {
 	surfacers   map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
 }
 
+// NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.
+// It requires a non-nil event bus and run store. The adapter and adapterReg may be
+// nil for raw-stdout capture mode; otherwise adapterReg is used for per-run adapter
+// resolution (via profile.AdapterID or run-level overrides).
+//
+// The returned executor is safe for concurrent use. Callers should configure
+// optional dependencies (agent registry, message queue, result aggregator, hub
+// callback, decision loop, metrics) via the fluent With* methods before calling
+// Start for the first time.
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
 	if bus == nil {
 		return nil, ErrProcessBusRequired
@@ -283,6 +323,17 @@ func (e *ProcessExecutor) WithHubCallback(c *hub.CallbackClient) *ProcessExecuto
 	return e
 }
 
+// Start creates a background context with the configured run timeout, registers
+// the run's cancel function in the executor's running map (so Cancel can find it),
+// and launches the run lifecycle in a new goroutine.
+//
+// Errors:
+//   - store.ErrNotFound if the run does not exist
+//   - ErrRunAlreadyStarted if the run is already running
+//   - ErrTooManyConcurrentRuns if the max concurrent runs limit is exceeded
+//
+// Start returns immediately after launching the background goroutine and does not
+// wait for the run to complete. Use the event bus to observe run lifecycle events.
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -315,6 +366,14 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	return nil
 }
 
+// Cancel attempts to cancel a running or queued run. It looks up the run's cancel
+// function in the executor's running map and invokes it, which cancels the run
+// context and triggers graceful shutdown (stdin interrupt, then process termination
+// after the configured grace period).
+//
+// Returns a CancelResult indicating whether the run was found and whether the
+// cancellation was actually performed (a run already in terminal state cannot be
+// cancelled). Cancel is safe to call on a run that has already finished.
 func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	run, ok := e.store.GetRun(runID)
 	if !ok {
@@ -1270,6 +1329,178 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
 }
 
+// ── Sub-Agent Result Sanitization Layer ─────────────────────────────────
+//
+// ARCHITECTURE NOTE (2026-06): This sanitization layer was added as a safety
+// gate between sub-agent completion and the message queue / result aggregator.
+// Before this layer, raw sub-agent output (including stack traces, absolute
+// file paths, and API keys) could enter the message queue unredacted.
+//
+// The layer operates at exactly one chokepoint — sendSubAgentResult — and
+// applies three transformations:
+//   1. Regex-based redaction of stack traces, file paths, and API keys
+//      (via pre-compiled regex patterns: reStackTrace, reFilePath, reAPIKey).
+//   2. Recursive structured-data scanning (maps and slices are walked depth-first
+//      so attackers cannot evade sanitization by nesting sensitive data).
+//   3. UTF-8-safe truncation at 32KB to bound message queue payload sizes.
+//
+// The same sanitized payload is written to both the message queue (for parent
+// orchestrator consumption) and the result aggregator (for persisted synthesis),
+// ensuring no bypass path exists. The _sanitized / _sanitized_reason metadata
+// fields on the message payload allow the parent orchestrator to detect when
+// output has been modified.
+
+// maxSanitizedResultBytes is the maximum size of a sub-agent result string
+// before truncation is applied. Strings longer than this are truncated to
+// keep message queue payloads bounded and prevent memory bloat from runaway
+// agent outputs.
+const maxSanitizedResultBytes = 32 * 1024 // 32KB
+
+// recursiveSanitizeString applies all regex-based sanitization to a string
+// and returns the sanitized result plus a comma-separated list of what was
+// modified (empty means no changes). This is the core sanitization logic
+// shared by both string and structured payload paths.
+func recursiveSanitizeString(s string) (string, string) {
+	if len(s) == 0 {
+		return s, ""
+	}
+	var reasons []string
+
+	if reStackTrace.MatchString(s) {
+		s = reStackTrace.ReplaceAllString(s, "[redacted:stack-trace]")
+		reasons = append(reasons, "stack-trace-redacted")
+	}
+
+	if reFilePath.MatchString(s) {
+		s = reFilePath.ReplaceAllString(s, "[redacted:file-path]")
+		reasons = append(reasons, "file-paths-redacted")
+	}
+
+	if reAPIKey.MatchString(s) {
+		s = reAPIKey.ReplaceAllString(s, "[redacted:api-key]")
+		reasons = append(reasons, "api-keys-redacted")
+	}
+
+	return s, strings.Join(reasons, ",")
+}
+
+// SanitizeSubAgentResult sanitizes a sub-agent result payload before it enters
+// the message queue. It applies the following transformations:
+//
+//  1. For string payloads: redacts stack traces, file paths, API keys, and
+//     truncates oversized output at a UTF-8-safe boundary.
+//  2. For structured payloads (map[string]any, []any): recursively walks the
+//     structure and sanitizes all string values using the same regex pipeline.
+//     This prevents attackers from evading sanitization by wrapping sensitive
+//     data in a map or slice.
+//  3. For all payloads: truncates the result if it exceeds maxSanitizedResultBytes
+//     when serializable as a string, keeping the head and appending a truncation
+//     marker.
+//
+// The function is designed to be safe (never panics) and fast (<1ms for
+// typical payloads). It returns the sanitized payload and a reason string
+// describing what was modified (empty string means no changes were made).
+func SanitizeSubAgentResult(payload any) (any, string) {
+	if payload == nil {
+		return nil, ""
+	}
+
+	switch v := payload.(type) {
+	case string:
+		s, reason := recursiveSanitizeString(v)
+		// Truncate if the result exceeds the maximum allowed size.
+		s, truncReason := truncateUTF8Safe(s)
+		if truncReason != "" {
+			if reason != "" {
+				reason = reason + "," + truncReason
+			} else {
+				reason = truncReason
+			}
+		}
+		return s, reason
+
+	case map[string]any:
+		// Recursively sanitize all string values in the map.
+		sanitized := make(map[string]any, len(v))
+		combinedReason := ""
+		for k, val := range v {
+			sanVal, r := SanitizeSubAgentResult(val)
+			sanitized[k] = sanVal
+			if r != "" {
+				if combinedReason != "" {
+					combinedReason = combinedReason + "," + r
+				} else {
+					combinedReason = r
+				}
+			}
+		}
+		return sanitized, combinedReason
+
+	case []any:
+		// Recursively sanitize all string values in the slice.
+		sanitized := make([]any, len(v))
+		combinedReason := ""
+		for i, val := range v {
+			sanVal, r := SanitizeSubAgentResult(val)
+			sanitized[i] = sanVal
+			if r != "" {
+				if combinedReason != "" {
+					combinedReason = combinedReason + "," + r
+				} else {
+					combinedReason = r
+				}
+			}
+		}
+		return sanitized, combinedReason
+
+	default:
+		// Non-string, non-map, non-slice payloads (e.g. numbers, bools)
+		// are passed through unchanged.
+		return payload, ""
+	}
+}
+
+// truncateUTF8Safe truncates s to maxSanitizedResultBytes at a UTF-8
+// character boundary to avoid slicing multi-byte code points. Returns the
+// (possibly truncated) string and a reason string (empty if no truncation).
+func truncateUTF8Safe(s string) (string, string) {
+	if len(s) <= maxSanitizedResultBytes {
+		return s, ""
+	}
+
+	headSize := maxSanitizedResultBytes - 2*1024 // reserve 2KB for tail
+	if headSize < 1024 {
+		headSize = 1024 // safety floor
+	}
+
+	// Walk backward from headSize to the start of a UTF-8 character.
+	// This prevents slicing in the middle of a multi-byte code point (e.g.
+	// CJK characters at 3 bytes each).
+	for headSize > 0 && headSize < len(s) {
+		if utf8.RuneStart(s[headSize]) {
+			break
+		}
+		headSize--
+	}
+
+	tailSize := len(s) - headSize
+	if tailSize > 2048 {
+		tailSize = 2048
+	}
+	// Also align tail start to UTF-8 boundary.
+	tailStart := len(s) - tailSize
+	for tailStart > 0 && tailStart < len(s) {
+		if utf8.RuneStart(s[tailStart]) {
+			break
+		}
+		tailStart++
+	}
+	tailSize = len(s) - tailStart
+
+	truncated := s[:headSize] + "\n... [truncated " + strconv.Itoa(len(s)-maxSanitizedResultBytes) + " bytes] ...\n" + s[tailStart:]
+	return truncated, "truncated-32kb"
+}
+
 // sendSubAgentResult delivers a result message from a completed sub-agent run
 // back to its parent agent via the message queue. This enables the orchestrator
 // to aggregate results from dispatched sub-agents.
@@ -1295,9 +1526,19 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	case "failed", "cancelled":
 		msgType = agents.MsgTypeError
 		e.agentRegistry.SetStatus(agentID, agents.StatusError, "")
-	case "finished":
+	case "finished", "completed_with_issues":
+		// completed_with_issues is a terminal status set by the evidence gate
+		// when verification fails. It is still a result, so msgType stays
+		// MsgTypeResult, but the agent registry must be updated to StatusCompleted
+		// so the parent orchestrator does not wait indefinitely for a child it
+		// thinks is still running.
 		e.agentRegistry.SetStatus(agentID, agents.StatusCompleted, "")
 	}
+
+	// Sanitize the sub-agent result before it enters the message queue.
+	// This redacts stack traces, file paths, and API keys, and truncates
+	// oversized outputs to keep queue payloads bounded.
+	sanitizedResult, sanitizeReason := SanitizeSubAgentResult(payload)
 
 	e.messageQueue.EnsureAgent(inst.ParentID, 64)
 	e.messageQueue.Send(agents.Message{
@@ -1307,11 +1548,13 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		Type:        msgType,
 		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
 		Payload: map[string]any{
-			"runId":     runID,
-			"status":    status,
-			"agentId":   agentID,
-			"agentName": inst.Name,
-			"result":    payload,
+			"runId":             runID,
+			"status":            status,
+			"agentId":           agentID,
+			"agentName":         inst.Name,
+			"result":            sanitizedResult,
+			"_sanitized":        sanitizeReason != "",
+			"_sanitized_reason": sanitizeReason,
 		},
 		Timestamp: time.Now().UTC(),
 	})
@@ -1320,16 +1563,28 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// synthesis when all children of the parent complete (or timeout).
 	// Reference: AionUi Team Mode Mailbox — persisted sub-agent results.
 	// Reference: LibreChat — structured subagent result return.
+	//
+	// Apply sanitization to the raw payload before storing in the result
+	// aggregator. This ensures that even if the message queue copy is
+	// tampered with, the raw persisted output does not leak API keys,
+	// file paths, or stack traces.
 	if e.resultAgg != nil {
+		sanitizedOutput := payload
+		if sanitizeReason != "" {
+			sanitizedOutput = sanitizedResult
+		}
 		e.resultAgg.StoreSubAgentResult(inst.ParentID, SubAgentResult{
 			AgentID:     agentID,
 			AgentName:   inst.Name,
 			RunID:       runID,
 			Status:      status,
-			Output:      payload,
+			Output:      sanitizedOutput,
 			CompletedAt: time.Now().UTC(),
 		})
 	}
+
+	// Decrement per-parent active child count so the slot can be reused.
+	e.agentRegistry.DecrChildCount(inst.ParentID)
 }
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
@@ -1404,9 +1659,13 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 // Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
 // Reference: OpenCode task.ts:145-162 (sessions.create with parentID, deriveSubagentSessionPermission).
 func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
-	// Enforce spawn slot and depth limits via the agent registry.
+	// Atomically check and reserve a spawn slot under the same write lock.
+	// This prevents the TOCTOU race where two concurrent goroutines both pass
+	// CanSpawn (seeing count=4) and both subsequently increment, exceeding
+	// MaxChildrenPerAgent=5.
+	slotReserved := false
 	if e.agentRegistry != nil {
-		if err := e.agentRegistry.CanSpawn(parentRun.ID, task.Depth); err != nil {
+		if err := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); err != nil {
 			slog.Warn("spawn slot rejected",
 				"parentRunId", parentRun.ID,
 				"taskId", task.TaskID,
@@ -1415,7 +1674,17 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 			)
 			return "", "", err
 		}
+		slotReserved = true
 	}
+
+	// Deferred cleanup: release the reserved slot on any error exit path.
+	// On success, the slot is released by sendSubAgentResult when the child
+	// run completes (keeps increment/decrement pair lexically close).
+	defer func() {
+		if err != nil && slotReserved {
+			e.agentRegistry.DecrChildCount(parentRun.ID)
+		}
+	}()
 
 	runID = "run_" + task.TaskID
 	agentInstanceID = "agent_" + task.TaskID
@@ -1431,9 +1700,10 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	}
 
 	// Create the run in the store
-	run, err := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
-	if err != nil {
-		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", err)
+	run, createErr := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
+	if createErr != nil {
+		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", createErr)
+		err = createErr
 		return "", "", err
 	}
 
@@ -1441,6 +1711,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// context scope. This ensures budget tracking in publishStructuredOutput
 	// monitors only the child's tokens, and parent/child results are
 	// independently routed via the message queue.
+	registered := false
 	if e.agentRegistry != nil {
 		inst := &agents.AgentInstance{
 			ID:        agentInstanceID,
@@ -1456,11 +1727,13 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 			CreatedAt: time.Now(),
 			LastSeen:  time.Now(),
 		}
-		if err := e.agentRegistry.Register(inst); err != nil {
+		if regErr := e.agentRegistry.Register(inst); regErr != nil {
 			slog.Warn("failed to register sub-agent instance in registry",
 				"agentInstanceId", agentInstanceID,
-				"error", err,
+				"error", regErr,
 			)
+		} else {
+			registered = true
 		}
 	}
 
@@ -1519,11 +1792,21 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Unlock()
 
 	// Start the run
-	if err := e.Start(run, runCtx); err != nil {
-		slog.Error("failed to start sub-agent run", "runId", runID, "error", err)
+	if startErr := e.Start(run, runCtx); startErr != nil {
+		slog.Error("failed to start sub-agent run", "runId", runID, "error", startErr)
 		e.mu.Lock()
 		delete(e.runToAgent, runID)
 		e.mu.Unlock()
+
+		// Cleanup on start failure: unregister the leaked agent instance,
+		// mark the run as failed so it does not pollute the store, and let
+		// the deferred cleanup release the reserved slot.
+		if registered {
+			e.agentRegistry.Unregister(agentInstanceID)
+		}
+		_, _ = e.store.SetRunStatus(runID, "failed")
+
+		err = startErr
 		return "", "", err
 	}
 

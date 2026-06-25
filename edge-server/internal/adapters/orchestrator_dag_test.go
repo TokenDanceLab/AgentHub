@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -438,4 +439,173 @@ func containsSubstr(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// ── DefaultOrchestratorPrompt XML Tags Tests (T2-I11) ───────────────────────
+
+func TestDefaultOrchestratorPrompt_RequiredXMLTags(t *testing.T) {
+	requiredTags := []string{
+		"<ROLE>",
+		"</ROLE>",
+		"<LIMITS>",
+		"</LIMITS>",
+		"<WORKFLOW>",
+		"</WORKFLOW>",
+		"<OUTPUT>",
+		"</OUTPUT>",
+		"<CONSTRAINTS>",
+		"</CONSTRAINTS>",
+	}
+
+	tests := []struct {
+		name    string
+		agents  []string
+	}{
+		{
+			name:   "with multiple agents",
+			agents: []string{"builder", "reviewer", "tester"},
+		},
+		{
+			name:   "with single agent",
+			agents: []string{"code-reviewer"},
+		},
+		{
+			name:   "with empty agent list",
+			agents: []string{},
+		},
+		{
+			name:   "nil agents",
+			agents: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := DefaultOrchestratorPrompt(tt.agents)
+
+			for _, tag := range requiredTags {
+				if !strings.Contains(prompt, tag) {
+					t.Errorf("DefaultOrchestratorPrompt(%v) missing required tag %q", tt.agents, tag)
+				}
+			}
+		})
+	}
+}
+
+func TestDefaultOrchestratorPrompt_ContainsExpectedSections(t *testing.T) {
+	prompt := DefaultOrchestratorPrompt([]string{"builder", "reviewer", "researcher"})
+
+	// ROLE section should mention the orchestrator's identity.
+	if !strings.Contains(prompt, "Orchestrator") {
+		t.Error("prompt should mention 'Orchestrator' in ROLE section")
+	}
+	if !strings.Contains(prompt, "multi-agent system") {
+		t.Error("prompt should mention 'multi-agent system'")
+	}
+
+	// LIMITS section should list available agents.
+	if !strings.Contains(prompt, "builder") {
+		t.Error("prompt should list 'builder' in available agents")
+	}
+	if !strings.Contains(prompt, "reviewer") {
+		t.Error("prompt should list 'reviewer' in available agents")
+	}
+	if !strings.Contains(prompt, "researcher") {
+		t.Error("prompt should list 'researcher' in available agents")
+	}
+
+	// WORKFLOW section should contain the 5-step workflow.
+	if !strings.Contains(prompt, "ANALYZE") {
+		t.Error("prompt should contain 'ANALYZE' step in WORKFLOW")
+	}
+	if !strings.Contains(prompt, "PLAN") {
+		t.Error("prompt should contain 'PLAN' step in WORKFLOW")
+	}
+	if !strings.Contains(prompt, "DISPATCH") {
+		t.Error("prompt should contain 'DISPATCH' step in WORKFLOW")
+	}
+	if !strings.Contains(prompt, "AGGREGATE") {
+		t.Error("prompt should contain 'AGGREGATE' step in WORKFLOW")
+	}
+	if !strings.Contains(prompt, "TERMINATE") {
+		t.Error("prompt should contain 'TERMINATE' step in WORKFLOW")
+	}
+
+	// OUTPUT section should contain the JSON schema structure.
+	if !strings.Contains(prompt, `"tasks"`) {
+		t.Error("prompt should contain JSON schema with 'tasks' array")
+	}
+	if !strings.Contains(prompt, `"agent"`) {
+		t.Error("prompt should contain JSON schema with 'agent' field")
+	}
+	if !strings.Contains(prompt, `"dependsOn"`) {
+		t.Error("prompt should contain JSON schema with 'dependsOn' field")
+	}
+
+	// CONSTRAINTS section should restrict behavior.
+	if !strings.Contains(prompt, "NEVER") {
+		t.Error("prompt CONSTRAINTS should contain 'NEVER' directives")
+	}
+	if !strings.Contains(prompt, "circular dependencies") {
+		t.Error("prompt should mention 'circular dependencies' constraint")
+	}
+}
+
+func TestDefaultOrchestratorPrompt_EmptyAgentList(t *testing.T) {
+	prompt := DefaultOrchestratorPrompt([]string{})
+
+	// With empty agent list, all XML tags must still be present.
+	requiredTags := []string{"<ROLE>", "</ROLE>", "<LIMITS>", "</LIMITS>",
+		"<WORKFLOW>", "</WORKFLOW>", "<OUTPUT>", "</OUTPUT>",
+		"<CONSTRAINTS>", "</CONSTRAINTS>"}
+	for _, tag := range requiredTags {
+		if !strings.Contains(prompt, tag) {
+			t.Errorf("DefaultOrchestratorPrompt([]) missing required tag %q", tag)
+		}
+	}
+
+	// With empty agent list, the agent list should say "none".
+	if !strings.Contains(prompt, "none") {
+		t.Error("prompt with empty agents should contain 'none' as agent list placeholder")
+	}
+}
+
+func TestDefaultOrchestratorPrompt_XMLTagOrder(t *testing.T) {
+	prompt := DefaultOrchestratorPrompt([]string{"builder"})
+
+	// Verify tags appear in the expected order: ROLE -> LIMITS -> WORKFLOW -> OUTPUT -> CONSTRAINTS.
+	tags := []string{"<ROLE>", "<LIMITS>", "<WORKFLOW>", "<OUTPUT>", "<CONSTRAINTS>"}
+	prevIdx := -1
+	for _, tag := range tags {
+		idx := strings.Index(prompt, tag)
+		if idx == -1 {
+			t.Errorf("tag %q not found in prompt", tag)
+			continue
+		}
+		if idx <= prevIdx {
+			t.Errorf("tag %q (at index %d) should appear after previous tag (at index %d)", tag, idx, prevIdx)
+		}
+		prevIdx = idx
+	}
+}
+
+func TestDefaultOrchestratorPrompt_NonEmpty(t *testing.T) {
+	// Prompt with nil agents should still produce a valid prompt.
+	prompt := DefaultOrchestratorPrompt(nil)
+	if len(prompt) == 0 {
+		t.Error("DefaultOrchestratorPrompt(nil) should not return empty string")
+	}
+	// Must contain all 5 sections.
+	for _, tag := range []string{"<ROLE>", "<LIMITS>", "<WORKFLOW>", "<OUTPUT>", "<CONSTRAINTS>"} {
+		if !strings.Contains(prompt, tag) {
+			t.Errorf("DefaultOrchestratorPrompt(nil) missing required tag %q", tag)
+		}
+	}
+}
+
+func BenchmarkDefaultOrchestratorPrompt(b *testing.B) {
+	agents := []string{"builder", "reviewer", "tester", "researcher", "deployer"}
+	for b.Loop() {
+		DefaultOrchestratorPrompt(agents)
+	}
 }

@@ -45,6 +45,8 @@ type dispatchPayload struct {
 	// Context continuity: thread history and pinned messages for all agent runtimes.
 	Messages       []dispatchMessage `json:"messages,omitempty"`
 	PinnedMessages []dispatchMessage `json:"pinned_messages,omitempty"`
+	// OutputSchema is the JSON Schema for structured output (--json-schema).
+	OutputSchema *json.RawMessage `json:"structured_output_schema,omitempty"`
 }
 
 // dispatchMessage represents a single message in thread history or pinned context.
@@ -79,6 +81,8 @@ type edgeRunRequest struct {
 	DeliveryID     string               `json:"deliveryId,omitempty"`
 	Messages       []dispatchMessage    `json:"messages,omitempty"`
 	PinnedMessages []dispatchMessage    `json:"pinnedMessages,omitempty"`
+	// StructuredOutputSchema is the JSON Schema for structured output (--json-schema).
+	StructuredOutputSchema string `json:"structuredOutputSchema,omitempty"`
 }
 
 // edgeRunResponse captures the relevant fields from Edge's /v1/runs response.
@@ -110,6 +114,11 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 		DeliveryID:     dp.DeliveryID,
 		Messages:       dp.Messages,
 		PinnedMessages: dp.PinnedMessages,
+	}
+
+	// Serialize OutputSchema to string for Edge HTTP dispatch.
+	if dp.OutputSchema != nil && len(*dp.OutputSchema) > 0 {
+		reqBody.StructuredOutputSchema = string(*dp.OutputSchema)
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -388,6 +397,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			dp.SystemPrompt = customAgent.SystemPrompt
 			dp.ModelParams = customAgent.ModelParams
 			dp.ToolWhitelist = customAgent.ToolWhitelist
+			dp.OutputSchema = customAgent.OutputSchema
 		}
 	}
 	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
