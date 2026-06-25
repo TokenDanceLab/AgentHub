@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -512,5 +513,227 @@ func TestRegistry_ShutdownCascade(t *testing.T) {
 	instB, _ := r2.Get("b")
 	if instB.Status != StatusIdle {
 		t.Fatalf("unrelated leaf b should be unaffected, got %s", instB.Status)
+	}
+}
+
+// ── Feature: TryReserveSlot per-parent child limit enforcement ──────────────
+
+// TestRegistry_TryReserveSlot_MaxChildrenPerAgentEnforced verifies that
+// TryReserveSlot rejects the (MaxChildrenPerAgent+1)-th reservation for the
+// same parent. This is the atomic slot reservation that replaces the
+// separate CanSpawn + IncrChildCount call pattern, eliminating the TOCTOU race.
+func TestRegistry_TryReserveSlot_MaxChildrenPerAgentEnforced(t *testing.T) {
+	r := NewRegistry()
+	parentID := "orchestrator-1"
+
+	// Reserve exactly MaxChildrenPerAgent slots — all must succeed.
+	for i := 0; i < MaxChildrenPerAgent; i++ {
+		err := r.TryReserveSlot(parentID, 1)
+		if err != nil {
+			t.Fatalf("TryReserveSlot #%d failed: %v (childrenCount=%d)", i+1, err, r.childrenCount[parentID])
+		}
+	}
+
+	// Verify the count is exactly MaxChildrenPerAgent.
+	count := r.childrenCount[parentID]
+	if count != MaxChildrenPerAgent {
+		t.Fatalf("childrenCount[%s] = %d, want %d", parentID, count, MaxChildrenPerAgent)
+	}
+
+	// The (MaxChildrenPerAgent+1)-th reservation must be rejected.
+	err := r.TryReserveSlot(parentID, 1)
+	if err == nil {
+		t.Fatal("TryReserveSlot should reject when MaxChildrenPerAgent is reached")
+	}
+	if err != ErrMaxChildrenPerAgentReached {
+		t.Fatalf("TryReserveSlot error = %v, want ErrMaxChildrenPerAgentReached", err)
+	}
+
+	// The count must NOT have been incremented on failure.
+	count = r.childrenCount[parentID]
+	if count != MaxChildrenPerAgent {
+		t.Fatalf("childrenCount[%s] = %d after rejection, want %d (count should not change on failure)", parentID, count, MaxChildrenPerAgent)
+	}
+}
+
+// TestRegistry_TryReserveSlot_DecrOnCompletion verifies that the active child
+// count is correctly decremented when a child completes (via Unregister which
+// calls DecrChildCount internally), freeing a slot for a new child.
+func TestRegistry_TryReserveSlot_DecrOnCompletion(t *testing.T) {
+	r := NewRegistry()
+
+	// Register the parent orchestrator.
+	_ = r.Register(&AgentInstance{
+		ID:        "parent-orch",
+		AdapterID: "orchestrator",
+		ParentID:  "",
+		Status:    StatusBusy,
+	})
+
+	parentID := "parent-orch"
+
+	// Reserve MaxChildrenPerAgent slots.
+	for i := 0; i < MaxChildrenPerAgent; i++ {
+		childID := fmt.Sprintf("child-%d", i+1)
+		err := r.TryReserveSlot(parentID, 1)
+		if err != nil {
+			t.Fatalf("TryReserveSlot for %s failed: %v", childID, err)
+		}
+		// Register the child agent (simulating a successful spawn).
+		_ = r.Register(&AgentInstance{
+			ID:        childID,
+			AdapterID: "worker",
+			ParentID:  parentID,
+			Depth:     1,
+			Status:    StatusBusy,
+		})
+	}
+
+	// At this point, no more spawns should be allowed.
+	err := r.TryReserveSlot(parentID, 1)
+	if err != ErrMaxChildrenPerAgentReached {
+		t.Fatalf("TryReserveSlot should be at capacity, got: %v", err)
+	}
+
+	// Complete one child: Unregister decrements childrenCount.
+	if !r.Unregister("child-1") {
+		t.Fatal("Unregister child-1 should succeed")
+	}
+
+	// Now the count should be MaxChildrenPerAgent-1, allowing a new reservation.
+	err = r.TryReserveSlot(parentID, 1)
+	if err != nil {
+		t.Fatalf("TryReserveSlot after child completion should succeed, got: %v", err)
+	}
+
+	// The count should be back to MaxChildrenPerAgent.
+	count := r.childrenCount[parentID]
+	if count != MaxChildrenPerAgent {
+		t.Fatalf("childrenCount[%s] = %d after re-reservation, want %d", parentID, count, MaxChildrenPerAgent)
+	}
+}
+
+// TestRegistry_TryReserveSlot_DecrChildCountExplicit verifies that explicit
+// DecrChildCount (without Unregister) also frees a slot. This covers the
+// path where the caller must release a reserved slot when registration fails
+// after TryReserveSlot succeeds (atomic reservation but registration failure).
+func TestRegistry_TryReserveSlot_DecrChildCountExplicit(t *testing.T) {
+	r := NewRegistry()
+	parentID := "orch-explicit"
+
+	// Reserve all slots.
+	for i := 0; i < MaxChildrenPerAgent; i++ {
+		err := r.TryReserveSlot(parentID, 1)
+		if err != nil {
+			t.Fatalf("TryReserveSlot #%d failed: %v", i+1, err)
+		}
+	}
+
+	// Full — next should fail.
+	err := r.TryReserveSlot(parentID, 1)
+	if err != ErrMaxChildrenPerAgentReached {
+		t.Fatalf("TryReserveSlot should be at capacity, got: %v", err)
+	}
+
+	// Explicitly decrement one (simulating a failed registration after slot reservation).
+	r.DecrChildCount(parentID)
+
+	// Now a new reservation should succeed.
+	err = r.TryReserveSlot(parentID, 1)
+	if err != nil {
+		t.Fatalf("TryReserveSlot after explicit DecrChildCount should succeed, got: %v", err)
+	}
+}
+
+// TestRegistry_TryReserveSlot_SlotFullAndMaxChildrenInterplay verifies that
+// the two limits (maxConcurrent and MaxChildrenPerAgent) operate independently
+// and both are enforced.
+func TestRegistry_TryReserveSlot_SlotFullAndMaxChildrenInterplay(t *testing.T) {
+	// Set a very low maxConcurrent to test interplay.
+	r := NewRegistry().WithMaxConcurrent(2)
+
+	// Register parent and two children to fill the concurrent slots.
+	_ = r.Register(&AgentInstance{ID: "parent", AdapterID: "orch", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "c1", AdapterID: "worker", ParentID: "parent", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "c2", AdapterID: "worker", ParentID: "parent", Status: StatusBusy})
+
+	// childrenCount tracks TryReserveSlot results, not registered instances.
+	// But TryReserveSlot checks both active agents and childrenCount.
+	// The childrenCount is 0 since we haven't called TryReserveSlot yet.
+	// With 2 active children (c1, c2) and maxConcurrent=2, the concurrent slot
+	// limit should reject before the childrenCount check.
+
+	// TryReserveSlot should fail for concurrent slot limit.
+	err := r.TryReserveSlot("parent", 1)
+	if err == nil {
+		r.DecrChildCount("parent")
+		t.Fatal("TryReserveSlot should fail when concurrent slots are full")
+	}
+	if err != ErrAgentSlotFull {
+		t.Fatalf("TryReserveSlot error = %v, want ErrAgentSlotFull", err)
+	}
+
+	// Now complete one child to free a concurrent slot.
+	r.SetStatus("c1", StatusCompleted, "")
+
+	// Should now be able to reserve via TryReserveSlot.
+	err = r.TryReserveSlot("parent", 1)
+	if err != nil {
+		t.Fatalf("TryReserveSlot after freeing slot: %v", err)
+	}
+	r.DecrChildCount("parent") // clean up
+
+	// Now test the childrenCount path: reserve MaxChildrenPerAgent slots via TryReserveSlot.
+	for i := 0; i < MaxChildrenPerAgent; i++ {
+		err := r.TryReserveSlot("parent", 1)
+		if err != nil {
+			t.Fatalf("TryReserveSlot #%d (childrenCount) failed: %v", i+1, err)
+		}
+	}
+
+	// childrenCount should now be MaxChildrenPerAgent.
+	count := r.childrenCount["parent"]
+	if count != MaxChildrenPerAgent {
+		t.Fatalf("childrenCount[parent] = %d, want %d", count, MaxChildrenPerAgent)
+	}
+
+	// Next reservation must fail with ErrMaxChildrenPerAgentReached.
+	err = r.TryReserveSlot("parent", 1)
+	if err != ErrMaxChildrenPerAgentReached {
+		t.Fatalf("TryReserveSlot error = %v, want ErrMaxChildrenPerAgentReached", err)
+	}
+}
+
+// TestRegistry_TryReserveSlot_CountActiveByParentExcludesTerminal verifies
+// that TryReserveSlot correctly excludes terminal statuses (completed,
+// error, disconnected) and only counts non-terminal agents for the
+// concurrent slot limit.
+func TestRegistry_TryReserveSlot_CountActiveByParentExcludesTerminal(t *testing.T) {
+	r := NewRegistry()
+
+	_ = r.Register(&AgentInstance{ID: "parent", AdapterID: "orch", Status: StatusBusy})
+
+	// Register 3 children: two busy, one completed.
+	_ = r.Register(&AgentInstance{ID: "c1", AdapterID: "worker", ParentID: "parent", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "c2", AdapterID: "worker", ParentID: "parent", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "c3", AdapterID: "worker", ParentID: "parent", Status: StatusCompleted})
+
+	active := r.CountActiveByParent("parent")
+	if active != 2 {
+		t.Fatalf("CountActiveByParent = %d, want 2 (completed excluded)", active)
+	}
+
+	// Also verify via TryReserveSlot which uses the same active-counting logic.
+	// With maxConcurrent=2, the completed child should not block.
+	r2 := NewRegistry().WithMaxConcurrent(2)
+	_ = r2.Register(&AgentInstance{ID: "p2", AdapterID: "orch", Status: StatusBusy})
+	_ = r2.Register(&AgentInstance{ID: "a1", AdapterID: "worker", ParentID: "p2", Status: StatusBusy})
+	_ = r2.Register(&AgentInstance{ID: "a2", AdapterID: "worker", ParentID: "p2", Status: StatusCompleted})
+	_ = r2.Register(&AgentInstance{ID: "a3", AdapterID: "worker", ParentID: "p2", Status: StatusError})
+
+	// Only 1 active (a1) — should be able to reserve.
+	err := r2.TryReserveSlot("p2", 1)
+	if err != nil {
+		t.Fatalf("TryReserveSlot with terminal children excluded: %v", err)
 	}
 }

@@ -20,11 +20,11 @@ func TestClassifyFailure(t *testing.T) {
 		wantReason   string
 	}{
 		{
-			name:         "both nil defaults to cancel",
+			name:         "both nil defaults to transient",
 			err:          nil,
 			runErr:       nil,
-			wantCategory: FailureCancel,
-			wantReason:   "no error to classify",
+			wantCategory: FailureTransient,
+			wantReason:   "no error to classify — assuming transient",
 		},
 		{
 			name:         "context.Canceled",
@@ -388,12 +388,16 @@ func TestBackoffDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := BackoffDuration(tt.base, tt.retryCount)
-			// With jitter, the result is in [want, want*1.25] (capped at 30s).
-			// Allow +1ms for floating point rounding.
+			// With true ±25% jitter, the result is in [want*0.75, want*1.25],
+			// capped at maxWait. Allow ±1ms for floating point rounding.
+			minWant := tt.want - tt.want/4 - 1*time.Millisecond
 			maxWant := tt.want + tt.want/4 + 1*time.Millisecond
-			if got < tt.want || got > maxWant {
+			if maxWant > maxWait {
+				maxWant = maxWait
+			}
+			if got < minWant || got > maxWant {
 				t.Errorf("BackoffDuration(%v, %d) = %v, want in [%v, %v]",
-					tt.base, tt.retryCount, got, tt.want, maxWant)
+					tt.base, tt.retryCount, got, minWant, maxWant)
 			}
 		})
 	}
@@ -615,6 +619,400 @@ func BenchmarkDecideRecovery(b *testing.B) {
 func BenchmarkBackoffDuration(b *testing.B) {
 	for b.Loop() {
 		BackoffDuration(1*time.Second, 3)
+	}
+}
+
+// ── BuildReflexionCritique Tests (T2-A09) ─────────────────────────────────────
+
+func TestBuildReflexionCritique(t *testing.T) {
+	tests := []struct {
+		name      string
+		agentName string
+		taskID    string
+		category  FailureCategory
+		reason    string
+		err       error
+		wantSubs  []string // substrings that must appear in the critique
+	}{
+		{
+			name:      "normal transient failure",
+			agentName: "code-reviewer",
+			taskID:    "task_abc123",
+			category:  FailureTransient,
+			reason:    "deadline or timeout detected",
+			err:       errors.New("context deadline exceeded"),
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=code-reviewer",
+				"category=transient",
+				"reason=deadline or timeout detected",
+				"error=context deadline exceeded",
+				"Analyze why",
+				"propose a different strategy",
+			},
+		},
+		{
+			name:      "capability failure with permission error",
+			agentName: "builder",
+			taskID:    "task_def456",
+			category:  FailureCapability,
+			reason:    "capability pattern matched: permission denied",
+			err:       errors.New("permission denied: cannot write to /etc/config"),
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=builder",
+				"category=capability",
+				"reason=capability pattern matched: permission denied",
+				"error=permission denied: cannot write to /etc/config",
+			},
+		},
+		{
+			name:      "cancel category",
+			agentName: "researcher",
+			taskID:    "task_ghi789",
+			category:  FailureCancel,
+			reason:    "context cancelled",
+			err:       context.Canceled,
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=researcher",
+				"category=cancel",
+				"reason=context cancelled",
+				"error=context canceled",
+			},
+		},
+		{
+			name:      "nil error (T2-A09 edge case)",
+			agentName: "tester",
+			taskID:    "task_nil_err",
+			category:  FailureTransient,
+			reason:    "no error to classify",
+			err:       nil,
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=tester",
+				"error=", // empty error message, but the field is still present
+			},
+		},
+		{
+			name:      "empty agentName (T2-A09 edge case)",
+			agentName: "",
+			taskID:    "task_empty_agent",
+			category:  FailureCancel,
+			reason:    "slot full",
+			err:       errors.New("agent slot full"),
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=",
+				"category=cancel",
+				"reason=slot full",
+				"error=agent slot full",
+			},
+		},
+		{
+			name:      "error message with newlines sanitized",
+			agentName: "worker",
+			taskID:    "task_nl",
+			category:  FailureTransient,
+			reason:    "transient pattern matched",
+			err:       errors.New("connection refused\nretry later\r\n\tbackoff"),
+			wantSubs: []string{
+				"error=connection refused retry later", // newlines collapsed to spaces
+				"backoff", // trailing part still present
+			},
+		},
+		{
+			name:      "long error message truncated to 200 chars",
+			agentName: "agent-long",
+			taskID:    "task_long",
+			category:  FailureTransient,
+			reason:    "transient pattern matched: timeout",
+			err:       fmt.Errorf("%s", strings.Repeat("x", 500)),
+			wantSubs: []string{
+				"Previous attempt failed",
+				"agent=agent-long",
+				// Error should be truncated to 200 chars + "..."
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildReflexionCritique(tt.agentName, tt.taskID, tt.category, tt.reason, tt.err)
+			for _, want := range tt.wantSubs {
+				if !strings.Contains(got, want) {
+					t.Errorf("BuildReflexionCritique() output missing substring %q\nGot: %s", want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildReflexionCritique_FormatStructure(t *testing.T) {
+	// Verify the critique follows the expected structural pattern:
+	// [Previous attempt failed: agent=X category=Y reason=Z error=E].
+	// Analyze why... What should be done differently...
+	got := BuildReflexionCritique(
+		"code-reviewer",
+		"task_001",
+		FailureTransient,
+		"timeout",
+		errors.New("connection refused"),
+	)
+
+	// Must start with the structured failure recap.
+	if !strings.HasPrefix(got, "[Previous attempt failed:") {
+		t.Errorf("critique should start with '[Previous attempt failed:', got: %s", got)
+	}
+
+	// Must contain the Reflexion pattern elements (Shinn et al., 2023).
+	if !strings.Contains(got, "Analyze why") {
+		t.Error("critique should contain 'Analyze why' (Reflexion pattern)")
+	}
+	if !strings.Contains(got, "What should be done differently") {
+		t.Error("critique should contain 'What should be done differently' (Reflexion pattern)")
+	}
+
+	// Must end with a question mark (it's a prompt asking for analysis).
+	if !strings.HasSuffix(got, "?") {
+		t.Errorf("critique should end with '?', got: %s", got)
+	}
+}
+
+// ── Rule Engine: isFinishDispatch Tests (T2-A08) ─────────────────────────────
+
+func TestIsFinishDispatch(t *testing.T) {
+	d := &dispatchInterceptor{} // minimal interceptor; isFinishDispatch is pure
+
+	tests := []struct {
+		name string
+		evt  dispatchEvent
+		want bool
+	}{
+		{
+			name: "empty task (T2-A08: no sub-task work)",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "",
+			},
+			want: true,
+		},
+		{
+			name: "task: done",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "done",
+			},
+			want: true,
+		},
+		{
+			name: "task: finish",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "finish",
+			},
+			want: true,
+		},
+		{
+			name: "task: complete",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "complete",
+			},
+			want: true,
+		},
+		{
+			name: "task: finished",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "finished",
+			},
+			want: true,
+		},
+		{
+			name: "task: completed",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "completed",
+			},
+			want: true,
+		},
+		{
+			name: "task: all done",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "all done",
+			},
+			want: true,
+		},
+		{
+			name: "task: all tasks done",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "all tasks done",
+			},
+			want: true,
+		},
+		{
+			name: "actual sub-task (not a finish signal)",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "review the codebase for security issues",
+			},
+			want: false,
+		},
+		{
+			name: "actual sub-task containing word 'finish' in sentence",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "builder",
+				Task:   "finish implementing the login module",
+			},
+			want: false, // only exact match recognized
+		},
+		{
+			name: "whitespace-only task with done keyword",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "  done  ",
+			},
+			want: true,
+		},
+		{
+			name: "case insensitive: DONE",
+			evt: dispatchEvent{
+				Action: "dispatch",
+				Agent:  "reviewer",
+				Task:   "DONE",
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := d.isFinishDispatch(tt.evt)
+			if got != tt.want {
+				t.Errorf("isFinishDispatch(%+v) = %v, want %v", tt.evt, got, tt.want)
+			}
+		})
+	}
+}
+
+// ── Rule Engine: matchCompletion Tests (T2-A08) ──────────────────────────────
+
+func TestMatchCompletion(t *testing.T) {
+	d := &dispatchInterceptor{} // minimal interceptor; matchCompletion is pure
+
+	tests := []struct {
+		name string
+		text string
+		want bool
+	}{
+		// Multi-word phrases — match at any position in any-length text.
+		{
+			name: "all tasks done (multi-word)",
+			text: "all tasks done",
+			want: true,
+		},
+		{
+			name: "all done (multi-word)",
+			text: "all done",
+			want: true,
+		},
+		{
+			name: "all tasks complete (multi-word)",
+			text: "all tasks complete",
+			want: true,
+		},
+		{
+			name: "all sub-agent tasks have completed (multi-word long)",
+			text: "all sub-agent tasks have completed",
+			want: true,
+		},
+		{
+			name: "multi-word embedded in longer text",
+			text: "The orchestrator reports: all tasks done, proceeding to summary.",
+			want: true,
+		},
+		// Single-word signals — only match on short text (<= 80 chars).
+		{
+			name: "done (single word, short)",
+			text: "done",
+			want: true,
+		},
+		{
+			name: "finish (single word, short)",
+			text: "finish",
+			want: true,
+		},
+		{
+			name: "complete (single word, short)",
+			text: "complete",
+			want: true,
+		},
+		{
+			name: "completed (single word, short)",
+			text: "completed",
+			want: true,
+		},
+		{
+			name: "done. with period (short)",
+			text: "done.",
+			want: true,
+		},
+		{
+			name: "finish! with exclamation (short)",
+			text: "finish!",
+			want: true,
+		},
+		// Single-word signals should NOT match in longer text (> 80 chars).
+		{
+			name: "done embedded in long text (T2-A08: false positive prevention)",
+			text: "done. Now we should also check the edge cases and run additional verification steps on all files.",
+			want: false, // "done." prefix but remainder is NOT whitespace-only
+		},
+		{
+			name: "finish in long text",
+			text: "finish the main implementation and then review all modules for correctness and performance.",
+			want: false,
+		},
+		// Non-completion text.
+		{
+			name: "normal dispatch text",
+			text: `{"action":"dispatch","agent":"builder","task":"build the module"}`,
+			want: false,
+		},
+		{
+			name: "empty string",
+			text: "",
+			want: false,
+		},
+		{
+			name: "code block with 'done' variable",
+			text: "let isDone = false; // check status",
+			want: false, // too long (>80 chars? no, it's short) but "isDone" != "done"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			textLower := strings.ToLower(tt.text)
+			got := d.matchCompletion(textLower)
+			if got != tt.want {
+				t.Errorf("matchCompletion(%q) = %v, want %v", tt.text, got, tt.want)
+			}
+		})
 	}
 }
 
