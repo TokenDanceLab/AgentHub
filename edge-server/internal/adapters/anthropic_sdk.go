@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -285,8 +286,11 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 
 	for attempt := 0; attempt <= anthropicMaxRetries; attempt++ {
 		if attempt > 0 {
-			// Exponential backoff: 1s, 2s, 4s
+			// Exponential backoff with jitter: 1s, 2s, 4s (±25%).
+			// Jitter prevents thundering herd when multiple sub-agents
+			// retry simultaneously after a provider-wide outage.
 			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
+			delay = delay + time.Duration(rand.Int63n(int64(delay/4)))
 			slog.Info("anthropic-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -290,16 +291,20 @@ func DecideRecovery(
 	}
 }
 
-// BackoffDuration calculates the exponential backoff wait time for a retry.
-// Uses the formula: base * 2^(retryCount-1), capped at 30 seconds.
+// BackoffDuration calculates the exponential backoff wait time for a retry
+// with jitter. Uses the formula: base * 2^(retryCount-1) + ±25% jitter,
+// capped at 30 seconds. Jitter prevents thundering herd when multiple
+// sub-agent retries fire simultaneously.
 func BackoffDuration(base time.Duration, retryCount int) time.Duration {
 	if base <= 0 {
 		base = 1 * time.Second
 	}
 	multiplier := math.Pow(2, float64(retryCount-1))
 	d := time.Duration(float64(base) * multiplier)
+	// Apply ±25% jitter before capping to avoid synchronized retry storms.
+	d = d + time.Duration(rand.Int63n(int64(d/4)))
 	if d > 30*time.Second {
-		return 30 * time.Second
+		d = 30 * time.Second
 	}
 	return d
 }
