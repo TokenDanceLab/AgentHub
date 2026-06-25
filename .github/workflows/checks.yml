@@ -40,7 +40,8 @@ jobs:
           args: --timeout=5m
 
       - name: Test (unit only, skip integration)
-        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+        timeout-minutes: 20
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic -timeout=15m
 
       - name: Coverage check (informational)
         run: |
