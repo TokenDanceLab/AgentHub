@@ -1798,10 +1798,13 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		delete(e.runToAgent, runID)
 		e.mu.Unlock()
 
-		// Cleanup on start failure: unregister the leaked agent instance,
-		// mark the run as failed so it does not pollute the store, and let
-		// the deferred cleanup release the reserved slot.
+		// Cleanup on start failure: unregister the agent instance,
+		// mark the run as failed, and release the reserved slot.
+		// Set slotReserved=false BEFORE Unregister to prevent the
+		// deferred DecrChildCount from double-decrementing.
+		// Unregister already decrements childrenCount internally.
 		if registered {
+			slotReserved = false
 			e.agentRegistry.Unregister(agentInstanceID)
 		}
 		_, _ = e.store.SetRunStatus(runID, "failed")
