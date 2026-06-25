@@ -165,7 +165,13 @@ func ccSwitchManaged() bool {
 }
 
 func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
-	prompt := ctx.Prompt
+	sanitizedPrompt, filtered := runnerctx.SanitizeMessage(runnerctx.Message{Role: "user", Content: ctx.Prompt})
+	if filtered {
+		slog.Warn("claude-code: sanitized prompt",
+			"originalLen", len(ctx.Prompt),
+		)
+	}
+	prompt := sanitizedPrompt.Content
 	if prompt == "" {
 		prompt = "Continue."
 	}
@@ -345,9 +351,22 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	// Strategy:
 	//   - cc-switch managed: don't inject anything, CC reads settings.json.
 	//     Injecting env vars would override settings.json and cause auth failures.
+	//     However, a nil Env inherits the parent's full os.Environ(), which could
+	//     leak ANTHROPIC_API_KEY etc. into the child and override settings.json.
+	//     Explicitly filter out auth-related vars so only settings.json is used.
 	//   - native/standalone: CC needs explicit auth credentials from OS env.
 	var env []string
-	if !ccSwitchManaged() {
+	if ccSwitchManaged() {
+		for _, e := range os.Environ() {
+			if strings.HasPrefix(e, "ANTHROPIC_API_KEY=") ||
+				strings.HasPrefix(e, "CLAUDE_API_KEY=") ||
+				strings.HasPrefix(e, "ANTHROPIC_AUTH_TOKEN=") ||
+				strings.HasPrefix(e, "ANTHROPIC_BASE_URL=") {
+				continue
+			}
+			env = append(env, e)
+		}
+	} else {
 		if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 			env = append(env, "ANTHROPIC_API_KEY="+key)
 		}
@@ -361,7 +380,6 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 			env = append(env, "ANTHROPIC_BASE_URL="+url)
 		}
 	}
-	// cc-switch managed: env stays empty → CC reads settings.json
 
 	return a.binaryPath, args, env, workDir
 }
