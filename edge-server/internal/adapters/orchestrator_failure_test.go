@@ -388,9 +388,12 @@ func TestBackoffDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := BackoffDuration(tt.base, tt.retryCount)
-			if got != tt.want {
-				t.Errorf("BackoffDuration(%v, %d) = %v, want %v",
-					tt.base, tt.retryCount, got, tt.want)
+			// With jitter, the result is in [want, want*1.25] (capped at 30s).
+			// Allow +1ms for floating point rounding.
+			maxWant := tt.want + tt.want/4 + 1*time.Millisecond
+			if got < tt.want || got > maxWant {
+				t.Errorf("BackoffDuration(%v, %d) = %v, want in [%v, %v]",
+					tt.base, tt.retryCount, got, tt.want, maxWant)
 			}
 		})
 	}
