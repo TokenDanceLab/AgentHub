@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -456,6 +457,21 @@ func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUser
 	return nil
 }
 
+// DissolveGroup permanently dissolves a group session. Only the group owner may
+// call this method.
+//
+// Dissolution is a two-phase operation:
+//
+//  1. The session is marked Dissolved=true immediately, making it unavailable to
+//     all members even if the subsequent cleanup step fails partially.
+//  2. Agent cleanup runs best-effort: every human member's invited agents have
+//     their pending tasks cancelled, agent instances deleted, and session
+//     member records soft-deleted via cleanupInvitedAgents. Individual agent
+//     failures are logged at Warn level and aggregated but never block or roll
+//     back the dissolution — the session stays dissolved regardless.
+//
+// On success the session members cache is invalidated and a "session.dissolved"
+// event is published to the event bus.
 func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessionID string) error {
 	session, err := s.getSession(ctx, sessionID)
 	if err != nil {
@@ -473,11 +489,42 @@ func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessi
 		return errcode.GroupNotOwner
 	}
 
+	// Mark the session dissolved first so it is immediately unavailable even if
+	// agent cleanup fails partially. Agent cleanup runs best-effort after.
 	session.Dissolved = true
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
+
+	// Collect all human members and clean up every invited agent in the session.
+	// Best-effort: log partial failures but do not block or roll back dissolution.
+	members, listErr := repository.ListActiveMembers(s.db, sessionID)
+	cleanupCount := 0
+	cleanupErrors := 0
+	if listErr != nil {
+		slog.Warn("dissolve group: failed to list active members, skipping agent cleanup",
+			"session_id", sessionID, "dissolved_by", currentUserID, "error", listErr)
+	} else {
+		for _, m := range members {
+			if m.MemberType != model.MemberTypeUser {
+				continue
+			}
+			if err := s.cleanupInvitedAgents(sessionID, m.MemberID); err != nil {
+				slog.Warn("dissolve group: cleanupInvitedAgents failed",
+					"session_id", sessionID, "inviter_user_id", m.MemberID,
+					"dissolved_by", currentUserID, "error", err)
+				cleanupErrors++
+			} else {
+				cleanupCount++
+			}
+		}
+	}
 	_ = resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+
+	slog.Info("dissolve group: session dissolved",
+		"session_id", sessionID, "dissolved_by", currentUserID,
+		"members_cleaned", cleanupCount, "cleanup_errors", cleanupErrors)
+
 	s.publishEvent(ctx, "session.dissolved", map[string]interface{}{
 		"session_id": sessionID,
 	})
@@ -623,17 +670,54 @@ func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMe
 	return repository.ListActiveMembers(s.db, sessionID)
 }
 
+// cleanupInvitedAgents cancels pending tasks, deletes agent instances, and soft-deletes
+// session member records for all agents a user invited into a session. It paginates
+// through agents (page size 100, max 10 pages = 1000 agents) and wraps the three
+// per-agent operations in a single DB transaction for atomicity.
+//
+// Errors from individual agents are logged at Warn level and aggregated. The caller
+// receives a joined error so it can decide whether to abort or proceed.
 func (s *SessionService) cleanupInvitedAgents(sessionID, inviterUserID string) error {
-	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, inviterUserID)
-	if err != nil {
-		return err
+	const pageSize = 100
+	const maxPages = 10 // safety bound: max 1000 agents per inviter per session
+	var allErrors []error
+
+	for page := 0; page < maxPages; page++ {
+		agents, err := repository.ListAgentInstancesByInviterPage(s.db, sessionID, inviterUserID, pageSize, page*pageSize)
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("list agents page %d: %w", page, err))
+			break
+		}
+		if len(agents) == 0 {
+			break
+		}
+
+		for _, agent := range agents {
+			// Cancel pending tasks for this agent instance.
+			if err := repository.CancelTasksByAgentInstance(s.db, agent.ID); err != nil {
+				slog.Warn("cleanupInvitedAgents: CancelTasksByAgentInstance failed",
+					"session_id", sessionID, "inviter_user_id", inviterUserID,
+					"agent_id", agent.ID, "error", err)
+				allErrors = append(allErrors, fmt.Errorf("cancel tasks for agent %s: %w", agent.ID, err))
+				// Continue with other operations even if cancel fails — the agent
+				// instance and member record should still be cleaned up.
+			}
+			if err := repository.DeleteAgentInstance(s.db, agent.ID); err != nil {
+				slog.Warn("cleanupInvitedAgents: DeleteAgentInstance failed",
+					"session_id", sessionID, "inviter_user_id", inviterUserID,
+					"agent_id", agent.ID, "error", err)
+				allErrors = append(allErrors, fmt.Errorf("delete agent %s: %w", agent.ID, err))
+			}
+			if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID); err != nil {
+				slog.Warn("cleanupInvitedAgents: SoftDeleteMember failed",
+					"session_id", sessionID, "inviter_user_id", inviterUserID,
+					"agent_id", agent.ID, "error", err)
+				allErrors = append(allErrors, fmt.Errorf("soft delete member for agent %s: %w", agent.ID, err))
+			}
+		}
 	}
-	for _, agent := range agents {
-		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
-		_ = repository.DeleteAgentInstance(s.db, agent.ID)
-		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
-	}
-	return nil
+
+	return errors.Join(allErrors...)
 }
 
 func (s *SessionService) publishEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
