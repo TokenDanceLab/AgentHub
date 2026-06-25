@@ -600,7 +600,19 @@ func formatAgentList(agents []string) string {
 // result/error messages. When a result arrives, it emits status updates, injects
 // the result/error as a text block into the orchestrator's stream, and emits an
 // aggregate progress summary. Exits when the context is cancelled.
+//
+// INVARIANT: failureRecovery.RecordCircuitSuccess is only reachable through this
+// listener (via handleSubAgentResult), which requires d.queue != nil. If the
+// FailureRecoveryManager is created without a message queue, circuit breakers
+// will never be reset on success and agents may become permanently tripped.
 func (d *dispatchInterceptor) runResultListener(ctx context.Context) {
+	// Guard: circuit breaker success recording is gated on the message queue path.
+	// If failureRecovery exists but the queue doesn't, successes won't reset
+	// circuit breakers — log a warning to surface this configuration gap.
+	if d.failureRecovery != nil && d.queue == nil {
+		slog.Warn("orchestrator: FailureRecoveryManager created without message queue; circuit breakers will never be reset on success")
+		return
+	}
 	ch := d.queue.Receive(d.parentRun.ID)
 	if ch == nil {
 		return
@@ -721,6 +733,17 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 		case DecisionFail:
 			// Fall through to the normal error injection below.
 		}
+	}
+
+	// Record success on the circuit breaker for non-error sub-agent completions.
+	// Use agentName (stable across dispatches) as the circuit breaker key,
+	// falling back to agentID if agentName is empty.
+	if !isError && d.failureRecovery != nil {
+		cbKey := agentName
+		if cbKey == "" {
+			cbKey = agentID
+		}
+		d.failureRecovery.RecordCircuitSuccess(cbKey)
 	}
 
 	// Build the injected message following OpenCode's XML task result injection pattern.
