@@ -11,7 +11,7 @@ import (
 
 func TestSanitizedEnvReturnsMinimalSet(t *testing.T) {
 	parentCount := len(os.Environ())
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 
 	// Sanitized output should be substantially smaller than the full parent env.
 	if len(env) >= parentCount {
@@ -23,7 +23,7 @@ func TestSanitizedEnvIncludesWhitelistedVars(t *testing.T) {
 	// Set a known whitelisted var so we can detect it.
 	t.Setenv("LANG", "en_US.UTF-8")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	whitelisted := []string{"PATH", "HOME", "USER", "LANG"}
@@ -44,7 +44,7 @@ func TestSanitizedEnvExcludesSensitiveVars(t *testing.T) {
 	t.Setenv("DB_PASSWORD", "secret-456")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-secret")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	sensitive := []string{"MY_API_KEY", "DB_PASSWORD", "ANTHROPIC_API_KEY"}
@@ -59,7 +59,7 @@ func TestSanitizedEnvExcludesGitConfigPathVars(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", "/tmp/gitconfig-with-credential-helper")
 	t.Setenv("GIT_CONFIG_SYSTEM", "/tmp/system-gitconfig-with-url-rewrite")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} {
@@ -75,7 +75,7 @@ func TestSanitizedEnvIncludesExtraEnv(t *testing.T) {
 		"OPENAI_API_KEY=sk-test-key",
 		"CUSTOM_CONFIG_PATH=/opt/myapp/config",
 	}
-	env := SanitizedEnv(nil, extra)
+	env, _ := SanitizedEnv(nil, extra)
 	envMap := envToMap(env)
 
 	want := map[string]string{
@@ -101,7 +101,7 @@ func TestSanitizedEnvIncludesNonSensitiveAgentHubVars(t *testing.T) {
 	// should NOT pass through from the parent environment.
 	t.Setenv("AGENTHUB_CUSTOM_SETTING", "custom-value")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	// Explicitly approved inherited AGENTHUB_* vars pass through.
@@ -126,7 +126,7 @@ func TestSanitizedEnvExcludesSensitiveAgentHubVars(t *testing.T) {
 	t.Setenv("AGENTHUB_DB_PASSWORD", "db-password")
 	t.Setenv("AGENTHUB_PASSWORD", "password")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	if got := envMap["AGENTHUB_RUN_ID"]; got != "run_test" {
@@ -155,7 +155,7 @@ func TestSanitizedEnvRespectsExplicitProfileEnv(t *testing.T) {
 	}
 	extraEnv := []string{"EXTRA_VAR=world"}
 
-	env := SanitizedEnv(profileEnv, extraEnv)
+	env, _ := SanitizedEnv(profileEnv, extraEnv)
 	envMap := envToMap(env)
 
 	if envMap["CUSTOM_VAR"] != "hello" {
@@ -174,7 +174,7 @@ func TestSanitizedEnvIncludesWindowsSpecificVars(t *testing.T) {
 		t.Skip("windows-specific test")
 	}
 	// On Windows, SystemRoot, TEMP, USERPROFILE must be present.
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	wantVars := map[string]bool{"systemroot": true, "temp": true, "userprofile": true}
@@ -188,7 +188,115 @@ func TestSanitizedEnvIncludesWindowsSpecificVars(t *testing.T) {
 	}
 }
 
-// TestEnvAllowlist is the acceptance test for AH-SR-047: Edge scoped env allowlist.
+// TestEnvFilterAudit_KnownMixCounts verifies that EnvFilterAudit counts correctly
+// reflect a known mix of sensitive, whitelisted, and unknown env vars. It also
+// validates that the sanitized output includes only whitelisted vars from the
+// known set and that FilteredKeys contains only key names, never values.
+func TestEnvFilterAudit_KnownMixCounts(t *testing.T) {
+	// ── Set a known mix of env vars ──
+
+	// Sensitive (should be filtered as SensitiveVars)
+	sensitiveVars := []string{
+		"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN",
+		"JWT_SECRET", "DATABASE_URL", "KUBECONFIG",
+		"MY_PRIVATE_KEY", "DB_PASSWORD",
+	}
+	for _, k := range sensitiveVars {
+		t.Setenv(k, "secret-placeholder-value")
+	}
+
+	// Whitelisted (should pass through)
+	whitelistedVars := []string{
+		"LANG", "EDITOR", "GOPATH", "SSH_AUTH_SOCK",
+		"NO_COLOR", "PWD", "CARGO_HOME",
+	}
+	for _, k := range whitelistedVars {
+		t.Setenv(k, "known-value")
+	}
+
+	// Unknown / not whitelisted (should be filtered as NotWhitelisted)
+	unknownVars := []string{
+		"MY_CUSTOM_VAR", "RANDOM_APP_SETTING",
+		"UNDEFINED_TOOL_CONFIG", "SOME_INTERNAL_FLAG",
+		"LOCAL_DEV_MODE",
+	}
+	for _, k := range unknownVars {
+		t.Setenv(k, "some-value")
+	}
+
+	// ── Sanitize ──
+
+	env, audit := SanitizedEnv(nil, nil)
+	envMap := envToMap(env)
+
+	// ── Verify audit counts (lower bounds — parent env has its own vars too) ──
+
+	if audit.SensitiveVars < len(sensitiveVars) {
+		t.Errorf("SensitiveVars = %d, want >= %d", audit.SensitiveVars, len(sensitiveVars))
+	}
+	if audit.NotWhitelisted < len(unknownVars) {
+		t.Errorf("NotWhitelisted = %d, want >= %d", audit.NotWhitelisted, len(unknownVars))
+	}
+	if audit.PassedVars < len(whitelistedVars) {
+		t.Errorf("PassedVars = %d, want >= %d", audit.PassedVars, len(whitelistedVars))
+	}
+	if audit.TotalVars < len(sensitiveVars)+len(whitelistedVars)+len(unknownVars) {
+		t.Errorf("TotalVars = %d, want >= %d", audit.TotalVars,
+			len(sensitiveVars)+len(whitelistedVars)+len(unknownVars))
+	}
+
+	// Invariant: TotalVars == SensitiveVars + NotWhitelisted + PassedVars
+	expectedPassed := audit.TotalVars - audit.SensitiveVars - audit.NotWhitelisted
+	if audit.PassedVars != expectedPassed {
+		t.Errorf("PassedVars = %d, want %d (total=%d - sensitive=%d - not_whitelisted=%d)",
+			audit.PassedVars, expectedPassed, audit.TotalVars, audit.SensitiveVars, audit.NotWhitelisted)
+	}
+
+	// ── Verify output env: whitelisted vars present, sensitive + unknown absent ──
+
+	for _, k := range whitelistedVars {
+		if _, ok := envMap[k]; !ok {
+			t.Errorf("whitelisted var %q not found in sanitized env (should pass through)", k)
+		}
+	}
+	for _, k := range sensitiveVars {
+		if _, ok := envMap[k]; ok {
+			t.Errorf("sensitive var %q leaked into sanitized env", k)
+		}
+	}
+	for _, k := range unknownVars {
+		if _, ok := envMap[k]; ok {
+			t.Errorf("unknown/not-whitelisted var %q leaked into sanitized env", k)
+		}
+	}
+
+	// ── Verify FilteredKeys: contains expected keys by name, never values ──
+
+	expectedFiltered := make(map[string]bool)
+	for _, k := range sensitiveVars {
+		expectedFiltered[k] = false
+	}
+	for _, k := range unknownVars {
+		expectedFiltered[k] = false
+	}
+	for _, key := range audit.FilteredKeys {
+		if _, expected := expectedFiltered[key]; expected {
+			expectedFiltered[key] = true
+		}
+		// Guard: FilteredKeys must never contain value data.
+		if strings.Contains(key, "=") {
+			t.Errorf("FilteredKeys contains value data (has '='): %q", key)
+		}
+		if strings.Contains(key, "secret") || strings.Contains(key, "placeholder") {
+			t.Errorf("FilteredKeys appears to contain a value, not a key name: %q", key)
+		}
+	}
+	for key, found := range expectedFiltered {
+		if !found {
+			t.Errorf("FilteredKeys missing expected key %q", key)
+		}
+	}
+}
 // It validates that:
 //   1. Only explicitly approved AGENTHUB_* vars pass through from inherited env.
 //   2. Non-allowlisted AGENTHUB_* vars are blocked from inherited env.
@@ -201,7 +309,7 @@ func TestEnvAllowlist(t *testing.T) {
 		t.Setenv("AGENTHUB_PROJECT_ID", "inherited-proj-456")
 		t.Setenv("AGENTHUB_THREAD_ID", "inherited-thread-789")
 
-		env := SanitizedEnv(nil, nil)
+		env, _ := SanitizedEnv(nil, nil)
 		envMap := envToMap(env)
 
 		allowed := []string{"AGENTHUB_RUN_ID", "AGENTHUB_PROJECT_ID", "AGENTHUB_THREAD_ID"}
@@ -220,7 +328,7 @@ func TestEnvAllowlist(t *testing.T) {
 		t.Setenv("AGENTHUB_ADMIN_TOKEN", "admin-secret-token")
 		t.Setenv("AGENTHUB_CUSTOM_SETTING", "some-value")
 
-		env := SanitizedEnv(nil, nil)
+		env, _ := SanitizedEnv(nil, nil)
 		envMap := envToMap(env)
 
 		blocked := []string{
@@ -247,7 +355,7 @@ func TestEnvAllowlist(t *testing.T) {
 		t.Setenv("AGENTHUB_ENCRYPTION_KEY", "enc-key")
 		t.Setenv("AGENTHUB_SECRET", "some-secret")
 
-		env := SanitizedEnv(nil, nil)
+		env, _ := SanitizedEnv(nil, nil)
 		envMap := envToMap(env)
 
 		sensitive := []string{
@@ -280,7 +388,7 @@ func TestEnvAllowlist(t *testing.T) {
 			"AGENTHUB_CUSTOM_SETTING=custom-value",
 		}
 
-		env := SanitizedEnv(profileEnv, nil)
+		env, _ := SanitizedEnv(profileEnv, nil)
 		envMap := envToMap(env)
 
 		// Profile env vars pass through verbatim because the administrator
@@ -325,7 +433,7 @@ func TestEnvAllowlist(t *testing.T) {
 			"AGENTHUB_PROJECT_ID=extra-proj-456",
 			"AGENTHUB_CUSTOM_SETTING=extra-custom",
 		}
-		env := SanitizedEnv(nil, extraEnv)
+		env, _ := SanitizedEnv(nil, extraEnv)
 		envMap := envToMap(env)
 
 		for _, kv := range extraEnv {
@@ -347,7 +455,7 @@ func TestEnvAllowlist(t *testing.T) {
 		t.Setenv("ANTHROPIC_API_KEY", "sk-ant-secret")
 		t.Setenv("GITHUB_TOKEN", "ghp-secret")
 
-		env := SanitizedEnv(nil, nil)
+		env, _ := SanitizedEnv(nil, nil)
 		envMap := envToMap(env)
 
 		blocked := []string{
