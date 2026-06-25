@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -235,8 +236,13 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 				Name:        toolName,
 				Description: "Tool: " + toolName,
 				InputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
+					"type": "object",
+					"properties": map[string]any{
+						"query": map[string]any{
+							"type":        "string",
+							"description": "Input for tool: " + toolName,
+						},
+					},
 				},
 			})
 		}
@@ -361,7 +367,14 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 
 	// Add thread history messages if present
 	for _, msg := range ctx.Messages {
-		role := msg.Role
+		sanitized, filtered := runnerctx.SanitizeMessage(msg)
+		if filtered {
+			slog.Warn("anthropic-sdk: sanitized message",
+				"role", msg.Role,
+				"originalLen", len(msg.Content),
+			)
+		}
+		role := sanitized.Role
 		if role == "system" {
 			continue // system messages go in the system field
 		}
@@ -372,7 +385,7 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 		}
 		messages = append(messages, anthropicMessage{
 			Role:    role,
-			Content: msg.Content,
+			Content: sanitized.Content,
 		})
 	}
 
@@ -381,9 +394,15 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 	if prompt == "" {
 		prompt = "Continue."
 	}
+	sanitizedPrompt, filtered := runnerctx.SanitizeMessage(runnerctx.Message{Role: "user", Content: prompt})
+	if filtered {
+		slog.Warn("anthropic-sdk: sanitized prompt",
+			"originalLen", len(prompt),
+		)
+	}
 	messages = append(messages, anthropicMessage{
 		Role:    "user",
-		Content: prompt,
+		Content: sanitizedPrompt.Content,
 	})
 
 	return messages
