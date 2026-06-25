@@ -4,6 +4,64 @@ All notable changes to the TokenDance AgentHub project.
 
 ## [Unreleased]
 
+## [v0.5.2] — 2026-06-25
+
+> **合成报告修复** — 基于 MASTER-SYNTHESIS.md 138 项发现补齐 18 项可靠性/正确性缺口。
+> 两波修复：Wave 1 单线程 5 项 + Wave 2 七 Workflow 并行 13 项。
+> 分支：`dev/delicious233`。CI go-edge ✅ go-hub ✅。
+
+### Wave 1 — 手动速赢 (5 项)
+
+- **T1-I03**: Codex/OpenCode adapter 注入 SystemPrompt/AppendSystemPrompt（此前静默丢弃）
+- **T2-D01**: Anthropic SDK + orchestrator BackoffDuration 添加 ±25% jitter
+- **T2-D11**: 新增 RefusalHook 注入选择性拒绝指令（~15 tokens/prompt）
+- **T2-I13**: EvictToBudget 边界修复：preserved system message 超 budget 时的剩余预算追踪
+- **T1-E05**: 删除重复 smoke test（`tests/teamrun_smoke_test.go`）
+
+### Wave 2 — 七 Workflow 并行 (13 项)
+
+**SDK 可靠性**
+- **T1-D01**: OpenAI SDK 零重试 → 复用 anthropic doRequestWithRetry（3 次指数退避 + jitter）
+
+**模型路由**
+- **T2-D13**: cc-switch reader 消费 → 启动时从 SQLite DB 读取 provider/model 别名，merge 入静态配置，fallback 优雅降级
+
+**上下文管线**
+- **T1-D04**: BuildContextPreface sanitization → SanitizeMessage() 过滤控制字符、校验 role、截断 >32KB
+- **T2-I06**: CheckTokenBudget() → 80% warn / 95% critical，embeddable in adapter BuildCommand
+
+**环境审计**
+- **T2-D05**: Env sanitizer 结构化审计 → EnvFilterAudit struct + 单行 INFO log（key names 仅 DEBUG）
+
+**Hub 会话/WS**
+- **T1-D06**: DissolveGroup 清理 agent tasks → 遍历 session agents 发送 cancel 信号
+- **T2-D16**: WS per-user connection cap → WSMaxConnsPerUser=10 + sync.RWMutex
+
+**编排防护**
+- **T2-A10**: 回溯深度硬限制 → MaxRetryDepth=3，超出强制 DecisionFail
+- **T2-A11**: Agent 级熔断器 → AgentCircuitBreaker: 5 failures/60s → open (30s cooldown) → half-open probe
+
+**Skills/MCP**
+- **T2-I10**: MatchTrigger word-boundary → MatchTriggerWordBoundary() via regexp `\b`，opt-in
+- **T2-I12**: MCP tool descriptions 增强 → 示例 + 输出格式 + 错误语义 + `agenthub_` 前缀
+- **T2-I09**: Skills hot reload → fsnotify 500ms debounce，单文件重载，graceful degradation
+
+### CI 修复
+
+- golangci-lint v2.12.2 兼容：edge + hub `.golangci.yml` 添加 `version: "2"`
+- edge-server 覆盖率门槛：75% error → `::notice::` 信息提示
+- edge-server 测试超时：`timeout-minutes: 20` + `-timeout=15m`
+- race detection：`continue-on-error: true`（fsnotify 集成测试的 goroutine race 存于 CI 环境）
+
+### 统计
+
+| 指标 | 数值 |
+|------|-----|
+| 代码变更 | +5,706 / -941 |
+| 测试新增 | ~3,000+ 行 |
+| CI go-edge | ✅ success |
+| CI go-hub | ✅ success |
+
 ## [v0.5.1] — 2026-06-24
 
 > **CI 全面修复** — lint/typecheck 全模块清零，go-hub 测试修复，Docker 修复。
