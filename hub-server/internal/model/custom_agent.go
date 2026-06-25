@@ -25,7 +25,7 @@ type CustomAgent struct {
 	SystemPrompt   string     `gorm:"type:text;not null" json:"system_prompt"`
 	CapabilityTags string     `gorm:"type:jsonb;default:'[]'" json:"capability_tags,omitempty"`
 	ToolWhitelist  string     `gorm:"type:jsonb;default:'[]'" json:"tool_whitelist,omitempty"`
-	ModelParams    string          `gorm:"type:jsonb;default:'[]'" json:"model_params,omitempty"`
+	ModelParams    string          `gorm:"type:jsonb;default:'{}'" json:"model_params,omitempty"`
 	OutputSchema   *json.RawMessage `gorm:"type:jsonb" json:"output_schema,omitempty"`
 	DeletedAt      *time.Time      `gorm:"type:timestamptz" json:"deleted_at,omitempty"`
 	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`

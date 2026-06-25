@@ -479,6 +479,7 @@ func ClassifyFailure(err error, runErr *RunError) (FailureCategory, string) {
 type RunError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 // ── Recovery Decision ────────────────────────────────────────────────────────
@@ -712,12 +713,6 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 	// Step 1: Classify.
 	category, reason := ClassifyFailure(err, runErr)
 
-	// T2-A09: Reflexion — generate a structured critique prompt that the
-	// orchestrator can inject before retrying the sub-agent. This turns a
-	// blind retry into a learning opportunity by asking the orchestrator to
-	// analyze the failure and propose a different strategy.
-	critique := BuildReflexionCritique(agentName, taskID, category, reason, err)
-
 	// Step 2: Get or create recovery state (hold lock across DecideRecovery
 	// to prevent TOCTOU race — a concurrent HandleSubAgentFailure for the same
 	// agentID could modify the state between our read and write-back).
@@ -741,6 +736,10 @@ func (m *FailureRecoveryManager) HandleSubAgentFailure(
 		m.totalDepth++
 	}
 	m.stateMu.Unlock()
+
+	// T2-A09: Reflexion — build the critique after the depth check so
+	// computation is not wasted when MaxRetryDepth rejects the attempt.
+	critique := BuildReflexionCritique(agentName, taskID, category, reason, err)
 
 	slog.Info("orchestrator: sub-agent failure classified",
 		"runId", parentRun.ID,
