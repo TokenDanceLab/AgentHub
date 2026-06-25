@@ -34,7 +34,17 @@ func ListAgentInstancesBySession(db *gorm.DB, sessionID string) ([]model.AgentIn
 
 func ListAgentInstancesByInviter(db *gorm.DB, sessionID, inviterID string) ([]model.AgentInstance, error) {
 	var agents []model.AgentInstance
-	err := db.Where("session_id = ? AND inviter_user_id = ?", sessionID, inviterID).Limit(100).Find(&agents).Error
+	err := db.Where("session_id = ? AND inviter_user_id = ?", sessionID, inviterID).Find(&agents).Error
+	return agents, err
+}
+
+// ListAgentInstancesByInviterPage is the paginated variant of ListAgentInstancesByInviter.
+// It returns up to `limit` rows starting at `offset`. Used by cleanup loops that must
+// process all agents even when a single inviter added more than the default page size.
+func ListAgentInstancesByInviterPage(db *gorm.DB, sessionID, inviterID string, limit, offset int) ([]model.AgentInstance, error) {
+	var agents []model.AgentInstance
+	err := db.Where("session_id = ? AND inviter_user_id = ?", sessionID, inviterID).
+		Limit(limit).Offset(offset).Find(&agents).Error
 	return agents, err
 }
 

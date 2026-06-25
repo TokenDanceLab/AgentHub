@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/require"
 )
@@ -670,7 +671,8 @@ func TestManagerConcurrentRegisterUnregister(t *testing.T) {
 }
 
 // TestManagerConcurrentSetAuth verifies that concurrent SetAuth calls on
-// different connections do not race.
+// different connections do not race, and that connections exceeding the
+// per-user cap are properly unregistered instead of becoming zombies.
 func TestManagerConcurrentSetAuth(t *testing.T) {
 	m := NewManager()
 
@@ -692,8 +694,9 @@ func TestManagerConcurrentSetAuth(t *testing.T) {
 	}
 	wg.Wait()
 
-	// All connections should still be accessible
-	require.Equal(t, numConns, m.Count())
+	// Only WSMaxConnsPerUser (10) connections should remain. The connections
+	// that exceeded the cap are closed and unregistered to avoid zombies.
+	require.Equal(t, config.WSMaxConnsPerUser, m.Count())
 }
 
 // TestManagerConcurrentPushToConn verifies that concurrent PushToConn calls
@@ -765,4 +768,32 @@ func TestManagerConcurrentCount(t *testing.T) {
 	count := m.Count()
 	require.GreaterOrEqual(t, count, 0)
 	require.LessOrEqual(t, count, 75)
+}
+
+// TestRegister_ExceedsPerUserCap verifies that Register rejects a connection
+// when the user already has WSMaxConnsPerUser active connections.
+func TestRegister_ExceedsPerUserCap(t *testing.T) {
+	m := NewManager()
+	const testUser = "user-cap"
+
+	// Register WSMaxConnsPerUser connections with UserID pre-set.
+	for i := 0; i < config.WSMaxConnsPerUser; i++ {
+		c := &Conn{
+			UserID: testUser,
+			Send:   make(chan []byte, 4),
+		}
+		require.NoError(t, m.Register(c))
+	}
+	require.Equal(t, config.WSMaxConnsPerUser, m.Count())
+
+	// The next connection for the same user must be rejected.
+	excess := &Conn{
+		UserID: testUser,
+		Send:   make(chan []byte, 4),
+	}
+	err := m.Register(excess)
+	require.ErrorIs(t, err, ErrPerUserCapReached)
+
+	// Count must not have increased.
+	require.Equal(t, config.WSMaxConnsPerUser, m.Count())
 }
