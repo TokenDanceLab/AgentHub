@@ -7,22 +7,73 @@ import (
 	"strings"
 )
 
+// EnvFilterAudit records the results of an environment variable filtering pass.
+// It is returned by SanitizedEnv so callers can log structured summaries and,
+// at DEBUG level, inspect which specific keys were filtered.
+//
+// FilteredKeys contains key names only — values are NEVER captured.
+//
+// # Structured Log Format
+//
+// sanitizeParentEnv emits a single structured INFO log with these keys:
+//
+//	"total"           — total env vars processed (parent + extra), maps to TotalVars
+//	"passed"          — vars that passed through (whitelisted + extra), maps to PassedVars
+//	"sensitive"       — vars blocked by IsSensitiveEnvKey, maps to SensitiveVars
+//	"not_whitelisted" — vars blocked because not in the approved whitelist, maps to NotWhitelisted
+//
+// At DEBUG level, an additional log is emitted:
+//
+//	"filteredKeys" — []string of key names that were filtered (keys only, never values)
+//
+// The INFO log is always emitted (even when zero vars are filtered) so operators
+// can confirm filtering is active. The DEBUG log is suppressed at default log
+// levels to avoid leaking key names into production logs.
+//
+// Callers (e.g., envForRun in process_executor.go) may also emit run-scoped audit
+// logs using the same field names when SensitiveVars > 0 or NotWhitelisted > 0,
+// adding a "runId" key for correlation.
+type EnvFilterAudit struct {
+	TotalVars      int      // total env vars processed (parent + extra)
+	PassedVars     int      // passed through whitelist + extra env
+	SensitiveVars  int      // blocked as sensitive (key pattern match)
+	NotWhitelisted int      // blocked as not in whitelist
+	FilteredKeys   []string // filtered key names (for DEBUG only, never contains values)
+}
+
 // SanitizedEnv returns a minimal environment for running agent CLI processes.
 // It does NOT inherit the full parent OS environment — only explicitly whitelisted
 // variables and explicitly provided extra env vars are passed through.
 //
 // When profileEnv is non-nil, it is used as-is (the caller has explicitly
 // configured the environment). When nil, the parent environment is filtered
-// to a safe subset.
+// to a safe subset via sanitizeParentEnv.
 //
 // extraEnv contains additional KEY=VALUE pairs to append (e.g., AgentHub
-// runtime vars like AGENTHUB_RUN_ID).
-func SanitizedEnv(profileEnv, extraEnv []string) []string {
+// runtime vars like AGENTHUB_RUN_ID). These always pass through unconditionally
+// — they are appended after filtering, never inspected by IsSensitiveEnvKey or
+// isWhitelistedEnvKey.
+//
+// # Structured Logging Side Effects
+//
+// When profileEnv is nil, sanitizeParentEnv emits structured logs:
+//   - INFO: "env filtered for agent process" with keys total/passed/sensitive/not_whitelisted
+//   - DEBUG: "env filtered keys" with key filteredKeys (key names only, never values)
+//
+// When profileEnv is non-nil, the caller (envForRun) is responsible for logging
+// warnings about sensitive-looking keys in the explicitly configured environment.
+//
+// The returned EnvFilterAudit provides structured counts of the filtering
+// pass for further logging and reporting by callers.
+func SanitizedEnv(profileEnv, extraEnv []string) ([]string, EnvFilterAudit) {
 	if profileEnv != nil {
 		env := make([]string, 0, len(profileEnv)+len(extraEnv))
 		env = append(env, profileEnv...)
 		env = append(env, extraEnv...)
-		return env
+		return env, EnvFilterAudit{
+			TotalVars:  len(env),
+			PassedVars: len(env),
+		}
 	}
 	return sanitizeParentEnv(extraEnv)
 }
@@ -257,20 +308,66 @@ func isSafeInheritedAgentHubEnvKey(upperKey string) bool {
 	return false
 }
 
-// sanitizeParentEnv filters os.Environ() to safe variables and appends extraEnv.
-func sanitizeParentEnv(extraEnv []string) []string {
+// sanitizeParentEnv filters os.Environ() to safe variables, appends extraEnv,
+// and returns a structured audit of the filtering pass.
+//
+// Filtering order for each parent env var:
+//  1. IsSensitiveEnvKey(key) → counted as SensitiveVars, appended to FilteredKeys
+//  2. isWhitelistedEnvKey(key) → counted as PassedVars, included in output
+//  3. Otherwise → counted as NotWhitelisted, appended to FilteredKeys
+//
+// ExtraEnv vars are appended after filtering and are never subject to
+// IsSensitiveEnvKey or isWhitelistedEnvKey checks — they always pass through.
+//
+// Structured logs emitted (via slog):
+//
+//	INFO  "env filtered for agent process"
+//	      total=N, passed=N, sensitive=N, not_whitelisted=N
+//	DEBUG "env filtered keys"
+//	      filteredKeys=["KEY_NAME", ...]
+//
+// Key names (total, passed, sensitive, not_whitelisted, filteredKeys) are a
+// stable contract — monitoring dashboards and alert rules may depend on them.
+// Values are NEVER logged. The DEBUG log is suppressed at default log levels.
+func sanitizeParentEnv(extraEnv []string) ([]string, EnvFilterAudit) {
+	var audit EnvFilterAudit
 	var env []string
+
 	for _, kv := range os.Environ() {
 		key, _, found := strings.Cut(kv, "=")
 		if !found {
 			continue
 		}
+		audit.TotalVars++
 		if IsSensitiveEnvKey(key) {
-			slog.Debug("sensitive env var filtered from agent process", "key", key)
+			audit.SensitiveVars++
+			audit.FilteredKeys = append(audit.FilteredKeys, key)
 		} else if isWhitelistedEnvKey(key) {
+			audit.PassedVars++
 			env = append(env, kv)
+		} else {
+			audit.NotWhitelisted++
+			audit.FilteredKeys = append(audit.FilteredKeys, key)
 		}
 	}
+
+	// Append extraEnv unconditionally — caller-provided vars always pass through.
 	env = append(env, extraEnv...)
-	return env
+	audit.TotalVars += len(extraEnv)
+	audit.PassedVars += len(extraEnv)
+
+	// Emit single structured INFO log — parseable, one line per filtering pass.
+	slog.Info("env filtered for agent process",
+		"total", audit.TotalVars,
+		"passed", audit.PassedVars,
+		"sensitive", audit.SensitiveVars,
+		"not_whitelisted", audit.NotWhitelisted,
+	)
+
+	// At DEBUG level, log the actual filtered key names (keys only, NEVER values).
+	if len(audit.FilteredKeys) > 0 {
+		slog.Debug("env filtered keys", "filteredKeys", audit.FilteredKeys)
+	}
+
+	return env, audit
 }

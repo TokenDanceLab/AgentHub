@@ -37,7 +37,7 @@ func TestSanitizedEnv_Behavior_NilProfileEnv_FiltersAllButWhitelist(t *testing.T
 	t.Setenv("NONEXISTENT_VAR", "some-value")
 	t.Setenv("RANDOM_DEBUG_FLAG", "1")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	// Whitelisted vars must pass through.
@@ -86,7 +86,7 @@ func TestSanitizedEnv_Behavior_ProfileEnv_BypassesFilteringEntirely(t *testing.T
 		"AGENTHUB_PROJECT_ID=proj-001",
 	}
 
-	env := SanitizedEnv(profileEnv, extraEnv)
+	env, _ := SanitizedEnv(profileEnv, extraEnv)
 	envMap := envToMap(env)
 
 	// Profile env vars pass through exactly as provided — no filtering applied.
@@ -132,7 +132,7 @@ func TestSanitizedEnv_Behavior_ProfileEnv_DoesNotConsultParentAtAll(t *testing.T
 		"ONLY_IN_PROFILE=yes",
 	}
 
-	env := SanitizedEnv(profileEnv, []string{"EXTRA=from-extra"})
+	env, _ := SanitizedEnv(profileEnv, []string{"EXTRA=from-extra"})
 	envMap := envToMap(env)
 
 	// Profile PATH overrides — parent PATH not consulted.
@@ -192,7 +192,7 @@ func TestSanitizedEnv_Behavior_SensitivePatterns_TOKEN_KEY_SECRET_PASSWORD(t *te
 		t.Setenv(k, v)
 	}
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for k := range sensitiveVars {
@@ -220,7 +220,7 @@ func TestSanitizedEnv_Behavior_AgentHubVars_OnlyRunProjectThreadAllowed(t *testi
 	t.Setenv("AGENTHUB_ENCRYPTION_KEY", "enc-key")
 	t.Setenv("AGENTHUB_SIGNING_KEY", "sign-key")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	// The three allowed vars pass through.
@@ -273,7 +273,7 @@ func TestSanitizedEnv_Behavior_ExtraEnv_AlwaysAppended(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-parent")
 	t.Setenv("CUSTOM_CONFIG_PATH", "/from/parent")
 
-	env := SanitizedEnv(nil, extraEnv)
+	env, _ := SanitizedEnv(nil, extraEnv)
 	envMap := envToMap(env)
 
 	// Every extra env var appears in the output with its value.
@@ -301,7 +301,7 @@ func TestSanitizedEnv_Behavior_EmptyProfileEnv_DoesNotBypass(t *testing.T) {
 
 	emptyProfile := []string{} // non-nil, zero length
 
-	env := SanitizedEnv(emptyProfile, []string{"EXTRA=value"})
+	env, _ := SanitizedEnv(emptyProfile, []string{"EXTRA=value"})
 	envMap := envToMap(env)
 
 	// Parent vars are excluded (profileEnv is non-nil, so no parent filtering).
@@ -330,7 +330,7 @@ func TestSanitizedEnv_Behavior_WhitelistedXDGVars_PassThrough(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "/home/user/.local/state")
 	t.Setenv("PATH", "/usr/bin") // ensure we aren't in empty state
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
@@ -353,7 +353,7 @@ func TestSanitizedEnv_Behavior_CommonDevToolVars_PassThrough(t *testing.T) {
 	t.Setenv("RUSTUP_HOME", "/home/user/.rustup")
 	t.Setenv("PATH", "/usr/bin") // ensure whitelist includes at least PATH
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
@@ -376,7 +376,7 @@ func TestSanitizedEnv_Behavior_GitConfigPathVars_Blocked(t *testing.T) {
 	t.Setenv("GIT_AUTHOR_EMAIL", "author@example.com")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	// Git config path vars blocked.
@@ -405,7 +405,7 @@ func TestSanitizedEnv_Behavior_ProxyVars_PassThrough(t *testing.T) {
 	t.Setenv("ALL_PROXY", "http://proxy:8080")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
@@ -431,7 +431,7 @@ func TestSanitizedEnv_Behavior_LowercaseProxyVars_PassThrough(t *testing.T) {
 	t.Setenv("no_proxy", "localhost,127.0.0.1")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
@@ -487,7 +487,7 @@ func TestSanitizedEnv_Behavior_ExactSecretVars_Blocked(t *testing.T) {
 
 	t.Setenv("PATH", "/usr/bin") // ensure we're not in empty state
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for k := range exactSecrets {
@@ -519,7 +519,7 @@ func TestSanitizedEnv_Behavior_CaseInsensitive_SensitiveDetection(t *testing.T) 
 
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for k := range sensitiveVars {
@@ -555,7 +555,7 @@ func TestSanitizedEnv_Behavior_LocaleVars_PassThrough(t *testing.T) {
 	t.Setenv("LC_TIME", "en_US.UTF-8")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{"LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_TIME"} {
@@ -574,7 +574,7 @@ func TestSanitizedEnv_Behavior_SanitizeParentEnv_ExtraEnvWithEqualsInValue(t *te
 		"COMPLEX_VAR=key=value&another=thing",
 	}
 
-	env := SanitizedEnv(nil, extraEnv)
+	env, _ := SanitizedEnv(nil, extraEnv)
 	envMap := envToMap(env)
 
 	if got := envMap["BASE64_DATA"]; got != "SGVsbG8gV29ybGQ=" {
@@ -594,7 +594,7 @@ func TestSanitizedEnv_Behavior_SSHAgentAndConnectionVars_PassThrough(t *testing.
 	t.Setenv("SSH_TTY", "/dev/pts/0")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
@@ -616,7 +616,7 @@ func TestSanitizedEnv_Behavior_DisplayAndEditorVars_PassThrough(t *testing.T) {
 	t.Setenv("BROWSER", "firefox")
 	t.Setenv("PATH", "/usr/bin")
 
-	env := SanitizedEnv(nil, nil)
+	env, _ := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
 	for _, key := range []string{
