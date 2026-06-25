@@ -323,6 +323,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		h.CCSwitchStatus = &ccStatus
 		h.CCSwitchReader = ccReader
 
+		// Consume cc-switch model aliases into the static config so all
+		// adapters benefit from dynamic model resolution (not just
+		// Claude Code). Graceful degradation: on error, static config
+		// only — never crash because cc-switch is unavailable.
+		if _, err := adapters.ConsumeCCSwitchModels(ccStatus.DBPath); err != nil {
+			slog.Warn("cc-switch model alias consumption failed, using static config only", "error", err)
+		}
+
 		// Wire cc-switch dynamic model resolver into Claude Code adapter
 		// so model aliases are resolved through the transparent proxy mapping.
 		if cfg.AdapterRegistry != nil && ccReader != nil {

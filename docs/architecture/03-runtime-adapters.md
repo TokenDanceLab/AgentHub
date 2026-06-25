@@ -96,6 +96,26 @@ Agent 原生输出 -> Adapter normalize -> RunEvent -> EventStore -> WS -> Trans
 | deploy | deploy |
 | error | error |
 
+## 动态模型路由（cc-switch 集成）
+
+Edge Server 支持通过 cc-switch 透明代理实现动态模型路由。当 cc-switch 在本机安装并激活时，Edge 启动阶段会调用 `ConsumeCCSwitchModels()` 读取 `~/.cc-switch/cc-switch.db`，将 cc-switch 配置的 provider 模型别名合并到静态 `ModelAliases` 表中。
+
+### 合并规则
+
+- cc-switch 动态别名覆盖同 key 的静态别名（例如 cc-switch 将 `sonnet` 映射到 `deepseek-v4-pro` 时，静态 `claude-sonnet-4-6` 被替换）。
+- 未冲突的静态条目保留（不会被删除）。
+- 只消费 `appTypeToAgentID` 映射中已知的 app_type（claude → claude-code, codex → codex, opencode → opencode）。
+
+### 优雅降级
+
+cc-switch 是可选增强，不是硬依赖。数据库缺失、不可读或无可用 provider 时，`ConsumeCCSwitchModels()` 返回 error，Edge 记录 WARNING 日志后以静态配置继续运行——不影响 Edge 正常启动和服务。
+
+### 对用户的意义
+
+当 cc-switch 激活时，用户在 AgentHub 中选择 "claude-sonnet" 可能实际运行在 DeepSeek、GLM 或 Qwen 等后端上，无需修改 AgentHub Profile。这是 cc-switch 为 Claude Code / Codex CLI 提供的同一透明代理机制，现在已对 Edge Server adapter 模型解析层开放。
+
+实现细节见 `edge-server/internal/adapters/model_config.go`（`ConsumeCCSwitchModels`）和 `edge-server/internal/ccswitch/reader.go`。
+
 ## 权限桥接
 
 - Desktop 文件操作必须经过 allowlist 和 typed Host API
