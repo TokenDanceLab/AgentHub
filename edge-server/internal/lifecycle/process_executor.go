@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -130,6 +131,7 @@ type ProcessExecutor struct {
 	hubOutputs  map[string]*hubOutputCollector             // runID to bounded final response collector
 	workDirs    map[string]string                          // runID to workDir (for post-finish surfacing)
 	surfacers   map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
+	cancelDone  map[string]chan struct{}                   // runID to done channel for graceful shutdown goroutines
 }
 
 // NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.
@@ -197,6 +199,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		hubOutputs:  make(map[string]*hubOutputCollector),
 		workDirs:    make(map[string]string),
 		surfacers:   make(map[string]*adapters.WorkdirSnapshot),
+		cancelDone:  make(map[string]chan struct{}),
 	}, nil
 }
 
@@ -407,13 +410,25 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Unlock()
 	if proc != nil {
 		// Graceful shutdown: run in a goroutine so Cancel() returns
-		// immediately and does not block the HTTP response. The process
-		// gets shutdownGracePeriod to respond to the stdin interrupt,
-		// then SIGTERM, then shutdownForceTimeout before Kill.
+		// immediately and does not block the HTTP response. The goroutine
+		// is tracked via cancelDone so finish() can abort it early if the
+		// process exits on its own before the grace periods elapse.
+		done := make(chan struct{})
+		e.mu.Lock()
+		e.cancelDone[runID] = done
+		e.mu.Unlock()
 		go func() {
-			time.Sleep(e.shutdownGracePeriod)
+			select {
+			case <-done:
+				return
+			case <-time.After(e.shutdownGracePeriod):
+			}
 			_ = proc.Signal(os.Interrupt)
-			time.Sleep(e.shutdownForceTimeout)
+			select {
+			case <-done:
+				return
+			case <-time.After(e.shutdownForceTimeout):
+			}
 			_ = proc.Kill()
 			_, _ = proc.Wait()
 		}()
@@ -889,7 +904,8 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					for _, line := range strings.Split(text, "\n") {
 						line = strings.TrimRight(line, "\r")
 						if line != "" {
-							slog.Error("cc stderr", "runId", run.ID, "line", line)
+							sanitizedLine, _ := recursiveSanitizeString(line)
+						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 						}
 					}
 				}
@@ -1291,6 +1307,10 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.hubOutputs, runID)
 	delete(e.workDirs, runID)
 	delete(e.surfacers, runID)
+	if done, ok := e.cancelDone[runID]; ok {
+		close(done)
+		delete(e.cancelDone, runID)
+	}
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
@@ -1400,6 +1420,9 @@ func recursiveSanitizeString(s string) (string, string) {
 // The function is designed to be safe (never panics) and fast (<1ms for
 // typical payloads). It returns the sanitized payload and a reason string
 // describing what was modified (empty string means no changes were made).
+// Design note: absolute file paths are redacted for security, which may reduce synthesis fidelity.
+// Structured file change data is available via BusEventFileChange on a separate event bus channel.
+// Relative paths and _sanitized metadata flags provide escape hatches for downstream consumers.
 func SanitizeSubAgentResult(payload any) (any, string) {
 	if payload == nil {
 		return nil, ""
@@ -1420,12 +1443,20 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 		return s, reason
 
 	case map[string]any:
-		// Recursively sanitize all string values in the map.
+		// Recursively sanitize all string values and keys in the map.
 		sanitized := make(map[string]any, len(v))
 		combinedReason := ""
 		for k, val := range v {
 			sanVal, r := SanitizeSubAgentResult(val)
-			sanitized[k] = sanVal
+			sanitizedKey, keyReason := recursiveSanitizeString(k)
+			sanitized[sanitizedKey] = sanVal
+			if keyReason != "" {
+				if combinedReason != "" {
+					combinedReason = combinedReason + "," + keyReason
+				} else {
+					combinedReason = keyReason
+				}
+			}
 			if r != "" {
 				if combinedReason != "" {
 					combinedReason = combinedReason + "," + r
@@ -1452,6 +1483,25 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 			}
 		}
 		return sanitized, combinedReason
+
+	case json.RawMessage:
+		var m map[string]any
+		if err := json.Unmarshal(v, &m); err == nil {
+			return SanitizeSubAgentResult(m)
+		}
+		return v, ""
+
+	case []byte:
+		s, reason := recursiveSanitizeString(string(v))
+		s, truncReason := truncateUTF8Safe(s)
+		if truncReason != "" {
+			if reason != "" {
+				reason = reason + "," + truncReason
+			} else {
+				reason = truncReason
+			}
+		}
+		return s, reason
 
 	default:
 		// Non-string, non-map, non-slice payloads (e.g. numbers, bools)

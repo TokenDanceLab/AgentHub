@@ -69,8 +69,19 @@ var (
 
 	// crossModuleRE matches keywords that imply changes across module
 	// boundaries or architectural restructuring.
+	// NOTE: \b is an ASCII word boundary — it does NOT match CJK characters
+	// because CJK runes are not \w in Go regex. For CJK prompts, use
+	// crossModuleCJKH instead (checked first, below).
 	crossModuleRE = regexp.MustCompile(
 		`(?i)\b(?:refactor|migrate|restructure|architecture|redesign|overhaul)\b`,
+	)
+
+	// crossModuleCJK matches CJK keywords that imply cross-module or
+	// architectural restructuring, WITHOUT \b word boundaries (CJK chars
+	// are not \w in Go regex, making \b ineffective for pure-CJK text).
+	// Checked BEFORE crossModuleRE to avoid misclassification of CJK prompts.
+	crossModuleCJK = regexp.MustCompile(
+		`重构|迁移|架构|重新设计|模块|改造|重建`,
 	)
 
 	// dependencyRE matches phrases that signal the task cannot start until
@@ -110,8 +121,11 @@ var (
 //  1. Word-count hard rule: >100 words → ComplexityComplex
 //  2. Rune-count fallback (CJK): <20 words && >200 runes → at least Medium;
 //     >800 runes → ComplexityComplex
-//  3. Cross-module keywords: "refactor", "migrate", "restructure",
-//     "architecture", "redesign", "overhaul" → ComplexityComplex
+//  3. Cross-module keywords (CJK first, then ASCII): "重构", "迁移", "架构",
+//     "重新设计", "模块", "改造", "重建", "refactor", "migrate",
+//     "restructure", "architecture", "redesign", "overhaul" → ComplexityComplex
+//     CJK patterns use no \b (CJK chars are not \w in Go regex) and are
+//     checked FIRST to avoid misclassification of pure-CJK prompts.
 //  4. Dependency indicators: "depends on", "requires", "blocked by"
 //     → ComplexityComplex
 //  5. File-count indicators: "all files", "every module", "entire codebase"
@@ -145,6 +159,11 @@ func ClassifyComplexity(prompt string) ComplexityLevel {
 	}
 
 	// Complex keyword signals take highest priority after extreme word count.
+	// CJK patterns checked FIRST — without \b boundaries, CJK chars are not
+	// \w in Go regex, so ASCII \b patterns won't match pure-CJK text.
+	if crossModuleCJK.MatchString(prompt) {
+		return ComplexityComplex
+	}
 	if crossModuleRE.MatchString(prompt) {
 		return ComplexityComplex
 	}

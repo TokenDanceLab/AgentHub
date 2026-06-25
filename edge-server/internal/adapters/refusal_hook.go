@@ -37,7 +37,11 @@ type RefusalHook struct{}
 // PrePrompt prepends the refusal instruction to the prompt if it isn't
 // already present (idempotent — prevents double-injection in retry loops).
 func (h *RefusalHook) PrePrompt(_ context.Context, prompt string) string {
-	if strings.Contains(prompt, refusalInstruction) {
+	// Use HasPrefix rather than Contains — this is a soft guardrail:
+	// an attacker could embed the refusal text mid-prompt as camouflage
+	// to bypass the injection check, but prefix-match ensures the
+	// instruction appears as a deliberate header, not hidden content.
+	if strings.HasPrefix(prompt, refusalInstruction) {
 		return prompt // already injected, skip
 	}
 	return refusalInstruction + "\n\n" + prompt
