@@ -132,14 +132,16 @@ func ClassifyComplexity(prompt string) ComplexityLevel {
 	}
 
 	// Rune-count fallback for CJK and other non-whitespace-delimited languages.
-	// When word count is low but the prompt is substantial in rune length,
-	// upgrade the classification to avoid misclassifying lengthy CJK prompts
-	// as "Simple" simply because they lack whitespace-separated words.
-	if words < 20 && runes > 200 {
-		return ComplexityMedium
-	}
+	// Check the highest rune threshold FIRST so that lengthy CJK prompts
+	// (e.g., 900-rune architectural refactoring) are correctly classified as
+	// Complex rather than being short-circuited by the Medium check.
+	// Previous ordering (words<20 && runes>200 before runes>800) made the
+	// runes>800 branch unreachable for all pure-CJK inputs.
 	if runes > 800 {
 		return ComplexityComplex
+	}
+	if words < 20 && runes > 200 {
+		return ComplexityMedium
 	}
 
 	// Complex keyword signals take highest priority after extreme word count.
