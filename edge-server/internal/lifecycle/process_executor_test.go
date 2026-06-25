@@ -1189,6 +1189,7 @@ func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
 	t.Setenv("AGENTHUB_JWT_SECRET", "jwt-secret")
 	t.Setenv("AGENTHUB_DB_PASSWORD", "db-password")
 	// PATH is whitelisted — it SHOULD be visible to the child.
+	t.Setenv("PATH", "/usr/bin:/bin")
 	parentPath := os.Getenv("PATH")
 
 	bus := events.NewBus(100)
