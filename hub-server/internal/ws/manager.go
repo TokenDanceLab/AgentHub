@@ -59,6 +59,7 @@ var (
 	ErrDeliveryConnClosed   = errors.New("websocket connection closed")
 	ErrDeliveryMarshalError = errors.New("websocket frame marshal failed")
 	ErrDeliveryBufferFull   = errors.New("websocket send buffer full")
+	ErrPerUserCapReached    = errors.New("websocket per-user connection cap reached")
 )
 
 type DeliveryResult struct {
@@ -112,12 +113,17 @@ type Manager struct {
 	mu     sync.RWMutex
 	conns  map[string]*Conn
 	byUser map[string]map[string]string
+
+	// userConnCount tracks the number of active connections per user.
+	// Updated atomically with byUser under mu.
+	userConnCount map[string]int
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		conns:  make(map[string]*Conn),
-		byUser: make(map[string]map[string]string),
+		conns:         make(map[string]*Conn),
+		byUser:        make(map[string]map[string]string),
+		userConnCount: make(map[string]int),
 	}
 }
 
@@ -152,6 +158,14 @@ func (c *Conn) ReadMessage(ctx context.Context) ([]byte, error) {
 	return data, err
 }
 
+// Register assigns a unique UUIDv7 connection ID to c and adds it to the global
+// registry. If c.UserID is already set (e.g. by a pre-authenticated upgrade
+// middleware), a per-user connection cap check is performed against
+// config.WSMaxConnsPerUser (default 10). When the cap is exceeded the connection
+// is rejected with ErrPerUserCapReached.
+//
+// For connections that authenticate after registration (the common path), the
+// cap is enforced in SetAuth instead.
 func (m *Manager) Register(c *Conn) error {
 	id, err := uuidv7.New()
 	if err != nil {
@@ -160,12 +174,26 @@ func (m *Manager) Register(c *Conn) error {
 	c.ID = id
 
 	m.mu.Lock()
+
+	// Per-user connection cap check (only applicable when UserID is pre-set,
+	// e.g. by pre-authenticated upgrade middleware).
+	if c.UserID != "" && m.userConnCount[c.UserID] >= config.WSMaxConnsPerUser {
+		m.mu.Unlock()
+		slog.Warn("ws register rejected: per-user connection cap reached",
+			"user_id", c.UserID,
+			"current", m.userConnCount[c.UserID],
+			"max", config.WSMaxConnsPerUser,
+		)
+		return ErrPerUserCapReached
+	}
+
 	m.conns[c.ID] = c
 	if c.UserID != "" {
 		if m.byUser[c.UserID] == nil {
 			m.byUser[c.UserID] = make(map[string]string)
 		}
 		m.byUser[c.UserID][c.ID] = c.ID
+		m.userConnCount[c.UserID]++
 	}
 	m.mu.Unlock()
 
@@ -173,12 +201,39 @@ func (m *Manager) Register(c *Conn) error {
 	return nil
 }
 
+// SetAuth binds user identity and device metadata to an already-registered
+// connection. It enforces the per-user connection cap (config.WSMaxConnsPerUser,
+// default 10): when the user already has the maximum number of active
+// connections, the incoming connection is closed and unregistered immediately to
+// prevent a zombie connection that would otherwise linger until read/write
+// timeout.
+//
+// SetAuth also tracks whether the user was previously offline (wasOffline) and
+// whether a same-device-type connection already existed (oldConnID), then fires
+// the OnRouteSet callback so higher layers can react to routing changes.
 func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	m.mu.Lock()
 
 	c, ok := m.conns[connID]
 	if !ok {
 		m.mu.Unlock()
+		return
+	}
+
+	// Per-user connection cap: reject new connections when the user already
+	// has WSMaxConnsPerUser active connections. The connection is already
+	// registered (in conns map, writeLoop running), so we must close and
+	// unregister it to avoid a zombie that consumes resources until timeout.
+	if m.userConnCount[userID] >= config.WSMaxConnsPerUser {
+		m.mu.Unlock()
+		slog.Warn("ws setauth rejected: per-user connection cap reached",
+			"user_id", userID,
+			"conn_id", connID,
+			"current", m.userConnCount[userID],
+			"max", config.WSMaxConnsPerUser,
+		)
+		c.Close()
+		m.Unregister(connID)
 		return
 	}
 
@@ -198,6 +253,7 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 
 	// Use connID as route key to prevent same-type devices from overwriting each other
 	m.byUser[userID][connID] = connID
+	m.userConnCount[userID]++
 
 	c.mu.Lock()
 	c.UserID = userID
@@ -224,6 +280,10 @@ func (m *Manager) Unregister(connID string) {
 	}
 	delete(m.conns, connID)
 	if c.UserID != "" {
+		m.userConnCount[c.UserID]--
+		if m.userConnCount[c.UserID] <= 0 {
+			delete(m.userConnCount, c.UserID)
+		}
 		if devs, ok := m.byUser[c.UserID]; ok {
 			delete(devs, c.ID)
 			if len(devs) == 0 {
@@ -309,6 +369,12 @@ func (m *Manager) PushToSession(sessionID string, frame Frame) {
 	if m.ResolveMembers == nil {
 		return
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("ws PushToSession panic recovered in ResolveMembers callback",
+				"session_id", sessionID, "panic", r)
+		}
+	}()
 	memberIDs := m.ResolveMembers(sessionID)
 	for _, userID := range memberIDs {
 		m.PushToUser(userID, frame)
@@ -361,6 +427,7 @@ func (m *Manager) Shutdown() {
 		delete(m.conns, id)
 	}
 	m.byUser = make(map[string]map[string]string)
+	m.userConnCount = make(map[string]int)
 }
 
 func (m *Manager) pingAll() {
