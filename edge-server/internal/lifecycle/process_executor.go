@@ -430,7 +430,9 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 			case <-time.After(e.shutdownForceTimeout):
 			}
 			_ = proc.Kill()
-			_, _ = proc.Wait()
+			if _, err := proc.Wait(); err != nil {
+				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
+			}
 		}()
 	}
 

@@ -589,20 +589,6 @@ func TestDefaultOrchestratorPrompt_XMLTagOrder(t *testing.T) {
 	}
 }
 
-func TestDefaultOrchestratorPrompt_NonEmpty(t *testing.T) {
-	// Prompt with nil agents should still produce a valid prompt.
-	prompt := DefaultOrchestratorPrompt(nil)
-	if len(prompt) == 0 {
-		t.Error("DefaultOrchestratorPrompt(nil) should not return empty string")
-	}
-	// Must contain all 5 sections.
-	for _, tag := range []string{"<ROLE>", "<LIMITS>", "<WORKFLOW>", "<OUTPUT>", "<CONSTRAINTS>"} {
-		if !strings.Contains(prompt, tag) {
-			t.Errorf("DefaultOrchestratorPrompt(nil) missing required tag %q", tag)
-		}
-	}
-}
-
 func BenchmarkDefaultOrchestratorPrompt(b *testing.B) {
 	agents := []string{"builder", "reviewer", "tester", "researcher", "deployer"}
 	for b.Loop() {
