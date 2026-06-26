@@ -5,8 +5,8 @@ import { AgentHubWorkbench } from '@shared/workbench';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import {
+  getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
-  isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
 } from '@shared/demo';
@@ -50,14 +50,21 @@ function WebWorkbenchRoot() {
   const { ensureAuth } = useWebAuth();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
-  const webPlatform = useMemo(() => createWebPlatform({ ensureAuth }), [ensureAuth]);
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
-  const realMode = isWorkbenchRealDataMode(dataMode);
+  const dataModeContract = getWorkbenchDataModeContract(dataMode);
+  const realMode = dataModeContract.isRealDataMode;
+  const webPlatform = useMemo(
+    () => createWebPlatform({
+      ensureAuth,
+      demoRuntimeFallback: dataModeContract.mode !== 'auto' && dataModeContract.allowsDemoRuntimeFallback,
+    }),
+    [dataModeContract.allowsDemoRuntimeFallback, dataModeContract.mode, ensureAuth],
+  );
   const agentList = useAgentList(true);
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
@@ -199,8 +206,8 @@ function WebWorkbenchRoot() {
         }}
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
-        showComposerAgentPicker={false}
-        showComposerStatus={false}
+        showComposerAgentPicker
+        showComposerStatus
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}

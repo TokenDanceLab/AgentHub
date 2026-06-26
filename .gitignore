@@ -183,6 +183,8 @@ app/mobile/
 !.agents/skills/adapter-dev/**
 !.agents/skills/env-sandbox/
 !.agents/skills/env-sandbox/**
+!.agents/skills/real-e2e-acceptance/
+!.agents/skills/real-e2e-acceptance/**
 !.agents/skills/ui-screenshot/
 !.agents/skills/ui-screenshot/**
 !.agents/skills/dev-team/

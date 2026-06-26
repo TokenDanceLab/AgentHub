@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
 
 // Shared fetch mock for apiClient / eventClient tests.
 // Tests can reset/override this per-suite via vi.mocked(fetch).mockImplementation.
@@ -21,13 +21,26 @@ export { default as userEvent } from '@testing-library/user-event';
    fulfilled before any test renders a Suspense boundary.
    ────────────────────────────────────────────────────────────── */
 
+const WORKBENCH_PRELOAD_TIMEOUT_MS = 5_000;
+
+async function preloadWorkbenchPage(load: () => Promise<unknown>): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    load(),
+    new Promise<void>((resolve) => {
+      timeout = setTimeout(resolve, WORKBENCH_PRELOAD_TIMEOUT_MS);
+    }),
+  ]);
+  if (timeout) clearTimeout(timeout);
+}
+
 beforeAll(async () => {
   await Promise.allSettled([
-    import('../workbench/pages/ProjectsPage'),
-    import('../workbench/pages/ContactsPage'),
-    import('../workbench/pages/DocsPage'),
-    import('../workbench/pages/AgentsPage'),
-    import('../workbench/pages/TasksPage'),
-    import('../workbench/pages/SettingsPage'),
+    preloadWorkbenchPage(() => import('../workbench/pages/ProjectsPage')),
+    preloadWorkbenchPage(() => import('../workbench/pages/ContactsPage')),
+    preloadWorkbenchPage(() => import('../workbench/pages/DocsPage')),
+    preloadWorkbenchPage(() => import('../workbench/pages/AgentsPage')),
+    preloadWorkbenchPage(() => import('../workbench/pages/TasksPage')),
+    preloadWorkbenchPage(() => import('../workbench/pages/SettingsPage')),
   ]);
-});
+}, 30_000);

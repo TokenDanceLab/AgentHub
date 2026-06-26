@@ -164,8 +164,11 @@ describe('workbench v4 demo data source', () => {
     }));
     expect(agentBlock).toEqual(expect.objectContaining({
       kind: 'text',
-      text: expect.stringContaining('已收到 mock 输入'),
+      text: expect.stringContaining('收到，我会继续跟进'),
     }));
+    expect(agentBlock).not.toHaveProperty('displayTitle');
+    expect(agentBlock).not.toHaveProperty('displayDetail');
+    expect(agentBlock).not.toHaveProperty('badgeLabel');
     expect(emits).toBe(1);
   });
 

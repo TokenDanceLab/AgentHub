@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { collectTranscriptEvidence, rawRunIdFromEvidenceId, resolveCurrentTranscriptRunId } from './transcriptEvidence';
+import {
+  collectTranscriptEvidence,
+  isSidebarOnlyTranscriptBlock as isTranscriptEvidenceSidebarOnlyBlock,
+  rawRunIdFromEvidenceId,
+  resolveCurrentTranscriptRunId,
+} from './transcriptEvidence';
+import { isSidebarOnlyTranscriptBlock as isCanonicalSidebarOnlyBlock } from './types';
 import type { TranscriptBlock } from './types';
 
 describe('collectTranscriptEvidence', () => {
@@ -90,6 +96,74 @@ describe('collectTranscriptEvidence', () => {
     expect(collectTranscriptEvidence(blocks)).toEqual([
       { id: 'run-1', kind: 'run', label: 'Run 1', status: 'completed' },
       { id: 'tool-1', kind: 'tool', label: 'Shell', status: 'completed' },
+    ]);
+  });
+});
+
+describe('isSidebarOnlyTranscriptBlock', () => {
+  it('keeps orchestration metadata out of the main chat transcript', () => {
+    const sidebarOnlyBlocks: TranscriptBlock[] = [
+      {
+        id: 'run-session',
+        kind: 'run_session',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        title: 'Run started',
+      },
+      {
+        id: 'route',
+        kind: 'route_decision',
+        author: { id: 'orchestrator', name: 'Orchestrator', role: 'agent' },
+        action: 'fanout',
+        targetAgent: 'Reviewer',
+      },
+      {
+        id: 'subagent',
+        kind: 'subagent',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'Review pass',
+        worker: 'Reviewer',
+        status: 'running',
+      },
+      {
+        id: 'subtask',
+        kind: 'subtask',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'Audit pass',
+        worker: 'Auditor',
+        status: 'completed',
+      },
+      {
+        id: 'child',
+        kind: 'child_agent',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'Child run',
+        agent: 'Reviewer',
+        status: 'completed',
+      },
+      {
+        id: 'context',
+        kind: 'context_usage',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        inputTokens: 1000,
+        outputTokens: 200,
+      },
+    ];
+
+    expect(sidebarOnlyBlocks.map(isCanonicalSidebarOnlyBlock)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(sidebarOnlyBlocks.map(isTranscriptEvidenceSidebarOnlyBlock)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
     ]);
   });
 });

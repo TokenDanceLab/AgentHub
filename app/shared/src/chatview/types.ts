@@ -23,6 +23,8 @@ export interface RowItem {
   content?: string
   /** Stable tool identifier for i18n + icon routing — never translated. e.g. "read", "grep", "eslint". */
   toolName?: string
+  /** Backend tool call id used to match tool_result cards to the correct tool_call. */
+  toolCallId?: string
   /** True if this tool card is a final result (applies result-row CSS via type check). */
   isResult?: boolean
   diffLines?: { type: 'add' | 'del' | 'ctx'; text: string }[]

@@ -48,6 +48,10 @@ function FileTypeIcon({ item }: { item: RowItemType }) {
   return <Icon size={14} />
 }
 
+function stableInteractionId(item: RowItemType): string {
+  return item.type === 'tool' && item.toolCallId ? `call-${item.toolCallId}` : item.id
+}
+
 interface Props {
   item: RowItemType
   onToggle?: (id: string) => void
@@ -87,6 +91,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const { key: labelKey, params: labelParams } = cardLabelKey(item)
   const labelText = labelParams ? t(labelKey, labelParams) : t(labelKey)
   const resultClass = isToolResult(item) ? ' result-row' : ''
+  const interactionId = stableInteractionId(item)
 
   const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
 
@@ -97,15 +102,23 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   }
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    onContextMenu?.(item.id, e)
+    onContextMenu?.(interactionId, e)
   }
 
   const handleSelectClick = (e: React.MouseEvent) => {
-    onBlockSelect?.(item.id, e.shiftKey)
+    onBlockSelect?.(interactionId, e.shiftKey)
   }
 
   return (
-    <div className={cls} onContextMenu={onContextMenu ? handleContextMenu : undefined} onClick={onBlockSelect ? handleSelectClick : undefined} data-block-id={item.id} data-selectable-card={item.id} tabIndex={0}>
+    <div
+      className={cls}
+      onContextMenu={onContextMenu ? handleContextMenu : undefined}
+      onClick={onBlockSelect ? handleSelectClick : undefined}
+      data-block-id={interactionId}
+      data-row-id={item.id}
+      data-selectable-card={interactionId}
+      tabIndex={0}
+    >
       <button
         type="button"
         className="row-hd"

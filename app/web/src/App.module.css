@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  min-width: 960px;
+  min-width: 0;
   overflow: hidden;
   background: var(--background);
   color: var(--foreground);
