@@ -20,6 +20,7 @@ import (
 type wsIPLimiter struct {
 	mu      sync.Mutex
 	limiters map[string]*ipEntry
+	stopCh   chan struct{}
 }
 
 type ipEntry struct {
@@ -31,6 +32,7 @@ var wsIPRL wsIPLimiter
 
 func init() {
 	wsIPRL.limiters = make(map[string]*ipEntry)
+	wsIPRL.stopCh = make(chan struct{})
 	// Background cleanup of stale IP limiters every 5 minutes.
 	go wsIPRL.cleanup()
 }
@@ -57,16 +59,40 @@ func (l *wsIPLimiter) getLimiter(ip string) *rate.Limiter {
 func (l *wsIPLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		l.mu.Lock()
-		cutoff := time.Now().Add(-10 * time.Minute)
-		for ip, entry := range l.limiters {
-			if entry.lastSeen.Before(cutoff) {
-				delete(l.limiters, ip)
+	for {
+		select {
+		case <-ticker.C:
+			l.mu.Lock()
+			cutoff := time.Now().Add(-10 * time.Minute)
+			for ip, entry := range l.limiters {
+				if entry.lastSeen.Before(cutoff) {
+					delete(l.limiters, ip)
+				}
 			}
+			l.mu.Unlock()
+		case <-l.stopCh:
+			return
 		}
-		l.mu.Unlock()
 	}
+}
+
+// Stop shuts down the background cleanup goroutine. It is safe to call multiple
+// times (only the first call closes the channel). If not called, the goroutine
+// runs for the lifetime of the process.
+func (l *wsIPLimiter) Stop() {
+	select {
+	case <-l.stopCh:
+		// Already closed.
+	default:
+		close(l.stopCh)
+	}
+}
+
+// StopWSIPRateLimiter stops the background cleanup goroutine for the global
+// WebSocket IP rate limiter. Call during graceful shutdown so the goroutine
+// does not outlive the process.
+func StopWSIPRateLimiter() {
+	wsIPRL.Stop()
 }
 
 // WSIPRateLimit is a Gin middleware that enforces per-IP rate limiting for
