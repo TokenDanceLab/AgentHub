@@ -36,6 +36,8 @@ const (
 	maxSnapshotFileBytes    = 128 * 1024 // 128 KB max per file content stored in snapshot
 	maxSnapshotTotalFiles   = 500
 	maxSurfacedArtifactSize = 512 * 1024 // 512 KB max artifact content emitted
+	maxWalkFiles            = 2000       // max files to scan per walk (prevents memory blowup on large repos)
+	maxWalkDepth            = 24         // max directory depth to descend
 )
 
 // Directories to skip when walking the workdir.
@@ -301,6 +303,7 @@ func DetectSurfacedFiles(snapshot *WorkdirSnapshot) []SurfacedFile {
 
 func walkCurrentState(dir string) map[string]fileRecord {
 	result := make(map[string]fileRecord)
+	count := 0
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -309,7 +312,18 @@ func walkCurrentState(dir string) map[string]fileRecord {
 			if skipDirs[d.Name()] {
 				return filepath.SkipDir
 			}
+			// Guard against excessive depth.
+			depth := strings.Count(path[len(dir):], string(filepath.Separator))
+			if depth > maxWalkDepth {
+				return filepath.SkipDir
+			}
 			return nil
+		}
+
+		// Guard against excessive file count.
+		count++
+		if count > maxWalkFiles {
+			return filepath.SkipAll
 		}
 
 		fi, err := d.Info()
