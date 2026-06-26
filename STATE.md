@@ -1,9 +1,31 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-25
+最后更新：2026-06-26
 当前活跃分支：`dev/delicious233`
-当前 dev HEAD：`47083eed` (`dev/delicious233`)
+当前 dev HEAD：`91fdcf65` (`dev/delicious233`)
 Release tag：`v0.5.0`（master 最新）
+
+## 全栈审计 (2026-06-26)
+
+四路并行 Explore Agent 深度扫描 hub-server、app/desktop、app/web、app/mobile-rn 和跨模块安全。发现 78 项问题（Critical 7 / High 15 / Medium 44 / Low 12）。
+详见 `docs/audit/full-stack-audit-2026-06-26.md`。
+
+## edge-server 内存/磁盘泄漏修复 (2026-06-26 完成)
+
+两轮 commit（`db93a1eb` + `91fdcf65`）共修复 **10 项**：
+
+| 修复 | 机制 |
+|------|------|
+| WAL auto-checkpoint | `PRAGMA wal_autocheckpoint=100` |
+| WAL 定期 TRUNCATE | 5min 定时 + Close 最终 |
+| surfacing 遍历上限 | maxWalkFiles=2000 + maxWalkDepth=24 |
+| Go 内存软上限 | `debug.SetMemoryLimit(512MB)` + `GOGC=50` |
+| MCP syncer 泄漏 | `ShutdownHooks` → `syncer.Stop()` |
+| EventLog 50MB 上限 | `truncateLocked()` 保留后 75% |
+| fireHub goroutine 池 | `callbackSem(10)` 信号量 |
+| WorkdirSnapshot defer | 清理移到 surfacing 前 |
+| Store 定期清理 | `cleanupLoop` 每 5 分钟 |
+| Bus.Close 幂等 | `sync.Once` 包装 |
 
 ## MASTER-SYNTHESIS 修复 (2026-06-25 完成)
 
