@@ -108,7 +108,12 @@ func routeField(deviceType, deviceID string) string {
 
 // SetRoute records the WebSocket connection for a user device.
 func (c *Client) SetRoute(ctx context.Context, userID, deviceType, connID string) error {
-	return c.rdb.HSet(ctx, routeKey(userID), deviceType, connID).Err()
+	key := routeKey(userID)
+	if err := c.rdb.HSet(ctx, key, deviceType, connID).Err(); err != nil {
+		return err
+	}
+	_ = c.rdb.Expire(ctx, key, 7*24*time.Hour).Err()
+	return nil
 }
 
 // DeleteRoute removes the route entry for a user device.
