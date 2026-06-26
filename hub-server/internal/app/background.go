@@ -71,14 +71,19 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			tasks, err := a.AgentService.ScanExpiredTasks()
-			if err != nil {
-				slog.Warn("failed to scan expired agent tasks", "error", err)
-				continue
-			}
-			for _, task := range tasks {
-				a.publishExpiredTaskTimeout(ctx, task)
+		for {
+			select {
+			case <-ticker.C:
+				tasks, err := a.AgentService.ScanExpiredTasks()
+				if err != nil {
+					slog.Warn("failed to scan expired agent tasks", "error", err)
+					continue
+				}
+				for _, task := range tasks {
+					a.publishExpiredTaskTimeout(ctx, task)
+				}
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
