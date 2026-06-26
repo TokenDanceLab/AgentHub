@@ -1,6 +1,6 @@
 # 文档规范
 
-最后更新：2026-06-17
+最后更新：2026-06-27
 
 ## 文档分层
 
@@ -13,6 +13,8 @@
 | **治理** | `docs/governance/` | 分支规范、文档标准、安全风险、威胁模型 | 三人协商 |
 | **部署** | `docs/architecture/05-deployment.md` | 部署手册 | 运维 |
 | **参考** | `docs/reference/` | 技术参考 + 竞品调研 | 按需查阅 |
+| **活跃 SPEC** | `docs/progress/MASTER.md` + `docs/analysis/` + `docs/plan/` | 当前 spec-driven 专项的分析、计划、进度入口；只在专项执行中存在 | 任务负责人 |
+| **归档** | `docs/archives/` | 已完成 spec-driven 专项和过期项目 skill 的只读归档 | 任务负责人 |
 
 ## 命名和格式
 
@@ -27,10 +29,11 @@
 
 1. **路线图唯一**：当前目标和优先级写在 `roadmap/`，完成打钩，不另建第二套 backlog
 2. **主文档优先**：架构说明写进 `architecture.md` + `architecture/`
-3. **计划直达**：阶段性实施计划直接放在 `docs/`，由 roadmap 链接
-4. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力），不归档
-5. 同一事实不出现在多个文档中
-6. 不用过时阶段名描述当前状态
+3. **活跃 SPEC 入口唯一**：只有存在 `docs/progress/MASTER.md` 时，`docs/analysis/` 和 `docs/plan/` 才表示当前 spec-driven 专项；任务细节以 MASTER 指向的 GitHub issue 或计划文档为准
+4. **归档边界清楚**：完成的 spec-driven 工件移入 `docs/archives/<topic>/`；过期项目 skill 放入 `docs/archives/project-skills/` 只作历史参考，不能作为 active workflow 加载
+5. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；spec-driven 工件和项目 skill 归档是例外
+6. 同一事实不出现在多个文档中
+7. 不用过时阶段名描述当前状态
 
 ## 新文档检查清单
 
@@ -38,3 +41,4 @@
 - 能否合并到现有主文档（roadmap / architecture / 当前阶段计划）？
 - 是否属于 ADR 或设计文档？
 - 读者是谁？新人还是团队成员？对应写到哪一层？
+- 如果是 spec-driven 过程材料，是否已有活跃 `docs/progress/MASTER.md`？如果没有，先建立 MASTER，不要散落新计划文件

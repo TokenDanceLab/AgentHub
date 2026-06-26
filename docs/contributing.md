@@ -519,10 +519,10 @@ go test ./... -short -count=1
 
 覆盖率要求：
 
-| 模块 | 最低覆盖率 |
+| 模块 | CI 覆盖率门槛 |
 |------|-----------|
-| edge-server | 75% |
-| hub-server | 40% |
+| edge-server | security 70%、lifecycle 60%、adapters 55% 分包阈值；总覆盖率只输出 notice |
+| hub-server | 40% 总覆盖率 |
 
 **后端 E2E fixture 状态**：
 
