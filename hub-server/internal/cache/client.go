@@ -574,21 +574,26 @@ func (c *Client) Close() error {
 
 // ── Rate limiting ──────────────────────────────────────────────────────
 
-// CheckRateLimit implements a simple sliding-window counter.  It atomically
-// increments the counter for key, sets a 60-second TTL on first access, and
-// returns whether the count exceeds the supplied limit.
+// CheckRateLimit implements a rate-limit counter with sliding-window semantics.
+// It atomically increments the counter for key and always refreshes the TTL to
+// 60 seconds on every request. This means the window slides forward with each
+// request: a trickle of 1 request every 59 seconds keeps the counter alive
+// indefinitely (though the counter still accumulates and eventually exceeds the
+// limit). This differs from strict fixed-window semantics where the TTL is set
+// only on the first request, creating a clean 60-second window from that point.
+//
+// The unconditional Expire prevents permanent key residue after a crash.
+//
+// If strict fixed-window semantics are required, use an atomic Lua script:
+//
+//	EVAL "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c" 1 key ttl
 func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (count int64, exceeded bool, err error) {
 	count, err = c.rdb.Incr(ctx, "ratelimit:"+key).Result()
 	if err != nil {
 		return 0, false, err
 	}
-	// Set expiry only when the key is brand-new (count == 1).
-	if count == 1 {
-		// Use a 60-second window; the TTL is never refreshed on subsequent
-		// requests, so the whole counter expires one minute after the very
-		// first request in each time window.
-		_ = c.rdb.Expire(ctx, "ratelimit:"+key, 60*time.Second).Err()
-	}
+	// Always refresh TTL (sliding-window semantics; see function doc).
+	_ = c.rdb.Expire(ctx, "ratelimit:"+key, 60*time.Second).Err()
 	exceeded = count > limit
 	return
 }
