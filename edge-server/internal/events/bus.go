@@ -66,10 +66,13 @@ type observer struct {
 // Each event is serialised as a single JSON line. Writes are safe for
 // concurrent use.
 type EventLog struct {
-	mu   sync.Mutex
-	f    *os.File
-	path string
+	mu      sync.Mutex
+	f       *os.File
+	path    string
+	maxSize int64 // max file size in bytes before truncation; 0 = unlimited
 }
+
+const defaultEventLogMaxSize = 50 * 1024 * 1024 // 50 MiB
 
 // NewEventLog opens or creates the append-only event log at the given path.
 // The parent directory is created if it does not exist.
@@ -85,7 +88,7 @@ func NewEventLog(path string) (*EventLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &EventLog{f: f, path: path}, nil
+	return &EventLog{f: f, path: path, maxSize: defaultEventLogMaxSize}, nil
 }
 
 // Append writes an event to the log as a single JSON line followed by a newline.
@@ -102,7 +105,47 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 	}
 	data = append(data, '\n')
 	_, err = l.f.Write(data)
+	if err == nil && l.maxSize > 0 {
+		// Truncate from the beginning if file exceeds the limit.
+		// Read the last ~75% and rewrite to keep recent events.
+		if fi, statErr := l.f.Stat(); statErr == nil && fi.Size() > l.maxSize {
+			l.truncateLocked()
+		}
+	}
 	return err
+}
+
+// truncateLocked rewrites the log file keeping only the trailing portion.
+// Must be called with l.mu held.
+func (l *EventLog) truncateLocked() {
+	keepBytes := l.maxSize * 3 / 4 // keep last 75%
+	if _, seekErr := l.f.Seek(-keepBytes, 2); seekErr != nil {
+		// File too small or seek failed; skip truncation.
+		return
+	}
+	buf := make([]byte, keepBytes)
+	n, readErr := l.f.Read(buf)
+	if readErr != nil && readErr.Error() != "EOF" {
+		return
+	}
+	// Skip to next newline so we don't keep a partial line.
+	start := 0
+	for i := 0; i < n; i++ {
+		if buf[i] == '\n' {
+			start = i + 1
+			break
+		}
+	}
+	// Truncate and rewrite.
+	if truncErr := l.f.Truncate(0); truncErr != nil {
+		return
+	}
+	if _, seekErr := l.f.Seek(0, 0); seekErr != nil {
+		return
+	}
+	if start < n {
+		l.f.Write(buf[start:n])
+	}
 }
 
 // Close flushes and closes the underlying file.
