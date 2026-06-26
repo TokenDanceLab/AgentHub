@@ -11,6 +11,7 @@
 ## GitHub Resources
 
 - **All Issues**: `gh issue list -R TokenDanceLab/AgentHub --label "spec:repo-governance-real-e2e" --state all`
+- **Phase 1 PR**: https://github.com/TokenDanceLab/AgentHub/pull/338
 - **Project Board**: skipped; current GitHub token does not have project scope.
 
 ## References
@@ -76,8 +77,8 @@ git worktree list
 ## Current Status
 
 **Active Phase**: Phase 1 - Governance Baseline
-**Active Task**: Phase 1 local implementation prepared; issues remain open until PR/merge closure.
-**Current Focus**: review Phase 1 governance diff, then open/merge the branch or continue Phase 2 if requested.
+**Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
+**Current Focus**: review/merge Phase 1 governance baseline, then start Phase 2 real E2E contract.
 **Blockers**: none
 
 ### Local Phase 1 Evidence
@@ -123,3 +124,4 @@ git worktree list
 |:--|:--|:--|
 | 2026-06-27 | setup | Phase 1-3 analysis/plan docs existed; refreshed GitHub state, created missing Phase 4 issues #335-#337, and created this MASTER index. |
 | 2026-06-27 | phase-1-local | Normalized project-skill archive/whitelist rules, branch/worktree live-state rules, document active/archive rules, and focused validators. Verification: `verify-project-skills.ps1`, `verify-ci-gates.ps1`, `verify-ci-gates.sh`, OpenAPI YAML parse, and `git diff --check` passed. |
+| 2026-06-27 | phase-1-pr | Pushed `docs/repo-governance-real-e2e` and opened PR #338 to `dev/delicious233`; PR body closes #322-#325 on merge and records evidence boundaries. |
