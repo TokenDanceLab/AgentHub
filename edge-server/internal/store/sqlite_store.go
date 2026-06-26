@@ -76,6 +76,10 @@ func NewSQLite(path string) (*SQLiteStore, error) {
 	// return freed memory to the OS, so keeping the WAL small is critical.
 	s.stopCheckpoint = make(chan struct{})
 	go s.checkpointLoop(5 * time.Minute)
+	// Periodically clean up old terminal runs to prevent unbounded Store map growth.
+	// Without this, Store maps only shrink when a new run is created,
+	// which may never happen on an idle server.
+	go s.cleanupLoop(5 * time.Minute)
 
 	return s, nil
 }
@@ -89,6 +93,21 @@ func (s *SQLiteStore) checkpointLoop(interval time.Duration) {
 			if _, err := s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
 				// Non-fatal; the auto-checkpoint will still work.
 			}
+		case <-s.stopCheckpoint:
+			return
+		}
+	}
+}
+// cleanupLoop periodically removes old terminal runs to prevent unbounded
+// in-memory Store map growth. Without this, Store maps only shrink when a
+// new run is explicitly created — which may never happen on an idle server.
+func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.store.CleanupRuns(RunCleanupOptions{TerminalTTL: 24 * time.Hour, MaxTerminalRunsPerThread: 50})
 		case <-s.stopCheckpoint:
 			return
 		}

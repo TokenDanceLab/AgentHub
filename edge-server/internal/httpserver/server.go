@@ -61,6 +61,7 @@ type Config struct {
 	SkillsDirs         []string                 // optional SKILL.md search dirs; empty = use defaults
 	EventLogPath       string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
+	ShutdownHooks      []func()                 // called in order during graceful shutdown, before bus.Close()
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -177,6 +178,9 @@ func Run(cfg Config) error {
 	}
 
 	// Flush and close the event log so no events are lost on shutdown.
+	for _, hook := range cfg.ShutdownHooks {
+		hook()
+	}
 	if err := handler.Bus.Close(); err != nil {
 		slog.Error("failed to close event bus event log", "error", err)
 	}
