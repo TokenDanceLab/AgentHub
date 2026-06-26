@@ -508,12 +508,22 @@ func (c *Client) PopPendingAgentControlsForDevice(ctx context.Context, userID, d
 
 // AllocateSeq atomically increments and returns the next seq for a session.
 func (c *Client) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	return c.rdb.Incr(ctx, "session:seq:"+sessionID).Result()
+	key := "session:seq:" + sessionID
+	val, err := c.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	// Always set TTL to prevent permanent key leak: when a session's seq key
+	// expires after 30 days, the next AllocateSeq recreates it via Incr with
+	// no TTL, and subsequent InitSeqIfAbsent becomes a no-op (SetNX fails
+	// because key already exists). The Expire call closes this leak path.
+	_ = c.rdb.Expire(ctx, key, 30*24*time.Hour).Err()
+	return val, nil
 }
 
 // InitSeqIfAbsent initializes the seq key if it doesn't exist.
 func (c *Client) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error {
-	return c.rdb.SetNX(ctx, "session:seq:"+sessionID, seq, 0).Err()
+	return c.rdb.SetNX(ctx, "session:seq:"+sessionID, seq, 30*24*time.Hour).Err()
 }
 
 // PeekSeq returns the current seq value for a session (diagnostics only).
