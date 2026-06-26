@@ -193,9 +193,11 @@ git status --short --branch       # 确认只改了允许的路径
 ### 仓库级 Skill
 
 - 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/real-e2e-acceptance/`。
+- 白名单由 `scripts/verify-project-skills.ps1` 校验；新增、删除或归档仓库级 skill 时，同步更新 `.gitignore`、本节和归档说明。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；若用户明确指定 spec-driven 或已有活跃 `docs/progress/MASTER.md`，按当前 SPEC/MASTER 继续；若专项已完成，则看 `docs/archives/README.md` 和对应归档，不复活旧进度文件。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - 涉及真实 E2E、Playwright、Visual QA、approved-real、真实登录/运行、打包 Desktop、发布或 merge-ready 结论时，先读 `.agents/skills/real-e2e-acceptance/SKILL.md`，按证据等级写明已测和未测。
+- `docs/archives/project-skills/` 只保存过期 skill 的历史副本；`ui-screenshot`、`dev-team`、`dev-team-codex` 不得作为 active workflow 加载。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
 - `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
 - 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
@@ -283,17 +285,7 @@ fix/short-topic
 feat/* → dev/delicious233 → master
 ```
 
-| 分支 | 说明 | 状态 |
-|------|------|:--:|
-| **dev/delicious233** | 当前集成开发分支 | ✅ 活跃 |
-| feat/super-phase1-safety-foundation | SUPER 工程修复历史分支，是否仍需合并以 live `git status` / PR 为准 | 🟡 复核 |
-| master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
-| ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
-| ~~dev/delicious223~~ | 旧集成主线 | ✅ 已归档 |
-| ~~origin/dev/trump~~ | 已归档 | ✅ 已清理 |
-| ~~origin/dev/johnny~~ | 已归档 | ✅ 已清理 |
-
-接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
+接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按历史表格、归档审计或旧 handoff 直接推断可提交范围。
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
@@ -312,7 +304,7 @@ feat/* → dev/delicious233 → master
 - 每个开发者至少在一天结束前 push 当前分支。
 - 完成一个可说明的小阶段就 push，不要把多天工作只留在本机。
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
-- PR 合并前先同步最新 `dev/delicious223`，解决冲突后再合。
+- PR 合并前先同步最新 `dev/delicious233`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
 - Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 - 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
@@ -322,7 +314,7 @@ feat/* → dev/delicious233 → master
 
 - 项目级 worktree 固定放在 `.worktrees/`，已写入 `.gitignore`，不得提交。
 - 一个 worktree = 一个短分支 = 一个 PR。不要多个 Agent 共用同一 worktree。
-- 创建前同步 `dev/delicious223`：`git checkout dev/delicious233 && git pull --ff-only`。
+- 创建前同步 `dev/delicious233`：`git checkout dev/delicious233 && git pull --ff-only`。
 - 创建示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
 - 每个 worktree 必须绑定任务卡和写入范围；范围变化先更新任务卡或 PR 说明。
 - DeepSeek、Codex、Claude 等可在 worktree 内调度 subagent，但 subagent 只能在当前 worktree 的指定路径内工作。
@@ -359,7 +351,7 @@ feat/* → dev/delicious233 → master
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级 `.agents/skills/dev-loop/` 是唯一例外）。
+- 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级白名单 skill 是唯一例外，白名单见第 2 节）。
 - 服务器主机名不得出现在仓库文件中；生产配置限 `.env.production`（已 gitignored）。
 
 执行规则：
@@ -445,12 +437,13 @@ corepack.cmd pnpm exec vite build
 
 | 模块 | 最低覆盖率 | 当前 |
 |------|-----------|------|
-| edge-server | 75% | CI 强制阻断 |
-| hub-server | 40% | CI 强制阻断 |
+| edge-server | security 70%、lifecycle 60%、adapters 55% 分包阈值；总覆盖率只作 notice | CI 强制分包阈值 |
+| hub-server | 40% 总覆盖率 | CI 强制阻断 |
 | app/desktop | 不做硬性要求 | 不做硬性要求 |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。
+- `docs/roadmap.md` 中的 edge-server 75% 是质量目标，不是当前 CI 总覆盖率门槛。
 - 新增 adapter 功能必须补同包 `*_test.go`。
 - 修改 shared types 必须同步更新所有消费者的测试。
 
