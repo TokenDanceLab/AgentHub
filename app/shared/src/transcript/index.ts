@@ -3,6 +3,7 @@ export { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 export { normalizeHubMessagesToTranscript } from './normalizeHubMessages';
 export { hubRuntimeEventFromPayload, normalizeHubRuntimeEventsToTranscript } from './normalizeHubRuntimeEvents';
 export { normalizeThreadItemsToTranscript } from './normalizeThreadItems';
+export { orderTranscriptBlocks, transcriptBlockTimestampMs } from './order';
 export {
   createAgentActivityStore,
   getAgentActivityStore,
