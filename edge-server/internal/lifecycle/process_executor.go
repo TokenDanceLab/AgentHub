@@ -130,8 +130,9 @@ type ProcessExecutor struct {
 	hubTasks    map[string]string                          // runID to Hub taskID (for Edge→Hub callbacks)
 	hubOutputs  map[string]*hubOutputCollector             // runID to bounded final response collector
 	workDirs    map[string]string                          // runID to workDir (for post-finish surfacing)
-	surfacers   map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
-	cancelDone  map[string]chan struct{}                   // runID to done channel for graceful shutdown goroutines
+	surfacers     map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
+	cancelDone    map[string]chan struct{}                   // runID to done channel for graceful shutdown goroutines
+	callbackSem   chan struct{}                              // bounds concurrent hub callbacks (max 10); prevents goroutine explosion
 }
 
 // NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.
@@ -198,8 +199,9 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		hubTasks:    make(map[string]string),
 		hubOutputs:  make(map[string]*hubOutputCollector),
 		workDirs:    make(map[string]string),
-		surfacers:   make(map[string]*adapters.WorkdirSnapshot),
-		cancelDone:  make(map[string]chan struct{}),
+		surfacers:     make(map[string]*adapters.WorkdirSnapshot),
+		cancelDone:    make(map[string]chan struct{}),
+		callbackSem:   make(chan struct{}, 10), // max 10 concurrent hub callbacks
 	}, nil
 }
 
@@ -2010,7 +2012,9 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 	}
 	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
 		chunk := chunk
+		e.callbackSem <- struct{}{}
 		go func() {
+			defer func() { <-e.callbackSem }()
 			ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 			defer cancel()
 			if err := e.hubCallback.TaskStream(ctx, taskID, runID, chunk); err != nil {

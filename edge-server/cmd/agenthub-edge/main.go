@@ -155,11 +155,12 @@ func main() {
 	// definitions from the Hub server's /web/mcp-servers endpoint periodically
 	// and stores them in an in-memory MCPConfigStore for injection into runs.
 	var mcpConfigStore *adapters.MCPConfigStore
+	var mcpSyncer *adapters.HubMCPSyncer
 	if cfg.HubMCPSyncURL != "" {
 		mcpConfigStore = adapters.NewMCPConfigStore()
 		syncInterval := parseDurationOrDefault(cfg.HubMCPSyncInterval, 5*time.Minute)
-		syncer := adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
-		go syncer.Run(context.Background(), syncInterval)
+		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
+		go mcpSyncer.Run(context.Background(), syncInterval)
 		slog.Info("mcp hub sync enabled", "url", cfg.HubMCPSyncURL, "interval", syncInterval)
 	}
 
@@ -181,6 +182,9 @@ func main() {
 		EventLogPath:       cfg.EventLogPath,
 		MCPConfigStore:     mcpConfigStore,
 	}
+		if mcpSyncer != nil {
+			serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
+		}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
 			Command:  cfg.RunnerCommand,
