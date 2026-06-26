@@ -1,10 +1,20 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+function devCspPlugin(): Plugin {
+  return {
+    name: 'agenthub-dev-csp',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'");
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/workbench/' : '/',
-  plugins: [react()],
+  plugins: [react(), devCspPlugin()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
@@ -25,7 +35,7 @@ export default defineConfig(({ command }) => ({
     headers: {
       'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https://avatars.githubusercontent.com",

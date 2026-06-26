@@ -13,6 +13,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:chat-flow": "playwright test --config playwright.config.ts --project=chromium chat-flow-ui.spec.ts",
+    "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
     "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium smoke.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "analyze": "pnpm build && npx vite-bundle-visualizer",

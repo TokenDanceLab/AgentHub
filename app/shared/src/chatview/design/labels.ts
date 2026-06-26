@@ -6,6 +6,20 @@ import type { RowItem } from '../types'
 import type { TransKey } from '../i18n/resources'
 import { SEP } from '../adapter'
 
+const KNOWN_TOOL_KEYS = new Set([
+  'read',
+  'grep',
+  'write',
+  'result',
+  'eslint',
+  'prettier',
+  'tsc',
+  'audit',
+  'check',
+  'test',
+  'lint',
+])
+
 /** Display label resolved from a {@link RowItem}, ready for i18n interpolation.
  *  Caller uses `t(result.key, result.params)` to get the final display string. */
 export interface LabelResult {
@@ -56,7 +70,13 @@ export function cardLabelKey(item: RowItem): LabelResult {
 
     case 'tool': {
       if (status === 'fail') return { key: 'card.tool.fail' }
-      const tn = (toolName || toolKey(item))
+      const tn = (toolName || toolKey(item)).trim().toLowerCase()
+      if (!KNOWN_TOOL_KEYS.has(tn)) {
+        return {
+          key: running ? 'card.tool.generic.running' : 'card.tool.generic',
+          params: { name: item.label || tn },
+        }
+      }
       if (running) {
         return { key: `card.tool.${tn}.running` as TransKey }
       }

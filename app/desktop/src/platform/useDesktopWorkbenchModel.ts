@@ -1,8 +1,8 @@
 import { useMemo, useSyncExternalStore, useEffect, useState, useCallback, useRef } from 'react';
 import {
   demoWorkbenchAgents,
+  getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
-  isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
   workbenchDemoRuntimeStore,
@@ -10,6 +10,7 @@ import {
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
+import { orderTranscriptBlocks } from '@shared/transcript';
 import { getAgentActivityStore, type AgentActivitySnapshot } from '@shared/transcript/agentActivity';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
@@ -68,7 +69,7 @@ export interface DesktopWorkbenchModel {
   chatActions?: DesktopChatActions;
   dataMode: string;
   isDemo: boolean;
-  /** When isDemo=true, indicates whether Edge API is available and demo uses real data. */
+  /** When isDemo=true, indicates whether auto mode is using Local Edge fallback data. */
   edgeDemoData?: boolean;
   projects?: ProjectInfo[];
   projectsStatus?: {
@@ -97,9 +98,8 @@ const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = []
 const DESKTOP_DEMO_DEFAULT_CONVERSATION_ID = 'agent-collab';
 
 /**
- * Lightweight Edge health check for demo mode.
- * Polls /v1/health so that demo mode can detect whether Edge is available
- * and fall through to real API data instead of JS mock objects.
+ * Lightweight Edge health check for auto mode.
+ * Polls /v1/health only when auto mode allows Local Edge fallback.
  */
 function useEdgeAvailableForDemo(enabled: boolean): boolean {
   const [available, setAvailable] = useState(false);
@@ -143,12 +143,13 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     workbenchDemoRuntimeStore.getSnapshot,
     workbenchDemoRuntimeStore.getSnapshot,
   );
-  const useDemo = !isWorkbenchRealDataMode(dataMode);
-  // In demo mode, detect whether Edge is available. If so, use Edge API data
-  // instead of the JS mock store, so the right sidebar gets real evidence.
-  const edgeAvailableForDemo = useEdgeAvailableForDemo(useDemo);
-  // When demo mode + Edge available, load data from Edge API.
-  const useEdgeDemoData = useDemo && edgeAvailableForDemo;
+  const dataModeContract = getWorkbenchDataModeContract(dataMode);
+  const useDemo = !dataModeContract.isRealDataMode;
+  // In auto mode, detect whether Edge is available. Explicit mock/fixture modes
+  // do not probe Local Edge or fall through to real API data.
+  const edgeAvailableForDemo = useEdgeAvailableForDemo(useDemo && dataModeContract.allowsLocalEdgeAutoFallback);
+  // When auto mode + Edge available, load data from Edge API.
+  const useEdgeDemoData = useDemo && dataModeContract.allowsLocalEdgeAutoFallback && edgeAvailableForDemo;
   const hubAuthenticated = useHubStore((state) => state.authenticated);
   const hubReady = !useDemo && hubAuthenticated && Boolean(getAccessToken());
 
@@ -231,8 +232,8 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const hubMessages = hubMessagesQuery.data ?? [];
 
   const demoModel = useMemo(() => {
-    // When Edge is available in demo mode, use real API data for conversations
-    // and transcript so the right sidebar gets real diffs/artifacts/previews.
+    // When auto mode can use Local Edge fallback, use Edge API data for
+    // conversations and transcript so the right sidebar gets real evidence.
     if (useEdgeDemoData && threads.length > 0) {
       const edgeConversations = threads.map((thread) =>
         threadToConversation(
@@ -250,7 +251,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
         activeConversationId: selectedDemoConversation,
         agents: demoWorkbenchAgents,
         conversations: edgeConversations,
-        dataMode: 'demo+edge' as string,
+        dataMode: dataModeContract.statusLabel,
         edgeDemoData: true as const,
         isDemo: true,
         transcript: edgeTranscript.length > 0 ? edgeTranscript : EMPTY_TRANSCRIPT,
@@ -272,7 +273,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       activeConversationId: selectedDemoConversation,
       agents: demoWorkbenchAgents,
       conversations: demoSnapshot.conversations,
-      dataMode: dataMode === 'auto' ? 'mock (auto fallback)' : dataMode,
+      dataMode: dataModeContract.statusLabel,
       isDemo: true,
       transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
       agentActivity,
@@ -281,7 +282,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
       ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
     };
-  }, [dataMode, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread?.threadId, threadPins, threadItems, agentActivity]);
+  }, [dataModeContract.statusLabel, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread?.threadId, threadPins, threadItems, agentActivity]);
 
   const conversations = useMemo(() => {
     // Merge Hub sessions + Edge threads into a unified conversation list.
@@ -308,7 +309,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     const items = threadItems ?? [];
     const persistedTranscript = normalizeThreadItemsToTranscript(items);
     if (persistedTranscript.length > 0 || liveTranscript.length > 0) {
-      return [...persistedTranscript, ...liveTranscript];
+      return orderTranscriptBlocks([...persistedTranscript, ...liveTranscript]);
     }
     if (threads.length === 0 && hubSessions.length === 0) return EMPTY_TRANSCRIPT;
     return [];
@@ -406,7 +407,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     ...(resolvedContactsActions != null ? { contactsActions: resolvedContactsActions } : {}),
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     conversations,
-    dataMode,
+    dataMode: dataModeContract.statusLabel,
     isDemo: false,
     ...(resolvedProjects != null ? { projects: resolvedProjects } : {}),
     ...(resolvedProjectsStatus != null ? { projectsStatus: resolvedProjectsStatus } : {}),

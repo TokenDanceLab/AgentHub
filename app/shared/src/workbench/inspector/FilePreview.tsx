@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { highlightLine, languageFromPath } from '../../ui/syntaxHighlight';
+import MarkdownContent from '../../ui/Markdown';
 import { DesignFileIcon, DesignNavIcon, DesignOpenWithIcon, type DesignOpenWithIconName } from '../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './FilePreview.module.css';
@@ -254,18 +255,9 @@ function MarkdownPreview({ content }: { content: string }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <article className={styles.markdownPreview} aria-label={t('aria.markdownPreview')}>
-      {content.split('\n').map((line, index) => renderMarkdownLine(line, index))}
+      <MarkdownContent content={content} />
     </article>
   );
-}
-
-function renderMarkdownLine(line: string, index: number): React.ReactElement {
-  if (line.startsWith('## ')) return <h2 key={index}>{line.slice(3)}</h2>;
-  if (line.startsWith('# ')) return <h1 key={index}>{line.slice(2)}</h1>;
-  if (line.startsWith('- ')) return <p className={styles.markdownListItem} key={index}>{line.slice(2)}</p>;
-  if (/^\d+\.\s/.test(line)) return <p className={styles.markdownListItem} key={index}>{line}</p>;
-  if (!line.trim()) return <div className={styles.markdownGap} key={index} />;
-  return <p key={index}>{line}</p>;
 }
 
 function defaultPreviewMode(filename: string): FilePreviewMode {

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
+  workbenchDataModeDisplayLabel,
   writeWorkbenchDataModeOverride,
 } from '../demo';
 import {
@@ -198,24 +200,11 @@ function persistDataModeLabel(value: string): void {
 }
 
 function dataModeLabel(): string {
-  switch (readWorkbenchDataModeOverride()) {
-    case 'mock':
-      return 'Mock';
-    case 'fixture':
-      return 'Fixture';
-    case 'observed':
-      return 'Observed';
-    case 'approved-real':
-      return 'Approved real';
-    case 'auto':
-    default:
-      return 'Auto';
-  }
+  return workbenchDataModeDisplayLabel(readWorkbenchDataModeOverride());
 }
 
 function isRouteRealDataMode(value: string | undefined): boolean {
-  const key = value?.trim().toLowerCase();
-  return key === 'observed' || key === 'approved-real' || key === 'approved real' || key === 'real';
+  return isWorkbenchRealDataMode(value);
 }
 
 function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
@@ -1298,7 +1287,7 @@ export function WorkbenchRoutes({
           dueTodayCount={visibleTasks.filter((task) => task.dueDate.includes('今天')).length}
           fieldConfigActive={!taskShowCreator}
           fieldConfigLabel={taskShowCreator ? '字段配置' : '字段配置 5/6'}
-          emptyStateLabel={realDataMode ? 'Real Hub tasks are not loaded.' : undefined}
+          emptyStateLabel={realDataMode ? 'Hub tasks are not loaded in this replay.' : undefined}
           groupActive={taskGroupMode !== 'custom' || taskViewMode !== 'list'}
           groupLabel={
             taskViewMode === 'board'

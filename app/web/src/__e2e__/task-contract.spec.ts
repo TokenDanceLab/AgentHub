@@ -30,7 +30,7 @@ test.describe('Web Hub task approval/artifact contract', () => {
         return route.fulfill(json(hubEnvelope([{
           id: 'session-web-contract',
           type: 'group',
-          name: 'Real Hub task contract',
+          name: 'Stubbed Hub task contract',
           member_count: 2,
         }])));
       }
@@ -237,10 +237,11 @@ test.describe('Web Hub task approval/artifact contract', () => {
 
     await expect(page.getByText('@Agent queued')).toBeVisible();
     await expect(page.getByText('@Agent done')).toBeVisible();
-    await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
-    await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
     await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
     await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/artifacts')).toBe(true);
+    await page.getByRole('button', { name: /Awaiting approval|Expand/ }).first().click();
+    await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
+    await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
 
     writeReplayManifest(requested);
   });
@@ -279,6 +280,8 @@ function writeReplayManifest(requested: Set<string>): void {
     approvalReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/approvals'),
     artifactReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/artifacts'),
     summaryReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/summary'),
+    dataSource: 'stubbed-hub-session',
+    real_tested: false,
     directLocalEdge: false,
     realTokenDanceIdLogin: false,
     realCliOrModelExecuted: false,

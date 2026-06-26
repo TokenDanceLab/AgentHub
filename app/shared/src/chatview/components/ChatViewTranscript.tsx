@@ -6,6 +6,7 @@
 
 import { Component, useMemo, useEffect, useRef, useCallback, memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ExternalLink, Pin, X } from 'lucide-react'
 
 import { Transcript } from './Transcript'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
@@ -128,27 +129,47 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
   }, [highlightedBlockId, clearHighlight])
 
   return (
-    <div className="chatview" ref={containerRef}>
+    <div className="chatview" data-pinned={pinnedAnnouncement ? 'true' : 'false'} ref={containerRef}>
       {pinnedAnnouncement && (
-        <div className="chatview-pinned-banner">
-          <div className="chatview-pinned-header">
-            <span className="chatview-pinned-title">{pinnedAnnouncement.title}</span>
-            <div className="chatview-pinned-actions">
-              {pinnedAnnouncement.onCopy && (
-                <button className="chatview-pinned-btn" onClick={pinnedAnnouncement.onCopy} type="button">Copy</button>
-              )}
-              {pinnedAnnouncement.onDismiss && (
-                <button className="chatview-pinned-btn chatview-pinned-dismiss" onClick={pinnedAnnouncement.onDismiss} type="button">Dismiss</button>
-              )}
+        <div className="chatview-pinned-wrap">
+          <div className="chatview-pinned-banner">
+            <span className="chatview-pinned-mark" aria-hidden="true">
+              <Pin />
+            </span>
+            <div className="chatview-pinned-copy">
+              <div className="chatview-pinned-line">
+                <strong>{pinnedAnnouncement.title}:</strong>
+                <span>{pinnedAnnouncement.content}</span>
+              </div>
+              <div className="chatview-pinned-meta">
+                由 <a>{pinnedAnnouncement.author ?? '系统'}</a> 置顶
+                {pinnedAnnouncement.time && <span className="chatview-pinned-time">{pinnedAnnouncement.time}</span>}
+              </div>
             </div>
+
+            {pinnedAnnouncement.onCopy && (
+              <button
+                aria-label="打开置顶内容"
+                className="chatview-pinned-btn"
+                onClick={pinnedAnnouncement.onCopy}
+                title="打开置顶内容"
+                type="button"
+              >
+                <ExternalLink />
+              </button>
+            )}
+            {pinnedAnnouncement.onDismiss && (
+              <button
+                aria-label="关闭置顶"
+                className="chatview-pinned-btn chatview-pinned-dismiss"
+                onClick={pinnedAnnouncement.onDismiss}
+                title="关闭置顶"
+                type="button"
+              >
+                <X />
+              </button>
+            )}
           </div>
-          <div className="chatview-pinned-body">{pinnedAnnouncement.content}</div>
-          {(pinnedAnnouncement.author || pinnedAnnouncement.time) && (
-            <div className="chatview-pinned-meta">
-              {pinnedAnnouncement.author}
-              {pinnedAnnouncement.time && <span className="chatview-pinned-time">{pinnedAnnouncement.time}</span>}
-            </div>
-          )}
         </div>
       )}
       {items.length === 0 ? (
