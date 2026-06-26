@@ -1,33 +1,55 @@
 # AgentHub 全链路数据对接路线图
 
-> 最后更新：2026-06-24
-> 版本：v0.5.1（SUPER 全完成 + CI 全模块 lint/typecheck 修复）
+> 最后更新：2026-06-26
+> 版本：v0.5.1（全栈审计 78 项发现 + edge 10 项修复已推送 + CI 全绿）
 > 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
 
 ---
 
-## 当前优先级（2026-06-24）
+## 当前优先级（2026-06-26）
 
-### P1 — 安全问题关闭
+### P0 — Critical 修复
 
-| ID | 风险 | 分类 | 预计 |
+| ID | 风险 | 分类 | 来源 |
 |---|---|---|---|
-| AH-SR-045 | Edge 远程读取缺少范围鉴权 | 代码 | 2d |
-| AH-SR-046 | Edge run-start 缺少 capability token | 代码 | 1d |
-| AH-SR-047 | Edge 子进程 env 缺少最小 allowlist | 代码 | 1d |
-| AH-SR-049 | Hub-Edge 交付缺少持久化契约 | 架构 | 1w |
-| AH-SR-035 | OIDC 浏览器完整登录证据 | 验证 | 半天 |
-| AH-SR-036 | Desktop login/logout 证据 | 验证 | 半天 |
-| AH-SR-037 | Web 服务端 session 姿势 | 架构 | 1w |
-| AH-SR-042 | Mobile 设备证明 | 验证 | 半天 |
+| HUB-C1 | Delivery Outbox 重试/清理 goroutine 从未启动 | Hub 后端 | 全栈审计 |
+| HUB-C2 | EventBus Publish 池满时阻塞 HTTP handler | Hub 后端 | 全栈审计 |
+| HUB-C3 | syncLegacySeqs 阻塞优雅关闭 | Hub 后端 | 全栈审计 |
+| HUB-C4 | Redis session seq key 无 TTL → 内存泄漏 | Hub 后端 | 全栈审计 |
+| HUB-C5 | TaskScheduler 不响应 context 取消 | Hub 后端 | 全栈审计 |
+| WEB-C1 | localStorage token 回退 → XSS 持久化风险 | Web 前端 | 全栈审计 |
+| SEC-C1 | Edge API 单层中间件鉴权（单点故障） | 安全 | 全栈审计 |
 
-### P2 — 质量
+### P1 — High 修复
+
+| ID | 风险 | 分类 | 来源 |
+|---|---|---|---|
+| HUB-H1 | 非 loopback HTTP 明文派发 Agent prompt | Hub 后端 | 全栈审计 |
+| HUB-H2 | 审计日志文件无 rotation → 无限增长 | Hub 后端 | 全栈审计 |
+| HUB-H3 | agent_run_events 表无全局清理 | Hub 后端 | 全栈审计 |
+| HUB-H4 | Redis device_route key 无 TTL | Hub 后端 | 全栈审计 |
+| HUB-H5 | pprof 通过 TCP 暴露 heap dump | Hub 后端 | 全栈审计 |
+| SEC-H1 | Token 黑名单检查缺失在中间件层 | Hub 安全 | 全栈审计 |
+| SEC-H2 | Edge PostRuns 本地模式缺 ownership | Edge 安全 | 全栈审计 |
+| DESK-H1 | React Query 缺 gcTime 配置 | Desktop | 全栈审计 |
+| DESK-H2 | 健康检查/Runner 每 5 秒轮询 | Desktop | 全栈审计 |
+| DESK-H3 | DesktopEntryGate render 中调用副作用 | Desktop | 全栈审计 |
+| WEB-H1 | WS token 在 URL query 参数暴露 | Web | 全栈审计 |
+| WEB-H2 | uploadMultipart 缺 401 refresh | Web | 全栈审计 |
+| WEB-H3 | ErrorBoundary 生产环境泄漏堆栈 | Web | 全栈审计 |
+| WEB-H4 | Mobile ChatScreen 无 FlatList → 长对话崩溃 | Mobile | 全栈审计 |
+| WEB-H5 | Mobile SecureStore 无错误处理 | Mobile | 全栈审计 |
+| AH-SR-045 | Edge 远程读取缺少范围鉴权 | 安全 | 安全台账 |
+| AH-SR-046 | Edge run-start 缺少 capability token | 安全 | 安全台账 |
+| AH-SR-049 | Hub-Edge 交付缺少持久化契约 | 架构 | 安全台账 |
+
+### P2 — Medium / 质量
 
 | 项目 | 当前 | 目标 |
 |---|---|---|
-| edge-server 覆盖率 | 66.5% | 75% |
-| E2E Smoke | ❌ | ✅ |
+| edge-server 覆盖率 | 72% | 75% |
+| 全栈审计 Medium 项 | 44 项待评估 | 逐步修复 |
 | Desktop test | ❌ 部分 | ✅ |
 | pnpm audit | 24 vulns | 0 |
 
@@ -38,14 +60,15 @@
 | golangci.yml v2 格式统一 |
 | docs/analysis/ docs/plan/ docs/progress/ → archives |
 | 签名证书（暂不处理） |
+| 全栈审计 Low 项（12 项） |
 
-### 发布阻断
+### 已完成 ✅
 
-| 阻断 | 状态 |
-|---|---|
-| 8 Open High 安全风险 | 🔴 待关闭 |
-| 签名证书 | ⛔ 暂不采购 |
-| Updater 元数据 | ⛔ 依赖签名 |
+| 项目 | 日期 |
+|---|:--:|
+| edge-server 内存/磁盘泄漏 10 项修复 | 2026-06-26 |
+| AH-SR-047 Edge env allowlist 修复 | 2026-06-25 |
+| AH-SR-035/036/042 降级为 Mitigated in repo | 2026-06-25 |
 
 ---
 
