@@ -35,13 +35,30 @@ export function useHealth(): HealthState {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    let interval = setInterval(poll, HEALTH_POLL_MS);
     queueMicrotask(() => {
       void poll();
     });
-    const id = setInterval(poll, HEALTH_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        clearInterval(interval);
+        queueMicrotask(() => {
+          void poll();
+        });
+        interval = setInterval(poll, HEALTH_POLL_MS);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       mountedRef.current = false;
-      clearInterval(id);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [poll]);
 

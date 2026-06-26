@@ -28,13 +28,29 @@ export function useRunners(online: boolean): Runner[] {
       };
     }
 
+    let interval = setInterval(load, RUNNERS_POLL_MS);
     queueMicrotask(() => {
       void load();
     });
-    const id = setInterval(load, RUNNERS_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        clearInterval(interval);
+        queueMicrotask(() => {
+          void load();
+        });
+        interval = setInterval(load, RUNNERS_POLL_MS);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       mountedRef.current = false;
-      clearInterval(id);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [online, load]);
 
