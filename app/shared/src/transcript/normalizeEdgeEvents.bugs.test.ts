@@ -28,26 +28,15 @@ function edgeEvent(
 
 // ── BUG HUNT: Failing tests for known bugs ──────────────────────
 
-describe('run.queued renders as text block with pending status', () => {
-  it('run.queued event is mapped to a text block with status pending', () => {
-    // FIX: run.queued removed from SKIPPED_EVENT_TYPES so the switch case is now reachable.
+describe('run.queued is lifecycle state, not chat content', () => {
+  it('run.queued event is dropped from transcript projection', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-queued', 1, 'run.queued', {
         runId: 'run-test-1',
       }),
     ]);
 
-    expect(blocks).toEqual([
-      expect.objectContaining({
-        id: 'edge-event-evt-queued',
-        kind: 'text',
-        author: { id: 'edge', name: 'Edge', role: 'system' },
-        text: 'Run run-test-1 queued',
-        evidenceRefs: [
-          { id: 'run-run-test-1', kind: 'run', label: 'Run run-test-1', status: 'pending' },
-        ],
-      }),
-    ]);
+    expect(blocks).toEqual([]);
   });
 });
 
@@ -160,7 +149,7 @@ describe('outputTextBlock and outputBatchTextBlock — missing runId now warns a
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.kind).toBe('text');
-    expect(blocks[0]!.text).toBe('Hello world');
+    expect((blocks[0]! as { text: string }).text).toBe('Hello world');
     // FIX: evidenceRefs now uses event.id as fallback run ID
     expect(blocks[0]!.evidenceRefs).toEqual([
       { id: 'run-evt-output-no-run', kind: 'run', label: 'Run evt-output-no-run', status: 'running' },
@@ -183,7 +172,7 @@ describe('outputTextBlock and outputBatchTextBlock — missing runId now warns a
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.kind).toBe('text');
-    expect(blocks[0]!.text).toBe('line 1line 2');
+    expect((blocks[0]! as { text: string }).text).toBe('line 1line 2');
     // FIX: evidenceRefs now uses event.id as fallback run ID
     expect(blocks[0]!.evidenceRefs).toEqual([
       { id: 'run-evt-batch-no-run', kind: 'run', label: 'Run evt-batch-no-run', status: 'running' },
@@ -202,7 +191,7 @@ describe('agentTextBlock — missing runId warns and falls back to event.id', ()
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.kind).toBe('text');
-    expect(blocks[0]!.text).toBe('Agent says hello');
+    expect((blocks[0]! as { text: string }).text).toBe('Agent says hello');
     // FIX: evidenceRefs now uses event.id as fallback run ID
     expect(blocks[0]!.evidenceRefs).toEqual([
       { id: 'run-evt-text-no-run', kind: 'run', label: 'Run evt-text-no-run', status: 'running' },
@@ -480,10 +469,8 @@ describe('BUG: agentResultBlock — missing runId returns null', () => {
   });
 });
 
-describe('BUG: runStatusChanged — run.status.changed with unknown status defaults to "running"', () => {
-  it('BUG: unrecognized status values default to "running" without any warning', () => {
-    // Line 115: const status = normalizeEvidenceStatus(statusText);
-    // normalizeEvidenceStatus returns 'running' for any unrecognized status (line 817-818)
+describe('run.status.changed is lifecycle state, not chat content', () => {
+  it('drops unrecognized run.status.changed values from transcript projection', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-status-unknown', 1, 'run.status.changed', {
         runId: 'run-test-15',
@@ -491,14 +478,7 @@ describe('BUG: runStatusChanged — run.status.changed with unknown status defau
       }),
     ]);
 
-    expect(blocks).toHaveLength(1);
-    // BUG: Unknown status 'mysterious-new-status' is silently mapped to 'running'
-    // The text preserves the original status, but the evidenceRef is wrong
-    expect(blocks[0]!.text).toBe('Run run-test-15 mysterious-new-status');
-    // EvidenceRef says 'running' but the text says 'mysterious-new-status'
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-test-15', kind: 'run', label: 'Run run-test-15', status: 'running' },
-    ]);
+    expect(blocks).toEqual([]);
   });
 });
 
@@ -508,17 +488,16 @@ describe('BUG: normalizeEvidenceStatus — cancelled and failed are the same', (
     // This means cancelled runs and failed runs are visually indistinguishable in the transcript
     // at the evidence level. The block kind ('failure') is the same for both.
 
-    // Verify via run.status.changed with cancelled status
+    // run.status.changed is not projected into transcript blocks; terminal events
+    // still use the same failed evidence state.
     const cancelled = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-cancelled', 1, 'run.status.changed', {
+      edgeEvent('evt-status-cancelled', 1, 'run.cancelled', {
         runId: 'run-test-16',
-        status: 'cancelled',
       }),
     ]);
     const failed = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-failed', 2, 'run.status.changed', {
+      edgeEvent('evt-status-failed', 2, 'run.failed', {
         runId: 'run-test-16',
-        status: 'failed',
       }),
     ]);
 
@@ -562,7 +541,7 @@ describe('BUG: event sorting — events without sentAt get POSITIVE_INFINITY tim
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.id).toBe('edge-event-evt-normal');
     expect(blocks[0]!.kind).toBe('text');
-    expect(blocks[0]!.text).toBe('should be firstshould be last');
+    expect((blocks[0]! as { text: string }).text).toBe('should be firstshould be last');
   });
 });
 

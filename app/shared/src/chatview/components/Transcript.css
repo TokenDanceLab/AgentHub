@@ -16,18 +16,259 @@
 /* ── Empty state ──────────────────────────────────────────────────── */
 .chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
 
+/* ── Pinned announcement ──────────────────────────────────────────── */
+.chatview {
+  position:relative;
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+}
+
+.chatview[data-pinned='true'] .transcript {
+  padding-top:72px;
+}
+
+.chatview-pinned-wrap {
+  --chat-col:min(100%, 820px);
+
+  position:absolute;
+  z-index:11;
+  top:8px;
+  left:max(20px, calc((100% - var(--chat-col)) / 2));
+  width:min(calc(100% - 40px), var(--chat-col));
+  max-width:min(calc(100% - 40px), var(--chat-col));
+  padding:0;
+  background:transparent;
+  pointer-events:none;
+  transition:
+    left var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
+    width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
+    max-width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
+    transform var(--dur-medium, 260ms) var(--ease-panel, var(--ease)),
+    opacity var(--dur-medium, 260ms) var(--ease);
+}
+
+.chatview-pinned-banner {
+  width:100%;
+  min-height:46px;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:7px 9px 7px 11px;
+  border:1px solid var(--bdr);
+  border-radius:var(--r-sm);
+  background:color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
+  color:var(--text-1);
+  box-shadow:0 4px 14px rgba(18, 18, 32, 0.045);
+  pointer-events:auto;
+  transition:border-color var(--dur, 160ms) var(--ease), box-shadow var(--dur-slow, 400ms) var(--ease);
+}
+
+.chatview-pinned-banner:hover {
+  border-color:var(--bdr-strong);
+  box-shadow:var(--e-2, var(--shadow));
+}
+
+.chatview-pinned-mark {
+  width:24px;
+  height:24px;
+  border-radius:var(--r-full);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  background:var(--accent-orange, var(--warning));
+  color:var(--accent-orange-foreground, var(--on-primary));
+}
+
+.chatview-pinned-mark svg {
+  width:13px;
+  height:13px;
+  display:block;
+}
+
+.chatview-pinned-copy {
+  flex:1 1 auto;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+
+.chatview-pinned-line {
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  color:var(--text-1);
+  font:400 0.8125rem/1.25 var(--font-sans);
+}
+
+.chatview-pinned-line strong {
+  flex:0 0 auto;
+  font-weight:600;
+}
+
+.chatview-pinned-line span {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.chatview-pinned-btn {
+  width:28px;
+  height:28px;
+  border:0;
+  border-radius:var(--r-xs);
+  background:transparent;
+  color:var(--text-2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  cursor:pointer;
+  padding:0;
+  transition:background var(--dur, 160ms) var(--ease), color var(--dur, 160ms) var(--ease);
+}
+
+.chatview-pinned-btn:hover,
+.chatview-pinned-dismiss:hover {
+  background:var(--surface-high);
+  color:var(--text-1);
+}
+
+.chatview-pinned-btn svg {
+  width:16px;
+  height:16px;
+  display:block;
+}
+
+.chatview-pinned-meta {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  min-width:0;
+  color:var(--text-3);
+  font:400 0.6875rem/1.2 var(--font-sans);
+}
+
+.chatview-pinned-meta a {
+  color:var(--primary);
+  text-decoration:none;
+  cursor:pointer;
+}
+
+.chatview-pinned-time {
+  margin-left:var(--sp-xs);
+  font-family:var(--font-mono);
+  font-weight:400;
+}
+
 /* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ──────── */
 .grp-row {
   display:flex; gap:var(--sp-md); align-items:flex-start;
   margin-bottom:var(--sp-lg);
 }
 .grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-xxs) }
-.card-stack { display:flex; flex-direction:column; gap:0 }
+.card-stack {
+  align-self:flex-start;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  width:min(86%, 820px);
+  max-width:100%;
+  min-width:0;
+}
 /* first child aligns flush to avatar top */
 .grp-content > :first-child { margin-top:0 }
-/* bubbles: fit content, not full width */
+/* Bubbles sit on a stable reading column; user replies still shrink right. */
 .grp-content > .agent-bubble { align-self:flex-start; max-width:72% }
 .grp-content > .user-bubble { align-self:flex-end; max-width:68% }
+.bubble-group {
+  align-self:flex-start;
+  display:flex;
+  flex-direction:column;
+  gap:var(--sp-xxs);
+  width:min(86%, 820px);
+  max-width:100%;
+  min-width:0;
+}
+.bubble-group > .agent-bubble { width:100% }
+
+/* ── Message display metadata from Hub/Edge contracts ─────────────── */
+.message-display-meta {
+  width:100%;
+  max-width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  color:var(--text-3);
+  font:var(--label-xs);
+}
+.message-display-meta[data-align='right'] {
+  align-items:flex-end;
+}
+.message-display-meta-line {
+  display:flex;
+  align-items:center;
+  gap:var(--sp-xs);
+  min-width:0;
+}
+.message-display-meta[data-align='right'] .message-display-meta-line {
+  justify-content:flex-end;
+}
+.message-display-title {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--text-2);
+  font-weight:600;
+}
+.message-display-badge {
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  min-height:18px;
+  padding:1px 6px;
+  border-radius:var(--r-xs);
+  border:1px solid var(--bdr);
+  background:var(--surface-high);
+  color:var(--text-2);
+  font:600 0.6875rem/1.2 var(--font-sans);
+}
+.message-display-badge[data-variant='thinking'] {
+  border-color:color-mix(in srgb, var(--primary) 28%, transparent);
+  background:color-mix(in srgb, var(--primary) 12%, transparent);
+  color:var(--primary);
+}
+.message-display-badge[data-variant='success'] {
+  border-color:color-mix(in srgb, var(--success) 30%, transparent);
+  background:color-mix(in srgb, var(--success) 12%, transparent);
+  color:var(--success);
+}
+.message-display-badge[data-variant='warning'] {
+  border-color:color-mix(in srgb, var(--warning) 32%, transparent);
+  background:color-mix(in srgb, var(--warning) 13%, transparent);
+  color:var(--warning);
+}
+.message-display-badge[data-variant='danger'] {
+  border-color:color-mix(in srgb, var(--danger) 32%, transparent);
+  background:color-mix(in srgb, var(--danger) 12%, transparent);
+  color:var(--danger);
+}
+.message-display-detail {
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--text-3);
+}
 
 /* ── Bubbles ───────────────────────────────────────────────────────── */
 .user-bubble {
@@ -39,8 +280,43 @@
   background:var(--surface); border:1px solid var(--bdr);
   border-radius:var(--r-md); padding:var(--sp-sm) var(--sp-14);
   font:var(--body); color:var(--text-1); line-height:1.55;
+  max-width:100%;
+  min-width:0;
 }
+.agent-bubble > div,
+.user-bubble > div { max-width:100%; color:inherit }
+.agent-bubble > div > :first-child { margin-top:0 }
+.agent-bubble > div > :last-child { margin-bottom:0 }
+.user-bubble > div > :first-child { margin-top:0 }
+.user-bubble > div > :last-child { margin-bottom:0 }
+.agent-bubble table,
+.user-bubble table { max-width:100% }
 .agent-bubble code { font:var(--label); background:var(--surface-high); padding:1px 5px; border-radius:var(--r-xs) }
+.user-bubble a {
+  color:var(--on-primary);
+  text-decoration-color:color-mix(in srgb, var(--on-primary) 70%, transparent);
+}
+.user-bubble code {
+  font:var(--label);
+  color:var(--on-primary);
+  background:color-mix(in srgb, var(--on-primary) 16%, transparent);
+  padding:1px 5px;
+  border-radius:var(--r-xs);
+}
+.user-bubble table {
+  border-color:color-mix(in srgb, var(--on-primary) 28%, transparent);
+  background:color-mix(in srgb, var(--on-primary) 7%, transparent);
+}
+.user-bubble th,
+.user-bubble td {
+  border-color:color-mix(in srgb, var(--on-primary) 24%, transparent);
+}
+.user-bubble th {
+  background:color-mix(in srgb, var(--on-primary) 12%, transparent);
+}
+.user-bubble tr:nth-child(even) td {
+  background:color-mix(in srgb, var(--on-primary) 6%, transparent);
+}
 
 /* ── Avatars ───────────────────────────────────────────────────────── */
 .ag-av {

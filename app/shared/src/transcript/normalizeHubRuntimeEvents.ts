@@ -1,5 +1,6 @@
 import type { EventEnvelope } from '../events';
 import { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
+import { orderTranscriptBlocks } from './order';
 import type { TranscriptBlock } from './types';
 
 export interface HubRuntimeEventTranscriptInput {
@@ -33,10 +34,10 @@ export function normalizeHubRuntimeEventsToTranscript(
       .map(hubRuntimeEventToEdgeEnvelope)
       .filter((event): event is EventEnvelope => Boolean(event)),
   );
-  return [
+  return orderTranscriptBlocks([
     ...hubRuntimeSessionBlocks(events),
     ...edgeBlocks,
-  ];
+  ]);
 }
 
 export function hubRuntimeEventFromPayload(payload: unknown): HubRuntimeEventTranscriptInput | null {
@@ -95,6 +96,7 @@ interface HubRuntimeSessionSummary {
   sessionId?: string;
   modeLabel?: string;
   targetLabel?: string;
+  createdAt?: string;
   status: 'running' | 'completed' | 'failed';
 }
 
@@ -131,6 +133,7 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
     const nextRuntimeLabel = previous?.runtimeLabel ?? runtimeRuntimeLabel(event, payload);
     const nextModeLabel = previous?.modeLabel ?? runtimeModeLabel(event, payload);
     const nextTargetLabel = previous?.targetLabel ?? runtimeTargetLabel(event, payload);
+    const nextCreatedAt = earliestTimestamp(previous?.createdAt, event.created_at);
     summaries.set(key, {
       key,
       ...(nextTaskId ? { taskId: nextTaskId } : {}),
@@ -142,6 +145,7 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
       ...(nextSessionId ? { sessionId: nextSessionId } : {}),
       ...(nextModeLabel ? { modeLabel: nextModeLabel } : {}),
       ...(nextTargetLabel ? { targetLabel: nextTargetLabel } : {}),
+      ...(nextCreatedAt ? { createdAt: nextCreatedAt } : {}),
       status: mergeSessionStatus(previous?.status, sessionStatus(event)),
     });
   }
@@ -153,6 +157,7 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
     title: 'Hub task replay',
     status: summary.status,
     meta: sessionMeta(summary),
+    ...(summary.createdAt ? { createdAt: summary.createdAt } : {}),
     ...(summary.agentLabel ? { agentLabel: summary.agentLabel } : {}),
     ...(summary.runtimeLabel ? { runtimeLabel: summary.runtimeLabel } : {}),
     ...(summary.edgeRunId ? { runId: summary.edgeRunId, edgeRunId: summary.edgeRunId } : {}),
@@ -330,17 +335,61 @@ function hubRuntimeEventToEdgeEnvelope(event: HubRuntimeEventTranscriptInput): E
       ...(event.edge_device_id ? { deviceId: event.edge_device_id } : {}),
     },
     sentAt: event.created_at ?? '',
-    payload: runtimePayloadRecord(event.payload, runId),
+    payload: runtimePayloadRecord(event.payload, runId, event),
   };
 }
 
-function runtimePayloadRecord(payload: unknown, runId: string | undefined): Record<string, unknown> {
+function earliestTimestamp(left: string | undefined, right: string | undefined): string | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  if (!Number.isFinite(leftMs)) return right;
+  if (!Number.isFinite(rightMs)) return left;
+  return rightMs < leftMs ? right : left;
+}
+
+function runtimePayloadRecord(
+  payload: unknown,
+  runId: string | undefined,
+  event: HubRuntimeEventTranscriptInput,
+): Record<string, unknown> {
   const parsed = parsePayloadRecord(payload);
   const record = parsed ?? { content: payload };
+  const agentId = stringField(event.agent_instance_id);
+  const agentLabel = firstString(event.agent_label, event.display_name);
   return {
     ...(runId && record.runId == null ? { runId } : {}),
+    ...(agentId && !hasAnyAgentId(record) ? { agentInstanceId: agentId } : {}),
+    ...(agentLabel && !hasAnyAgentLabel(record) ? { agentLabel } : {}),
     ...record,
   };
+}
+
+function hasAnyAgentId(record: Record<string, unknown>): boolean {
+  return Boolean(firstString(
+    record.agentId,
+    record.agent_id,
+    record.agentInstanceId,
+    record.agent_instance_id,
+    record.workerId,
+    record.worker_id,
+  ));
+}
+
+function hasAnyAgentLabel(record: Record<string, unknown>): boolean {
+  return Boolean(firstString(
+    record.agentName,
+    record.agent_name,
+    record.agentLabel,
+    record.agent_label,
+    record.displayName,
+    record.display_name,
+    record.workerName,
+    record.worker_name,
+    record.worker,
+    record.agent,
+  ));
 }
 
 function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {

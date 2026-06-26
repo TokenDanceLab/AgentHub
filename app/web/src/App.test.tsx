@@ -196,9 +196,9 @@ describe('Web app root', () => {
     expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('发消息给 Agent 协作群')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Data: auto');
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
@@ -230,7 +230,7 @@ describe('Web app root', () => {
     expect(screen.getByText('来自 Hub session 的真实消息')).toBeInTheDocument();
   });
 
-  it('keeps Hub Agent Profiles inside the adapter model instead of adding first-screen composer controls', () => {
+  it('keeps Hub Agent Profiles available to the shared composer without legacy demo controls', () => {
     useAgentListMock.mockReturnValue({
       data: {
         items: [
@@ -262,7 +262,7 @@ describe('Web app root', () => {
 
     expect(useAgentListMock).toHaveBeenCalledWith(true);
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
     expect(screen.queryByText('@Hub Builder')).not.toBeInTheDocument();
   });
 

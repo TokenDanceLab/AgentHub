@@ -2,29 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { EvidenceRefStatus } from '../transcript';
 import styles from './StepCard.module.css';
 
-/* ═══ Status icon mapping ═══ */
-
 export type StepCardStatus = EvidenceRefStatus;
 
-const STATUS_ICON: Record<StepCardStatus, string> = {
-  completed: '✅',
-  running: '⏳',
-  pending: '⏸',
-  failed: '❌',
-};
-
-/* ═══ Sub-step kind icons ═══ */
-
 export type SubStepKind = 'plan' | 'tool_call' | 'skill' | 'artifact' | 'text' | 'error';
-
-const KIND_ICON: Record<SubStepKind, string> = {
-  plan: '📋',
-  tool_call: '🔧',
-  skill: '🎯',
-  artifact: '📄',
-  text: '💬',
-  error: '❌',
-};
 
 /* ═══ Sub-step shape ═══ */
 
@@ -61,10 +41,6 @@ export interface StepCardProps {
 }
 
 /* ═══ Helpers ═══ */
-
-function statusIcon(status: StepCardStatus): string {
-  return STATUS_ICON[status] ?? '';
-}
 
 function statusLabel(status: StepCardStatus): string {
   switch (status) {
@@ -155,7 +131,7 @@ export function StepCard({
           <strong className={styles.title}>{title}</strong>
           {meta && <small className={styles.meta}>{meta}</small>}
         </span>
-        <span className={styles.statusIcon}>{statusIcon(status)}</span>
+        <span className={styles.statusIcon} data-status={status} aria-hidden="true" />
         <span className={styles.statusLabel}>{statusLabel(status)}</span>
         {hasBody && (
           <span className={styles.chevron} aria-hidden="true">
@@ -188,9 +164,7 @@ export function StepCard({
                     key={step.key}
                     className={[styles.timelineItem, subStepStatusClass(step.status)].filter(Boolean).join(' ')}
                   >
-                    <span className={styles.timelineMarker} aria-hidden="true">
-                      {KIND_ICON[step.kind]}
-                    </span>
+                    <span className={styles.timelineMarker} data-kind={step.kind} aria-hidden="true" />
                     <span className={styles.timelineCopy}>
                       <span className={styles.timelineLabel}>{step.label}</span>
                       {step.detail && (
