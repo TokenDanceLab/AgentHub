@@ -11,7 +11,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config playwright.config.ts",
-    "test:e2e:real-mode": "playwright test --config playwright.config.ts --project=chromium web-hub-real-mode-smoke.spec.ts task-contract.spec.ts",
+    "test:e2e:chat-flow": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts",
+    "test:e2e:stubbed-hub": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts web-stubbed-hub-replay-smoke.spec.ts task-contract.spec.ts",
+    "test:e2e:approved-real-stub": "pnpm test:e2e:stubbed-hub",
+    "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

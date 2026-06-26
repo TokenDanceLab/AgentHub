@@ -1,7 +1,15 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore } from '@shared/demo';
+import {
+  WORKBENCH_DATA_MODE_STORAGE_KEY,
+  getWorkbenchDataModeContract,
+  getWorkbenchDataModeOverrideSnapshot,
+  resolveWorkbenchDataMode,
+  subscribeWorkbenchDataModeOverride,
+  writeWorkbenchDataModeOverride,
+  workbenchDemoRuntimeStore,
+} from '@shared/demo';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
@@ -40,7 +48,17 @@ import { useToastStore } from '@/stores/toastStore';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
-  const { online: edgeOnline } = useHealth();
+  const dataModeOverride = useSyncExternalStore(
+    subscribeWorkbenchDataModeOverride,
+    getWorkbenchDataModeOverrideSnapshot,
+    getWorkbenchDataModeOverrideSnapshot,
+  );
+  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride);
+  const dataModeContract = getWorkbenchDataModeContract(dataMode);
+  const edgeHealthEnabled = entryMode === 'entry' ||
+    dataModeContract.requiresLocalEdgeForDesktop ||
+    dataModeContract.allowsLocalEdgeAutoFallback;
+  const { online: edgeOnline } = useHealth({ enabled: edgeHealthEnabled });
   const { user } = useAuth();
 
   // If already authenticated (e.g. returning from OIDC callback with stored session),
@@ -94,14 +112,14 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
-  const { online: edgeOnline } = useHealth();
+  const { online: edgeOnline } = useHealth({ enabled: !workbench.isDemo || workbench.edgeDemoData === true });
   const queryClient = useQueryClient();
   const submitRunRef = useRef(false);
   const agentsRef = useRef<WorkbenchAgent[] | undefined>(undefined);
   const showToast = useToastStore((s) => s.showToast);
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
-  // In demo mode with Edge available, also fetch evidence from Edge API.
+  // In auto mode with Local Edge fallback, also fetch evidence from Edge API.
   const demoEdgeEnabled = edgeOnline && workbench.isDemo && workbench.edgeDemoData === true;
   const edgeFetchEnabled = liveEdgeEnabled || demoEdgeEnabled;
   const { data: agentData } = useAgentList(liveEdgeEnabled);
@@ -165,10 +183,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     if (!workbench.activeThreadId && !demoEdgeEnabled) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
   }, [workbench.activeThreadId, workbench.transcript, demoEdgeEnabled]);
-  // In demo+edge mode, also fetch run evidence from Edge API.
+  // In auto mode with an available Local Edge, also fetch run evidence from Edge API.
   const edgeRunEvidence = useRunEvidence(edgeFetchEnabled ? activeRunId : undefined);
 
-  // Demo mode: when Edge is available, use Edge API evidence; otherwise use JS mock.
+  // Auto mode with Local Edge fallback uses Edge API evidence; explicit mock/fixture use JS data.
   // Real mode: always use Edge API evidence.
   const runtimeEvidence = workbench.isDemo
     ? (demoEdgeEnabled && activeRunId
@@ -267,7 +285,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
     ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
     ...(edgeOnline ? { submitRun: submitRunWithRefresh } : {}),
-  }), [submitRunWithRefresh, workbench.activeProjectId, workbench.activeThreadId, edgeOnline]);
+    demoRuntimeFallback: workbench.isDemo && workbench.edgeDemoData !== true,
+  }), [submitRunWithRefresh, workbench.activeProjectId, workbench.activeThreadId, edgeOnline, workbench.edgeDemoData, workbench.isDemo]);
   const edgeAgents = useMemo(
     () => mapEdgeAgentsToWorkbenchAgents(agentData?.items ?? [], modelCatalog),
     [agentData?.items, modelCatalog],
@@ -438,8 +457,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
         workbenchStatus={{
           dataMode: workbench.dataMode,
-          targetState: workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
-          targetLabel: workbench.isDemo ? 'Demo runtime' : 'Local Edge',
+          targetState: workbench.edgeDemoData ? 'observed' : workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
+          targetLabel: workbench.edgeDemoData ? 'Local Edge observed (auto)' : workbench.isDemo ? 'Demo runtime' : 'Local Edge',
           initialLoading: workbench.threadsLoading === true && workbench.conversations.length === 0,
           ...((workbench.threadsError ?? workbench.itemsError) !== undefined
             ? { loadError: (workbench.threadsError ?? workbench.itemsError) as string }

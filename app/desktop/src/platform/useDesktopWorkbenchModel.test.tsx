@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -6,6 +6,8 @@ import { WORKBENCH_DATA_MODE_STORAGE_KEY, resolveDemoWorkbenchTranscript } from 
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
 import { useDesktopWorkbenchModel } from './useDesktopWorkbenchModel';
+import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
+import { fetchHealth } from '@/api/edgeClient';
 
 vi.mock('@/api/threadQueries', () => ({
   useThreadPins: vi.fn(),
@@ -65,6 +67,8 @@ const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedUseHubSessions = vi.mocked(useHubSessions);
 const mockedUseHubMessages = vi.mocked(useHubMessages);
+const mockedUseDesktopEdgeEvents = vi.mocked(useDesktopEdgeEvents);
+const mockedFetchHealth = vi.mocked(fetchHealth);
 
 describe('useDesktopWorkbenchModel', () => {
   const queryClient = new QueryClient();
@@ -91,6 +95,8 @@ describe('useDesktopWorkbenchModel', () => {
     mockedUseHubMessages.mockReturnValue({
       data: undefined,
     } as unknown as ReturnType<typeof useHubMessages>);
+    mockedUseDesktopEdgeEvents.mockReturnValue([]);
+    mockedFetchHealth.mockRejectedValue(new Error('Edge not available'));
   });
 
   function renderWithProvider() {
@@ -123,7 +129,7 @@ describe('useDesktopWorkbenchModel', () => {
     const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('agent-collab');
-    expect(result.current.dataMode).toBe('mock (auto fallback)');
+    expect(result.current.dataMode).toBe('auto');
     expect(result.current.conversations.length).toBeGreaterThan(0);
     expect(result.current.transcript).toEqual(resolveDemoWorkbenchTranscript('agent-collab'));
   });
@@ -143,10 +149,34 @@ describe('useDesktopWorkbenchModel', () => {
     const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('agent-collab');
-    expect(result.current.dataMode).toBe('mock (auto fallback)');
+    expect(result.current.dataMode).toBe('auto');
     expect(result.current.isDemo).toBe(true);
     expect(result.current.conversations.some((conversation) => conversation.title === 'Local Thread')).toBe(false);
     expect(result.current.transcript).toEqual(resolveDemoWorkbenchTranscript('agent-collab'));
+  });
+
+  it('keeps explicit mock mode isolated from Local Edge probing and data', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'mock');
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [{
+          threadId: 'live-thread',
+          title: 'Local Thread',
+          status: 'active',
+        }],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+
+    const { result } = renderWithProvider();
+
+    await waitFor(() => {
+      expect(mockedUseThreads).toHaveBeenCalledWith(undefined, { enabled: false });
+    });
+    expect(mockedFetchHealth).not.toHaveBeenCalled();
+    expect(result.current.dataMode).toBe('mock');
+    expect(result.current.isDemo).toBe(true);
+    expect(result.current.conversations.some((conversation) => conversation.title === 'Local Thread')).toBe(false);
   });
 
   it('uses Local Edge threads only after approved-real is explicitly selected', () => {
@@ -174,5 +204,46 @@ describe('useDesktopWorkbenchModel', () => {
       }),
     ]);
     expect(mockedUseThreads).toHaveBeenCalledWith(undefined, { enabled: true });
+  });
+
+  it('merges persisted thread items and live Edge events by transcript time', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [{
+          threadId: 'live-thread',
+          title: 'Local Thread',
+          status: 'active',
+        }],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: {
+        items: [{
+          itemId: 'persisted-later',
+          type: 'message',
+          role: 'agent',
+          senderName: 'Agent',
+          content: 'persisted later',
+          createdAt: '2026-06-26T10:00:05.000Z',
+        }],
+        page: { hasMore: false },
+      },
+    } as unknown as ReturnType<typeof useThreadMessages>);
+    mockedUseDesktopEdgeEvents.mockReturnValue([{
+      id: 'live-earlier',
+      kind: 'text',
+      text: 'live earlier',
+      author: { id: 'agent', name: 'Agent', role: 'agent' },
+      createdAt: '2026-06-26T10:00:01.000Z',
+    }]);
+
+    const { result } = renderWithProvider();
+
+    expect(result.current.transcript.map((block) => block.id)).toEqual([
+      'live-earlier',
+      'thread-item-persisted-later',
+    ]);
   });
 });

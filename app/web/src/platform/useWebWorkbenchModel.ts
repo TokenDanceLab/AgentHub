@@ -4,13 +4,12 @@ import type { ProjectDraft, ProjectInfo, RuntimeEvidenceSnapshot } from '@shared
 import type { WorkbenchDataMode } from '@shared/demo';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
-  isWorkbenchFixtureDataMode,
   isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   subscribeWorkbenchDataModeOverride,
-  workbenchDataModeLabel,
 } from '@shared/demo';
 import {
   resolveHubContacts,
@@ -19,6 +18,7 @@ import {
 import {
   normalizeHubMessagesToTranscript,
   normalizeHubRuntimeEventsToTranscript,
+  orderTranscriptBlocks,
   collectTranscriptEvidence,
   resolveCurrentTranscriptRunId,
   getAgentActivityStore,
@@ -80,10 +80,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
+  const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const authenticated = useHubStore((state) => state.authenticated);
-  const fixtureMode = isWorkbenchFixtureDataMode(dataMode);
-  const realMode = isWorkbenchRealDataMode(dataMode);
-  const hubReady = !fixtureMode && authenticated && Boolean(getAccessToken());
+  const realMode = dataModeContract.isRealDataMode;
+  const hubReady = dataModeContract.allowsHubData && authenticated && Boolean(getAccessToken());
   const queryClient = useQueryClient();
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
@@ -460,7 +460,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       : undefined,
     runtimeEvidence: resolveWebRuntimeEvidence(surfacedTranscript),
     workbenchStatus: {
-      dataMode: workbenchDataModeLabel(dataMode),
+      dataMode: dataModeContract.statusLabel,
       targetState: executionTargetStatus.state,
       targetLabel: executionTargetStatus.selectedTarget
         ? executionTargetLabel(executionTargetStatus.selectedTarget)
@@ -629,7 +629,7 @@ function webTaskContractErrorBlock(channel: 'approvals' | 'artifacts', taskId: s
     kind: 'text',
     author: { id: 'hub-task-contract', name: 'Hub task contract', role: 'system' },
     text,
-    badgeLabel: 'Real Hub error',
+    badgeLabel: 'Hub task error',
     badgeVariant: 'danger',
   };
 }
@@ -743,14 +743,19 @@ export function resolveWebWorkbenchProjects(
   projectGroups?: Record<string, WorkspaceProjectGroupProjection | undefined>,
 ): ProjectInfo[] | undefined {
   if (!hubReady) {
-    return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
+    const contract = getWorkbenchDataModeContract(dataMode);
+    return contract.mode === 'mock' || contract.mode === 'fixture' ? undefined : [];
   }
   return (projects ?? []).map((project) => workspaceProjectToProjectInfo(project, projectGroups?.[project.id]));
 }
 
 export interface WorkspaceProjectGroupProjection {
-  threads: WorkspaceProjectThread[];
-  messages: WorkspaceProjectThreadMessage[];
+  threads: WorkspaceProjectThread[] | WorkspaceProjectGroupListEnvelope<WorkspaceProjectThread>;
+  messages: WorkspaceProjectThreadMessage[] | WorkspaceProjectGroupListEnvelope<WorkspaceProjectThreadMessage>;
+}
+
+interface WorkspaceProjectGroupListEnvelope<T> {
+  items?: T[] | undefined;
 }
 
 export interface ParsedProjectThreadMessageContent {
@@ -768,8 +773,8 @@ export function workspaceProjectToProjectInfo(
   group?: WorkspaceProjectGroupProjection,
 ): ProjectInfo {
   const description = project.description?.trim() || 'Hub workspace project';
-  const threads = group?.threads ?? [];
-  const messages = group?.messages ?? [];
+  const threads = projectGroupItems(group?.threads);
+  const messages = projectGroupItems(group?.messages);
   const parsedMessages = messages.map(parseWorkspaceProjectThreadMessageContent);
   const queueRuns = parsedMessages
     .map((parsed, index) => projectQueueRunFromMessage(messages[index]!, parsed))
@@ -799,6 +804,14 @@ export function workspaceProjectToProjectInfo(
     artifacts: [],
     feed,
   };
+}
+
+function projectGroupItems<T>(
+  value: T[] | WorkspaceProjectGroupListEnvelope<T> | undefined,
+): T[] {
+  if (Array.isArray(value)) return value;
+  if (value && Array.isArray(value.items)) return value.items;
+  return [];
 }
 
 export function parseWorkspaceProjectThreadMessageContent(
@@ -1105,10 +1118,10 @@ export function resolveWebWorkbenchTranscript(
       : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
   if (activeHubSessionId) {
-    return [
+    return orderTranscriptBlocks([
       ...normalizeHubMessagesToTranscript(messages),
       ...normalizeHubRuntimeEventsToTranscript(liveRuntimeEvents),
-    ];
+    ]);
   }
   return isWorkbenchRealDataMode(dataMode)
     ? webHubEmptyTranscript

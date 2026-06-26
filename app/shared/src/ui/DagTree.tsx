@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import type { RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
+import type { RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock, SubtaskTranscriptBlock } from '../transcript';
 
 /* ═══════════════════════════════════════════════════════════════════════
    DagTree — Pure HTML tree showing agent dispatch / routing DAG.
@@ -8,7 +8,7 @@ import type { RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentT
      1. RouteDecisionTranscriptBlock from transcript
      2. SubagentTranscriptBlock / ChildAgentTranscriptBlock for sub-trees
 
-   Each node renders: status icon + agent name + optional duration.
+   Each node renders: tokenized status mark + agent name + optional duration.
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -27,15 +27,6 @@ export interface DagTreeProps {
   nodes: DagNode[];
   title?: string | undefined;
 }
-
-// ── Status icons ─────────────────────────────────────────────────────────
-
-const STATUS_ICON: Record<DagNodeStatus, string> = {
-  completed: '✅',
-  in_progress: '⏳',
-  pending: '⏸',
-  failed: '❌',
-};
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -89,7 +80,7 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
         onKeyDown={hasChildren ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } : undefined}
         tabIndex={hasChildren ? 0 : -1}
       >
-        <span aria-hidden="true">{STATUS_ICON[node.status]}</span>
+        <span aria-hidden="true" style={statusMarkStyle(node.status)} />
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {node.label}
         </span>
@@ -108,9 +99,33 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
   );
 }
 
+function statusMarkStyle(status: DagNodeStatus): React.CSSProperties {
+  const color = statusColor(status);
+  return {
+    width: 9,
+    height: 9,
+    borderRadius: '50%',
+    flex: '0 0 auto',
+    border: `1px solid ${color}`,
+    background: status === 'pending' ? 'transparent' : color,
+    boxShadow: status === 'in_progress' ? `0 0 0 3px color-mix(in srgb, ${color} 16%, transparent)` : undefined,
+  };
+}
+
+function statusColor(status: DagNodeStatus): string {
+  switch (status) {
+    case 'completed': return 'var(--success)';
+    case 'in_progress': return 'var(--state-thinking)';
+    case 'failed': return 'var(--danger)';
+    case 'pending':
+    default:
+      return 'var(--text-3)';
+  }
+}
+
 // ── Factory: build DagNode[] from transcript blocks ──────────────────────
 
-export function buildDagNodesFromTranscript(blocks: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock>): DagNode[] {
+export function buildDagNodesFromTranscript(blocks: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock>): DagNode[] {
   return blocks.map((block, i) => {
     let label: string;
     let status: string | undefined;
@@ -120,6 +135,9 @@ export function buildDagNodesFromTranscript(blocks: Array<RouteDecisionTranscrip
       status = 'completed';
     } else if (block.kind === 'child_agent') {
       label = block.agent;
+      status = block.status;
+    } else if (block.kind === 'subtask') {
+      label = block.worker || block.title;
       status = block.status;
     } else {
       label = block.worker;

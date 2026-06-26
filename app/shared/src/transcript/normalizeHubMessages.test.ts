@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { normalizeHubMessagesToTranscript } from './normalizeHubMessages';
 
 describe('normalizeHubMessagesToTranscript', () => {
+  it('drops runtime diagnostics from Hub messages before they reach shared chat UI', () => {
+    const blocks = normalizeHubMessagesToTranscript([
+      {
+        id: 'hub-runtime-diagnostic',
+        sender_type: 'agent',
+        sender_id: 'agent-1',
+        sender: { nickname: 'Hub Builder' },
+        content: {
+          text: 'Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.',
+        },
+        created_at: '2026-06-07T07:00:02Z',
+      },
+    ]);
+
+    expect(blocks).toEqual([]);
+  });
+
   it('projects Hub session messages into shared transcript blocks', () => {
     const blocks = normalizeHubMessagesToTranscript([
       {

@@ -178,24 +178,24 @@ git diff --check                  # 无冲突标记、无行尾空格
 git status --short --branch       # 确认只改了允许的路径
 ```
 
-### 并行团队调度策略
+### 并行协作策略
 
-> 具体执行口径以仓库级 skill 为准，不在本文件硬编码模型、供应商或本地 alias 映射。
+> 不在本文件硬编码模型、供应商或本地 alias 映射。
 
-- 通用多团队、多 subagent 并行开发、审查、测试和文档同步，读 `.agents/skills/dev-team/SKILL.md`。
-- Codex 专用 Leader/Worker 编队，读 `.agents/skills/dev-team-codex/SKILL.md`。
-- `dev-loop` 仍负责长程单线推进、交叉审查和循环验证；需要并行攻坚时由 `dev-team` 或 `dev-team-codex` 接管分队调度。
+- 长程单线推进、交叉审查和循环验证读 `.agents/skills/dev-loop/SKILL.md`。
+- 并行任务只在写入范围互不重叠时拆分；主 Agent 必须先写清目标、允许改动路径、禁改范围、验证命令和回报格式。
 - 每个 subagent 必须有明确写入范围、禁改范围、验证命令和回报格式；主 Agent 负责集成审查和最终验证。
 
 ### Agent 间进度同步
 
-当前活跃进度以 `docs/roadmap.md`、`docs/architecture.md` 和相关计划文档为准。其他 Agent 或人类提交的结论进入对应 roadmap、design plan、governance 或 `docs/reference/`，不要新增长期状态目录。
+长期路线以 `docs/roadmap.md` 和 `docs/architecture.md` 为准；只有存在 `docs/progress/MASTER.md` 时，它才是当前 spec-driven 专项的活跃进度入口。完成后的专项归档到 `docs/archives/`，不要把过期阶段、分支或验收记录继续留在 active docs 根目录。其他 Agent 或人类提交的结论进入对应 roadmap、design plan、governance 或 `docs/reference/`，不要新增长期状态目录。
 
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`、`.agents/skills/dev-team-codex/`。
-- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；本轮 Desktop/Web v4 clean rebuild 是用户明确排除 dev-loop 的例外，按 roadmap/plan 直接推进。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/real-e2e-acceptance/`。
+- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；若用户明确指定 spec-driven 或已有活跃 `docs/progress/MASTER.md`，按当前 SPEC/MASTER 继续；若专项已完成，则看 `docs/archives/README.md` 和对应归档，不复活旧进度文件。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
+- 涉及真实 E2E、Playwright、Visual QA、approved-real、真实登录/运行、打包 Desktop、发布或 merge-ready 结论时，先读 `.agents/skills/real-e2e-acceptance/SKILL.md`，按证据等级写明已测和未测。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
 - `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
 - 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
@@ -286,7 +286,7 @@ feat/* → dev/delicious233 → master
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
 | **dev/delicious233** | 当前集成开发分支 | ✅ 活跃 |
-| **feat/super-phase1-safety-foundation** | SUPER 工程修复（52 任务全完成，待合并） | 🔥 活跃 |
+| feat/super-phase1-safety-foundation | SUPER 工程修复历史分支，是否仍需合并以 live `git status` / PR 为准 | 🟡 复核 |
 | master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
 | ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
 | ~~dev/delicious223~~ | 旧集成主线 | ✅ 已归档 |
@@ -336,7 +336,7 @@ feat/* → dev/delicious233 → master
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
-- 过时文档直接删除（git 历史保留追溯能力），不归档。
+- 过时长期文档直接删除（git 历史保留追溯能力），不归档；spec-driven 的过程工件按第 9 节归档到 `docs/archives/`。
 - 文档、issue、PR 正文中文为主；代码标识、路径、API 字段、命令保留英文。
 - 不使用未解释缩写。第一次出现时写白话解释。
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
@@ -345,7 +345,7 @@ feat/* → dev/delicious233 → master
 
 ### 文档维护规则
 
-1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
+1. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；已完成的 spec-driven 工件例外，归档到 `docs/archives/`。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
 4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
@@ -415,7 +415,7 @@ corepack.cmd pnpm exec vite build
 前端和客户端测试要求：
 
 - 前端状态转换和 API client 要有单元测试。
-- 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
+- 关键 UI 流程用 Playwright 和 Visual QA 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview；真实验收口径按 `.agents/skills/real-e2e-acceptance/SKILL.md`。
 - Desktop/Edge 执行链路改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
 
 ### 7.1 测试质量红线
@@ -489,14 +489,12 @@ scope: client|edge|api|docs|desktop|web
 
 本仓库采用 spec-driven-develop 工作流驱动大型复杂任务。规则如下：
 
-1. **进度追踪**：活跃进度以 `docs/progress/MASTER.md` 为准。spec-driven-develop 启动后，任务卡、阶段验收、阻塞项和里程碑状态统一写入该文件，不在 AGENTS.md 或 roadmap 中重复记录进度细节。
-2. **任务追踪模式**：`GITHUB_STANDARD` — 使用 GitHub Issues + Milestones + Labels 进行任务分解、分配和追踪。spec 产出的大型任务拆为 Milestone，子任务映射为 Issue，按 Label 区分方向（frontend/backend/client/docs/governance）。
-3. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
-4. **当前活跃 Phase 与分支**：
-   - Phase：`super-phase1-safety-foundation`
-   - 分支：`feat/super-phase1-safety-foundation`
-   - 入口文档：`docs/progress/MASTER.md`（不在本文件重复记录子任务进度）
-5. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
+1. **活跃进度**：只有存在 `docs/progress/MASTER.md` 时，它才是当前 spec-driven 专项的进度 SSOT。任务卡、阶段验收、阻塞项和里程碑状态写在那里，不在 AGENTS.md 或 roadmap 中重复记录。
+2. **归档规则**：专项完成后，把 `docs/analysis/`、本专项 `docs/plan/` 文件和 `docs/progress/` 移到 `docs/archives/<topic>/`，并更新 `docs/archives/README.md`。active docs 根目录只保留仍在执行的计划。
+3. **任务追踪模式**：以活跃 MASTER 或对应 GitHub Issues/Milestones 为准。短期专项可用 `LOCAL_ONLY`，但必须记录验收证据和未完成项。
+4. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
+5. **当前活跃 Phase 与分支**：只看活跃 MASTER 或 GitHub 任务，不在本文件重复维护。
+6. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
    - 先加载 `.agents/skills/spec-driven-develop/SKILL.md`（如存在）或 `spec-driven-develop` skill。
    - 产出 spec 文档、任务分解、验收标准后再进入实现。
    - 短任务（单文件修复、typo、小改动）不受此约束，直接做。
