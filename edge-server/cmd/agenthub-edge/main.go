@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime/debug"
+	"strconv"
 	"path/filepath"
 	"strings"
 	"time"
@@ -112,6 +114,18 @@ func main() {
 	}
 	slog.SetDefault(slog.New(handler))
 
+	// Apply soft memory limit to prevent unbounded heap growth on long-running
+	// Edge processes. The Go runtime will trigger GC more aggressively when the
+	// heap approaches this limit and return unused memory to the OS.
+	// Default: 512 MiB. Set AGENTHUB_MEMORY_LIMIT_MB to override (0 = disable).
+	memLimitMB := parseIntEnv("AGENTHUB_MEMORY_LIMIT_MB", 512)
+	if memLimitMB > 0 {
+		limitBytes := int64(memLimitMB) * 1024 * 1024
+		debug.SetMemoryLimit(limitBytes)
+		debug.SetGCPercent(50) // more frequent GC to stay well under the limit
+		slog.Info("memory limit configured", "limit_mb", memLimitMB)
+	}
+
 	cfg, err := buildConfig(os.Args[1:])
 	if err != nil {
 		slog.Error("invalid configuration", "err", err)
@@ -189,6 +203,15 @@ func runtimeManifestFixtureReplayRequested(args []string) bool {
 func getEnv(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return defaultVal
+}
+
+func parseIntEnv(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return defaultVal
 }
