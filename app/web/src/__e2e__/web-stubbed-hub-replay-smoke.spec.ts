@@ -1,16 +1,34 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  buildE2EDataModeManifest,
+  classifyE2ERequest,
+  createE2EDataModeScenario,
+  type E2EObservedRequest,
+} from '../../../shared/src/testing/e2eDataModeContract';
 
-const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'web-hub-real-mode-smoke');
+const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'web-stubbed-hub-replay-smoke');
 const HUB_ORIGIN = 'http://localhost:8080';
+const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
+const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
+const WEB_HUB_SMOKE_SCENARIO = createE2EDataModeScenario({
+  name: 'web-stubbed-hub-replay-smoke',
+  surface: 'web',
+  dataMode: 'approved-real',
+  dataSource: 'stubbed-hub-session',
+  appOrigin: WEB_E2E_APP_ORIGIN,
+  hubOrigin: HUB_ORIGIN,
+  mockAdapterUsed: true,
+});
 
-test.describe('Web Hub real-mode smoke', () => {
+test.describe('Web stubbed Hub replay smoke', () => {
   test.beforeEach(async ({ page }) => {
-    await installHubStub(page);
+    collectPageDiagnostics(page);
   });
 
   test('shows signed-out Hub state in approved-real mode without demo fallback', async ({ page }) => {
+    const requests = await installHubStub(page);
     await setApprovedRealMode(page);
     await page.goto('/');
 
@@ -20,58 +38,64 @@ test.describe('Web Hub real-mode smoke', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Hub replay: no active Hub session' })).toBeVisible();
     await expect(page.getByText('Sign in to Hub before Web can select a local_edge execution target.')).toBeVisible();
 
-    await page.getByRole('button', { name: '项目' }).click();
+    await page.getByRole('button', { name: 'Projects' }).click();
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText(
       'Sign in to Hub to load workspace projects.',
     );
+    buildE2EDataModeManifest(WEB_HUB_SMOKE_SCENARIO, requests.requests, {
+      scenario: 'signed-out',
+    });
   });
 
-  test('renders Hub session and no-target blocker from a stubbed Hub', async ({ page }) => {
+  test('renders Hub session and no-target blocker from a stubbed Hub replay', async ({ page }) => {
     const requests = await startAuthenticatedHubSmoke(page, 'no-target');
 
-    await expect(page.getByRole('heading', { name: 'Real Hub session smoke' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Stubbed Hub replay smoke' })).toBeVisible();
     await expect(page.getByText('Target: no-target')).toBeVisible();
     await expect(page.getByText('No online local_edge execution target is available.')).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Hub replay: task task-web-smoke' })).toBeVisible();
-    await expect(page.getByText('reports/web-real-mode-smoke.md').first()).toBeVisible();
+    await expect(page.getByText('reports/web-stubbed-replay-smoke.md').first()).toBeVisible();
 
-    await page.getByRole('button', { name: '项目' }).click();
+    await page.getByRole('button', { name: 'Projects' }).click();
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub Smoke Project');
     await page.getByRole('button', { name: 'Agent' }).click();
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub Smoke Builder');
-    await page.getByRole('button', { name: '任务' }).click();
-    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Real Hub tasks are not loaded.');
+    await page.getByRole('button', { name: 'Tasks' }).click();
+    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub tasks are not loaded in this replay.');
 
     await writeSmokeArtifact(page, 'no-target', requests);
   });
 
-  test('renders healthy Hub target, transcript, Projects, Agents, Tasks, and Inspector evidence', async ({ page }) => {
+  test('renders healthy Hub target, transcript, Projects, Agents, Tasks, and Inspector evidence from a stubbed Hub replay', async ({ page }) => {
     const requests = await startAuthenticatedHubSmoke(page, 'healthy-target');
 
     await expect(page.getByText('Target: ready - Smoke Desktop Edge (target-web-smoke)')).toBeVisible();
     await expect(page.getByText('Selected local_edge execution target: Smoke Desktop Edge')).toBeVisible();
-    await expect(page.getByLabel('@Agent')).toBeVisible();
     await expect(page.getByLabel('Desktop/Edge target')).toContainText('Smoke Desktop Edge (target-web-smoke)');
-    await expect(page.getByText('Review the Web -> Hub real-mode smoke boundary.')).toBeVisible();
-    await expect(page.getByText('Stubbed Hub real-mode approval')).toBeVisible();
-    await expect(page.getByText('reports/web-real-mode-smoke.md').first()).toBeVisible();
+    await expect(page.getByText('Review the Web -> Hub stubbed replay boundary.')).toBeVisible();
+    await page
+      .locator('[data-block-id="edge-event-hub-runtime-event-web-smoke-approval"]')
+      .getByRole('button', { name: 'Expand' })
+      .click();
+    await expect(page.getByText('Stubbed Hub replay approval')).toBeVisible();
+    await expect(page.getByText('reports/web-stubbed-replay-smoke.md').first()).toBeVisible();
     await expect(page.getByText('运行证据').first()).toBeVisible();
     await expect(page.getByText('Hub replay artifact index: 1')).toBeVisible();
 
-    await page.getByRole('button', { name: '项目' }).click();
+    await page.getByRole('button', { name: 'Projects' }).click();
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub Smoke Project');
     await page.getByRole('button', { name: 'Agent' }).click();
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub Smoke Builder');
-    await page.getByRole('button', { name: '任务' }).click();
-    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Real Hub tasks are not loaded.');
+    await page.getByRole('button', { name: 'Tasks' }).click();
+    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('Hub tasks are not loaded in this replay.');
 
-    await expect.poll(() => requests.has('GET /client/auth/me')).toBe(true);
-    await expect.poll(() => requests.has('GET /client/sessions')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/execution-targets')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/projects')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-profiles')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-smoke/approvals')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-smoke/artifacts')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /client/auth/me')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /client/sessions')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/execution-targets')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/projects')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-profiles')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-smoke/approvals')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-smoke/artifacts')).toBe(true);
 
     await writeSmokeArtifact(page, 'healthy-target', requests);
   });
@@ -86,19 +110,30 @@ test.describe('Web Hub real-mode smoke', () => {
     await page.getByLabel('@Agent').selectOption('agent-profile-web-smoke');
     await page.getByLabel('Desktop/Edge target').selectOption('target-web-smoke');
     await page.getByLabel('Composer input').fill('Create a Hub-routed remote control task.');
-    await page.getByRole('button', { name: '启动 Agent 任务' }).click();
+    await page.getByRole('button', { name: 'Start agent task' }).click();
 
     await expect(page.getByText('Hub replay: task task-web-created')).toBeVisible();
-    await expect(page.getByText('Created task replay hydrated from Hub.')).toBeVisible();
+    const transcript = page.getByRole('log');
+    await expect(transcript).toContainText('Create a Hub-routed remote control task.');
+    await expect(transcript).toContainText('Created task replay hydrated from Hub.');
     await expect(page.getByText('reports/web-created-task.md').first()).toBeVisible();
+    const order = await transcript.evaluate((node) => {
+      const text = node.textContent ?? '';
+      return {
+        user: text.indexOf('Create a Hub-routed remote control task.'),
+        reply: text.indexOf('Created task replay hydrated from Hub.'),
+      };
+    });
+    expect(order.user).toBeGreaterThanOrEqual(0);
+    expect(order.reply).toBeGreaterThan(order.user);
 
-    await expect.poll(() => requests.has('POST /client/sessions/session-web-smoke/messages')).toBe(true);
-    await expect.poll(() => requests.has('POST /client/sessions/session-web-smoke/agents')).toBe(true);
-    await expect.poll(() => requests.has('POST /web/agent-tasks')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/events')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/summary')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/approvals')).toBe(true);
-    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/artifacts')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('POST /client/sessions/session-web-smoke/messages')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('POST /client/sessions/session-web-smoke/agents')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('POST /web/agent-tasks')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-created/events')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-created/summary')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-created/approvals')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-created/artifacts')).toBe(true);
     await expect.poll(dispatch).toMatchObject({
       triggerMessageId: 'message-web-created',
       targetId: 'target-web-smoke',
@@ -114,17 +149,48 @@ test.describe('Web Hub real-mode smoke', () => {
     await expect(page.getByText('Target: error')).toBeVisible();
     await expect(page.getByText('Hub execution targets unavailable: Hub target inventory unavailable')).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Hub replay: 0 runtime events observed' })).toBeVisible();
-    await expect.poll(() => requests.has('GET /web/execution-targets')).toBe(true);
-    await expect.poll(() => Array.from(requests).some((request) => request.includes('3210'))).toBe(false);
+    await expect.poll(() => requests.endpoints.has('GET /web/execution-targets')).toBe(true);
+    await expect.poll(() => requests.requests.some((request) => request.url.includes('3210'))).toBe(false);
 
     await writeSmokeArtifact(page, 'target-error', requests);
   });
 });
 
+function collectPageDiagnostics(page: Page): void {
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      const text = message.text();
+      if (!isExpectedBrowserDiagnostic(text)) {
+        console.log(`[browser:${message.type()}] ${text}`);
+      }
+    }
+  });
+  page.on('pageerror', (error) => {
+    console.log(`[pageerror] ${error.message}`);
+  });
+  page.on('requestfailed', (request) => {
+    console.log(`[requestfailed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
+  });
+}
+
+function isExpectedBrowserDiagnostic(text: string): boolean {
+  return (
+    text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
+    text.includes("WebSocket connection to 'ws://localhost:8080/client/ws") ||
+    text.includes('Failed to load resource: the server responded with a status of 503') ||
+    text.includes('[API] target_inventory_unavailable (HTTP 503): Hub target inventory unavailable')
+  );
+}
+
 type HubScenario = 'no-target' | 'healthy-target' | 'target-error';
 
 interface HubSmokeOptions {
   activeTask?: boolean;
+}
+
+interface BackendRequestLog {
+  endpoints: Set<string>;
+  requests: E2EObservedRequest[];
 }
 
 interface DispatchCapture {
@@ -143,7 +209,7 @@ async function startAuthenticatedHubSmoke(
   page: Page,
   scenario: HubScenario,
   options: HubSmokeOptions = {},
-): Promise<Set<string>> {
+): Promise<BackendRequestLog> {
   const requests = await installHubStub(page, scenario);
   await page.addInitScript(({ activeTask }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
@@ -169,22 +235,44 @@ async function startAuthenticatedHubSmoke(
   return requests;
 }
 
-async function installHubStub(page: Page, scenario: HubScenario = 'healthy-target'): Promise<Set<string>> {
-  const requests = new Set<string>();
+async function installHubStub(page: Page, scenario: HubScenario = 'healthy-target'): Promise<BackendRequestLog> {
+  const endpoints = new Set<string>();
+  const requests: E2EObservedRequest[] = [];
 
-  await page.route(`${HUB_ORIGIN}/**`, async (route) => {
+  await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    requests.add(`${request.method()} ${url.pathname}`);
+    const boundary = classifyE2ERequest(request.url(), WEB_HUB_SMOKE_SCENARIO);
 
-    if (request.method() === 'OPTIONS') {
-      return route.fulfill({ status: 204, headers: corsHeaders() });
+    if (boundary === 'app') {
+      return route.continue();
     }
 
-    return fulfillHubRoute(page, route, url.pathname, scenario);
+    if (boundary === 'hub') {
+      endpoints.add(`${request.method()} ${url.pathname}`);
+      requests.push({ method: request.method(), url: request.url() });
+
+      if (request.method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: corsHeaders() });
+      }
+
+      return fulfillHubRoute(page, route, url.pathname, scenario);
+    }
+
+    if (boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
+      requests.push({ method: request.method(), url: request.url() });
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+        headers: corsHeaders(),
+      });
+    }
+
+    return route.continue();
   });
 
-  return requests;
+  return { endpoints, requests };
 }
 
 async function fulfillHubRoute(page: Page, route: Route, pathname: string, scenario: HubScenario): Promise<void> {
@@ -201,7 +289,7 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
     return route.fulfill(json(hubEnvelope([{
       id: 'session-web-smoke',
       type: 'group',
-      name: 'Real Hub session smoke',
+      name: 'Stubbed Hub replay smoke',
       member_count: 3,
       unread_count: 0,
     }])));
@@ -223,7 +311,7 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
       sender_type: 'user',
       sender_id: 'user-web-smoke',
       content_type: 'text',
-      content: 'Review the Web -> Hub real-mode smoke boundary.',
+      content: 'Review the Web -> Hub stubbed replay boundary.',
       created_at: '2026-06-09T08:00:00Z',
     }])));
   }
@@ -252,7 +340,7 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
       items: [{
         id: 'agent-profile-web-smoke',
         name: 'Hub Smoke Builder',
-        description: 'Stubbed Hub Agent Profile for real-mode smoke',
+        description: 'Stubbed Hub Agent Profile for replay smoke',
         runtime_id: 'codex',
         model: 'gpt-5-codex',
         provider: 'codex',
@@ -288,6 +376,14 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
       created_at: '2026-06-09T08:00:00Z',
       updated_at: '2026-06-09T08:00:00Z',
     })));
+  }
+
+  if (pathname === '/web/projects/project-web-smoke/threads') {
+    return route.fulfill(json(hubEnvelope([])));
+  }
+
+  if (pathname.startsWith('/web/projects/project-web-smoke/threads/') && pathname.endsWith('/messages')) {
+    return route.fulfill(json(hubEnvelope([])));
   }
 
   if (pathname === '/web/execution-targets') {
@@ -426,7 +522,7 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
         request_id: 'perm-web-smoke-1',
         tool_name: 'Write',
         status: 'pending',
-        reason: 'Stubbed Hub real-mode approval',
+        reason: 'Stubbed Hub replay approval',
         created_at: '2026-06-09T08:00:02Z',
       }],
       pending: [],
@@ -459,7 +555,7 @@ async function fulfillHubRoute(page: Page, route: Route, pathname: string, scena
         source_event_id: 'event-web-smoke-artifact',
         event_seq: 3,
         artifact_id: 'artifact-web-smoke-1',
-        path: 'reports/web-real-mode-smoke.md',
+        path: 'reports/web-stubbed-replay-smoke.md',
         action: 'created',
         type: 'artifact',
         tool_name: 'Write',
@@ -505,29 +601,22 @@ function hubDispatchCapture(page: Page): () => Promise<DispatchCapture | null> {
   });
 }
 
-async function writeSmokeArtifact(page: Page, scenario: string, requests: Set<string>): Promise<void> {
+async function writeSmokeArtifact(page: Page, scenario: string, requests: BackendRequestLog): Promise<void> {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
   const screenshotPath = path.join(ARTIFACT_DIR, `${scenario}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   const manifestPath = path.join(ARTIFACT_DIR, `${scenario}.manifest.json`);
-  fs.writeFileSync(manifestPath, `${JSON.stringify({
-    schema: 'agenthub.web_hub_real_mode_smoke.v1',
+  const manifest = buildE2EDataModeManifest(WEB_HUB_SMOKE_SCENARIO, requests.requests, {
     scenario,
     url: page.url(),
-    dataMode: 'approved-real',
-    hubOrigin: HUB_ORIGIN,
-    directLocalEdge: false,
-    realCliOrModelExecuted: false,
-    tokenDanceIdSecretUsed: false,
-    RealLoginTested: false,
-    RealCliTested: false,
-    MockAdapterUsed: true,
     HubSessionSource: 'stubbed-hub-session',
     WebReplayObserved: true,
-    requestedEndpoints: Array.from(requests).sort(),
+    RealExecutionSource: 'none',
+    hubEndpoints: Array.from(requests.endpoints).sort(),
     screenshot: path.relative(process.cwd(), screenshotPath).replace(/\\/g, '/'),
-  }, null, 2)}\n`);
+  });
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 function hubEnvelope<T>(data: T): { code: string; data: T } {

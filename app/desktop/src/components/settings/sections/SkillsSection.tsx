@@ -26,7 +26,7 @@ const PROJECT_SKILLS: ProjectSkill[] = [
   { id: 'integration-test', title: 'integration-test', descriptionKey: 'settings.skill.integrationTestDesc', status: 'ready', hasScripts: false, hasReferences: false },
   { id: 'pre-push', title: 'pre-push', descriptionKey: 'settings.skill.prePushDesc', status: 'review', hasScripts: false, hasReferences: false },
   { id: 'test-coverage', title: 'test-coverage', descriptionKey: 'settings.skill.testCoverageDesc', status: 'ready', hasScripts: false, hasReferences: false },
-  { id: 'ui-screenshot', title: 'ui-screenshot', descriptionKey: 'settings.skill.uiScreenshotDesc', status: 'ready', hasScripts: true, hasReferences: false },
+  { id: 'real-e2e-acceptance', title: 'real-e2e-acceptance', descriptionKey: 'settings.skill.realE2eAcceptanceDesc', status: 'ready', hasScripts: false, hasReferences: false },
 ];
 
 interface SkillsSectionProps {

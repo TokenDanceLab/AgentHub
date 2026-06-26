@@ -9,13 +9,26 @@ import type { BadgeVariant, EvidenceRef } from '../transcript/types'
 /** A user message rendered in the transcript. */
 export interface TranscriptUserItem {
   type: 'user'
+  id?: string
   name?: string
   time?: string
   text: string
   displayTitle?: string
+  displayDetail?: string
   badgeLabel?: string
   badgeVariant?: BadgeVariant
 }
+
+export type TranscriptAgentPart =
+  | { type: 'row'; row: RowItem }
+  | {
+      type: 'bubble'
+      text: string
+      displayTitle?: string
+      displayDetail?: string
+      badgeLabel?: string
+      badgeVariant?: BadgeVariant
+    }
 
 /** An agent block rendered in the transcript — groups rows, bubbles, standalone cards. */
 export interface TranscriptAgentItem {
@@ -26,9 +39,11 @@ export interface TranscriptAgentItem {
   rows: RowItem[]
   bubbles: string[]
   standaloneRows: RowItem[]
+  parts?: TranscriptAgentPart[]
   runs: never[]
   groupId?: string
   displayTitle?: string
+  displayDetail?: string
   badgeLabel?: string
   badgeVariant?: BadgeVariant
   /** ID of the upstream block this message is replying to. */

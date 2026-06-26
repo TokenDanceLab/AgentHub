@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRunners } from '../hooks/useRunners';
+import { RUNNERS_POLL_MS } from '../config';
 
 describe('useRunners', () => {
   beforeEach(() => {
@@ -85,7 +86,7 @@ describe('useRunners', () => {
     const afterFirst = fetchSpy.mock.calls.length;
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(RUNNERS_POLL_MS);
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(afterFirst + 1);

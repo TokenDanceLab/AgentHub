@@ -1,6 +1,6 @@
 # AgentHub 全链路数据对接路线图
 
-> 最后更新：2026-06-26
+> 最后更新：2026-06-27
 > 版本：v0.5.1（全栈审计 78 项发现 + edge 10 项修复已推送 + CI 全绿）
 > 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
@@ -58,7 +58,6 @@
 | 项目 |
 |---|
 | golangci.yml v2 格式统一 |
-| docs/analysis/ docs/plan/ docs/progress/ → archives |
 | 签名证书（暂不处理） |
 | 全栈审计 Low 项（12 项） |
 
@@ -66,6 +65,7 @@
 
 | 项目 | 日期 |
 |---|:--:|
+| Chat UIUX Data Mode E2E spec 工件归档到 `docs/archives/` | 2026-06-27 |
 | edge-server 内存/磁盘泄漏 10 项修复 | 2026-06-26 |
 | AH-SR-047 Edge env allowlist 修复 | 2026-06-25 |
 | AH-SR-035/036/042 降级为 Mitigated in repo | 2026-06-25 |
@@ -1834,7 +1834,7 @@ server {
 6. **Mock 和 fixture 模式必须显式**；real mode 不能静默降级。
 7. **真实登录**、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
 8. **Roadmap 只写路线**；当前事实写在 `STATE.md`。
-9. **非必要不碰 UI 层**：UI 作为需求文档，目标是调通数据流。
+9. **UI 改动必须有任务和验收**：允许修复真实 UIUX/数据流问题，但禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 10. **所有 Hub API 必须经过 `AuthMiddleware` + `RequireHubSession`**。
 11. **Desktop 文件操作必须经过 allowlist 和 typed Host API**。
 12. **TokenDance API key 不得暴露给浏览器 UI**。

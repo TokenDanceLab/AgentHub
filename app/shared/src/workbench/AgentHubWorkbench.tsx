@@ -13,7 +13,7 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationHost, type MainchainSummary } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
@@ -328,8 +328,8 @@ export function AgentHubWorkbench({
 
   // ── Inspector data: route decisions, context usage, deploy preview ──
   const inspectorRouteBlocks = useMemo(
-    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock =>
-      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'child_agent',
+    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock =>
+      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent',
     ),
     [transcript],
   );
@@ -1299,6 +1299,7 @@ export function AgentHubWorkbench({
       data-selection-mode={selectionMode ? 'true' : 'false'}
       data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}
       data-sidebar-resizing={sidebarResizing ? 'true' : 'false'}
+      data-data-mode={workbenchStatus?.dataMode}
       data-testid="agenthub-workbench"
       style={shellStyle}
     >

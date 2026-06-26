@@ -1,4 +1,5 @@
 import type { EvidenceRef, EvidenceRefStatus, TranscriptAuthor, TranscriptBlock } from './types';
+import { isRuntimeDiagnosticText } from './runtimeDiagnostics';
 
 export interface ThreadTranscriptItemInput {
   id?: string;
@@ -38,6 +39,7 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
 
   const content = item.content?.trim() ?? '';
   if (!content) return null;
+  if (isRuntimeDiagnosticText(content)) return null;
 
   const author = normalizeAuthor(item.role, item.senderName);
   if (!author) return null;
