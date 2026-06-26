@@ -1,8 +1,8 @@
-// Health polling hook. Reports browser Hub runtime availability.
+// Health hook. Reports browser Hub runtime availability.
+// Stub data — no real HTTP health endpoint exists for Web yet.
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { HealthResponse } from '@shared/types';
-import { HEALTH_POLL_MS } from '@/config';
 import { useHubStore } from '@/stores/hubStore';
 
 export interface HealthState {
@@ -13,45 +13,25 @@ export interface HealthState {
 export function useHealth(): HealthState {
   const [online, setOnline] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const mountedRef = useRef(true);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
 
-  const poll = useCallback(async () => {
+  useEffect(() => {
     if (!hubAuthenticated) {
-      if (mountedRef.current) {
-        setOnline(false);
-        setHealth(null);
-      }
-      return;
-    }
-    try {
-      if (!mountedRef.current) return;
-      setHealth({
-        status: 'hub-only',
-        version: 'web-preview',
-        edgeId: 'web-hub-only',
-        checks: {
-          executor: { status: 'stubbed' },
-          runners: { status: 'stubbed', total: 0, available: 0, items: [] },
-        },
-      });
-      setOnline(true);
-    } catch {
-      if (!mountedRef.current) return;
       setOnline(false);
       setHealth(null);
+      return;
     }
+    setHealth({
+      status: 'hub-only',
+      version: 'web-preview',
+      edgeId: 'web-hub-only',
+      checks: {
+        executor: { status: 'stubbed' },
+        runners: { status: 'stubbed', total: 0, available: 0, items: [] },
+      },
+    });
+    setOnline(true);
   }, [hubAuthenticated]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    poll();
-    const id = setInterval(poll, HEALTH_POLL_MS);
-    return () => {
-      mountedRef.current = false;
-      clearInterval(id);
-    };
-  }, [poll]);
 
   return { online, health };
 }
