@@ -7,7 +7,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -106,7 +108,8 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	// dispatch payloads contain user prompts and system instructions sent in
 	// cleartext over the network.
 	if !strings.HasPrefix(edgeURL, "https://") && !isLoopback(edgeURL) {
-		slog.Warn("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", edgeURL)
+		slog.Error("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", edgeURL)
+		return ""
 	}
 
 	// Build the Edge run request from the dispatch payload.
@@ -176,11 +179,21 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	return runID
 }
 
-// isLoopback reports whether url contains a loopback address.
-func isLoopback(url string) bool {
-	return strings.Contains(url, "127.0.0.1") ||
-		strings.Contains(url, "localhost") ||
-		strings.Contains(url, "[::1]")
+// isLoopback reports whether rawURL has a loopback hostname.
+// Uses url.Parse + net.ParseIP for accurate loopback detection — simple
+// substring matching (e.g. strings.Contains) is vulnerable to bypass via
+// domains like localhost.evil.com.
+func isLoopback(rawURL string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func normalizeRuntimeAgentType(agentType string) string {

@@ -23,6 +23,8 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
 
   // On mount, try auto-login — this handles the OIDC callback URL case
   // where the browser returns to localhost:5173/auth/tokendance/callback?code=xxx&state=yyy
+  // NOTE: tryAutoLogin is wrapped in useCallback with a stable [auth] singleton (useAuth.ts).
+  // If the singleton pattern is changed, this effect may re-fire spuriously.
   useEffect(() => {
     void tryAutoLogin().catch((err: unknown) => {
       if (err instanceof OidcError) {
@@ -32,10 +34,11 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
   }, [tryAutoLogin, t]);
 
   // If user becomes authenticated (e.g. after OIDC callback), notify parent
-  if (user) {
-    onLoginSuccess();
-    return null;
-  }
+  useEffect(() => {
+    if (user) onLoginSuccess();
+  }, [user, onLoginSuccess]);
+
+  if (user) return null;
 
   async function handleTokenDanceLogin() {
     setLoginError(null);
