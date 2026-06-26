@@ -1,0 +1,125 @@
+# Repo Governance Real E2E Closure - Progress Tracker
+
+> **Task**: Normalize AgentHub repo governance, real E2E acceptance, source/test alignment, and merge readiness.
+> **Started**: 2026-06-27
+> **Last Updated**: 2026-06-27
+> **Mode**: GITHUB_STANDARD
+> **Repo**: TokenDanceLab/AgentHub
+> **Branch**: docs/repo-governance-real-e2e
+> **Baseline**: origin/dev/delicious233
+
+## GitHub Resources
+
+- **All Issues**: `gh issue list -R TokenDanceLab/AgentHub --label "spec:repo-governance-real-e2e" --state all`
+- **Project Board**: skipped; current GitHub token does not have project scope.
+
+## References
+
+- [Project Overview](../analysis/project-overview.md)
+- [Module Inventory](../analysis/module-inventory.md)
+- [Risk Assessment](../analysis/risk-assessment.md)
+- [Task Breakdown](../plan/task-breakdown.md)
+- [Dependency Graph](../plan/dependency-graph.md)
+- [Milestones](../plan/milestones.md)
+
+## Milestones
+
+| Phase | Name | Milestone URL | Open | Closed | Total |
+|:--|:--|:--|--:|--:|--:|
+| 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 4 | 0 | 4 |
+| 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 4 | 0 | 4 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 0 | 5 |
+| 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
+
+## Issue Mapping
+
+| Task ID | Issue | Title | Status |
+|:--|:--|:--|:--|
+| T1.1 | #322 | Normalize branch/worktree governance | open |
+| T1.2 | #323 | Normalize document standards and active/archive rules | open |
+| T1.3 | #325 | Add useful project-skill whitelist verification | open |
+| T1.4 | #324 | Clean generated artifact hygiene | open |
+| T2.1 | #326 | Make evidence-level matrix canonical | open |
+| T2.2 | #327 | Split data mode surface auth and execution axes | open |
+| T2.3 | #328 | Align E2E smoke matrix and manifests | open |
+| T2.4 | #329 | Normalize Visual QA acceptance | open |
+| T3.1 | #330 | Harden chat transcript behavior tests | open |
+| T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
+| T3.3 | #332 | Classify backend API performance and leak gates | open |
+| T3.4 | #333 | Check Desktop packaged evidence boundary | open |
+| T3.5 | #334 | Align Web Mobile client test lanes | open |
+| T4.1 | #335 | Run focused acceptance gate bundle | open |
+| T4.2 | #336 | Cross-review and architecture approval packet | open |
+| T4.3 | #337 | Merge-readiness and archive preparation | open |
+
+## Quick Status Commands
+
+```powershell
+# Phase progress
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.title | startswith("Spec Governance Real E2E")) | "\(.title): \(.open_issues) open, \(.closed_issues) closed"'
+
+# All task issues
+gh issue list -R TokenDanceLab/AgentHub --label "spec:repo-governance-real-e2e" --state all --limit 80 --json number,title,state,milestone
+
+# Local branch and worktree truth
+git status --short --branch
+git worktree list
+```
+
+## Phase Checklist
+
+- [ ] Phase 1: Governance Baseline (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
+- [ ] Phase 2: Real E2E Contract (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
+- [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
+
+## Current Status
+
+**Active Phase**: Phase 1 - Governance Baseline
+**Active Task**: Phase 1 local implementation prepared; issues remain open until PR/merge closure.
+**Current Focus**: review Phase 1 governance diff, then open/merge the branch or continue Phase 2 if requested.
+**Blockers**: none
+
+### Local Phase 1 Evidence
+
+| Task | Local status | Evidence |
+|:--|:--|:--|
+| T1.1 | Implemented in branch | `AGENTS.md` and `docs/governance/branch-governance.md` now use live-state branch/worktree rules; stale active branch table removed. |
+| T1.2 | Implemented in branch | `docs/governance/document-standards.md`, `docs/README.md`, `docs/contributing.md`, `AGENTS.md`, and `CLAUDE.md` agree on active SPEC, archive, skill whitelist, and current CI coverage policy boundaries. |
+| T1.3 | Implemented in branch | `scripts/verify-project-skills.ps1` added; CI validate now runs it; old project skills remain archived only; PowerShell and Bash CI policy verifiers both check this gate. |
+| T1.4 | Verified in branch | `app/desktop/stats.html` is not tracked by Git and is ignored by `.gitignore`; stale skill unignore rules removed; generated artifact hygiene remains explicit. |
+
+## Governance Status
+
+**Shared instruction surface**: `AGENTS.md`
+**Claude Code instruction surface**: `CLAUDE.md`
+**Other platform rule surfaces**: none found (`.cursor/`, `.windsurf/`, `.clinerules*`, `.codex/`)
+**Memory surface**: native Codex memory; no repo fallback selected
+**Memory fallback path**: none
+
+### Project Skill Boundary
+
+- Active project skills are only the allowlisted directories under `.agents/skills/`.
+- Archived project skills live under `docs/archives/project-skills/` for historical reference only.
+- Archived skills such as `ui-screenshot`, `dev-team`, and `dev-team-codex` must not be loaded as active workflows.
+- Real E2E acceptance is now the active replacement for the old screenshot skill: `.agents/skills/real-e2e-acceptance/SKILL.md`.
+
+## Execution Telemetry
+
+- GitHub modes store per-task telemetry in issue comments before closure.
+- Adaptive control state lives in milestone descriptions.
+- Current drift score for all phases: 0.
+
+## Next Steps
+
+1. Complete T1.1: normalize branch/worktree governance and remove stale active branch/worktree wording.
+2. Complete T1.2: normalize active/archive document rules and remove conflicting old wording.
+3. Complete T1.3: add focused project-skill whitelist verification for active `.agents/skills/`.
+4. Complete T1.4: remove or justify generated artifact noise.
+
+## Session Log
+
+| Date | Session | Summary |
+|:--|:--|:--|
+| 2026-06-27 | setup | Phase 1-3 analysis/plan docs existed; refreshed GitHub state, created missing Phase 4 issues #335-#337, and created this MASTER index. |
+| 2026-06-27 | phase-1-local | Normalized project-skill archive/whitelist rules, branch/worktree live-state rules, document active/archive rules, and focused validators. Verification: `verify-project-skills.ps1`, `verify-ci-gates.ps1`, `verify-ci-gates.sh`, OpenAPI YAML parse, and `git diff --check` passed. |

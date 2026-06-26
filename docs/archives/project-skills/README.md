@@ -2,6 +2,8 @@
 
 这些 skill 已从 active `.agents/skills/` 移出，只保留历史参考。Agent 不应从这里加载执行流程；当前可用仓库级 skill 以根目录 `AGENTS.md` 的白名单为准。
 
+白名单由 `scripts/verify-project-skills.ps1` 校验。若归档 skill 又出现在 `.agents/skills/` 或 `.gitignore` 重新放行旧 skill，验证必须失败。
+
 | Skill | 归档原因 | 替代入口 |
 |---|---|---|
 | `ui-screenshot` | 旧截图脚本和 mock 注入口径过窄，容易把 Vite renderer 截图误写成真实 Desktop/Tauri 证据 | `.agents/skills/real-e2e-acceptance/` + app 内 `test:visual:*` |
