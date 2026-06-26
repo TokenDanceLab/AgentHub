@@ -193,7 +193,11 @@ fn read_cli_version(path: &str) -> Option<String> {
                     .map(|line| line.chars().take(120).collect());
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(_) => return None,
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
         }
     }
     let _ = child.kill();
