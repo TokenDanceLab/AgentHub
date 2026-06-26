@@ -34,6 +34,7 @@ git diff --check; git status --short --branch
 
 # 治理门禁
 .\scripts\verify-ci-gates.ps1
+.\scripts\verify-project-skills.ps1
 ```
 
 ## 3. Claude 特化规则

@@ -510,6 +510,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-ci-gates.ps1
 
+      - name: Verify project skill whitelist
+        shell: pwsh
+        run: ./scripts/verify-project-skills.ps1
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML
