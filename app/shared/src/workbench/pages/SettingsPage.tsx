@@ -7,6 +7,7 @@ import {
   type DesignNavIconName,
 } from '../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
+import { getWorkbenchDataModeContract } from '../../demo';
 import type { LocalCliDiscoveryManifest } from '../../platform';
 import styles from './SettingsPage.module.css';
 
@@ -262,7 +263,7 @@ interface DataModeControlProps {
 }
 
 function DataModeControl({ active, onChange }: DataModeControlProps): React.ReactElement {
-  const normalized = normalizeSettingsDataMode(active);
+  const normalized = getWorkbenchDataModeContract(active).displayLabel;
   return (
     <SettingSegment
       options={['Auto', 'Mock', 'Fixture', 'Observed', 'Approved real']}
@@ -333,80 +334,35 @@ function SettingPath({ value, onCopy }: SettingPathProps): React.ReactElement {
 
 /* ── Data mode status ── */
 
-function normalizeSettingsDataMode(value: string): 'Auto' | 'Mock' | 'Fixture' | 'Observed' | 'Approved real' {
-  const key = value.trim().toLowerCase();
-  if (key === 'mock') return 'Mock';
-  if (key === 'fixture' || key === 'demo') return 'Fixture';
-  if (key === 'observed' || key === 'replay') return 'Observed';
-  if (key === 'approved real' || key === 'approved-real' || key === 'approved_real' || key === 'normal' || key === 'real') {
-    return 'Approved real';
-  }
-  return 'Auto';
-}
-
 function DataModeStatus({
   mode,
 }: {
   mode: string;
 }): React.ReactElement {
-  const normalized = normalizeSettingsDataMode(mode);
-  const detail = normalized === 'Mock'
-    ? {
-      label: 'Mock data',
-      title: 'Pinned mock workbench data',
-      copy: 'Uses local mock data only. Hub and local Edge are not contacted.',
-      desktop: '5173: demo transcript',
-      web: '5174: demo transcript',
-    }
-    : normalized === 'Fixture'
-      ? {
-        label: 'Fixture data',
-        title: 'Pinned shared workbench fixture',
-        copy: 'Uses deterministic fixture data for UI and screenshot verification.',
-        desktop: '5173: fixture transcript',
-        web: '5174: fixture transcript',
-      }
-      : normalized === 'Observed'
-        ? {
-          label: 'Observed data',
-          title: 'Hub observed replay only',
-          copy: 'Uses observed Hub sessions, messages, and replayed runtime events. It does not fall back to mock data.',
-          desktop: '5173: observed Edge snapshot',
-          web: '5174: observed Hub replay',
-        }
-        : normalized === 'Approved real'
-          ? {
-            label: 'Approved real',
-            title: 'Approved real Hub / Edge data only',
-            copy: 'Uses authenticated Hub and Edge data only. Empty or signed-out states stay explicit.',
-            desktop: '5173: Edge thread data',
-            web: '5174: Hub session data',
-          }
-          : {
-            label: 'Auto fallback',
-            title: 'Prefer real data, allow development fallback',
-            copy: 'Uses real data when available and fixture data only for explicit development fallback paths.',
-            desktop: '5173: Tauri real / browser fixture',
-            web: '5174: authenticated real / anonymous fixture',
-          };
+  const detail = getWorkbenchDataModeContract(mode);
+  const label = detail.mode === 'auto'
+    ? 'Auto fallback'
+    : detail.mode === 'approved-real'
+      ? 'Approved real'
+      : `${detail.displayLabel} data`;
 
   return (
     <section className={styles.modeStatus} aria-label="数据模式状态">
       <div className={styles.modeStatusHead}>
-        <span>{detail.label}</span>
+        <span>{label}</span>
         <span className={styles.modeStatusSpacer} aria-hidden="true" />
-        <em>{normalized}</em>
+        <em>{detail.displayLabel}</em>
       </div>
       <strong>{detail.title}</strong>
-      <p>{detail.copy}</p>
+      <p>{detail.description}</p>
       <dl className={styles.modeFacts}>
         <div>
           <dt>Desktop</dt>
-          <dd>{detail.desktop}</dd>
+          <dd>{detail.desktopLabel}</dd>
         </div>
         <div>
           <dt>Web</dt>
-          <dd>{detail.web}</dd>
+          <dd>{detail.webLabel}</dd>
         </div>
       </dl>
     </section>

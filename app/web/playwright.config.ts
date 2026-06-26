@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const webE2EPort = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
-const webE2EBaseURL = `http://localhost:${webE2EPort}`;
+const webE2EBaseURL = `http://127.0.0.1:${webE2EPort}`;
+const webWorkspaceViewport = { width: 1440, height: 810 };
 
 export default defineConfig({
   testDir: './src/__e2e__',
@@ -15,11 +16,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], viewport: webWorkspaceViewport },
     },
   ],
   webServer: {
-    command: `pnpm dev --port ${webE2EPort}`,
+    command: `pnpm dev --host 127.0.0.1 --port ${webE2EPort}`,
     url: webE2EBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 15_000,

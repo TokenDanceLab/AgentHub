@@ -1269,6 +1269,48 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('/demo-preview.html')).toBeInTheDocument();
   });
 
+  it('routes subtask orchestration blocks to the inspector instead of the main chat stream', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+    const subtaskTranscript: TranscriptBlock[] = [
+      {
+        id: 'user-subtask-prompt',
+        kind: 'text',
+        author: { id: 'user', name: 'Ding', role: 'human' },
+        text: '继续修复聊天流。',
+      },
+      {
+        id: 'subtask-chat-card-audit',
+        kind: 'subtask',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'Audit chat card contracts',
+        worker: 'Card Contract Auditor',
+        status: 'running',
+        summary: '检查用户输入、Agent 回复和工具卡片。',
+      },
+    ];
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={subtaskTranscript}
+      />,
+    );
+
+    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    expect(within(transcriptRegion).queryByText('Card Contract Auditor')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Audit chat card contracts')).not.toBeInTheDocument();
+
+    const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
+    expect(inspector.getByText('Agent 调度树')).toBeInTheDocument();
+    expect(inspector.getByText('Card Contract Auditor')).toBeInTheDocument();
+  });
+
   it('opens structured file details in the inspector from Review actions', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
@@ -1873,7 +1915,7 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '任务' }));
     const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
-    expect(within(tasksPage).getByRole('status')).toHaveTextContent('Real Hub tasks are not loaded.');
+    expect(within(tasksPage).getByRole('status')).toHaveTextContent('Hub tasks are not loaded in this replay.');
     expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
   });
@@ -2779,5 +2821,167 @@ describe('AgentHubWorkbench', () => {
     // After failed submit, the component clears the input in the current implementation.
     // Verify the send button still exists for retry.
     expect(screen.getByRole('button', { name: '发送消息' })).toBeInTheDocument();
+  });
+
+  it('renders visible chat transcript blocks in chronological order even when platform input is unsorted', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[
+          {
+            id: 'agent-late',
+            kind: 'text',
+            author: { id: 'builder', name: 'Builder', role: 'agent' },
+            text: 'Agent response later.',
+            createdAt: '2026-06-26T08:00:02.000Z',
+          },
+          {
+            id: 'user-first',
+            kind: 'text',
+            author: { id: 'user', name: 'You', role: 'human' },
+            text: 'User prompt first.',
+            createdAt: '2026-06-26T08:00:00.000Z',
+          },
+        ]}
+      />,
+    );
+
+    const transcriptText = screen.getByRole('log').textContent ?? '';
+    expect(transcriptText.indexOf('User prompt first.')).toBeGreaterThanOrEqual(0);
+    expect(transcriptText.indexOf('Agent response later.')).toBeGreaterThan(
+      transcriptText.indexOf('User prompt first.'),
+    );
+  });
+
+  it('keeps the optimistic user message visible until the transcript catches up', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '研究一下AgentHub项目' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.getByText('研究一下AgentHub项目')).toBeInTheDocument();
+  });
+
+  it('replaces the optimistic user message when matching transcript text arrives with server clock skew', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
+
+    const { rerender } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '继续修复聊天流' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByText('继续修复聊天流')).toBeInTheDocument();
+
+    rerender(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[{
+          id: 'hub-message-confirmed',
+          kind: 'text',
+          author: { id: 'user', name: 'You', role: 'human' },
+          text: '继续修复聊天流',
+          createdAt: '2020-01-01T00:00:00.000Z',
+        }]}
+      />,
+    );
+
+    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(1);
+  });
+
+  it('only acknowledges one optimistic user message for each matching confirmed transcript message', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
+
+    const { rerender } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    for (let index = 0; index < 2; index += 1) {
+      fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+        target: { value: '继续修复聊天流' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+      await waitFor(() => {
+        expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(index + 1);
+      });
+    }
+
+    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(2);
+
+    rerender(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[{
+          id: 'hub-message-confirmed-once',
+          kind: 'text',
+          author: { id: 'user', name: 'You', role: 'human' },
+          text: '继续修复聊天流',
+          createdAt: '2020-01-01T00:00:00.000Z',
+        }]}
+      />,
+    );
+
+    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(2);
   });
 });

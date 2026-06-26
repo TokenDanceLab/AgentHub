@@ -53,13 +53,14 @@ function patchToDiffLines(patch: string, maxLines = 40) {
 
 /**
  * Extract optional display-override fields from a block.
- * Picks `displayTitle`, `badgeLabel`, and `badgeVariant` when present.
+ * Picks `displayTitle`, `displayDetail`, `badgeLabel`, and `badgeVariant` when present.
  * Used to propagate display annotations from upstream blocks into
  * {@link TranscriptUserItem} and {@link TranscriptAgentItem}.
  */
 function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (b.displayTitle !== undefined) out.displayTitle = b.displayTitle
+  if (b.displayDetail !== undefined) out.displayDetail = b.displayDetail
   if (b.badgeLabel !== undefined) out.badgeLabel = b.badgeLabel
   if (b.badgeVariant !== undefined) out.badgeVariant = b.badgeVariant
   return out
@@ -82,6 +83,7 @@ function newAgentBlock(author: TranscriptBlock['author'], role: string, createdA
     rows: [],
     bubbles: [],
     standaloneRows: [],
+    parts: [],
     runs: [],
   }
 }
@@ -212,6 +214,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: toolStatus,
         collapsible: true,
         toolName: tn,
+        ...(t.callId ? { toolCallId: t.callId } : {}),
         content: t.summary || t.target,
         extra: t.target && !t.summary ? t.target : undefined,
       } as RowItem
@@ -226,6 +229,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: statusNorm(t.status),
         collapsible: true,
         toolName: tn,
+        ...(t.callId ? { toolCallId: t.callId } : {}),
         content: t.summary,
         isResult: true,
       } as RowItem
@@ -438,6 +442,43 @@ function mapEvidenceRefs(b: TranscriptBlock): TranscriptAgentItem['evidenceRefs'
   return b.evidenceRefs
 }
 
+function pushAgentRow(agent: TranscriptAgentItem, row: RowItem, standalone: boolean): void {
+  if (standalone) {
+    agent.standaloneRows.push(row)
+  } else {
+    agent.rows.push(row)
+  }
+  agent.parts ??= []
+  agent.parts.push({ type: 'row', row })
+}
+
+function pushAgentBubble(agent: TranscriptAgentItem, block: TextTranscriptBlock): void {
+  const text = block.text
+  agent.bubbles.push(text)
+  agent.parts ??= []
+  agent.parts.push({
+    type: 'bubble',
+    text,
+    ...(block.displayTitle ? { displayTitle: block.displayTitle } : {}),
+    ...(block.displayDetail ? { displayDetail: block.displayDetail } : {}),
+    ...(block.badgeLabel ? { badgeLabel: block.badgeLabel } : {}),
+    ...(block.badgeVariant ? { badgeVariant: block.badgeVariant } : {}),
+  })
+}
+
+function replaceAgentRow(agent: TranscriptAgentItem, id: string, row: RowItem): void {
+  const replaceById = (rows: RowItem[]) => {
+    const index = rows.findIndex((item) => item.id === id)
+    if (index >= 0) rows[index] = row
+  }
+  replaceById(agent.rows)
+  replaceById(agent.standaloneRows)
+  if (agent.parts) {
+    const partIndex = agent.parts.findIndex((part) => part.type === 'row' && part.row.id === id)
+    if (partIndex >= 0) agent.parts[partIndex] = { type: 'row', row }
+  }
+}
+
 /**
  * Convert an array of upstream {@link TranscriptBlock} objects into
  * generic {@link TranscriptItem} objects ready for rendering.
@@ -477,7 +518,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (currentAgent) { items.push(currentAgent); currentAgent = null }
       const t = block as TextTranscriptBlock
       items.push({
-        type: 'user', name: block.author?.name, time: timeStr(block.createdAt), text: t.text,
+        type: 'user', id: block.id, name: block.author?.name, time: timeStr(block.createdAt), text: t.text,
         ...pickDisplay(t as unknown as Record<string, unknown>),
       })
       continue
@@ -499,8 +540,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       // currentAgent is guaranteed non-null after the block above
       const agent = currentAgent
       if (!agent) continue
-      const bubbleText = t.displayDetail || t.text
-      if (bubbleText) agent.bubbles.push(bubbleText)
+      if (t.text) pushAgentBubble(agent, t)
       // Map reply-to metadata from upstream block
       if (t.replyToMessageId && !agent.replyBlockId) {
         agent.replyBlockId = t.replyToMessageId
@@ -534,7 +574,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
             const refs = mapEvidenceRefs(block)
             if (refs) currentAgent.evidenceRefs = refs
           }
-          currentAgent.rows.push(row)
+          pushAgentRow(currentAgent, row, false)
         }
       }
       continue
@@ -568,7 +608,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           children: childRows,
           ...(g.meta !== undefined ? { extra: g.meta } : {}),
         }
-        currentAgent.rows.push(groupRow)
+        pushAgentRow(currentAgent, groupRow, false)
       }
       continue
     }
@@ -580,34 +620,36 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
         const refs = mapEvidenceRefs(block)
-        currentAgent = { id: block.author?.id ?? 'unknown', agent: block.author?.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, ...(refs ? { evidenceRefs: refs } : {}) }
+        currentAgent = { id: block.author?.id ?? 'unknown', agent: block.author?.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], parts: [], runs: [], groupId, ...(refs ? { evidenceRefs: refs } : {}) }
         currentAgent.id = `${block.author?.id ?? 'unknown'}-${_seq}`
       }
       if (!currentAgent) continue
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
         row.type === 'approval' || row.type === 'session' || row.type === 'attachment' || row.type === 'preview'
-      if (standalone) {
-        currentAgent.standaloneRows.push(row)
-      } else {
-        // Merge: tool_result replaces the first unmatched tool_call (same toolName).
-        // Using FIFO (findIndex of first unmatched) instead of findLastIndex
-        // so that multiple calls to the same tool pair correctly with their results
-        // in order: result-1 matches call-1, result-2 matches call-2, etc.
-        if (row.type === 'tool' && row.isResult) {
-          const matchIdx = currentAgent.rows.findIndex(r => r.type === 'tool' && r.toolName === row.toolName && !r.isResult)
-          if (matchIdx >= 0) {
-            // Preserve the original id for React key stability; update status+content
-            const matched = currentAgent.rows[matchIdx]
-            if (matched) {
-              currentAgent.rows[matchIdx] = { ...row, id: matched.id }
-            }
-          } else {
-            currentAgent.rows.push(row)
+      // Merge: tool_result replaces the first unmatched tool_call (same toolName).
+      // Using FIFO (findIndex of first unmatched) instead of findLastIndex
+      // so that multiple calls to the same tool pair correctly with their results
+      // in order: result-1 matches call-1, result-2 matches call-2, etc.
+      if (row.type === 'tool' && row.isResult) {
+        const matchIdx = currentAgent.rows.findIndex(r => (
+          r.type === 'tool' &&
+          !r.isResult &&
+          (row.toolCallId && r.toolCallId
+            ? r.toolCallId === row.toolCallId
+            : r.toolName === row.toolName)
+        ))
+        if (matchIdx >= 0) {
+          // Preserve the original id for React key stability; update status+content
+          const matched = currentAgent.rows[matchIdx]
+          if (matched) {
+            replaceAgentRow(currentAgent, matched.id, { ...row, id: matched.id })
           }
         } else {
-          currentAgent.rows.push(row)
+          pushAgentRow(currentAgent, row, false)
         }
+      } else {
+        pushAgentRow(currentAgent, row, standalone)
       }
     }
   }

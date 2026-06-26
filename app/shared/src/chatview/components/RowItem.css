@@ -6,14 +6,20 @@
 .row-item {
   display:flex; flex-direction:column;
   background:var(--surface); border:1px solid var(--bdr); margin:0;
+  border-radius:var(--r-md);
   overflow:hidden;
 }
 .row-item.selected { outline: 2px solid var(--primary); outline-offset: -2px }
 .row-item.soft-hidden { display:none }
-.row-item + .row-item { border-top:none; margin-top:-1px }
-.row-item:first-child { border-radius:var(--r-md) var(--r-md) 0 0 }
-.row-item:last-child { border-radius:0 0 var(--r-md) var(--r-md) }
-.row-item:only-child { border-radius:var(--r-md) }
+.card-stack > .row-item {
+  width:100%;
+  border-radius:0;
+}
+.card-stack > .row-item + .row-item { border-top:none; margin-top:-1px }
+.card-stack > .row-item:first-child { border-radius:var(--r-md) var(--r-md) 0 0 }
+.card-stack > .row-item:last-child { border-radius:0 0 var(--r-md) var(--r-md) }
+.card-stack > .row-item:only-child { border-radius:var(--r-md) }
+.card-stack > .row-item.route { margin:0 }
 
 .row-hd {
   display:flex; align-items:center; gap:var(--sp-xxs);

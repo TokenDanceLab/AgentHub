@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@/stores/toastStore';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 /**
  * Web-specific auth orchestration hook.
@@ -26,8 +27,8 @@ export function useWebAuth() {
     void tryAutoLogin()
       .then((authenticated) => {
         if (authenticated && !cancelled) {
-          void queryClient.refetchQueries({ queryKey: ['threads'] });
-          void queryClient.refetchQueries({ queryKey: ['agents'] });
+          void queryClient.refetchQueries({ queryKey: hubQueryKeys.threads.root });
+          void queryClient.refetchQueries({ queryKey: hubQueryKeys.agents.root });
         }
       })
       .catch(() => {
