@@ -60,6 +60,7 @@ export interface WebPlatformOptions {
   queryClient?: QueryClient;
   createClientMessageId?: () => string;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
+  demoRuntimeFallback?: boolean;
   now?: () => string;
   ensureAuth?: () => boolean;
 }
@@ -232,7 +233,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
-        const shouldUseDemoFallback = !hasInjectedHubClient && !ensureAuth && (
+        const shouldUseDemoFallback = options.demoRuntimeFallback === true && !hasInjectedHubClient && !ensureAuth && (
           isWorkbenchFixtureDataMode(dataMode) ||
           (dataMode === 'auto' && !hasHubToken)
         );
@@ -240,6 +241,9 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
           return demoRuntimeStore.submitComposerIntent(intent);
         }
         if (!hasHubToken && ensureAuth && !ensureAuth()) {
+          throw new Error('Hub authentication is required before Web can submit real Hub work.');
+        }
+        if (!hasHubToken && !ensureAuth && !hasInjectedHubClient) {
           throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });

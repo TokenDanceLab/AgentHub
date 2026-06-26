@@ -37,6 +37,7 @@ export interface DesktopPlatformOptions {
   openPreview?: (evidence: EvidenceRef) => Promise<void>;
   pickLocalAttachments?: NonNullable<AgentHubPlatform['attachments']>['pickFiles'];
   submitRun?: (request: StartRunRequest) => Promise<RunInfo>;
+  demoRuntimeFallback?: boolean;
 }
 
 export interface DesktopEdgeHostReadiness {
@@ -177,7 +178,11 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
           };
         }
 
-        return workbenchDemoRuntimeStore.submitComposerIntent(intent);
+        if (options.demoRuntimeFallback) {
+          return workbenchDemoRuntimeStore.submitComposerIntent(intent);
+        }
+
+        throw new Error('Local Edge run submission is unavailable');
       },
     },
   };

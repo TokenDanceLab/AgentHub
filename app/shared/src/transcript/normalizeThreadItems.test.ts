@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { normalizeThreadItemsToTranscript } from './normalizeThreadItems';
 
 describe('normalizeThreadItemsToTranscript', () => {
+  it('drops persisted runtime diagnostics that are not conversational content', () => {
+    const blocks = normalizeThreadItemsToTranscript([
+      {
+        itemId: 'diag-1',
+        threadId: 'thread-1',
+        type: 'agent_message',
+        role: 'assistant',
+        content: 'Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.',
+        runId: 'run-1',
+        createdAt: '2026-06-07T01:00:02Z',
+      },
+    ]);
+
+    expect(blocks).toEqual([]);
+  });
+
   it('projects persisted thread messages into transcript blocks', () => {
     const blocks = normalizeThreadItemsToTranscript([
       {

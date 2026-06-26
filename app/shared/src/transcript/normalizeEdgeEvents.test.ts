@@ -3,6 +3,23 @@ import type { EventEnvelope } from '../events';
 import { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 
 describe('normalizeEdgeEventsToTranscript', () => {
+  it('drops Codex stdin diagnostics from Edge runtime output', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-stdin-warning', 1, 'run.output.batch', {
+        runId: 'run-live',
+        stream: 'stderr',
+        chunks: [
+          {
+            offset: 0,
+            text: 'Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.',
+          },
+        ],
+      }),
+    ]);
+
+    expect(blocks).toEqual([]);
+  });
+
   it('projects live Edge agent events into transcript blocks with evidence', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-start', 1, 'run.started', {
@@ -54,15 +71,6 @@ describe('normalizeEdgeEventsToTranscript', () => {
 
     expect(blocks).toEqual([
       expect.objectContaining({
-        id: 'edge-event-evt-start',
-        kind: 'text',
-        author: { id: 'edge', name: 'Edge', role: 'system' },
-        text: 'Run run-live started',
-        evidenceRefs: [
-          { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'running' },
-        ],
-      }),
-      expect.objectContaining({
         id: 'edge-event-evt-text',
         kind: 'text',
         author: { id: 'agent', name: 'Agent', role: 'agent' },
@@ -74,6 +82,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
       expect.objectContaining({
         id: 'edge-event-evt-tool',
         kind: 'tool_call',
+        callId: 'call-rg',
         toolName: 'rg',
         status: 'running',
         evidenceRefs: [
@@ -144,14 +153,6 @@ describe('normalizeEdgeEventsToTranscript', () => {
         runId: 'run-live',
         evidenceRefs: [
           { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'completed' },
-        ],
-      }),
-      expect.objectContaining({
-        id: 'edge-event-evt-unknown-status',
-        kind: 'text',
-        text: 'Run run-live throttled',
-        evidenceRefs: [
-          { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'running' },
         ],
       }),
     ]);
@@ -297,6 +298,33 @@ describe('normalizeEdgeEventsToTranscript', () => {
         turns: 7,
         summary: '协作进度 78%。',
       }),
+    ]);
+  });
+
+  it('keeps worker-authored agent text separate inside the same run', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-builder-text', 1, 'run.agent.text_delta', {
+        runId: 'team-run',
+        agentId: 'builder',
+        agentName: 'Builder',
+        content: 'Builder report.',
+      }),
+      edgeEvent('evt-reviewer-text', 2, 'run.agent.text_delta', {
+        runId: 'team-run',
+        agentId: 'reviewer',
+        agentName: 'Reviewer',
+        content: 'Reviewer report.',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks.map((block) => block.author)).toEqual([
+      { id: 'builder', name: 'Builder', role: 'agent' },
+      { id: 'reviewer', name: 'Reviewer', role: 'agent' },
+    ]);
+    expect(blocks.map((block) => block.kind === 'text' ? block.text : '')).toEqual([
+      'Builder report.',
+      'Reviewer report.',
     ]);
   });
 });
@@ -557,67 +585,32 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
     expect(blocks[2]!.kind).toBe('text');
   });
 
-  // ── 4. All status mappings (done/todo/pending/running/completed/failed) ─
+  // ── 4. Lifecycle status events stay out of conversational transcript ─
 
-  it('maps "done" status to "completed" in normalizeEvidenceStatus', () => {
-    // "done" is NOT in normalizeEvidenceStatus, so it falls through to default 'running'.
-    // This test documents current behavior — "done" is not a recognized status.
-    const blocks = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-done', 1, 'run.status.changed', {
-        runId: 'run-status',
-        status: 'done',
-      }),
-    ]);
+  it('drops run.status.changed from transcript because run state is handled by workbench state', () => {
+    const statuses = [
+      'done',
+      'todo',
+      'pending',
+      'queued',
+      'running',
+      'streaming',
+      'draining',
+      'starting',
+      'completed',
+      'finished',
+      'succeeded',
+      'success',
+      'approved',
+      'ready',
+      'failed',
+      'cancelled',
+      'error',
+      'denied',
+      'rejected',
+      'some-future-status',
+    ];
 
-    expect(blocks).toHaveLength(1);
-    expect((blocks[0]! as { text: string }).text).toBe('Run run-status done');
-    // "done" is not in the known mapping → defaults to 'running'
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'running' },
-    ]);
-  });
-
-  it('maps "todo" status to "running" (unrecognized default)', () => {
-    // "todo" is also NOT in normalizeEvidenceStatus — it falls through to 'running'.
-    const blocks = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-todo', 1, 'run.status.changed', {
-        runId: 'run-status',
-        status: 'todo',
-      }),
-    ]);
-
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'running' },
-    ]);
-  });
-
-  it('maps "pending" status correctly', () => {
-    const blocks = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-pending', 1, 'run.status.changed', {
-        runId: 'run-status',
-        status: 'pending',
-      }),
-    ]);
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'pending' },
-    ]);
-  });
-
-  it('maps "queued" to "pending" status', () => {
-    const blocks = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-queued', 1, 'run.status.changed', {
-        runId: 'run-status',
-        status: 'queued',
-      }),
-    ]);
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'pending' },
-    ]);
-  });
-
-  it('maps "running" / "streaming" / "draining" / "starting" to "running"', () => {
-    const statuses = ['running', 'streaming', 'draining', 'starting'];
     for (const status of statuses) {
       const blocks = normalizeEdgeEventsToTranscript([
         edgeEvent(`evt-status-${status}`, 1, 'run.status.changed', {
@@ -625,53 +618,8 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
           status,
         }),
       ]);
-      expect(blocks[0]!.evidenceRefs).toEqual([
-        { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'running' },
-      ]);
+      expect(blocks).toEqual([]);
     }
-  });
-
-  it('maps "completed" / "finished" / "succeeded" / "success" / "approved" / "ready" to "completed"', () => {
-    const statuses = ['completed', 'finished', 'succeeded', 'success', 'approved', 'ready'];
-    for (const status of statuses) {
-      const blocks = normalizeEdgeEventsToTranscript([
-        edgeEvent(`evt-status-${status}`, 1, 'run.status.changed', {
-          runId: 'run-status',
-          status,
-        }),
-      ]);
-      expect(blocks[0]!.evidenceRefs).toEqual([
-        { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'completed' },
-      ]);
-    }
-  });
-
-  it('maps "failed" / "cancelled" / "error" / "denied" / "rejected" to "failed"', () => {
-    const statuses = ['failed', 'cancelled', 'error', 'denied', 'rejected'];
-    for (const status of statuses) {
-      const blocks = normalizeEdgeEventsToTranscript([
-        edgeEvent(`evt-status-${status}`, 1, 'run.status.changed', {
-          runId: 'run-status',
-          status,
-        }),
-      ]);
-      expect(blocks[0]!.evidenceRefs).toEqual([
-        { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'failed' },
-      ]);
-    }
-  });
-
-  it('maps unrecognized status to "running" (safe default)', () => {
-    const blocks = normalizeEdgeEventsToTranscript([
-      edgeEvent('evt-status-weird', 1, 'run.status.changed', {
-        runId: 'run-status',
-        status: 'some-future-status',
-      }),
-    ]);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-status', kind: 'run', label: 'Run run-status', status: 'running' },
-    ]);
   });
 
   it('maps "deny" / "rejected" permission decisions to "failed" status', () => {
@@ -704,19 +652,14 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
 
   // ── 5. run.queued handler ──────────────────────────────────────────────
 
-  it('produces a text block with "pending" status for run.queued events', () => {
+  it('drops run.queued events from transcript because they are lifecycle status only', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-queued', 1, 'run.queued', {
         runId: 'run-q',
       }),
     ]);
 
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]!.kind).toBe('text');
-    expect((blocks[0]! as { text: string }).text).toBe('Run run-q queued');
-    expect(blocks[0]!.evidenceRefs).toEqual([
-      { id: 'run-run-q', kind: 'run', label: 'Run run-q', status: 'pending' },
-    ]);
+    expect(blocks).toEqual([]);
   });
 
   it('returns null for run.queued without a runId', () => {
@@ -726,25 +669,16 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
     expect(blocks).toEqual([]);
   });
 
-  it('run.queued block is correctly ordered when mixed with other lifecycle events', () => {
-    // Note: run.queued, run.started, and run.output all produce kind='text' blocks
-    // with EDGE_AUTHOR. If they share the same runId, consecutive text blocks merge.
-    // To test ordering without merge, we use different runIds.
+  it('keeps lifecycle-only events out while preserving terminal and output events', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-started', 3, 'run.started', { runId: 'run-a' }, '2026-06-07T03:00:03Z'),
       edgeEvent('evt-queued', 1, 'run.queued', { runId: 'run-b' }, '2026-06-07T03:00:01Z'),
       edgeEvent('evt-finished', 5, 'run.finished', { runId: 'run-a', durationMs: 1000 }, '2026-06-07T03:00:05Z'),
     ]);
 
-    // Events are sorted by sentAt. run.queued is first, then run.started, then run.finished.
-    // Since run.queued and run.started have DIFFERENT runIds, they don't merge.
-    expect(blocks).toHaveLength(3);
-    expect(blocks[0]!.id).toBe('edge-event-evt-queued');
-    expect((blocks[0]! as { text: string }).text).toBe('Run run-b queued');
-    expect(blocks[1]!.id).toBe('edge-event-evt-started');
-    expect((blocks[1]! as { text: string }).text).toBe('Run run-a started');
-    expect(blocks[2]!.id).toBe('edge-event-evt-finished');
-    expect(blocks[2]!.kind).toBe('finished');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.id).toBe('edge-event-evt-finished');
+    expect(blocks[0]!.kind).toBe('finished');
   });
 
   // ── 6. Dedup logic ────────────────────────────────────────────────────

@@ -7,20 +7,13 @@
 2. 长程任务默认走 spec-driven-develop；短任务（单文件修复、typo）直接做。
 3. 涉及 `../` workspace 治理时，同步读 `../AGENTS.md` 和 `../docs/`。
 
-## 1. 活跃 SUPER 安全加固
-- **Phase**: `super-phase1-safety-foundation`（6 阶段，52 任务，6 Milestones）
-- **分支**: `feat/super-phase1-safety-foundation`
-- **进度**: `docs/progress/MASTER.md`（自适应控制 SSOT）
-- **仓库**: `github.com/TokenDanceLab/AgentHub`
-- **目标**: S.U.P.E.R 63→release-ready，优先 P0 crash/security→架构拆分→前端→文档
+## 1. 当前进度
+- 如果 `docs/progress/MASTER.md` 存在，活跃任务、分支、阶段和验收以它为准。
+- 如果不存在活跃 MASTER，先读 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/archives/README.md`；不要把归档专项当成当前任务。
+- 不在本文件硬编码某个历史 Phase 或分支；过期任务完成后归档到 `docs/archives/`。
+- UI 改动必须有明确任务、SPEC/验收和测试证据；模式、mock、manifest 状态留在状态区或设置区，不进主聊天流。
 
-## 2. UI Freeze（硬约束）
-- **Desktop/Web UI 组件冻结**：禁止修改组件视觉、样式、布局。
-- 前端任务限定 infrastructure-only：ErrorBoundary、timeout、toast、error surface。
-- Mobile RN UI 可修改，但不得改 Desktop/Web native 配置。
-- 违反此约束的 PR 直接退回。
-
-## 3. 关键命令
+## 2. 关键命令
 ```powershell
 # 同步基线
 git checkout dev/delicious233 && git pull --ff-only
@@ -43,7 +36,7 @@ git diff --check; git status --short --branch
 .\scripts\verify-ci-gates.ps1
 ```
 
-## 4. Claude 特化规则
+## 3. Claude 特化规则
 - **不猜测**：不确定的路径、配置、状态先读文档或问，禁止基于假设修改。
 - **小步提交**：每个独立改动完成后立即 commit + push，不攒变更。
 - **范围锁**：只改任务卡允许的路径；发现范围不够停下报告，不自行扩大。

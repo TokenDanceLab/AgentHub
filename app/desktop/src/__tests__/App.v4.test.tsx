@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import type { EventEnvelope } from '@shared/events';
@@ -167,6 +167,18 @@ const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
 const tryAutoLogin = vi.fn().mockResolvedValue(undefined);
 const refetchHealth = vi.fn();
+const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
+const workspaceLabel = /^(Workspace|aria\.workspace)$/;
+const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
+const railAvatarLabel = /^(Delicious233|user\.fallbackName)$/;
+const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
+const browserInspectorTabLabel = /^×(浏览器|Browser|inspector\.browser)$/;
+const logoutLabel = /^(退出登录|Log out|user\.logout)$/;
+
+function getComposerInput(): HTMLTextAreaElement {
+  return screen.getByLabelText(composerInputLabel) as HTMLTextAreaElement;
+}
 const mockHubClient = { ackTask: vi.fn() };
 const mockHubWS = {
   on: vi.fn(() => vi.fn()),
@@ -364,25 +376,26 @@ describe('Desktop App v4 root', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
 
-    expect(screen.getByRole('group', { name: 'Desktop navigation controls' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '切换左侧栏' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '后退' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '前进' })).toBeInTheDocument();
+    const desktopNavigation = screen.getByRole('group', { name: 'Desktop navigation controls' });
+    expect(desktopNavigation).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: '切换左侧栏' })).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: '后退' })).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: '前进' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
-    expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
+    expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: workspaceTabsLabel })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Composer input')).toBeInTheDocument();
+    expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '添加本机附件' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: browserInspectorTabLabel })).toBeInTheDocument();
     expect(screen.getByRole('heading')).toBeInTheDocument();
-    expect(screen.getByLabelText('Composer input')).toBeInTheDocument();
+    expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '数据模式' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
@@ -424,11 +437,18 @@ describe('Desktop App v4 root', () => {
   });
 
   it('returns to the Desktop login card from the account logout action', () => {
+    mockedUseCurrentUser.mockReturnValue({
+      data: {
+        userId: 'user-delicious233',
+        displayName: 'Delicious233',
+        avatarUrl: '',
+      },
+    } as ReturnType<typeof useCurrentUser>);
     renderWithProviders(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delicious233' }));
-    fireEvent.click(screen.getByRole('button', { name: '退出登录' }));
+    fireEvent.click(screen.getByRole('button', { name: railAvatarLabel }));
+    fireEvent.click(screen.getByRole('button', { name: logoutLabel }));
 
     expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
@@ -603,7 +623,7 @@ describe('Desktop App v4 root', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
-    expect(screen.getAllByText('rg').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('rg')).toHaveLength(1);
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
     expect(mockedUseRunEvidence).toHaveBeenLastCalledWith('run-live');
 
@@ -658,10 +678,10 @@ describe('Desktop App v4 root', () => {
 
     renderWithProviders(<DesktopWorkbenchApp />);
 
-    fireEvent.change(screen.getByLabelText('Composer input'), {
+    fireEvent.change(getComposerInput(), {
       target: { value: '跑一下 v4 smoke' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+    fireEvent.click(screen.getByRole('button', { name: sendMessageLabel }));
 
     await waitFor(() => {
       expect(createRunMutateAsync).toHaveBeenCalledTimes(1);
@@ -673,7 +693,7 @@ describe('Desktop App v4 root', () => {
       prompt: '跑一下 v4 smoke',
       threadId: 'thread-real',
     });
-    expect(screen.getByLabelText('Composer input')).toHaveValue('');
+    expect(getComposerInput()).toHaveValue('');
   });
 });
 

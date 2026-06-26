@@ -237,11 +237,11 @@ const PROJECT_SKILLS: ProjectSkill[] = [
     hasReferences: false,
   },
   {
-    id: 'ui-screenshot',
-    title: 'ui-screenshot',
-    descriptionKey: 'settings.skill.uiScreenshotDesc',
+    id: 'real-e2e-acceptance',
+    title: 'real-e2e-acceptance',
+    descriptionKey: 'settings.skill.realE2eAcceptanceDesc',
     status: 'ready',
-    hasScripts: true,
+    hasScripts: false,
     hasReferences: false,
   },
 ];

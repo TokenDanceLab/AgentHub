@@ -1682,7 +1682,7 @@
   "settings.skill.integrationTestDesc": "Edge、Agent Runtime 和 WebSocket 事件的集成 E2E 工作流。",
   "settings.skill.prePushDesc": "构建、测试、覆盖率、lint 和 E2E 的 push 前验证清单。",
   "settings.skill.testCoverageDesc": "用于识别薄弱区域的测试和覆盖率分析工作流。",
-  "settings.skill.uiScreenshotDesc": "用于视觉 QA 和竞品对比的 Desktop UI 截图自动化。",
+  "settings.skill.realE2eAcceptanceDesc": "真实 E2E、Playwright、Visual QA、approved-real 和打包验收的证据分级。",
   "settings.skillGovernance": "Skill 治理",
   "settings.skillGovernanceDesc": "本地注册表、脚本审计、references 和 Hub 同步边界。",
   "settings.skillGuard": "Skill 边界",
