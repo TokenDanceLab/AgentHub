@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-06-27
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
-> **Branch**: dev/delicious233 baseline; current pre-Phase 3 hygiene branch `docs/active-doc-regroup`
+> **Branch**: dev/delicious233 baseline; current governance/source-contract branch `docs/active-markdown-trim`
 > **Baseline**: origin/dev/delicious233
 
 ## GitHub Resources
@@ -30,7 +30,7 @@
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 0 | 5 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 6 | 0 | 6 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -46,6 +46,7 @@
 | T2.3 | #328 | Align E2E smoke matrix and manifests | closed |
 | T2.4 | #329 | Normalize Visual QA acceptance | closed |
 | T2.5 | #339 | Degiant active docs and archive stale material | closed |
+| T3.0 | #342 | Trim active API/Hub docs and source-contract owner mapping | open |
 | T3.1 | #330 | Harden chat transcript behavior tests | open |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
 | T3.3 | #332 | Classify backend API performance and leak gates | open |
@@ -73,15 +74,15 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (0/6 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
-**Active Task**: operator-directed pre-Phase 3 documentation hygiene checkpoint on `docs/active-doc-regroup`; #330 / T3.1 remains the next source/test task after this branch is reviewed.
-**Current Focus**: Phase 2 merged into `dev/delicious233` via PR #340 (`b79486fa`). This hygiene checkpoint aggressively de-giants active entrypoints without changing source behavior: `AGENTS.md`, `CHANGELOG.md`, `docs/architecture.md`, `docs/developer-quickstart.md`, `docs/governance/security-risk-register.md`, `docs/governance/threat-model.md`, and `docs/reference/` become concise owner documents, while old longform content moves to `docs/archive/`. Phase 3 source/test alignment remains scoped to chat transcript behavior, frontend architecture docs, backend API gates, and Desktop packaged evidence boundaries.
-**Blockers**: none for Phase 2. Phase 3-4 issues remain open and must run through their own spec, implementation, and acceptance gates.
+**Active Task**: #342 / T3.0 on `docs/active-markdown-trim`; #330 / T3.1 remains the next UI/source implementation task after this branch is reviewed.
+**Current Focus**: PR #341 has been merged into `dev/delicious233` and the temporary `docs/active-doc-regroup` worktree/branch has been cleaned up. This branch finishes the next hygiene layer: `api/events.md`, `hub-server/README.md`, `hub-server/deployments/README.md`, Hub architecture/deployment docs, and doc verifier rules should become concise active owner documents that point to source owners and useful tests instead of duplicating long event/deployment tables. Phase 3 source/test alignment remains scoped to chat transcript behavior, frontend architecture docs, backend API/performance/leak gates, Desktop packaged evidence, and Web/Mobile client lanes.
+**Blockers**: none for governance cleanup. Phase 3-4 issues remain open and must run through their own implementation and acceptance gates.
 
 ### Local Phase 1 Evidence
 
@@ -127,11 +128,13 @@ git worktree list
 - 2026-06-27 `active-doc-degianting`: actual effort L; S.U.P.E.R quick check S/P/E/R pass for single owner docs, archive ports, active-doc environment boundaries, and replaceable concise entrypoints; unplanned dependencies 3 (root STATE tests, duplicate API reference, stale docs/reference projects).
 - 2026-06-27 `phase-2-ci-fix`: actual effort S; S.U.P.E.R quick check S/P/E/R pass for roadmap ownership, fixture topology contract, environment honesty, and verifier reuse; unplanned dependencies 1 (PR merge CI exposed a stale roadmap line not caught before push).
 - 2026-06-27 `active-doc-regroup`: actual effort M; S.U.P.E.R quick check S/U/R pass for owner-file consolidation, archive routing, and stricter verifier limits; unplanned dependencies 2 (Git index lock after attempted parallel `git mv`, stale roadmap Phase 2 status).
+- 2026-06-27 `active-markdown-trim`: actual effort M; S.U.P.E.R quick check S/P/E/R pass for API/HUB owner-file consolidation, source-owner routing, environment boundary cleanup, and verifier limits; unplanned dependencies 3 (WS event doc mixed Edge/Hub/fixture/manifest responsibilities, Hub README duplicated architecture/API/config, deployment README duplicated live-infra and env facts).
+- 2026-06-27 `active-markdown-trim-ci-fix`: actual effort S; S.U.P.E.R quick check S/P/R pass for event owner coverage, parser/test contract routing, and concise active-doc inventory; unplanned dependencies 1 (CI exposed missing `run.agent.text_block` coverage after trimming `api/events.md`).
 
 ## Next Steps
 
-1. Review and merge `docs/active-doc-regroup`, then start Phase 3 from #330 / T3.1 with a fresh spec checkpoint and a new branch/worktree from `dev/delicious233`.
-2. Keep Phase 3 source/test alignment separate from this active-doc regrouping patch.
+1. Review and merge `docs/active-markdown-trim` for #342 / T3.0, then start Phase 3 from #330 / T3.1 with a fresh spec checkpoint and a new branch/worktree from `dev/delicious233`.
+2. Keep Phase 3 chat transcript source/test implementation separate from this governance/source-contract cleanup patch.
 3. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
 4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this spec unless the operator opens a separate scoped task.
 
@@ -156,3 +159,6 @@ git worktree list
 | 2026-06-27 | phase-2-ci-fix | PR #340 CI showed `validate` failing on a `docs/roadmap.md` stale root-rule filename and `Backend E2E (fixture-only)` failing on a missing P0 remote-control topology sentence. Fixed the roadmap without widening scope. Verification: `verify-doc-ssot.ps1` and `verify-p0-remote-control-fixture.ps1` passed locally. |
 | 2026-06-27 | phase-2-merged | PR #340 merged into `dev/delicious233` with all checks green. Because the PR target was not the default branch, #326-#329 and #339 were closed manually with merge evidence; Phase 2 milestone #11 is closed with 0 open / 5 closed issues. Phase 3 begins at #330 after the next spec checkpoint. |
 | 2026-06-27 | active-doc-regroup | Operator requested aggressive active-doc cleanup before Phase 3 implementation. Created `docs/active-doc-regroup`, archived old longform architecture/security/changelog/threat-model/reference/screenshot checklist snapshots, rebuilt concise owner docs, shortened quickstart, and tightened `verify-doc-ssot.ps1` line limits to prevent active entrypoint bloat. |
+| 2026-06-27 | active-doc-regroup-merged | PR #341 merged into `dev/delicious233`; local main fast-forwarded to `34d9e318`; `.worktrees/active-doc-regroup` and local/remote `docs/active-doc-regroup` branch are gone. |
+| 2026-06-27 | active-markdown-trim | Operator expanded the active goal to full branch/rule/doc/source/test governance. Created `docs/active-markdown-trim` from `dev/delicious233` to finish active Markdown consolidation before Phase 3 implementation. |
+| 2026-06-27 | active-markdown-trim-ci-fix | PR #343 CI showed Edge/cross-platform/benchmark failures from `TestEventDocsCoverRuntimeAdapterEvents`; `api/events.md` now keeps a compact runtime adapter inventory instead of restoring the old long event table. Verification: adapter contract test, adapters short test, doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and `git diff --check` passed locally. |

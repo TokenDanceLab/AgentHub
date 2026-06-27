@@ -18,10 +18,10 @@ api/
 ├── README.md          # API 总入口
 ├── conventions.md     # 命名、分页、错误、权限、版本
 ├── openapi.yaml       # REST API 路径总表和基础契约
-└── events.md          # WebSocket event envelope、序号、游标和事件总表
+└── events.md          # WebSocket event envelope、源码 owner、事件族和验收边界
 ```
 
-`openapi.yaml` 只描述 REST API。WebSocket 的事件格式、序号、游标和事件表写在 `events.md`。业务解释、权威边界和架构背景写进 `docs/`，不要塞进 OpenAPI。
+`openapi.yaml` 只描述 REST API。WebSocket 的 envelope、frame、事件族、源码 owner 和验收边界写在 `events.md`；完整事件常量由 `edge-server/internal/adapters/adapter.go`、`hub-server/internal/ws/frame.go` 和 shared transcript tests 守住。业务解释、权威边界和架构背景写进 `docs/`，不要塞进 OpenAPI。
 
 ## 产品术语
 
