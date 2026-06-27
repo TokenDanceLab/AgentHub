@@ -21,7 +21,7 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md" -or $p -eq "hub-server/tests/README.md") { return $true }
     if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md" -or $p -eq "app/mobile-rn/README.md") { return $true }
     if ($p -eq "scripts/load-test-scenarios.md") { return $true }
-    if ($p -eq "docs/README.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
+    if ($p -eq "docs/README.md" -or $p -eq "docs/history.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
     if ($p -match "^docs/(analysis|plan|progress|governance|adr)/.+\.md$") { return $true }
     if ($p -match "^\.agents/skills/.+\.md$") { return $true }
@@ -65,7 +65,7 @@ foreach ($archivedActivePath in @(
 
 $datedGovernance = @(Get-ChildItem -LiteralPath "docs/governance" -File -Filter "*.md" | Where-Object { $_.Name -match "\d{4}-\d{2}-\d{2}" })
 if ($datedGovernance.Count -gt 0) {
-    Fail ("dated governance evidence must live under docs/archives/: " + (($datedGovernance | ForEach-Object { $_.Name }) -join ", "))
+    Fail ("dated governance evidence must live in the external archive indexed by docs/history.md: " + (($datedGovernance | ForEach-Object { $_.Name }) -join ", "))
 }
 
 $requiredMarkers = @(
@@ -75,9 +75,11 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
     @{ Path = "AGENTS.md"; Marker = '项目规则只写 `AGENTS.md`' },
+    @{ Path = "docs/history.md"; Marker = "Archive commit" },
+    @{ Path = "docs/history.md"; Marker = "TokenDanceLab/docs" },
     @{ Path = ".agents/skills/real-e2e-acceptance/SKILL.md"; Marker = "Packaged release" },
     @{ Path = "api/events.md"; Marker = "Owner" },
-    @{ Path = "app/web/README.md"; Marker = "docs/archive/app/web-readme-full-2026-06-27.md" },
+    @{ Path = "app/web/README.md"; Marker = "docs/history.md" },
     @{ Path = "app/desktop/README.md"; Marker = "packaged-release" },
     @{ Path = "app/desktop/README.md"; Marker = "Vite renderer 证据不等于 packaged Desktop" },
     @{ Path = "app/mobile-rn/README.md"; Marker = "real_tested=false" },
@@ -90,7 +92,7 @@ $requiredMarkers = @(
     @{ Path = "scripts/load-test-scenarios.md"; Marker = "Gate Matrix" },
     @{ Path = "scripts/load-test-scenarios.md"; Marker = "Do Not Claim" },
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
-    @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
+    @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南见" },
     @{ Path = "docs/governance/governance-execution.md"; Marker = "D2b. Release dry build topology" }
     @{ Path = "docs/governance/governance-execution.md"; Marker = "later approval slice" }
     @{ Path = "docs/architecture/05-deployment.md"; Marker = "Desktop packaged 行为正确" }
@@ -177,6 +179,7 @@ $maxLines = @{
     "hub-server/tests/README.md" = 70
     "scripts/load-test-scenarios.md" = 115
     "docs/README.md" = 120
+    "docs/history.md" = 80
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
     "docs/architecture.md" = 170

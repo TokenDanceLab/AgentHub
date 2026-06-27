@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-Edge Server 是靠近 workspace 和 Agent Runtime 的执行控制节点，可运行在 Desktop 内、本机后台、远程机器或 headless Cloud Edge。旧长版 README 已归档到 [../docs/archive/edge-server/README-full-2026-06-27.md](../docs/archive/edge-server/README-full-2026-06-27.md)。
+Edge Server 是靠近 workspace 和 Agent Runtime 的执行控制节点，可运行在 Desktop 内、本机后台、远程机器或 headless Cloud Edge。旧长版 README 见 [../docs/history.md](../docs/history.md)。
 
 Runtime: Go 1.25.
 

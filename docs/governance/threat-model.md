@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文件是活跃威胁模型摘要。旧长版快照已归档到 [../archive/security/threat-model-2026-06-27.md](../archive/security/threat-model-2026-06-27.md)。当前风险队列和发布门禁以 [security-risk-register.md](security-risk-register.md) 为准。
+本文件是活跃威胁模型摘要。旧长版快照见 [../history.md](../history.md)。当前风险队列和发布门禁以 [security-risk-register.md](security-risk-register.md) 为准。
 
 ## 资产
 

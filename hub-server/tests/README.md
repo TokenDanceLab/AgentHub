@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-`hub-server/tests/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis. The old helper walkthrough is archived at [../../docs/archive/hub-server/tests-readme-full-2026-06-27.md](../../docs/archive/hub-server/tests-readme-full-2026-06-27.md).
+`hub-server/tests/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis. The old helper walkthrough is indexed in [../../docs/history.md](../../docs/history.md).
 
 ## Commands
 
