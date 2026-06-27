@@ -20,7 +20,7 @@ docs/
 ├── README.md                          ← 导航索引（你在这里）
 ├── developer-quickstart.md            ← 新人入门
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
-├── architecture/                      ← 6 篇模块化架构文档
+├── architecture/                      ← 模块化架构文档
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
 ├── progress/                          ← 当前 spec-driven 专项进度（仅执行中存在）
 ├── design-decisions.md                ← 5 个关键技术决策摘要
@@ -40,6 +40,7 @@ docs/
 | 历史设计、审计、发布、参考调研 | [archive/README.md](archive/README.md) |
 | spec-driven 专项归档 | [archives/README.md](archives/README.md) — 完成后的 analysis/plan/progress |
 | 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md) — 仅当该文件存在时有效 |
+| WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
 | 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
