@@ -33,7 +33,7 @@ function Invoke-Smoke {
         [string]$WorkingDirectory = $RepoRoot
     )
 
-    $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-binary-smoke.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.ps1"
     Push-Location $WorkingDirectory
     try {
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
@@ -55,7 +55,7 @@ function Invoke-Prepare {
         [string]$WorkingDirectory = $RepoRoot
     )
 
-    $scriptPath = Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\release\prepare-tauri-sidecar-local.ps1"
     Push-Location $WorkingDirectory
     try {
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
@@ -110,8 +110,8 @@ function Get-HostExecutable {
     throw "No PowerShell executable fixture is available"
 }
 
-$preparePath = Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1"
-$smokePath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-binary-smoke.ps1"
+$preparePath = Join-Path $RepoRoot "scripts\release\prepare-tauri-sidecar-local.ps1"
+$smokePath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.ps1"
 $prepareImplementationPath = Join-Path $RepoRoot "scripts\release\prepare-tauri-sidecar-local.ps1"
 $smokeImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.ps1"
 Assert-True (Test-Path $preparePath) "local sidecar prepare script exists"

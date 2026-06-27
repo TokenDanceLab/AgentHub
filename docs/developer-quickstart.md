@@ -138,9 +138,9 @@ corepack.cmd pnpm exec vite build
 文档/API：
 
 ```bash
-pwsh ./scripts/verify-doc-ssot.ps1
-pwsh ./scripts/verify-project-skills.ps1
-pwsh ./scripts/verify-real-e2e-contract.ps1
+pwsh ./scripts/verify/verify-doc-ssot.ps1
+pwsh ./scripts/verify/verify-project-skills.ps1
+pwsh ./scripts/verify/verify-real-e2e-contract.ps1
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 git diff --check
 ```

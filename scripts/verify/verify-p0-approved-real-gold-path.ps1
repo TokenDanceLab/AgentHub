@@ -294,7 +294,7 @@ if ($Failures.Count -eq 0) {
     if ($SkipTokenDanceIDReadiness) {
         Add-Segment "tokendance_id_readiness" "no-secret-readiness" "SKIPPED" $null "" "Skipped by caller."
     } elseif ([string]::IsNullOrWhiteSpace($TokenDanceIDReadinessPath)) {
-        $tokenRun = Invoke-RepoScript "scripts\verify-token-dance-id-login-readiness.ps1" @("-RepoRoot", $RepoRoot, "-OutputPath", $tokenEvidence)
+        $tokenRun = Invoke-RepoScript "scripts\verify\verify-token-dance-id-login-readiness.ps1" @("-RepoRoot", $RepoRoot, "-OutputPath", $tokenEvidence)
         Add-Segment "tokendance_id_readiness" "no-secret-readiness" $(if ($tokenRun.ExitCode -eq 0) { "PASS" } else { "BLOCKED" }) $tokenRun.ExitCode $tokenEvidence $tokenRun.Output
     } else {
         Add-Segment "tokendance_id_readiness" "evidence-file" $(if (Test-Path -LiteralPath $tokenEvidence -PathType Leaf) { "PASS" } else { "BLOCKED" }) $null $tokenEvidence "Using caller-provided TokenDanceID readiness evidence."
@@ -302,7 +302,7 @@ if ($Failures.Count -eq 0) {
 
     if ($RunDesktopEdgeCliSmoke) {
         $edgeRoot = Join-Path $ArtifactRoot "desktop-edge-cli-smoke"
-        $edgeRun = Invoke-RepoScript "scripts\verify-p0-desktop-edge-cli-smoke.ps1" @(
+        $edgeRun = Invoke-RepoScript "scripts\smoke\verify-p0-desktop-edge-cli-smoke.ps1" @(
             "-RepoRoot", $RepoRoot,
             "-Runtime", $Runtime,
             "-ArtifactRoot", $edgeRoot,
@@ -329,7 +329,7 @@ if ($Failures.Count -eq 0) {
             $demoArgs += @("-WebSmokeManifestPath", (Resolve-InputPath $webSmoke))
         }
         if ($RunLocalStackSmoke) { $demoArgs += "-RunLocalStackSmoke" }
-        $demoRun = Invoke-RepoScript "scripts\verify-approved-real-demo-readiness.ps1" $demoArgs
+        $demoRun = Invoke-RepoScript "scripts\verify\verify-approved-real-demo-readiness.ps1" $demoArgs
         Add-Segment "hub_replay_web_redacted_manifest" "approved-real-demo" $(if ($demoRun.ExitCode -eq 0) { "PASS" } else { "BLOCKED" }) $demoRun.ExitCode $demoManifest $demoRun.Output
     } else {
         Add-Segment "hub_replay_web_redacted_manifest" "evidence-file" $(if (Test-Path -LiteralPath $demoManifest -PathType Leaf) { "PASS" } else { "BLOCKED" }) $null $demoManifest "Using caller-provided demo readiness manifest."

@@ -190,19 +190,19 @@ if ($Mode -eq "ApprovedReal") {
 }
 
 if ($Failures.Count -eq 0) {
-    $topology = Invoke-RepoScript "scripts\verify-live-chain-topology.ps1" @("-RepoRoot", $RepoRoot)
+    $topology = Invoke-RepoScript "scripts\verify\verify-live-chain-topology.ps1" @("-RepoRoot", $RepoRoot)
     Add-Segment "live_chain_topology" "static" $topology.ExitCode "" $topology.Output
 }
 
 if ($Failures.Count -eq 0) {
-    $boundary = Invoke-RepoScript "scripts\verify-web-hub-boundary.ps1" @()
+    $boundary = Invoke-RepoScript "scripts\verify\verify-web-hub-boundary.ps1" @()
     Add-Segment "web_hub_boundary" "static" $boundary.ExitCode "" $boundary.Output
 }
 
 if ($Failures.Count -eq 0 -and $Mode -ne "ApprovedReal") {
     $p0ArtifactRoot = Join-Path $RepoRoot ".tmp\p0-local-product-loop-evidence\product-loop-qa-$PID"
     $p0EvidencePath = Join-Path $p0ArtifactRoot "p0-local-product-loop.json"
-    $p0 = Invoke-RepoScript "scripts\verify-p0-local-product-loop-evidence.ps1" @(
+    $p0 = Invoke-RepoScript "scripts\smoke\verify-p0-local-product-loop-evidence.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-Mode", "FixtureOnly",
         "-ArtifactRoot", $p0ArtifactRoot,
@@ -216,7 +216,7 @@ if ($Failures.Count -eq 0) {
     $localStackMode = if ($Mode -eq "ReadinessOnly") { "ReadinessOnly" } else { "FixtureOnly" }
     $localStackArtifactRoot = Join-Path $RepoRoot ".tmp\local-stack-e2e-readiness\product-loop-qa-$PID"
     $localStackEvidencePath = Join-Path $localStackArtifactRoot "local-stack-e2e-readiness.json"
-    $localStack = Invoke-RepoScript "scripts\verify-local-stack-e2e-readiness.ps1" @(
+    $localStack = Invoke-RepoScript "scripts\smoke\verify-local-stack-e2e-readiness.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-Mode", $localStackMode,
         "-ArtifactRoot", $localStackArtifactRoot,
@@ -232,14 +232,14 @@ if ($Failures.Count -eq 0) {
         Add-Warning "web_deploy_readiness skipped in FixtureOnly because app/web/dist is missing; run the Web production build before ReadinessOnly or ApprovedReal."
         Add-Segment "web_deploy_readiness" "fixture-skipped" 0 "" "skipped: app/web/dist missing"
     } else {
-        $webDeploy = Invoke-RepoScript "scripts\verify-web-deploy-readiness.ps1" @("-RepoRoot", $RepoRoot)
+        $webDeploy = Invoke-RepoScript "scripts\release\verify-web-deploy-readiness.ps1" @("-RepoRoot", $RepoRoot)
         Add-Segment "web_deploy_readiness" "readiness" $webDeploy.ExitCode "" $webDeploy.Output
     }
 }
 
 if ($Failures.Count -eq 0 -and $Mode -eq "ApprovedReal") {
     $observedReport = Join-Path $ArtifactRoot "observed-localhost-dispatch-report.json"
-    $observed = Invoke-RepoScript "scripts\verify-observed-localhost-dispatch.ps1" @(
+    $observed = Invoke-RepoScript "scripts\smoke\verify-observed-localhost-dispatch.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-ObservedEvidencePath", $ObservedEvidencePath,
         "-EvidencePath", $observedReport,
@@ -251,7 +251,7 @@ if ($Failures.Count -eq 0 -and $Mode -eq "ApprovedReal") {
 
 if ($Failures.Count -eq 0 -and $Mode -eq "ApprovedReal") {
     $cliRoot = Split-Path -Parent $ApprovedCliManifest
-    $cli = Invoke-RepoScript "scripts\verify-approved-real-edge-cli-evidence.ps1" @(
+    $cli = Invoke-RepoScript "scripts\verify\verify-approved-real-edge-cli-evidence.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-ObservedManifest", $ApprovedCliManifest,
         "-EvidenceRoot", $cliRoot,

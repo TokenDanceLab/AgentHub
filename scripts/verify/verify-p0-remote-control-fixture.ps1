@@ -249,14 +249,14 @@ Write-Host "  Boundary: does not deploy." -ForegroundColor White
 
 if ($Failed -eq 0) {
     Step "Login fixture topology"
-    Invoke-RequiredScriptGate "verify-login-fixture-topology.ps1" "scripts\verify-login-fixture-topology.ps1" @("-RepoRoot", $RepoRoot)
+    Invoke-RequiredScriptGate "verify-login-fixture-topology.ps1" "scripts\verify\verify-login-fixture-topology.ps1" @("-RepoRoot", $RepoRoot)
 
     Step "Web Hub boundary"
-    Invoke-RequiredScriptGate "verify-web-hub-boundary.ps1" "scripts\verify-web-hub-boundary.ps1"
+    Invoke-RequiredScriptGate "verify-web-hub-boundary.ps1" "scripts\verify\verify-web-hub-boundary.ps1"
 
     Step "Remote-control fixture E2E"
     $remoteOutputRoot = New-TempOutputRoot "agenthub-p0-remote-control-fixture-$PID"
-    Invoke-RequiredScriptGate "verify-remote-control-fixture-e2e.ps1" "scripts\verify-remote-control-fixture-e2e.ps1" @(
+    Invoke-RequiredScriptGate "verify-remote-control-fixture-e2e.ps1" "scripts\smoke\verify-remote-control-fixture-e2e.ps1" @(
         "-OutputRoot", $remoteOutputRoot,
         "-Stamp", "p0-fixture-readiness"
     )

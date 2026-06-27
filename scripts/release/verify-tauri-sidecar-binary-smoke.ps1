@@ -76,7 +76,7 @@ function Get-TauriSidecarTarget {
 
 function Test-PackageReadinessPrerequisites {
     $required = @(
-        "scripts\verify-tauri-package-readiness.ps1",
+        "scripts\release\verify-tauri-package-readiness.ps1",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "app\desktop\package.json",
@@ -101,7 +101,7 @@ function Invoke-PackageReadinessGate {
     }
 
     Step "Strict package readiness sidecar gate"
-    & (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot -RequireBundledSidecar
+    & (Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot -RequireBundledSidecar
     if ($LASTEXITCODE -ne 0) {
         Fail "verify-tauri-package-readiness.ps1 -RequireBundledSidecar failed"
     }

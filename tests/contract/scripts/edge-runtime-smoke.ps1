@@ -99,7 +99,7 @@ function Assert-True {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\integration-e2e.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\integration-e2e.ps1"
 
 $help = Invoke-SmokeScript @("-NoProfile", "-File", $scriptPath, "-Help")
 Assert-True ($help.ExitCode -eq 0) "integration-e2e help exits 0" $help.Output

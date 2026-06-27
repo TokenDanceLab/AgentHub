@@ -121,8 +121,8 @@ Assert-Contains "edge-server\internal\adapters\opencode.go" "permission\.asked" 
 Assert-Contains "edge-server\internal\adapters\opencode.go" "decisionBridge" "OpenCode parser marks blocked non-interactive permission bridge"
 
 Step "hard real-execution forbids"
-Assert-NotContains "scripts\verify-edge-cli-json-readiness.ps1" $noDirectRuntimeCommandPattern "checker has no direct Codex/Claude/OpenCode command pattern"
-Assert-NotContains "scripts\verify-edge-cli-json-readiness.ps1" $forbiddenPrimitivePattern "checker has no model/API/network/deploy/container/auth primitive"
+Assert-NotContains "scripts\verify\verify-edge-cli-json-readiness.ps1" $noDirectRuntimeCommandPattern "checker has no direct Codex/Claude/OpenCode command pattern"
+Assert-NotContains "scripts\verify\verify-edge-cli-json-readiness.ps1" $forbiddenPrimitivePattern "checker has no model/API/network/deploy/container/auth primitive"
 Assert-NotContains "edge-server\internal\adapters\cli_json_readiness_test.go" $noDirectRuntimeCommandPattern "fixture tests have no direct runtime command line"
 
 Step "focused fixture tests"

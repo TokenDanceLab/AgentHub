@@ -2,14 +2,14 @@
 # AgentHub client local smoke test — bash equivalent of client-smoke.ps1
 #
 # Chains Edge and Desktop-facing API end-to-end verification.
-# Run ./scripts/setup.sh first, then this script.
+# Run ./scripts/dev/setup.sh first, then this script.
 #
 # Usage:
-#   ./scripts/client-smoke.sh
-#   ./scripts/client-smoke.sh --skip-build
-#   ./scripts/client-smoke.sh --reuse-existing-edge
-#   ./scripts/client-smoke.sh --edge-addr 127.0.0.1:3228
-#   ./scripts/client-smoke.sh --edge-addr 127.0.0.1:3228 --edge-auth-token local-smoke-token
+#   ./scripts/smoke/client-smoke.sh
+#   ./scripts/smoke/client-smoke.sh --skip-build
+#   ./scripts/smoke/client-smoke.sh --reuse-existing-edge
+#   ./scripts/smoke/client-smoke.sh --edge-addr 127.0.0.1:3228
+#   ./scripts/smoke/client-smoke.sh --edge-addr 127.0.0.1:3228 --edge-auth-token local-smoke-token
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

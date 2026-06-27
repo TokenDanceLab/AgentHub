@@ -578,7 +578,7 @@ if ($Mode -eq "FixtureOnly") {
     } else {
         Join-Path (Resolve-RepoPath $ArtifactRoot) "localhost-product-loop.json"
     }
-    $fixtureRun = Invoke-RepoScript "scripts\verify-localhost-product-loop.ps1" @(
+    $fixtureRun = Invoke-RepoScript "scripts\smoke\verify-localhost-product-loop.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-EvidencePath", $fixtureEvidence
     )
@@ -596,7 +596,7 @@ if ($Mode -eq "FixtureOnly") {
 }
 
 Step "Approval-boundary gates"
-$loginRun = Invoke-RepoScript "scripts\verify-login-e2e-readiness.ps1" @(
+$loginRun = Invoke-RepoScript "scripts\verify\verify-login-e2e-readiness.ps1" @(
     "-RepoRoot", $RepoRoot
 )
 Write-Host $loginRun.Output
@@ -608,7 +608,7 @@ if ($loginRun.ExitCode -eq 2 -and $loginRun.Output -match "BLOCKED_UNTIL_APPROVE
     Add-GateResult "verify-login-e2e-readiness.ps1" "ProposalOnly" $loginRun.ExitCode "UNEXPECTED" ""
 }
 
-$edgeRun = Invoke-RepoScript "scripts\verify-edge-cli-real-readiness.ps1" @(
+$edgeRun = Invoke-RepoScript "scripts\verify\verify-edge-cli-real-readiness.ps1" @(
     "-RepoRoot", $RepoRoot
 )
 Write-Host $edgeRun.Output
@@ -654,7 +654,7 @@ if ($ProbeServices -or $StartServices) {
         $serviceArgs += "-StartServicePlanPath"
         $serviceArgs += $StartServicePlanPath
     }
-    $servicesRun = Invoke-RepoScript "scripts\verify-localhost-real-services.ps1" $serviceArgs
+    $servicesRun = Invoke-RepoScript "scripts\smoke\verify-localhost-real-services.ps1" $serviceArgs
     Write-Host $servicesRun.Output
     Add-GateResult "verify-localhost-real-services.ps1" "ReadinessOnly" $servicesRun.ExitCode $(if ($servicesRun.ExitCode -eq 0) { "PASS" } else { "FAIL" }) $realServicesEvidence
     if ($servicesRun.ExitCode -ne 0) {
@@ -687,7 +687,7 @@ if ($Mode -eq "ApprovedReal") {
         if ($ApproveRealEvidence) {
             $observedArgs += "-AllowRealTestedApproval"
         }
-        $observedRun = Invoke-RepoScript "scripts\verify-observed-localhost-dispatch.ps1" $observedArgs
+        $observedRun = Invoke-RepoScript "scripts\smoke\verify-observed-localhost-dispatch.ps1" $observedArgs
         Write-Host $observedRun.Output
         Add-GateResult "verify-observed-localhost-dispatch.ps1" "ApprovedReal" $observedRun.ExitCode $(if ($observedRun.ExitCode -eq 0) { "PASS" } else { "FAIL" }) $observedReport
         if ($observedRun.ExitCode -ne 0) {

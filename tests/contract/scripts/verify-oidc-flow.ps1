@@ -94,7 +94,7 @@ function Invoke-OidcScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-oidc-flow.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-oidc-flow.ps1"
 $scriptText = Get-Content -LiteralPath $scriptPath -Raw
 
 Assert-True ($scriptText -match 'function\s+Redact-OidcConfigValue') "verify-oidc-flow has OIDC config value redactor"

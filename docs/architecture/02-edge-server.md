@@ -105,4 +105,4 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 - [01-hub-server.md](01-hub-server.md) — Hub 与 Edge 的同步和中继关系
 - [03-runtime-adapters.md](03-runtime-adapters.md) — 所有 adapter 的详细规范
 - [04-frontend-data-flow.md](04-frontend-data-flow.md) — 前端如何消费 Edge 事件
-- [../../scripts/load-test-scenarios.md](../../scripts/load-test-scenarios.md) — Edge lifecycle/store/adapters 的性能和泄漏证据边界
+- [../reference/backend-performance-gates.md](../reference/backend-performance-gates.md) — Edge lifecycle/store/adapters 的性能和泄漏证据边界

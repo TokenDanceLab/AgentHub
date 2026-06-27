@@ -30,10 +30,10 @@ Edge REST + WebSocket runtime event path. It is not a full Hub/PG/Redis/OIDC
 E2E gate.
 
 Usage:
-  pwsh -File scripts/edge-runtime-smoke.ps1 -Port 3299
-  pwsh -File scripts/edge-runtime-smoke.ps1 -RealCli -Runtime claude-code -Port 3299
-  pwsh -File scripts/edge-runtime-smoke.ps1 -RealCli -Runtime codex -CliPath C:\tools\codex.exe
-  pwsh -File scripts/edge-runtime-smoke.ps1 -RealCli -Runtime opencode -EdgeUrl http://127.0.0.1:3301
+  pwsh -File scripts/smoke/edge-runtime-smoke.ps1 -Port 3299
+  pwsh -File scripts/smoke/edge-runtime-smoke.ps1 -RealCli -Runtime claude-code -Port 3299
+  pwsh -File scripts/smoke/edge-runtime-smoke.ps1 -RealCli -Runtime codex -CliPath C:\tools\codex.exe
+  pwsh -File scripts/smoke/edge-runtime-smoke.ps1 -RealCli -Runtime opencode -EdgeUrl http://127.0.0.1:3301
 
 Key parameters:
   -RealCli                               Opt in to real CLI/model execution. Omitted by default for CI-safe smoke.

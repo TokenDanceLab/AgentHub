@@ -5,12 +5,12 @@ description: Use when AgentHub adapter, executor, Edge runtime event pipeline, W
 
 # Integration Test
 
-The current local runtime smoke entrypoint is `scripts/edge-runtime-smoke.ps1`. The older `scripts/integration-e2e.ps1` is a compatibility wrapper and must not be documented as the primary gate.
+The current local runtime smoke entrypoint is `scripts/smoke/edge-runtime-smoke.ps1`. The older `scripts/smoke/integration-e2e.ps1` is a deprecated forwarding entrypoint and must not be documented as the primary gate.
 
 ## CI-Safe Fixture Smoke
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\edge-runtime-smoke.ps1
 ```
 
 This starts local Edge, uses a fake process fixture, creates a run, and checks REST + WebSocket events. It does not prove real CLI/model/API execution.
@@ -18,9 +18,9 @@ This starts local Edge, uses a fake process fixture, creates a run, and checks R
 ## Approved Real CLI Smoke
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1 -RealCli -Runtime claude-code
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1 -RealCli -Runtime codex
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1 -RealCli -Runtime opencode
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\edge-runtime-smoke.ps1 -RealCli -Runtime claude-code
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\edge-runtime-smoke.ps1 -RealCli -Runtime codex
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\edge-runtime-smoke.ps1 -RealCli -Runtime opencode
 ```
 
 Run real CLI smoke only when approval, credentials, runtime path, and evidence boundary are explicit. Pair it with `.agents/skills/real-e2e-acceptance/SKILL.md` and record `real_tested=true` only for the exact runtime that executed.

@@ -25,7 +25,7 @@ function Read-Text([string]$RelativePath) {
     Get-Content (Join-Path $RepoRoot $RelativePath) -Raw -Encoding UTF8
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-dry.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-dry.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-dry.ps1"
 Assert-True (Test-Path $scriptPath) "Tauri package dry gate exists"
 Assert-True (Test-Path $scriptImplementationPath) "Tauri package dry gate implementation exists"

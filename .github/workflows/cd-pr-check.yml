@@ -10,8 +10,7 @@ on:
       - "hub-server/**.dockerignore"
       - ".github/workflows/cd-*.yml"
       - ".github/workflows/release.yml"
-      - "scripts/*deploy*"
-      - "scripts/generate-secrets*"
+      - "hub-server/scripts/generate-secrets*"
 
 env:
   GO_VERSION: "1.25"
