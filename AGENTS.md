@@ -1,10 +1,12 @@
-# AGENTS.md - AgentHub 项目规则
+# AGENTS.md - AgentHub 项目总规则
 
 ## 0. 优先级
 
 1. 管理员的直接指令
 2. 本文件
-3. `docs/reference/` 调研文档
+3. `docs/progress/MASTER.md` 中的当前 spec 进度
+4. `docs/roadmap.md` 中的总进度和长期路线
+5. 其他 `docs/` 专题文档与 `docs/reference/` 调研文档
 
 ## 1. 渐进式加载
 
@@ -12,7 +14,11 @@
 
 - `README.md` 是对外展示页，给评审、同学和新读者快速了解项目，不放细碎开发约束。
 - `README_EN.md` 是英文补充入口，只保留对外介绍。
-- `AGENTS.md` 是给开发者和 Agent 的开发规范、开发风格和流程约束；每个 Agent 开始工作前必须读。
+- `AGENTS.md` 是项目总规则唯一入口，承载开发红线、工作流、分层事实源、skill 白名单和提交/验证规则；每个 Agent 开始工作前必须读。
+- 本仓库不再维护 `CLAUDE.md`。Claude Code、Codex 和其他 Agent 都读本文件；平台特化差异只在全局工具配置或对应 skill 中处理，不在仓库根目录再建第二套规则。
+- `docs/progress/MASTER.md` 只记录当前 spec-driven 专项进度、PR/Issue、阻塞和验收证据；没有当前专项时该目录应被归档或不存在。
+- `docs/roadmap.md` 和 `docs/roadmap/` 是总进度与长期路线，不承载项目规则，也不替代当前 spec 进度。
+- `docs/architecture.md` 和 `docs/architecture/` 记录系统结构、数据流和协议细节，不承载分支/skill/提交纪律。
 - 在 workspace 内做跨系统治理时，先读 `../AGENTS.md` 和 `../docs/`；AgentHub 仓内 docs 只负责本产品实现细节。
 
 人类同学先读：
@@ -26,7 +32,7 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 2. 读 `docs/roadmap.md` 和 `docs/architecture.md` — 当前目标、架构边界和实现阶段。
 3. 做 Desktop/Web v4 重构时，继续读 `docs/roadmap/` 子文档了解各模块进展。
 4. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，默认先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
+5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，且当前没有更具体的 spec-driven 指令，加载 `.agents/skills/dev-loop/SKILL.md`。短任务（单文件修复、小改动）不需要。
 6. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
 7. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 8. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
@@ -188,16 +194,29 @@ git status --short --branch       # 确认只改了允许的路径
 
 ### Agent 间进度同步
 
-长期路线以 `docs/roadmap.md` 和 `docs/architecture.md` 为准；只有存在 `docs/progress/MASTER.md` 时，它才是当前 spec-driven 专项的活跃进度入口。完成后的专项归档到 `docs/archives/`，不要把过期阶段、分支或验收记录继续留在 active docs 根目录。其他 Agent 或人类提交的结论进入对应 roadmap、design plan、governance 或 `docs/reference/`，不要新增长期状态目录。
+规则分层必须保持清楚：
+
+| 文件 | 唯一职责 |
+|---|---|
+| `AGENTS.md` | 项目总规则、红线、工作流、skill 白名单 |
+| `docs/progress/MASTER.md` | 当前 spec-driven 专项进度、PR/Issue、阻塞、验收证据 |
+| `docs/roadmap.md` | 总进度、长期路线、模块级下一步 |
+| `docs/architecture.md` + `docs/architecture/` | 架构和数据流细节 |
+| `docs/governance/` | 专题治理说明、安全风险、分支和文档规范 |
+| `docs/archives/` | 已完成专项、过期 skill、历史证据 |
+
+不要在 roadmap、MASTER、治理报告和 skill 里复制本文件的规则。需要改规则时改 `AGENTS.md`，其他文件只链接或简短说明。
 
 ### 仓库级 Skill
 
 - 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/real-e2e-acceptance/`。
+- 白名单由 `scripts/verify-project-skills.ps1` 校验；新增、删除或归档仓库级 skill 时，同步更新 `.gitignore`、本节和归档说明。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；若用户明确指定 spec-driven 或已有活跃 `docs/progress/MASTER.md`，按当前 SPEC/MASTER 继续；若专项已完成，则看 `docs/archives/README.md` 和对应归档，不复活旧进度文件。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - 涉及真实 E2E、Playwright、Visual QA、approved-real、真实登录/运行、打包 Desktop、发布或 merge-ready 结论时，先读 `.agents/skills/real-e2e-acceptance/SKILL.md`，按证据等级写明已测和未测。
-- `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
-- `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
+- `docs/archives/project-skills/` 只保存过期 skill 的历史副本；`ui-screenshot`、`dev-team`、`dev-team-codex` 不得作为 active workflow 加载。
+- `.agents/skills/dev-loop/references/` 只保存能力路由和审查清单；不要在项目规则里硬编码模型供应商、私有模型名或本机 alias。
+- `docs/roadmap.md` 是总进度，不是规则文档；当前 spec 进度写 `docs/progress/MASTER.md`，规则写本文件。
 - 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
@@ -283,17 +302,7 @@ fix/short-topic
 feat/* → dev/delicious233 → master
 ```
 
-| 分支 | 说明 | 状态 |
-|------|------|:--:|
-| **dev/delicious233** | 当前集成开发分支 | ✅ 活跃 |
-| feat/super-phase1-safety-foundation | SUPER 工程修复历史分支，是否仍需合并以 live `git status` / PR 为准 | 🟡 复核 |
-| master | PR-only 稳定快照，v0.5.0 | ✅ 当前 |
-| ~~feat/glm-frontend-integration~~ | GLM 前端集成（已删除） | ✅ 已删除 |
-| ~~dev/delicious223~~ | 旧集成主线 | ✅ 已归档 |
-| ~~origin/dev/trump~~ | 已归档 | ✅ 已清理 |
-| ~~origin/dev/johnny~~ | 已归档 | ✅ 已清理 |
-
-接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
+接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按历史表格、归档审计或旧 handoff 直接推断可提交范围。
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
@@ -303,7 +312,7 @@ feat/* → dev/delicious233 → master
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
 - Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
-开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
+开发引擎：`.agents/skills/dev-loop/` — 长程任务循环、能力路由、交叉审查和进度同步。
 
 历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/roadmap/` 子文档为准。
 
@@ -312,7 +321,7 @@ feat/* → dev/delicious233 → master
 - 每个开发者至少在一天结束前 push 当前分支。
 - 完成一个可说明的小阶段就 push，不要把多天工作只留在本机。
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
-- PR 合并前先同步最新 `dev/delicious223`，解决冲突后再合。
+- PR 合并前先同步最新 `dev/delicious233`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
 - Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 - 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
@@ -322,7 +331,7 @@ feat/* → dev/delicious233 → master
 
 - 项目级 worktree 固定放在 `.worktrees/`，已写入 `.gitignore`，不得提交。
 - 一个 worktree = 一个短分支 = 一个 PR。不要多个 Agent 共用同一 worktree。
-- 创建前同步 `dev/delicious223`：`git checkout dev/delicious233 && git pull --ff-only`。
+- 创建前同步 `dev/delicious233`：`git checkout dev/delicious233 && git pull --ff-only`。
 - 创建示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
 - 每个 worktree 必须绑定任务卡和写入范围；范围变化先更新任务卡或 PR 说明。
 - DeepSeek、Codex、Claude 等可在 worktree 内调度 subagent，但 subagent 只能在当前 worktree 的指定路径内工作。
@@ -331,8 +340,10 @@ feat/* → dev/delicious233 → master
 
 ## 5. 文档规则
 
-- 主文档只保留一份：`docs/architecture.md`（概览）+ `docs/architecture/`（模块详情）。
-- `docs/roadmap.md`（概览）+ `docs/roadmap/`（模块路线图）记录持续开发目标、当前进展和下一步。
+- 项目总规则只写在 `AGENTS.md`；不要新增 `CLAUDE.md` 或其他根级规则副本。
+- 当前 spec-driven 专项只写在 `docs/progress/MASTER.md`，并指向 GitHub issue/PR、分析和计划文档。
+- 总进度和长期路线只写在 `docs/roadmap.md`（概览）+ `docs/roadmap/`（模块路线图）。
+- 架构说明写在 `docs/architecture.md`（概览）+ `docs/architecture/`（模块详情）。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
@@ -345,7 +356,7 @@ feat/* → dev/delicious233 → master
 
 ### 文档维护规则
 
-1. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；已完成的 spec-driven 工件例外，归档到 `docs/archives/`。
+1. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；已完成的 spec-driven 工件和过期项目 skill 例外，归档到 `docs/archives/`。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
 4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
@@ -359,7 +370,7 @@ feat/* → dev/delicious233 → master
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级 `.agents/skills/dev-loop/` 是唯一例外）。
+- 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级白名单 skill 是唯一例外，白名单见第 2 节）。
 - 服务器主机名不得出现在仓库文件中；生产配置限 `.env.production`（已 gitignored）。
 
 执行规则：
@@ -445,12 +456,13 @@ corepack.cmd pnpm exec vite build
 
 | 模块 | 最低覆盖率 | 当前 |
 |------|-----------|------|
-| edge-server | 75% | CI 强制阻断 |
-| hub-server | 40% | CI 强制阻断 |
+| edge-server | security 70%、lifecycle 60%、adapters 55% 分包阈值；总覆盖率只作 notice | CI 强制分包阈值 |
+| hub-server | 40% 总覆盖率 | CI 强制阻断 |
 | app/desktop | 不做硬性要求 | 不做硬性要求 |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。
+- `docs/roadmap.md` 中的 edge-server 75% 是质量目标，不是当前 CI 总覆盖率门槛。
 - 新增 adapter 功能必须补同包 `*_test.go`。
 - 修改 shared types 必须同步更新所有消费者的测试。
 
@@ -495,6 +507,6 @@ scope: client|edge|api|docs|desktop|web
 4. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
 5. **当前活跃 Phase 与分支**：只看活跃 MASTER 或 GitHub 任务，不在本文件重复维护。
 6. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
-   - 先加载 `.agents/skills/spec-driven-develop/SKILL.md`（如存在）或 `spec-driven-develop` skill。
+   - 先加载全局 `spec-driven-develop` skill，或继续当前活跃的 `docs/progress/MASTER.md` / SPEC 文档。
    - 产出 spec 文档、任务分解、验收标准后再进入实现。
    - 短任务（单文件修复、typo、小改动）不受此约束，直接做。

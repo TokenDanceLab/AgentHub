@@ -2,6 +2,7 @@
 
 **日期**: 2026-05-24
 **状态**: 已采纳
+**规则更新**: 2026-06-27 后，模型/供应商/本机 alias 分配不再由本 ADR 规定；以 `AGENTS.md` 和 `.agents/skills/dev-loop/` 的能力路由为准。
 **决策者**: Delicious233, Johnny, Trump
 
 ## 背景
@@ -14,9 +15,9 @@
 
 - 每个功能分支使用独立的 Git worktree，存放在 `.worktrees/` 目录（已 `.gitignore`）。
 - 一个 worktree = 一个短分支 = 一个 PR。不同 Agent 永远不会共享同一个 worktree。
-- 创建前必须同步 master：`git switch master && git pull --ff-only`。
+- 创建前必须同步 `dev/delicious233`。
 - Subagent 只能在当前 worktree 的指定路径内工作，不能访问其他 worktree 或项目外路径。
-- Dev Loop 引擎定义入口感知的 subagent 分配策略：Codex GPT-5.5 low/mid 负责前端、看图和局部视觉判断，Codex GPT-5.5 xhigh 负责复杂架构和高风险设计复核，Claude opus 负责长文本、找东西和架构整理，Claude sonnet 负责窄范围代码实现，Claude haiku 负责快速轻量检查。
+- Dev Loop 使用能力路由：高风险设计交给最强推理 agent，窄范围实现交给聚焦编码 agent，读写范围必须明确；不在项目文档中硬编码模型供应商、私有模型名或本机 alias。
 - 完成后执行验收命令、push 分支、开 PR，合并后删除 worktree。
 
 ## 后果
@@ -24,7 +25,7 @@
 - 需要 `.worktrees/` 在 `.gitignore` 中排除，防止 worktree 目录被提交。
 - 分支清理规程必须严格执行：合并后 `git worktree remove .worktrees/<name>` + 删除远程分支，否则磁盘空间随时间增长。
 - Subagent 范围约束：主 Agent 分发任务时必须明确写入范围（允许修改的路径），subagent 发现范围不够必须停下交回。
-- 新建 worktree 前需同步 master，否则 worktree 基线过旧会导致大量冲突。
+- 新建 worktree 前需同步 `dev/delicious233`，否则 worktree 基线过旧会导致大量冲突。
 - 合并方向固定：`feat/* -> dev/delicious233 -> master`，确保各方向改动最终汇入主 dev 分支。
 
 ## 备选方案

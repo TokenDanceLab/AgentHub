@@ -82,8 +82,8 @@
 
 ## 本轮已修
 
-- `scripts/verify-tauri-package-readiness.ps1` 不再读取已删除的 `docs/backend-integration-governance.md`，改读 `docs/architecture/05-deployment.md`。
-- `docs/architecture/05-deployment.md` 记录 release dry topology：只做拓扑/预检，不声称产出可发布安装包。
+- `scripts/verify-tauri-package-readiness.ps1` 不再读取已删除治理文档，改读 `docs/governance/governance-execution.md`。
+- `docs/governance/governance-execution.md` 记录 release dry topology：只做拓扑/预检，不声称产出可发布安装包。
 - `scripts/release.sh` 改为 tag-only，clean check 覆盖 tracked、staged、untracked。版本提交失败不会继续 tag。
 - `.github/workflows/checks.yml` 移除归档分支 `dev/trump`。
 - `CONTRIBUTING.md` 切到 `dev/delicious233`。

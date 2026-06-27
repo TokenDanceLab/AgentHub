@@ -1,6 +1,6 @@
 # AgentHub Workflow 标准化规范
 
-> 2026-06-19 | 所有后续 Workflow 必须遵守此模板
+> 2026-06-27 | 所有后续 Workflow 必须遵守此模板
 
 ## 通用开发五阶段
 
@@ -45,6 +45,24 @@
 - UI 相关改动必须附 Playwright、截图或人工验收证据；非 UI 任务用 diff scope 证明没有意外改动
 - 输出：全部通过或阻塞项列表
 
+## 真实 E2E 证据等级
+
+涉及真实 E2E、Playwright、Visual QA、approved-real、打包 Desktop、性能/泄漏或 merge-ready 结论时，执行段必须先按 `.agents/skills/real-e2e-acceptance/SKILL.md` 标注证据等级。一个 gate 只能证明它实际覆盖的层级，不能用更高等级措辞包装。
+
+| 证据等级 | 能证明 | 不能证明 |
+|---|---|---|
+| Fixture/unit | 纯合同、normalizer、模型逻辑 | 浏览器、网络、运行时、打包 |
+| Playwright UI | 真实浏览器交互、顺序、滚动、可见状态 | packaged Tauri、真实登录、真实 CLI/model/API |
+| Visual QA | 截图、几何、溢出、遮挡、视觉回归 | 数据正确性、后端健康、运行时执行 |
+| Stubbed Hub | Hub-shaped Web 合同和回放边界 | 真实 Hub 可用性、真实登录、模型消耗 |
+| Observed local | 本地 Edge/Hub 只读或无消耗路径 | 云端生产、真实模型/API、安装包 |
+| Approved real | 明确审批后的真实登录、CLI、模型或 API 路径 | 打包/签名/release，除非对应 gate 也跑过 |
+| Backend/API | handler、service、权限、API 合同 | 浏览器 UX、renderer 几何、Desktop 打包 |
+| Performance/leak | 指定路径的 benchmark/load/pprof/leak 证据 | 功能正确性，除非配套行为测试 |
+| Packaged release | Tauri sidecar/icon/installer/signing/update 证据 | 运行时/model 正确性，除非配套运行时 gate |
+
+Stub、fixture、readiness-only 或 manifest-only 输出必须保留 `real_tested=false`。Vite renderer、Stubbed Hub、Observed local、Approved real、Packaged release 是不同证据层，PR 和文档不得混写。
+
 ## 反模式（禁止）
 
 - ❌ 只有 Execute 没有 VERIFY 的 Workflow
@@ -52,3 +70,4 @@
 - ❌ 跳过 Gate 直接 commit
 - ❌ Cross-Review 只在最后做（应该在 self-test 之后、VERIFY 之前）
 - ❌ 把已归档 spec-driven 专项继续当成当前活跃任务
+- ❌ 把 Stubbed Hub、fixture 或 readiness-only 结果写成真实登录、真实 CLI/model/API、packaged Desktop 或 release 通过

@@ -5,7 +5,7 @@ package store
 // so the app reads equivalent content through the real Edge API instead of hardcoded JS objects.
 
 const (
-	seedProjectID = "proj_demo"
+	seedProjectID   = "proj_demo"
 	seedProjectName = "AgentHub Demo"
 )
 
@@ -90,7 +90,7 @@ var seedThreads = []seedThreadDef{
 			Status: "finished",
 			Diffs: []seedDiffDef{
 				{
-					Path: "migrations/0007_chat_threads.sql",
+					Path:   "migrations/0007_chat_threads.sql",
 					Status: "added",
 					Diff: `diff --git a/migrations/0007_chat_threads.sql b/migrations/0007_chat_threads.sql
 --- /dev/null
@@ -110,7 +110,7 @@ var seedThreads = []seedThreadDef{
 +COMMIT;`,
 				},
 				{
-					Path: "hooks/useThreadNavigation.ts",
+					Path:   "hooks/useThreadNavigation.ts",
 					Status: "modified",
 					Diff: `diff --git a/hooks/useThreadNavigation.ts b/hooks/useThreadNavigation.ts
 --- a/hooks/useThreadNavigation.ts
@@ -128,7 +128,7 @@ var seedThreads = []seedThreadDef{
  }`,
 				},
 				{
-					Path: "B0-SQLITE-RISKS.md",
+					Path:   "B0-SQLITE-RISKS.md",
 					Status: "added",
 					Diff: `diff --git a/B0-SQLITE-RISKS.md b/B0-SQLITE-RISKS.md
 --- /dev/null
@@ -177,15 +177,15 @@ var seedThreads = []seedThreadDef{
 		},
 	},
 
-	// 3. ByteDance TeamRun — fixture UI evidence (matching teamrunDemoTranscript)
+	// 3. TeamRun fixture — UI evidence (matching teamrunDemoTranscript)
 	{
-		ID:          "bytedance-teamrun",
-		Title:       "ByteDance TeamRun",
+		ID:          "teamrun-fixture",
+		Title:       "TeamRun Fixture",
 		Kind:        "group",
 		AvatarColor: "linear-gradient(135deg, var(--role-orchestrator), var(--role-reviewer))",
 		AvatarLabel: "T",
 		Items: []seedItemDef{
-			{ID: "teamrun-user-1", Type: "user_message", Role: "user", SenderID: "user-delicious233", SenderName: "Delicious233", Content: "为 ByteDance demo 打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。"},
+			{ID: "teamrun-user-1", Type: "user_message", Role: "user", SenderID: "user-delicious233", SenderName: "Delicious233", Content: "打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。"},
 			{ID: "teamrun-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "TeamRun Console fixture state 已载入。teamrun-fixture-001 已完成，包含 supervisor 到 worker 的可回放路由、任务和事件列表。", RunID: "run-teamrun-1"},
 			{ID: "teamrun-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "TeamRun route: agent.dispatch → run.agent.route_decision → team.route.decided → agent.dispatch → run.agent.result → team.run.completed。所有事件均为 fixture 记录，无真实运行。", RunID: "run-teamrun-1"},
 			{ID: "teamrun-msg-3", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "Worker fixture task completed: 返回 fixture 实现结果，无真实 CLI/model 进程启动。UI evidence 覆盖 transcript、right inspector files、route decision、task list 和 event list。", RunID: "run-teamrun-1"},
@@ -195,23 +195,23 @@ var seedThreads = []seedThreadDef{
 			Status: "finished",
 			Diffs: []seedDiffDef{
 				{
-					Path:   "docs/competition/teamrun-demo-scenario.json",
+					Path:   "tests/fixtures/teamrun/teamrun-demo-scenario.json",
 					Status: "added",
-					Diff: `diff --git a/docs/competition/teamrun-demo-scenario.json b/docs/competition/teamrun-demo-scenario.json
+					Diff: `diff --git a/tests/fixtures/teamrun/teamrun-demo-scenario.json b/tests/fixtures/teamrun/teamrun-demo-scenario.json
 --- /dev/null
-+++ b/docs/competition/teamrun-demo-scenario.json
++++ b/tests/fixtures/teamrun/teamrun-demo-scenario.json
 @@ -0,0 +1,8 @@
 +{
 +  "contract": "teamrun-demo-evidence-v1",
-+  "scenarioId": "bytedance-teamrun-fixture-minimum",
++  "scenarioId": "teamrun-fixture-minimum",
 +  "fixtureOnly": true,
 +  "state": { "status": "completed" }
 +}`,
 				},
 			},
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-teamrun-1", Kind: "file", Path: "docs/competition/teamrun-demo-scenario.json", SizeBytes: 2048},
-				{ID: "artifact-teamrun-2", Kind: "markdown", Path: "docs/competition/teamrun-evidence-report.md", SizeBytes: 1536},
+				{ID: "artifact-teamrun-1", Kind: "file", Path: "tests/fixtures/teamrun/teamrun-demo-scenario.json", SizeBytes: 2048},
+				{ID: "artifact-teamrun-2", Kind: "markdown", Path: "tests/fixtures/teamrun/teamrun-evidence-report.md", SizeBytes: 1536},
 			},
 			Previews: []seedPreviewDef{
 				{ID: "preview-teamrun-1", URL: "http://127.0.0.1:5176/desktop/teamrun/", Status: "ready"},

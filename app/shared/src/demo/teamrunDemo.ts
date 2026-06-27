@@ -1,6 +1,6 @@
 import type { TranscriptBlock } from '../transcript';
 
-export const TEAMRUN_DEMO_CONVERSATION_ID = 'bytedance-teamrun';
+export const TEAMRUN_DEMO_CONVERSATION_ID = 'teamrun-fixture';
 
 export interface TeamRunDemoRuntimeProfile {
   id: string;
@@ -53,7 +53,7 @@ export interface TeamRunDemoScenario {
 
 export const teamRunDemoScenario: TeamRunDemoScenario = {
   contract: 'teamrun-demo-evidence-v1',
-  scenarioId: 'bytedance-teamrun-fixture-minimum',
+  scenarioId: 'teamrun-fixture-minimum',
   fixtureOnly: true,
   claims: {
     realRuntimeExecuted: false,
@@ -62,7 +62,7 @@ export const teamRunDemoScenario: TeamRunDemoScenario = {
     submissionReady: false,
   },
   state: {
-    teamId: 'team-fixture-bytedance',
+    teamId: 'team-fixture',
     teamRunId: 'teamrun-fixture-001',
     status: 'completed',
     goal: 'Show the minimum TeamRun route from supervisor to worker using fixture-only evidence.',
@@ -160,7 +160,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
     kind: 'text',
     createdAt: '2026-06-08T10:10:00+08:00',
     author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
-    text: '为 ByteDance demo 打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。',
+    text: '打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。',
   },
   {
     id: 'teamrun-state-1',
@@ -177,7 +177,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         id: 'teamrun-state-fixture',
         kind: 'file',
         label: 'teamrun-state.json',
-        path: 'docs/competition/teamrun-demo-scenario.json#state',
+        path: 'tests/fixtures/teamrun/teamrun-demo-scenario.json#state',
         status: 'completed',
       },
       {
@@ -193,7 +193,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
     kind: 'run_session',
     createdAt: '2026-06-08T10:10:12+08:00',
     author: { id: 'profile-supervisor-fixture', name: 'Demo Supervisor', role: 'agent' },
-    title: 'ByteDance TeamRun fixture',
+    title: 'TeamRun fixture',
     status: 'completed',
     meta: 'fixture-only · no login · no CLI/model · no secrets',
     runId: teamRunDemoScenario.state.teamRunId,
@@ -239,7 +239,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         id: 'teamrun-events-fixture',
         kind: 'file',
         label: 'teamrun-events.json',
-        path: 'docs/competition/teamrun-demo-scenario.json#events',
+        path: 'tests/fixtures/teamrun/teamrun-demo-scenario.json#events',
         status: 'completed',
       },
     ],
@@ -259,7 +259,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         id: 'teamrun-tasks-fixture',
         kind: 'file',
         label: 'teamrun-tasks.json',
-        path: 'docs/competition/teamrun-demo-scenario.json#tasks',
+        path: 'tests/fixtures/teamrun/teamrun-demo-scenario.json#tasks',
         status: 'completed',
       },
     ],
@@ -270,7 +270,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         author: { id: 'fixture-harness', name: 'Fixture Harness', role: 'system' },
         toolName: 'GET /state',
         status: 'completed',
-        target: '/web/agent-teams/team-fixture-bytedance/runs/teamrun-fixture-001/state',
+        target: '/web/agent-teams/team-fixture/runs/teamrun-fixture-001/state',
         summary: 'Read local fixture state only; no Hub request is sent by this UI gate.',
       },
       {
@@ -279,7 +279,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         author: { id: 'fixture-harness', name: 'Fixture Harness', role: 'system' },
         toolName: 'GET /tasks',
         status: 'completed',
-        target: '/web/agent-teams/team-fixture-bytedance/runs/teamrun-fixture-001/tasks',
+        target: '/web/agent-teams/team-fixture/runs/teamrun-fixture-001/tasks',
         summary: 'Shows supervisor and worker tasks from deterministic fixture data.',
       },
       {
@@ -288,7 +288,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
         author: { id: 'fixture-harness', name: 'Fixture Harness', role: 'system' },
         toolName: 'GET /events',
         status: 'completed',
-        target: '/web/agent-teams/team-fixture-bytedance/runs/teamrun-fixture-001/events',
+        target: '/web/agent-teams/team-fixture/runs/teamrun-fixture-001/events',
         summary: 'Shows dispatch, route decision, child dispatch, result, and completion events.',
       },
     ],
