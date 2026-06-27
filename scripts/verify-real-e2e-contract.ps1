@@ -14,13 +14,13 @@ function Read-Text([string]$Path) {
 }
 
 $skillPath = ".agents/skills/real-e2e-acceptance/SKILL.md"
-$workflowPath = "docs/governance/workflow-standard.md"
+$rulesPath = "AGENTS.md"
 $architecturePath = "docs/architecture.md"
 $roadmapPath = "docs/roadmap.md"
 $smokeMatrixPath = "scripts/verify-e2e-smoke-matrix.ps1"
 
 $skill = Read-Text $skillPath
-$workflow = Read-Text $workflowPath
+$rules = Read-Text $rulesPath
 $architecture = Read-Text $architecturePath
 $roadmap = Read-Text $roadmapPath
 $smokeMatrix = Read-Text $smokeMatrixPath
@@ -48,11 +48,11 @@ foreach ($label in $canonicalLevels.Keys) {
     }
 }
 
-if ($workflow -notmatch [regex]::Escape($skillPath)) {
-    Fail "workflow-standard must point to the real-e2e-acceptance skill instead of owning another matrix"
+if ($rules -notmatch [regex]::Escape($skillPath)) {
+    Fail "AGENTS.md must point to the real-e2e-acceptance skill instead of owning another matrix"
 }
-if ($workflow -match "\|\s*Fixture/unit\s*\|" -or $workflow -match "\|\s*Playwright UI\s*\|") {
-    Fail "workflow-standard duplicates the evidence-level matrix; keep the table only in $skillPath"
+if ($rules -match "\|\s*Fixture/unit\s*\|" -or $rules -match "\|\s*Playwright UI\s*\|") {
+    Fail "AGENTS.md duplicates the evidence-level matrix; keep the table only in $skillPath"
 }
 
 if ($architecture -match "1440x920") {

@@ -66,5 +66,5 @@ Stub、fixture、readiness-only 或 dry-run 证据必须保留 `real_tested=fals
 - [01-hub-server.md](01-hub-server.md) — Hub Server 架构
 - [02-edge-server.md](02-edge-server.md) — Edge Server 架构
 - [06-auth-identity.md](06-auth-identity.md) — TokenDance ID 和 Hub session
-- [../governance/workflow-standard.md](../governance/workflow-standard.md) — 执行 gate
+- [../../AGENTS.md](../../AGENTS.md) — 执行 gate 和项目规则
 - [../../.agents/skills/real-e2e-acceptance/SKILL.md](../../.agents/skills/real-e2e-acceptance/SKILL.md) — 真实 E2E 证据等级
