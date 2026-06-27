@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # AgentHub Release Script — bump version, test, build, tag, push
 # Usage:
-#   ./scripts/release.sh <version>               # full release pipeline
-#   ./scripts/release.sh <version> --skip-tests   # skip tests
-#   ./scripts/release.sh <version> --dry-run      # print actions only
+#   ./scripts/release/release.sh <version>               # full release pipeline
+#   ./scripts/release/release.sh <version> --skip-tests   # skip tests
+#   ./scripts/release/release.sh <version> --dry-run      # print actions only
 set -euo pipefail
 
 # ── Globals ──────────────────────────────────────────────

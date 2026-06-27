@@ -109,7 +109,7 @@ function Get-FileSha256 {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-approved-real-edge-cli-evidence.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-edge-cli-evidence.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p0-approved-real-evidence-verifier.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "approved-real evidence verifier exists"

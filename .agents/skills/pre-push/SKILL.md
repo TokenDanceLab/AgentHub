@@ -11,14 +11,14 @@ Prefer focused gates while iterating, then run the gates that match the touched 
 
 ```powershell
 git diff --check
-bash scripts/check-secrets.sh --range HEAD^..HEAD
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-project-skills.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-doc-ssot.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-ci-gates.ps1
-bash ./scripts/verify-ci-gates.sh
+bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-project-skills.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-doc-ssot.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-ci-gates.ps1
+bash ./scripts/verify/verify-ci-gates.sh
 ```
 
-Use `bash scripts/check-secrets.sh --staged` before commit when changes are still staged.
+Use `bash scripts/verify/check-secrets.sh --staged` before commit when changes are still staged.
 
 ## Surface Gates
 
@@ -31,7 +31,7 @@ Use `bash scripts/check-secrets.sh --staged` before commit when changes are stil
 | Web UI | `corepack.cmd pnpm --dir app/web typecheck` + relevant Vitest/Playwright/Visual QA |
 | Shared frontend | focused `app/shared` tests plus affected consumers |
 | Mobile RN | `corepack.cmd pnpm --dir app/mobile-rn verify` unless Mobile is explicitly out of scope |
-| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md`; backend perf/leak also runs `scripts/verify-backend-perf-leak-gates.ps1` |
+| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md`; backend perf/leak also runs `scripts/verify/verify-backend-perf-leak-gates.ps1` |
 
 ## Reporting
 

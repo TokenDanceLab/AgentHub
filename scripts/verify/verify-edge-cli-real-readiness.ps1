@@ -374,8 +374,8 @@ $forbiddenPrimitivePattern = @(
     ("System" + "\.Diagnostics" + "\.Process"),
     ("Process" + "StartInfo")
 ) -join "|"
-Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" $forbiddenPrimitivePattern "this readiness script has no process/network execution primitive"
-Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode)\b' "this readiness script has no direct real CLI command pattern"
+Assert-NotContains "scripts\verify\verify-edge-cli-real-readiness.ps1" $forbiddenPrimitivePattern "this readiness script has no process/network execution primitive"
+Assert-NotContains "scripts\verify\verify-edge-cli-real-readiness.ps1" '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode)\b' "this readiness script has no direct real CLI command pattern"
 
 Step "per-runtime readiness manifest"
 $readinessManifest = New-RuntimeReadinessManifest

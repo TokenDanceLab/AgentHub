@@ -275,7 +275,7 @@ if ($observedManifestAccepted) {
     Write-Host "real_tested=false" -ForegroundColor Yellow
     Write-Host "observed_manifest_accepted=true" -ForegroundColor Green
     Write-Host "Status: OBSERVED_MANIFEST_ACCEPTED" -ForegroundColor Green
-    Write-Host "RealTested promotion requires a separate verifier: scripts\verify-approved-real-edge-cli-evidence.ps1 must dereference the observed evidence artifact/log/hash." -ForegroundColor Yellow
+    Write-Host "RealTested promotion requires a separate verifier: scripts\verify\verify-approved-real-edge-cli-evidence.ps1 must dereference the observed evidence artifact/log/hash." -ForegroundColor Yellow
     exit $(if ($Failed -eq 0) { 0 } else { 1 })
 }
 

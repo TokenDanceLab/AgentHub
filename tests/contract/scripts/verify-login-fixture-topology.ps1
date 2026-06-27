@@ -50,7 +50,7 @@ function Invoke-CheckedScript([string]$RelativePath) {
 
 Write-Host "AgentHub P0 remote-control auth/topology prerequisite gate tests" -ForegroundColor Magenta
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-login-fixture-topology.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-login-fixture-topology.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "P0 auth/topology prerequisite script exists"
 
 if (Test-Path -LiteralPath $scriptPath) {
@@ -70,7 +70,7 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -match 'Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter') "script roadmap assertion requires the concrete P0 remote-control chain"
 }
 
-$run = Invoke-CheckedScript "scripts\verify-login-fixture-topology.ps1"
+$run = Invoke-CheckedScript "scripts\verify\verify-login-fixture-topology.ps1"
 Assert-True ($run.ExitCode -eq 0) "P0 auth/topology prerequisite script passes on current repo" $run.Output
 Assert-True ($run.Output -match "Mock-only: fake OIDC callback") "script labels mock-only evidence" $run.Output
 Assert-True ($run.Output -match "Real-mode ready: source gates") "script labels real-mode ready gates" $run.Output

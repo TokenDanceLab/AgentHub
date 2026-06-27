@@ -69,7 +69,7 @@ function Invoke-CapturedProcess {
     }
 }
 
-$gatePath = Join-Path $RepoRoot "scripts\verify-edge-sqlite-durable-observed-smoke.ps1"
+$gatePath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-observed-smoke.ps1"
 $gateImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-observed-smoke.ps1"
 $goTestPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main_test.go"
 

@@ -129,8 +129,8 @@ function New-ObservedManifestWithoutWebRender {
 }
 
 try {
-    $scriptPath = Join-Path $RepoRoot "scripts\verify-product-loop-qa.ps1"
-    $observedPath = Join-Path $RepoRoot "scripts\verify-observed-localhost-dispatch.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-product-loop-qa.ps1"
+    $observedPath = Join-Path $RepoRoot "scripts\smoke\verify-observed-localhost-dispatch.ps1"
     $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-product-loop-qa.ps1"
     $observedImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-observed-localhost-dispatch.ps1"
     Assert-True (Test-Path -LiteralPath $scriptPath) "product-loop QA umbrella exists"

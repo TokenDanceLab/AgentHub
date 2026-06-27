@@ -125,9 +125,9 @@ function Invoke-InstrumentedScenario {
     }
 }
 
-$devStartPath = Join-Path $RepoRoot "scripts\dev-start.ps1"
-$devDownPath = Join-Path $RepoRoot "scripts\dev-down.ps1"
-$devUpPath = Join-Path $RepoRoot "scripts\dev-up.ps1"
+$devStartPath = Join-Path $RepoRoot "scripts\dev\dev-start.ps1"
+$devDownPath = Join-Path $RepoRoot "scripts\dev\dev-down.ps1"
+$devUpPath = Join-Path $RepoRoot "scripts\dev\dev-up.ps1"
 
 Assert-True (Test-Path -LiteralPath $devStartPath) "dev-start script exists"
 Assert-True (Test-Path -LiteralPath $devDownPath) "dev-down script exists"
