@@ -88,7 +88,7 @@ git worktree list
 
 **Active Task**: #335 / T4.1 focused acceptance gate bundle.
 
-**Current Focus**: Run the focused final acceptance bundle, then architecture approval and archive preparation. No blockers.
+**Current Focus**: Prepare #335 PR from the focused acceptance bundle, then use #336 for architecture approval and #337 for archive preparation. No failed gates; approved-real login remains blocked-with-evidence until explicit live-test approval metadata exists.
 
 ## Governance Status
 
@@ -121,6 +121,7 @@ git worktree list
 - T3.0d actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-real-e2e-contract` still depended on the archived workflow doc). PR #353 merged; #352 closed. Drift contribution 1; Phase 3 is now 8/9 with `drift_score=2`.
 - T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed.
 - T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. PR #356 merged; #334 closed; local gates and CI passed.
+- T4.1 actual effort: L; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. Gate stabilization notes: Desktop smoke now follows Entry Gate -> Demo workbench, and client smoke now installs from the app workspace root. Evidence: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md).
 
 ## Recent Checkpoints
 
@@ -128,7 +129,6 @@ git worktree list
 |:--|:--|:--|
 | 2026-06-27 | Phase 1 merged | PR #338 merged; #322-#325 closed. |
 | 2026-06-27 | Phase 2 merged | PR #340 merged; #326-#329 and #339 closed. |
-| 2026-06-27 | Active doc regroup merged | PR #341 merged; old active-doc regroup branch/worktree cleaned. |
 | 2026-06-27 | API/Hub source contract merged | PR #343 merged; #342 closed. |
 | 2026-06-27 | Module README cleanup merged | PR #345 merged; #344 closed. |
 | 2026-06-27 | Progress SSOT cleanup | #346 closes stale Phase 3 counts, stale branch wording, and oversized MASTER session log drift. |
@@ -141,6 +141,7 @@ git worktree list
 | 2026-06-27 | Continued doc-spine cleanup merged | PR #355 merged; #354 closed; branch-governance and Mobile handoff moved to archive, Mobile README shortened, and doc SSOT now guards Mobile stale proof claims. |
 | 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
 | 2026-06-27 | Web/Mobile lane merged | PR #356 merged; #334 closed; Phase 3 is complete. |
+| 2026-06-27 | Phase 4 acceptance bundle | #335 focused gates have 0 failed rows; smoke matrix is passed-with-blockers only for expected approved-real login readiness. Evidence file: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md). |
 
 ## Next Steps
 
