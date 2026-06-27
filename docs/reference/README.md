@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本目录只保留仍会被当前实现或近期架构讨论引用的轻量参考。第三方项目调研、cc-switch 长文、旧设计系统报告和 Desktop 研究材料已归档到 [../archive/README.md](../archive/README.md)。
+本目录只保留仍会被当前实现或近期架构讨论引用的轻量参考。第三方项目调研、cc-switch 长文、旧设计系统报告和 Desktop 研究材料见 [../history.md](../history.md)。
 
 ## Active Reference
 
@@ -16,8 +16,8 @@
 
 | 内容 | 位置 |
 |---|---|
-| 第三方/竞品项目调研 | [../archive/reference-projects/](../archive/reference-projects/) |
-| cc-switch 长文和旧技术参考 | [../archive/reference/](../archive/reference/) |
-| 早期竞品研究 | [../archive/competitor-research/](../archive/competitor-research/) |
+| 第三方/竞品项目调研 | [../history.md](../history.md) |
+| cc-switch 长文和旧技术参考 | [../history.md](../history.md) |
+| 早期竞品研究 | [../history.md](../history.md) |
 
 所有 reference 文档只提供背景，不覆盖 `AGENTS.md`、`docs/roadmap.md`、`docs/architecture.md` 或 `api/` 契约。

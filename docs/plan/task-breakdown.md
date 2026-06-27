@@ -19,7 +19,7 @@
 |---|---|---|---|---|---|---|
 | T1.1 | Finalize SPEC docs, GitHub tracking, and reference graph | P0 | M | none | S/U/R | `docs/analysis`, `docs/plan`, and `docs/progress/MASTER.md` exist; GitHub milestones/issues exist; no destructive cleanup. |
 | T1.2 | Prepare external docs archive receiver design | P0 | M | T1.1 | S/E/R | External docs dirty state is handled by isolated worktree/branch plan; target archive layout is documented before migration. |
-| T2.1 | Migrate `docs/archive` and `docs/archives` externally with `docs/history.md` | P0 | L | T1.2 | S/U/R | External archive commit receives history; AgentHub has short history index; active docs and verifiers stop depending on in-repo archive trees. |
+| T2.1 | Migrate former history trees externally with `docs/history.md` | P0 | L | T1.2 | S/U/R | External archive commit receives history; AgentHub has short history index; active docs and verifiers stop depending on in-repo archive trees. |
 | T2.2 | Compress `docs/adr` into `docs/decisions.md` | P0 | M | T2.1 | S/P/R | Current decisions summary exists; old ADR bodies are in external archive; active references point to `docs/decisions.md` or specific current owner docs. |
 | T3.1 | Reorganize `scripts/` wrapper-first | P0 | L | T2.2 | R/E | Implementations move to `scripts/verify`, `scripts/dev`, `scripts/release`, `scripts/smoke`, `scripts/lib`; old root script paths remain wrappers and tests pass. |
 | T3.2 | Reorganize `tests/scripts` to `tests/contract/scripts` | P1 | M | T3.1 | P/R | Release-readiness, verifier tests, and fixtures point to the new contract path; compatibility is documented for one PR cycle. |
@@ -30,5 +30,5 @@
 
 - Every PR: `git diff --check`, `pwsh ./scripts/verify-doc-ssot.ps1`, `pwsh ./scripts/verify-project-skills.ps1`, `pwsh ./scripts/verify-real-e2e-contract.ps1`, OpenAPI YAML parse when active docs/verifiers change.
 - Scripts/tests PRs: CI `validate`, frontend Desktop/Web gates, `go test ./tests/teamrun -count=1`, release-readiness path checks, and script contract tests.
-- Archive PRs: `rg "docs/archive|docs/archives|docs/adr|ADR-"` must show only allowed index/history/code-comment references.
+- Archive PRs: reference scans must show only allowed index/history/code-comment references for removed history or ADR paths.
 - Final acceptance: AgentHub active markdown limited to owner entrypoints, no tracked one-off evidence at root, CI green, external TokenDance docs archive commit exists.

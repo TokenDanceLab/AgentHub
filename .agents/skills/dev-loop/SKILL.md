@@ -53,7 +53,7 @@ Do not hard-code provider names or local aliases in task cards. Assign work by c
 
 - Real E2E, approved-real, packaged Desktop, login, model/API spend, performance, or leak claims must use `.agents/skills/real-e2e-acceptance/SKILL.md`.
 - Do not weaken CI, lower thresholds, skip required checks, or relabel stubbed evidence as real.
-- Do not resurrect archived project skills from `docs/archives/project-skills/`.
+- Do not resurrect archived project skills from the external archive indexed by `docs/history.md`.
 - Do not put local secrets, hostnames, absolute private paths, or agent runtime state into project docs.
 
 ## References

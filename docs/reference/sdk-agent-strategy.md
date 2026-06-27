@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文档是轻量策略摘要。旧长版调研和 PoC backlog 已归档到 [../archive/reference/sdk-agent-strategy-2026-06-27.md](../archive/reference/sdk-agent-strategy-2026-06-27.md)。
+本文档是轻量策略摘要。旧长版调研和 PoC backlog 见 [../history.md](../history.md)。
 
 ## Decision
 

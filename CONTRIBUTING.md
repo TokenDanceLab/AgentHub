@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文件是唯一贡献入口。旧详细贡献指南已归档到 [docs/archive/contributing-2026-06-17.md](docs/archive/contributing-2026-06-17.md)。
+本文件是唯一贡献入口。旧详细贡献指南见 [docs/history.md](docs/history.md)。
 
 ## Start
 
