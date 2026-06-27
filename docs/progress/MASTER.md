@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 3 | 8 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 4 | 4 | 8 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -50,7 +50,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.0 | #342 | Trim active API/Hub docs and source-contract owner mapping | closed |
 | T3.0b | #344 | Trim module README docs and stale active references | closed |
 | T3.0c | #346 | Sync progress SSOT and doc governance guardrails | closed |
-| T3.1 | #330 | Harden chat transcript behavior tests | open |
+| T3.1 | #330 | Harden chat transcript behavior tests | closed |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
 | T3.3 | #332 | Classify backend API performance and leak gates | open |
 | T3.4 | #333 | Check Desktop packaged evidence boundary | open |
@@ -77,16 +77,16 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (3/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (4/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #330 / T3.1 on `test/chat-transcript-flow`
+**Active Task**: #331 / T3.2, next branch not created yet
 
-**Current Focus**: Desktop/Web chat transcript behavior tests and source alignment: optimistic user messages, chronological card grouping, markdown/table rendering, auto-follow, and transcript cleanliness. Keep backend/package/perf lanes separate unless the issue scope requires them.
+**Current Focus**: frontend architecture docs should now be checked against the shared chat/workbench implementation and the test evidence from #330. Keep backend/package/perf lanes separate unless their issue scope requires them.
 
 **Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
@@ -114,6 +114,7 @@ git worktree list
 - GitHub modes store per-task telemetry in issue comments and milestone descriptions.
 - Phase 3 adaptive state is in milestone #9. Current drift score: 1, caused by the extra T3.0c doc/progress SSOT checkpoint requested before source/test work continues.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
+- T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 
 ## Recent Checkpoints
 
@@ -125,9 +126,10 @@ git worktree list
 | 2026-06-27 | API/Hub source contract merged | PR #343 merged; #342 closed. |
 | 2026-06-27 | Module README cleanup merged | PR #345 merged; #344 closed. |
 | 2026-06-27 | Progress SSOT cleanup | #346 closes stale Phase 3 counts, stale branch wording, and oversized MASTER session log drift. |
+| 2026-06-27 | Chat transcript tests | #330 adds Web delayed-send optimistic bubble coverage and verifies existing shared/Desktop/Web/Visual QA chat-flow gates. |
 
 ## Next Steps
 
-1. Resume #330 / T3.1 in `test/chat-transcript-flow` for Desktop/Web chat transcript behavior tests.
+1. Start #331 / T3.2 in a fresh branch/worktree from `dev/delicious233`.
 2. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
 3. Keep Mobile native/UI expansion out of this spec unless the operator opens a separate scoped task.

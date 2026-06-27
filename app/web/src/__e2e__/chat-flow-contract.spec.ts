@@ -77,6 +77,37 @@ test.describe('Web shared chat flow contract', () => {
     await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
     assertE2EDataModeScenario(WEB_CHAT_FLOW_SCENARIO, backendRequests.requests);
   });
+
+  test('keeps a submitted Hub user message visible while the send request is in flight', async ({ page }) => {
+    collectPageDiagnostics(page);
+    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800 });
+    await enterApprovedRealHubSession(page);
+    expect(page.viewportSize()).toEqual(DESKTOP_WORKSPACE_VIEWPORT);
+
+    const transcript = page.getByRole('log');
+    const submittedText = `Web optimistic send ${Date.now()}`;
+    await installMessagePresenceProbe(page, submittedText);
+    await submitComposerMessage(page, submittedText);
+
+    await expect(transcript.locator('.user-bubble').filter({ hasText: submittedText })).toHaveCount(1);
+    await expect.poll(() => backendRequests.endpoints.has(`POST /client/sessions/${SESSION_ID}/messages`)).toBe(true);
+    await expect.poll(() => messagePresenceProbe(page)).toMatchObject({
+      sawVisible: true,
+      disappearedAfterVisible: false,
+    });
+    const order = await transcript.evaluate((node, text) => {
+      const transcriptText = node.textContent ?? '';
+      return {
+        replaySummary: transcriptText.indexOf('The replay summary is below.'),
+        submitted: transcriptText.indexOf(text),
+      };
+    }, submittedText);
+    expect(order.replaySummary).toBeGreaterThanOrEqual(0);
+    expect(order.submitted).toBeGreaterThan(order.replaySummary);
+    await expect.poll(() => transcriptScrollGap(page)).toBeLessThanOrEqual(4);
+    await expectTranscriptWithoutModeDebug(transcript);
+    assertE2EDataModeScenario(WEB_CHAT_FLOW_SCENARIO, backendRequests.requests);
+  });
 });
 
 function collectPageDiagnostics(page: Page): void {
@@ -107,6 +138,13 @@ async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 }
 
+async function transcriptScrollGap(page: Page): Promise<number> {
+  return page.getByRole('log').evaluate((node) => {
+    const element = node as HTMLElement;
+    return Math.max(0, element.scrollHeight - element.scrollTop - element.clientHeight);
+  });
+}
+
 async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['getByRole']>): Promise<void> {
   await expect(transcript).not.toContainText('Data:');
   await expect(transcript).not.toContainText('Hub replay:');
@@ -133,7 +171,11 @@ async function enterApprovedRealHubSession(page: Page): Promise<void> {
   await page.goto('/');
 }
 
-async function installChatFlowHubStub(page: Page): Promise<BackendRequestLog> {
+interface ChatFlowHubStubOptions {
+  messagePostDelayMs?: number;
+}
+
+async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOptions = {}): Promise<BackendRequestLog> {
   const endpoints = new Set<string>();
   const requests: E2EObservedRequest[] = [];
 
@@ -156,7 +198,7 @@ async function installChatFlowHubStub(page: Page): Promise<BackendRequestLog> {
         return;
       }
 
-      await fulfillHubRoute(route, url.pathname);
+      await fulfillHubRoute(route, request.method(), url.pathname, options);
       return;
     }
 
@@ -177,7 +219,12 @@ async function installChatFlowHubStub(page: Page): Promise<BackendRequestLog> {
   return { endpoints, requests };
 }
 
-async function fulfillHubRoute(route: Route, pathname: string): Promise<void> {
+async function fulfillHubRoute(
+  route: Route,
+  method: string,
+  pathname: string,
+  options: ChatFlowHubStubOptions,
+): Promise<void> {
   if (pathname === '/client/auth/me') {
     await route.fulfill(json(hubEnvelope({
       id: 'user-chat-flow',
@@ -196,6 +243,16 @@ async function fulfillHubRoute(route: Route, pathname: string): Promise<void> {
       member_count: 2,
       unread_count: 0,
     }])));
+    return;
+  }
+
+  if (pathname === `/client/sessions/${SESSION_ID}/messages` && method === 'POST') {
+    await delay(options.messagePostDelayMs ?? 0);
+    await route.fulfill(json(hubEnvelope({
+      message_id: 'message-chat-flow-submitted',
+      seq_id: 2,
+      created_at: '2026-06-26T08:00:08Z',
+    })));
     return;
   }
 
@@ -302,6 +359,54 @@ async function fulfillHubRoute(route: Route, pathname: string): Promise<void> {
   }
 
   await route.fulfill(json(hubEnvelope({})));
+}
+
+async function submitComposerMessage(page: Page, message: string): Promise<void> {
+  const composer = page.getByLabel('Composer input');
+  const sendButton = page.getByRole('button', { name: /^(Send message|发送消息)$/ });
+  await composer.fill(message);
+  await expect(sendButton).toBeEnabled();
+  await sendButton.click();
+  await expect(composer).toHaveValue('');
+}
+
+async function installMessagePresenceProbe(page: Page, message: string): Promise<void> {
+  await page.evaluate((text) => {
+    const log = document.querySelector('[role="log"]');
+    const state = {
+      sawVisible: false,
+      disappearedAfterVisible: false,
+    };
+    const sample = () => {
+      const visible = Array.from(document.querySelectorAll('.user-bubble'))
+        .some((node) => node.textContent?.includes(text));
+      if (visible) state.sawVisible = true;
+      if (state.sawVisible && !visible) state.disappearedAfterVisible = true;
+    };
+    sample();
+    const observer = new MutationObserver(sample);
+    observer.observe(log ?? document.body, { childList: true, subtree: true, characterData: true });
+    (window as unknown as { __agenthubMessagePresenceProbe?: unknown }).__agenthubMessagePresenceProbe = state;
+  }, message);
+}
+
+async function messagePresenceProbe(page: Page): Promise<{
+  sawVisible: boolean;
+  disappearedAfterVisible: boolean;
+}> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __agenthubMessagePresenceProbe?: {
+        sawVisible: boolean;
+        disappearedAfterVisible: boolean;
+      };
+    }).__agenthubMessagePresenceProbe;
+    return state ?? { sawVisible: false, disappearedAfterVisible: false };
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function chatFlowEvents(): unknown[] {
