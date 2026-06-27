@@ -5,13 +5,14 @@
 > **Last Updated**: 2026-06-27
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
-> **Branch**: docs/real-e2e-contract-phase2
+> **Branch**: dev/delicious233 (baseline; next Phase 3 branch TBD)
 > **Baseline**: origin/dev/delicious233
 
 ## GitHub Resources
 
 - **All Issues**: `gh issue list -R TokenDanceLab/AgentHub --label "spec:repo-governance-real-e2e" --state all`
 - **Phase 1 PR**: https://github.com/TokenDanceLab/AgentHub/pull/338
+- **Phase 2 PR**: https://github.com/TokenDanceLab/AgentHub/pull/340
 - **Project Board**: skipped; current GitHub token does not have project scope.
 
 ## References
@@ -28,7 +29,7 @@
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
-| 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 5 | 0 | 5 |
+| 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
 | 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 0 | 5 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
@@ -40,11 +41,11 @@
 | T1.2 | #323 | Normalize document standards and active/archive rules | closed |
 | T1.3 | #325 | Add useful project-skill whitelist verification | closed |
 | T1.4 | #324 | Clean generated artifact hygiene | closed |
-| T2.1 | #326 | Make evidence-level matrix canonical | open |
-| T2.2 | #327 | Split data mode surface auth and execution axes | open |
-| T2.3 | #328 | Align E2E smoke matrix and manifests | open |
-| T2.4 | #329 | Normalize Visual QA acceptance | open |
-| T2.5 | #339 | Degiant active docs and archive stale material | open |
+| T2.1 | #326 | Make evidence-level matrix canonical | closed |
+| T2.2 | #327 | Split data mode surface auth and execution axes | closed |
+| T2.3 | #328 | Align E2E smoke matrix and manifests | closed |
+| T2.4 | #329 | Normalize Visual QA acceptance | closed |
+| T2.5 | #339 | Degiant active docs and archive stale material | closed |
 | T3.1 | #330 | Harden chat transcript behavior tests | open |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
 | T3.3 | #332 | Classify backend API performance and leak gates | open |
@@ -71,16 +72,16 @@ git worktree list
 ## Phase Checklist
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
-- [ ] Phase 2: Real E2E Contract (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
+- [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
-**Active Phase**: Phase 2 - Real E2E Contract
-**Active Task**: T2.1-T2.5 implemented locally on `docs/real-e2e-contract-phase2`; PR pending.
-**Current Focus**: Phase 2 now makes `.agents/skills/real-e2e-acceptance/SKILL.md` the only evidence-level matrix, adds a validate-job verifier for real E2E contract drift, keeps smoke matrix evidence levels on canonical machine labels, updates Visual QA docs to use the 16:9 `1440x810` Desktop/Web primary viewport, and aggressively de-giants active docs by archiving historical longform/materials. A PR CI regression in `docs/roadmap.md` was reproduced and fixed locally: the roadmap no longer names the removed root rule file, and it keeps the required P0 remote-control topology contract.
-**Blockers**: none locally. Issues #326-#329 and #339 remain open until the Phase 2 PR merges into `dev/delicious233`.
+**Active Phase**: Phase 3 - Source And Test Alignment
+**Active Task**: not started; next work begins at #330 / T3.1 after a Phase 3 spec checkpoint.
+**Current Focus**: Phase 2 merged into `dev/delicious233` via PR #340 (`b79486fa`). The real E2E evidence matrix, doc SSOT cleanup, smoke matrix labels, Visual QA viewport boundary, and active-doc archive rules are now on baseline. Phase 3 should focus on source/test alignment for chat transcript behavior, frontend architecture docs, backend API gates, and Desktop packaged evidence boundaries.
+**Blockers**: none for Phase 2. Phase 3-4 issues remain open and must run through their own spec, implementation, and acceptance gates.
 
 ### Local Phase 1 Evidence
 
@@ -128,9 +129,9 @@ git worktree list
 
 ## Next Steps
 
-1. Commit and push the Phase 2 CI follow-up, then re-check PR #340.
-2. Keep Phase 3 source/test alignment separate from this PR unless CI exposes a direct regression in the touched contract gates.
-3. After PR merge, confirm #326-#329 and #339 close and move the active tracker to Phase 3.
+1. Start Phase 3 from #330 / T3.1 with a fresh spec checkpoint and a new branch/worktree from `dev/delicious233`.
+2. Keep Phase 3 source/test alignment separate from Phase 2 archive/governance cleanup.
+3. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
 4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this spec unless the operator opens a separate scoped task.
 
 ## Session Log
@@ -152,3 +153,4 @@ git worktree list
 | 2026-06-27 | phase-2-real-e2e-contract | Implemented Phase 2 contract cleanup: canonical evidence matrix and machine labels live only in `real-e2e-acceptance`; workflow docs now reference that skill; new `verify-real-e2e-contract.ps1` is wired into CI validate and CI policy verifiers; smoke matrix uses canonical `approved-real` and `packaged-release` labels while keeping readiness/dry scope in claim/status; roadmap stale Mobile blocker wording was replaced with bounded evidence; architecture Visual QA now names `1440x810` as primary Desktop/Web viewport. Verification: real E2E contract verifier, doc SSOT, project skill whitelist, PS/Bash CI policy, shared data-mode contract Vitest 5/5, skip-only smoke manifest, Web stubbed-Hub smoke matrix, and Desktop/Web 1440x810 visual chat-flow checks passed. |
 | 2026-06-27 | active-doc-degianting | Added issue #339 and aggressively archived stale/duplicated active docs: old longform roadmap, obsolete root state snapshot, duplicate contributing/API reference docs, dated audits, release/merge notes, one-off plans, deprecated designs, old test-result snapshots, cc-switch/design reports, and third-party project research. Active entrypoints are now concise `AGENTS.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/roadmap.md`, `docs/api-reference.md`, and `docs/reference/README.md`; `verify-doc-ssot.ps1` blocks old active paths and entrypoint bloat. Verification: doc SSOT, real E2E contract, project skill whitelist, PS/Bash CI policy, readiness/gold-path scripts, Desktop targeted Vitest 22/22, shared data-mode contract 5/5, Desktop/Web typecheck, Web stubbed-Hub smoke matrix, and Desktop/Web 1440x810 Visual QA passed. |
 | 2026-06-27 | phase-2-ci-fix | PR #340 CI showed `validate` failing on a `docs/roadmap.md` stale root-rule filename and `Backend E2E (fixture-only)` failing on a missing P0 remote-control topology sentence. Fixed the roadmap without widening scope. Verification: `verify-doc-ssot.ps1` and `verify-p0-remote-control-fixture.ps1` passed locally. |
+| 2026-06-27 | phase-2-merged | PR #340 merged into `dev/delicious233` with all checks green. Because the PR target was not the default branch, #326-#329 and #339 were closed manually with merge evidence; Phase 2 milestone #11 is closed with 0 open / 5 closed issues. Phase 3 begins at #330 after the next spec checkpoint. |
