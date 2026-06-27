@@ -113,7 +113,7 @@ git worktree list
 ## Execution Telemetry
 
 - GitHub modes store per-task telemetry in issue comments and milestone descriptions.
-- Phase 3 adaptive state is in milestone #9. Current drift score: 1, with total tasks adjusted to 9 after #352 was added for operator-requested active-doc consolidation.
+- Phase 3 adaptive state is in milestone #9. Current drift score: 2, after #352 found one unplanned verifier dependency and triggered the annotate threshold.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 - T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
@@ -135,6 +135,7 @@ git worktree list
 | 2026-06-27 | Backend performance/leak gates | PR #350 merged; #332 closed; `scripts/load-test-scenarios.md` owns gate classification and `scripts/verify-backend-perf-leak-gates.ps1` runs focused behavior + microbench smoke. |
 | 2026-06-27 | Desktop packaged boundary | PR #351 merged; #333 closed; package readiness/dry gates separate Vite renderer, packaged-release, signing/updater/release upload, and `real_tested=false` boundaries. |
 | 2026-06-27 | Active doc consolidation started | #352 tracks the operator-requested cleanup of duplicate active governance rule files before #334 continues. |
+| 2026-06-27 | Adaptive drift warning | Milestone #9 drift score updated to 2; #334 annotated for possible Web/Mobile client lane contract/verifier alignment. |
 
 ## Next Steps
 
