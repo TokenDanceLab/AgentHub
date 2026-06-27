@@ -38,6 +38,7 @@ test.describe('Desktop shared chat flow UI', () => {
     await expect(page.getByText('demo+edge')).toHaveCount(0);
 
     const transcript = page.getByRole('log');
+    await expectTranscriptWithoutModeDebug(transcript);
     const firstMessage = `Playwright chat flow ${Date.now()}`;
     const repeatedMessage = `Repeated chat flow ${Date.now()}`;
 
@@ -129,6 +130,15 @@ async function enterDemoWorkbench(page: Page, onWorkbenchRuntime?: () => void): 
   await expect(workbench).toBeVisible();
   onWorkbenchRuntime?.();
   await expect(page.getByRole('log')).toBeVisible();
+}
+
+async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['getByRole']>): Promise<void> {
+  await expect(transcript).not.toContainText('Data:');
+  await expect(transcript).not.toContainText('Hub replay:');
+  await expect(transcript).not.toContainText('mock (auto fallback)');
+  await expect(transcript).not.toContainText('demo+edge');
+  await expect(transcript).not.toContainText('Local Vite');
+  await expect(transcript).not.toContainText('只读预览');
 }
 
 function collectPageDiagnostics(page: Page): void {
