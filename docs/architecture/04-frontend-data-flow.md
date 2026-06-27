@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-17
+> 最后更新：2026-06-27
 
 ## 概述
 
@@ -136,20 +136,36 @@ Edge local profiles (本地已安装的 Agent)
 - Hub profile 提供跨设备共享
 - Raw adapter 是底层 runtime 的可用列表
 
-## 数据模式 (`app/shared/src/demo/dataMode.ts`)
+## 数据模式与 E2E 边界
 
-工作台数据模式控制 UI 数据来源和展示行为：
+`app/shared/src/demo/dataMode.ts` 仍是产品兼容字段，但不能再被当成“数据来源、执行能力、登录状态”三者的唯一事实源。测试和文档必须同时标注三条轴：
 
-| 模式 | 值 | 用途 |
+| 轴 | 含义 | 例子 |
 |---|---|---|
-| Auto | `auto` | 根据环境自动选择，默认回落到 mock |
-| Mock | `mock` | 纯内存硬编码数据，无后端依赖 |
-| Fixture | `fixture` | 基于 runtime manifest 的静态 fixture 数据 |
-| Observed | `observed` | 读取已持久化的真实运行记录（replay） |
-| Approved Real | `approved-real` | 真实 API/CLI 调用，需审批和 API key |
+| Surface | 运行壳层 | Desktop Vite、Web Vite、Desktop Tauri |
+| Data Source | UI 数据来源 | `local-mock`、`deterministic-fixture`、`stubbed-hub-session`、`observed-hub-replay`、approved real source |
+| Auth/Execution | 登录和执行真实性 | anonymous、local-only、hub-signed-in、approved-real |
 
-- 持久化 key：`agenthub.workbench.dataMode`（localStorage）
-- `isWorkbenchFixtureDataMode()` / `isWorkbenchRealDataMode()` — 模式判断 helper
+| 产品模式 | `dataMode` | Data Source | Auth/Execution | Workbench runtime 网络边界 | 不得声称 |
+|---|---|---|---|---|---|
+| Demo | `mock` | `local-mock` | anonymous | 不访问 Hub/Edge；Desktop 入口页只允许 `GET /v1/health` preflight | real replay、真实登录、真实执行 |
+| Fixture | `fixture` | `deterministic-fixture` | anonymous | 不访问 Hub/Edge | real replay、真实用户数据 |
+| Local | `auto`/local target | Local Edge | local-only | Desktop 可访问 `127.0.0.1:3210`；Web 不直连 Local Edge | Hub 登录或云端同步 |
+| Login/Hub | `auto`/Hub session | Hub | hub-signed-in | Web/Desktop 通过 Hub；真实登录需 Hub session 证据 | TokenDance API key、模型消耗 |
+| Observed | `observed` | `observed-hub-replay` 或本地只读记录 | read-only observed | 只读回放端点；不执行新 CLI/model/API | mock fallback、真实执行 |
+| Approved Real | `approved-real` | approved Hub/Edge/CLI/API | approved-real | 只允许审批清单中的真实路径 | silent fallback、stubbed real、packaged release |
+
+Phase-aware 边界：
+
+| Phase | 允许范围 |
+|---|---|
+| Entry preflight | Desktop 入口页可探测 Local Edge health，用于展示本地连接状态 |
+| Workbench runtime | 按上表执行；Demo/Fixture 进入工作台后不再触碰 Hub/Edge |
+| Manifest preflight | 只读 manifest，不触碰 Hub/Edge/TokenDance ID/Gateway |
+
+- 持久化 key：`agenthub.workbench.dataMode`（localStorage）。
+- E2E 网络边界合同：`app/shared/src/testing/e2eDataModeContract.ts`。
+- Stubbed Hub、fixture、readiness-only 或 manifest-only 必须输出 `real_tested=false`，不能冒充真实登录、真实 CLI/model/API、packaged Desktop 或 release 证据。
 
 ## 安全边界
 

@@ -43,6 +43,7 @@ test.describe('Web shared chat flow contract', () => {
     await expect(transcript).toContainText('The replay summary is below.');
     await expect(transcript.locator('table')).toContainText('Status');
     await expect(transcript.locator('table')).toContainText('ordered');
+    await expectTranscriptWithoutModeDebug(transcript);
 
     await expect(transcript.locator('[data-block-id="call-read-a"]')).toBeVisible();
     await expect(transcript.locator('[data-block-id="call-read-b"]')).toBeVisible();
@@ -104,6 +105,13 @@ function isExpectedBrowserDiagnostic(text: string): boolean {
 
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+}
+
+async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['getByRole']>): Promise<void> {
+  await expect(transcript).not.toContainText('Data:');
+  await expect(transcript).not.toContainText('Hub replay:');
+  await expect(transcript).not.toContainText('mock (auto fallback)');
+  await expect(transcript).not.toContainText('demo+edge');
 }
 
 async function enterApprovedRealHubSession(page: Page): Promise<void> {

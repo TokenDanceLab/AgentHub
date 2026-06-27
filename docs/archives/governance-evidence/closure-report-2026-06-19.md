@@ -42,7 +42,7 @@
 
 | # | 原等级 | 问题 | 原始状态（已修复） | 当前回归证据 |
 |---|--------|------|-------------------|-------------|
-| R1 | P1 | `verify-tauri-package-readiness.ps1` 读已删除文件 | 原始报告称已改为读 `docs/architecture/05-deployment.md` | 当前 L503 仍引用 `docs\backend-integration-governance.md`，该文件已不存在。多个 verify 脚本（verify-edge-cli-real-readiness、verify-login-fixture-topology、verify-packaged-login-real-readiness、verify-tauri-sidecar-binary-smoke）也仍引用此已删除文件。 |
+| R1 | P1 | readiness 脚本读已删除治理文档 | 原始报告称已改为读部署文档 | 2026-06-27 复核：相关 readiness / topology 脚本已统一改读 `docs/governance/governance-execution.md`；剩余 package/productName、审计文档和未实现 command 失败另属既有 gate 债。 |
 | R2 | P2 | active docs AI 腔清零 | 原始报告称"active docs 清零" | 当前仍有：(1) `docs/roadmap.md` L1766 "闭环面板"；(2) `docs/roadmap/README.md` L48 "增量补齐闭环"；(3) `docs/governance/threat-model.md` L107 "待闭环项"、L112 "收口"；(4) `docs/governance/security-risk-register.md` L262 "落地"、L267 "落地"；(5) `edge-server/README.md` L107 "闭环"。其中部分为诚实标注（threat model/risk register），部分为新增。 |
 
 ---
