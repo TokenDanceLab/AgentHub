@@ -78,5 +78,5 @@ cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
 
 - 新风险进入本文件；历史证据、长命令输出和日期型审计进入 [../history.md](../history.md) 指向的外部归档或私有运维文档。
 - 修复落地时只在表格中写当前状态和关闭条件，避免追加长篇日志。
-- 变成架构决策的风险链接 ADR 或架构章节。
+- 变成架构决策的风险链接 [../decisions.md](../decisions.md) 或架构章节。
 - 处于 `Open` 的 High 风险必须在 roadmap、issue 或 PR 中有 owner 和下一步。

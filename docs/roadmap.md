@@ -69,7 +69,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | Frontend data flow | [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md) |
 | Deployment | [architecture/05-deployment.md](architecture/05-deployment.md) |
 | Auth and identity | [architecture/06-auth-identity.md](architecture/06-auth-identity.md) |
-| Architecture decisions | [adr/](adr/) |
+| Architecture decisions | [decisions.md](decisions.md) |
 
 ## API 入口
 

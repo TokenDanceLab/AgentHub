@@ -7,9 +7,9 @@
 | 角色 | 先读 | 然后 |
 |------|------|------|
 | **新开发者** | [developer-quickstart.md](developer-quickstart.md) | [architecture.md](architecture.md) → [roadmap.md](roadmap.md) |
-| **评审/产品** | [architecture.md](architecture.md) | [adr/](adr/) → [governance/threat-model.md](governance/threat-model.md) |
+| **评审/产品** | [architecture.md](architecture.md) | [decisions.md](decisions.md) → [governance/threat-model.md](governance/threat-model.md) |
 | **贡献者** | [../CONTRIBUTING.md](../CONTRIBUTING.md) | [developer-quickstart.md](developer-quickstart.md) |
-| **功能设计** | [architecture.md](architecture.md) | [adr/](adr/) |
+| **功能设计** | [architecture.md](architecture.md) | [decisions.md](decisions.md) |
 | **历史追溯** | [history.md](history.md) | TokenDance docs 外部归档 |
 
 端口速记：Desktop/Tauri `5173`，Web `5174`，Mobile RN Expo `5177`，Hub `8080`，Edge `3210`。
@@ -22,9 +22,9 @@ docs/
 ├── developer-quickstart.md            ← 新人入门
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
 ├── architecture/                      ← 模块化架构文档
+├── decisions.md                       ← 当前架构决策摘要
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
 ├── progress/                          ← 当前 spec-driven 专项进度（仅执行中才存在）
-├── adr/                               ← 架构决策记录（11 篇）
 ├── governance/                        ← 治理：执行映射、安全风险、威胁模型
 ├── history.md                         ← 历史归档索引（外部 TokenDance docs）
 ├── images/                            ← 截图与图片资源
@@ -35,8 +35,8 @@ docs/
 
 | 需要 | 去看 |
 |------|------|
-| 某个架构决策的背景 | [adr/](adr/) |
-| 旧关键技术决策摘要 | [history.md](history.md) |
+| 当前架构决策摘要 | [decisions.md](decisions.md) |
+| 旧架构决策正文和背景 | [history.md](history.md) |
 | 历史设计、审计、发布、参考调研 | [history.md](history.md) |
 | spec-driven 专项归档 | [history.md](history.md) |
 | 当前 spec-driven 进度 | `progress/MASTER.md` — 仅当该文件存在时有效 |
