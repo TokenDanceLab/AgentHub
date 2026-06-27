@@ -57,5 +57,5 @@ Browser/Web
 ## 维护规则
 
 - 新发现进入 [security-risk-register.md](security-risk-register.md)，不要在本文件复制长表。
-- 形成稳定架构决策时补 ADR，并在本文件只保留一行摘要。
+- 形成稳定架构决策时更新 [../decisions.md](../decisions.md) 或对应架构 owner 文档，并在本文件只保留一行摘要。
 - 生产证据只放私有运维文档；本仓库不保存 endpoint、token、secret、callback code、session 或日志原文。

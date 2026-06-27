@@ -8,9 +8,9 @@ This SPEC cleans repository structure, active documentation, archive ownership, 
 
 | Area | Current Finding |
 |---|---|
-| Active docs | `docs/README.md`, `docs/roadmap.md`, `docs/architecture.md`, `docs/architecture/`, `docs/governance/`, `docs/reference/`, and `docs/adr/` are active. |
+| Active docs | `docs/README.md`, `docs/roadmap.md`, `docs/architecture.md`, `docs/decisions.md`, `docs/architecture/`, `docs/governance/`, and `docs/reference/` are active. |
 | Historical docs | Former in-repo history trees were copied to the external TokenDance docs archive; AgentHub now keeps only `docs/history.md`. |
-| ADR | `docs/adr/` has 16 ADR body files plus `README.md`; several code comments still mention ADR IDs. |
+| ADR | Old ADR bodies are archived externally; AgentHub keeps `docs/decisions.md` as the current compact summary. Code comments may keep ADR ID tags. |
 | Scripts | Root `scripts/` has many direct CI, docs, package, Desktop, and test references; `scripts/evidence/` and `scripts/git-hooks/` already exist. |
 | Tests | Root `tests/` currently has `fixtures/` and `scripts/`; release-readiness triggers on `tests/scripts/**`. |
 | Root artifacts | `css-audit-results.json` is tracked at repo root and appears to be one-off CSS audit evidence. |

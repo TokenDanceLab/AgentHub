@@ -21,9 +21,9 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md" -or $p -eq "hub-server/tests/README.md") { return $true }
     if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md" -or $p -eq "app/mobile-rn/README.md") { return $true }
     if ($p -eq "scripts/load-test-scenarios.md") { return $true }
-    if ($p -eq "docs/README.md" -or $p -eq "docs/history.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
+    if ($p -eq "docs/README.md" -or $p -eq "docs/history.md" -or $p -eq "docs/decisions.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
-    if ($p -match "^docs/(analysis|plan|progress|governance|adr)/.+\.md$") { return $true }
+    if ($p -match "^docs/(analysis|plan|progress|governance)/.+\.md$") { return $true }
     if ($p -match "^\.agents/skills/.+\.md$") { return $true }
     return $false
 }
@@ -36,6 +36,7 @@ foreach ($stalePath in @(
     "STATE.md",
     "docs/contributing.md",
     "docs/roadmap",
+    "docs/adr",
     "docs/audit",
     "docs/reference/projects",
     "docs/release/screenshot-checklist.md",
@@ -75,8 +76,10 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
     @{ Path = "AGENTS.md"; Marker = '项目规则只写 `AGENTS.md`' },
-    @{ Path = "docs/history.md"; Marker = "Archive commit" },
+    @{ Path = "docs/history.md"; Marker = "archive commit" },
     @{ Path = "docs/history.md"; Marker = "TokenDanceLab/docs" },
+    @{ Path = "docs/decisions.md"; Marker = "ADR-017" },
+    @{ Path = "docs/decisions.md"; Marker = "Full ADR bodies are archived" },
     @{ Path = ".agents/skills/real-e2e-acceptance/SKILL.md"; Marker = "Packaged release" },
     @{ Path = "api/events.md"; Marker = "Owner" },
     @{ Path = "app/web/README.md"; Marker = "docs/history.md" },
@@ -180,6 +183,7 @@ $maxLines = @{
     "scripts/load-test-scenarios.md" = 115
     "docs/README.md" = 120
     "docs/history.md" = 80
+    "docs/decisions.md" = 80
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
     "docs/architecture.md" = 170
