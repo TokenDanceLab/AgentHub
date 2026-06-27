@@ -26,9 +26,11 @@ function Read-Text([string]$RelativePath) {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-p0-desktop-edge-cli-smoke.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-desktop-edge-cli-smoke.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath -PathType Leaf) "P0 Desktop/Edge/CLI smoke gate exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) "P0 Desktop/Edge/CLI smoke gate implementation exists"
 
-$scriptText = Read-Text "scripts\verify-p0-desktop-edge-cli-smoke.ps1"
+$scriptText = Read-Text "scripts\smoke\verify-p0-desktop-edge-cli-smoke.ps1"
 Assert-True ($scriptText -match "prepare-tauri-sidecar-local\.ps1" -and $scriptText -match "verify-tauri-sidecar-binary-smoke\.ps1") "smoke prepares and verifies the Tauri Local Edge sidecar"
 Assert-True ($scriptText -match "/v1/health" -and $scriptText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "smoke starts the bundled Local Edge sidecar and probes health"
 Assert-True ($scriptText -match "--version" -and $scriptText -match "no-spend version probe only") "smoke limits real CLI discovery to a no-spend version probe"
