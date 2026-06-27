@@ -521,6 +521,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-doc-ssot.ps1
 
+      - name: Verify real E2E contract
+        shell: pwsh
+        run: ./scripts/verify-real-e2e-contract.ps1
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML

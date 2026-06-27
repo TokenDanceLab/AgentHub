@@ -65,13 +65,13 @@ function New-DiscoveryFixture {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-token-dance-id-login-readiness.ps1"
-$statePath = Join-Path $RepoRoot "STATE.md"
-$readinessDocPath = Join-Path $RepoRoot "docs\audit\token-dance-id-login-readiness.md"
+$realE2eSkillPath = Join-Path $RepoRoot ".agents\skills\real-e2e-acceptance\SKILL.md"
+$roadmapPath = Join-Path $RepoRoot "docs\roadmap.md"
 $envExamplePath = Join-Path $RepoRoot ".env.example"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "TokenDanceID login readiness script exists"
-Assert-True (Test-Path -LiteralPath $statePath) "STATE.md exists"
-Assert-True (Test-Path -LiteralPath $readinessDocPath) "TokenDanceID login readiness doc exists"
+Assert-True (Test-Path -LiteralPath $realE2eSkillPath) "real E2E acceptance skill exists"
+Assert-True (Test-Path -LiteralPath $roadmapPath) "roadmap exists"
 
 try {
     $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-token-dance-id-login-readiness-$PID"
@@ -147,21 +147,18 @@ try {
         Assert-True ($readyJson.secret_values_logged -eq $false) "JSON output records no secret logging" ($readyJson | ConvertTo-Json -Depth 8)
     }
 
-    if (Test-Path -LiteralPath $statePath) {
-        $stateText = Get-Content -Raw -LiteralPath $statePath
-        Assert-True ($stateText -match "verify-token-dance-id-login-readiness\.ps1") "STATE references the no-secret login readiness gate"
-        Assert-True ($stateText -match "READY_FOR_OPERATOR") "STATE records ready-for-operator status contract"
-        Assert-True ($stateText -match "fixture") "STATE states fixture evidence is not real login"
+    if (Test-Path -LiteralPath $realE2eSkillPath) {
+        $skillText = Get-Content -Raw -LiteralPath $realE2eSkillPath
+        Assert-True ($skillText -match "approved-real") "real E2E skill documents approved-real evidence"
+        Assert-True ($skillText -match "real_tested=false") "real E2E skill preserves fixture/readiness false boundary"
+        Assert-True ($skillText -match "Stubbed Hub") "real E2E skill separates stubbed Hub from real login"
     }
 
-    if (Test-Path -LiteralPath $readinessDocPath) {
-        $docText = Get-Content -Raw -LiteralPath $readinessDocPath
-        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_ISSUER_URL") "readiness doc names issuer URL env"
-        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_CLIENT_ID") "readiness doc names client id env"
-        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF") "readiness doc names test account ref env"
-        Assert-True ($docText -match "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET") "readiness doc distinguishes runtime client secret"
-        Assert-True ($docText -match "verify-p0-approved-real-gold-path\.ps1") "readiness doc includes gold-path command"
-        Assert-True ($docText -match "BLOCKED_WITH_EVIDENCE") "readiness doc preserves blocked-with-evidence boundary"
+    if (Test-Path -LiteralPath $roadmapPath) {
+        $roadmapText = Get-Content -Raw -LiteralPath $roadmapPath
+        Assert-True ($roadmapText -match "Approved-Real") "roadmap keeps approved-real as a product mode boundary"
+        Assert-True ($roadmapText -match "真实登录") "roadmap says real login needs explicit approval"
+        Assert-True ($roadmapText -match "real_tested=false") "roadmap keeps fixture/readiness false boundary"
     }
 
     if (Test-Path -LiteralPath $envExamplePath) {
