@@ -19,7 +19,7 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -eq "api/README.md" -or $p -eq "api/events.md" -or $p -eq "api/conventions.md") { return $true }
     if ($p -eq "edge-server/README.md") { return $true }
     if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md" -or $p -eq "hub-server/tests/README.md") { return $true }
-    if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md") { return $true }
+    if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md" -or $p -eq "app/mobile-rn/README.md") { return $true }
     if ($p -eq "scripts/load-test-scenarios.md") { return $true }
     if ($p -eq "docs/README.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
@@ -54,6 +54,15 @@ if (Test-Path -LiteralPath "docs/reference/desktop-ui-qa-sop.md") {
     Fail "old Desktop UI QA SOP must stay archived; use real-e2e-acceptance for active UI/E2E gates"
 }
 
+foreach ($archivedActivePath in @(
+    "docs/governance/branch-governance.md",
+    "app/mobile-rn/docs/handoff.md"
+)) {
+    if (Test-Path -LiteralPath $archivedActivePath) {
+        Fail "$archivedActivePath must stay archived; active branch rules live in AGENTS.md and Mobile gates live in app/mobile-rn/README.md"
+    }
+}
+
 $datedGovernance = @(Get-ChildItem -LiteralPath "docs/governance" -File -Filter "*.md" | Where-Object { $_.Name -match "\d{4}-\d{2}-\d{2}" })
 if ($datedGovernance.Count -gt 0) {
     Fail ("dated governance evidence must live under docs/archives/: " + (($datedGovernance | ForEach-Object { $_.Name }) -join ", "))
@@ -71,6 +80,8 @@ $requiredMarkers = @(
     @{ Path = "app/web/README.md"; Marker = "docs/archive/app/web-readme-full-2026-06-27.md" },
     @{ Path = "app/desktop/README.md"; Marker = "packaged-release" },
     @{ Path = "app/desktop/README.md"; Marker = "Vite renderer 证据不等于 packaged Desktop" },
+    @{ Path = "app/mobile-rn/README.md"; Marker = "real_tested=false" },
+    @{ Path = "app/mobile-rn/README.md"; Marker = "Mobile must not connect directly to Local Edge" },
     @{ Path = "edge-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
@@ -120,6 +131,11 @@ $forbiddenPatterns = @(
     @{ Pattern = 'Phase 3: Source And Test Alignment\s*\(1/7 tasks\)'; Message = "stale Phase 3 pre-#344 progress count" },
     @{ Pattern = 'current governance/source-contract branch'; Message = "stale current branch prose in progress docs" },
     @{ Pattern = "Mobile tests pass"; Message = "stale Mobile pass claim" },
+    @{ Pattern = "Local mock Hub check passed"; Message = "stale Mobile mock-Hub pass claim" },
+    @{ Pattern = "Visual QA should pass"; Message = "stale Mobile visual QA pass claim" },
+    @{ Pattern = "Wi-Fi ADB"; Message = "stale Mobile device proof wording" },
+    @{ Pattern = "v0\.3\.0-rc\.7"; Message = "stale Mobile release-candidate proof wording" },
+    @{ Pattern = "Current branch handoff"; Message = "stale Mobile handoff owner wording" },
     @{ Pattern = "真实执行已验证"; Message = "stale real-execution acceptance claim without current approved-real evidence" },
     @{ Pattern = "当前事实写在\s+`?STATE\.md`?"; Message = "old STATE.md fact-owner rule" },
     @{ Pattern = "docs/architecture/system-design/"; Message = "removed system-design architecture path" },
@@ -154,6 +170,7 @@ $maxLines = @{
     "api/conventions.md" = 190
     "app/web/README.md" = 95
     "app/desktop/README.md" = 95
+    "app/mobile-rn/README.md" = 95
     "edge-server/README.md" = 115
     "hub-server/README.md" = 120
     "hub-server/deployments/README.md" = 100
@@ -171,7 +188,6 @@ $maxLines = @{
     "docs/governance/security-risk-register.md" = 180
     "docs/governance/threat-model.md" = 140
     "docs/governance/governance-execution.md" = 110
-    "docs/governance/branch-governance.md" = 90
     "docs/progress/MASTER.md" = 150
 }
 
