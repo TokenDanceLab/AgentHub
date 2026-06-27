@@ -1,7 +1,7 @@
 # AgentHub 全链路数据对接路线图
 
 > 最后更新：2026-06-27
-> 版本：v0.5.1（全栈审计 78 项发现 + edge 10 项修复已推送 + CI 全绿）
+> 版本：v0.5.1（全栈审计 78 项发现 + edge 10 项修复已推送；当前 CI 事实以活跃 PR 和 `docs/progress/MASTER.md` 为准）
 > 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
 
@@ -176,13 +176,18 @@ Web / Desktop / Mobile / IM
 | 证据线 | RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview | REST + WS | Diff、Artifact、Preview 内联展示 |
 | 同步线 | Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers | REST + WS | 离线补齐、跨端同步、历史回放 |
 
-### 1.3 三层数据模式
+### 1.3 数据模式三轴与证据边界
 
-| 模式 | `dataMode` 值 | 特征 | 当前状态 |
-|------|-------------|------|---------|
-| Demo (mock) | `mock` | JS 内存数据，零依赖 | 已工作 |
-| Observed | `observed` | Edge API 只读观察 | `verify-real-api-smoke.ps1` 44/44 通过 |
-| Approved-Real | `approved-real` | 真实 Hub+Edge+CLI | Claude Code + OpenCode 真实执行已验证 |
+`dataMode` 是产品兼容字段，不单独证明数据来源、登录状态或真实执行。验收时同时标注 Surface、Data Source、Auth/Execution，并按 `.agents/skills/real-e2e-acceptance/SKILL.md` 写清证据等级。
+
+| 产品模式 | `dataMode` 值 | Data Source | Auth/Execution | 当前证据边界 |
+|------|-------------|------|------|---------|
+| Demo | `mock` | `local-mock` | anonymous | Workbench runtime 不访问 Hub/Edge；Desktop entry preflight 只允许 Local Edge health |
+| Fixture | `fixture` | `deterministic-fixture` | anonymous | 只验证离线证据形状，`real_tested=false` |
+| Local | local target | Local Edge | local-only | Desktop 可访问 `127.0.0.1:3210`；Web 不直连 Local Edge |
+| Login/Hub | Hub session | Hub | hub-signed-in | 需要 Hub session 证据；不等于 TokenDance API key 或模型消耗 |
+| Observed | `observed` | observed replay | read-only observed | 只读回放或无消耗观察；不代表真实执行 |
+| Approved-Real | `approved-real` | approved Hub/Edge/CLI/API | approved-real | 只有对应 approved-real gate 和 manifest 通过时才可声明真实登录或真实 CLI/model/API |
 
 ### 1.4 Hub Server 完整路由表
 
@@ -477,8 +482,8 @@ Web / Desktop / Mobile / IM
 | **Agent Profile CRUD** | Web + Desktop 全部 hooks（list/create/update/delete） | `agentProfileQueries.ts` |
 | **Agent 合并策略** | Edge profiles > Hub profiles > raw adapter list | Desktop 优先级合并 |
 | **Desktop Settings 三层** | Edge -> Hub -> localStorage 回退 | Desktop platform adapter |
-| **CLI Adapters** | Claude Code/Codex/OpenCode JSON readiness + 真实执行 | `claude_code.go`/`codex.go`/`opencode.go` |
-| **CLI 真实执行** | Claude Code + OpenCode 已验证真实执行 | STATE.md 记录 |
+| **CLI Adapters** | Claude Code/Codex/OpenCode JSON readiness + approved-real 证据门禁 | `claude_code.go`/`codex.go`/`opencode.go` |
+| **CLI 真实执行** | 需要 approved-real manifest 和 `real_tested=true` 证据；历史 STATE 记录不能替代当前 gate | `scripts/verify-approved-real-edge-cli-evidence.ps1` |
 | **SDK HTTP Adapters** | `AnthropicSDKAdapter` + `OpenAISDKAdapter`（纯 net/http SSE streaming） | `anthropic_sdk.go`/`openai_sdk.go` |
 | **Codex Preflight** | `PreflightAdapter` 接口，缺 `OPENAI_API_KEY` 快速失败 | `codex.go` |
 | **OpenCode 修复** | `--session` 只在 resume 时传递 | `opencode.go` |
@@ -486,7 +491,7 @@ Web / Desktop / Mobile / IM
 | **E2E Playwright** | `chat-real.spec.ts` 9 个测试（Hub API + Edge API + Web UI） | Playwright |
 | **Hub API 验证** | 16/20 端点返回 200，含 contacts/sessions/messages/documents/WebSocket | 真实 HTTP 测试 |
 | **Desktop Tauri packaging** | Unsigned NSIS + portable zip + sidecar + manifest hash | `verify-tauri-package-dry.ps1` |
-| **Mobile RN** | 91 tests pass, Hub contracts aligned | `corepack pnpm --dir app/mobile-rn verify` |
+| **Mobile RN** | 当前活跃 PR 中 Mobile Visual QA 已 fail-fast，具体 UI/fixture 修复另行 scoped pass | `corepack pnpm --dir app/mobile-rn verify` |
 | **i18n** | zh + en 两个 locale 文件，2169 个键 | `app/shared/src/i18n/` |
 | **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
 | **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
@@ -1085,7 +1090,7 @@ CLI permission request
 
 #### 当前状态
 
-- ✅ 91 tests pass, Hub contracts aligned
+- ⚠️ Hub contracts aligned；当前活跃 PR 的 Mobile required check 阻塞于 Visual QA fixture/display-name 断言，具体 UI/fixture 修复另行 scoped pass
 - ✅ `hubClient.ts`/`hubEvents.ts`/`hubLifecycle.ts` 全部对齐 Hub API 合同
 - ✅ vitest.config 修复
 - ⏳ Android APK 未产出
