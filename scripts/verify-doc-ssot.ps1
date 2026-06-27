@@ -99,6 +99,12 @@ $forbiddenPatterns = @(
     @{ Pattern = "Phase 2 Real E2E Contract\s*\|\s*进行中"; Message = "stale Phase 2 progress state" },
     @{ Pattern = 'current pre-Phase 3 hygiene branch `docs/active-doc-regroup`'; Message = "stale active-doc-regroup branch status" },
     @{ Pattern = 'Review and merge `docs/active-doc-regroup`'; Message = "stale active-doc-regroup next step" },
+    @{ Pattern = 'docs/module-readme-trim'; Message = "stale module-readme cleanup branch presented as active work" },
+    @{ Pattern = 'T3\.0b\s*\|\s*#344[^\r\n]*\|\s*open'; Message = "stale #344 open status after module README cleanup merged" },
+    @{ Pattern = '#344\s*/\s*T3\.0b\s+on'; Message = "stale #344 active-task wording" },
+    @{ Pattern = 'Phase 3 Source And Test Alignment\s*\|\s*待开始'; Message = "stale Phase 3 not-started roadmap state" },
+    @{ Pattern = 'Phase 3: Source And Test Alignment\s*\(1/7 tasks\)'; Message = "stale Phase 3 pre-#344 progress count" },
+    @{ Pattern = 'current governance/source-contract branch'; Message = "stale current branch prose in progress docs" },
     @{ Pattern = "Mobile tests pass"; Message = "stale Mobile pass claim" },
     @{ Pattern = "真实执行已验证"; Message = "stale real-execution acceptance claim without current approved-real evidence" },
     @{ Pattern = "当前事实写在\s+`?STATE\.md`?"; Message = "old STATE.md fact-owner rule" },
@@ -150,7 +156,7 @@ $maxLines = @{
     "docs/reference/agent-protocol-compat.md" = 100
     "docs/governance/security-risk-register.md" = 180
     "docs/governance/threat-model.md" = 140
-    "docs/progress/MASTER.md" = 260
+    "docs/progress/MASTER.md" = 150
 }
 
 foreach ($entry in $maxLines.GetEnumerator()) {

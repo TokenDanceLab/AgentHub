@@ -25,7 +25,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，根级重复规则文件已移除，旧 skill 归档 |
 | Phase 2 Real E2E Contract | 完成 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
-| Phase 3 Source And Test Alignment | 待开始 | 聊天流、前后端合同、性能/泄漏、Desktop packaged 边界 |
+| Phase 3 Source And Test Alignment | 进行中 | 已完成 API/Hub、模块 README 和进度 SSOT 文档收敛；当前进入 #330 聊天流测试/实现 |
 | Phase 4 Acceptance And Merge Readiness | 待开始 | 聚合验收、架构审批、归档和合并准备 |
 
 ## 当前优先级
@@ -55,7 +55,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | Mobile | 暂不做 UI/native 深入重构；只保持现有 required gate 边界清楚 | Expo Web Visual QA + mock-Hub + Expo Doctor，不声明 native/device/real Hub |
 | Release hardening | High 风险关闭或 accepted，依赖漏洞和安全头补齐 | release gate + risk register |
-| Long-term docs | 继续把活跃大文档拆成入口 + owner 子文档，完成材料归档 | doc SSOT + 人工 review |
+| Long-term docs | 活跃文档只保留入口/当前事实/owner 链接；历史 session log、审计和旧入口快照归档 | doc SSOT + 人工 review |
 
 ## 架构入口
 
