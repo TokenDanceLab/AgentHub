@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 4 | 4 | 8 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 3 | 5 | 8 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -51,7 +51,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.0b | #344 | Trim module README docs and stale active references | closed |
 | T3.0c | #346 | Sync progress SSOT and doc governance guardrails | closed |
 | T3.1 | #330 | Harden chat transcript behavior tests | closed |
-| T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
+| T3.2 | #331 | Align frontend architecture docs to shared implementation | closed |
 | T3.3 | #332 | Classify backend API performance and leak gates | open |
 | T3.4 | #333 | Check Desktop packaged evidence boundary | open |
 | T3.5 | #334 | Align Web Mobile client test lanes | open |
@@ -77,16 +77,16 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (4/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (5/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #331 / T3.2 on branch `docs/331-frontend-ssot`
+**Active Task**: #332 / T3.3 on branch `test/332-perf-leak-gates`
 
-**Current Focus**: frontend architecture docs should now be checked against the shared chat/workbench implementation and the test evidence from #330. Also apply the operator's doc cleanup rule for this lane: active docs stay short and owner-based; duplicate frontend/design evidence or historical material is archived rather than appended. Keep backend/package/perf lanes separate unless their issue scope requires them.
+**Current Focus**: classify Hub/Edge backend performance and leak gates without turning functional tests into fake leak proof. Active docs stay short and owner-based; backend gate classification lives in `scripts/load-test-scenarios.md`, with runnable focused gates in `scripts/verify-backend-perf-leak-gates.ps1`.
 
 **Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
@@ -115,6 +115,7 @@ git worktree list
 - Phase 3 adaptive state is in milestone #9. Current drift score: 1, caused by the extra T3.0c doc/progress SSOT checkpoint requested before source/test work continues.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
+- T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
 
 ## Recent Checkpoints
 
@@ -127,10 +128,11 @@ git worktree list
 | 2026-06-27 | Module README cleanup merged | PR #345 merged; #344 closed. |
 | 2026-06-27 | Progress SSOT cleanup | #346 closes stale Phase 3 counts, stale branch wording, and oversized MASTER session log drift. |
 | 2026-06-27 | Chat transcript tests | #330 adds Web delayed-send optimistic bubble coverage and verifies existing shared/Desktop/Web/Visual QA chat-flow gates. |
+| 2026-06-27 | Frontend architecture SSOT | PR #349 merged; #331 closed; `docs/architecture/04-frontend-data-flow.md` now maps shared implementation owners. |
 
 ## Next Steps
 
-1. Compare `docs/architecture.md` and `docs/architecture/04-frontend-data-flow.md` with `app/shared/src/workbench`, `app/shared/src/chatview`, `app/shared/src/transcript`, Desktop/Web adapters, and #330 chat-flow evidence.
-2. Trim or redirect duplicated frontend/chat/data-mode prose; archive historical evidence when it must be retained.
-3. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
+1. Finish #332 by mapping Hub EventBus/outbox/scheduler/Redis TTL and Edge lifecycle/store/adapters to behavior, benchmark, load, pprof/leak, or blocker evidence.
+2. Run `pwsh ./scripts/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms`, doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and diff check.
+3. Record telemetry on #332 and update milestone #9 before moving to #333.
 4. Keep Mobile native/UI expansion out of this spec unless the operator opens a separate scoped task.

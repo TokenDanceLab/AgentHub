@@ -71,7 +71,7 @@ Remote/cloud execution claims require relay/provisioning/device proof/workspace 
 | REST contract | OpenAPI YAML parse + affected handler tests |
 | WS event behavior | Hub WS tests + `api/events.md` sync |
 | Auth/session | OIDC/session tests + `scripts/verify-oidc-readiness.ps1` if config shape changed |
-| Performance/leak path | Targeted benchmark/load/pprof/leak gate plus behavior test for the same path |
+| Performance/leak path | [../../scripts/load-test-scenarios.md](../../scripts/load-test-scenarios.md) plus behavior test for the same path |
 
 ## Related
 

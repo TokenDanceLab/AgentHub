@@ -45,4 +45,5 @@ docs/
 | 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
+| 后端性能/泄漏证据 | [../scripts/load-test-scenarios.md](../scripts/load-test-scenarios.md) |
 | 发布/截图历史清单 | [archive/release/](archive/release/) |
