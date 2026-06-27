@@ -131,7 +131,7 @@ function Invoke-RepoScript {
     }
 }
 
-$scenarioPath = Resolve-RepoPath "docs\competition\teamrun-demo-scenario.json"
+$scenarioPath = Resolve-RepoPath "tests\fixtures\teamrun\teamrun-demo-scenario.json"
 $exporterPath = Resolve-RepoPath "scripts\export-teamrun-demo-fixture-evidence.ps1"
 $packagePath = Resolve-RepoPath "scripts\package-teamrun-demo-evidence.ps1"
 $readinessPath = Resolve-RepoPath "scripts\verify-teamrun-demo-readiness.ps1"

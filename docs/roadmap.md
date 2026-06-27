@@ -91,6 +91,8 @@ Web / Desktop / Mobile / IM
 - IM 是核心体验：单聊、群聊、`@Agent`、Orchestrator 分派和上下文连续必须在同一条任务流里成立。
 - 产物必须内联：代码 Diff、网页预览、文件附件、审批、部署状态和生成资产不应散落在日志或后台页面。
 - Web 远控、Desktop 本地执行、Mobile/IM 审批查看使用同一 Hub/Edge 事件合同。
+- P0 远控 fixture 拓扑必须保持为 Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter；fixture gate 只验证离线证据形状，不声称真实登录、真实 CLI/model 或发布。
+- TokenDanceID/OIDC approval gate：真实登录需要 approved OAuth client、disposable test account、`/client/auth/me` 证据；client secret、cookie 和 authorization material 不得进入 docs/logs/screenshots/commits/reports。
 - mock、fixture、observed、approved-real、production 必须显式区分；真实登录、真实 CLI/model/API、部署、签名、公证和 release upload 都需要明确审批。
 
 ---
