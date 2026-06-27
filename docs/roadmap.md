@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-06-27
+最后更新：2026-06-28
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 已归档到 [archive/roadmap-v0.5.1/roadmap-longform-2026-06-27.md](archive/roadmap-v0.5.1/roadmap-longform-2026-06-27.md)。
 
@@ -17,16 +17,16 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前执行中的 spec-driven 专项以 [progress/MASTER.md](progress/MASTER.md) 为准。MASTER 只记录当前专项进度、Issue/PR、阻塞和验收证据；本 roadmap 不复制任务日志。
+当前没有 active spec-driven 专项。执行中的专项会重新创建 `docs/progress/MASTER.md`，MASTER 只记录当前专项进度、Issue/PR、阻塞和验收证据；本 roadmap 不复制任务日志。
 
-当前阶段：
+最近完成：
 
 | Phase | 状态 | 说明 |
 |---|---|---|
 | Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，根级重复规则文件已移除，旧 skill 归档 |
 | Phase 2 Real E2E Contract | 完成 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
 | Phase 3 Source And Test Alignment | 完成 | API/Hub、模块 README、进度 SSOT、聊天流、前端架构、后端性能/泄漏、Desktop packaged evidence、active docs 和 Web/Mobile client lanes 已对齐 |
-| Phase 4 Acceptance And Merge Readiness | 进行中 | 聚合验收、架构审批、归档和合并准备 |
+| Phase 4 Acceptance And Merge Readiness | 完成 | 聚合验收、架构审批、归档和合并准备；下一轮仓库结构清理必须单独开 SPEC |
 
 ## 当前优先级
 
@@ -34,7 +34,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | 方向 | 目标 | 验收 |
 |---|---|---|
-| 文档治理 | active docs 只保留规则、当前 spec、总路线、架构和契约入口；重复规则面和历史 longform/审计/发布材料/旧入口快照归档 | `scripts/verify-doc-ssot.ps1` |
+| 文档治理 | active docs 只保留规则、当前 spec（若存在）、总路线、架构和契约入口；重复规则面和历史 longform/审计/发布材料/旧入口快照归档 | `scripts/verify-doc-ssot.ps1` |
 | 真实 E2E 合同 | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 | `scripts/verify-real-e2e-contract.ps1` |
 | 远控拓扑前置合同 | P0 remote-control fixture 验证 `Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter` 的离线拓扑形状，不声明真实登录或真实执行 | `scripts/verify-p0-remote-control-fixture.ps1` |
 | Chat flow 可靠性 | 发送不消失、消息线性排序、自动滚动、卡片合并、markdown/table 渲染 | Desktop/Web Playwright + Visual QA |
@@ -102,7 +102,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 5. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
 6. Mock 和 fixture 模式必须显式；real mode 不能静默降级。
 7. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. 当前 spec 进度写 `docs/progress/MASTER.md`，规则写 `AGENTS.md`，历史 longform/审计/发布材料放 `docs/archive/`，已完成 spec 工件和过期项目 skill 放 `docs/archives/`。
+8. 当前 spec 进度只在专项执行中写 `docs/progress/MASTER.md`，规则写 `AGENTS.md`，历史 longform/审计/发布材料放 `docs/archive/`，已完成 spec 工件和过期项目 skill 放 `docs/archives/`。
 9. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 10. TokenDance API key 不得暴露给浏览器 UI。
 
