@@ -17,7 +17,7 @@
 - `AGENTS.md` 是项目总规则唯一入口，承载开发红线、工作流、分层事实源、skill 白名单和提交/验证规则；每个 Agent 开始工作前必须读。
 - 本仓库不再维护 `CLAUDE.md`。Claude Code、Codex 和其他 Agent 都读本文件；平台特化差异只在全局工具配置或对应 skill 中处理，不在仓库根目录再建第二套规则。
 - `docs/progress/MASTER.md` 只记录当前 spec-driven 专项进度、PR/Issue、阻塞和验收证据；没有当前专项时该目录应被归档或不存在。
-- `docs/roadmap.md` 和 `docs/roadmap/` 是总进度与长期路线，不承载项目规则，也不替代当前 spec 进度。
+- `docs/roadmap.md` 是总进度与长期路线，不承载项目规则，也不替代当前 spec 进度。
 - `docs/architecture.md` 和 `docs/architecture/` 记录系统结构、数据流和协议细节，不承载分支/skill/提交纪律。
 - 在 workspace 内做跨系统治理时，先读 `../AGENTS.md` 和 `../docs/`；AgentHub 仓内 docs 只负责本产品实现细节。
 
@@ -30,16 +30,14 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 读 `docs/roadmap.md` 和 `docs/architecture.md` — 当前目标、架构边界和实现阶段。
-3. 做 Desktop/Web v4 重构时，继续读 `docs/roadmap/` 子文档了解各模块进展。
-4. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，且当前没有更具体的 spec-driven 指令，加载 `.agents/skills/dev-loop/SKILL.md`。短任务（单文件修复、小改动）不需要。
-6. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
-7. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-8. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
-9. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
-10. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
-11. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
-12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
+4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，且当前没有更具体的 spec-driven 指令，加载 `.agents/skills/dev-loop/SKILL.md`。短任务（单文件修复、小改动）不需要。
+5. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
+6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
+7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
+8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+9. 持续开发、任务拆解和客户端任务读 `docs/roadmap.md` 与 `docs/architecture.md`。
+10. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`；第三方项目调研默认只看 `docs/archive/reference-projects/` 的具体目标文件。
 
 `reference/**` 是第三方源码调研，默认不改、不翻译、不全文扫描。
 
@@ -314,7 +312,7 @@ feat/* → dev/delicious233 → master
 
 开发引擎：`.agents/skills/dev-loop/` — 长程任务循环、能力路由、交叉审查和进度同步。
 
-历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/roadmap/` 子文档为准。
+历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md` 和 `docs/architecture.md` 为准。
 
 进度同步：
 
@@ -342,12 +340,13 @@ feat/* → dev/delicious233 → master
 
 - 项目总规则只写在 `AGENTS.md`；不要新增 `CLAUDE.md` 或其他根级规则副本。
 - 当前 spec-driven 专项只写在 `docs/progress/MASTER.md`，并指向 GitHub issue/PR、分析和计划文档。
-- 总进度和长期路线只写在 `docs/roadmap.md`（概览）+ `docs/roadmap/`（模块路线图）。
+- 总进度和长期路线只写在 `docs/roadmap.md`。
 - 架构说明写在 `docs/architecture.md`（概览）+ `docs/architecture/`（模块详情）。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
 - 过时长期文档直接删除（git 历史保留追溯能力），不归档；spec-driven 的过程工件按第 9 节归档到 `docs/archives/`。
+- 避免巨石文档：`AGENTS.md`、`docs/progress/MASTER.md`、`docs/roadmap.md` 只保留各自职责内的入口、摘要和当前事实；长表、历史日志、验收证据和专题设计拆到子文档或 `docs/archives/`，不要无限追加到主文档。
 - 文档、issue、PR 正文中文为主；代码标识、路径、API 字段、命令保留英文。
 - 不使用未解释缩写。第一次出现时写白话解释。
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
@@ -358,9 +357,10 @@ feat/* → dev/delicious233 → master
 
 1. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；已完成的 spec-driven 工件和过期项目 skill 例外，归档到 `docs/archives/`。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
-3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
-4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
-5. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次；`docs/` 目录结构每 7 天可做一次过期扫描。
+3. **主动拆分**：主文档变长时先把历史、长表或专题内容移到 owner 子文档或归档目录，再在主文档保留链接和一句结论。
+4. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
+5. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D）。
+6. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次；`docs/` 目录结构每 7 天可做一次过期扫描。
 
 ## 6. 安全和隐私
 

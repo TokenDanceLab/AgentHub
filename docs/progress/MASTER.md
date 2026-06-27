@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-06-27
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
-> **Branch**: docs/repo-governance-real-e2e
+> **Branch**: docs/real-e2e-contract-phase2
 > **Baseline**: origin/dev/delicious233
 
 ## GitHub Resources
@@ -28,7 +28,7 @@
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
-| 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 4 | 0 | 4 |
+| 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 5 | 0 | 5 |
 | 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 0 | 5 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
@@ -44,6 +44,7 @@
 | T2.2 | #327 | Split data mode surface auth and execution axes | open |
 | T2.3 | #328 | Align E2E smoke matrix and manifests | open |
 | T2.4 | #329 | Normalize Visual QA acceptance | open |
+| T2.5 | #339 | Degiant active docs and archive stale material | open |
 | T3.1 | #330 | Harden chat transcript behavior tests | open |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | open |
 | T3.3 | #332 | Classify backend API performance and leak gates | open |
@@ -70,25 +71,35 @@ git worktree list
 ## Phase Checklist
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
-- [ ] Phase 2: Real E2E Contract (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
+- [ ] Phase 2: Real E2E Contract (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 2 - Real E2E Contract
-**Active Task**: not started; next work begins at #326 / T2.1.
-**Current Focus**: Phase 1 governance baseline is merged into `dev/delicious233` via PR #338 (`4dc4f496d845a3e76c8c87adbe2a74a2d6f8dd4b`). `AGENTS.md` is the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, and stale project skills remain archived-only. The next phase should refine the real E2E evidence contract without adding duplicate rule documents.
-**Blockers**: none for Phase 1. Phase 2-4 issues remain open and must run through their own spec, implementation, and acceptance gates.
+**Active Task**: T2.1-T2.5 implemented locally on `docs/real-e2e-contract-phase2`; PR pending.
+**Current Focus**: Phase 2 now makes `.agents/skills/real-e2e-acceptance/SKILL.md` the only evidence-level matrix, adds a validate-job verifier for real E2E contract drift, keeps smoke matrix evidence levels on canonical machine labels, updates Visual QA docs to use the 16:9 `1440x810` Desktop/Web primary viewport, and aggressively de-giants active docs by archiving historical longform/materials. A PR CI regression in `docs/roadmap.md` was reproduced and fixed locally: the roadmap no longer names the removed root rule file, and it keeps the required P0 remote-control topology contract.
+**Blockers**: none locally. Issues #326-#329 and #339 remain open until the Phase 2 PR merges into `dev/delicious233`.
 
 ### Local Phase 1 Evidence
 
 | Task | Local status | Evidence |
 |:--|:--|:--|
 | T1.1 | Implemented in branch | `AGENTS.md` and `docs/governance/branch-governance.md` now use live-state branch/worktree rules; stale active branch table removed. |
-| T1.2 | Implemented in branch | `AGENTS.md` is the only active project rule surface; `CLAUDE.md` was removed; dated governance reports moved to `docs/archives/governance-evidence/`; old Desktop UI QA SOP moved to `docs/archive/`; `docs/governance/document-standards.md`, `docs/README.md`, `docs/contributing.md`, and `docs/reference/README.md` align active SPEC, archive, skill whitelist, and current CI coverage policy boundaries. |
+| T1.2 | Implemented in branch | `AGENTS.md` is the only active project rule surface; `CLAUDE.md` was removed; dated governance reports moved to `docs/archives/governance-evidence/`; old Desktop UI QA SOP moved to `docs/archive/`; `docs/governance/document-standards.md`, `docs/README.md`, `CONTRIBUTING.md`, and `docs/reference/README.md` align active SPEC, archive, skill whitelist, and current CI coverage policy boundaries. |
 | T1.3 | Implemented in branch | `scripts/verify-project-skills.ps1` added; CI validate now runs it; old project skills remain archived only; PowerShell and Bash CI policy verifiers both check this gate. |
 | T1.4 | Verified in branch | `app/desktop/stats.html` is not tracked by Git and is ignored by `.gitignore`; stale skill unignore rules removed; generated artifact hygiene remains explicit. |
+
+### Local Phase 2 Evidence
+
+| Task | Local status | Evidence |
+|:--|:--|:--|
+| T2.1 | Implemented in branch | `real-e2e-acceptance` now owns the only evidence-level matrix and includes canonical machine labels; `workflow-standard.md` links to it instead of duplicating the table; `scripts/verify-real-e2e-contract.ps1` blocks drift. |
+| T2.2 | Verified in branch | Existing `app/shared/src/testing/e2eDataModeContract.ts` remains the data-mode boundary contract; targeted Vitest passed for `e2eDataModeContract.test.ts` with 5 tests. No new data-mode source system was added. |
+| T2.3 | Implemented in branch | `scripts/verify-e2e-smoke-matrix.ps1` emits canonical labels such as `approved-real` and `packaged-release`; Web stubbed-Hub matrix run passed with executed `evidence_levels=["stubbed-hub"]` and `real_tested=false`. |
+| T2.4 | Verified in branch | Desktop/Web visual chat-flow checks passed at `1440x810`, with screenshots under app-local `.tmp/`, `horizontalOverflow=0`, `scrollGap=0`, and `transcriptHasModeDebug=false`. Architecture docs now name `1440x810` as the primary Desktop/Web Visual QA viewport. |
+| T2.5 | Implemented in branch | Active docs were de-gianted: old longform roadmap, obsolete root state snapshot, static API reference, duplicate contributing guide, dated audits, release/merge notes, stale one-off plans, deprecated designs, cc-switch/design reports, and third-party project research moved to `docs/archive/`; concise active entrypoints now own the current facts. |
 
 ## Governance Status
 
@@ -111,12 +122,15 @@ git worktree list
 - Adaptive control state lives in milestone descriptions.
 - Current drift score for all phases: 0.
 - 2026-06-27 `doc-ssot-cleanup`: actual effort M; S.U.P.E.R quick check S/U/R pass for rule ownership, doc flow, and replaceable archived evidence; unplanned dependencies 2 (`verify-runtime-readiness` stale STATE assertion, old Desktop UI QA SOP archival).
+- 2026-06-27 `phase-2-real-e2e-contract`: actual effort M; S.U.P.E.R quick check S/P/E/R pass for single matrix ownership, manifest ports, environment-labeled evidence, and replaceable verifiers; unplanned dependencies 2 (stale Mobile roadmap blocker wording, smoke matrix non-canonical derived evidence labels).
+- 2026-06-27 `active-doc-degianting`: actual effort L; S.U.P.E.R quick check S/P/E/R pass for single owner docs, archive ports, active-doc environment boundaries, and replaceable concise entrypoints; unplanned dependencies 3 (root STATE tests, duplicate API reference, stale docs/reference projects).
+- 2026-06-27 `phase-2-ci-fix`: actual effort S; S.U.P.E.R quick check S/P/E/R pass for roadmap ownership, fixture topology contract, environment honesty, and verifier reuse; unplanned dependencies 1 (PR merge CI exposed a stale roadmap line not caught before push).
 
 ## Next Steps
 
-1. Start Phase 2 from #326 / T2.1 after a spec checkpoint; do not reuse Phase 1 PR state as implementation evidence.
-2. Keep active rules in `AGENTS.md`, current progress in this file, and total roadmap in `docs/roadmap.md`; archive or delete stale rules instead of appending duplicates.
-3. For every real E2E claim, map the claim to Playwright, Visual QA, backend/API, observed-local, approved-real, or packaged-release evidence before implementation.
+1. Commit and push the Phase 2 CI follow-up, then re-check PR #340.
+2. Keep Phase 3 source/test alignment separate from this PR unless CI exposes a direct regression in the touched contract gates.
+3. After PR merge, confirm #326-#329 and #339 close and move the active tracker to Phase 3.
 4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this spec unless the operator opens a separate scoped task.
 
 ## Session Log
@@ -135,3 +149,6 @@ git worktree list
 | 2026-06-27 | mobile-visual-contract | Scoped Mobile required-gate fix only. Confirmed the current visible home/account identity is `Delicious233` per existing source/tests, then updated Mobile Visual QA assertions from the stale `Alice` expectation. Added mock-Hub contract checks for `/client/sessions`, `/client/contacts`, CORS preflight, and `/client/ws`; implemented those routes without suppressing browser console errors. CI then showed Linux `Screenshot visual QA (mobile)` hanging after prior steps passed, so `visual-qa.mjs` now starts owned preview/mock-Hub servers in a non-Windows process group and terminates the full process tree during teardown. Evidence level: Expo Web Visual QA + mock-Hub fixture contract, not native package or real Hub login. Verification: `mock:hub:check` failed first on `/client/sessions` preflight, then passed; `visual:qa` passed before and after process-group teardown; `verify` passed with 25 files / 330 tests; CI-style mock-Hub Vitest passed with 25 files / 330 tests. |
 | 2026-06-27 | mobile-expo-doctor-contract | Scoped Mobile required-gate fix only. CI `Frontend (mobile)` then failed at Expo Doctor after Visual QA and mock-Hub E2E passed. Aligned Expo SDK 56 patch dependencies and kept React/React DOM on the repo-shared `19.2.7` contract using Expo's documented `expo.install.exclude` for those two packages. Evidence level remains Expo Web + mock-Hub fixture/native config checks, not native package, device install, or real Hub login. Verification: `corepack.cmd pnpm --dir app/mobile-rn verify:qa` passed, including typecheck, lint, brand/boundary checks, 25 Vitest files / 330 tests, Expo Doctor 21/21 checks, native readiness, mock-Hub contract, and Visual QA screenshots. |
 | 2026-06-27 | phase-1-merged | PR #338 merged into `dev/delicious233` with all required checks green. GitHub did not auto-close issues because the PR target was not the default branch, so #322-#325 were closed manually with merge evidence. Phase 1 milestone is closed with 0 open / 4 closed issues; Phase 2 begins at #326 after the next spec checkpoint. |
+| 2026-06-27 | phase-2-real-e2e-contract | Implemented Phase 2 contract cleanup: canonical evidence matrix and machine labels live only in `real-e2e-acceptance`; workflow docs now reference that skill; new `verify-real-e2e-contract.ps1` is wired into CI validate and CI policy verifiers; smoke matrix uses canonical `approved-real` and `packaged-release` labels while keeping readiness/dry scope in claim/status; roadmap stale Mobile blocker wording was replaced with bounded evidence; architecture Visual QA now names `1440x810` as primary Desktop/Web viewport. Verification: real E2E contract verifier, doc SSOT, project skill whitelist, PS/Bash CI policy, shared data-mode contract Vitest 5/5, skip-only smoke manifest, Web stubbed-Hub smoke matrix, and Desktop/Web 1440x810 visual chat-flow checks passed. |
+| 2026-06-27 | active-doc-degianting | Added issue #339 and aggressively archived stale/duplicated active docs: old longform roadmap, obsolete root state snapshot, duplicate contributing/API reference docs, dated audits, release/merge notes, one-off plans, deprecated designs, old test-result snapshots, cc-switch/design reports, and third-party project research. Active entrypoints are now concise `AGENTS.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/roadmap.md`, `docs/api-reference.md`, and `docs/reference/README.md`; `verify-doc-ssot.ps1` blocks old active paths and entrypoint bloat. Verification: doc SSOT, real E2E contract, project skill whitelist, PS/Bash CI policy, readiness/gold-path scripts, Desktop targeted Vitest 22/22, shared data-mode contract 5/5, Desktop/Web typecheck, Web stubbed-Hub smoke matrix, and Desktop/Web 1440x810 Visual QA passed. |
+| 2026-06-27 | phase-2-ci-fix | PR #340 CI showed `validate` failing on a `docs/roadmap.md` stale root-rule filename and `Backend E2E (fixture-only)` failing on a missing P0 remote-control topology sentence. Fixed the roadmap without widening scope. Verification: `verify-doc-ssot.ps1` and `verify-p0-remote-control-fixture.ps1` passed locally. |
