@@ -310,6 +310,7 @@ try {
 
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
+  page.setDefaultNavigationTimeout(60_000);
 
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -370,7 +371,7 @@ try {
     }));
   }, { sessionId, taskId });
 
-  await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.getByTestId('agenthub-workbench').waitFor({ state: 'visible' });
   await page.getByRole('heading', { name: 'Web visual chat flow' }).waitFor({ state: 'visible' });
   await page.getByRole('log').waitFor({ state: 'visible' });

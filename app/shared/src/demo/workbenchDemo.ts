@@ -64,7 +64,7 @@ const demoConversationsBase: WorkbenchConversation[] = [
   },
   {
     id: TEAMRUN_DEMO_CONVERSATION_ID,
-    title: 'ByteDance TeamRun',
+    title: 'TeamRun Fixture',
     kind: 'group',
     subtitle: 'fixture-only UI evidence capture',
     updatedLabel: '10:11',

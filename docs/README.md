@@ -23,6 +23,7 @@ docs/
 ├── architecture/                      ← 6 篇模块化架构文档
 ├── roadmap.md                         ← 路线图概览（→ roadmap/ 模块详情）
 ├── roadmap/                           ← 模块化路线图
+├── progress/                          ← 当前 spec-driven 专项进度（仅执行中存在）
 ├── chatview-action-plan.md            ← ChatView 迁移行动计划
 ├── contributing.md                    ← 贡献指南
 ├── design-decisions.md                ← 5 个关键技术决策摘要
@@ -46,6 +47,7 @@ docs/
 | Adapter 架构 | [designs/enhanced-adapter-architecture.md](designs/enhanced-adapter-architecture.md) |
 | 竞品分析（已归档） | [archive/competitor-research/](archive/competitor-research/) — 历史研究 |
 | spec-driven 专项归档 | [archives/README.md](archives/README.md) — 完成后的 analysis/plan/progress |
+| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md) — 仅当该文件存在时有效 |
 | cc-switch 集成 | [reference/cc-switch-integration-design.md](reference/cc-switch-integration-design.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
 | 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |

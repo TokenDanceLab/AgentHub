@@ -110,7 +110,7 @@ function Invoke-RepoScript {
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-remote-control-fixture-e2e.ps1"
 $exporterPath = Join-Path $RepoRoot "scripts\export-teamrun-demo-fixture-evidence.ps1"
-$scenarioPath = Join-Path $RepoRoot "docs\competition\teamrun-demo-scenario.json"
+$scenarioPath = Join-Path $RepoRoot "tests\fixtures\teamrun\teamrun-demo-scenario.json"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "remote-control fixture E2E gate exists"
 Assert-True (Test-Path -LiteralPath $exporterPath) "TeamRun fixture exporter exists"

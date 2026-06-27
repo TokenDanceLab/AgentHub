@@ -82,7 +82,7 @@ function Test-PackageReadinessPrerequisites {
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )
 
     foreach ($relative in $required) {

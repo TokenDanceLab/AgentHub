@@ -9,7 +9,7 @@ mobile. It proves the local chain shape and required evidence identifiers.
 
 [CmdletBinding()]
 param(
-    [string]$ScenarioManifest = "docs/competition/teamrun-demo-scenario.json",
+    [string]$ScenarioManifest = "tests/fixtures/teamrun/teamrun-demo-scenario.json",
     [string]$EvidencePath,
     [string]$OutputRoot = ".tmp/teamrun-evidence",
     [string]$Stamp

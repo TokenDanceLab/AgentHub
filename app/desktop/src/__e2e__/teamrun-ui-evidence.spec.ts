@@ -18,7 +18,7 @@ test.describe('TeamRun UI evidence fixture', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
 
-    await page.getByRole('button', { name: /ByteDance TeamRun/ }).click();
+    await page.getByRole('button', { name: /TeamRun Fixture/ }).click();
 
     await expect(page.getByRole('region', { name: 'Transcript' })).toContainText(
       'TeamRun Console fixture state 已载入',

@@ -110,13 +110,13 @@ describe('workbench v4 demo data source', () => {
     expect(collabTranscript[0]).toHaveProperty('id');
   });
 
-  it('exposes the ByteDance TeamRun fixture without live-runtime claims', () => {
+  it('exposes the TeamRun fixture without live-runtime claims', () => {
     const store = createWorkbenchDemoStore();
     const teamRun = store.conversations.find((conversation) => conversation.id === TEAMRUN_DEMO_CONVERSATION_ID);
     const transcript = resolveDemoWorkbenchTranscript(TEAMRUN_DEMO_CONVERSATION_ID);
 
     expect(teamRun).toEqual(expect.objectContaining({
-      title: 'ByteDance TeamRun',
+      title: 'TeamRun Fixture',
       model: 'fixture-only',
     }));
     expect(teamRunDemoScenario.fixtureOnly).toBe(true);

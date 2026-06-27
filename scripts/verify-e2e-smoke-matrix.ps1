@@ -2,10 +2,10 @@
 <#
 AgentHub E2E/smoke matrix runner.
 
-Runs the CI-safe real-surface smoke set for Web approved-real mode,
-Desktop renderer/Tauri dry gates, Local Edge/Hub service health, and
-approval/artifact replay. Real TokenDance ID login and live Hub dispatch are
-recorded as BLOCKED_WITH_EVIDENCE unless the separate approval gate is satisfied.
+Runs the CI-safe smoke set for Web stubbed Hub replay, Desktop renderer/Tauri
+dry gates, Local Edge/Hub service health, and approval/artifact replay. Real
+TokenDance ID login and live Hub dispatch are recorded as BLOCKED_WITH_EVIDENCE
+unless the separate approval gate is satisfied.
 #>
 
 [CmdletBinding()]
@@ -133,18 +133,24 @@ function Invoke-MatrixCommand {
         [int[]]$BlockedExitCodes = @(),
         [string]$BlockedReason = "",
         [switch]$Skipped,
-        [string]$SkipReason = ""
+        [string]$SkipReason = "",
+        [string]$EvidenceLevel = "fixture-unit",
+        [bool]$RealTested = $false,
+        [string]$Claim = ""
     )
 
     if ($Skipped) {
         $script:Rows += [pscustomobject][ordered]@{
             name = $Name
             area = $Area
+            evidence_level = $EvidenceLevel
+            real_tested = $RealTested
             status = "skipped"
             exit_code = $null
             duration_ms = 0
             command = "$Command $(Join-NativeArguments $Arguments)"
             working_directory = $WorkingDirectory
+            claim = $Claim
             evidence = $SkipReason
         }
         Write-Host "SKIP  $Name - $SkipReason" -ForegroundColor Yellow
@@ -156,11 +162,14 @@ function Invoke-MatrixCommand {
         $script:Rows += [pscustomobject][ordered]@{
             name = $Name
             area = $Area
+            evidence_level = $EvidenceLevel
+            real_tested = $RealTested
             status = "failed"
             exit_code = "missing-command"
             duration_ms = 0
             command = ""
             working_directory = $WorkingDirectory
+            claim = $Claim
             evidence = "Command path could not be resolved."
         }
         Write-Host "FAIL  $Name - command path could not be resolved" -ForegroundColor Red
@@ -203,11 +212,14 @@ function Invoke-MatrixCommand {
         $script:Rows += [pscustomobject][ordered]@{
             name = $Name
             area = $Area
+            evidence_level = $EvidenceLevel
+            real_tested = $RealTested
             status = "failed"
             exit_code = "timeout"
             duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
             command = "$Command $(Join-NativeArguments $Arguments)"
             working_directory = $WorkingDirectory
+            claim = $Claim
             evidence = Shorten-Text "Timed out after $CommandTimeoutSec seconds.`n$stdout`n$stderr"
         }
         Write-Host "FAIL  $Name - timeout" -ForegroundColor Red
@@ -238,11 +250,14 @@ function Invoke-MatrixCommand {
     $script:Rows += [pscustomobject][ordered]@{
         name = $Name
         area = $Area
+        evidence_level = $EvidenceLevel
+        real_tested = $RealTested
         status = $status
         exit_code = $exitCode
         duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
         command = "$Command $(Join-NativeArguments $Arguments)"
         working_directory = $WorkingDirectory
+        claim = $Claim
         evidence = Shorten-Text $evidenceText
     }
 
@@ -274,17 +289,20 @@ $CorepackPath = Get-CommandPath $corepack
 $EdgeClientSmokeAddr = "127.0.0.1:$(Get-FreePort)"
 
 if ($null -eq $corepack) {
-    Invoke-MatrixCommand -Name "web-real-mode-playwright" -Area "web" -Command "corepack" -Arguments @() -WorkingDirectory $RepoRoot -Skipped -SkipReason "corepack is unavailable"
-    Invoke-MatrixCommand -Name "desktop-renderer-playwright" -Area "desktop" -Command "corepack" -Arguments @() -WorkingDirectory $RepoRoot -Skipped -SkipReason "corepack is unavailable"
+    Invoke-MatrixCommand -Name "web-stubbed-hub-playwright" -Area "web" -Command "corepack" -Arguments @() -WorkingDirectory $RepoRoot -Skipped -SkipReason "corepack is unavailable" -EvidenceLevel "stubbed-hub" -RealTested $false -Claim "Web Hub-shaped replay boundary; not real login or model execution"
+    Invoke-MatrixCommand -Name "desktop-renderer-playwright" -Area "desktop" -Command "corepack" -Arguments @() -WorkingDirectory $RepoRoot -Skipped -SkipReason "corepack is unavailable" -EvidenceLevel "playwright-ui" -RealTested $false -Claim "Desktop Vite renderer smoke; not packaged Tauri"
 } else {
     Invoke-MatrixCommand `
-        -Name "web-real-mode-playwright" `
+        -Name "web-stubbed-hub-playwright" `
         -Area "web" `
         -Command $CorepackPath `
-        -Arguments @("pnpm", "--dir", (Join-Path $RepoRoot "app\web"), "run", "test:e2e:real-mode") `
+        -Arguments @("pnpm", "--dir", (Join-Path $RepoRoot "app\web"), "run", "test:e2e:stubbed-hub") `
         -WorkingDirectory (Join-Path $RepoRoot "app\web") `
         -Skipped:$SkipWebE2E `
-        -SkipReason "skipped by -SkipWebE2E"
+        -SkipReason "skipped by -SkipWebE2E" `
+        -EvidenceLevel "stubbed-hub" `
+        -RealTested $false `
+        -Claim "Web Hub-shaped replay boundary; not real login or model execution"
 
     Invoke-MatrixCommand `
         -Name "desktop-renderer-playwright" `
@@ -293,7 +311,10 @@ if ($null -eq $corepack) {
         -Arguments @("pnpm", "--dir", (Join-Path $RepoRoot "app\desktop"), "run", "test:e2e:smoke") `
         -WorkingDirectory (Join-Path $RepoRoot "app\desktop") `
         -Skipped:$SkipDesktopE2E `
-        -SkipReason "skipped by -SkipDesktopE2E"
+        -SkipReason "skipped by -SkipDesktopE2E" `
+        -EvidenceLevel "playwright-ui" `
+        -RealTested $false `
+        -Claim "Desktop Vite renderer smoke; not packaged Tauri"
 }
 
 Invoke-MatrixCommand `
@@ -303,7 +324,10 @@ Invoke-MatrixCommand `
     -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify-localhost-real-stack-smoke.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactRoot", (Join-Path $RepoRoot ".tmp\localhost-real-stack-smoke\e2e-matrix-$PID"), "-ProbeHub") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipLocalStack `
-    -SkipReason "skipped by -SkipLocalStack"
+    -SkipReason "skipped by -SkipLocalStack" `
+    -EvidenceLevel "observed-local" `
+    -RealTested $false `
+    -Claim "Local service health/readiness; not cloud production or real login"
 
 Invoke-MatrixCommand `
     -Name "edge-client-smoke" `
@@ -312,7 +336,10 @@ Invoke-MatrixCommand `
     -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\client-smoke.ps1"), "-EdgeAddr", $EdgeClientSmokeAddr, "-EdgeAuthToken", "local-smoke-token", "-SkipGoTests", "-SkipCancel") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipEdgeClientSmoke `
-    -SkipReason "skipped by -SkipEdgeClientSmoke"
+    -SkipReason "skipped by -SkipEdgeClientSmoke" `
+    -EvidenceLevel "observed-local" `
+    -RealTested $false `
+    -Claim "Local Edge API and event path smoke; not real model/API spend"
 
 Invoke-MatrixCommand `
     -Name "login-real-readiness-gate" `
@@ -323,7 +350,10 @@ Invoke-MatrixCommand `
     -BlockedExitCodes @(2) `
     -BlockedReason "BLOCKED_WITH_EVIDENCE: real login/remote dispatch needs explicit approved test account, callback, Hub URL, artifact boundary, and operator approval metadata." `
     -Skipped:$SkipLoginReadiness `
-    -SkipReason "skipped by -SkipLoginReadiness"
+    -SkipReason "skipped by -SkipLoginReadiness" `
+    -EvidenceLevel "approved-real-readiness" `
+    -RealTested $false `
+    -Claim "Readiness gate only unless approved-real login metadata is present"
 
 Invoke-MatrixCommand `
     -Name "desktop-tauri-dry-smoke" `
@@ -332,7 +362,10 @@ Invoke-MatrixCommand `
     -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify-tauri-package-dry.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactsRoot", (Join-Path $ArtifactRoot "tauri-dry"), "-SkipInstall", "-SkipExecutableCompile") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipTauriDry `
-    -SkipReason "skipped by -SkipTauriDry"
+    -SkipReason "skipped by -SkipTauriDry" `
+    -EvidenceLevel "packaged-release-dry" `
+    -RealTested $false `
+    -Claim "Tauri packaging policy/dry gate; not installer/signing/release upload"
 
 $failed = @($Rows | Where-Object { $_.status -eq "failed" })
 $blocked = @($Rows | Where-Object { $_.status -eq "blocked_with_evidence" })
@@ -354,9 +387,19 @@ $overall = if ($failed.Count -gt 0) {
     "passed"
 }
 
+$plannedEvidenceLevels = @($Rows | ForEach-Object { $_.evidence_level } | Sort-Object -Unique)
+$executedRows = @($Rows | Where-Object { $_.status -ne "skipped" })
+$executedEvidenceLevels = @($executedRows | ForEach-Object { $_.evidence_level } | Sort-Object -Unique)
+$skippedEvidenceLevels = @($Rows | Where-Object { $_.status -eq "skipped" } | ForEach-Object { $_.evidence_level } | Sort-Object -Unique)
+$realTested = @($executedRows | Where-Object { $_.real_tested -eq $true }).Count -gt 0
+
 $manifest = [ordered]@{
     schema = "agenthub-e2e-smoke-matrix-v1"
     status = $overall
+    real_tested = $realTested
+    evidence_levels = $executedEvidenceLevels
+    planned_evidence_levels = $plannedEvidenceLevels
+    skipped_evidence_levels = $skippedEvidenceLevels
     generated_at = (Get-Date).ToString("o")
     started_at = $StartedAt.ToString("o")
     repo_root = $RepoRoot

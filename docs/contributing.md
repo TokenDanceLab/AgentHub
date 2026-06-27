@@ -198,7 +198,6 @@ docs/api-conventions
 ```
 AgentHub/
   AGENTS.md           # 开发规范和流程约束（Agent 和开发者必读）
-  STATE.md            # 当前项目状态快照
   README.md           # 对外展示页
   docs/               # 产品文档、架构、路线图、治理
   api/                # REST API 契约（OpenAPI）和 WebSocket 事件定义
@@ -519,10 +518,10 @@ go test ./... -short -count=1
 
 覆盖率要求：
 
-| 模块 | 最低覆盖率 |
+| 模块 | CI 覆盖率门槛 |
 |------|-----------|
-| edge-server | 75% |
-| hub-server | 40% |
+| edge-server | security 70%、lifecycle 60%、adapters 55% 分包阈值；总覆盖率只输出 notice |
+| hub-server | 40% 总覆盖率 |
 
 **后端 E2E fixture 状态**：
 
@@ -736,8 +735,8 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 
 | 文档 | 更新时机 | 内容定位 |
 |------|---------|---------|
-| `STATE.md` | 每次重要里程碑或基线变更 | 当前事实快照：分支状态、已合入能力、release gate、不声明完成项 |
-| `docs/roadmap.md` | 调整目标或优先级时 | 持续开发目标、当前进展、验证和下一步 |
+| `docs/progress/MASTER.md` | spec-driven 专项执行中 | 当前专项进度、PR/Issue、阻塞和验收证据 |
+| `docs/roadmap.md` | 调整目标或优先级时 | 总进度、长期路线、模块级下一步 |
 | `docs/architecture/` | 架构决策变更时 | 架构边界、分层、通信方式、数据流模式、验收门禁 |
 | `AGENTS.md` | 开发流程或规范变更时 | 开发规范、分工、Git 规则、安全规则 |
 | `README.md` | 新增面向外部的能力说明时 | 对外展示页，给新读者快速了解项目 |
@@ -752,7 +751,7 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture/`、`docs/roadmap.md` 中对应章节。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
 4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase 1-7），不使用旧命名（Phase A/B/C/D、M1/M3a/P0-1/Phase 0/Phase 1）。
-5. **时间戳快照删除**：文件名含日期的快照文档完成任务后直接删除，不留在活跃目录。
+5. **时间戳快照归档或删除**：spec-driven 验收证据归档到 `docs/archives/`；普通临时快照完成后直接删除，不留在活跃目录。
 6. **不新增根级文档**：新增长期说明先考虑合并进主文档（`docs/architecture/`、`docs/roadmap.md`），不要随手新增根级文档。
 7. **详细调研放 `docs/reference/`**：第三方调研和源码分析放 `docs/reference/`，不混入主文档。
 
