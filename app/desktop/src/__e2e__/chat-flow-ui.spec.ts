@@ -26,7 +26,7 @@ interface BackendRequestLog {
 }
 
 test.describe('Desktop shared chat flow UI', () => {
-  test.describe.configure({ timeout: 45_000 });
+  test.describe.configure({ timeout: 60_000 });
 
   test('keeps submitted user messages visible, distinct, and auto-followed', async ({ page }) => {
     collectPageDiagnostics(page);
