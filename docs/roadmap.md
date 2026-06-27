@@ -23,7 +23,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | Phase | 状态 | 说明 |
 |---|---|---|
-| Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，`CLAUDE.md` 删除，旧 skill 归档 |
+| Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，根级重复规则文件已移除，旧 skill 归档 |
 | Phase 2 Real E2E Contract | 进行中 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
 | Phase 3 Source And Test Alignment | 待开始 | 聊天流、前后端合同、性能/泄漏、Desktop packaged 边界 |
 | Phase 4 Acceptance And Merge Readiness | 待开始 | 聚合验收、架构审批、归档和合并准备 |
@@ -36,6 +36,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | 文档治理 | active docs 只保留规则、当前 spec、总路线、架构和契约入口；历史 longform/审计/发布材料归档 | `scripts/verify-doc-ssot.ps1` |
 | 真实 E2E 合同 | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 | `scripts/verify-real-e2e-contract.ps1` |
+| 远控拓扑前置合同 | P0 remote-control fixture 验证 `Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter` 的离线拓扑形状，不声明真实登录或真实执行 | `scripts/verify-p0-remote-control-fixture.ps1` |
 | Chat flow 可靠性 | 发送不消失、消息线性排序、自动滚动、卡片合并、markdown/table 渲染 | Desktop/Web Playwright + Visual QA |
 | Hub/Edge 安全边界 | TokenDance ID 只做身份，AgentHub 权限由 Hub 本地资源检查决定 | 后端 auth/permission tests + security risk register |
 
