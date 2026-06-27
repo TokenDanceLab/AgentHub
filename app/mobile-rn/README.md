@@ -2,7 +2,7 @@
 
 Expo + React Native is the active Mobile implementation. Mobile is currently a boundary and QA framework lane, not an Android/iOS release candidate.
 
-Historical longform notes are archived in [docs/archive/app/mobile-rn-readme-full-2026-06-27.md](../../docs/archive/app/mobile-rn-readme-full-2026-06-27.md) and [docs/archive/app/mobile-rn-handoff-2026-06-27.md](../../docs/archive/app/mobile-rn-handoff-2026-06-27.md). Do not use archived handoff text as current branch, device, or release proof.
+Historical longform notes are indexed in [docs/history.md](../../docs/history.md). Do not use archived handoff text as current branch, device, or release proof.
 
 ## Scope
 

@@ -4,7 +4,7 @@
 
 `reference/` stores local third-party source checkouts for research only. The cloned source trees are not part of the AgentHub product source, are usually untracked, and must not become active architecture truth.
 
-Current written research entry: [../docs/reference/README.md](../docs/reference/README.md). Historical third-party reports live under [../docs/archive/reference-projects/](../docs/archive/reference-projects/) and related archive folders.
+Current written research entry: [../docs/reference/README.md](../docs/reference/README.md). Historical third-party reports live in the external archive indexed by [../docs/history.md](../docs/history.md).
 
 ## Tier 0 References
 
@@ -47,4 +47,4 @@ Current written research entry: [../docs/reference/README.md](../docs/reference/
 .\scripts\sync-reference.ps1 -Tier all
 ```
 
-If a reference finding affects current implementation, write the conclusion into the owning active doc (`docs/architecture.md`, `api/`, or `AGENTS.md`) and archive long research notes under `docs/archive/`; do not expand this index into a research report.
+If a reference finding affects current implementation, write the conclusion into the owning active doc (`docs/architecture.md`, `api/`, or `AGENTS.md`) and archive long research notes through `docs/history.md`; do not expand this index into a research report.

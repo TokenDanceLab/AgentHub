@@ -2,7 +2,7 @@
 
 最后更新：2026-06-28
 
-本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明已归档到 [archive/architecture/architecture-overview-2026-06-27.md](archive/architecture/architecture-overview-2026-06-27.md)。
+本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
 ## 产品定位
 

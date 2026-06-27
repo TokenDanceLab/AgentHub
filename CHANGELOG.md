@@ -1,6 +1,6 @@
 # Changelog
 
-所有值得发布的用户可见变化、兼容性变化和 release gate 结论记录在这里。2026-06-27 前的完整历史 changelog 已归档到 [docs/archive/release/CHANGELOG-full-2026-06-27.md](docs/archive/release/CHANGELOG-full-2026-06-27.md)。
+所有值得发布的用户可见变化、兼容性变化和 release gate 结论记录在这里。2026-06-27 前的完整历史 changelog 见 [docs/history.md](docs/history.md)。
 
 ## [Unreleased]
 
@@ -19,6 +19,6 @@
 
 | 版本范围 | 位置 |
 |---|---|
-| v0.1.0 - v0.5.2 longform | [docs/archive/release/CHANGELOG-full-2026-06-27.md](docs/archive/release/CHANGELOG-full-2026-06-27.md) |
-| 2026-06-17 release materials | [docs/archive/release/2026-06-17/](docs/archive/release/2026-06-17/) |
-| 已完成 spec-driven 专项 | [docs/archives/README.md](docs/archives/README.md) |
+| v0.1.0 - v0.5.2 longform | [docs/history.md](docs/history.md) |
+| 2026-06-17 release materials | [docs/history.md](docs/history.md) |
+| 已完成 spec-driven 专项 | [docs/history.md](docs/history.md) |
