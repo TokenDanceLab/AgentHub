@@ -78,8 +78,8 @@ git worktree list
 
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
-**Current Focus**: review/merge Phase 1 governance baseline while landing safe Phase 2 contract hardening in the same PR: `AGENTS.md` is now the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, and Desktop/Web real E2E evidence boundaries are encoded in the smoke matrix manifest. Mobile-specific UI/fixture fixes are deferred for a later pass by operator direction.
-**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and all non-Mobile GitHub checks are green. Mobile now fails fast in Visual QA on the existing `Alice` visibility assertion instead of hanging indefinitely.
+**Current Focus**: review/merge Phase 1 governance baseline while keeping Phase 2 evidence boundaries honest in the same PR: `AGENTS.md` is now the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, Desktop/Web real E2E evidence boundaries are encoded in the smoke matrix manifest, and the required Mobile gate has a narrow mock-Hub contract fix without Mobile redesign.
+**Blockers**: PR #338 was blocked only by the `Frontend (mobile)` required check. Local evidence now covers the prior failure path: Mobile Visual QA passes after aligning the screenshot fixture display name with the existing `Delicious233` UI contract and after adding `/client/*` REST/CORS/WebSocket support to the Mobile mock Hub. Remote PR checks must be re-run after push before merge.
 
 ### Local Phase 1 Evidence
 
@@ -114,10 +114,10 @@ git worktree list
 
 ## Next Steps
 
-1. Do not merge PR #338 until `Frontend (mobile)` is fixed in a scoped Mobile pass or the workflow owner explicitly changes the Mobile gate policy.
-2. Keep Mobile-specific UI/fixture fixes out of this branch unless the operator re-scopes the work; only workflow-level timeout/diagnostic hardening is in scope here.
+1. Push the scoped Mobile Visual QA/mock-Hub contract fix and wait for PR #338 `Frontend (mobile)` to turn green.
+2. Do not merge PR #338 until required GitHub checks are green; do not weaken Mobile assertions or ignore browser console errors.
 3. After PR #338 merges, confirm issues #322-#325 close, update this tracker from GitHub state, and start Phase 2 from the evidence-level contract tasks.
-4. If PR #338 cannot merge because Mobile remains stuck, record that as a workflow gating issue under T3.5/T4.3 instead of silently weakening Mobile assertions.
+4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this branch unless the operator opens a separate spec.
 
 ## Session Log
 
@@ -132,3 +132,4 @@ git worktree list
 | 2026-06-27 | e2e-evidence-contract | Added Phase 2 contract hardening without touching Mobile UI fixtures. `scripts/verify-e2e-smoke-matrix.ps1` now runs Web `test:e2e:stubbed-hub` instead of a misleading/nonexistent real-mode command and emits row-level `evidence_level`, `real_tested`, and `claim`; top-level `evidence_levels` only includes non-skipped rows. `workflow-standard.md`, `04-frontend-data-flow.md`, `roadmap.md`, and `real-e2e-acceptance` now share the same evidence vocabulary and data-mode axis boundary. Verification: smoke matrix skip-only manifest produced empty executed evidence levels, Web stubbed-Hub matrix passed with `evidence_levels=["stubbed-hub"]` and `real_tested=false`, `verify-project-skills.ps1` passed, `verify-ci-gates.ps1` passed. |
 | 2026-06-27 | doc-ssot-cleanup | Reorganized active rule ownership: `AGENTS.md` is the project rule SSOT, `docs/progress/MASTER.md` is current spec progress, `docs/roadmap.md` is total progress, and `CLAUDE.md` was deleted to avoid duplicate platform-specific rules. Active project skills are being shortened to current CI/runtime entrypoints and stale fixed test counts are removed. |
 | 2026-06-27 | doc-ssot-archive | Archived dated governance evidence into `docs/archives/governance-evidence/`, archived the old Desktop UI QA SOP under `docs/archive/`, added `scripts/verify-doc-ssot.ps1`, wired it into CI validate and CI-policy verifiers, and fixed runtime-readiness checks to use the current approved-real boundary instead of a missing STATE handoff file. |
+| 2026-06-27 | mobile-visual-contract | Scoped Mobile required-gate fix only. Confirmed the current visible home/account identity is `Delicious233` per existing source/tests, then updated Mobile Visual QA assertions from the stale `Alice` expectation. Added mock-Hub contract checks for `/client/sessions`, `/client/contacts`, CORS preflight, and `/client/ws`; implemented those routes without suppressing browser console errors. Evidence level: Expo Web Visual QA + mock-Hub fixture contract, not native package or real Hub login. Verification: `mock:hub:check` failed first on `/client/sessions` preflight, then passed; `visual:qa` passed; `verify` passed with 25 files / 330 tests; CI-style mock-Hub Vitest passed with 25 files / 330 tests. |
