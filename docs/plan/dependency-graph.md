@@ -23,11 +23,16 @@ graph TD
     end
 
     subgraph P3["Phase 3: Source And Test Alignment"]
+        T30["T3.0 API/Hub doc owner trim"]
+        T30B["T3.0b Module README trim"]
+        T30C["T3.0c Progress/doc SSOT sync"]
         T31["T3.1 Chat transcript behavior tests"]
         T32["T3.2 Frontend architecture docs"]
         T33["T3.3 Backend/API perf and leak gates"]
         T34["T3.4 Desktop packaged evidence"]
         T35["T3.5 Web/Mobile/client test lanes"]
+        T30 --> T30B
+        T30B --> T30C
         T22 --> T31
         T24 --> T31
         T31 --> T32
@@ -40,6 +45,7 @@ graph TD
         T41["T4.1 Focused acceptance gate bundle"]
         T42["T4.2 Cross-review and architecture approval"]
         T43["T4.3 Merge-readiness and archive preparation"]
+        T30C --> T41
         T31 --> T41
         T33 --> T41
         T34 --> T41
