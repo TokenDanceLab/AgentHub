@@ -483,7 +483,7 @@ Web / Desktop / Mobile / IM
 | **Agent 合并策略** | Edge profiles > Hub profiles > raw adapter list | Desktop 优先级合并 |
 | **Desktop Settings 三层** | Edge -> Hub -> localStorage 回退 | Desktop platform adapter |
 | **CLI Adapters** | Claude Code/Codex/OpenCode JSON readiness + approved-real 证据门禁 | `claude_code.go`/`codex.go`/`opencode.go` |
-| **CLI 真实执行** | 需要 approved-real manifest 和 `real_tested=true` 证据；历史 STATE 记录不能替代当前 gate | `scripts/verify-approved-real-edge-cli-evidence.ps1` |
+| **CLI 真实执行** | 需要 approved-real manifest 和 `real_tested=true` 证据；历史状态记录不能替代当前 gate | `scripts/verify-approved-real-edge-cli-evidence.ps1` |
 | **SDK HTTP Adapters** | `AnthropicSDKAdapter` + `OpenAISDKAdapter`（纯 net/http SSE streaming） | `anthropic_sdk.go`/`openai_sdk.go` |
 | **Codex Preflight** | `PreflightAdapter` 接口，缺 `OPENAI_API_KEY` 快速失败 | `codex.go` |
 | **OpenCode 修复** | `--session` 只在 resume 时传递 | `opencode.go` |
@@ -496,7 +496,7 @@ Web / Desktop / Mobile / IM
 | **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
 | **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
 | **OIDC Full PKCE Flow** | Hub authorize -> TokenDanceID -> callback -> JWT -> me -> sessions -> WS auth.ok | 真实验证 |
-| **生产部署** | 生产 Docker Compose（hub/postgres/redis）运行中 | `../server/projects/agenthub/STATE.md` |
+| **生产部署** | 生产 Docker Compose（hub/postgres/redis）运行中 | server workspace AgentHub 运维状态文档 |
 | **Hub 限流** | 全局 IP 限流 100/min + 认证滑动窗口 + Body 10MB 限制 | `middleware/rate_limit.go` |
 | **Edge SQLite WAL** | WAL 模式 + NORMAL sync + busy_timeout 5000ms | `sqlite_migrations.go` |
 | **CSP 安全头** | Nginx 层 `Content-Security-Policy` + `X-Content-Type-Options` + `Referrer-Policy` + `Strict-Transport-Security`（SUPER Phase 1） | Nginx 配置 |
@@ -532,7 +532,7 @@ Web / Desktop / Mobile / IM
 - ✅ Web OIDC redirect callback 代码已存在
 - ✅ Hub JWT session 签发已实现
 - ✅ Token storage 已实现（Web + Desktop）
-- ✅ 完整 PKCE 流程已验证（STATE.md 记录）
+- ✅ 完整 PKCE 流程有历史验证记录；当前发布或登录结论需按 real-e2e gate 复验
 - ⏳ 生产环境 TokenDance ID issuer 配置待最终验证
 
 ### 3.2 API 端点
@@ -917,7 +917,7 @@ Web / Desktop / Mobile / IM
 - ✅ Hub REST Agent Task 全链路已实现
 - ✅ Edge REST Run lifecycle 已实现
 - ✅ 6 个 Adapters 已实现（Claude Code/Codex/OpenCode/Anthropic SDK/OpenAI SDK/Fixture）
-- ✅ Claude Code + OpenCode 真实执行已验证
+- ✅ CLI adapter 实现已覆盖 Claude Code/OpenCode；当前真实执行结论需 approved-real 证据复验
 - ✅ Codex PreflightAdapter 快速失败已实现
 - ✅ SDK HTTP SSE adapters 已实现
 - ✅ `verify-real-api-smoke.ps1` ALL 13 phases PASSED (0 failures)
@@ -952,7 +952,7 @@ Web / Desktop / Mobile / IM
 - [x] 5. 验证 Run 状态变化
 - [x] 6. 验证 Approval 工作流
 - [x] 7. 验证 Artifact/Diff 展示
-- [x] 8. 验证 CLI/SDK 真实执行（Claude Code + OpenCode）
+- [ ] 8. 当前 approved-real CLI/SDK 真实执行复验（Claude Code + OpenCode）
 - [ ] 9. 验证 Codex CLI 真实执行（需 `OPENAI_API_KEY`）
 - [ ] 10. 实现 Artifact/Diff apply/revert 写文件（需审批）
 
@@ -966,8 +966,8 @@ Web / Desktop / Mobile / IM
 - [x] Artifact 列表和 Diff 渲染 | 验证人：E2E smoke phase 13
 - [x] Target 列表 online/offline | 验证人：E2E smoke phase 10
 - [x] Target ping 可达性 | 验证人：E2E smoke phase 10
-- [x] Claude Code 真实执行 | 验证人：E2E smoke phase 13
-- [x] OpenCode 真实执行 | 验证人：E2E smoke phase 13
+- [ ] Claude Code approved-real 真实执行复验 | 验证人：real-e2e acceptance gate
+- [ ] OpenCode approved-real 真实执行复验 | 验证人：real-e2e acceptance gate
 - [x] Codex 预检快速失败 | 验证人：E2E smoke phase 3
 - [x] Anthropic SDK HTTP SSE | 验证人：E2E smoke phase 3
 - [x] OpenAI SDK HTTP SSE | 验证人：E2E smoke phase 3
@@ -1031,9 +1031,9 @@ Web / Desktop / Mobile / IM
 
 | CLI | 命令格式 | Edge adapter | hubClient 方法 | 真实执行状态 |
 |-----|----------|-------------|---------------|------------|
-| Claude Code | `claude --output-format stream-json` | `claude_code.go` | `triggerAgentTask` | ✅ 已验证 |
+| Claude Code | `claude --output-format stream-json` | `claude_code.go` | `triggerAgentTask` | 需 approved-real 复验 |
 | Codex | `codex exec --json` | `codex.go` | `triggerAgentTask` | ⏳ 缺 API key |
-| OpenCode | `opencode run --format json` | `opencode.go` | `triggerAgentTask` | ✅ 已验证 |
+| OpenCode | `opencode run --format json` | `opencode.go` | `triggerAgentTask` | 需 approved-real 复验 |
 
 ### 12.2 SDK 接入
 
@@ -1069,8 +1069,8 @@ CLI permission request
 
 ### 12.5 验收标准
 
-- [x] Claude Code 真实执行产出 typed events | 验证人：E2E smoke phase 13
-- [x] OpenCode 真实执行产出 typed events | 验证人：E2E smoke phase 13
+- [ ] Claude Code approved-real 真实执行产出 typed events | 验证人：real-e2e acceptance gate
+- [ ] OpenCode approved-real 真实执行产出 typed events | 验证人：real-e2e acceptance gate
 - [x] Codex 缺 API key 快速失败 | 验证人：E2E smoke phase 3
 - [x] Anthropic SDK HTTP SSE 流式调用 | 验证人：E2E smoke phase 3
 - [x] OpenAI SDK HTTP SSE 流式调用 | 验证人：E2E smoke phase 3
@@ -1180,7 +1180,7 @@ CLI permission request
 - [ ] 所有 High 风险有 accepted 或 fixed | 验证人：安全风险登记册
 - [x] Windows package hash 一致 | 验证人：`verify-tauri-package-dry.ps1`
 - [x] sidecar 正确放置 | 验证人：`verify-tauri-package-dry.ps1`
-- [x] Mobile tests pass | 验证人：`corepack pnpm --dir app/mobile-rn verify`
+- [ ] Mobile required check 当前阻塞；具体 UI/fixture 修复另行 scoped pass | 验证人：`corepack pnpm --dir app/mobile-rn verify`
 - [x] Hub + Edge + Web + Desktop smoke 通过 | 验证人：`verify-real-api-smoke.ps1`
 
 ---
@@ -1193,7 +1193,7 @@ CLI permission request
 - ✅ Docker 网络已创建
 - ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
-- ✅ 部署流程已文档化（项目 `STATE.md`）
+- ✅ 部署流程已在 server workspace 运维文档记录
 - ✅ Docker healthcheck 已配置（PG 5s / Redis 5s / Hub 15s）
 - ✅ 回滚策略已文档化（roadmap 15.7）
 - ✅ Prometheus metrics 端点已实现（middleware/metrics.go + admin port 6060）
@@ -1389,7 +1389,7 @@ server {
 | `hub-server/internal/config/constants.go` | 运行时常量 | 超时/限制/TTL |
 | `deployments/docker-compose.prod.yml` | 部署 | Docker Compose 编排 |
 | Nginx 配置（生产） | 运维 | SSL + 反代 + 静态站 |
-| 项目 `STATE.md` | 运维 | 部署状态文档 |
+| server workspace AgentHub 运维状态文档 | 运维 | 部署状态文档 |
 
 ### 15.9 实施步骤
 
@@ -1840,7 +1840,7 @@ server {
 5. **Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离**。
 6. **Mock 和 fixture 模式必须显式**；real mode 不能静默降级。
 7. **真实登录**、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. **Roadmap 只写路线**；当前事实写在 `STATE.md`。
+8. **Roadmap 只写总进度和长期路线**；当前 spec 进度写 `docs/progress/MASTER.md`，生产运行事实写 server workspace 运维文档。
 9. **UI 改动必须有任务和验收**：允许修复真实 UIUX/数据流问题，但禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 10. **所有 Hub API 必须经过 `AuthMiddleware` + `RequireHubSession`**。
 11. **Desktop 文件操作必须经过 allowlist 和 typed Host API**。
@@ -1877,7 +1877,7 @@ Phase 3 (P1 Extended): 扩展数据流 ✅ 完成（SUPER Phase 4 前端质量�
   └─ 13.3 i18n -> en locale 补齐
 
 Phase 4 (P2): 运行时集成 ✅ 完成（部分阻塞项除外）
-  ├─ 12. CLI -> Claude Code/OpenCode 真实调用 ✅
+  ├─ 12. CLI -> Claude Code/OpenCode adapter 已实现，approved-real 当前复验待补
   ├─ 12. CLI -> Codex 真实调用 ⏳（缺 API key）
   ├─ 12. SDK -> Anthropic/OpenAI API 消耗 ⏳（缺 API key）
   └─ 13.1 Mobile -> Hub API + OIDC deep-link ✅（APK 构建 ⏳ 缺环境）
@@ -2140,8 +2140,8 @@ SUPER Phase 3 (架构重构): ✅ 完成 (5/5)
 
 ### B.9 CLI/SDK（6 项）
 
-- [x] Claude Code 真实执行
-- [x] OpenCode 真实执行
+- [ ] Claude Code approved-real 真实执行复验
+- [ ] OpenCode approved-real 真实执行复验
 - [x] Codex 预检快速失败
 - [x] Anthropic SDK adapter
 - [x] OpenAI SDK adapter

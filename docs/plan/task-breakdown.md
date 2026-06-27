@@ -14,7 +14,7 @@
 ## S.U.P.E.R Design Constraints
 
 - **S (Single Purpose)**: every doc, skill, script, and test must have one owner and one purpose. Do not add another parallel truth source when an existing canonical file can be corrected.
-- **U (Unidirectional Flow)**: instructions point from `AGENTS.md`/`CLAUDE.md` to skills and docs; skills do not override AGENTS; roadmap/architecture consume evidence, not vice versa.
+- **U (Unidirectional Flow)**: instructions point from `AGENTS.md` to skills and docs; skills do not override AGENTS; roadmap/architecture consume evidence, not vice versa.
 - **P (Ports over Implementation)**: real E2E claims must map to evidence levels and structured manifests, not informal prose.
 - **E (Environment-Agnostic)**: Vite renderer, packaged Tauri, local Edge, stubbed Hub, observed local, and approved-real paths must be labeled separately.
 - **R (Replaceable Parts)**: scripts and docs should be replaceable without changing source behavior; tests protect behavior or policy contracts, not implementation strings.
@@ -25,7 +25,7 @@
 - Visual QA must include desktop-like 16:9 viewports for Desktop/Web claims and mobile viewports only when responsive behavior is claimed.
 - Stubbed or fixture evidence must say `real_tested=false` and must not be described as real login, real model/API, packaged Desktop, or production deploy.
 - Performance/leak acceptance requires targeted benchmark/load/pprof/leak evidence plus a behavior gate for the same path.
-- Durable agent behavior changes update `AGENTS.md`, `CLAUDE.md`, or active project skills. Do not create repo-local memory files unless explicitly selected.
+- Durable agent behavior changes update `AGENTS.md`, active project skills, or the active `docs/progress/MASTER.md` when they affect the current SPEC. Do not create repo-local memory files unless explicitly selected.
 
 ## Phase 1: Governance Baseline
 
@@ -36,7 +36,7 @@
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
 |:--|:--|:--|:--|:--|:--|:--|:--|:--|:--|
 | T1.1 | Normalize branch/worktree governance | P0 | M | - | A | S, U, R | Docs-only; run stale branch search and `git status --short --branch; git worktree list` | Update instruction surfaces if branch rules change | `AGENTS.md` and `docs/governance/branch-governance.md` no longer contain active-looking `dev/delicious223`, deleted worktrees, or old feature branches; live-state rule is canonical. |
-| T1.2 | Normalize document standards and active/archive rules | P0 | M | - | B | S, U, R | Docs-only; run stale doc-structure search and `git diff --check` | Update `AGENTS.md`/`CLAUDE.md` if workflow rule changes | `docs/governance/document-standards.md`, `docs/README.md`, and `AGENTS.md` agree: active spec work uses `docs/progress/MASTER.md`; completed spec artifacts go to `docs/archives/`; stale long-lived docs are replaced or deleted, not duplicated. |
+| T1.2 | Normalize document standards and active/archive rules | P0 | M | - | B | S, U, R | Docs-only; run stale doc-structure search and `git diff --check` | Update `AGENTS.md` if workflow rule changes | `docs/governance/document-standards.md`, `docs/README.md`, and `AGENTS.md` agree: active spec work uses `docs/progress/MASTER.md`; completed spec artifacts go to `docs/archives/`; stale long-lived docs are replaced or deleted, not duplicated. |
 | T1.3 | Add useful project-skill whitelist verification | P1 | M | T1.1, T1.2 | C | P, R | Add/adjust a focused verifier or documented command; avoid testing archived skill internals | Update instruction surfaces if verifier becomes required | Active `.agents/skills` exactly matches the AGENTS whitelist; archived `ui-screenshot`, `dev-team`, `dev-team-codex` are not loadable active skills; verifier fails on drift without scanning private state. |
 | T1.4 | Clean generated artifact hygiene | P1 | S | - | D | S, E | Run generated-artifact search and `git diff --check` | None unless recurring rule changes | Tracked generated bundle artifact noise such as `app/desktop/stats.html` is removed or justified; ignore/documentation rules prevent reintroducing dist, coverage, node_modules, bundle stats, logs, sqlite/db artifacts. |
 
@@ -45,7 +45,7 @@
 | Lane | Tasks | Combined Effort | Merge Risk | Key Files |
 |:--|:--|:--|:--|:--|
 | A | T1.1 | M | Medium | `AGENTS.md`, `docs/governance/branch-governance.md` |
-| B | T1.2 | M | Medium | `docs/governance/document-standards.md`, `docs/README.md`, `AGENTS.md`, `CLAUDE.md` |
+| B | T1.2 | M | Medium | `docs/governance/document-standards.md`, `docs/README.md`, `AGENTS.md` |
 | C | T1.3 | M | Medium | `.agents/skills/`, `scripts/`, `AGENTS.md` |
 | D | T1.4 | S | Low | `.gitignore`, generated artifacts, docs governance |
 
