@@ -14,13 +14,13 @@ This SPEC cleans repository structure, active documentation, archive ownership, 
 | Scripts | Root `scripts/` has many direct CI, docs, package, Desktop, and test references; `scripts/evidence/` and `scripts/git-hooks/` already exist. |
 | Tests | Root `tests/` currently has `fixtures/` and `scripts/`; release-readiness triggers on `tests/scripts/**`. |
 | Root artifacts | `css-audit-results.json` is tracked at repo root and appears to be one-off CSS audit evidence. |
-| External archive target | `D:\Code\TokenDance\docs` is an independent Git repo and currently dirty. Use an isolated receiver branch/worktree before adding AgentHub archive files. |
+| External archive target | `D:\Code\TokenDance\docs` is an independent Git repo and currently dirty. Receiver worktree: `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive` on `docs/agenthub-archive-receiver`. |
 | GitHub mode | `GITHUB_STANDARD`; `gh project` lacks `read:project` scope, so no project board. |
 
 ## Implementation Boundaries
 
 - Baseline branch: `dev/delicious233`.
-- Worktrees: project-local `.worktrees/` for AgentHub; external docs must use an isolated docs repo branch/worktree or an explicitly staged-only commit.
+- Worktrees: project-local `.worktrees/` for AgentHub; external docs archive work uses `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive`.
 - No bulk delete before reference graph and verifier updates.
 - Mobile deep UI/native work is out of scope.
 - `real_tested=false` remains required for stubbed/fixture/readiness-only evidence.
