@@ -69,7 +69,7 @@ git worktree list
 
 ## Phase Checklist
 
-- [ ] Phase 1: Governance Baseline (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
+- [ ] Phase 1: Governance Baseline (4/4 tasks implemented locally; merge pending) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [ ] Phase 2: Real E2E Contract (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
@@ -79,7 +79,7 @@ git worktree list
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
 **Current Focus**: review/merge Phase 1 governance baseline; Desktop/Web real E2E and visual QA framework now has focused 16:9 chat-flow evidence. Mobile-specific Visual QA is deferred for a later pass by operator direction.
-**Blockers**: PR #338 still needs final GitHub check review before merge; current local Desktop/Web focused gates are green.
+**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check still running on GitHub. Current local Desktop/Web focused gates and all non-Mobile GitHub checks are green.
 
 ### Local Phase 1 Evidence
 
@@ -113,10 +113,10 @@ git worktree list
 
 ## Next Steps
 
-1. Complete T1.1: normalize branch/worktree governance and remove stale active branch/worktree wording.
-2. Complete T1.2: normalize active/archive document rules and remove conflicting old wording.
-3. Complete T1.3: add focused project-skill whitelist verification for active `.agents/skills/`.
-4. Complete T1.4: remove or justify generated artifact noise.
+1. Do not merge PR #338 until GitHub reports a terminal result for `Frontend (mobile)` or the workflow owner explicitly changes the Mobile gate policy.
+2. Keep Mobile-specific UI/fixture fixes out of this branch unless the operator re-scopes the work; the current Desktop/Web gate framework is already verified.
+3. After PR #338 merges, confirm issues #322-#325 close, update this tracker from GitHub state, and start Phase 2 from the evidence-level contract tasks.
+4. If PR #338 cannot merge because Mobile remains stuck, record that as a workflow gating issue under T3.5/T4.3 instead of silently weakening Mobile assertions.
 
 ## Session Log
 
