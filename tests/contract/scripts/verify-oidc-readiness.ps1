@@ -134,7 +134,7 @@ function New-LegacyOnlyWorkspaceFixture {
 
     $agentHubRoot = Join-Path $Root "AgentHub"
     New-Item -ItemType Directory -Force -Path (Join-Path $agentHubRoot "scripts") | Out-Null
-    Copy-Item -LiteralPath $scriptPath -Destination (Join-Path $agentHubRoot "scripts\verify-oidc-readiness.ps1")
+    Copy-Item -LiteralPath $scriptPath -Destination (Join-Path $agentHubRoot "scripts\verify\verify-oidc-readiness.ps1")
 
     New-FixtureFile $agentHubRoot "api\openapi.yaml" @"
 /client/auth/oidc/authorize
@@ -190,7 +190,7 @@ BFF/HttpOnly cookie
     return $agentHubRoot
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-oidc-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-oidc-readiness.ps1"
 $scriptText = Get-Content -LiteralPath $scriptPath -Raw
 
 Assert-True ($scriptText -match '\[switch\]\$SkipWorkspaceDocs') "OIDC readiness exposes -SkipWorkspaceDocs"
@@ -229,7 +229,7 @@ try {
     $legacyRun = Invoke-ReadinessScript @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
-        "-File", (Join-Path $legacyAgentHubRoot "scripts\verify-oidc-readiness.ps1")
+        "-File", (Join-Path $legacyAgentHubRoot "scripts\verify\verify-oidc-readiness.ps1")
     )
     Assert-True ($legacyRun.ExitCode -eq 0) "OIDC readiness default mode accepts legacy-only workspace docs" $legacyRun.Output
     Assert-True ($legacyRun.Output -match 'workspace docs source: docs\\relying-party-readiness\.md') "legacy-only fixture reports legacy readiness matrix source" $legacyRun.Output

@@ -13,6 +13,8 @@
 | History archive commit | `8417e00b` merge commit; source archive commit `e94cb7d` |
 | ADR archive PR | TokenDanceLab/docs#2 |
 | ADR archive commit | `50c360e` merge commit; source archive commit `4fe876b` |
+| Root evidence archive PR | TokenDanceLab/docs#3 |
+| Root evidence archive commit | `bc774192` merge commit; source archive commit `6cb00e9` |
 | Archive root | `archive/agenthub/` |
 
 ## Migrated Paths
@@ -23,12 +25,7 @@
 | `docs/archives/` | `archive/agenthub/repo/docs/archives/` |
 | `docs/adr/` | `archive/agenthub/repo/docs/adr/` |
 | archived project skills | `archive/agenthub/repo/docs/archives/project-skills/` |
-
-## Pending Archive Paths
-
-| AgentHub path | Target | Tracking |
-|---|---|---|
-| root one-off evidence | `archive/agenthub/repo/root-evidence/` | AgentHub #366 |
+| `css-audit-results.json` | `archive/agenthub/repo/root-evidence/css-audit-results.json` |
 
 ## Rules
 

@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
-$scriptPath = Join-Path $RepoRoot "scripts/verify-live-chain-topology.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts/verify/verify-live-chain-topology.ps1"
 
 if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     Write-Error "Missing verifier: $scriptPath"

@@ -94,7 +94,7 @@ function Invoke-DispatchScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-edge-cli-dispatch-evidence.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-edge-cli-dispatch-evidence.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-edge-real-cli-evidence.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "Edge CLI dispatch evidence verifier exists"

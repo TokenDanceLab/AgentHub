@@ -252,7 +252,7 @@ function Assert-Fails {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-observed-localhost-dispatch.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-observed-localhost-dispatch.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "observed localhost dispatch verifier exists"
 
 $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-observed-localhost-dispatch-$PID"

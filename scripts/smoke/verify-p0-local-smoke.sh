@@ -113,8 +113,8 @@ assert_file "app/shared/package.json" "Shared package.json exists"
 
 step "CI and hooks"
 assert_file ".github/workflows/checks.yml" "CI checks workflow exists"
-assert_file "scripts/git-hooks/commit-msg" "commit-msg hook exists"
-assert_file "scripts/setup.sh" "setup.sh exists"
+assert_file "scripts/dev/git-hooks/commit-msg" "commit-msg hook exists"
+assert_file "scripts/dev/setup.sh" "setup.sh exists"
 
 # === Localhost probes ===
 step "Localhost service probes"

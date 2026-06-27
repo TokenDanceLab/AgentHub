@@ -61,7 +61,7 @@ function Write-Json {
     $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-p0-approved-real-gold-path.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-p0-approved-real-gold-path.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-p0-approved-real-gold-path.ps1"
 $realE2eSkillPath = Join-Path $RepoRoot ".agents\skills\real-e2e-acceptance\SKILL.md"
 $agentsPath = Join-Path $RepoRoot "AGENTS.md"
@@ -151,7 +151,7 @@ try {
     Assert-True ($readyManifestText -notmatch '(?i)(sk-[a-z0-9_-]{8,}|Authorization:\s*Bearer\s+(?!<redacted)[^\s,;}]+)') "manifest has no unredacted secret-like values"
 
     $verify = Invoke-RepoScript @(
-        (Join-Path $RepoRoot "scripts\evidence\verify-redacted-manifest.ps1"),
+        (Join-Path $RepoRoot "scripts\lib\evidence\verify-redacted-manifest.ps1"),
         "-ManifestPath", $manifestPath
     )
     Assert-True ($verify.ExitCode -eq 0) "redacted manifest verifier accepts gold-path output" $verify.Output

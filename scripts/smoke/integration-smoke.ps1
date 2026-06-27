@@ -3,13 +3,13 @@
 # Starts Edge Server with a real agent CLI, sends a prompt, and
 # verifies end-to-end event flow through the WebSocket event stream.
 # This script intentionally does not fall back to the mock executor. Use
-# scripts/client-smoke.ps1 for CI-safe mock coverage.
+# scripts/smoke/client-smoke.ps1 for CI-safe mock coverage.
 #
 # Usage:
-#   .\scripts\integration-smoke.ps1 -Agent codex -EdgeAddr 127.0.0.1:3231
-#   .\scripts\integration-smoke.ps1 -Agent claude-code -EdgeAddr 127.0.0.1:3232
-#   .\scripts\integration-smoke.ps1 -Agent opencode -EdgeAddr 127.0.0.1:3233
-#   .\scripts\integration-smoke.ps1 -SkipBuild -Agent codex
+#   .\scripts\smoke\integration-smoke.ps1 -Agent codex -EdgeAddr 127.0.0.1:3231
+#   .\scripts\smoke\integration-smoke.ps1 -Agent claude-code -EdgeAddr 127.0.0.1:3232
+#   .\scripts\smoke\integration-smoke.ps1 -Agent opencode -EdgeAddr 127.0.0.1:3233
+#   .\scripts\smoke\integration-smoke.ps1 -SkipBuild -Agent codex
 
 [CmdletBinding()]
 param(
