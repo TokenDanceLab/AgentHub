@@ -27,7 +27,7 @@
 
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
-| 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 4 | 0 | 4 |
+| 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 4 | 0 | 4 |
 | 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 5 | 0 | 5 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
@@ -36,10 +36,10 @@
 
 | Task ID | Issue | Title | Status |
 |:--|:--|:--|:--|
-| T1.1 | #322 | Normalize branch/worktree governance | open |
-| T1.2 | #323 | Normalize document standards and active/archive rules | open |
-| T1.3 | #325 | Add useful project-skill whitelist verification | open |
-| T1.4 | #324 | Clean generated artifact hygiene | open |
+| T1.1 | #322 | Normalize branch/worktree governance | closed |
+| T1.2 | #323 | Normalize document standards and active/archive rules | closed |
+| T1.3 | #325 | Add useful project-skill whitelist verification | closed |
+| T1.4 | #324 | Clean generated artifact hygiene | closed |
 | T2.1 | #326 | Make evidence-level matrix canonical | open |
 | T2.2 | #327 | Split data mode surface auth and execution axes | open |
 | T2.3 | #328 | Align E2E smoke matrix and manifests | open |
@@ -69,17 +69,17 @@ git worktree list
 
 ## Phase Checklist
 
-- [ ] Phase 1: Governance Baseline (4/4 tasks implemented locally; merge pending) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
+- [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [ ] Phase 2: Real E2E Contract (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [ ] Phase 3: Source And Test Alignment (0/5 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
-**Active Phase**: Phase 1 - Governance Baseline
-**Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
-**Current Focus**: review/merge Phase 1 governance baseline while keeping Phase 2 evidence boundaries honest in the same PR: `AGENTS.md` is now the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, Desktop/Web real E2E evidence boundaries are encoded in the smoke matrix manifest, and the required Mobile gate has narrow mock-Hub and dependency-contract fixes without Mobile redesign.
-**Blockers**: PR #338 was blocked only by the `Frontend (mobile)` required check. The first failure path was Mobile Visual QA/mock-Hub contract drift; the second was Expo Doctor dependency drift. Local evidence now covers both paths: Mobile Visual QA passes after aligning the screenshot fixture display name with the existing `Delicious233` UI contract and adding `/client/*` REST/CORS/WebSocket support to the Mobile mock Hub; Expo Doctor passes after aligning Expo SDK 56 patch dependencies while keeping React/React DOM on the monorepo `19.2.7` contract via Expo's install exclude. Remote PR checks must be re-run after push before merge.
+**Active Phase**: Phase 2 - Real E2E Contract
+**Active Task**: not started; next work begins at #326 / T2.1.
+**Current Focus**: Phase 1 governance baseline is merged into `dev/delicious233` via PR #338 (`4dc4f496d845a3e76c8c87adbe2a74a2d6f8dd4b`). `AGENTS.md` is the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, and stale project skills remain archived-only. The next phase should refine the real E2E evidence contract without adding duplicate rule documents.
+**Blockers**: none for Phase 1. Phase 2-4 issues remain open and must run through their own spec, implementation, and acceptance gates.
 
 ### Local Phase 1 Evidence
 
@@ -114,10 +114,10 @@ git worktree list
 
 ## Next Steps
 
-1. Push the scoped Mobile Visual QA/mock-Hub and Expo Doctor dependency-contract fixes, then wait for PR #338 `Frontend (mobile)` to turn green.
-2. Do not merge PR #338 until required GitHub checks are green; do not weaken Mobile assertions or ignore browser console errors.
-3. After PR #338 merges, confirm issues #322-#325 close, update this tracker from GitHub state, and start Phase 2 from the evidence-level contract tasks.
-4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this branch unless the operator opens a separate spec.
+1. Start Phase 2 from #326 / T2.1 after a spec checkpoint; do not reuse Phase 1 PR state as implementation evidence.
+2. Keep active rules in `AGENTS.md`, current progress in this file, and total roadmap in `docs/roadmap.md`; archive or delete stale rules instead of appending duplicates.
+3. For every real E2E claim, map the claim to Playwright, Visual QA, backend/API, observed-local, approved-real, or packaged-release evidence before implementation.
+4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this spec unless the operator opens a separate scoped task.
 
 ## Session Log
 
@@ -134,3 +134,4 @@ git worktree list
 | 2026-06-27 | doc-ssot-archive | Archived dated governance evidence into `docs/archives/governance-evidence/`, archived the old Desktop UI QA SOP under `docs/archive/`, added `scripts/verify-doc-ssot.ps1`, wired it into CI validate and CI-policy verifiers, and fixed runtime-readiness checks to use the current approved-real boundary instead of a missing STATE handoff file. |
 | 2026-06-27 | mobile-visual-contract | Scoped Mobile required-gate fix only. Confirmed the current visible home/account identity is `Delicious233` per existing source/tests, then updated Mobile Visual QA assertions from the stale `Alice` expectation. Added mock-Hub contract checks for `/client/sessions`, `/client/contacts`, CORS preflight, and `/client/ws`; implemented those routes without suppressing browser console errors. CI then showed Linux `Screenshot visual QA (mobile)` hanging after prior steps passed, so `visual-qa.mjs` now starts owned preview/mock-Hub servers in a non-Windows process group and terminates the full process tree during teardown. Evidence level: Expo Web Visual QA + mock-Hub fixture contract, not native package or real Hub login. Verification: `mock:hub:check` failed first on `/client/sessions` preflight, then passed; `visual:qa` passed before and after process-group teardown; `verify` passed with 25 files / 330 tests; CI-style mock-Hub Vitest passed with 25 files / 330 tests. |
 | 2026-06-27 | mobile-expo-doctor-contract | Scoped Mobile required-gate fix only. CI `Frontend (mobile)` then failed at Expo Doctor after Visual QA and mock-Hub E2E passed. Aligned Expo SDK 56 patch dependencies and kept React/React DOM on the repo-shared `19.2.7` contract using Expo's documented `expo.install.exclude` for those two packages. Evidence level remains Expo Web + mock-Hub fixture/native config checks, not native package, device install, or real Hub login. Verification: `corepack.cmd pnpm --dir app/mobile-rn verify:qa` passed, including typecheck, lint, brand/boundary checks, 25 Vitest files / 330 tests, Expo Doctor 21/21 checks, native readiness, mock-Hub contract, and Visual QA screenshots. |
+| 2026-06-27 | phase-1-merged | PR #338 merged into `dev/delicious233` with all required checks green. GitHub did not auto-close issues because the PR target was not the default branch, so #322-#325 were closed manually with merge evidence. Phase 1 milestone is closed with 0 open / 4 closed issues; Phase 2 begins at #326 after the next spec checkpoint. |
