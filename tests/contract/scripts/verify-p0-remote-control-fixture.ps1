@@ -110,8 +110,8 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $gateImpleme
         "verify-login-fixture-topology.ps1",
         "verify-web-hub-boundary.ps1",
         "verify-remote-control-fixture-e2e.ps1",
-        "tests\scripts\verify-remote-control-fixture-e2e.ps1",
-        "tests\scripts\verify-teamrun-demo-contract.ps1",
+        "tests\contract\scripts\verify-remote-control-fixture-e2e.ps1",
+        "tests\contract\scripts\verify-teamrun-demo-contract.ps1",
         "go test ./internal/adapters -run SDKFixture -short -count=1"
     )) {
         Assert-True ($scriptText.Contains($required)) "total gate references $required"
@@ -160,8 +160,8 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $gateImpleme
     Assert-True ($gateRun.Output -match "PASS\s+verify-login-fixture-topology\.ps1") "total gate records login topology gate pass" $gateRun.Output
     Assert-True ($gateRun.Output -match "PASS\s+verify-web-hub-boundary\.ps1") "total gate records Web Hub boundary pass" $gateRun.Output
     Assert-True ($gateRun.Output -match "PASS\s+verify-remote-control-fixture-e2e\.ps1") "total gate records remote fixture E2E pass" $gateRun.Output
-    Assert-True ($gateRun.Output -match "PASS\s+tests/scripts/verify-remote-control-fixture-e2e\.ps1") "total gate records remote fixture E2E test pass" $gateRun.Output
-    Assert-True ($gateRun.Output -match "PASS\s+tests/scripts/verify-teamrun-demo-contract\.ps1") "total gate records TeamRun contract pass" $gateRun.Output
+    Assert-True ($gateRun.Output -match "PASS\s+tests/contract/scripts/verify-remote-control-fixture-e2e\.ps1") "total gate records remote fixture E2E test pass" $gateRun.Output
+    Assert-True ($gateRun.Output -match "PASS\s+tests/contract/scripts/verify-teamrun-demo-contract\.ps1") "total gate records TeamRun contract pass" $gateRun.Output
     Assert-True ($gateRun.Output -match "PASS\s+go test ./internal/adapters -run SDKFixture -short -count=1") "total gate records Edge SDK fixture pass" $gateRun.Output
 
     $badMode = Invoke-RepoScript @(

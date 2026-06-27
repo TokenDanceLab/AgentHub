@@ -8,7 +8,7 @@ $Failed = 0
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..\..")).ProviderPath
+    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..\..\..")).ProviderPath
 }
 
 function Join-NativeArguments {
