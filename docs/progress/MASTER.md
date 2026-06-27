@@ -78,7 +78,7 @@ git worktree list
 
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
-**Current Focus**: review/merge Phase 1 governance baseline while landing safe Phase 2 contract hardening in the same PR: Desktop/Web real E2E and visual QA framework now has focused 16:9 chat-flow evidence, transcript cleanliness checks, and smoke matrix manifest evidence-level boundaries. Mobile-specific UI/fixture fixes are deferred for a later pass by operator direction.
+**Current Focus**: review/merge Phase 1 governance baseline while landing safe Phase 2 contract hardening in the same PR: `AGENTS.md` is now the single project rule surface, `docs/progress/MASTER.md` is the current spec progress surface, `docs/roadmap.md` is the total progress surface, dated governance evidence is archived, and Desktop/Web real E2E evidence boundaries are encoded in the smoke matrix manifest. Mobile-specific UI/fixture fixes are deferred for a later pass by operator direction.
 **Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and all non-Mobile GitHub checks are green. Mobile now fails fast in Visual QA on the existing `Alice` visibility assertion instead of hanging indefinitely.
 
 ### Local Phase 1 Evidence
@@ -86,14 +86,14 @@ git worktree list
 | Task | Local status | Evidence |
 |:--|:--|:--|
 | T1.1 | Implemented in branch | `AGENTS.md` and `docs/governance/branch-governance.md` now use live-state branch/worktree rules; stale active branch table removed. |
-| T1.2 | Implemented in branch | `docs/governance/document-standards.md`, `docs/README.md`, `docs/contributing.md`, `AGENTS.md`, and `CLAUDE.md` agree on active SPEC, archive, skill whitelist, and current CI coverage policy boundaries. |
+| T1.2 | Implemented in branch | `AGENTS.md` is the only active project rule surface; `CLAUDE.md` was removed; dated governance reports moved to `docs/archives/governance-evidence/`; old Desktop UI QA SOP moved to `docs/archive/`; `docs/governance/document-standards.md`, `docs/README.md`, `docs/contributing.md`, and `docs/reference/README.md` align active SPEC, archive, skill whitelist, and current CI coverage policy boundaries. |
 | T1.3 | Implemented in branch | `scripts/verify-project-skills.ps1` added; CI validate now runs it; old project skills remain archived only; PowerShell and Bash CI policy verifiers both check this gate. |
 | T1.4 | Verified in branch | `app/desktop/stats.html` is not tracked by Git and is ignored by `.gitignore`; stale skill unignore rules removed; generated artifact hygiene remains explicit. |
 
 ## Governance Status
 
 **Shared instruction surface**: `AGENTS.md`
-**Claude Code instruction surface**: `CLAUDE.md`
+**Platform-specific instruction surfaces**: none; `CLAUDE.md` is intentionally not used in this repo.
 **Other platform rule surfaces**: none found (`.cursor/`, `.windsurf/`, `.clinerules*`, `.codex/`)
 **Memory surface**: native Codex memory; no repo fallback selected
 **Memory fallback path**: none
@@ -110,6 +110,7 @@ git worktree list
 - GitHub modes store per-task telemetry in issue comments before closure.
 - Adaptive control state lives in milestone descriptions.
 - Current drift score for all phases: 0.
+- 2026-06-27 `doc-ssot-cleanup`: actual effort M; S.U.P.E.R quick check S/U/R pass for rule ownership, doc flow, and replaceable archived evidence; unplanned dependencies 2 (`verify-runtime-readiness` stale STATE assertion, old Desktop UI QA SOP archival).
 
 ## Next Steps
 
@@ -129,3 +130,5 @@ git worktree list
 | 2026-06-27 | mobile-gate-timeout | Did not change Mobile UI or fixtures. Added hard timeouts to the Mobile GitHub job, screenshot Visual QA step, and mock-Hub E2E step, enforced them through PowerShell and Bash CI policy verifiers, and made the Mobile Visual QA script exit immediately after reporting its real assertion failure. Verification: `verify-ci-gates.ps1`, `verify-ci-gates.sh`, and `corepack.cmd pnpm --dir app/mobile-rn visual:qa` failed fast in ~45s on the existing `Alice` assertion. |
 | 2026-06-27 | desktop-web-transcript-cleanliness | Kept scope on Desktop/Web. Added Playwright assertions that mode/debug status does not enter the main transcript for Desktop mock and Web stubbed Hub flows, and added Desktop visual JSON evidence `transcriptHasModeDebug: false`. Verification: Desktop chat-flow Playwright 4/4 passed, Web stubbed Hub Playwright 7/7 passed, Desktop/Web manual 1440x810 visual chat-flow checks passed, Desktop test typecheck passed, Web typecheck passed, targeted eslint on changed E2E files passed. Full Desktop lint remains blocked by pre-existing unrelated lint debt. |
 | 2026-06-27 | e2e-evidence-contract | Added Phase 2 contract hardening without touching Mobile UI fixtures. `scripts/verify-e2e-smoke-matrix.ps1` now runs Web `test:e2e:stubbed-hub` instead of a misleading/nonexistent real-mode command and emits row-level `evidence_level`, `real_tested`, and `claim`; top-level `evidence_levels` only includes non-skipped rows. `workflow-standard.md`, `04-frontend-data-flow.md`, `roadmap.md`, and `real-e2e-acceptance` now share the same evidence vocabulary and data-mode axis boundary. Verification: smoke matrix skip-only manifest produced empty executed evidence levels, Web stubbed-Hub matrix passed with `evidence_levels=["stubbed-hub"]` and `real_tested=false`, `verify-project-skills.ps1` passed, `verify-ci-gates.ps1` passed. |
+| 2026-06-27 | doc-ssot-cleanup | Reorganized active rule ownership: `AGENTS.md` is the project rule SSOT, `docs/progress/MASTER.md` is current spec progress, `docs/roadmap.md` is total progress, and `CLAUDE.md` was deleted to avoid duplicate platform-specific rules. Active project skills are being shortened to current CI/runtime entrypoints and stale fixed test counts are removed. |
+| 2026-06-27 | doc-ssot-archive | Archived dated governance evidence into `docs/archives/governance-evidence/`, archived the old Desktop UI QA SOP under `docs/archive/`, added `scripts/verify-doc-ssot.ps1`, wired it into CI validate and CI-policy verifiers, and fixed runtime-readiness checks to use the current approved-real boundary instead of a missing STATE handoff file. |

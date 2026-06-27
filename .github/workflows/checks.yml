@@ -517,6 +517,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-project-skills.ps1
 
+      - name: Verify doc SSOT
+        shell: pwsh
+        run: ./scripts/verify-doc-ssot.ps1
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML
