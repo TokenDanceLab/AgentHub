@@ -163,6 +163,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 当前 spec 进度只写 `docs/progress/MASTER.md`。
 - 总进度只写 `docs/roadmap.md`。
 - 架构概览写 `docs/architecture.md`；模块细节写 `docs/architecture/`。
+- 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料和过期设计放 `docs/archive/`。
 - 已完成 spec-driven 工件和过期项目 skill 放 `docs/archives/`，这是 spec-driven 工具期望的路径。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
