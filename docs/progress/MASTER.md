@@ -86,11 +86,9 @@ git worktree list
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #334 / T3.5 pending worktree.
+**Active Task**: #334 / T3.5 validated in worktree; PR pending.
 
-**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; Mobile only clarifies RN-safe shared contract gate boundaries and does not start deep native/UI redesign.
-
-**Blockers**: none. Mobile deep UI/native redesign remains out of scope.
+**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; Mobile only clarifies RN-safe shared contract gate boundaries and does not start deep native/UI redesign. No blockers.
 
 ## Governance Status
 
@@ -122,6 +120,7 @@ git worktree list
 - T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 was 7/8 before #352 expanded the phase to 9 tasks.
 - T3.0d actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-real-e2e-contract` still depended on the archived workflow doc). PR #353 merged; #352 closed. Drift contribution 1; Phase 3 is now 8/9 with `drift_score=2`.
 - T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed. Phase 3 is now 9/10 with `drift_score=4`; lightweight replan keeps #334 as the remaining task.
+- T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. Local validation covers shared data-mode contract, Mobile RN-safe platform boundaries, Web stubbed Hub replay manifest reuse, doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and diff check.
 
 ## Recent Checkpoints
 
@@ -141,10 +140,10 @@ git worktree list
 | 2026-06-27 | Adaptive drift warning | Milestone #9 drift score updated to 2; #334 annotated for possible Web/Mobile client lane contract/verifier alignment. |
 | 2026-06-27 | Continued doc-spine cleanup merged | PR #355 merged; #354 closed; branch-governance and Mobile handoff moved to archive, Mobile README shortened, and doc SSOT now guards Mobile stale proof claims. |
 | 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
+| 2026-06-27 | Web/Mobile lane validation | #334 worktree validates Mobile as a distinct non-Desktop surface, keeps Web/Mobile off Local Edge, and records stubbed Hub replay as `real_tested=false`. |
 
 ## Next Steps
 
-1. Continue #334 in `.worktrees/web-mobile-client-lanes-334`.
-2. Keep Desktop/Web UI and shared client contracts first; Mobile work only clarifies existing gate boundaries.
-3. Do not add Mobile native/UI redesign or low-signal tests in this spec.
-4. Continue to mark stub/fixture/readiness-only paths with `real_tested=false`.
+1. Push #334 and open the PR.
+2. Merge #334 after CI, then sync Phase 3 to complete.
+3. Start Phase 4 focused acceptance, architecture approval, and archive preparation.
