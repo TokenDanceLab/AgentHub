@@ -1,6 +1,6 @@
 param(
     [string]$SkillsRoot = ".agents/skills",
-    [string]$ArchiveRoot = "docs/archives/project-skills",
+    [string]$HistoryPath = "docs/history.md",
     [string]$GitignorePath = ".gitignore"
 )
 
@@ -61,11 +61,15 @@ foreach ($skill in $ArchivedOnly) {
     if (Test-Path -LiteralPath $activePath) {
         Fail "archived skill is active again: $skill"
     }
+}
 
-    $archivedPath = Join-Path $ArchiveRoot $skill
-    if (-not (Test-Path -LiteralPath $archivedPath -PathType Container)) {
-        Fail "archived skill copy is missing: $skill"
-    }
+if (-not (Test-Path -LiteralPath $HistoryPath -PathType Leaf)) {
+    Fail "history index not found: $HistoryPath"
+}
+
+$history = Get-Content -LiteralPath $HistoryPath -Raw
+if (-not $history.Contains("archive/agenthub/repo/docs/archives/project-skills/")) {
+    Fail "history index is missing external archived project-skills path"
 }
 
 if (-not (Test-Path -LiteralPath $GitignorePath -PathType Leaf)) {
