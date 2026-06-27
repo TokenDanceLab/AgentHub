@@ -79,7 +79,7 @@ git worktree list
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
 **Current Focus**: review/merge Phase 1 governance baseline; Desktop/Web real E2E and visual QA framework now has focused 16:9 chat-flow evidence. Mobile-specific UI/fixture fixes are deferred for a later pass by operator direction.
-**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and non-Mobile GitHub checks are green; the Mobile workflow now has hard timeouts and the Mobile Visual QA harness exits with the real assertion failure instead of hanging indefinitely.
+**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and all non-Mobile GitHub checks are green. Mobile now fails fast in Visual QA on the existing `Alice` visibility assertion instead of hanging indefinitely.
 
 ### Local Phase 1 Evidence
 
@@ -113,7 +113,7 @@ git worktree list
 
 ## Next Steps
 
-1. Do not merge PR #338 until GitHub reports a terminal result for `Frontend (mobile)` or the workflow owner explicitly changes the Mobile gate policy.
+1. Do not merge PR #338 until `Frontend (mobile)` is fixed in a scoped Mobile pass or the workflow owner explicitly changes the Mobile gate policy.
 2. Keep Mobile-specific UI/fixture fixes out of this branch unless the operator re-scopes the work; only workflow-level timeout/diagnostic hardening is in scope here.
 3. After PR #338 merges, confirm issues #322-#325 close, update this tracker from GitHub state, and start Phase 2 from the evidence-level contract tasks.
 4. If PR #338 cannot merge because Mobile remains stuck, record that as a workflow gating issue under T3.5/T4.3 instead of silently weakening Mobile assertions.
