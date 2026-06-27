@@ -144,4 +144,8 @@ Assert-Contains $validate "scripts/verify-project-skills\.ps1" "validate job mus
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
 
+Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"
+Assert-Contains (Get-StepBlock $mobile "Screenshot visual QA (mobile)") "(?m)^\s+timeout-minutes:\s+12\s*$" "mobile visual QA must have a hard timeout"
+Assert-Contains (Get-StepBlock $mobile "E2E (mock hub)") "(?m)^\s+timeout-minutes:\s+10\s*$" "mobile mock-hub E2E must have a hard timeout"
+
 Write-Host "ci gate policy ok"
