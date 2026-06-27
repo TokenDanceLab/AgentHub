@@ -745,8 +745,10 @@ function startServer() {
       CI: '1',
       EXPO_NO_TELEMETRY: '1',
     },
+    detached: process.platform !== 'win32',
     shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
 
   const appendLog = (chunk) => {
@@ -774,6 +776,7 @@ function startMockHub() {
       AGENTHUB_MOBILE_MOCK_HUB_PORT: String(mockHubPort),
       CI: '1',
     },
+    detached: process.platform !== 'win32',
     shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -810,7 +813,62 @@ async function stopServer(child) {
     return;
   }
 
-  child.kill('SIGTERM');
+  await terminateProcessTree(child);
+}
+
+async function terminateProcessTree(child) {
+  const exited = waitForExit(child, 5_000);
+
+  try {
+    if (child.pid) {
+      process.kill(-child.pid, 'SIGTERM');
+    } else {
+      child.kill('SIGTERM');
+    }
+  } catch {
+    child.kill('SIGTERM');
+  }
+
+  if (await exited) {
+    return;
+  }
+
+  try {
+    if (child.pid) {
+      process.kill(-child.pid, 'SIGKILL');
+    } else {
+      child.kill('SIGKILL');
+    }
+  } catch {
+    child.kill('SIGKILL');
+  }
+
+  await waitForExit(child, 2_000);
+}
+
+function waitForExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(false);
+    }, timeoutMs);
+    const done = () => {
+      cleanup();
+      resolve(true);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.off('exit', done);
+      child.off('error', done);
+    };
+
+    child.once('exit', done);
+    child.once('error', done);
+  });
 }
 
 async function waitForServer(logs) {
