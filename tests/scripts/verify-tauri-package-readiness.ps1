@@ -85,6 +85,7 @@ function New-RogueTauriBuildFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -129,6 +130,7 @@ function New-RogueMacOSCommandFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -164,6 +166,7 @@ function New-RogueMacOSReleaseActionFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -201,6 +204,7 @@ function New-FixedStableReleaseFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -236,6 +240,7 @@ function New-TaggedReleaseFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -288,6 +293,7 @@ function New-DirtyGeneratedSchemaFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -316,6 +322,7 @@ function New-MissingBundledSidecarFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -342,6 +349,7 @@ function New-DeletedGeneratedSchemaFixture {
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -423,16 +431,20 @@ function New-TestArtifactRoot {
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
 $smokeScriptPath = Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1"
+$smokeScriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-installer-smoke.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\release.yml"
 $readinessWorkflowPath = Join-Path $RepoRoot ".github\workflows\release-readiness.yml"
 
 Assert-True (Test-Path $scriptPath) "Tauri package readiness checker exists"
 Assert-True (Test-Path $smokeScriptPath) "Tauri installer smoke preflight exists"
+Assert-True (Test-Path $scriptImplementationPath) "Tauri package readiness checker implementation exists"
+Assert-True (Test-Path $smokeScriptImplementationPath) "Tauri installer smoke preflight implementation exists"
 Assert-True (Test-Path $workflowPath) "release workflow exists"
 Assert-True (Test-Path $readinessWorkflowPath) "release readiness workflow exists"
 
-$scriptText = Read-Text "scripts\verify-tauri-package-readiness.ps1"
-$smokeScriptText = Read-Text "scripts\verify-tauri-installer-smoke.ps1"
+$scriptText = Read-Text "scripts\release\verify-tauri-package-readiness.ps1"
+$smokeScriptText = Read-Text "scripts\release\verify-tauri-installer-smoke.ps1"
 $workflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
 $desktopPackage = Get-Content (Join-Path $RepoRoot "app\desktop\package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
