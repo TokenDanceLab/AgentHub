@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文件只做 API 契约入口。旧 2041 行静态 API 参考已归档到 [archive/api-reference-2026-06-19.md](archive/api-reference-2026-06-19.md)，避免它和 OpenAPI / WebSocket 契约漂移。
+本文件只做 API 契约入口。旧 2041 行静态 API 参考见 [history.md](history.md)，避免它和 OpenAPI / WebSocket 契约漂移。
 
 ## 权威契约
 

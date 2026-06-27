@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文件是 WebSocket 事件合同入口，只保留协议边界、源码 owner 和验收命令。旧长版事件说明已归档到 [../docs/archive/api/events-full-2026-06-27.md](../docs/archive/api/events-full-2026-06-27.md)。
+本文件是 WebSocket 事件合同入口，只保留协议边界、源码 owner 和验收命令。旧长版事件说明见 [../docs/history.md](../docs/history.md)。
 
 ## Owner
 
