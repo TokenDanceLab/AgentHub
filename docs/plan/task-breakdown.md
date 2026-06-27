@@ -28,7 +28,7 @@
 
 ## Test Expectations
 
-- Every PR: `git diff --check`, `pwsh ./scripts/verify-doc-ssot.ps1`, `pwsh ./scripts/verify-project-skills.ps1`, `pwsh ./scripts/verify-real-e2e-contract.ps1`, OpenAPI YAML parse when active docs/verifiers change.
+- Every PR: `git diff --check`, `pwsh ./scripts/verify/verify-doc-ssot.ps1`, `pwsh ./scripts/verify/verify-project-skills.ps1`, `pwsh ./scripts/verify/verify-real-e2e-contract.ps1`, OpenAPI YAML parse when active docs/verifiers change.
 - Scripts/tests PRs: CI `validate`, frontend Desktop/Web gates, `go test ./tests/teamrun -count=1`, release-readiness path checks, and script contract tests.
 - Archive PRs: reference scans must show only allowed index/history/code-comment references for removed history or ADR paths.
 - Final acceptance: AgentHub active markdown limited to owner entrypoints, no tracked one-off evidence at root, CI green, external TokenDance docs archive commit exists.

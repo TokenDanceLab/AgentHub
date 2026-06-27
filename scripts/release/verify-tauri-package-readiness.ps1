@@ -112,7 +112,7 @@ function Assert-GeneratedSchemaClean {
 
 function Assert-WindowsUnsignedDevPackageContract {
     Step "Windows unsigned/dev package reproducibility contract"
-    Assert-FileExists "scripts\verify-tauri-package-dry.ps1" "Windows unsigned/dev package dry checker compatibility wrapper"
+    Assert-FileExists "scripts\release\verify-tauri-package-dry.ps1" "Windows unsigned/dev package dry categorized script"
 
     $dryText = Read-Text "scripts\release\verify-tauri-package-dry.ps1"
     Assert-True ($dryText -match 'mode\s*=\s*"windows-desktop-package-dry"') "package dry report declares windows-desktop-package-dry mode"

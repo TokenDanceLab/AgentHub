@@ -59,8 +59,8 @@
 ## 验证入口
 
 ```powershell
-pwsh ./scripts/verify-ci-gates.ps1
-pwsh ./scripts/verify-release-gate.ps1
+pwsh ./scripts/verify/verify-ci-gates.ps1
+pwsh ./scripts/release/verify-release-gate.ps1
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 git diff --check
 ```

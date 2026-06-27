@@ -132,10 +132,10 @@ function Invoke-RepoScript {
 }
 
 $scenarioPath = Resolve-RepoPath "tests\fixtures\teamrun\teamrun-demo-scenario.json"
-$exporterPath = Resolve-RepoPath "scripts\export-teamrun-demo-fixture-evidence.ps1"
-$packagePath = Resolve-RepoPath "scripts\package-teamrun-demo-evidence.ps1"
-$readinessPath = Resolve-RepoPath "scripts\verify-teamrun-demo-readiness.ps1"
-$redactedManifestVerifierPath = Resolve-RepoPath "scripts\evidence\verify-redacted-manifest.ps1"
+$exporterPath = Resolve-RepoPath "scripts\lib\export-teamrun-demo-fixture-evidence.ps1"
+$packagePath = Resolve-RepoPath "scripts\lib\package-teamrun-demo-evidence.ps1"
+$readinessPath = Resolve-RepoPath "scripts\verify\verify-teamrun-demo-readiness.ps1"
+$redactedManifestVerifierPath = Resolve-RepoPath "scripts\lib\evidence\verify-redacted-manifest.ps1"
 
 Assert-True (Test-Path -LiteralPath $scenarioPath) "TeamRun demo scenario manifest exists"
 Assert-True (Test-Path -LiteralPath $exporterPath) "TeamRun fixture evidence exporter exists"

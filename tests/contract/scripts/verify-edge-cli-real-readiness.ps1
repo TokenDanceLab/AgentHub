@@ -94,7 +94,7 @@ function Invoke-ReadinessScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-edge-cli-real-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-edge-cli-real-readiness.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p0-edge-cli-real-readiness.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "Edge CLI real readiness script exists"

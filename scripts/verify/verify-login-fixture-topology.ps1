@@ -113,10 +113,10 @@ Write-Host "  agenthub-web: pnpm test -- src/api/hubAuth.test.ts" -ForegroundCol
 Write-Host "  agenthub-web: pnpm typecheck" -ForegroundColor White
 Write-Host "  agenthub-desktop: pnpm test -- src/api/hubAuth.test.ts" -ForegroundColor White
 Write-Host "  agenthub-desktop: pnpm test -- src/platform/desktopPlatform.test.ts" -ForegroundColor White
-Write-Host "  local OIDC: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -LocalOnly" -ForegroundColor White
-Write-Host "  packaged dry: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-packaged-login-real-readiness.ps1 -RepoRoot ." -ForegroundColor White
-Write-Host "  Web boundary: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-web-hub-boundary.ps1" -ForegroundColor White
-Write-Host "  Tauri package readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-readiness.ps1 -RepoRoot ." -ForegroundColor White
+Write-Host "  local OIDC: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-oidc-flow.ps1 -LocalOnly" -ForegroundColor White
+Write-Host "  packaged dry: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-packaged-login-real-readiness.ps1 -RepoRoot ." -ForegroundColor White
+Write-Host "  Web boundary: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-web-hub-boundary.ps1" -ForegroundColor White
+Write-Host "  Tauri package readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-tauri-package-readiness.ps1 -RepoRoot ." -ForegroundColor White
 
 Step "Evidence boundaries"
 Write-Host "  Mock-only: fake OIDC callback, Hub-issued fixture tokens, and Hub execution-target inventory fixture" -ForegroundColor Yellow

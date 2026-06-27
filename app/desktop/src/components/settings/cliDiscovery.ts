@@ -8,7 +8,7 @@ import type {
 export type { LocalCliDiscoveryItem, LocalCliDiscoveryManifest, LocalCliRuntimeId };
 
 export const LOCAL_CLI_READINESS_MANIFEST = '.tmp/evidence/p0-edge-cli-real-readiness.json';
-export const LOCAL_CLI_READINESS_SCRIPT = 'scripts/verify-edge-cli-real-readiness.ps1';
+export const LOCAL_CLI_READINESS_SCRIPT = 'scripts/verify/verify-edge-cli-real-readiness.ps1';
 
 const runtimeDefaults: Record<LocalCliRuntimeId, Omit<LocalCliDiscoveryItem, 'installed' | 'version'>> = {
   codex: {

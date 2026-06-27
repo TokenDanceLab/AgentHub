@@ -103,7 +103,7 @@ $RequiredFiles = @(
     "edge-server/internal/adapters/adapter.go",
     "edge-server/internal/adapters/codex.go",
     "edge-server/internal/adapters/sdk_fixture_mapper.go",
-    "scripts/verify-web-hub-boundary.ps1"
+    "scripts/verify/verify-web-hub-boundary.ps1"
 )
 
 foreach ($file in $RequiredFiles) {

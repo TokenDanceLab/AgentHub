@@ -72,7 +72,7 @@ function Invoke-RepoScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-e2e-smoke-matrix.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-e2e-smoke-matrix.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-e2e-smoke-matrix.ps1"
 $appPackagePath = Join-Path $RepoRoot "app\package.json"
 $webPackagePath = Join-Path $RepoRoot "app\web\package.json"

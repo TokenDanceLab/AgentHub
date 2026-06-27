@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path $RepoRoot).Path
-$scriptPath = Join-Path $RepoRoot "scripts\verify-release-gate.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-release-gate.ps1"
 
 function Pass([string]$Message) { Write-Host "PASS: $Message" -ForegroundColor Green }
 function Fail([string]$Message, [string]$Details = "") {
@@ -49,7 +49,7 @@ function New-ReleaseGateFixture {
         "app\desktop\package.json",
         "app\desktop\src-tauri\tauri.conf.json",
         "docs\governance\security-risk-register.md",
-        "scripts\verify-release-gate.ps1"
+        "scripts\release\verify-release-gate.ps1"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }

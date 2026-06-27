@@ -126,11 +126,11 @@ Invoke-Checked "fixture chain manifest: Web -> Hub -> Desktop -> Edge -> fixture
 }
 
 Invoke-Checked "Web Hub-only boundary" {
-    & (Join-Path $RepoRoot "scripts\verify-web-hub-boundary.ps1")
+    & (Join-Path $RepoRoot "scripts\verify\verify-web-hub-boundary.ps1")
 }
 
 Invoke-Checked "Desktop/Tauri sidecar observed fixture readiness" {
-    $sidecarScript = Join-Path $RepoRoot "scripts\verify-desktop-sidecar-observed-smoke.ps1"
+    $sidecarScript = Join-Path $RepoRoot "scripts\smoke\verify-desktop-sidecar-observed-smoke.ps1"
     if ($SkipCargoTest -or $SkipFocusedTests) {
         & $sidecarScript -RepoRoot $RepoRoot -SkipCargoTest
     } else {
@@ -139,7 +139,7 @@ Invoke-Checked "Desktop/Tauri sidecar observed fixture readiness" {
 }
 
 Invoke-Checked "Local Edge adapter fixture dispatch/replay evidence" {
-    & (Join-Path $RepoRoot "scripts\verify-edge-cli-dispatch-evidence.ps1") -RepoRoot $RepoRoot -Mode Fixture
+    & (Join-Path $RepoRoot "scripts\verify\verify-edge-cli-dispatch-evidence.ps1") -RepoRoot $RepoRoot -Mode Fixture
 }
 
 if (-not $SkipFocusedTests) {

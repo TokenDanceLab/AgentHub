@@ -90,10 +90,10 @@ function Invoke-RepoScript {
     }
 }
 
-$gatePath = Join-Path $RepoRoot "scripts\verify-p0-remote-control-fixture.ps1"
+$gatePath = Join-Path $RepoRoot "scripts\verify\verify-p0-remote-control-fixture.ps1"
 $gateImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-p0-remote-control-fixture.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\checks.yml"
-$ciPolicyPath = Join-Path $RepoRoot "scripts\verify-ci-gates.ps1"
+$ciPolicyPath = Join-Path $RepoRoot "scripts\verify\verify-ci-gates.ps1"
 $ciPolicyImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-ci-gates.ps1"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "P0 remote-control fixture total gate exists"
@@ -186,7 +186,7 @@ if ((Test-Path -LiteralPath $workflowPath) -and (Test-Path -LiteralPath $ciPolic
     $ciPolicyText = Get-Content -Raw -LiteralPath $ciPolicyImplementationPath -Encoding UTF8
 
     Assert-True ($workflowText -match "P0 remote-control fixture readiness") "CI workflow runs P0 remote-control fixture readiness gate"
-    Assert-True ($workflowText -match [regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1")) "CI workflow invokes the P0 fixture gate by script path"
+    Assert-True ($workflowText -match [regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-p0-remote-control-fixture.ps1")) "CI workflow invokes the P0 fixture gate by script path"
     Assert-True ($workflowText -notmatch "self-hosted") "CI fixture gate does not require self-hosted runner"
 
     Assert-True ($ciPolicyText -match "P0 remote-control fixture readiness") "CI policy verifier checks P0 fixture gate step"

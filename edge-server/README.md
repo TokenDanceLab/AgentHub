@@ -71,14 +71,14 @@ go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile op
 
 ```powershell
 go test ./edge-server/... -short -count=1
-pwsh ./scripts/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
-pwsh ./scripts/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
-pwsh ./scripts/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
+pwsh ./scripts/smoke/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
+pwsh ./scripts/smoke/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
+pwsh ./scripts/verify/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
 ```
 
 `client-smoke.ps1` uses the current Edge runtime architecture and no longer builds the deleted standalone `runner/` directory.
 
-Performance/leak claims follow [../scripts/load-test-scenarios.md](../scripts/load-test-scenarios.md); Edge lifecycle/store/adapters behavior tests and microbenchmarks are not production capacity proof.
+Performance/leak claims follow [../docs/reference/backend-performance-gates.md](../docs/reference/backend-performance-gates.md); Edge lifecycle/store/adapters behavior tests and microbenchmarks are not production capacity proof.
 
 ## Links
 

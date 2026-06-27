@@ -3,7 +3,7 @@
     AgentHub release builder — builds all binaries, packages, uploads to GitHub Release.
 .DESCRIPTION
     One-command release pipeline:
-      .\scripts\release.ps1 v0.1.1
+      .\scripts\release\release.ps1 v0.1.1
     Creates clean worktree, builds Go + Tauri, uploads assets, cleans up.
 .PARAMETER Version
     Release version tag (e.g. v0.1.1). Must be an existing git tag.

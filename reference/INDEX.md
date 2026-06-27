@@ -43,8 +43,8 @@ Current written research entry: [../docs/reference/README.md](../docs/reference/
 ## Sync
 
 ```powershell
-.\scripts\setup.ps1 -Reference core
-.\scripts\sync-reference.ps1 -Tier all
+.\scripts\dev\setup.ps1 -Reference core
+.\scripts\dev\sync-reference.ps1 -Tier all
 ```
 
 If a reference finding affects current implementation, write the conclusion into the owning active doc (`docs/architecture.md`, `api/`, or `AGENTS.md`) and archive long research notes through `docs/history.md`; do not expand this index into a research report.

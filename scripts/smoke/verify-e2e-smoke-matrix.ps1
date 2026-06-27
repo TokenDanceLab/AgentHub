@@ -321,7 +321,7 @@ Invoke-MatrixCommand `
     -Name "localhost-services-smoke" `
     -Area "services" `
     -Command $PowerShellPath `
-    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify-localhost-real-stack-smoke.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactRoot", (Join-Path $RepoRoot ".tmp\localhost-real-stack-smoke\e2e-matrix-$PID"), "-ProbeHub") `
+    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-stack-smoke.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactRoot", (Join-Path $RepoRoot ".tmp\localhost-real-stack-smoke\e2e-matrix-$PID"), "-ProbeHub") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipLocalStack `
     -SkipReason "skipped by -SkipLocalStack" `
@@ -333,7 +333,7 @@ Invoke-MatrixCommand `
     -Name "edge-client-smoke" `
     -Area "edge" `
     -Command $PowerShellPath `
-    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\client-smoke.ps1"), "-EdgeAddr", $EdgeClientSmokeAddr, "-EdgeAuthToken", "local-smoke-token", "-SkipGoTests", "-SkipCancel") `
+    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\smoke\client-smoke.ps1"), "-EdgeAddr", $EdgeClientSmokeAddr, "-EdgeAuthToken", "local-smoke-token", "-SkipGoTests", "-SkipCancel") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipEdgeClientSmoke `
     -SkipReason "skipped by -SkipEdgeClientSmoke" `
@@ -345,7 +345,7 @@ Invoke-MatrixCommand `
     -Name "login-real-readiness-gate" `
     -Area "auth" `
     -Command $PowerShellPath `
-    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify-login-e2e-readiness.ps1"), "-RepoRoot", $RepoRoot, "-OutputPath", (Join-Path $ArtifactRoot "login-readiness.json")) `
+    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify\verify-login-e2e-readiness.ps1"), "-RepoRoot", $RepoRoot, "-OutputPath", (Join-Path $ArtifactRoot "login-readiness.json")) `
     -WorkingDirectory $RepoRoot `
     -BlockedExitCodes @(2) `
     -BlockedReason "BLOCKED_WITH_EVIDENCE: real login/remote dispatch needs explicit approved test account, callback, Hub URL, artifact boundary, and operator approval metadata." `
@@ -359,7 +359,7 @@ Invoke-MatrixCommand `
     -Name "desktop-tauri-dry-smoke" `
     -Area "tauri" `
     -Command $PowerShellPath `
-    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\verify-tauri-package-dry.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactsRoot", (Join-Path $ArtifactRoot "tauri-dry"), "-SkipInstall", "-SkipExecutableCompile") `
+    -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $RepoRoot "scripts\release\verify-tauri-package-dry.ps1"), "-RepoRoot", $RepoRoot, "-ArtifactsRoot", (Join-Path $ArtifactRoot "tauri-dry"), "-SkipInstall", "-SkipExecutableCompile") `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipTauriDry `
     -SkipReason "skipped by -SkipTauriDry" `

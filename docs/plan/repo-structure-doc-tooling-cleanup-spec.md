@@ -35,7 +35,7 @@ Migration targets:
 - Move AgentHub history trees to the TokenDance docs external archive and keep only a short source-repo index.
 - Replace in-repo archive trees with a short `docs/history.md` index.
 - Compress old ADR bodies into `docs/decisions.md`; move old ADR full text to the external archive.
-- Reshape `scripts/` into `scripts/verify/`, `scripts/dev/`, `scripts/release/`, `scripts/smoke/`, and `scripts/lib/` with compatibility wrappers first.
+- Reshape `scripts/` into `scripts/verify/`, `scripts/dev/`, `scripts/release/`, `scripts/smoke/`, and `scripts/lib/` with temporary forwarding entrypoints first.
 - Reshape `tests/` into `tests/fixtures/`, `tests/contract/`, and `tests/integration/`.
 - Classify `css-audit-results.json` as either active owner artifact or historical evidence.
 
@@ -53,9 +53,9 @@ Migration targets:
 ## Required Acceptance
 
 - `git diff --check`
-- `pwsh ./scripts/verify-doc-ssot.ps1`
-- `pwsh ./scripts/verify-project-skills.ps1`
-- `pwsh ./scripts/verify-real-e2e-contract.ps1`
+- `pwsh ./scripts/verify/verify-doc-ssot.ps1`
+- `pwsh ./scripts/verify/verify-project-skills.ps1`
+- `pwsh ./scripts/verify/verify-real-e2e-contract.ps1`
 - For scripts/tests reshape: CI `validate`, Web/Desktop frontend gates, `go test ./tests/teamrun -count=1`, release-readiness path checks.
 - For archive migration: reference scan with only allowed current-index references remaining.
 - Final: AgentHub active markdown is limited to current owner entrypoints; no tracked one-off evidence remains at root; CI is green; `D:\Code\TokenDance\docs` receives the corresponding archive commit.

@@ -92,7 +92,7 @@ function Invoke-RepoScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-approved-real-demo-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-demo-readiness.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-demo-readiness.ps1"
 $webSmokePath = Join-Path $RepoRoot "app\web\src\__e2e__\web-hub-real-mode-smoke.spec.ts"
 
@@ -157,7 +157,7 @@ try {
     Assert-True ($manifestText -notmatch '(?i)(sk-[a-z0-9_-]{8,}|Authorization:\s*Bearer\s+(?!<redacted)[^\s,;}]+)') "manifest has no unredacted secret-like values"
 
     $verify = Invoke-RepoScript @(
-        (Join-Path $RepoRoot "scripts\evidence\verify-redacted-manifest.ps1"),
+        (Join-Path $RepoRoot "scripts\lib\evidence\verify-redacted-manifest.ps1"),
         "-ManifestPath", $manifestPath
     )
     Assert-True ($verify.ExitCode -eq 0) "redacted manifest verifier accepts runner output" $verify.Output

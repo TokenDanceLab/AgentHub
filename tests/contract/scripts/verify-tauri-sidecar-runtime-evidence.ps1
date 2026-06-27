@@ -31,7 +31,7 @@ function Invoke-Gate {
         [string]$WorkingDirectory = $RepoRoot
     )
 
-    $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-runtime-evidence.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-runtime-evidence.ps1"
     Push-Location $WorkingDirectory
     try {
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
@@ -72,8 +72,8 @@ function New-MinimalRepoFixture {
         "app\desktop\src-tauri\src\lib.rs",
         "app\desktop\src\platform\desktopPlatform.ts",
         "app\desktop\src\platform\desktopPlatform.test.ts",
-        "scripts\verify-tauri-package-readiness.ps1",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-readiness.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-readiness.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "docs\audit\p1-tauri-build-package-evidence.md"
@@ -137,7 +137,7 @@ function New-ArtifactRoot {
     return $root
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-runtime-evidence.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-runtime-evidence.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-runtime-evidence.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "Tauri sidecar runtime evidence gate exists"
 Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "Tauri sidecar runtime evidence gate implementation exists"

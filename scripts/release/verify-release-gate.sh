@@ -5,9 +5,9 @@
 # RC tag policy, security risk register, and artifact manifest.
 #
 # Usage:
-#   ./scripts/verify-release-gate.sh [--allow-open-high-risks] [--skip-ref-check]
-#   ./scripts/verify-release-gate.sh --base-ref origin/master --dev-ref origin/dev/delicious233
-#   ./scripts/verify-release-gate.sh --artifacts-root dist/unsigned-dry --report-path .tmp/release-gate-report.json
+#   ./scripts/release/verify-release-gate.sh [--allow-open-high-risks] [--skip-ref-check]
+#   ./scripts/release/verify-release-gate.sh --base-ref origin/master --dev-ref origin/dev/delicious233
+#   ./scripts/release/verify-release-gate.sh --artifacts-root dist/unsigned-dry --report-path .tmp/release-gate-report.json
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"

@@ -90,7 +90,7 @@ function Invoke-RepoScript {
     }
 }
 
-$gatePath = Join-Path $RepoRoot "scripts\verify-p0-local-smoke.ps1"
+$gatePath = Join-Path $RepoRoot "scripts\smoke\verify-p0-local-smoke.ps1"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "P0 localhost smoke harness exists"
 

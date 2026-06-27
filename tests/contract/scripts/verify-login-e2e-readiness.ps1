@@ -94,7 +94,7 @@ function Invoke-RepoScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-login-e2e-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-login-e2e-readiness.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-login-e2e-readiness.ps1"
 $specPath = Join-Path $RepoRoot "app\web\src\__e2e__\oidc-login.spec.ts"
 $docPath = Join-Path $RepoRoot "docs\audit\p2-login-e2e-approval-harness.md"
