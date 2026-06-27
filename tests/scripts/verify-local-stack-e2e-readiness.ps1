@@ -104,9 +104,11 @@ function Get-FreePort {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-local-stack-e2e-readiness.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-local-stack-e2e-readiness.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-local-stack-e2e-runner.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "local stack E2E readiness script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "local stack E2E readiness script implementation exists"
 Assert-True (Test-Path -LiteralPath $docPath) "local stack E2E readiness audit doc exists"
 
 try {
@@ -119,8 +121,8 @@ try {
     New-Item -ItemType Directory -Force -Path $safeArtifactRoot | Out-Null
     $TempRoots += $safeArtifactRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match '\[ValidateSet\("FixtureOnly", "ReadinessOnly", "ApprovedReal"\)\]') "script distinguishes FixtureOnly, ReadinessOnly, and ApprovedReal"
         Assert-True ($scriptText -match 'verify-localhost-product-loop\.ps1') "script composes localhost product-loop fixture gate"
         Assert-True ($scriptText -match 'verify-localhost-real-services\.ps1') "script composes localhost real-services readiness gate"

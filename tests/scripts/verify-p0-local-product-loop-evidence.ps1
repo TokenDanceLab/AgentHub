@@ -109,9 +109,11 @@ function Get-EventIndex {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-p0-local-product-loop-evidence.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-local-product-loop-evidence.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p0-local-product-loop-evidence.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "P0 local product-loop evidence runner exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "P0 local product-loop evidence runner implementation exists"
 Assert-True (Test-Path -LiteralPath $docPath) "P0 local product-loop audit doc exists"
 
 try {
@@ -120,8 +122,8 @@ try {
     New-Item -ItemType Directory -Force -Path $safeArtifactRoot | Out-Null
     $TempRoots += $safeArtifactRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match '\[ValidateSet\("FixtureOnly", "ApprovedRealReview"\)\]') "runner distinguishes FixtureOnly and ApprovedRealReview"
         Assert-True ($scriptText -match 'verify-localhost-product-loop\.ps1') "runner composes localhost product-loop fixture harness"
         Assert-True ($scriptText -match 'verify-observed-localhost-dispatch\.ps1') "runner can review observed dispatch manifest"

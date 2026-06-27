@@ -65,11 +65,13 @@ function New-DiscoveryFixture {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-token-dance-id-login-readiness.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-token-dance-id-login-readiness.ps1"
 $realE2eSkillPath = Join-Path $RepoRoot ".agents\skills\real-e2e-acceptance\SKILL.md"
 $roadmapPath = Join-Path $RepoRoot "docs\roadmap.md"
 $envExamplePath = Join-Path $RepoRoot ".env.example"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "TokenDanceID login readiness script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "TokenDanceID login readiness script implementation exists"
 Assert-True (Test-Path -LiteralPath $realE2eSkillPath) "real E2E acceptance skill exists"
 Assert-True (Test-Path -LiteralPath $roadmapPath) "roadmap exists"
 
@@ -79,8 +81,8 @@ try {
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match 'agenthub-token-dance-id-login-readiness-v1') "script emits stable schema"
         Assert-True ($scriptText -match 'READY_FOR_OPERATOR') "script has ready-for-operator status"
         Assert-True ($scriptText -match 'BLOCKED') "script has blocked status"

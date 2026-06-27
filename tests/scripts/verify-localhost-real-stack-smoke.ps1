@@ -129,9 +129,11 @@ function Test-PortListening {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-real-stack-smoke.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-stack-smoke.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-localhost-real-stack-smoke.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "real local stack smoke script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "real local stack smoke script implementation exists"
 
 try {
     $tmpRoot = Join-Path $RepoRoot ".tmp\localhost-real-stack-smoke\script-test-$PID"
@@ -139,8 +141,8 @@ try {
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match "agenthub-localhost-real-stack-smoke-v1") "script writes a stable manifest schema"
         Assert-True ($scriptText -match "agenthub-runner-mock") "script starts Local Edge with mock runner only"
         Assert-True ($scriptText -match "--store-backend" -and $scriptText -match "sqlite" -and $scriptText -match "--store-db") "script starts Local Edge with SQLite store"
