@@ -68,7 +68,7 @@ export function createMobilePlatform(options: MobilePlatformOptions): AgentHubPl
   const hubClient = createMobileHubClientFromOptions(options);
 
   return {
-    surface: 'web',
+    surface: 'mobile',
     capabilities: mobileCapabilities,
 
     conversations: {

@@ -61,4 +61,14 @@ describe('createMockPlatform', () => {
       }),
     ]);
   });
+
+  it('accepts mobile as a first-class platform surface', () => {
+    const platform = createMockPlatform({
+      surface: 'mobile',
+      capabilities: { localEdge: false, localFiles: true, browserPreview: false },
+    });
+
+    expect(platform.surface).toBe('mobile');
+    expect(platform.capabilities.localEdge).toBe(false);
+  });
 });

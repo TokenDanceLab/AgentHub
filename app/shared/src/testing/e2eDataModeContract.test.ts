@@ -84,7 +84,7 @@ describe('e2e data-mode contract', () => {
       directLocalEdge: true,
     }, [])).toMatchObject({
       ok: false,
-      errors: ['web-stubbed-hub-replay-smoke is Web approved-real replay and must not direct-call Local Edge'],
+      errors: ['web-stubbed-hub-replay-smoke surface web must not direct-call Local Edge'],
     });
     expect(validateE2EDataModeScenario({
       ...scenario,
@@ -98,6 +98,77 @@ describe('e2e data-mode contract', () => {
     ])).toEqual({
       ok: false,
       errors: ['web-stubbed-hub-replay-smoke forbids local-edge request GET http://127.0.0.1:3210/v1/runs'],
+    });
+  });
+
+  it('keeps Mobile mock preview offline and blocks Local Edge', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'mobile-expo-web-preview',
+      surface: 'mobile',
+      dataMode: 'mock',
+      dataSource: 'local-mock',
+      appOrigin: 'http://127.0.0.1:5177',
+      mockAdapterUsed: true,
+    });
+
+    expect(validateE2EDataModeScenario(scenario, [
+      { method: 'GET', url: 'http://127.0.0.1:5177/' },
+    ])).toEqual({ ok: true, errors: [] });
+    expect(validateE2EDataModeScenario(scenario, [
+      { method: 'GET', url: 'http://127.0.0.1:8088/v1/mobile/snapshot' },
+    ])).toEqual({
+      ok: false,
+      errors: ['mobile-expo-web-preview forbids other-http request GET http://127.0.0.1:8088/v1/mobile/snapshot'],
+    });
+    expect(validateE2EDataModeScenario({
+      ...scenario,
+      directLocalEdge: true,
+    }, [])).toEqual({
+      ok: false,
+      errors: ['mobile-expo-web-preview surface mobile must not direct-call Local Edge'],
+    });
+  });
+
+  it('records Mobile stubbed Hub checks as non-real evidence', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'mobile-mock-hub-contract',
+      surface: 'mobile',
+      dataMode: 'approved-real',
+      dataSource: 'stubbed-hub-session',
+      appOrigin: 'http://127.0.0.1:5177',
+      hubOrigin: 'http://127.0.0.1:8088',
+      mockAdapterUsed: true,
+    });
+
+    const requests = [
+      { method: 'GET', url: 'http://127.0.0.1:8088/v1/mobile/snapshot' },
+      { method: 'GET', url: 'http://127.0.0.1:8088/v1/events' },
+    ];
+
+    expect(validateE2EDataModeScenario(scenario, requests)).toEqual({ ok: true, errors: [] });
+    expect(validateE2EDataModeScenario(scenario, [
+      ...requests,
+      { method: 'GET', url: 'http://127.0.0.1:3210/v1/health' },
+    ])).toEqual({
+      ok: false,
+      errors: ['mobile-mock-hub-contract forbids local-edge request GET http://127.0.0.1:3210/v1/health'],
+    });
+    expect(buildE2EDataModeManifest(scenario, requests)).toMatchObject({
+      scenario: 'mobile-mock-hub-contract',
+      surface: 'mobile',
+      dataMode: 'approved-real',
+      dataSource: 'stubbed-hub-session',
+      hubOrigin: 'http://127.0.0.1:8088',
+      directLocalEdge: false,
+      realLoginTested: false,
+      realCliOrModelExecuted: false,
+      mockAdapterUsed: true,
+      real_tested: false,
+      requestedBoundaries: ['hub'],
+      requestedEndpoints: [
+        'GET http://127.0.0.1:8088/v1/events',
+        'GET http://127.0.0.1:8088/v1/mobile/snapshot',
+      ],
     });
   });
 
