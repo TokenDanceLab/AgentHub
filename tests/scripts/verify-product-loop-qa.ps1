@@ -131,15 +131,19 @@ function New-ObservedManifestWithoutWebRender {
 try {
     $scriptPath = Join-Path $RepoRoot "scripts\verify-product-loop-qa.ps1"
     $observedPath = Join-Path $RepoRoot "scripts\verify-observed-localhost-dispatch.ps1"
+    $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-product-loop-qa.ps1"
+    $observedImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-observed-localhost-dispatch.ps1"
     Assert-True (Test-Path -LiteralPath $scriptPath) "product-loop QA umbrella exists"
     Assert-True (Test-Path -LiteralPath $observedPath) "observed dispatch verifier exists"
+    Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "product-loop QA umbrella implementation exists"
+    Assert-True (Test-Path -LiteralPath $observedImplementationPath) "observed dispatch verifier implementation exists"
 
-    $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
     Assert-True ($scriptText -match 'agenthub-product-loop-qa-v1') "umbrella writes product-loop QA schema"
     Assert-True ($scriptText -match 'ApprovedReal requires -ApproveRealEvidence') "ApprovedReal fails closed without approval"
     Assert-True ($scriptText -match 'verify-approved-real-edge-cli-evidence\.ps1') "umbrella composes approved-real CLI evidence verifier"
 
-    $observedText = Get-Content -Raw -LiteralPath $observedPath
+    $observedText = Get-Content -Raw -LiteralPath $observedImplementationPath
     Assert-True ($observedText -match 'web_render') "observed verifier requires Web render section"
     Assert-True ($observedText -match 'web\.replay\.rendered') "observed verifier requires rendered replay event"
     Assert-True ($observedText -match 'Web render source must be hub-replay') "observed verifier requires Hub replay render source"
