@@ -105,7 +105,7 @@ function Add-ArtifactManifest {
 function Assert-SidecarSqlitePolicy {
     Step "Packaged Local Edge SQLite app-data policy"
     $edgeManager = Read-Text "app\desktop\src-tauri\src\edge_manager.rs"
-    $commands = Read-Text "app\desktop\src-tauri\src\commands.rs"
+    $hostEdge = Read-Text "app\desktop\src-tauri\src\host\edge.rs"
     $lib = Read-Text "app\desktop\src-tauri\src\lib.rs"
     $useHealth = Read-Text "app\desktop\src\hooks\useHealth.ts"
     $desktopPlatformTest = Read-Text "app\desktop\src\platform\desktopPlatform.test.ts"
@@ -117,7 +117,7 @@ function Assert-SidecarSqlitePolicy {
     Assert-True ($edgeManager -match 'new_unavailable' -and $lib -match 'Local Edge startup is blocked') "Token generation failure keeps Local Edge fail-closed"
     Assert-True ($edgeManager -match 'local-edge\.stdout\.log' -and $edgeManager -match 'local-edge\.stderr\.log') "Local Edge stdout/stderr log paths are exposed for diagnostics"
     Assert-True ($edgeManager -match 'edge_health_url' -and $edgeManager -match '/v1/health') "Local Edge health URL is included in readiness/status"
-    Assert-True ($commands -match 'get_edge_host_readiness' -and $commands -match 'host_readiness_for_app' -and $commands -match 'local_auth_token\(\)\.map') "Tauri commands expose readiness and fail closed on missing Edge auth token"
+    Assert-True ($lib -match 'get_edge_host_readiness' -and $hostEdge -match 'host_readiness_for_app' -and $hostEdge -match 'local_auth_token\(\)\.map') "Tauri host commands expose readiness and fail closed on missing Edge auth token"
     Assert-True ($useHealth -match 'lastError' -and $useHealth -match 'Local Edge health check failed') "Desktop health hook preserves the last Local Edge health error"
     Assert-True ($desktopPlatformTest -match 'direct_cli_spawn:\s*false' -and $desktopPlatformTest -match '<app-data>/agenthub-edge\.sqlite' -and $desktopPlatformTest -match 'local-edge\.stderr\.log') "Desktop platform test preserves no direct CLI spawn, app-data SQLite policy, and log diagnostics"
 }
