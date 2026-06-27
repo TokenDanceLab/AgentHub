@@ -16,10 +16,10 @@
 
 ### S.U.P.E.R Violation Hotspots
 
-1. `docs/roadmap.md`: roadmap, current state, architecture, release gates, verification matrix, backlog, and appendix all in one active file of roughly 119 KB and more than 2,000 lines.
-2. `docs/governance/`: now narrowed to long-lived owner docs, but dated governance evidence must stay archived so it cannot be mistaken for active policy.
+1. `docs/roadmap.md`: previously mixed roadmap, current state, architecture, release gates, verification matrix, backlog, and appendix; now trimmed, but recurrence must be blocked by doc SSOT checks.
+2. `docs/governance/`: narrowed to long-lived owner docs; duplicate rule surfaces must stay archived so they cannot be mistaken for active policy.
 3. Project skills: active skills are allowlisted, but their wording must keep matching the current CI/runtime entrypoints.
-4. `docs/governance/document-standards.md`: says phase plans go directly in `docs/`, conflicting with current spec-driven archive/progress rules.
+4. Legacy document/workflow rule files can drift from `AGENTS.md`; current mitigation is to archive duplicate rule surfaces and keep active rules in one file.
 5. `app/desktop/stats.html`: tracked generated bundle analysis contains node_modules paths and pollutes source search.
 6. `hub-server`: largest module and current roadmap P0/P1 findings target goroutines, EventBus blocking, Redis TTL, scheduler cancellation, token/session risks, and pprof boundaries.
 
@@ -71,16 +71,14 @@ Avoid adding tests that only verify mock data or duplicate switch statements.
 
 ### Documentation Source Sprawl
 
-`docs/roadmap.md` still mixes long-term direction with historical verification claims, release checklists, and implementation backlog. `docs/architecture.md` still has older ChatView hardening context while newer Chat UIUX work has been archived. This makes future agents read too much and still get stale facts.
-
-Mitigation should reduce active docs, not add another governance layer.
+Earlier active docs mixed long-term direction with historical verification claims, release checklists, implementation backlog, and older ChatView context. The current mitigation is to keep `AGENTS.md`, `docs/progress/MASTER.md`, and `docs/roadmap.md` as separate owner surfaces, archive duplicate governance rule files, and prevent old longform material from returning to active docs.
 
 ## Technical Debt
 
 - `hub-server` size and domain breadth make it the top backend complexity hotspot.
 - `app/shared` is the right shared UI home, but its responsibilities are broad enough that data-mode/transcript/workbench contracts need stricter boundaries.
 - `scripts` contains useful gates, but several policy checks inspect string patterns in workflow files; these should stay narrow and not become broad governance logic.
-- `docs/archive/` and `docs/archives/` both exist. Their purposes are now documented, but the split is easy to misunderstand.
+- `docs/archive/` and `docs/archives/` both exist. Their purposes are documented, but the split must stay visible in `docs/archive/README.md`, `docs/archives/README.md`, and `AGENTS.md`.
 - Old one-off plans, dated audits, release notes, and longform reference research must stay under `docs/archive/`; active `docs/plan/` and `docs/progress/` are reserved for the current spec-driven run only.
 - Archived project skills are correctly moved out of `.agents/skills`, but future scans should enforce that active skill names match the AGENTS whitelist.
 
@@ -94,7 +92,7 @@ Mitigation should reduce active docs, not add another governance layer.
 
 ## Project Governance Risks
 
-- `docs/progress/MASTER.md` does not exist, so this is a fresh run; future sessions must read it first after Phase 4 creates it.
+- `docs/progress/MASTER.md` is the active spec-driven progress index; future sessions must read it first and then sync GitHub issue/milestone live state.
 - `GITHUB_STANDARD` is available, but Project board integration is not available without `read:project`.
 - Native memory exists outside the repo. Do not create repo-local memory files unless explicitly selected.
 - The active skill surface is clean today, but stale global/project skills can reappear if AGENTS whitelist is not enforced.
