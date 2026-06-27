@@ -79,7 +79,7 @@ git worktree list
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
 **Current Focus**: review/merge Phase 1 governance baseline; Desktop/Web real E2E and visual QA framework now has focused 16:9 chat-flow evidence. Mobile-specific UI/fixture fixes are deferred for a later pass by operator direction.
-**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and non-Mobile GitHub checks are green; the Mobile workflow now has hard timeouts so it fails fast instead of hanging indefinitely.
+**Blockers**: PR #338 is blocked only by the `Frontend (mobile)` required check. Current local Desktop/Web focused gates and non-Mobile GitHub checks are green; the Mobile workflow now has hard timeouts and the Mobile Visual QA harness exits with the real assertion failure instead of hanging indefinitely.
 
 ### Local Phase 1 Evidence
 
@@ -126,4 +126,4 @@ git worktree list
 | 2026-06-27 | phase-1-local | Normalized project-skill archive/whitelist rules, branch/worktree live-state rules, document active/archive rules, and focused validators. Verification: `verify-project-skills.ps1`, `verify-ci-gates.ps1`, `verify-ci-gates.sh`, OpenAPI YAML parse, and `git diff --check` passed. |
 | 2026-06-27 | phase-1-pr | Pushed `docs/repo-governance-real-e2e` and opened PR #338 to `dev/delicious233`; PR body closes #322-#325 on merge and records evidence boundaries. |
 | 2026-06-27 | desktop-web-gates | Scoped Mobile out for this pass; tuned Desktop/Web Playwright and manual visual chat-flow navigation budgets to match Windows cold-start behavior without weakening UI assertions. Verification: shared data-mode contract 784 tests passed, Desktop chat-flow Playwright 4/4 passed, Web stubbed Hub Playwright 7/7 passed, Desktop/Web manual 1440x810 visual chat-flow checks passed. |
-| 2026-06-27 | mobile-gate-timeout | Did not change Mobile UI or fixtures. Added hard timeouts to the Mobile GitHub job, screenshot Visual QA step, and mock-Hub E2E step, then enforced them through PowerShell and Bash CI policy verifiers. Verification: `verify-ci-gates.ps1` and `verify-ci-gates.sh` passed. |
+| 2026-06-27 | mobile-gate-timeout | Did not change Mobile UI or fixtures. Added hard timeouts to the Mobile GitHub job, screenshot Visual QA step, and mock-Hub E2E step, enforced them through PowerShell and Bash CI policy verifiers, and made the Mobile Visual QA script exit immediately after reporting its real assertion failure. Verification: `verify-ci-gates.ps1`, `verify-ci-gates.sh`, and `corepack.cmd pnpm --dir app/mobile-rn visual:qa` failed fast in ~45s on the existing `Alice` assertion. |
