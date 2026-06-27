@@ -24,7 +24,7 @@ docs/
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
 ├── progress/                          ← 当前 spec-driven 专项进度（仅执行中存在）
 ├── adr/                               ← 架构决策记录（11 篇）
-├── governance/                        ← 治理：执行映射、分支规范、安全风险、威胁模型
+├── governance/                        ← 治理：执行映射、安全风险、威胁模型
 ├── archive/                           ← 历史 longform、审计、发布、过期设计、参考调研和旧入口快照
 ├── archives/                          ← spec-driven 专项归档和过期项目 skill
 ├── images/                            ← 截图与图片资源
@@ -43,7 +43,7 @@ docs/
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
-| 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |
+| 分支和 worktree 规则 | [../AGENTS.md](../AGENTS.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
 | 后端性能/泄漏证据 | [../scripts/load-test-scenarios.md](../scripts/load-test-scenarios.md) |

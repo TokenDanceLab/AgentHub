@@ -25,7 +25,6 @@ const requiredConfigRefs = [
 ];
 const scannedTextFiles = [
   'README.md',
-  'docs/handoff.md',
   'app.config.ts',
 ];
 
