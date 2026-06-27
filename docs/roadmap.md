@@ -25,7 +25,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，根级重复规则文件已移除，旧 skill 归档 |
 | Phase 2 Real E2E Contract | 完成 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
-| Phase 3 Source And Test Alignment | 进行中 | 已完成 API/Hub、模块 README 和进度 SSOT 文档收敛；当前进入 #330 聊天流测试/实现 |
+| Phase 3 Source And Test Alignment | 进行中 | 已完成 API/Hub、模块 README、进度 SSOT 和 #330 聊天流测试加固；当前进入 #331 前端架构文档对齐 |
 | Phase 4 Acceptance And Merge Readiness | 待开始 | 聚合验收、架构审批、归档和合并准备 |
 
 ## 当前优先级
