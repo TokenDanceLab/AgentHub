@@ -138,6 +138,7 @@ try {
 
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
+  page.setDefaultNavigationTimeout(60_000);
 
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -180,7 +181,7 @@ try {
     } catch {}
   });
 
-  await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const demoButton = page.getByRole('button', { name: '使用 Demo 模式继续' });
   if (await demoButton.isVisible().catch(() => false)) {
     await demoButton.click({ timeout: 5_000 }).catch(async (error) => {

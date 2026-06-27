@@ -6,11 +6,12 @@ const webWorkspaceViewport = { width: 1440, height: 810 };
 
 export default defineConfig({
   testDir: './src/__e2e__',
-  timeout: 30_000,
+  timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: 0,
   use: {
     baseURL: webE2EBaseURL,
+    navigationTimeout: 60_000,
     screenshot: 'only-on-failure',
   },
   projects: [
@@ -23,6 +24,6 @@ export default defineConfig({
     command: `pnpm dev --host 127.0.0.1 --port ${webE2EPort}`,
     url: webE2EBaseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 15_000,
+    timeout: 45_000,
   },
 });

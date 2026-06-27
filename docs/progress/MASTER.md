@@ -78,8 +78,8 @@ git worktree list
 
 **Active Phase**: Phase 1 - Governance Baseline
 **Active Task**: Phase 1 PR #338 open; issues #322-#325 close on merge.
-**Current Focus**: review/merge Phase 1 governance baseline, then start Phase 2 real E2E contract.
-**Blockers**: none
+**Current Focus**: review/merge Phase 1 governance baseline; Desktop/Web real E2E and visual QA framework now has focused 16:9 chat-flow evidence. Mobile-specific Visual QA is deferred for a later pass by operator direction.
+**Blockers**: PR #338 still needs final GitHub check review before merge; current local Desktop/Web focused gates are green.
 
 ### Local Phase 1 Evidence
 
@@ -125,3 +125,4 @@ git worktree list
 | 2026-06-27 | setup | Phase 1-3 analysis/plan docs existed; refreshed GitHub state, created missing Phase 4 issues #335-#337, and created this MASTER index. |
 | 2026-06-27 | phase-1-local | Normalized project-skill archive/whitelist rules, branch/worktree live-state rules, document active/archive rules, and focused validators. Verification: `verify-project-skills.ps1`, `verify-ci-gates.ps1`, `verify-ci-gates.sh`, OpenAPI YAML parse, and `git diff --check` passed. |
 | 2026-06-27 | phase-1-pr | Pushed `docs/repo-governance-real-e2e` and opened PR #338 to `dev/delicious233`; PR body closes #322-#325 on merge and records evidence boundaries. |
+| 2026-06-27 | desktop-web-gates | Scoped Mobile out for this pass; tuned Desktop/Web Playwright and manual visual chat-flow navigation budgets to match Windows cold-start behavior without weakening UI assertions. Verification: shared data-mode contract 784 tests passed, Desktop chat-flow Playwright 4/4 passed, Web stubbed Hub Playwright 7/7 passed, Desktop/Web manual 1440x810 visual chat-flow checks passed. |
