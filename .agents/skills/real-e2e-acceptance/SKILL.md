@@ -34,6 +34,14 @@ Stubbed, fixture, Vite renderer, observed-local, approved-real, and packaged-rel
 
 Use the narrowest accurate wording. Stubbed or manifest-only reports must include `real_tested=false`.
 
+Smoke matrix manifests must be machine-honest:
+
+- Every row records `evidence_level`, `real_tested`, `status`, and a short `claim`.
+- Top-level `evidence_levels` includes only non-skipped rows that actually ran.
+- Skipped gates may appear only under `skipped_evidence_levels` and row-level `status: "skipped"`.
+- Stubbed Hub rows use `evidence_level: "stubbed-hub"` and `real_tested: false`; they must not be named or reported as real login/model/API execution.
+- Desktop Vite rows use Playwright/UI wording; packaged Desktop claims require a separate packaged-release row.
+
 ## Gate Matrix
 
 | Claim | Minimum useful gates |
