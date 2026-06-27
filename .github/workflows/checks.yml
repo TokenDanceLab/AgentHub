@@ -339,6 +339,7 @@ jobs:
   frontend-mobile:
     name: Frontend (mobile)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: ./app
@@ -398,6 +399,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Screenshot visual QA (mobile)
+        timeout-minutes: 12
         run: |
           echo "=== Mobile screenshot visual QA ==="
           cd mobile-rn
@@ -415,6 +417,7 @@ jobs:
           retention-days: 7
 
       - name: E2E (mock hub)
+        timeout-minutes: 10
         run: |
           node mobile-rn/scripts/mock-hub.mjs &
           MOCK_HUB_PID=$!
