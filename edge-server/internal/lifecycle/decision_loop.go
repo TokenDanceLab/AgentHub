@@ -3,7 +3,7 @@
 // enforcement, and tool-approval gating.
 //
 // This addresses the gap documented in:
-//   docs/archive/reference-projects/lobehub/03-full-borrow-list.md Finding 1
+//   Historical LobeHub borrow-list Finding 1, indexed by docs/history.md:
 //   "AgentHub relies on Claude Code's opaque internal loop"
 //
 // Design:

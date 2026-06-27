@@ -418,12 +418,12 @@ Write-Host "  RealTested=false" -ForegroundColor White
 Pass "smoke claim labels are explicit" "LocalOnly" "Dry-run/plan output cannot claim real execution."
 
 Step "FixtureOnly gates"
-Invoke-RequiredScriptGate "verify-p0-remote-control-fixture.ps1" "scripts\verify-p0-remote-control-fixture.ps1" @(
+Invoke-RequiredScriptGate "verify-p0-remote-control-fixture.ps1" "scripts\verify\verify-p0-remote-control-fixture.ps1" @(
     "-RepoRoot", $RepoRoot
 ) "FixtureOnly"
 
 Step "LocalOnly gates"
-Invoke-RequiredScriptGate "verify-oidc-flow.ps1 -LocalOnly -SkipTD" "scripts\verify-oidc-flow.ps1" @(
+Invoke-RequiredScriptGate "verify-oidc-flow.ps1 -LocalOnly -SkipTD" "scripts\verify\verify-oidc-flow.ps1" @(
     "-LocalOnly",
     "-SkipTD",
     "-RepoRoot", $RepoRoot

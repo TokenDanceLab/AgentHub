@@ -28,7 +28,7 @@ function Assert-True {
 function Invoke-Readiness {
     param([string[]]$Arguments)
 
-    $scriptPath = Join-Path $RepoRoot "scripts\verify-teamrun-demo-readiness.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\verify\verify-teamrun-demo-readiness.ps1"
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {

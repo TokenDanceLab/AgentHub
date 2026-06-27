@@ -111,9 +111,9 @@ Assert-Contains ".env.example" "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET" "example c
 Assert-Contains ".env.example" "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS" "example config names allowed redirect URI boundary"
 
 Step "future real E2E proposal commands"
-Write-Host "  fake/local: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -LocalOnly" -ForegroundColor White
-Write-Host "  packaged readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-readiness.ps1 -RepoRoot ." -ForegroundColor White
-Write-Host "  dry real-readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-packaged-login-real-readiness.ps1 -RepoRoot ." -ForegroundColor White
+Write-Host "  fake/local: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-oidc-flow.ps1 -LocalOnly" -ForegroundColor White
+Write-Host "  packaged readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-tauri-package-readiness.ps1 -RepoRoot ." -ForegroundColor White
+Write-Host "  dry real-readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-packaged-login-real-readiness.ps1 -RepoRoot ." -ForegroundColor White
 
 Step "future real E2E blockers"
 Warn "requires explicit operator approval to open the system browser and run a real TokenDance ID login"

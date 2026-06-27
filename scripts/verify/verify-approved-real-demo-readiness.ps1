@@ -324,7 +324,7 @@ $observedReport = Join-Path $ObservedGateRoot "observed-dispatch-report.json"
 $observedPassed = $false
 
 if ($Failures.Count -eq 0 -and -not $SkipObservedFixture) {
-    $observedRun = Invoke-RepoScript "scripts\verify-localhost-observed-loop.ps1" @(
+    $observedRun = Invoke-RepoScript "scripts\smoke\verify-localhost-observed-loop.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-Mode", "FixtureManifest",
         "-ArtifactRoot", $ObservedGateRoot,
@@ -339,7 +339,7 @@ if ($Failures.Count -eq 0 -and -not $SkipObservedFixture) {
 $LocalStackGateRoot = Join-Path $RepoRoot ".tmp\localhost-real-stack-smoke\approved-real-demo-$PID"
 $localStackEvidence = Join-Path $LocalStackGateRoot "localhost-real-stack-smoke.json"
 if ($Failures.Count -eq 0 -and $RunLocalStackSmoke) {
-    $localStackRun = Invoke-RepoScript "scripts\verify-localhost-real-stack-smoke.ps1" @(
+    $localStackRun = Invoke-RepoScript "scripts\smoke\verify-localhost-real-stack-smoke.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-ArtifactRoot", $LocalStackGateRoot,
         "-EvidencePath", $localStackEvidence,
@@ -365,7 +365,7 @@ $preflightCopy = ""
 if (-not [string]::IsNullOrWhiteSpace($PreflightManifestPath)) {
     $resolvedPreflight = Resolve-InputPath $PreflightManifestPath
     $preflightCopy = Copy-EvidenceFile $resolvedPreflight "approved-real-preflight.json"
-    $preflightRun = Invoke-RepoScript "scripts\verify-approved-real-preflight.ps1" @(
+    $preflightRun = Invoke-RepoScript "scripts\verify\verify-approved-real-preflight.ps1" @(
         "-RepoRoot", $RepoRoot,
         "-ManifestPath", $resolvedPreflight
     )

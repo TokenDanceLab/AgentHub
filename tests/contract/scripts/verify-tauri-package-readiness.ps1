@@ -49,7 +49,7 @@ function Invoke-Script {
         [string]$WorkingDirectory = $RepoRoot
     )
 
-    $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
+    $scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1"
     Push-Location $WorkingDirectory
     $oldErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -84,7 +84,7 @@ function New-RogueTauriBuildFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -129,7 +129,7 @@ function New-RogueMacOSCommandFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -165,7 +165,7 @@ function New-RogueMacOSReleaseActionFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -203,7 +203,7 @@ function New-FixedStableReleaseFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -239,7 +239,7 @@ function New-TaggedReleaseFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -292,7 +292,7 @@ function New-DirtyGeneratedSchemaFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -321,7 +321,7 @@ function New-MissingBundledSidecarFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -348,7 +348,7 @@ function New-DeletedGeneratedSchemaFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
-        "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "scripts\release\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
@@ -429,8 +429,8 @@ function New-TestArtifactRoot {
     return $root
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
-$smokeScriptPath = Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1"
+$smokeScriptPath = Join-Path $RepoRoot "scripts\release\verify-tauri-installer-smoke.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1"
 $smokeScriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-installer-smoke.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\release.yml"

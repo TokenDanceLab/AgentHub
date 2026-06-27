@@ -1,14 +1,14 @@
 # AgentHub client local smoke test (Windows / PowerShell)
 #
 # Chains Edge and Desktop-facing API end-to-end verification.
-# Run .\scripts\setup.ps1 first, then this script.
+# Run .\scripts\dev\setup.ps1 first, then this script.
 #
 # Usage:
-#   .\scripts\client-smoke.ps1
-#   .\scripts\client-smoke.ps1 -SkipBuild
-#   .\scripts\client-smoke.ps1 -ReuseExistingEdge
-#   .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
-#   .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
+#   .\scripts\smoke\client-smoke.ps1
+#   .\scripts\smoke\client-smoke.ps1 -SkipBuild
+#   .\scripts\smoke\client-smoke.ps1 -ReuseExistingEdge
+#   .\scripts\smoke\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
+#   .\scripts\smoke\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
 
 [CmdletBinding()]
 param(

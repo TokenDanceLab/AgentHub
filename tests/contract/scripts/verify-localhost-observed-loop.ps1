@@ -103,7 +103,7 @@ function Get-FreePort {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-observed-loop.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-observed-loop.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-observed-loop.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-localhost-observed-loop.md"
 $webConfigPath = Join-Path $RepoRoot "app\web\playwright.config.ts"

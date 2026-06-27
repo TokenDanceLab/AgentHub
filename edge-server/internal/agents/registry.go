@@ -3,7 +3,7 @@
 // status, and enables communication between orchestrator and sub-agents.
 //
 // Reference: docs/reference/cross-comparison/03-orchestration.md Layer 2
-// Reference: docs/archive/reference-projects/codex-cli/01-overview.md AgentTree pattern
+// Reference: historical codex-cli AgentTree pattern indexed by docs/history.md.
 package agents
 
 import (

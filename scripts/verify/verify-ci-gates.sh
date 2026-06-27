@@ -6,7 +6,7 @@
 # and validate job requirements.
 #
 # Usage:
-#   ./scripts/verify-ci-gates.sh [WORKFLOW_PATH]
+#   ./scripts/verify/verify-ci-gates.sh [WORKFLOW_PATH]
 set -euo pipefail
 
 WORKFLOW_PATH="${1:-.github/workflows/checks.yml}"
@@ -146,7 +146,7 @@ assert_contains "$backend_fixture" "TeamRun fixture E2E" "backend-e2e-fixture mu
 assert_contains_fixed "$backend_fixture" "go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1" "backend-e2e-fixture must run only the TeamRun fixture smoke test"
 assert_step_continue_on_error "$backend_fixture" "TeamRun fixture E2E" false
 assert_contains "$backend_fixture" "P0 remote-control fixture readiness" "backend-e2e-fixture must run the P0 remote-control fixture readiness step"
-assert_contains "$backend_fixture" "pwsh.*scripts/verify-p0-remote-control-fixture.ps1" "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
+assert_contains "$backend_fixture" "pwsh.*scripts/verify/verify-p0-remote-control-fixture.ps1" "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
 assert_step_continue_on_error "$backend_fixture" "P0 remote-control fixture readiness" false
 
 # Backend focused subset constraints
@@ -209,13 +209,13 @@ done
 
 # Validate job requirements
 assert_contains "$validate" "Verify CI gate policy" "validate job must run the CI gate policy verifier"
-assert_contains "$validate" "scripts/verify-ci-gates\\.ps1" "validate job must call scripts/verify-ci-gates.ps1"
+assert_contains "$validate" "scripts/verify/verify-ci-gates\\.ps1" "validate job must call scripts/verify/verify-ci-gates.ps1"
 assert_contains "$validate" "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
-assert_contains "$validate" "scripts/verify-project-skills\\.ps1" "validate job must call scripts/verify-project-skills.ps1"
+assert_contains "$validate" "scripts/verify/verify-project-skills\\.ps1" "validate job must call scripts/verify/verify-project-skills.ps1"
 assert_contains "$validate" "Verify doc SSOT" "validate job must run the doc SSOT verifier"
-assert_contains "$validate" "scripts/verify-doc-ssot\\.ps1" "validate job must call scripts/verify-doc-ssot.ps1"
+assert_contains "$validate" "scripts/verify/verify-doc-ssot\\.ps1" "validate job must call scripts/verify/verify-doc-ssot.ps1"
 assert_contains "$validate" "Verify real E2E contract" "validate job must run the real E2E contract verifier"
-assert_contains "$validate" "scripts/verify-real-e2e-contract\\.ps1" "validate job must call scripts/verify-real-e2e-contract.ps1"
+assert_contains "$validate" "scripts/verify/verify-real-e2e-contract\\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 assert_contains "$validate" "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 assert_contains "$validate" "check-secrets\\.sh" "validate job must keep secret guard"
 

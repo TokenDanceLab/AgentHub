@@ -103,7 +103,7 @@ function Get-FreePort {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-local-stack-e2e-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-local-stack-e2e-readiness.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-local-stack-e2e-readiness.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-local-stack-e2e-runner.md"
 

@@ -82,7 +82,7 @@ Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must 
 Assert-Contains $backendFixture ([regex]::Escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1")) "backend-e2e-fixture must run only the TeamRun fixture smoke test"
 Assert-StepContinueOnError $backendFixture "TeamRun fixture E2E" $false
 Assert-Contains $backendFixture "P0 remote-control fixture readiness" "backend-e2e-fixture must run the P0 remote-control fixture readiness step"
-Assert-Contains $backendFixture ([regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
+Assert-Contains $backendFixture ([regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-p0-remote-control-fixture.ps1")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
 Assert-StepContinueOnError $backendFixture "P0 remote-control fixture readiness" $false
 
 Assert-Contains $backendFocused "Backend focused subset" "backend-focused-subset must use a clear job name"
@@ -138,13 +138,13 @@ foreach ($job in @(
 }
 
 Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
-Assert-Contains $validate "scripts/verify-ci-gates\.ps1" "validate job must call scripts/verify-ci-gates.ps1"
+Assert-Contains $validate "scripts/verify/verify-ci-gates\.ps1" "validate job must call scripts/verify/verify-ci-gates.ps1"
 Assert-Contains $validate "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
-Assert-Contains $validate "scripts/verify-project-skills\.ps1" "validate job must call scripts/verify-project-skills.ps1"
+Assert-Contains $validate "scripts/verify/verify-project-skills\.ps1" "validate job must call scripts/verify/verify-project-skills.ps1"
 Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT verifier"
-Assert-Contains $validate "scripts/verify-doc-ssot\.ps1" "validate job must call scripts/verify-doc-ssot.ps1"
+Assert-Contains $validate "scripts/verify/verify-doc-ssot\.ps1" "validate job must call scripts/verify/verify-doc-ssot.ps1"
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
-Assert-Contains $validate "scripts/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify-real-e2e-contract.ps1"
+Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
 

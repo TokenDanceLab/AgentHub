@@ -25,7 +25,7 @@ function Read-Text([string]$RelativePath) {
     Get-Content (Join-Path $RepoRoot $RelativePath) -Raw -Encoding UTF8
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-p0-desktop-edge-cli-smoke.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-desktop-edge-cli-smoke.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-desktop-edge-cli-smoke.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath -PathType Leaf) "P0 Desktop/Edge/CLI smoke gate exists"
 Assert-True (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) "P0 Desktop/Edge/CLI smoke gate implementation exists"
