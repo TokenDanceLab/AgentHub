@@ -143,6 +143,8 @@ Assert-Contains $validate "Verify project skill whitelist" "validate job must ru
 Assert-Contains $validate "scripts/verify-project-skills\.ps1" "validate job must call scripts/verify-project-skills.ps1"
 Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT verifier"
 Assert-Contains $validate "scripts/verify-doc-ssot\.ps1" "validate job must call scripts/verify-doc-ssot.ps1"
+Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
+Assert-Contains $validate "scripts/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
 
