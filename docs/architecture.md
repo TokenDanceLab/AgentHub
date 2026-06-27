@@ -112,6 +112,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 |---|---|
 | API/协议 | OpenAPI YAML parse + affected handler/service tests |
 | Hub/Edge 逻辑 | focused Go tests; broad changes run `go test ./... -short -count=1` in touched service |
+| Backend performance/leak | [../scripts/load-test-scenarios.md](../scripts/load-test-scenarios.md) maps behavior gates, microbenchmarks, load smoke, and pprof/leak blockers |
 | Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；Desktop/Web 主视口为 16:9 `1440x810` |
 | Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
