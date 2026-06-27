@@ -7,7 +7,7 @@
 
 ## SUPER 工程修复进度
 
-> 基于 [SUPER 工程审计](../governance/super-score-2026-06-19.md)（63/100），52 任务 6 Phase。
+> 基于已归档的 [SUPER 工程审计](../archives/governance-evidence/super-score-2026-06-19.md)（63/100），52 任务 6 Phase。
 
 | Phase | 名称 | 进度 | 状态 |
 |---|---|---|---|

@@ -104,9 +104,9 @@ Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "Test
 
 Step "Topology docs"
 Assert-Contains "docs\roadmap.md" "P0.*Web\s*->\s*Hub\s*->.*Desktop/Edge\s*->\s*Local Edge\s*->\s*CLI/SDK adapter" "roadmap records P0 remote-control auth/topology prerequisite"
-Assert-Contains "docs\backend-integration-governance.md" "Login fixture topology gate" "governance records login fixture topology gate"
-Assert-Contains "docs\backend-integration-governance.md" "Desktop receives Hub dispatch -> Local Edge starts CLI adapter" "governance keeps dispatch/CLI start outside this login slice"
-Assert-Contains "docs\backend-integration-governance.md" "future real TokenDanceID/OIDC login remains approval-gated" "governance keeps real TokenDanceID/OIDC approval gate"
+Assert-Contains "docs\governance\governance-execution.md" "Login fixture topology gate" "governance records login fixture topology gate"
+Assert-Contains "docs\governance\governance-execution.md" "Desktop receives Hub dispatch -> Local Edge starts CLI adapter" "governance keeps dispatch/CLI start outside this login slice"
+Assert-Contains "docs\governance\governance-execution.md" "future real TokenDanceID/OIDC login remains approval-gated" "governance keeps real TokenDanceID/OIDC approval gate"
 
 Step "Focused verification commands"
 Write-Host "  agenthub-web: pnpm test -- src/api/hubAuth.test.ts" -ForegroundColor White

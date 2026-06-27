@@ -62,7 +62,11 @@ $mobile = Get-JobBlock $workflow "frontend-mobile"
 $e2e = Get-JobBlock $workflow "e2e-smoke"
 $validate = Get-JobBlock $workflow "validate"
 
-Assert-Contains $edge "THRESHOLD=75" "go-edge coverage threshold must be 75%"
+Assert-Contains $edge "Coverage check \(informational\)" "go-edge overall coverage must stay informational"
+Assert-Contains $edge "Coverage per-package minimums" "go-edge must keep per-package coverage minimums"
+Assert-Contains $edge ([regex]::Escape('check_pkg "edge-server/internal/security/" 70 "security"')) "go-edge must keep security package coverage minimum"
+Assert-Contains $edge ([regex]::Escape('check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle"')) "go-edge must keep lifecycle package coverage minimum"
+Assert-Contains $edge ([regex]::Escape('check_pkg "edge-server/internal/adapters/" 55 "adapters"')) "go-edge must keep adapters package coverage minimum"
 Assert-Contains $hub "THRESHOLD=40" "go-hub coverage threshold must be 40%"
 
 Assert-StepContinueOnError $edge "Lint" $true
@@ -71,6 +75,7 @@ Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
 Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
 Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
+Assert-StepContinueOnError $edge "Coverage per-package minimums" $false
 
 Assert-Contains $backendFixture "working-directory:\s+hub-server" "backend-e2e-fixture must run from hub-server"
 Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must name the TeamRun fixture step"
@@ -134,7 +139,15 @@ foreach ($job in @(
 
 Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
 Assert-Contains $validate "scripts/verify-ci-gates\.ps1" "validate job must call scripts/verify-ci-gates.ps1"
+Assert-Contains $validate "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
+Assert-Contains $validate "scripts/verify-project-skills\.ps1" "validate job must call scripts/verify-project-skills.ps1"
+Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT verifier"
+Assert-Contains $validate "scripts/verify-doc-ssot\.ps1" "validate job must call scripts/verify-doc-ssot.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
+
+Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"
+Assert-Contains (Get-StepBlock $mobile "Screenshot visual QA (mobile)") "(?m)^\s+timeout-minutes:\s+12\s*$" "mobile visual QA must have a hard timeout"
+Assert-Contains (Get-StepBlock $mobile "E2E (mock hub)") "(?m)^\s+timeout-minutes:\s+10\s*$" "mobile mock-hub E2E must have a hard timeout"
 
 Write-Host "ci gate policy ok"

@@ -99,6 +99,9 @@ function assertMetrics(result) {
   if (result.firstMessageIndex < 0 || result.secondMessageIndex <= result.firstMessageIndex) {
     failures.push('expected user messages to remain in chronological transcript order');
   }
+  if (result.transcriptHasModeDebug) {
+    failures.push('expected data-mode/debug status outside main transcript');
+  }
   if (!result.cardStack.exists) {
     failures.push('expected approval and preview cards to render as a merged stack');
   } else {
@@ -138,6 +141,7 @@ try {
 
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
+  page.setDefaultNavigationTimeout(60_000);
 
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -180,7 +184,7 @@ try {
     } catch {}
   });
 
-  await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const demoButton = page.getByRole('button', { name: '使用 Demo 模式继续' });
   if (await demoButton.isVisible().catch(() => false)) {
     await demoButton.click({ timeout: 5_000 }).catch(async (error) => {
@@ -269,6 +273,12 @@ try {
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
       firstMessageIndex: text.indexOf(firstMessage),
       secondMessageIndex: text.indexOf(secondMessage),
+      transcriptHasModeDebug: text.includes('Data:') ||
+        text.includes('Hub replay:') ||
+        text.includes('mock (auto fallback)') ||
+        text.includes('demo+edge') ||
+        text.includes('Local Vite') ||
+        text.includes('只读预览'),
       cardStack,
     };
   }, { firstMessage, secondMessage });

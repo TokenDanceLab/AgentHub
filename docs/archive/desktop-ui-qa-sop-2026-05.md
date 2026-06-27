@@ -1,5 +1,7 @@
 # Desktop UI QA SOP
 
+> 归档说明：这是 2026-05 的旧 Desktop UI QA SOP。当前 UI/E2E 验收入口是 `.agents/skills/real-e2e-acceptance/SKILL.md`、Playwright/Visual QA 脚本和活跃 `docs/progress/MASTER.md`；本文件只作历史参考，不作为当前规则。
+
 > 范围：只覆盖 `app/desktop/**`。最后更新：2026-05-29。
 
 本 SOP 面向接手 Desktop UI/UX 修复的 Agent。除非任务明确要求，否则不要改 Mobile、Hub、Edge 的无关内容。

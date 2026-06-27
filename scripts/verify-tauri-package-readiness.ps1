@@ -488,7 +488,7 @@ Assert-True ($package.version -eq $tauri.version) "package.json and tauri.conf.j
 Assert-True ($cargoVersion -eq $tauri.version) "Cargo.toml and tauri.conf.json versions match ($cargoVersion)"
 Assert-True ($cargoLockVersion -eq $tauri.version) "Cargo.lock and tauri.conf.json versions match ($cargoLockVersion)"
 Assert-True ($tauri.identifier -eq "com.agenthub.desktop") "Desktop Tauri identifier is stable"
-Assert-True ($tauri.productName -eq "AgentHub") "Desktop product name is stable"
+Assert-True ($tauri.productName -eq "AgentHub Desktop") "Desktop product name is stable"
 Assert-ReleaseTagVersionAlignment ([string]$tauri.version)
 
 Step "Windows package policy"
@@ -500,7 +500,7 @@ Assert-True ($tauri.bundle.windows.nsis.installMode -eq "currentUser") "NSIS ins
 
 $releaseWorkflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
-$governanceText = Read-Text "docs\backend-integration-governance.md"
+$governanceText = Read-Text "docs\governance\governance-execution.md"
 $dryGateText = Read-Text "scripts\verify-tauri-package-dry.ps1"
 $checkerText = Get-Content -LiteralPath $PSCommandPath -Raw -Encoding UTF8
 Assert-True ($dryGateText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "release readiness dry gate prepares Windows sidecar agenthub-edge_x86_64-pc-windows-msvc.exe"

@@ -34,7 +34,7 @@ NC='\033[0m'
 
 step()    { printf '\n>>> %s\n' "$1"; }
 pass()    { printf '%sPASS:%s %s\n' "$GREEN" "$NC" "$1"; }
-fail()    { printf '%sFAIL:%s %s\n' "$RED" "$NC" "$1"; exit 1; }
+fail()    { printf >&2 '%sFAIL:%s %s\n' "$RED" "$NC" "$1"; exit 1; }
 
 # ── Helpers ──────────────────────────────────────────────────
 
@@ -133,10 +133,25 @@ get_cargo_version() {
 
 get_cargo_lock_package_version() {
   local path="$1" pkg_name="$2"
-  local text
-  text="$(read_text "$path")"
   local ver
-  ver="$(echo "$text" | grep -ozP "\[\[package\]\]\s*\nname\s*=\s*\"${pkg_name}\"\s*\nversion\s*=\s*\"[^\"]+\"" | grep -oP 'version\s*=\s*"\K[^"]+' || true)"
+  ver="$(awk -v pkg="$pkg_name" '
+    { sub(/\r$/, "") }
+    /^\[\[package\]\]$/ {
+      in_package = 1
+      found_name = 0
+      next
+    }
+    in_package && /^name[[:space:]]*=[[:space:]]*"/ {
+      found_name = ($0 == "name = \"" pkg "\"")
+      next
+    }
+    in_package && found_name && /^version[[:space:]]*=[[:space:]]*"/ {
+      sub(/^version[[:space:]]*=[[:space:]]*"/, "")
+      sub(/".*$/, "")
+      print
+      exit
+    }
+  ' "$path")"
   if [[ -z "$ver" ]]; then
     fail "Cargo.lock package version is missing for $pkg_name"
   fi
@@ -166,6 +181,37 @@ get_head_release_tags() {
       echo "$tag"
     fi
   done <<< "$tags"
+}
+
+workflow_has_tag_push_trigger() {
+  local path="$1"
+  awk '
+    function indent_of(line) {
+      match(line, /[^ ]/)
+      return RSTART ? RSTART - 1 : length(line)
+    }
+    /^[[:space:]]*on:[[:space:]]*$/ {
+      in_on = 1
+      on_indent = indent_of($0)
+      next
+    }
+    in_on && indent_of($0) <= on_indent && $0 !~ /^[[:space:]]*$/ {
+      in_on = 0
+      in_push = 0
+    }
+    in_on && /^[[:space:]]*push:[[:space:]]*$/ {
+      in_push = 1
+      push_indent = indent_of($0)
+      next
+    }
+    in_push && indent_of($0) <= push_indent && $0 !~ /^[[:space:]]*$/ {
+      in_push = 0
+    }
+    in_push && /^[[:space:]]*tags:[[:space:]]*/ {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$path"
 }
 
 get_workflow_job_block() {
@@ -219,7 +265,11 @@ assert_generated_schema_clean() {
   local required_schemas=("desktop-schema.json" "windows-schema.json")
 
   step "Generated Tauri schema policy"
-  assert_git_path_clean "$schema_dir_rel" "Tauri generated schemas"
+  if ! git -C "$REPO_ROOT" diff --ignore-cr-at-eol --quiet -- "$schema_dir_rel" 2>/dev/null || \
+     ! git -C "$REPO_ROOT" diff --cached --ignore-cr-at-eol --quiet -- "$schema_dir_rel" 2>/dev/null; then
+    fail "Tauri generated schemas has uncommitted generated content changes under $schema_dir_rel"
+  fi
+  pass "Tauri generated schemas has no uncommitted generated content changes ($schema_dir_rel)"
   assert_true "$([[ -d "$schema_dir" ]] && echo true || echo false)" "required generated schema directory exists ($schema_dir_rel)"
 
   local schema_count
@@ -246,7 +296,7 @@ assert_windows_unsigned_dev_package_contract() {
 
   assert_true "$(echo "$dry_text" | grep -qP 'mode\s*=\s*"windows-desktop-package-dry"' && echo true || echo false)" "package dry report declares windows-desktop-package-dry mode"
   assert_true "$(echo "$dry_text" | grep -qP 'signing\s*=\s*"out-of-scope"' && echo "$dry_text" | grep -qP 'notarization\s*=\s*"out-of-scope"' && echo "$dry_text" | grep -qP 'stapling\s*=\s*"out-of-scope"' && echo "$dry_text" | grep -qP 'releaseUpload\s*=\s*"out-of-scope"' && echo true || echo false)" "package dry report keeps signing, notarization, stapling, and release upload out of scope"
-  assert_true "$(echo "$dry_text" | grep -q 'Build Tauri executable without bundling' && echo "$dry_text" | grep -q '--no-bundle' && echo true || echo false)" "package dry checker proves the dev executable compile path with pnpm tauri build --no-bundle"
+  assert_true "$(echo "$dry_text" | grep -q 'Build Tauri executable without bundling' && echo "$dry_text" | grep -q -- '--no-bundle' && echo true || echo false)" "package dry checker proves the dev executable compile path with pnpm tauri build --no-bundle"
   assert_true "$(echo "$dry_text" | grep -qP 'if\s*\(\$RunWindowsBundle\)' && echo "$dry_text" | grep -q 'Build unsigned Tauri Windows NSIS package' && echo "$dry_text" | grep -q 'pnpm.*tauri.*build' && echo true || echo false)" "package dry checker gates the unsigned Windows NSIS package path behind -RunWindowsBundle"
   assert_true "$(echo "$dry_text" | grep -q 'GOOS' && echo "$dry_text" | grep -q 'GOARCH' && echo "$dry_text" | grep -q 'agenthub-edge-windows-amd64\.exe' && echo true || echo false)" "package dry checker compiles the Windows Local Edge sidecar explicitly"
   assert_true "$(echo "$dry_text" | grep -q 'prepare-tauri-sidecar-local' && echo "$dry_text" | grep -q 'agenthub-edge-x86_64-pc-windows-msvc\.exe' && echo true || echo false)" "package dry checker places the sidecar at the Tauri Windows target-triple path"
@@ -347,7 +397,7 @@ assert_true "$([[ "$cargo_lock_version" == "$tauri_version" ]] && echo true || e
 identifier="$(json_field "$tauri_conf" "identifier")"
 product_name="$(json_field "$tauri_conf" "productName")"
 assert_true "$([[ "$identifier" == "com.agenthub.desktop" ]] && echo true || echo false)" "Desktop Tauri identifier is stable"
-assert_true "$([[ "$product_name" == "AgentHub" ]] && echo true || echo false)" "Desktop product name is stable"
+assert_true "$([[ "$product_name" == "AgentHub Desktop" ]] && echo true || echo false)" "Desktop product name is stable"
 
 # Release tag version alignment
 step "Release tag version alignment"
@@ -401,7 +451,7 @@ fi
 # Read workflow and governance texts
 release_wf="$REPO_ROOT/.github/workflows/release.yml"
 readiness_wf="$REPO_ROOT/.github/workflows/release-readiness.yml"
-governance_doc="$REPO_ROOT/docs/backend-integration-governance.md"
+governance_doc="$REPO_ROOT/docs/governance/governance-execution.md"
 dry_gate_script="$REPO_ROOT/scripts/verify-tauri-package-dry.ps1"
 
 release_wf_text="$(read_text "$release_wf")" || true
@@ -431,7 +481,7 @@ assert_true "$(echo "$dry_gate_text" | grep -q 'RequireUpdaterMetadata' && echo 
 
 # Tag release policy
 step "Tag release policy"
-assert_true "$(echo "$release_wf_text" | grep -qP '(?ms)on:\s*\n\s*push:\s*\n\s*tags:' && echo true || echo false)" "release workflow keeps tag push trigger"
+assert_true "$(workflow_has_tag_push_trigger "$release_wf" && echo true || echo false)" "release workflow keeps tag push trigger"
 assert_true "$(echo "$release_wf_text" | grep -q 'softprops/action-gh-release' && echo true || echo false)" "release workflow keeps GitHub Release creation"
 assert_true "$(echo "$release_wf_text" | grep -q 'TAURI_SIGNING_PRIVATE_KEY' && echo true || echo false)" "release workflow keeps production Tauri signing secret boundary"
 assert_release_workflow_prerelease_policy "$release_wf_text"
@@ -491,11 +541,17 @@ else
   pass "macOS unsigned dry policy job does not run build, release upload, or production signing secret commands"
 fi
 
-# Assert no codesign/notarytool/stapler
-if echo "$macos_dry_block" | grep -iP 'codesign|notarytool|stapler'; then
+# Assert no codesign/notarytool/stapler command execution.
+if echo "$macos_dry_block" | grep -qiP '(^|[\s;&|(`])(?:xcrun\s+)?(?:codesign|notarytool|stapler)(?:\s|$)'; then
   fail "macOS unsigned dry policy job contains forbidden signing command"
 else
   pass "macOS unsigned dry policy job has no codesign, notarytool, or stapler commands"
+fi
+
+if echo "$macos_dry_block" | grep -qiP '\bsoftprops/action-gh-release\b|\bactions/upload-release-asset\b|(^|[\s;&|(`])gh\s+release\s+(create|upload)(\s|$)|(^|[\s;&|(`])(aws\s+s3\s+cp|az\s+storage\s+blob\s+upload|gsutil\s+cp|rclone\s+copy|wrangler\s+r2\s+object\s+put)(\s|$)|\blatest\.json\b.*\b(upload|publish|release|s3|blob|r2|gsutil|rclone)\b|\bupdater\b.*\bmetadata\b.*\b(upload|publish|release)\b'; then
+  fail "macOS unsigned dry policy job contains forbidden release/updater publication action"
+else
+  pass "macOS unsigned dry policy job has no GitHub Release upload or updater metadata publication actions"
 fi
 
 # Governance doc release dry topology (if governance exists)
