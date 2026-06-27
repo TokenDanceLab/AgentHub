@@ -11,7 +11,7 @@ on:
       - "app/desktop/src-tauri/tauri.conf.json"
       - "scripts/**release**"
       - "scripts/**tauri**"
-      - "tests/scripts/**"
+      - "tests/contract/scripts/**"
   workflow_dispatch:
     inputs:
       run_windows_package_dry:
