@@ -309,20 +309,18 @@ try {
             Assert (Test-Path $EdgeBinary) "edge-server binary"
         } finally { Pop-Location }
 
-        Write-Step "Install Shared Dependencies"
-        Push-Location "$Root/app/shared"
+        Write-Step "Install App Workspace Dependencies"
+        Push-Location "$Root/app"
         try {
-            pnpm install --frozen-lockfile 2>&1 | Out-Null
-            Assert ($LASTEXITCODE -eq 0) "shared pnpm install"
+            corepack pnpm install --frozen-lockfile 2>&1 | Out-Null
+            Assert ($LASTEXITCODE -eq 0) "app workspace pnpm install"
         } finally { Pop-Location }
 
         Write-Step "Build Desktop (web only)"
-        Push-Location "$Root/app/desktop"
+        Push-Location "$Root"
         try {
-            pnpm install --frozen-lockfile 2>&1 | Out-Null
-            Assert ($LASTEXITCODE -eq 0) "pnpm install"
-            pnpm build 2>&1 | Out-Null
-            Assert ($LASTEXITCODE -eq 0 -and (Test-Path "dist/index.html")) "pnpm build OK"
+            corepack pnpm --dir "$Root/app/desktop" build 2>&1 | Out-Null
+            Assert ($LASTEXITCODE -eq 0 -and (Test-Path "$Root/app/desktop/dist/index.html")) "pnpm build OK"
         } finally { Pop-Location }
     }
 
