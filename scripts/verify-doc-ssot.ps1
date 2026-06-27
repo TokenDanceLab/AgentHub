@@ -15,6 +15,8 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -match "^docs/(archive|archives|audit|release)/") { return $false }
     if ($p -eq "AGENTS.md") { return $true }
     if ($p -eq "CONTRIBUTING.md") { return $true }
+    if ($p -eq "api/README.md" -or $p -eq "api/events.md" -or $p -eq "api/conventions.md") { return $true }
+    if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md") { return $true }
     if ($p -eq "docs/README.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
     if ($p -match "^docs/(analysis|plan|progress|governance|adr)/.+\.md$") { return $true }
@@ -33,6 +35,7 @@ foreach ($stalePath in @(
     "docs/audit",
     "docs/reference/projects",
     "docs/release/screenshot-checklist.md",
+    "api/events-full.md",
     "edge-server/docs/audit",
     "hub-server/docs/audit"
 )) {
@@ -56,6 +59,9 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = "docs/roadmap.md" },
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
+    @{ Path = "api/events.md"; Marker = "Owner" },
+    @{ Path = "hub-server/README.md"; Marker = "Source Map" },
+    @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
     @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
 )
@@ -81,6 +87,8 @@ $forbiddenPatterns = @(
     @{ Pattern = "(?<![\w-])/(goal|loop)(?![\w-])"; Message = "legacy Codex /goal or /loop workflow rule" },
     @{ Pattern = "Desktop/Web UI freeze|UI freeze"; Message = "obsolete UI freeze rule" },
     @{ Pattern = "Phase 2 Real E2E Contract\s*\|\s*进行中"; Message = "stale Phase 2 progress state" },
+    @{ Pattern = 'current pre-Phase 3 hygiene branch `docs/active-doc-regroup`'; Message = "stale active-doc-regroup branch status" },
+    @{ Pattern = 'Review and merge `docs/active-doc-regroup`'; Message = "stale active-doc-regroup next step" },
     @{ Pattern = "Mobile tests pass"; Message = "stale Mobile pass claim" },
     @{ Pattern = "真实执行已验证"; Message = "stale real-execution acceptance claim without current approved-real evidence" },
     @{ Pattern = "当前事实写在\s+`?STATE\.md`?"; Message = "old STATE.md fact-owner rule" },
@@ -107,6 +115,11 @@ $maxLines = @{
     "AGENTS.md" = 260
     "CHANGELOG.md" = 90
     "CONTRIBUTING.md" = 90
+    "api/README.md" = 100
+    "api/events.md" = 180
+    "api/conventions.md" = 190
+    "hub-server/README.md" = 120
+    "hub-server/deployments/README.md" = 100
     "docs/README.md" = 120
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220

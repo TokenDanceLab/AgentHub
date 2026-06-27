@@ -9,14 +9,14 @@
 | 内容 | 权威文件 | 验证 |
 |---|---|---|
 | REST 路径、schema、阶段标记 | `api/openapi.yaml` | OpenAPI YAML parse / endpoint tests |
-| WebSocket envelope、事件、序号、游标 | [../api/events.md](../api/events.md) | WS tests / event normalizer tests |
+| WebSocket envelope、frame、事件族和源码 owner | [../api/events.md](../api/events.md) | WS tests / event normalizer tests |
 | 命名、分页、错误、权限、版本 | [../api/conventions.md](../api/conventions.md) | API review / handler tests |
 | 架构背景和边界 | [architecture.md](architecture.md) | 架构 review |
 
 ## 使用规则
 
 1. 新 REST 接口先改 `api/openapi.yaml`。
-2. 新 WebSocket 事件先改 `api/events.md`。
+2. 新 WebSocket 事件先改源码 owner，再同步 `api/events.md` 的事件族和验收边界。
 3. 通用命名、错误、分页、权限规则先改 `api/conventions.md`。
 4. 新增鉴权、session、TokenDance ID 或权限行为时，同步 [architecture/06-auth-identity.md](architecture/06-auth-identity.md) 和 `AGENTS.md` 中的边界规则。
 5. 不再在 `docs/` 里维护第二份完整 API 表。
