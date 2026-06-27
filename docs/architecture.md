@@ -444,7 +444,7 @@ ChatView 卡片树不自己管理滚动。滚动由外层 Workbench 的 `.transc
 | Typecheck | shared、desktop、web 分别通过 |
 | Unit tests | transcript normalization、composer state、inspector data、platform adapters |
 | Tauri tests | Host API path validation、dangerous operations、Edge lifecycle |
-| Visual QA | Desktop/Web 各 1440x920、1280x800、390x844 截图 |
+| Visual QA | Desktop/Web 以 16:9 `1440x810` 为主视口；窄屏/响应式截图只在任务声明覆盖对应行为时作为补充 |
 | Browser QA | Playwright 验证无横向滚动、无遮挡、composer 不遮挡最后消息 |
 | Legacy scan | active route/import 不依赖旧 UI |
 | Docs sync | roadmap、architecture、README、governance 同步 |

@@ -14,8 +14,9 @@ function Is-ActiveDoc([string]$Path) {
     $p = Normalize-Path $Path
     if ($p -match "^docs/(archive|archives|audit|release)/") { return $false }
     if ($p -eq "AGENTS.md") { return $true }
-    if ($p -eq "docs/README.md" -or $p -eq "docs/contributing.md" -or $p -eq "docs/reference/README.md") { return $true }
-    if ($p -eq "docs/roadmap.md" -or $p -match "^docs/roadmap/[^/]+\.md$") { return $true }
+    if ($p -eq "CONTRIBUTING.md") { return $true }
+    if ($p -eq "docs/README.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
+    if ($p -eq "docs/roadmap.md") { return $true }
     if ($p -match "^docs/(analysis|plan|progress|governance|adr)/.+\.md$") { return $true }
     if ($p -match "^\.agents/skills/.+\.md$") { return $true }
     return $false
@@ -23,6 +24,20 @@ function Is-ActiveDoc([string]$Path) {
 
 if (Test-Path -LiteralPath "CLAUDE.md") {
     Fail "root CLAUDE.md must not exist; AGENTS.md is the single project rule surface"
+}
+
+foreach ($stalePath in @(
+    "STATE.md",
+    "docs/contributing.md",
+    "docs/roadmap",
+    "docs/audit",
+    "docs/reference/projects",
+    "edge-server/docs/audit",
+    "hub-server/docs/audit"
+)) {
+    if (Test-Path -LiteralPath $stalePath) {
+        Fail "$stalePath must stay archived or removed from active docs"
+    }
 }
 
 if (Test-Path -LiteralPath "docs/reference/desktop-ui-qa-sop.md") {
@@ -34,10 +49,20 @@ if ($datedGovernance.Count -gt 0) {
     Fail ("dated governance evidence must live under docs/archives/: " + (($datedGovernance | ForEach-Object { $_.Name }) -join ", "))
 }
 
-$agents = Get-Content -LiteralPath "AGENTS.md" -Raw
-foreach ($required in @("项目总规则唯一入口", "docs/progress/MASTER.md", "docs/roadmap.md", ".agents/skills/real-e2e-acceptance/SKILL.md")) {
-    if (-not $agents.Contains($required)) {
-        Fail "AGENTS.md is missing required ownership marker: $required"
+$requiredMarkers = @(
+    @{ Path = "AGENTS.md"; Marker = "项目总规则唯一入口" },
+    @{ Path = "AGENTS.md"; Marker = "docs/progress/MASTER.md" },
+    @{ Path = "AGENTS.md"; Marker = "docs/roadmap.md" },
+    @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
+    @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
+    @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
+    @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
+)
+
+foreach ($required in $requiredMarkers) {
+    $content = Get-Content -LiteralPath $required.Path -Raw
+    if (-not $content.Contains($required.Marker)) {
+        Fail "$($required.Path) is missing required ownership marker: $($required.Marker)"
     }
 }
 
@@ -72,6 +97,25 @@ foreach ($file in $files) {
     foreach ($rule in $forbiddenPatterns) {
         if ($content -cmatch $rule.Pattern) {
             Fail "$file contains $($rule.Message)"
+        }
+    }
+}
+
+$maxLines = @{
+    "AGENTS.md" = 700
+    "CONTRIBUTING.md" = 90
+    "docs/README.md" = 120
+    "docs/roadmap.md" = 220
+    "docs/api-reference.md" = 80
+    "docs/reference/README.md" = 80
+    "docs/progress/MASTER.md" = 260
+}
+
+foreach ($entry in $maxLines.GetEnumerator()) {
+    if (Test-Path -LiteralPath $entry.Key) {
+        $lineCount = ([System.IO.File]::ReadLines((Resolve-Path -LiteralPath $entry.Key).ProviderPath) | Measure-Object).Count
+        if ($lineCount -gt $entry.Value) {
+            Fail "$($entry.Key) has $lineCount lines; active entry limit is $($entry.Value). Move detail to owner docs or archive."
         }
     }
 }

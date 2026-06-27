@@ -55,7 +55,7 @@ const diagnostics: DesktopLocalEdgeDiagnostics = {
   },
   local_cli_discovery: {
     mode: 'no-spend-discovery',
-    readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+    readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
     readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
     generatedAt: '2026-06-09T00:00:00.000Z',
     items: [
@@ -160,7 +160,7 @@ describe('formatLocalEdgeDiagnosticText', () => {
     expect(text).toContain('stderr: <app-data>/edge-logs/local-edge.stderr.log');
     expect(text).toContain('Local CLI discovery');
     expect(text).toContain('mode: no-spend-discovery');
-    expect(text).toContain('readiness manifest: docs/audit/p0-edge-cli-real-readiness.md');
+    expect(text).toContain('readiness manifest: .tmp/evidence/p0-edge-cli-real-readiness.json');
     expect(text).toContain('readiness script: scripts/verify-edge-cli-real-readiness.ps1');
     expect(text).toContain('codex: installed version=0.27.0 path=codex.cmd boundary=no-spend');
     expect(text).toContain('claude-code: installed version=2.1.4 path=claude boundary=no-spend');
