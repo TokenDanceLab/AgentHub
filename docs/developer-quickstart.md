@@ -1,8 +1,8 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-06-27
+最后更新：2026-06-28
 
-本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md`、`docs/progress/MASTER.md`、`docs/roadmap.md` 和 `.agents/skills/real-e2e-acceptance/SKILL.md` 为准。
+本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md`、当前 `docs/progress/MASTER.md`（仅当存在时）、`docs/roadmap.md` 和 `.agents/skills/real-e2e-acceptance/SKILL.md` 为准。
 
 ## 前置条件
 
