@@ -7,7 +7,7 @@
 ## Overview
 
 - **Total Phases**: 4
-- **Total Tasks**: 15
+- **Total Tasks**: 16
 - **Estimated Total Effort**: XL
 - **Strategy**: governance-first, evidence-contract-first, then source/test execution. This avoids hiding UI/backend/client defects behind stale docs or ambiguous "real E2E" wording.
 
@@ -80,6 +80,7 @@
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
 |:--|:--|:--|:--|:--|:--|:--|:--|:--|:--|
 | T3.0 | Trim active API/Hub docs and source-contract owner mapping | P1 | M | PR #341 merged | Prep | S, P, E, R | Docs/source-contract cleanup; run doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and diff check | Update MASTER/task plan/verifier | `api/events.md`, Hub README/deployment README, Hub architecture/deployment docs, and verifier rules are concise owner docs that point to source owners and useful tests; old longform snapshots are archived. |
+| T3.0b | Trim module README docs and stale active references | P2 | M | T3.0 | Prep | S, P, R | Docs/source-reference cleanup; run doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and diff check | Update MASTER/task plan/verifier | Web/Desktop/Edge/module test/load README files are concise owner docs; old longform snapshots are archived; removed architecture-path and old Desktop QA SOP links are blocked by verifier. |
 | T3.1 | Harden chat transcript behavior tests | P0 | L | T2.2, T2.4 | A | S, P, R | Shared unit/contract + Desktop/Web Playwright + Visual QA | None unless transcript invariant becomes agent rule | User messages render immediately without disappearing; agent cards group correctly; markdown/table render; chronological ordering and auto-follow are covered by meaningful tests. |
 | T3.2 | Align frontend architecture docs to shared implementation | P1 | M | T3.1 | A | S, U, R | Docs and source-reference scan; no broad snapshots | None | `docs/architecture.md` and `docs/architecture/04-frontend-data-flow.md` describe current shared workbench/chat/data-mode reality without stale ChatView phase banners. |
 | T3.3 | Classify backend/API performance and leak gates | P0 | L | T2.1 | B | P, E | Run focused Go tests/benchmarks or document exact blockers; no broad fake load claims | Update instruction surfaces if new gate is required | Hub/Edge performance/leak acceptance has a concrete command matrix for EventBus/outbox/scheduler/Redis TTL, Edge lifecycle/store/adapters, and API handlers. |
@@ -90,7 +91,7 @@
 
 | Lane | Tasks | Combined Effort | Merge Risk | Key Files |
 |:--|:--|:--|:--|:--|
-| Prep | T3.0 | M | Low | `api/`, `hub-server/README.md`, `docs/architecture/`, `docs/progress/MASTER.md`, `scripts/verify-doc-ssot.ps1` |
+| Prep | T3.0, T3.0b | M+M | Low | `api/`, module README files, `hub-server/README.md`, `docs/architecture/`, `docs/progress/MASTER.md`, `scripts/verify-doc-ssot.ps1` |
 | A | T3.1, T3.2 | L+M | High | `app/shared`, `app/desktop`, `app/web`, architecture docs |
 | B | T3.3 | L | Medium | `hub-server`, `edge-server`, `scripts`, CI docs |
 | C | T3.4 | M | Medium | `app/desktop/src-tauri`, package scripts, release readiness docs |
@@ -104,7 +105,7 @@
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
 |:--|:--|:--|:--|:--|:--|:--|:--|:--|:--|
-| T4.1 | Run focused acceptance gate bundle | P0 | L | T3.0, T3.1, T3.3, T3.4, T3.5 | A | P, E | Run selected docs/API/frontend/backend/visual/package/perf gates based on touched surfaces | None | Evidence table lists commands, pass/fail, artifact paths, and explicit not-tested boundaries. |
+| T4.1 | Run focused acceptance gate bundle | P0 | L | T3.0, T3.0b, T3.1, T3.3, T3.4, T3.5 | A | P, E | Run selected docs/API/frontend/backend/visual/package/perf gates based on touched surfaces | None | Evidence table lists commands, pass/fail, artifact paths, and explicit not-tested boundaries. |
 | T4.2 | Cross-review and architecture approval packet | P0 | M | T4.1 | B | R | Review diff scope, stale wording, source/docs alignment, and test value | None | Review packet shows no duplicate truth sources, no stale active skills, no debug transcript pollution, no false real-E2E claims. |
 | T4.3 | Merge-readiness and archive preparation | P1 | M | T4.2 | C | R | `git diff --check`, status, issue/milestone/progress sync | Update native memory only if durable rules changed and user explicitly requests | `docs/progress/MASTER.md`, GitHub issues, milestones, and archive plan are current; branch is ready for PR/merge decision. |
 

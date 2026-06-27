@@ -15,8 +15,12 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -match "^docs/(archive|archives|audit|release)/") { return $false }
     if ($p -eq "AGENTS.md") { return $true }
     if ($p -eq "CONTRIBUTING.md") { return $true }
+    if ($p -eq "reference/INDEX.md") { return $true }
     if ($p -eq "api/README.md" -or $p -eq "api/events.md" -or $p -eq "api/conventions.md") { return $true }
-    if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md") { return $true }
+    if ($p -eq "edge-server/README.md") { return $true }
+    if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md" -or $p -eq "hub-server/tests/README.md") { return $true }
+    if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md") { return $true }
+    if ($p -eq "scripts/load-test-scenarios.md") { return $true }
     if ($p -eq "docs/README.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
     if ($p -match "^docs/(analysis|plan|progress|governance|adr)/.+\.md$") { return $true }
@@ -60,8 +64,14 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
     @{ Path = "api/events.md"; Marker = "Owner" },
+    @{ Path = "app/web/README.md"; Marker = "docs/archive/app/web-readme-full-2026-06-27.md" },
+    @{ Path = "app/desktop/README.md"; Marker = "packaged-release" },
+    @{ Path = "edge-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
+    @{ Path = "hub-server/tests/README.md"; Marker = "Integration Tests" },
+    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Current Scope" },
+    @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
     @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
 )
@@ -92,6 +102,9 @@ $forbiddenPatterns = @(
     @{ Pattern = "Mobile tests pass"; Message = "stale Mobile pass claim" },
     @{ Pattern = "真实执行已验证"; Message = "stale real-execution acceptance claim without current approved-real evidence" },
     @{ Pattern = "当前事实写在\s+`?STATE\.md`?"; Message = "old STATE.md fact-owner rule" },
+    @{ Pattern = "docs/architecture/system-design/"; Message = "removed system-design architecture path" },
+    @{ Pattern = "docs/operations/desktop-ui-qa-sop"; Message = "removed Desktop UI QA SOP path" },
+    @{ Pattern = "app/web/screenshots/web-design"; Message = "old Web screenshot evidence list in active docs" },
     @{ Pattern = "132 tests|278 tests|11/11|12/12\s+(Mock|curl|tests|PASS)"; Message = "fixed test-count acceptance claim" }
 )
 
@@ -115,11 +128,17 @@ $maxLines = @{
     "AGENTS.md" = 260
     "CHANGELOG.md" = 90
     "CONTRIBUTING.md" = 90
+    "reference/INDEX.md" = 80
     "api/README.md" = 100
     "api/events.md" = 180
     "api/conventions.md" = 190
+    "app/web/README.md" = 95
+    "app/desktop/README.md" = 95
+    "edge-server/README.md" = 115
     "hub-server/README.md" = 120
     "hub-server/deployments/README.md" = 100
+    "hub-server/tests/README.md" = 70
+    "scripts/load-test-scenarios.md" = 70
     "docs/README.md" = 120
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
