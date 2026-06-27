@@ -71,10 +71,14 @@ $requiredMarkers = @(
     @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
     @{ Path = "hub-server/tests/README.md"; Marker = "Integration Tests" },
     @{ Path = "scripts/load-test-scenarios.md"; Marker = "Current Scope" },
+    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Gate Matrix" },
+    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Do Not Claim" },
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
     @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
     @{ Path = "docs/architecture/04-frontend-data-flow.md"; Marker = "Source Owner Map" }
+    @{ Path = "hub-server/README.md"; Marker = "scripts/load-test-scenarios.md" }
+    @{ Path = "edge-server/README.md"; Marker = "verify-backend-perf-leak-gates.ps1" }
 )
 
 foreach ($required in $requiredMarkers) {
@@ -145,7 +149,7 @@ $maxLines = @{
     "hub-server/README.md" = 120
     "hub-server/deployments/README.md" = 100
     "hub-server/tests/README.md" = 70
-    "scripts/load-test-scenarios.md" = 70
+    "scripts/load-test-scenarios.md" = 115
     "docs/README.md" = 120
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
