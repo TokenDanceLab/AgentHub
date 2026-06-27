@@ -2,7 +2,7 @@ import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitR
 import type { EvidenceRef } from '../transcript';
 import type { AgentActivitySnapshot } from '../transcript/agentActivity';
 
-export type AgentHubSurface = 'desktop' | 'web';
+export type AgentHubSurface = 'desktop' | 'web' | 'mobile';
 
 export interface SurfaceCapabilities {
   localEdge: boolean;
