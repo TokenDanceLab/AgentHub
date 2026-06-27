@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 1 | 7 | 8 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 2 | 7 | 9 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -50,6 +50,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.0 | #342 | Trim active API/Hub docs and source-contract owner mapping | closed |
 | T3.0b | #344 | Trim module README docs and stale active references | closed |
 | T3.0c | #346 | Sync progress SSOT and doc governance guardrails | closed |
+| T3.0d | #352 | Aggressively consolidate active documentation | open |
 | T3.1 | #330 | Harden chat transcript behavior tests | closed |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | closed |
 | T3.3 | #332 | Classify backend API performance and leak gates | closed |
@@ -77,16 +78,16 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (7/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (7/9 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #334 / T3.5 pending worktree
+**Active Task**: #352 / T3.0d in progress
 
-**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; for Mobile only clarify required gate boundaries and do not start deep native/UI redesign.
+**Current Focus**: Aggressively consolidate active docs before #334. Rules stay in `AGENTS.md`, current SPEC progress stays here, roadmap stays in `docs/roadmap.md`, and duplicate active governance rule files move to archive.
 
 **Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
@@ -112,12 +113,12 @@ git worktree list
 ## Execution Telemetry
 
 - GitHub modes store per-task telemetry in issue comments and milestone descriptions.
-- Phase 3 adaptive state is in milestone #9. Current drift score: 1, caused by the extra T3.0c doc/progress SSOT checkpoint requested before source/test work continues.
+- Phase 3 adaptive state is in milestone #9. Current drift score: 1, with total tasks adjusted to 9 after #352 was added for operator-requested active-doc consolidation.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 - T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
 - T3.3 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #350 merged; #332 closed. Drift contribution 0; Phase 3 is now 6/8 with `drift_score=1`.
-- T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 is now 7/8 with `drift_score=1`.
+- T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 was 7/8 before #352 expanded the phase to 9 tasks.
 
 ## Recent Checkpoints
 
@@ -133,10 +134,11 @@ git worktree list
 | 2026-06-27 | Frontend architecture SSOT | PR #349 merged; #331 closed; `docs/architecture/04-frontend-data-flow.md` now maps shared implementation owners. |
 | 2026-06-27 | Backend performance/leak gates | PR #350 merged; #332 closed; `scripts/load-test-scenarios.md` owns gate classification and `scripts/verify-backend-perf-leak-gates.ps1` runs focused behavior + microbench smoke. |
 | 2026-06-27 | Desktop packaged boundary | PR #351 merged; #333 closed; package readiness/dry gates separate Vite renderer, packaged-release, signing/updater/release upload, and `real_tested=false` boundaries. |
+| 2026-06-27 | Active doc consolidation started | #352 tracks the operator-requested cleanup of duplicate active governance rule files before #334 continues. |
 
 ## Next Steps
 
-1. Create the #334 worktree from `dev/delicious233` and inspect Web/Mobile client test lanes.
-2. Keep Desktop/Web UI and shared client contracts first; Mobile work only clarifies existing gate boundaries.
-3. Do not add Mobile native/UI redesign or low-signal tests in this spec.
-4. Continue to mark stub/fixture/readiness-only paths with `real_tested=false`.
+1. Finish #352 in `docs/aggressive-doc-consolidation`, then open PR and merge to `dev/delicious233`.
+2. Run doc SSOT, real E2E contract, project skill whitelist, stale wording search, OpenAPI YAML parse, and diff check.
+3. After #352 merges, create the #334 worktree and inspect Web/Mobile client test lanes.
+4. Keep Mobile work to gate-boundary clarification; do not add native/UI redesign or low-signal tests in this spec.
