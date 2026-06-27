@@ -62,11 +62,13 @@ function Write-Json {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-p0-approved-real-gold-path.ps1"
-$statePath = Join-Path $RepoRoot "STATE.md"
+$realE2eSkillPath = Join-Path $RepoRoot ".agents\skills\real-e2e-acceptance\SKILL.md"
+$agentsPath = Join-Path $RepoRoot "AGENTS.md"
 
 try {
     Assert-True (Test-Path -LiteralPath $scriptPath -PathType Leaf) "P0 approved-real gold-path harness exists"
-    Assert-True (Test-Path -LiteralPath $statePath -PathType Leaf) "STATE.md exists"
+    Assert-True (Test-Path -LiteralPath $realE2eSkillPath -PathType Leaf) "real E2E acceptance skill exists"
+    Assert-True (Test-Path -LiteralPath $agentsPath -PathType Leaf) "AGENTS.md exists"
 
     if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
         $scriptText = Get-Content -Raw -LiteralPath $scriptPath
@@ -196,10 +198,16 @@ finally {
     }
 }
 
-if (Test-Path -LiteralPath $statePath) {
-    $stateText = Get-Content -Raw -LiteralPath $statePath
-    Assert-True ($stateText -match "verify-p0-approved-real-gold-path\.ps1") "STATE references P0 gold-path harness"
-    Assert-True ($stateText -match "BLOCKED_WITH_EVIDENCE") "STATE records blocked-with-evidence contract"
+if (Test-Path -LiteralPath $realE2eSkillPath) {
+    $skillText = Get-Content -Raw -LiteralPath $realE2eSkillPath
+    Assert-True ($skillText -match "approved-real") "real E2E skill owns approved-real evidence boundary"
+    Assert-True ($skillText -match "real_tested=false") "real E2E skill preserves readiness/fixture false boundary"
+}
+
+if (Test-Path -LiteralPath $agentsPath) {
+    $agentsText = Get-Content -Raw -LiteralPath $agentsPath
+    Assert-True ($agentsText -match "real-e2e-acceptance") "AGENTS references real E2E acceptance skill"
+    Assert-True ($agentsText -match "STATE\.md" -eq $false) "AGENTS no longer uses root STATE.md as fact owner"
 }
 
 if ($Failed -gt 0) {
