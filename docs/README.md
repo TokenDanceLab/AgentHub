@@ -26,10 +26,9 @@ docs/
 ├── design-decisions.md                ← 5 个关键技术决策摘要
 ├── adr/                               ← 架构决策记录（11 篇）
 ├── governance/                        ← 治理：分支规范、文档标准、安全风险、威胁模型
-├── archive/                           ← 历史 longform、审计、发布、过期设计和参考调研
-├── archives/                          ← spec-driven 专项归档索引与过程材料
+├── archive/                           ← 历史 longform、审计、发布、过期设计、参考调研和旧入口快照
+├── archives/                          ← spec-driven 专项归档和过期项目 skill
 ├── images/                            ← 截图与图片资源
-├── release/                           ← 发布清单
 └── reference/                         ← 轻量技术参考
 ```
 
@@ -37,7 +36,7 @@ docs/
 
 | 需要 | 去看 |
 |------|------|
-| 某个架构决策的背景 | [adr/](adr/) — 11 篇 ADR |
+| 某个架构决策的背景 | [adr/](adr/) |
 | 历史设计、审计、发布、参考调研 | [archive/README.md](archive/README.md) |
 | spec-driven 专项归档 | [archives/README.md](archives/README.md) — 完成后的 analysis/plan/progress |
 | 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md) — 仅当该文件存在时有效 |
@@ -45,4 +44,4 @@ docs/
 | 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
-| 发布清单 | [release/screenshot-checklist.md](release/screenshot-checklist.md) |
+| 发布/截图历史清单 | [archive/release/](archive/release/) |
