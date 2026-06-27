@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-06-27
+最后更新：2026-06-28
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明已归档到 [archive/architecture/architecture-overview-2026-06-27.md](archive/architecture/architecture-overview-2026-06-27.md)。
 
@@ -120,6 +120,6 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 ## 文档权威
 
 - 当前规则：[../AGENTS.md](../AGENTS.md)
-- 当前 SPEC 进度：[progress/MASTER.md](progress/MASTER.md)
+- 当前 SPEC 进度：`docs/progress/MASTER.md`（仅当文件存在时有效）
 - 总进度：[roadmap.md](roadmap.md)
 - 安全风险：[governance/security-risk-register.md](governance/security-risk-register.md)
