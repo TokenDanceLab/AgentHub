@@ -4,7 +4,7 @@
 
 | Original Plan Point | Revision |
 |---|---|
-| Move archives directly to `D:\Code\TokenDance\docs` | Do not write to the dirty main checkout directly. Use an isolated docs repo worktree/branch, or stage only new archive files with explicit status checks. |
+| Move archives directly to `D:\Code\TokenDance\docs` | Do not write to the dirty main checkout directly. Use receiver worktree `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive` on branch `docs/agenthub-archive-receiver`. |
 | Delete `docs/archive`, `docs/archives`, `docs/adr` after migration | Only after links, verifiers, and `docs/history.md` / `docs/decisions.md` are in place. |
 | Move scripts into subdirectories | Must be wrapper-first. CI, docs, tests, Desktop readinessScript, and package scripts reference root script paths. |
 | Move `tests/scripts` | Must update release-readiness workflow path filters and script contract tests. |
