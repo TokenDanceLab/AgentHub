@@ -34,7 +34,7 @@ Migration targets:
 
 - Move AgentHub history trees to the TokenDance docs external archive and keep only a short source-repo index.
 - Replace in-repo archive trees with a short `docs/history.md` index.
-- Compress `docs/adr/` into `docs/decisions.md`; move old ADR full text to the external archive.
+- Compress old ADR bodies into `docs/decisions.md`; move old ADR full text to the external archive.
 - Reshape `scripts/` into `scripts/verify/`, `scripts/dev/`, `scripts/release/`, `scripts/smoke/`, and `scripts/lib/` with compatibility wrappers first.
 - Reshape `tests/` into `tests/fixtures/`, `tests/contract/`, and `tests/integration/`.
 - Classify `css-audit-results.json` as either active owner artifact or historical evidence.

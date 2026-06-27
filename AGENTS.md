@@ -9,7 +9,7 @@
 3. `docs/progress/MASTER.md` - 当前 spec-driven 专项进度、Issue/PR、阻塞、验收证据
 4. `docs/roadmap.md` - 总进度、长期路线、模块级下一步
 5. `docs/architecture.md` + `docs/architecture/` - 架构、数据流、协议边界
-6. 其他专题文档、ADR、reference、archive
+6. 其他专题文档、`docs/decisions.md`、reference、history
 
 不要在 roadmap、MASTER、治理报告或 skill 里复制本文件的规则。规则变更改这里；其他文档只链接或保留一句摘要。
 
@@ -163,6 +163,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 当前 spec 进度只写 `docs/progress/MASTER.md`。
 - 总进度只写 `docs/roadmap.md`。
 - 架构概览写 `docs/architecture.md`；模块细节写 `docs/architecture/`。
+- 架构决策摘要写 `docs/decisions.md`；旧 ADR 正文只在 `docs/history.md` 指向的外部归档中追溯。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
 - AgentHub 源仓不再保留 `docs/archive/` 或 `docs/archives/`；当前执行中的 SPEC 才可以临时使用 `docs/analysis/`、`docs/plan/` 和 `docs/progress/`。
