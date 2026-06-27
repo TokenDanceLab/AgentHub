@@ -32,7 +32,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
 | 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 0 | 10 | 10 |
-| 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
+| 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 2 | 1 | 3 |
 
 ## Issue Mapping
 
@@ -57,7 +57,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.3 | #332 | Classify backend API performance and leak gates | closed |
 | T3.4 | #333 | Check Desktop packaged evidence boundary | closed |
 | T3.5 | #334 | Align Web Mobile client test lanes | closed |
-| T4.1 | #335 | Run focused acceptance gate bundle | open |
+| T4.1 | #335 | Run focused acceptance gate bundle | closed |
 | T4.2 | #336 | Cross-review and architecture approval packet | open |
 | T4.3 | #337 | Merge-readiness and archive preparation | open |
 
@@ -80,15 +80,15 @@ git worktree list
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [x] Phase 3: Source And Test Alignment (10/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
-- [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
+- [ ] Phase 4: Acceptance And Merge Readiness (1/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 4 - Acceptance And Merge Readiness
 
-**Active Task**: #335 / T4.1 focused acceptance gate bundle.
+**Active Task**: #336 / T4.2 cross-review and architecture approval packet.
 
-**Current Focus**: Prepare #335 PR from the focused acceptance bundle, then use #336 for architecture approval and #337 for archive preparation. No failed gates; approved-real login remains blocked-with-evidence until explicit live-test approval metadata exists.
+**Current Focus**: Merge the architecture approval packet, then use #337 for merge-readiness and archive preparation. #335 is merged into `dev/delicious233`; approved-real login remains blocked-with-evidence until explicit live-test approval metadata exists.
 
 ## Governance Status
 
@@ -122,13 +122,12 @@ git worktree list
 - T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed.
 - T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. PR #356 merged; #334 closed; local gates and CI passed.
 - T4.1 actual effort: L; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. Gate stabilization notes: Desktop smoke now follows Entry Gate -> Demo workbench, and client smoke now installs from the app workspace root. Evidence: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md).
+- T4.2 actual effort: M; S.U.P.E.R focus R pass; unplanned dependency count: 0. Evidence: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../archives/governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md).
 
 ## Recent Checkpoints
 
 | Date | Checkpoint | Evidence |
 |:--|:--|:--|
-| 2026-06-27 | Phase 1 merged | PR #338 merged; #322-#325 closed. |
-| 2026-06-27 | Phase 2 merged | PR #340 merged; #326-#329 and #339 closed. |
 | 2026-06-27 | API/Hub source contract merged | PR #343 merged; #342 closed. |
 | 2026-06-27 | Module README cleanup merged | PR #345 merged; #344 closed. |
 | 2026-06-27 | Progress SSOT cleanup | #346 closes stale Phase 3 counts, stale branch wording, and oversized MASTER session log drift. |
@@ -142,9 +141,10 @@ git worktree list
 | 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
 | 2026-06-27 | Web/Mobile lane merged | PR #356 merged; #334 closed; Phase 3 is complete. |
 | 2026-06-27 | Phase 4 acceptance bundle | #335 focused gates have 0 failed rows; smoke matrix is passed-with-blockers only for expected approved-real login readiness. Evidence file: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md). |
+| 2026-06-28 | Architecture approval packet | #336 cross-review found no Critical/High blockers; doc/archive/ADR bulk is deferred to the next cleanup SPEC. Evidence file: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../archives/governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md). |
 
 ## Next Steps
 
-1. Start #335 focused acceptance gate bundle.
-2. Use #336 for architecture approval and #337 for merge-readiness/archive preparation.
+1. Merge #336 architecture approval packet.
+2. Use #337 for merge-readiness and archive preparation.
 3. Keep final acceptance evidence concise and archive completed SPEC artifacts.
