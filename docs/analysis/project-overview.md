@@ -93,7 +93,7 @@ Known gaps:
 | Surface | Current state |
 |:--|:--|
 | `AGENTS.md` | Canonical shared instruction surface. It now whitelists active project skills and says active spec work lives in `docs/progress/MASTER.md` only when present. |
-| `CLAUDE.md` | Claude-specific surface; delegates to `AGENTS.md`, avoids hardcoding historical phase/branch. |
+| Platform-specific root rule files | Not used; shared project rules live in `AGENTS.md`. |
 | `.agents/skills/` | Active whitelist only: `dev-loop`, `test-coverage`, `pre-push`, `integration-test`, `adapter-dev`, `env-sandbox`, `real-e2e-acceptance`. |
 | `docs/archives/project-skills/` | Archived `ui-screenshot`, `dev-team`, `dev-team-codex`; archive README says agents should not load them. |
 | `docs/progress/MASTER.md` | Not present at Phase 1 start; this is a fresh spec-driven run. |

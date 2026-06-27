@@ -212,6 +212,8 @@ assert_contains "$validate" "Verify CI gate policy" "validate job must run the C
 assert_contains "$validate" "scripts/verify-ci-gates\\.ps1" "validate job must call scripts/verify-ci-gates.ps1"
 assert_contains "$validate" "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
 assert_contains "$validate" "scripts/verify-project-skills\\.ps1" "validate job must call scripts/verify-project-skills.ps1"
+assert_contains "$validate" "Verify doc SSOT" "validate job must run the doc SSOT verifier"
+assert_contains "$validate" "scripts/verify-doc-ssot\\.ps1" "validate job must call scripts/verify-doc-ssot.ps1"
 assert_contains "$validate" "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 assert_contains "$validate" "check-secrets\\.sh" "validate job must keep secret guard"
 
