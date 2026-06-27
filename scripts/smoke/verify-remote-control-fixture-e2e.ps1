@@ -160,8 +160,8 @@ if ([string]::IsNullOrWhiteSpace($Stamp)) {
     $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 }
 
-$exporterPath = Join-Path $RepoRoot "scripts\export-teamrun-demo-fixture-evidence.ps1"
-$readinessPath = Join-Path $RepoRoot "scripts\verify-teamrun-demo-readiness.ps1"
+$exporterPath = Join-Path $RepoRoot "scripts\lib\export-teamrun-demo-fixture-evidence.ps1"
+$readinessPath = Join-Path $RepoRoot "scripts\verify\verify-teamrun-demo-readiness.ps1"
 
 Step "Fixture boundary"
 Pass "FixtureRehearsal only: no TokenDanceID, real CLI/model, deployment, or mobile"

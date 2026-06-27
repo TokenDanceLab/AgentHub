@@ -6,9 +6,9 @@
 # external dependencies.
 #
 # Usage:
-#   ./scripts/load-test.sh                           # default: 1000 req, 50 concurrent
-#   ./scripts/load-test.sh -n 5000 -c 100            # custom load
-#   ./scripts/load-test.sh -url http://127.0.0.1:3210/v1/health
+#   ./scripts/smoke/load-test.sh                           # default: 1000 req, 50 concurrent
+#   ./scripts/smoke/load-test.sh -n 5000 -c 100            # custom load
+#   ./scripts/smoke/load-test.sh -url http://127.0.0.1:3210/v1/health
 #
 # Options:
 #   -n        Total requests (default: 1000)

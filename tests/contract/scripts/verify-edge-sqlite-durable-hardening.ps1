@@ -25,7 +25,7 @@ function Assert-True {
     }
 }
 
-$gatePath = Join-Path $RepoRoot "scripts\verify-edge-sqlite-durable-hardening.ps1"
+$gatePath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-hardening.ps1"
 $gateImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-hardening.ps1"
 $testPath = Join-Path $RepoRoot "edge-server\internal\store\sqlite_durable_hardening_test.go"
 $cmdPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main.go"

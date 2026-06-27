@@ -30,7 +30,7 @@ function Assert-True {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-edge-cli-json-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-edge-cli-json-readiness.ps1"
 $contractTestPath = Join-Path $RepoRoot "edge-server\internal\adapters\cli_json_readiness_test.go"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "CLI JSON readiness checker exists"

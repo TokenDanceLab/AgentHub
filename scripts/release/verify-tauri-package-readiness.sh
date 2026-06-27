@@ -5,9 +5,9 @@
 # updater policy, release workflow gates, and generated artifact ignore policy.
 #
 # Usage:
-#   ./scripts/verify-tauri-package-readiness.sh
-#   ./scripts/verify-tauri-package-readiness.sh --require-built-artifacts --built-artifacts-root dist/
-#   ./scripts/verify-tauri-package-readiness.sh --require-bundled-sidecar
+#   ./scripts/release/verify-tauri-package-readiness.sh
+#   ./scripts/release/verify-tauri-package-readiness.sh --require-built-artifacts --built-artifacts-root dist/
+#   ./scripts/release/verify-tauri-package-readiness.sh --require-bundled-sidecar
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
@@ -288,7 +288,7 @@ assert_generated_schema_clean() {
 
 assert_windows_unsigned_dev_package_contract() {
   step "Windows unsigned/dev package reproducibility contract"
-  local dry_script="$REPO_ROOT/scripts/verify-tauri-package-dry.ps1"
+  local dry_script="$REPO_ROOT/scripts/release/verify-tauri-package-dry.ps1"
   assert_true "$([[ -f "$dry_script" ]] && echo true || echo false)" "Windows unsigned/dev package dry checker exists"
 
   local dry_text
@@ -452,7 +452,7 @@ fi
 release_wf="$REPO_ROOT/.github/workflows/release.yml"
 readiness_wf="$REPO_ROOT/.github/workflows/release-readiness.yml"
 governance_doc="$REPO_ROOT/docs/governance/governance-execution.md"
-dry_gate_script="$REPO_ROOT/scripts/verify-tauri-package-dry.ps1"
+dry_gate_script="$REPO_ROOT/scripts/release/verify-tauri-package-dry.ps1"
 
 release_wf_text="$(read_text "$release_wf")" || true
 readiness_wf_text="$(read_text "$readiness_wf")" || true

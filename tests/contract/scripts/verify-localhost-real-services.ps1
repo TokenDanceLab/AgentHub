@@ -176,7 +176,7 @@ async function start(name, descriptor) {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-real-services.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-services.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-services.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "real localhost services harness exists"
 Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "real localhost services harness implementation exists"

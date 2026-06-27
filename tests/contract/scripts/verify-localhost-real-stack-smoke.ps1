@@ -128,7 +128,7 @@ function Test-PortListening {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-real-stack-smoke.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-stack-smoke.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-stack-smoke.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-localhost-real-stack-smoke.md"
 

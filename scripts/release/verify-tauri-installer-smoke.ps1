@@ -81,7 +81,7 @@ function Assert-PackageScript {
 }
 
 Step "Baseline package readiness policy"
-& (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
+& (Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
 if ($LASTEXITCODE -ne 0) {
     Fail "baseline Tauri package readiness policy failed"
 }
