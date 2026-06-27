@@ -21,7 +21,10 @@
 | [roadmap-v0.5.1/](roadmap-v0.5.1/) | 旧 longform roadmap |
 | [roadmap-v0.5.0/](roadmap-v0.5.0/) | 旧模块化 roadmap 入口 |
 | [api/](api/) | 旧长版 API / WebSocket 事件说明 |
+| [app/](app/) | 旧长版 Web/Desktop README 和视觉证据快照 |
+| [edge-server/](edge-server/) | 旧长版 Edge Server README |
 | [hub-server/](hub-server/) | 旧长版 Hub Server 和部署 README |
+| [performance/](performance/) | 旧 load/performance 场景规划和历史参考 |
 | [state/](state/) | 已废弃 root `STATE.md` 历史快照 |
 | [audit/](audit/) | 日期型审计、cross-review、acceptance 报告 |
 | [release/](release/) | 历史 PR、merge-readiness、release notes |
