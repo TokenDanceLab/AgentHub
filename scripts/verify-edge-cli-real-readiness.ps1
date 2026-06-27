@@ -356,15 +356,15 @@ Assert-Contains "edge-server\internal\lifecycle\process_executor.go" "adapterReg
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback" "lifecycle test covers explicit unknown runtime"
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "unknown-runtime" "lifecycle test uses explicit unknown-runtime id"
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "default adapter was invoked for unknown runtime" "lifecycle test proves no default fallback"
-Assert-Contains "docs\backend-integration-governance.md" "unknown runtime.*fallback|agentId.*adapter registry.*fallback" "governance docs require no fallback for unknown runtimes"
+Assert-Contains "docs\governance\governance-execution.md" "unknown runtime.*fallback|agentId.*adapter registry.*fallback" "governance docs require no fallback for unknown runtimes"
 
 Step "proposal/readiness artifact"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "No real CLI/model run" "audit doc records no real CLI/model run"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "operator approval" "audit doc records operator approval prerequisite"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "runtime path/env" "audit doc records runtime path/env prerequisite"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "budget/redaction" "audit doc records budget/redaction prerequisite"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "artifact root" "audit doc records artifact root prerequisite"
-Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "evidence mode" "audit doc records evidence mode prerequisite"
+Assert-Contains "docs\governance\governance-execution.md" "No real CLI/model run" "governance doc records no real CLI/model run"
+Assert-Contains "docs\governance\governance-execution.md" "operator approval" "governance doc records operator approval prerequisite"
+Assert-Contains "docs\governance\governance-execution.md" "runtime path/env" "governance doc records runtime path/env prerequisite"
+Assert-Contains "docs\governance\governance-execution.md" "budget/redaction" "governance doc records budget/redaction prerequisite"
+Assert-Contains "docs\governance\governance-execution.md" "artifact root" "governance doc records artifact root prerequisite"
+Assert-Contains "docs\governance\governance-execution.md" "evidence mode" "governance doc records evidence mode prerequisite"
 $forbiddenPrimitivePattern = @(
     ("Start" + "-Process"),
     ("Invoke" + "-Expression"),
