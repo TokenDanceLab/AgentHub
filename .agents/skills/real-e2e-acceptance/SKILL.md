@@ -20,23 +20,23 @@ Stubbed, fixture, Vite renderer, observed-local, approved-real, and packaged-rel
 
 ## Evidence Levels
 
-| Level | Proves | Does Not Prove |
-|---|---|---|
-| Fixture/unit | Pure contracts, normalizers, model logic | Network, browser, runtime, packaging |
-| Playwright UI E2E | Real browser interaction, ordering, scrolling, route guards, visible state | Packaged Tauri, real login, real CLI/model/API |
-| Visual QA | Screenshot, pixel/geometry, responsive layout, occlusion/overflow, visual regressions | Data correctness, backend health, runtime execution |
-| Stubbed Hub | Hub-shaped Web contracts without live backend | Real Hub availability, auth, model spend |
-| Observed local | Real local Edge/Hub read or no-spend dispatch path | Cloud/prod, real model/API spend, packaged installer |
-| Approved real | Explicitly approved real login, CLI, model, API, or spend path | Packaged installer or release unless that gate ran |
-| Backend/API | Hub/Edge handlers, service contracts, auth/permission checks | Browser UX, renderer geometry, packaged Desktop |
-| Performance/leak | Benchmarks, load checks, pprof/leak evidence for the claimed path | Functional correctness unless paired with behavior tests |
-| Packaged release | Tauri sidecar/icon/installer/signing/update behavior | Runtime/model correctness unless paired with runtime gates |
+| Level | Machine label | Proves | Does Not Prove |
+|---|---|---|---|
+| Fixture/unit | `fixture-unit` | Pure contracts, normalizers, model logic | Network, browser, runtime, packaging |
+| Playwright UI E2E | `playwright-ui` | Real browser interaction, ordering, scrolling, route guards, visible state | Packaged Tauri, real login, real CLI/model/API |
+| Visual QA | `visual-qa` | Screenshot, pixel/geometry, responsive layout, occlusion/overflow, visual regressions | Data correctness, backend health, runtime execution |
+| Stubbed Hub | `stubbed-hub` | Hub-shaped Web contracts without live backend | Real Hub availability, auth, model spend |
+| Observed local | `observed-local` | Real local Edge/Hub read or no-spend dispatch path | Cloud/prod, real model/API spend, packaged installer |
+| Approved real | `approved-real` | Explicitly approved real login, CLI, model, API, or spend path | Packaged installer or release unless that gate ran |
+| Backend/API | `backend-api` | Hub/Edge handlers, service contracts, auth/permission checks | Browser UX, renderer geometry, packaged Desktop |
+| Performance/leak | `performance-leak` | Benchmarks, load checks, pprof/leak evidence for the claimed path | Functional correctness unless paired with behavior tests |
+| Packaged release | `packaged-release` | Tauri sidecar/icon/installer/signing/update behavior | Runtime/model correctness unless paired with runtime gates |
 
 Use the narrowest accurate wording. Stubbed or manifest-only reports must include `real_tested=false`.
 
 Smoke matrix manifests must be machine-honest:
 
-- Every row records `evidence_level`, `real_tested`, `status`, and a short `claim`.
+- Every row records canonical machine-label `evidence_level`, `real_tested`, `status`, and a short `claim`.
 - Top-level `evidence_levels` includes only non-skipped rows that actually ran.
 - Skipped gates may appear only under `skipped_evidence_levels` and row-level `status: "skipped"`.
 - Stubbed Hub rows use `evidence_level: "stubbed-hub"` and `real_tested: false`; they must not be named or reported as real login/model/API execution.
