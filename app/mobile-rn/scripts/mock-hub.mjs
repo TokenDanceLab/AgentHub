@@ -254,12 +254,17 @@ async function main() {
 
   console.log(`AgentHub Mobile mock Hub listening at ${baseUrl}`);
   console.log(`Android emulator base URL: http://10.0.2.2:${actualPort}`);
-  console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /v1/threads');
-  console.log('WS:   GET /v1/events');
+  console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /v1/threads, GET /client/sessions, GET /client/contacts');
+  console.log('WS:   GET /v1/events, GET /client/ws');
 }
 
 function handleRequest(request, response) {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${requestedPort}`}`);
+
+  if (request.method === 'OPTIONS') {
+    writeCorsNoContent(response);
+    return;
+  }
 
   if (request.method === 'GET' && (url.pathname === '/health' || url.pathname === '/v1/health')) {
     writeJson(response, 200, {
@@ -280,6 +285,22 @@ function handleRequest(request, response) {
     return;
   }
 
+  if (request.method === 'GET' && url.pathname === '/client/sessions') {
+    writeJson(response, 200, {
+      code: 'OK',
+      data: buildClientSessions(),
+    });
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/client/contacts') {
+    writeJson(response, 200, {
+      code: 'OK',
+      data: buildClientContacts(),
+    });
+    return;
+  }
+
   writeJson(response, 404, {
     error: {
       code: 'not_found',
@@ -291,7 +312,7 @@ function handleRequest(request, response) {
 function handleUpgrade(request, socket) {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${requestedPort}`}`);
 
-  if (url.pathname !== '/v1/events') {
+  if (url.pathname !== '/v1/events' && url.pathname !== '/client/ws') {
     socket.destroy();
     return;
   }
@@ -321,6 +342,42 @@ function handleUpgrade(request, socket) {
   }
 }
 
+function buildClientSessions() {
+  return snapshot.threads.map((thread, index) => ({
+    session_id: thread.id,
+    id: thread.id,
+    type: thread.participantKind === 'group' ? 'group' : 'private',
+    name: thread.title,
+    unread_count: thread.unread,
+    muted: thread.muted ?? false,
+    updated_at: thread.lastActivity,
+    last_message_at: thread.lastActivity,
+    last_message: {
+      message_id: `mock-message-${index + 1}`,
+      content: thread.subtitle,
+      content_type: 'text',
+      created_at: thread.lastActivity,
+    },
+  }));
+}
+
+function buildClientContacts() {
+  return [
+    {
+      user_id: 'alice',
+      display_name: 'Delicious233',
+      remark: 'AgentHub workspace owner',
+      status: 'online',
+    },
+    {
+      user_id: 'agenthub',
+      display_name: 'AgentHub',
+      remark: 'Workspace automation',
+      status: 'online',
+    },
+  ];
+}
+
 function encodeTextFrame(text) {
   const payload = Buffer.from(text);
 
@@ -341,9 +398,21 @@ function encodeTextFrame(text) {
 function writeJson(response, status, body) {
   response.writeHead(status, {
     'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'access-control-allow-headers': 'authorization,content-type',
     'content-type': 'application/json',
   });
   response.end(JSON.stringify(body));
+}
+
+function writeCorsNoContent(response) {
+  response.writeHead(204, {
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'access-control-allow-headers': 'authorization,content-type',
+    'access-control-max-age': '600',
+  });
+  response.end();
 }
 
 function listen(server, port) {
@@ -382,6 +451,28 @@ async function checkHttp(baseUrl) {
   if (!snapshotResponse.ok || !Array.isArray(snapshotBody.threads) || snapshotBody.threads.length === 0) {
     throw new Error('Mock Hub snapshot check failed');
   }
+
+  for (const pathname of ['/client/sessions', '/client/contacts']) {
+    const preflight = await fetch(`${baseUrl}${pathname}`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://127.0.0.1:5177',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+
+    if (!preflight.ok || preflight.headers.get('access-control-allow-origin') !== '*') {
+      throw new Error(`Mock Hub CORS preflight check failed for ${pathname}`);
+    }
+
+    const response = await fetch(`${baseUrl}${pathname}`);
+    const responseBody = await response.json();
+
+    if (!response.ok || responseBody.code !== 'OK' || !Array.isArray(responseBody.data)) {
+      throw new Error(`Mock Hub client route check failed for ${pathname}`);
+    }
+  }
 }
 
 function checkWebSocket(port) {
@@ -405,7 +496,7 @@ function checkWebSocket(port) {
     });
     socket.once('connect', () => {
       socket.write([
-        'GET /v1/events HTTP/1.1',
+        'GET /client/ws HTTP/1.1',
         `Host: ${host}:${port}`,
         'Upgrade: websocket',
         'Connection: Upgrade',
