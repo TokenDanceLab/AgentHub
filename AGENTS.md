@@ -488,6 +488,6 @@ scope: client|edge|api|docs|desktop|web
 4. **仓库**：`TokenDanceLab/AgentHub`（github.com/TokenDanceLab/AgentHub）。
 5. **当前活跃 Phase 与分支**：只看活跃 MASTER 或 GitHub 任务，不在本文件重复维护。
 6. **默认工作流规则**：新增 feature 工作（含跨文件重构、多步骤功能、协议变更、安全加固）默认走 spec-driven-develop 工作流：
-   - 先加载 `.agents/skills/spec-driven-develop/SKILL.md`（如存在）或 `spec-driven-develop` skill。
+   - 先加载全局 `spec-driven-develop` skill，或继续当前活跃的 `docs/progress/MASTER.md` / SPEC 文档。
    - 产出 spec 文档、任务分解、验收标准后再进入实现。
    - 短任务（单文件修复、typo、小改动）不受此约束，直接做。

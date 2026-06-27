@@ -8,7 +8,7 @@ start Hub/Edge services, upload artifacts, or claim the final recording.
 
 [CmdletBinding()]
 param(
-    [string]$ScenarioManifest = "docs/competition/teamrun-demo-scenario.json",
+    [string]$ScenarioManifest = "tests/fixtures/teamrun/teamrun-demo-scenario.json",
     [string]$OutputRoot = ".tmp/teamrun-evidence",
     [string]$Stamp
 )
@@ -123,7 +123,7 @@ $evidence = [ordered]@{
     generated_at = $generatedAt
     source = [ordered]@{
         fixture_only = $true
-        scenario_manifest = "docs/competition/teamrun-demo-scenario.json"
+        scenario_manifest = "tests/fixtures/teamrun/teamrun-demo-scenario.json"
         commit = $commit
         real_runtime_executed = $false
         final_recording_complete = $false
@@ -179,7 +179,7 @@ Contract: $($scenario.contract)
 - submission_ready: false
 - screenshot_or_video_rehearsal: $($scenario.screenshot_or_video_rehearsal.mode)
 
-This package freezes the minimum evidence shape for the ByteDance/TeamRun demo.
+This package freezes the minimum evidence shape for the TeamRun demo.
 It is not the final 3-minute recording and is not proof of a real runtime run.
 
 ## Evidence Summary
