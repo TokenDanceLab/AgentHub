@@ -36,6 +36,27 @@
 5. Web 客户端仅连接 Hub（无本地 Edge loopback）；无直接第三方 provider 登录。
 6. 生产部署和运维证据保留在 server workspace；不得将主机/路径/密钥复制到本仓库。
 
+## Login fixture topology gate
+
+P0 remote-control fixture 只验证拓扑合同和离线证据形状：`Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter`。
+
+- Web 侧只用 Hub-issued session 和 Hub execution-target inventory fixture，不直连 Local Edge。
+- Desktop receives Hub dispatch -> Local Edge starts CLI adapter 是真实远控链路的后续验收，不属于登录 fixture slice。
+- future real TokenDanceID/OIDC login remains approval-gated；未获审批时，脚本不得打开真实浏览器登录、访问 TokenDance ID、启动真实 CLI/model 或部署。
+
+## Package and real-readiness gates
+
+D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）验证；它检查版本、workflow、sidecar 名称、ignore 策略和 artifact 合同，不运行发布流程。
+
+- full Tauri build / `pnpm tauri build` 是单独 opt-in 范围；Windows unsigned NSIS/portable 是未来显式启用的 artifact scope。
+- Windows sidecar 名称固定为 `agenthub-edge-x86_64-pc-windows-msvc.exe`；updater metadata 必须成对记录 `latest.json` 和 `.sig`。
+- macOS arm64 unsigned 边界只记录 `agenthub-edge-aarch64-apple-darwin`、`AgentHub.app` 和 `AgentHub_${version}_aarch64.dmg` 的未来包形状。
+- `notarytool` notarization、codesign、stapling、GitHub Release、release asset upload 和 updater 生产 metadata publication 都是 later approval slice（后续审批范围）。
+- dry artifacts 只允许作为 workflow artifact 上传；不发布到 release channel。
+- Packaged Desktop OIDC readiness 是 proposal-only gate；Packaged real login dry readiness 只读仓库，不访问 Hub/TokenDance ID、不打开浏览器、不读取 secrets。
+- unknown runtime fallback is forbidden; agentId must resolve through adapter registry without fallback.
+- Edge CLI real-readiness is proposal-only unless explicitly approved: No real CLI/model run, operator approval, runtime path/env ownership, budget/redaction policy, artifact root, and evidence mode must be recorded before RealTested or Submission.
+
 ## 同步清单
 
 - 当队列 ID 从未开始变为部分完成或已完成时，更新本文件。

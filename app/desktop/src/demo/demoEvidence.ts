@@ -63,7 +63,7 @@ const agentCollabEvidence: RuntimeEvidenceSnapshot = {
   previews: [],
 };
 
-/* ═══ ByteDance TeamRun ═══ */
+/* ═══ TeamRun Fixture ═══ */
 const teamRunEvidence: RuntimeEvidenceSnapshot = {
   runId: 'run-teamrun-1',
   diffs: [
@@ -73,10 +73,10 @@ const teamRunEvidence: RuntimeEvidenceSnapshot = {
     ]),
   ],
   artifacts: [
-    { id: 't1', runId: 'run-teamrun-1', threadId: 'bytedance-teamrun', kind: 'json', path: 'fixture/evidence-capture.json', sizeBytes: 4200, createdAt: '2026-06-10T10:11:00Z' },
+    { id: 't1', runId: 'run-teamrun-1', threadId: 'teamrun-fixture', kind: 'json', path: 'fixture/evidence-capture.json', sizeBytes: 4200, createdAt: '2026-06-10T10:11:00Z' },
   ],
   previews: [
-    { id: 'tp1', runId: 'run-teamrun-1', threadId: 'bytedance-teamrun', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-10T10:11:00Z' },
+    { id: 'tp1', runId: 'run-teamrun-1', threadId: 'teamrun-fixture', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-10T10:11:00Z' },
   ],
 };
 
@@ -191,7 +191,7 @@ const projectDocsEvidence: RuntimeEvidenceSnapshot = {
 const demoEvidenceByConversation: Record<string, RuntimeEvidenceSnapshot> = {
   builder: builderEvidence,
   'agent-collab': agentCollabEvidence,
-  'bytedance-teamrun': teamRunEvidence,
+  'teamrun-fixture': teamRunEvidence,
   deployer: deployerEvidence,
   orchestrator: orchestratorEvidence,
   reviewer: reviewerEvidence,

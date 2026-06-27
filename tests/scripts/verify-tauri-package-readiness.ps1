@@ -91,7 +91,7 @@ function New-RogueTauriBuildFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -135,7 +135,7 @@ function New-RogueMacOSCommandFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -170,7 +170,7 @@ function New-RogueMacOSReleaseActionFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -207,7 +207,7 @@ function New-FixedStableReleaseFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -242,7 +242,7 @@ function New-TaggedReleaseFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -294,7 +294,7 @@ function New-DirtyGeneratedSchemaFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -322,7 +322,7 @@ function New-MissingBundledSidecarFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
@@ -348,7 +348,7 @@ function New-DeletedGeneratedSchemaFixture {
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
         "app\desktop\src-tauri\gen\schemas\windows-schema.json",
-        "docs\backend-integration-governance.md"
+        "docs\governance\governance-execution.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
     }
