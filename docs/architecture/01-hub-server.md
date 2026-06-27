@@ -2,186 +2,79 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-17
+> 最后更新：2026-06-27
 
-## 职责
+Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
 
-Hub Server（`hub-server/`）是 AgentHub 的云端中枢：
+## Boundaries
 
-- TokenDance ID relying party（OIDC 认证）
-- Hub session 管理
-- IM 消息存储和分发
-- AgentTeam 编排
-- Edge 同步、中继
-- 审计日志
-
-## 在架构中的位置
-
-```text
-Desktop 共享工作台
-  -> Desktop platform adapter
-  -> 本地 Edge Server
-  -> Hub Server              <-- 本文档（认证 / 联系人 / 会话 / 消息）
-  -> AgentAdapter
-  -> Claude Code / Codex / OpenCode
-```
-
-```text
-Web 共享工作台
-  -> Web platform adapter
-  -> Hub Server              <-- 本文档（全量 API）
-  -> Edge 路由 / 中继
-  -> Edge Server
-  -> AgentAdapter
-```
-
-## 路由表
-
-Hub Server（`hub-server/internal/router/router.go`）使用 Gin 框架，所有路由在 `SetupRoutes` 中注册。
-
-### 全局中间件
-
-CORS、API Version、Body Limit（默认 10MB）、全局限流、Request ID、访问日志、Prometheus Metrics、请求超时。
-
-### 路由组
-
-| 路由前缀 | 认证 | 说明 |
+| 主题 | Hub owns | 不拥有 |
 |---|---|---|
-| `GET /health` `/health/live` `/health/ready` | 无 | 健康检查 |
-| `GET /api/public/stats` | 无 | 公开统计（计数桶化，不暴露精确值） |
-| `GET /client/ws` | WS Auth | WebSocket 连接 |
-| `POST /client/auth/refresh` | IP 限流 | JWT 刷新 |
-| `POST /client/auth/oidc/authorize` | IP 限流 | OIDC 授权启动 |
-| `POST /client/auth/oidc/callback` | IP 限流 | OIDC 回调（code 兑换） |
-| `GET /client/auth/oidc/callback` | IP 限流 | OIDC 回调（浏览器跳转） |
-| `GET /client/auth/me` `POST /client/auth/logout` `PUT /client/auth/profile` | Hub Session | 认证管理 |
-| `/client/contacts/*` | Hub Session | 联系人：搜索、好友请求、列表、删除、拉黑、备注 |
-| `/client/sessions/*` | Hub Session | 会话：列表、创建、成员管理、消息、置顶、已读、搜索 |
-| `/client/messages/*` | Hub Session | 消息操作：撤回、编辑、置顶、表情回复、转发、搜索 |
-| `/client/attachments/*` | Hub Session | 附件：探测、上传、下载 |
-| `/client/notifications/*` | Hub Session | 通知：列表、标记已读 |
-| `GET/PATCH /client/settings` | Hub Session | 用户设置（键值存储） |
-| `/edge/*` | Hub Session + 仅 Desktop | Edge 设备注册、Agent Task 回调 |
-| `POST /cloud/edge/register` | Hub Session | 云端 Edge 注册 |
-| `/web/*` | Hub Session + 仅 Web | Web 端专用 API |
+| Identity | OIDC code exchange，`tokendance_sub` 到 Hub user 映射 | 第三方 provider OAuth app 或 provider token |
+| Session | Hub access/refresh session，WebSocket auth，device proof | TokenDance ID token 作为产品 session |
+| Authorization | Hub-local membership/resource/action checks | 把身份认证等同授权 |
+| IM | Contacts、sessions、messages、attachments、notifications | Local filesystem / raw process |
+| Agent routing | Agent Profile、Execution Target、pending task、relay control | CLI process lifecycle |
+| Audit | Audit event persistence and admin query | 生产 secret 或 live infra 状态 |
 
-### Web 端路由 (`/web/*`)
+## Source Map
 
-| 路由前缀 | 说明 |
+| 方向 | Source |
 |---|---|
-| `POST /web/agent-tasks` | 触发 Agent 任务 |
-| `POST /web/agent-tasks/:id/cancel` | 取消任务 |
-| `GET /web/agent-tasks/:id/events` `summary` | 事件流和摘要 |
-| `GET /web/agent-tasks/:id/approvals` | 任务审批列表 |
-| `POST /web/agent-tasks/:id/approvals/:approval_id/decide` | 审批决定 |
-| `GET /web/agent-tasks/:id/artifacts` | 任务产物列表 |
-| `/web/custom-agents` | 自定义 Agent CRUD |
-| `/web/agent-profiles` | Agent Profile CRUD + 发布/安装 |
-| `/web/skills` | Skill CRUD + 发布/取消发布 |
-| `/web/mcp-servers` | MCP Server CRUD + 发布/取消发布 |
-| `/web/market/*` | 市场搜索/安装/评分 |
-| `/web/provider-bindings` | Provider Binding CRUD |
-| `/web/execution-targets` | Execution Target CRUD + Ping |
-| `/web/documents` | 云文档 CRUD |
-| `/web/projects` | 项目 CRUD + Thread + Thread Messages |
-| `GET /web/audit-events` | 审计事件（Admin only） |
-| `/web/relay/commands` | Relay 命令（Admin only） |
-| `GET /web/devices` | 设备列表 |
-| `/web/agent-teams` | Agent Team CRUD + Run + Assignment + Route Decision + Approval + Conflict |
+| App assembly | `hub-server/cmd/server-hub/main.go`, `hub-server/internal/app/` |
+| Route registry | `hub-server/internal/router/router.go` |
+| HTTP layer | `hub-server/internal/handler/` |
+| Business logic | `hub-server/internal/service/` |
+| Persistence | `hub-server/internal/repository/`, `hub-server/internal/model/` |
+| WebSocket frames | `hub-server/internal/ws/frame.go` |
+| Event fanout | `hub-server/internal/app/events.go` |
+| Config | `hub-server/internal/config/`, `hub-server/configs/`, `.env.example` |
+| Migrations | `hub-server/migrations/` |
 
-## Hub WebSocket 事件
+## Contract Map
 
-Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件类型定义在 `app/shared/src/hubEvents.ts`（前端常量）和 `hub-server/internal/ws/frame.go`（后端定义）。
+| 契约 | Owner |
+|---|---|
+| REST path/schema | `api/openapi.yaml` |
+| WS frame/event families | `api/events.md` |
+| API conventions | `api/conventions.md` |
+| Auth/identity | [06-auth-identity.md](06-auth-identity.md) |
+| Deployment boundary | [05-deployment.md](05-deployment.md) |
+| Security risk status | [../governance/security-risk-register.md](../governance/security-risk-register.md) |
 
-共 33 个事件类型：
-
-| 分类 | 事件 | 常量 |
-|---|---|---|
-| **认证** | `auth` | `AUTH` |
-| | `typing` | `TYPING` |
-| | `auth.ok` | `AUTH_OK` |
-| | `auth.fail` | `AUTH_FAIL` |
-| **消息** | `message.new` | `MESSAGE_NEW` |
-| | `message.edited` | `MESSAGE_EDITED` |
-| | `message.recall` | `MESSAGE_RECALL` |
-| | `message.pin` | `MESSAGE_PIN` |
-| | `message.unpin` | `MESSAGE_UNPIN` |
-| | `message.reaction_added` | `MESSAGE_REACTION_ADDED` |
-| | `message.reaction_removed` | `MESSAGE_REACTION_REMOVED` |
-| | `message.read` | `MESSAGE_READ` |
-| **会话** | `session.created` | `SESSION_CREATED` |
-| | `session.dissolved` | `SESSION_DISSOLVED` |
-| | `session.member_joined` | `SESSION_MEMBER_JOINED` |
-| | `session.member_left` | `SESSION_MEMBER_LEFT` |
-| | `session.info_updated` | `SESSION_INFO_UPDATED` |
-| **设备** | `device.online` | `DEVICE_ONLINE` |
-| | `device.offline` | `DEVICE_OFFLINE` |
-| | `device.kicked` | `DEVICE_KICKED` |
-| **Agent** | `agent.dispatch` | `AGENT_DISPATCH` |
-| | `agent.stream` | `AGENT_STREAM` |
-| | `agent.done` | `AGENT_DONE` |
-| | `agent.failed` | `AGENT_FAILED` |
-| | `agent.cancel` | `AGENT_CANCEL` |
-| | `agent.control` | `AGENT_CONTROL` |
-| **团队** | `team.run.started` | `TEAM_RUN_STARTED` |
-| | `team.event` | `TEAM_EVENT` |
-| | `team.assignment.done` | `TEAM_ASSIGNMENT_DONE` |
-| | `team.assignment.failed` | `TEAM_ASSIGNMENT_FAILED` |
-| **通知** | `notification.new` | `NOTIFICATION_NEW` |
-| | `friend.request` | `FRIEND_REQUEST` |
-| | `friend.accepted` | `FRIEND_ACCEPTED` |
-
-## Auth Token 管道模式
-
-Desktop 的所有 Hub API 查询统一通过 `getToken` 回调注入认证 token：
+## Data Flow
 
 ```text
-Desktop Tauri keyring/session
-  -> getAccessToken() 回调
-  -> { getToken: getAccessToken }
-  -> hubQueries / sessionQueries / documentQueries / projectQueries
-  -> Hub REST API Authorization: Bearer <token>
+Web/Desktop/Mobile
+  -> Hub REST/WS
+  -> handler
+  -> service transaction
+  -> repository
+  -> PostgreSQL / Redis
+  -> event bus
+  -> WebSocket fanout / Edge dispatch
 ```
 
-涉及文件：`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts`。不硬编码 token 值。
+`agent.stream` events from Edge are persisted as run events and may be projected into chat messages for current clients. Transcript rendering must consume normalized shared blocks, not raw Hub frames.
 
-## WebSocket 实时缓存失效模式
+## Runtime And Team Routing
 
-```text
-Hub WS 事件（message.new / session.updated / …）
-  -> useHubWebSocket 事件处理器
-  -> React Query queryClient.invalidateQueries([queryKey])
-  -> UI 自动重新获取最新数据
-```
+Hub can enqueue and route `agent.dispatch`, `agent.control`, TeamRun route decisions, approvals and assignment events. Device/target routing must preserve the exact selected target and must not silently fallback to another Desktop/Edge when a target-bound device is offline.
 
-覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
+Remote/cloud execution claims require relay/provisioning/device proof/workspace allowlist/approval evidence. A queued or replayed Hub task alone does not prove real model/API execution.
 
-## Chat Actions
+## Verification
 
-Web 和 Desktop 的 workbench model 分别暴露 chat actions，统一命名但各自实现：
+| Change | Minimum check |
+|---|---|
+| Handler/service/repository | `cd hub-server; go test ./... -short -count=1` or narrower focused package |
+| REST contract | OpenAPI YAML parse + affected handler tests |
+| WS event behavior | Hub WS tests + `api/events.md` sync |
+| Auth/session | OIDC/session tests + `scripts/verify-oidc-readiness.ps1` if config shape changed |
+| Performance/leak path | Targeted benchmark/load/pprof/leak gate plus behavior test for the same path |
 
-| Action | Web `useWebWorkbenchModel` | Desktop `useDesktopWorkbenchModel` |
-|--------|---------------------------|-----------------------------------|
-| send | Hub REST sendMessage | Hub REST sendMessage |
-| recall | Hub REST recallMessage | Hub REST recallMessage |
-| edit | Hub REST editMessage | Hub REST editMessage |
-| pin | Hub REST pinMessage | Hub REST pinMessage |
-| unpin | Hub REST unpinMessage | Hub REST unpinMessage |
-| markRead | Hub REST markRead | Hub REST markRead |
-| addReaction | Hub REST addMessageReaction | -- |
-| removeReaction | Hub REST removeMessageReaction | -- |
-| forward | Hub REST forwardMessage | -- |
-| searchMessages | Hub REST searchMessages | -- |
+## Related
 
-自动已读回执：进入会话后自动标记最后一条消息为已读。
-
-## 安全边界
-
-- Web 不能持有 TokenDance API key 或本机文件系统能力。
-- Hub 权限由 Hub-local membership/resource/action 决定，TokenDance ID 只证明身份。
-
-## 相关文档
-
-- [02-edge-server.md](02-edge-server.md) — Edge 与 Hub 的同步和中继关系
-- [06-auth-identity.md](06-auth-identity.md) — OIDC PKCE 完整流程
-- [04-frontend-data-flow.md](04-frontend-data-flow.md) — 前端如何消费 Hub 数据
+- [02-edge-server.md](02-edge-server.md) — Edge execution owner
+- [04-frontend-data-flow.md](04-frontend-data-flow.md) — shared client consumption
+- [../api-reference.md](../api-reference.md) — API entry

@@ -20,6 +20,8 @@
 |---|---|
 | [roadmap-v0.5.1/](roadmap-v0.5.1/) | 旧 longform roadmap |
 | [roadmap-v0.5.0/](roadmap-v0.5.0/) | 旧模块化 roadmap 入口 |
+| [api/](api/) | 旧长版 API / WebSocket 事件说明 |
+| [hub-server/](hub-server/) | 旧长版 Hub Server 和部署 README |
 | [state/](state/) | 已废弃 root `STATE.md` 历史快照 |
 | [audit/](audit/) | 日期型审计、cross-review、acceptance 报告 |
 | [release/](release/) | 历史 PR、merge-readiness、release notes |
