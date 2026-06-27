@@ -31,7 +31,7 @@ Use `bash scripts/check-secrets.sh --staged` before commit when changes are stil
 | Web UI | `corepack.cmd pnpm --dir app/web typecheck` + relevant Vitest/Playwright/Visual QA |
 | Shared frontend | focused `app/shared` tests plus affected consumers |
 | Mobile RN | `corepack.cmd pnpm --dir app/mobile-rn verify` unless Mobile is explicitly out of scope |
-| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md` gate mapping |
+| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md`; backend perf/leak also runs `scripts/verify-backend-perf-leak-gates.ps1` |
 
 ## Reporting
 

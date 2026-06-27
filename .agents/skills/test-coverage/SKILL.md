@@ -24,7 +24,7 @@ Use current CI gates as the coverage truth. Do not record fixed test counts in t
 - Desktop chat flow: `corepack.cmd pnpm --dir app/desktop test:e2e:chat-flow`
 - Web stubbed Hub: `corepack.cmd pnpm --dir app/web test:e2e:stubbed-hub`
 - Edge runtime smoke: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/edge-runtime-smoke.ps1`
-- Benchmarks: use the benchmark job package list from `.github/workflows/checks.yml`.
+- Backend performance/leak: `pwsh ./scripts/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms`; use `.github/workflows/checks.yml` only as CI coverage context.
 
 ## Reporting
 
