@@ -27,7 +27,7 @@
 
 | Risk | Impact | Likelihood | Severity | Mitigation |
 |:--|:--|:--|:--|:--|
-| Stale branch/worktree governance leads agents to use deleted branches or wrong base | Wrong merges, wasted work, regressions | High | High | Replace active branch table with live-state rule and current baseline; remove stale `dev/delicious223` commands. |
+| Stale branch/worktree governance leads agents to use deleted branches or wrong base | Wrong merges, wasted work, regressions | High | High | Keep branch/worktree rules in `AGENTS.md`; archive old branch-rule snapshots and rely on live git/GitHub state. |
 | Roadmap and architecture docs duplicate active truth and old phase status | Conflicting decisions, stale acceptance claims | High | High | Split current state, architecture, roadmap, and verification evidence into smaller canonical sections; archive/delete stale plan docs. |
 | Real E2E claims are not consistently mapped to evidence levels | False confidence in UI/package/login/runtime readiness | High | High | Promote `.agents/skills/real-e2e-acceptance/` to the canonical matrix and sync scripts/docs/workflows to it. |
 | Demo/local/login/observed/approved-real axes stay overloaded | Mock or preflight traffic appears in chat flow, tests misclassify mode boundaries | Medium | High | Define mode matrix and phase-aware network boundary tests in shared contracts and docs. |
@@ -42,9 +42,7 @@
 
 ### Branch and Workflow Drift
 
-Live state shows only one worktree at `docs/repo-governance-real-e2e`, based on `b2b5bf16`, while `docs/governance/branch-governance.md` still lists old active worktrees and branches. `AGENTS.md` also still mentions syncing `dev/delicious223` in two command/rule lines even though the current baseline is `dev/delicious233`.
-
-Mitigation should be a small, direct governance cleanup: remove active-looking stale branch rows, make live `git status`/`git worktree list` the operational truth, and keep historical details in archives.
+Initial analysis found branch and worktree facts duplicated across active docs. That is now treated as a closed-but-guarded risk: `AGENTS.md` owns the branch/worktree rules, live `git status`/`git worktree list`/GitHub state owns current truth, and old branch-rule snapshots belong in archive only.
 
 ### Real E2E Evidence Ambiguity
 
