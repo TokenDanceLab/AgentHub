@@ -104,10 +104,12 @@ function Get-FreePort {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-observed-loop.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-observed-loop.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p1-localhost-observed-loop.md"
 $webConfigPath = Join-Path $RepoRoot "app\web\playwright.config.ts"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "localhost observed loop runner exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "localhost observed loop runner implementation exists"
 Assert-True (Test-Path -LiteralPath $docPath) "localhost observed loop audit doc exists"
 Assert-True (Test-Path -LiteralPath $webConfigPath) "Web Playwright config exists"
 
@@ -117,8 +119,8 @@ try {
     New-Item -ItemType Directory -Force -Path $safeArtifactRoot | Out-Null
     $TempRoots += $safeArtifactRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match '\[ValidateSet\("ReadinessOnly", "FixtureManifest", "ApprovedReal"\)\]') "runner exposes ReadinessOnly, FixtureManifest, and ApprovedReal modes"
         Assert-True ($scriptText -match '5174' -and $scriptText -match '8080' -and $scriptText -match '5173' -and $scriptText -match '3210') "runner defines Web 5174, Hub 8080, Desktop 5173, and Local Edge 3210"
         Assert-True ($scriptText -match 'verify-observed-localhost-dispatch\.ps1') "runner delegates observed manifest validation"

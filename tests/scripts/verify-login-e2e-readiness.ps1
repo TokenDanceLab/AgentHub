@@ -95,10 +95,12 @@ function Invoke-RepoScript {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-login-e2e-readiness.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-login-e2e-readiness.ps1"
 $specPath = Join-Path $RepoRoot "app\web\src\__e2e__\oidc-login.spec.ts"
 $docPath = Join-Path $RepoRoot "docs\audit\p2-login-e2e-approval-harness.md"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "login E2E readiness script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "login E2E readiness script implementation exists"
 Assert-True (Test-Path -LiteralPath $specPath) "web OIDC Playwright spec exists"
 Assert-True (Test-Path -LiteralPath $docPath) "login E2E audit doc exists"
 
@@ -108,8 +110,8 @@ try {
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match '\[ValidateSet\("ProposalOnly", "RealApproved", "EvidenceReview"\)\]') "script exposes proposal, approved, and evidence review modes"
         Assert-True ($scriptText -match 'ApproveRealLogin') "script requires explicit real login approval"
         Assert-True ($scriptText -match 'ApproveRemoteDispatch') "script requires explicit remote dispatch approval"

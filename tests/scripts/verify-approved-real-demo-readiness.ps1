@@ -93,14 +93,16 @@ function Invoke-RepoScript {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-approved-real-demo-readiness.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-demo-readiness.ps1"
 $webSmokePath = Join-Path $RepoRoot "app\web\src\__e2e__\web-hub-real-mode-smoke.spec.ts"
 
 try {
     Assert-True (Test-Path -LiteralPath $scriptPath -PathType Leaf) "approved-real demo readiness runner exists"
+    Assert-True (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) "approved-real demo readiness runner implementation exists"
     Assert-True (Test-Path -LiteralPath $webSmokePath -PathType Leaf) "Web real-mode smoke spec exists"
 
-    if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match "verify-localhost-observed-loop\.ps1") "runner composes localhost observed fixture replay"
         Assert-True ($scriptText -match "verify-localhost-real-stack-smoke\.ps1") "runner can compose localhost real-stack smoke"
         Assert-True ($scriptText -match "verify-approved-real-preflight\.ps1") "runner reads approved-real preflight gate"
