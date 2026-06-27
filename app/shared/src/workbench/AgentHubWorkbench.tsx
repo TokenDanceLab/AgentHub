@@ -61,7 +61,7 @@ const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
-  readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+  readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
   readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
   generatedAt: null,
   items: [
