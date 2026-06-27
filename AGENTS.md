@@ -29,7 +29,7 @@ Agent 按需加载，够用就停：
 4. 改接口时读 `api/openapi.yaml`、`api/events.md`、`api/conventions.md`。
 5. 做 UI/数据流时读 `docs/architecture/04-frontend-data-flow.md` 和 workspace 设计文档中相关章节。
 6. 做登录、授权、Feishu/Lark、Gateway、安全、公开包装、i18n 或共享设计 token 时，先读 `../AGENTS.md` 和对应 `../docs/` owner 文档。
-7. 需要论证时最多读 1-3 篇精确 `docs/reference/**`。第三方调研默认只看 `docs/archive/reference-projects/` 的目标文件。
+7. 需要论证时最多读 1-3 篇精确 `docs/reference/**`。第三方调研默认先看 `docs/history.md` 定位外部归档，避免展开旧长文。
 
 ## 2. 项目分工和边界
 
@@ -149,7 +149,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - `.agents/skills/env-sandbox/`
 - `.agents/skills/real-e2e-acceptance/`
 
-白名单由 `scripts/verify-project-skills.ps1` 校验。过期 skill 只保存在 `docs/archives/project-skills/`，不能作为 active workflow 加载。
+白名单由 `scripts/verify-project-skills.ps1` 校验。过期 skill 只保存在 `docs/history.md` 指向的外部归档，不能作为 active workflow 加载。
 
 使用规则：
 
@@ -164,8 +164,8 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 总进度只写 `docs/roadmap.md`。
 - 架构概览写 `docs/architecture.md`；模块细节写 `docs/architecture/`。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
-- 历史 longform、日期型审计、旧发布材料和过期设计放 `docs/archive/`。
-- 已完成 spec-driven 工件和过期项目 skill 放 `docs/archives/`，这是 spec-driven 工具期望的路径。
+- 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
+- AgentHub 源仓不再保留 `docs/archive/` 或 `docs/archives/`；当前执行中的 SPEC 才可以临时使用 `docs/analysis/`、`docs/plan/` 和 `docs/progress/`。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
@@ -231,6 +231,6 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 2. SPEC 文档、任务分解、验收标准先行。
 3. 开发、测试、端到端验收其次。
 4. 完成后更新 MASTER、GitHub issue/PR、验收证据和归档计划。
-5. 专项完成后，把 `docs/analysis/`、本专项 `docs/plan/` 和 `docs/progress/` 移到 `docs/archives/<topic>/`，更新 `docs/archives/README.md`。
+5. 专项完成后，把 `docs/analysis/`、本专项 `docs/plan/` 和 `docs/progress/` 外迁到 `docs/history.md` 指向的外部归档，并更新历史索引。
 
 短任务（单文件修复、typo、小改动）不需要完整 SPEC，但仍必须遵守本文件的范围、隐私和验证规则。

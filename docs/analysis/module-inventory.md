@@ -7,8 +7,7 @@
 | `docs/architecture/` | Current module architecture | Keep active | P/E: owns current contracts and evidence wording |
 | `docs/governance/` | Current governance/security/threat docs | Keep active, no dated evidence | S: good if only owner docs remain |
 | `docs/reference/` | Small current reference docs | Keep active | R: should stay short and link to external archive when history moves |
-| `docs/archive/` | Historical longform and dated material | Move to external TokenDance docs archive; replace with `docs/history.md` | S: currently mixed into source repo |
-| `docs/archives/` | Completed SPEC artifacts and archived skills | Move to external TokenDance docs archive; keep history index only | R: currently large but useful as history |
+| Former history trees | Historical longform, dated material, completed SPEC artifacts, and archived skills | External TokenDance docs archive; AgentHub keeps `docs/history.md` only | S/R: source repo no longer carries history bulk |
 | `docs/adr/` | ADR body files and README summary | Compress to `docs/decisions.md`; old bodies move external | S/R: active summary is useful, body sprawl is not |
 | `scripts/` | Developer, verify, smoke, release, package, evidence helpers | Reorganize wrapper-first into typed subdirs | R: many direct references require staged migration |
 | `scripts/evidence/` | Evidence helper scripts | Preserve under `scripts/lib/` or `scripts/verify/` based on owner | P/R: avoid breaking approved-real scripts |
