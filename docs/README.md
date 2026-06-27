@@ -1,6 +1,6 @@
 # AgentHub 文档
 
-最后更新：2026-06-27
+最后更新：2026-06-28
 
 ## 快速入口
 
@@ -22,7 +22,7 @@ docs/
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
 ├── architecture/                      ← 模块化架构文档
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
-├── progress/                          ← 当前 spec-driven 专项进度（仅执行中存在）
+├── progress/                          ← 当前 spec-driven 专项进度（仅执行中才存在）
 ├── adr/                               ← 架构决策记录（11 篇）
 ├── governance/                        ← 治理：执行映射、安全风险、威胁模型
 ├── archive/                           ← 历史 longform、审计、发布、过期设计、参考调研和旧入口快照
@@ -39,7 +39,7 @@ docs/
 | 旧关键技术决策摘要 | [archive/designs/design-decisions-2026-06-27.md](archive/designs/design-decisions-2026-06-27.md) |
 | 历史设计、审计、发布、参考调研 | [archive/README.md](archive/README.md) |
 | spec-driven 专项归档 | [archives/README.md](archives/README.md) — 完成后的 analysis/plan/progress |
-| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md) — 仅当该文件存在时有效 |
+| 当前 spec-driven 进度 | `progress/MASTER.md` — 仅当该文件存在时有效 |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
