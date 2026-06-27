@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-06-27
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
-> **Branch**: dev/delicious233 (baseline; next Phase 3 branch TBD)
+> **Branch**: dev/delicious233 baseline; current pre-Phase 3 hygiene branch `docs/active-doc-regroup`
 > **Baseline**: origin/dev/delicious233
 
 ## GitHub Resources
@@ -79,8 +79,8 @@ git worktree list
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
-**Active Task**: not started; next work begins at #330 / T3.1 after a Phase 3 spec checkpoint.
-**Current Focus**: Phase 2 merged into `dev/delicious233` via PR #340 (`b79486fa`). The real E2E evidence matrix, doc SSOT cleanup, smoke matrix labels, Visual QA viewport boundary, and active-doc archive rules are now on baseline. Phase 3 should focus on source/test alignment for chat transcript behavior, frontend architecture docs, backend API gates, and Desktop packaged evidence boundaries.
+**Active Task**: operator-directed pre-Phase 3 documentation hygiene checkpoint on `docs/active-doc-regroup`; #330 / T3.1 remains the next source/test task after this branch is reviewed.
+**Current Focus**: Phase 2 merged into `dev/delicious233` via PR #340 (`b79486fa`). This hygiene checkpoint aggressively de-giants active entrypoints without changing source behavior: `AGENTS.md`, `CHANGELOG.md`, `docs/architecture.md`, `docs/developer-quickstart.md`, `docs/governance/security-risk-register.md`, `docs/governance/threat-model.md`, and `docs/reference/` become concise owner documents, while old longform content moves to `docs/archive/`. Phase 3 source/test alignment remains scoped to chat transcript behavior, frontend architecture docs, backend API gates, and Desktop packaged evidence boundaries.
 **Blockers**: none for Phase 2. Phase 3-4 issues remain open and must run through their own spec, implementation, and acceptance gates.
 
 ### Local Phase 1 Evidence
@@ -126,11 +126,12 @@ git worktree list
 - 2026-06-27 `phase-2-real-e2e-contract`: actual effort M; S.U.P.E.R quick check S/P/E/R pass for single matrix ownership, manifest ports, environment-labeled evidence, and replaceable verifiers; unplanned dependencies 2 (stale Mobile roadmap blocker wording, smoke matrix non-canonical derived evidence labels).
 - 2026-06-27 `active-doc-degianting`: actual effort L; S.U.P.E.R quick check S/P/E/R pass for single owner docs, archive ports, active-doc environment boundaries, and replaceable concise entrypoints; unplanned dependencies 3 (root STATE tests, duplicate API reference, stale docs/reference projects).
 - 2026-06-27 `phase-2-ci-fix`: actual effort S; S.U.P.E.R quick check S/P/E/R pass for roadmap ownership, fixture topology contract, environment honesty, and verifier reuse; unplanned dependencies 1 (PR merge CI exposed a stale roadmap line not caught before push).
+- 2026-06-27 `active-doc-regroup`: actual effort M; S.U.P.E.R quick check S/U/R pass for owner-file consolidation, archive routing, and stricter verifier limits; unplanned dependencies 2 (Git index lock after attempted parallel `git mv`, stale roadmap Phase 2 status).
 
 ## Next Steps
 
-1. Start Phase 3 from #330 / T3.1 with a fresh spec checkpoint and a new branch/worktree from `dev/delicious233`.
-2. Keep Phase 3 source/test alignment separate from Phase 2 archive/governance cleanup.
+1. Review and merge `docs/active-doc-regroup`, then start Phase 3 from #330 / T3.1 with a fresh spec checkpoint and a new branch/worktree from `dev/delicious233`.
+2. Keep Phase 3 source/test alignment separate from this active-doc regrouping patch.
 3. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
 4. Keep Mobile redesign, native package, and mobile-specific UX expansion out of this spec unless the operator opens a separate scoped task.
 
@@ -154,3 +155,4 @@ git worktree list
 | 2026-06-27 | active-doc-degianting | Added issue #339 and aggressively archived stale/duplicated active docs: old longform roadmap, obsolete root state snapshot, duplicate contributing/API reference docs, dated audits, release/merge notes, one-off plans, deprecated designs, old test-result snapshots, cc-switch/design reports, and third-party project research. Active entrypoints are now concise `AGENTS.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/roadmap.md`, `docs/api-reference.md`, and `docs/reference/README.md`; `verify-doc-ssot.ps1` blocks old active paths and entrypoint bloat. Verification: doc SSOT, real E2E contract, project skill whitelist, PS/Bash CI policy, readiness/gold-path scripts, Desktop targeted Vitest 22/22, shared data-mode contract 5/5, Desktop/Web typecheck, Web stubbed-Hub smoke matrix, and Desktop/Web 1440x810 Visual QA passed. |
 | 2026-06-27 | phase-2-ci-fix | PR #340 CI showed `validate` failing on a `docs/roadmap.md` stale root-rule filename and `Backend E2E (fixture-only)` failing on a missing P0 remote-control topology sentence. Fixed the roadmap without widening scope. Verification: `verify-doc-ssot.ps1` and `verify-p0-remote-control-fixture.ps1` passed locally. |
 | 2026-06-27 | phase-2-merged | PR #340 merged into `dev/delicious233` with all checks green. Because the PR target was not the default branch, #326-#329 and #339 were closed manually with merge evidence; Phase 2 milestone #11 is closed with 0 open / 5 closed issues. Phase 3 begins at #330 after the next spec checkpoint. |
+| 2026-06-27 | active-doc-regroup | Operator requested aggressive active-doc cleanup before Phase 3 implementation. Created `docs/active-doc-regroup`, archived old longform architecture/security/changelog/threat-model/reference/screenshot checklist snapshots, rebuilt concise owner docs, shortened quickstart, and tightened `verify-doc-ssot.ps1` line limits to prevent active entrypoint bloat. |
