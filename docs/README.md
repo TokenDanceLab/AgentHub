@@ -7,9 +7,9 @@
 | 角色 | 先读 | 然后 |
 |------|------|------|
 | **新开发者** | [developer-quickstart.md](developer-quickstart.md) | [architecture.md](architecture.md) → [roadmap.md](roadmap.md) |
-| **评审/产品** | [design-decisions.md](design-decisions.md) | [architecture.md](architecture.md) → [governance/threat-model.md](governance/threat-model.md) |
+| **评审/产品** | [architecture.md](architecture.md) | [adr/](adr/) → [governance/threat-model.md](governance/threat-model.md) |
 | **贡献者** | [../CONTRIBUTING.md](../CONTRIBUTING.md) | [developer-quickstart.md](developer-quickstart.md) |
-| **功能设计** | [architecture.md](architecture.md) | [design-decisions.md](design-decisions.md) → [adr/](adr/) |
+| **功能设计** | [architecture.md](architecture.md) | [adr/](adr/) |
 
 端口速记：Desktop/Tauri `5173`，Web `5174`，Mobile RN Expo `5177`，Hub `8080`，Edge `3210`。
 
@@ -23,7 +23,6 @@ docs/
 ├── architecture/                      ← 模块化架构文档
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
 ├── progress/                          ← 当前 spec-driven 专项进度（仅执行中存在）
-├── design-decisions.md                ← 5 个关键技术决策摘要
 ├── adr/                               ← 架构决策记录（11 篇）
 ├── governance/                        ← 治理：分支规范、文档标准、安全风险、威胁模型
 ├── archive/                           ← 历史 longform、审计、发布、过期设计、参考调研和旧入口快照
@@ -37,6 +36,7 @@ docs/
 | 需要 | 去看 |
 |------|------|
 | 某个架构决策的背景 | [adr/](adr/) |
+| 旧关键技术决策摘要 | [archive/designs/design-decisions-2026-06-27.md](archive/designs/design-decisions-2026-06-27.md) |
 | 历史设计、审计、发布、参考调研 | [archive/README.md](archive/README.md) |
 | spec-driven 专项归档 | [archives/README.md](archives/README.md) — 完成后的 analysis/plan/progress |
 | 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md) — 仅当该文件存在时有效 |
