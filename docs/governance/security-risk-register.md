@@ -2,7 +2,7 @@
 
 最后审查：2026-06-27
 
-本文件只记录当前安全风险队列、发布门禁和验证入口。2026-06-27 前的完整历史登记表已归档到 [../archive/security/security-register-full-2026-06-27.md](../archive/security/security-register-full-2026-06-27.md)。
+本文件只记录当前安全风险队列、发布门禁和验证入口。2026-06-27 前的完整历史登记表见 [../history.md](../history.md)。
 
 ## 发布门禁
 
@@ -76,7 +76,7 @@ cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
 
 ## 维护规则
 
-- 新风险进入本文件；历史证据、长命令输出和日期型审计进入 `docs/archive/security/` 或私有运维文档。
+- 新风险进入本文件；历史证据、长命令输出和日期型审计进入 [../history.md](../history.md) 指向的外部归档或私有运维文档。
 - 修复落地时只在表格中写当前状态和关闭条件，避免追加长篇日志。
 - 变成架构决策的风险链接 ADR 或架构章节。
 - 处于 `Open` 的 High 风险必须在 roadmap、issue 或 PR 中有 owner 和下一步。

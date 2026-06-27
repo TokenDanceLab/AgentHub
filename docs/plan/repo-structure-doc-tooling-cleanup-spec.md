@@ -32,7 +32,7 @@ docs/
 
 Migration targets:
 
-- Move AgentHub `docs/archive/` and `docs/archives/` history to `D:\Code\TokenDance\docs\archive\agenthub\`.
+- Move AgentHub history trees to the TokenDance docs external archive and keep only a short source-repo index.
 - Replace in-repo archive trees with a short `docs/history.md` index.
 - Compress `docs/adr/` into `docs/decisions.md`; move old ADR full text to the external archive.
 - Reshape `scripts/` into `scripts/verify/`, `scripts/dev/`, `scripts/release/`, `scripts/smoke/`, and `scripts/lib/` with compatibility wrappers first.
@@ -57,13 +57,13 @@ Migration targets:
 - `pwsh ./scripts/verify-project-skills.ps1`
 - `pwsh ./scripts/verify-real-e2e-contract.ps1`
 - For scripts/tests reshape: CI `validate`, Web/Desktop frontend gates, `go test ./tests/teamrun -count=1`, release-readiness path checks.
-- For archive migration: `rg "docs/archive|docs/archives|docs/adr|ADR-"` with only allowed current-index references remaining.
+- For archive migration: reference scan with only allowed current-index references remaining.
 - Final: AgentHub active markdown is limited to current owner entrypoints; no tracked one-off evidence remains at root; CI is green; `D:\Code\TokenDance\docs` receives the corresponding archive commit.
 
 ## Information To Collect Before Finalizing
 
 - Current AgentHub root/docs/scripts/tests inventory and tracked root artifacts.
-- Reference graph for `docs/archive`, `docs/archives`, `docs/adr`, `ADR-`, script paths, and `tests/` paths.
+- Reference graph for history trees, ADRs, script paths, and `tests/` paths.
 - Current verifier and CI references to script/test/doc paths.
 - Current state of `D:\Code\TokenDance\docs` and whether a clean receiver branch/worktree is required.
 - Current GitHub tracking mode, milestone/issue plan, and project-scope availability.

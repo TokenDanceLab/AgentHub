@@ -26,7 +26,7 @@
 
 | Phase | Milestone | URL | Open | Closed |
 |---|---|---|---:|---:|
-| 1 | Design and Reference Graph Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/12 | 1 | 1 |
+| 1 | Design and Reference Graph Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/12 | 0 | 2 |
 | 2 | Docs Archive and ADR Migration | https://github.com/TokenDanceLab/AgentHub/milestone/13 | 2 | 0 |
 | 3 | Scripts and Tests Wrapper Migration | https://github.com/TokenDanceLab/AgentHub/milestone/14 | 2 | 0 |
 | 4 | Final Wrapper and Root Hygiene Cleanup | https://github.com/TokenDanceLab/AgentHub/milestone/15 | 1 | 0 |
@@ -34,7 +34,7 @@
 
 ## Phase Checklist
 
-- [ ] Phase 1: Design and Reference Graph Baseline (1/2 tasks)
+- [x] Phase 1: Design and Reference Graph Baseline (2/2 tasks)
 - [ ] Phase 2: Docs Archive and ADR Migration (0/2 tasks)
 - [ ] Phase 3: Scripts and Tests Wrapper Migration (0/2 tasks)
 - [ ] Phase 4: Final Wrapper and Root Hygiene Cleanup (0/1 tasks)
@@ -45,8 +45,8 @@
 | Task ID | Issue | Status |
 |---|---|---|
 | T1.1 | #360 | closed |
-| T1.2 | #361 | in progress |
-| T2.1 | #362 | pending |
+| T1.2 | #361 | closed |
+| T2.1 | #362 | in progress |
 | T2.2 | #363 | pending |
 | T3.1 | #364 | pending |
 | T3.2 | #365 | pending |
@@ -55,11 +55,11 @@
 
 ## Current Status
 
-**Active Phase**: Phase 1 - Design and Reference Graph Baseline
+**Active Phase**: Phase 2 - Docs Archive and ADR Migration
 
-**Active Task**: #361 / T1.2 - Prepare external docs archive receiver design.
+**Active Task**: #362 / T2.1 - Migrate history trees externally with `docs/history.md`.
 
-**Current Focus**: Merge the non-destructive external archive receiver design, then use #362/#363 for actual archive and ADR migration.
+**Current Focus**: Remove the migrated history trees from AgentHub, keep `docs/history.md` as the short index, and update active docs/verifiers to stop depending on in-repo archive paths.
 
 ## Governance Status
 
@@ -72,9 +72,11 @@
 ## Execution Telemetry
 
 - T1.1 started after previous repo governance SPEC was archived and all its milestones closed.
-- Initial reference graph found direct active references to `docs/archive`, `docs/archives`, `docs/adr`, root `scripts/*.ps1|sh`, `tests/scripts/**`, and Desktop readiness script paths.
+- Initial reference graph found direct active references to history trees, ADRs, root `scripts/*.ps1|sh`, `tests/scripts/**`, and Desktop readiness script paths.
 - T1.1 completed by PR #368; drift 0.
 - T1.2 receiver worktree selected: `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive` on branch `docs/agenthub-archive-receiver`; dirty docs main checkout is not used for writes.
+- T1.2 completed by PR #369; drift 0. Phase 1 milestone #12 is closed.
+- T2.1 external archive commit: TokenDanceLab/docs merge commit `8417e00b` (source commit `e94cb7d`) on PR #1, containing former AgentHub history trees under `archive/agenthub/repo/docs/`.
 
 ## Quick Status Commands
 

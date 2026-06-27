@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本文档是轻量兼容性摘要。旧长版端点示例已归档到 [../archive/reference/agent-protocol-compat-2026-06-27.md](../archive/reference/agent-protocol-compat-2026-06-27.md)。
+本文档是轻量兼容性摘要。旧长版端点示例见 [../history.md](../history.md)。
 
 ## Compatibility Statement
 

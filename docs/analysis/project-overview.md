@@ -9,7 +9,7 @@ This SPEC cleans repository structure, active documentation, archive ownership, 
 | Area | Current Finding |
 |---|---|
 | Active docs | `docs/README.md`, `docs/roadmap.md`, `docs/architecture.md`, `docs/architecture/`, `docs/governance/`, `docs/reference/`, and `docs/adr/` are active. |
-| Historical docs | `docs/archive/` has 131 Markdown files; `docs/archives/` has 41 Markdown files. |
+| Historical docs | Former in-repo history trees were copied to the external TokenDance docs archive; AgentHub now keeps only `docs/history.md`. |
 | ADR | `docs/adr/` has 16 ADR body files plus `README.md`; several code comments still mention ADR IDs. |
 | Scripts | Root `scripts/` has many direct CI, docs, package, Desktop, and test references; `scripts/evidence/` and `scripts/git-hooks/` already exist. |
 | Tests | Root `tests/` currently has `fixtures/` and `scripts/`; release-readiness triggers on `tests/scripts/**`. |
