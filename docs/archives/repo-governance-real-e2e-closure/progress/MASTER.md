@@ -2,12 +2,12 @@
 
 > **Task**: Normalize AgentHub repo governance, real E2E acceptance, source/test alignment, and merge readiness.
 > **Started**: 2026-06-27
-> **Last Updated**: 2026-06-27
+> **Last Updated**: 2026-06-28
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
 > **Baseline**: `dev/delicious233`
 
-This file is the lightweight local index for the active spec-driven run. Detailed task execution lives in GitHub issues/PRs and milestone descriptions; old evidence snapshots belong in `docs/archive/` or `docs/archives/`.
+This file is the archived local index for the completed spec-driven run. Live task history remains in GitHub issues/PRs and milestone descriptions; evidence snapshots remain in `docs/archive/` or `docs/archives/`.
 
 ## GitHub Resources
 
@@ -32,7 +32,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
 | 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 0 | 10 | 10 |
-| 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 2 | 1 | 3 |
+| 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 1 | 2 | 3 |
 
 ## Issue Mapping
 
@@ -58,8 +58,8 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.4 | #333 | Check Desktop packaged evidence boundary | closed |
 | T3.5 | #334 | Align Web Mobile client test lanes | closed |
 | T4.1 | #335 | Run focused acceptance gate bundle | closed |
-| T4.2 | #336 | Cross-review and architecture approval packet | open |
-| T4.3 | #337 | Merge-readiness and archive preparation | open |
+| T4.2 | #336 | Cross-review and architecture approval packet | closed |
+| T4.3 | #337 | Merge-readiness and archive preparation | PR-ready |
 
 ## Quick Status Commands
 
@@ -80,15 +80,15 @@ git worktree list
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
 - [x] Phase 3: Source And Test Alignment (10/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
-- [ ] Phase 4: Acceptance And Merge Readiness (1/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
+- [ ] Phase 4: Acceptance And Merge Readiness (2/3 tasks complete; #337 prepared this archive branch) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
-**Active Phase**: Phase 4 - Acceptance And Merge Readiness
+**Active Phase**: Archived after Phase 4 merge-readiness preparation
 
-**Active Task**: #336 / T4.2 cross-review and architecture approval packet.
+**Active Task**: #337 / T4.3 merge-readiness and archive preparation.
 
-**Current Focus**: Merge the architecture approval packet, then use #337 for merge-readiness and archive preparation. #335 is merged into `dev/delicious233`; approved-real login remains blocked-with-evidence until explicit live-test approval metadata exists.
+**Current Focus**: Merge the archive-preparation PR, manually close #337 if GitHub does not auto-close against `dev/delicious233`, close Phase 4 milestone, then start the separate `repo-structure-doc-tooling-cleanup` SPEC.
 
 ## Governance Status
 
@@ -121,8 +121,9 @@ git worktree list
 - T3.0d actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-real-e2e-contract` still depended on the archived workflow doc). PR #353 merged; #352 closed. Drift contribution 1; Phase 3 is now 8/9 with `drift_score=2`.
 - T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed.
 - T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. PR #356 merged; #334 closed; local gates and CI passed.
-- T4.1 actual effort: L; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. Gate stabilization notes: Desktop smoke now follows Entry Gate -> Demo workbench, and client smoke now installs from the app workspace root. Evidence: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md).
-- T4.2 actual effort: M; S.U.P.E.R focus R pass; unplanned dependency count: 0. Evidence: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../archives/governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md).
+- T4.1 actual effort: L; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. Gate stabilization notes: Desktop smoke now follows Entry Gate -> Demo workbench, and client smoke now installs from the app workspace root. Evidence: [phase4-acceptance-gates-2026-06-27.md](../../governance-evidence/phase4-acceptance-gates-2026-06-27.md).
+- T4.2 actual effort: M; S.U.P.E.R focus R pass; unplanned dependency count: 0. Evidence: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../../governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md).
+- T4.3 actual effort: M; S.U.P.E.R focus R pass; unplanned dependency count: 0. This branch archives `docs/analysis/`, `docs/plan/`, and `docs/progress/` under `docs/archives/repo-governance-real-e2e-closure/`.
 
 ## Recent Checkpoints
 
@@ -140,11 +141,12 @@ git worktree list
 | 2026-06-27 | Continued doc-spine cleanup merged | PR #355 merged; #354 closed; branch-governance and Mobile handoff moved to archive, Mobile README shortened, and doc SSOT now guards Mobile stale proof claims. |
 | 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
 | 2026-06-27 | Web/Mobile lane merged | PR #356 merged; #334 closed; Phase 3 is complete. |
-| 2026-06-27 | Phase 4 acceptance bundle | #335 focused gates have 0 failed rows; smoke matrix is passed-with-blockers only for expected approved-real login readiness. Evidence file: [phase4-acceptance-gates-2026-06-27.md](../archives/governance-evidence/phase4-acceptance-gates-2026-06-27.md). |
-| 2026-06-28 | Architecture approval packet | #336 cross-review found no Critical/High blockers; doc/archive/ADR bulk is deferred to the next cleanup SPEC. Evidence file: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../archives/governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md). |
+| 2026-06-27 | Phase 4 acceptance bundle | #335 focused gates have 0 failed rows; smoke matrix is passed-with-blockers only for expected approved-real login readiness. Evidence file: [phase4-acceptance-gates-2026-06-27.md](../../governance-evidence/phase4-acceptance-gates-2026-06-27.md). |
+| 2026-06-28 | Architecture approval packet | #336 cross-review found no Critical/High blockers; doc/archive/ADR bulk is deferred to the next cleanup SPEC. Evidence file: [architecture-approval-repo-governance-real-e2e-2026-06-28.md](../../governance-evidence/architecture-approval-repo-governance-real-e2e-2026-06-28.md). |
+| 2026-06-28 | Merge-readiness archive | #337 moves this SPEC's analysis, plan, and progress materials under `docs/archives/repo-governance-real-e2e-closure/` and leaves the next repository-structure cleanup as a separate SPEC. |
 
 ## Next Steps
 
-1. Merge #336 architecture approval packet.
-2. Use #337 for merge-readiness and archive preparation.
-3. Keep final acceptance evidence concise and archive completed SPEC artifacts.
+1. Merge the #337 archive-preparation PR into `dev/delicious233`.
+2. Close #337 and milestone #10 if GitHub does not auto-close because `dev/delicious233` is not the default branch.
+3. Start the separate `repo-structure-doc-tooling-cleanup` SPEC before moving external archives or reorganizing scripts/tests.
