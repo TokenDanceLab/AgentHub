@@ -32,6 +32,7 @@ foreach ($stalePath in @(
     "docs/roadmap",
     "docs/audit",
     "docs/reference/projects",
+    "docs/release/screenshot-checklist.md",
     "edge-server/docs/audit",
     "hub-server/docs/audit"
 )) {
@@ -79,6 +80,7 @@ $forbiddenPatterns = @(
     @{ Pattern = "GPT-5\.5"; Message = "hard-coded private/local model alias" },
     @{ Pattern = "(?<![\w-])/(goal|loop)(?![\w-])"; Message = "legacy Codex /goal or /loop workflow rule" },
     @{ Pattern = "Desktop/Web UI freeze|UI freeze"; Message = "obsolete UI freeze rule" },
+    @{ Pattern = "Phase 2 Real E2E Contract\s*\|\s*进行中"; Message = "stale Phase 2 progress state" },
     @{ Pattern = "Mobile tests pass"; Message = "stale Mobile pass claim" },
     @{ Pattern = "真实执行已验证"; Message = "stale real-execution acceptance claim without current approved-real evidence" },
     @{ Pattern = "当前事实写在\s+`?STATE\.md`?"; Message = "old STATE.md fact-owner rule" },
@@ -102,12 +104,20 @@ foreach ($file in $files) {
 }
 
 $maxLines = @{
-    "AGENTS.md" = 700
+    "AGENTS.md" = 260
+    "CHANGELOG.md" = 90
     "CONTRIBUTING.md" = 90
     "docs/README.md" = 120
+    "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
+    "docs/architecture.md" = 170
+    "docs/architecture/04-frontend-data-flow.md" = 230
     "docs/api-reference.md" = 80
     "docs/reference/README.md" = 80
+    "docs/reference/sdk-agent-strategy.md" = 120
+    "docs/reference/agent-protocol-compat.md" = 100
+    "docs/governance/security-risk-register.md" = 180
+    "docs/governance/threat-model.md" = 140
     "docs/progress/MASTER.md" = 260
 }
 
