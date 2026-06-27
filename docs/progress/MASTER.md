@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 2 | 6 | 8 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 1 | 7 | 8 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -53,7 +53,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.1 | #330 | Harden chat transcript behavior tests | closed |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | closed |
 | T3.3 | #332 | Classify backend API performance and leak gates | closed |
-| T3.4 | #333 | Check Desktop packaged evidence boundary | open |
+| T3.4 | #333 | Check Desktop packaged evidence boundary | closed |
 | T3.5 | #334 | Align Web Mobile client test lanes | open |
 | T4.1 | #335 | Run focused acceptance gate bundle | open |
 | T4.2 | #336 | Cross-review and architecture approval packet | open |
@@ -77,16 +77,16 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (6/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (7/8 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #333 / T3.4 pending worktree
+**Active Task**: #334 / T3.5 pending worktree
 
-**Current Focus**: Desktop packaged evidence boundary. Distinguish Vite renderer evidence from Tauri package, sidecar, sqlite, icon, installer/signing, updater, and approved-real runtime claims. Keep Mobile native/UI expansion out of scope.
+**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; for Mobile only clarify required gate boundaries and do not start deep native/UI redesign.
 
 **Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
@@ -117,6 +117,7 @@ git worktree list
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 - T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
 - T3.3 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #350 merged; #332 closed. Drift contribution 0; Phase 3 is now 6/8 with `drift_score=1`.
+- T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 is now 7/8 with `drift_score=1`.
 
 ## Recent Checkpoints
 
@@ -131,10 +132,11 @@ git worktree list
 | 2026-06-27 | Chat transcript tests | #330 adds Web delayed-send optimistic bubble coverage and verifies existing shared/Desktop/Web/Visual QA chat-flow gates. |
 | 2026-06-27 | Frontend architecture SSOT | PR #349 merged; #331 closed; `docs/architecture/04-frontend-data-flow.md` now maps shared implementation owners. |
 | 2026-06-27 | Backend performance/leak gates | PR #350 merged; #332 closed; `scripts/load-test-scenarios.md` owns gate classification and `scripts/verify-backend-perf-leak-gates.ps1` runs focused behavior + microbench smoke. |
+| 2026-06-27 | Desktop packaged boundary | PR #351 merged; #333 closed; package readiness/dry gates separate Vite renderer, packaged-release, signing/updater/release upload, and `real_tested=false` boundaries. |
 
 ## Next Steps
 
-1. Create the #333 worktree from `dev/delicious233` and check Desktop packaged-release evidence surfaces.
-2. Separate renderer/Vite proof from Tauri package, sidecar, sqlite, icon, installer/signing, updater, and approved-real runtime proof.
-3. Run only focused Desktop/package/readiness gates that match the claim; mark unrun package/real paths `real_tested=false`.
-4. Keep Mobile native/UI expansion out of this spec unless the operator opens a separate scoped task.
+1. Create the #334 worktree from `dev/delicious233` and inspect Web/Mobile client test lanes.
+2. Keep Desktop/Web UI and shared client contracts first; Mobile work only clarifies existing gate boundaries.
+3. Do not add Mobile native/UI redesign or low-signal tests in this spec.
+4. Continue to mark stub/fixture/readiness-only paths with `real_tested=false`.
