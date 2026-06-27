@@ -39,6 +39,8 @@ foreach ($stalePath in @(
     "docs/audit",
     "docs/reference/projects",
     "docs/release/screenshot-checklist.md",
+    "docs/governance/document-standards.md",
+    "docs/governance/workflow-standard.md",
     "api/events-full.md",
     "edge-server/docs/audit",
     "hub-server/docs/audit"
@@ -63,6 +65,7 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = "docs/roadmap.md" },
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
+    @{ Path = "AGENTS.md"; Marker = '项目规则只写 `AGENTS.md`' },
     @{ Path = ".agents/skills/real-e2e-acceptance/SKILL.md"; Marker = "Packaged release" },
     @{ Path = "api/events.md"; Marker = "Owner" },
     @{ Path = "app/web/README.md"; Marker = "docs/archive/app/web-readme-full-2026-06-27.md" },
@@ -77,7 +80,6 @@ $requiredMarkers = @(
     @{ Path = "scripts/load-test-scenarios.md"; Marker = "Do Not Claim" },
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
-    @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
     @{ Path = "docs/governance/governance-execution.md"; Marker = "D2b. Release dry build topology" }
     @{ Path = "docs/governance/governance-execution.md"; Marker = "later approval slice" }
     @{ Path = "docs/architecture/05-deployment.md"; Marker = "Desktop packaged 行为正确" }
@@ -98,7 +100,6 @@ foreach ($required in $requiredMarkers) {
 
 $allowedClaudeMentions = @(
     "AGENTS.md",
-    "docs/governance/document-standards.md",
     "docs/progress/MASTER.md"
 )
 
@@ -169,6 +170,8 @@ $maxLines = @{
     "docs/reference/agent-protocol-compat.md" = 100
     "docs/governance/security-risk-register.md" = 180
     "docs/governance/threat-model.md" = 140
+    "docs/governance/governance-execution.md" = 110
+    "docs/governance/branch-governance.md" = 90
     "docs/progress/MASTER.md" = 150
 }
 
