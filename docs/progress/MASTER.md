@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 2 | 8 | 10 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 1 | 9 | 10 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -51,7 +51,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.0b | #344 | Trim module README docs and stale active references | closed |
 | T3.0c | #346 | Sync progress SSOT and doc governance guardrails | closed |
 | T3.0d | #352 | Aggressively consolidate active documentation | closed |
-| T3.0e | #354 | Degiant active documentation spine | open |
+| T3.0e | #354 | Degiant active documentation spine | closed |
 | T3.1 | #330 | Harden chat transcript behavior tests | closed |
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | closed |
 | T3.3 | #332 | Classify backend API performance and leak gates | closed |
@@ -79,18 +79,18 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (8/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [ ] Phase 3: Source And Test Alignment (9/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #354 / T3.0e in `docs/354-doc-spine-cleanup`; #334 worktree remains pending and unchanged.
+**Active Task**: #334 / T3.5 pending worktree.
 
-**Current Focus**: Degiant active documentation spine. Keep the active doc set compact, archive obsolete longform material, and preserve the rule/progress spine: `AGENTS.md`, `docs/progress/MASTER.md`, `docs/roadmap.md`, focused architecture/API owner docs, and `.agents/skills/real-e2e-acceptance/SKILL.md`.
+**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; Mobile only clarifies RN-safe shared contract gate boundaries and does not start deep native/UI redesign.
 
-**Blockers**: none. Mobile deep UI/native redesign remains out of scope for #334; #354 must not add new active rule docs.
+**Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
 ## Governance Status
 
@@ -114,14 +114,14 @@ git worktree list
 ## Execution Telemetry
 
 - GitHub modes store per-task telemetry in issue comments and milestone descriptions.
-- Phase 3 adaptive state is in milestone #9. Current drift score: 3 after #354 was added for continued active-doc cleanup pressure; annotate threshold is already active, replan threshold is 4.
+- Phase 3 adaptive state is in milestone #9. Current drift score: 4 after #354 exposed an extra Mobile brand verifier dependency. Replan threshold is reached; the response is scope stabilization, not new task creation: #334 remains the only Phase 3 task before Phase 4 acceptance.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 - T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
 - T3.3 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #350 merged; #332 closed. Drift contribution 0; Phase 3 is now 6/8 with `drift_score=1`.
 - T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 was 7/8 before #352 expanded the phase to 9 tasks.
 - T3.0d actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-real-e2e-contract` still depended on the archived workflow doc). PR #353 merged; #352 closed. Drift contribution 1; Phase 3 is now 8/9 with `drift_score=2`.
-- T3.0e plan opened from user-directed doc-spine cleanup pressure. Planned effort: M; S.U.P.E.R focus S/U/R; unplanned dependency count before execution: 1. Issue #354 tracks the work; this entry is the required plan-before-audit checkpoint.
+- T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed. Phase 3 is now 9/10 with `drift_score=4`; lightweight replan keeps #334 as the remaining task.
 
 ## Recent Checkpoints
 
@@ -139,11 +139,12 @@ git worktree list
 | 2026-06-27 | Desktop packaged boundary | PR #351 merged; #333 closed; package readiness/dry gates separate Vite renderer, packaged-release, signing/updater/release upload, and `real_tested=false` boundaries. |
 | 2026-06-27 | Active doc consolidation merged | PR #353 merged; #352 closed; duplicate active governance rule files archived and verifiers now block them from returning. |
 | 2026-06-27 | Adaptive drift warning | Milestone #9 drift score updated to 2; #334 annotated for possible Web/Mobile client lane contract/verifier alignment. |
-| 2026-06-27 | Continued doc-spine cleanup opened | #354 added after follow-up review found active docs still risk becoming giant, duplicated, or stale. |
+| 2026-06-27 | Continued doc-spine cleanup merged | PR #355 merged; #354 closed; branch-governance and Mobile handoff moved to archive, Mobile README shortened, and doc SSOT now guards Mobile stale proof claims. |
+| 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
 
 ## Next Steps
 
-1. Inventory active Markdown/rule surfaces for #354 and classify keep/merge/archive/delete candidates.
-2. Archive stale or duplicate longform material under existing archive trees; do not create replacement rule sprawl.
-3. Run focused governance gates and update only high-signal guardrails.
-4. Return to #334 after #354 is merged or explicitly deferred.
+1. Continue #334 in `.worktrees/web-mobile-client-lanes-334`.
+2. Keep Desktop/Web UI and shared client contracts first; Mobile work only clarifies existing gate boundaries.
+3. Do not add Mobile native/UI redesign or low-signal tests in this spec.
+4. Continue to mark stub/fixture/readiness-only paths with `real_tested=false`.
