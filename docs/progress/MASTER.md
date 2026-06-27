@@ -31,7 +31,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 |:--|:--|:--|--:|--:|--:|
 | 1 | Governance Baseline | https://github.com/TokenDanceLab/AgentHub/milestone/8 | 0 | 4 | 4 |
 | 2 | Real E2E Contract | https://github.com/TokenDanceLab/AgentHub/milestone/11 | 0 | 5 | 5 |
-| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 1 | 9 | 10 |
+| 3 | Source And Test Alignment | https://github.com/TokenDanceLab/AgentHub/milestone/9 | 0 | 10 | 10 |
 | 4 | Acceptance And Merge Readiness | https://github.com/TokenDanceLab/AgentHub/milestone/10 | 3 | 0 | 3 |
 
 ## Issue Mapping
@@ -56,7 +56,7 @@ This file is the lightweight local index for the active spec-driven run. Detaile
 | T3.2 | #331 | Align frontend architecture docs to shared implementation | closed |
 | T3.3 | #332 | Classify backend API performance and leak gates | closed |
 | T3.4 | #333 | Check Desktop packaged evidence boundary | closed |
-| T3.5 | #334 | Align Web Mobile client test lanes | open |
+| T3.5 | #334 | Align Web Mobile client test lanes | closed |
 | T4.1 | #335 | Run focused acceptance gate bundle | open |
 | T4.2 | #336 | Cross-review and architecture approval packet | open |
 | T4.3 | #337 | Merge-readiness and archive preparation | open |
@@ -79,16 +79,16 @@ git worktree list
 
 - [x] Phase 1: Governance Baseline (4/4 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/8)
 - [x] Phase 2: Real E2E Contract (5/5 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/11)
-- [ ] Phase 3: Source And Test Alignment (9/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
+- [x] Phase 3: Source And Test Alignment (10/10 tasks merged) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/9)
 - [ ] Phase 4: Acceptance And Merge Readiness (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/10)
 
 ## Current Status
 
-**Active Phase**: Phase 3 - Source And Test Alignment
+**Active Phase**: Phase 4 - Acceptance And Merge Readiness
 
-**Active Task**: #334 / T3.5 validated in worktree; PR pending.
+**Active Task**: #335 / T4.1 focused acceptance gate bundle.
 
-**Current Focus**: Web/Mobile client test lanes. Keep Desktop/Web first; Mobile only clarifies RN-safe shared contract gate boundaries and does not start deep native/UI redesign. No blockers.
+**Current Focus**: Run the focused final acceptance bundle, then architecture approval and archive preparation. No blockers.
 
 ## Governance Status
 
@@ -112,15 +112,15 @@ git worktree list
 ## Execution Telemetry
 
 - GitHub modes store per-task telemetry in issue comments and milestone descriptions.
-- Phase 3 adaptive state is in milestone #9. Current drift score: 4 after #354 exposed an extra Mobile brand verifier dependency. Replan threshold is reached; the response is scope stabilization, not new task creation: #334 remains the only Phase 3 task before Phase 4 acceptance.
+- Phase 3 closed at `drift_score=4`; scope stabilization held and no extra task was added.
 - T3.0c actual effort: S; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (GitHub milestone adaptive state was stale after #344 closed).
 - T3.1 actual effort: M; S.U.P.E.R focus S/P/R pass; unplanned dependency count: 1 (new Web optimistic-send E2E passed on current implementation, so no production fix was needed).
 - T3.2 actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 0. PR #349 merged; #331 closed. Phase 3 is now 5/8 with `drift_score=1`.
 - T3.3 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #350 merged; #332 closed. Drift contribution 0; Phase 3 is now 6/8 with `drift_score=1`.
 - T3.4 actual effort: M; S.U.P.E.R focus P/E pass; unplanned dependency count: 0. PR #351 merged; #333 closed. Drift contribution 0; Phase 3 was 7/8 before #352 expanded the phase to 9 tasks.
 - T3.0d actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-real-e2e-contract` still depended on the archived workflow doc). PR #353 merged; #352 closed. Drift contribution 1; Phase 3 is now 8/9 with `drift_score=2`.
-- T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed. Phase 3 is now 9/10 with `drift_score=4`; lightweight replan keeps #334 as the remaining task.
-- T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. Local validation covers shared data-mode contract, Mobile RN-safe platform boundaries, Web stubbed Hub replay manifest reuse, doc SSOT, real E2E contract, project skill whitelist, OpenAPI YAML parse, and diff check.
+- T3.0e actual effort: M; S.U.P.E.R focus S/U/R pass; unplanned dependency count: 1 (`verify-brand-assets.mjs` still read the archived Mobile handoff). PR #355 merged; #354 closed.
+- T3.5 actual effort: M; S.U.P.E.R focus S/P/E/R pass; unplanned dependency count: 0. PR #356 merged; #334 closed; local gates and CI passed.
 
 ## Recent Checkpoints
 
@@ -140,10 +140,10 @@ git worktree list
 | 2026-06-27 | Adaptive drift warning | Milestone #9 drift score updated to 2; #334 annotated for possible Web/Mobile client lane contract/verifier alignment. |
 | 2026-06-27 | Continued doc-spine cleanup merged | PR #355 merged; #354 closed; branch-governance and Mobile handoff moved to archive, Mobile README shortened, and doc SSOT now guards Mobile stale proof claims. |
 | 2026-06-27 | Lightweight replan | Phase 3 drift reached 4; no new task added because #334 already owns the remaining Web/Mobile lane alignment. |
-| 2026-06-27 | Web/Mobile lane validation | #334 worktree validates Mobile as a distinct non-Desktop surface, keeps Web/Mobile off Local Edge, and records stubbed Hub replay as `real_tested=false`. |
+| 2026-06-27 | Web/Mobile lane merged | PR #356 merged; #334 closed; Phase 3 is complete. |
 
 ## Next Steps
 
-1. Push #334 and open the PR.
-2. Merge #334 after CI, then sync Phase 3 to complete.
-3. Start Phase 4 focused acceptance, architecture approval, and archive preparation.
+1. Start #335 focused acceptance gate bundle.
+2. Use #336 for architecture approval and #337 for merge-readiness/archive preparation.
+3. Keep final acceptance evidence concise and archive completed SPEC artifacts.
