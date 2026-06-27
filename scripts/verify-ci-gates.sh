@@ -215,4 +215,10 @@ assert_contains "$validate" "scripts/verify-project-skills\\.ps1" "validate job 
 assert_contains "$validate" "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 assert_contains "$validate" "check-secrets\\.sh" "validate job must keep secret guard"
 
+assert_contains "$mobile" '^    timeout-minutes:[[:space:]]+45[[:space:]]*$' "frontend-mobile job must have a hard timeout"
+mobile_visual_step="$(get_step_block "$mobile" "Screenshot visual QA (mobile)")" || fail "missing step 'Screenshot visual QA (mobile)'"
+mobile_mock_hub_step="$(get_step_block "$mobile" "E2E (mock hub)")" || fail "missing step 'E2E (mock hub)'"
+assert_contains "$mobile_visual_step" '^[[:space:]]+timeout-minutes:[[:space:]]+12[[:space:]]*$' "mobile visual QA must have a hard timeout"
+assert_contains "$mobile_mock_hub_step" '^[[:space:]]+timeout-minutes:[[:space:]]+10[[:space:]]*$' "mobile mock-hub E2E must have a hard timeout"
+
 echo "ci gate policy ok"
