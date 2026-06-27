@@ -96,7 +96,7 @@ Known gaps:
 | Platform-specific root rule files | Not used; shared project rules live in `AGENTS.md`. |
 | `.agents/skills/` | Active whitelist only: `dev-loop`, `test-coverage`, `pre-push`, `integration-test`, `adapter-dev`, `env-sandbox`, `real-e2e-acceptance`. |
 | `docs/archives/project-skills/` | Archived `ui-screenshot`, `dev-team`, `dev-team-codex`; archive README says agents should not load them. |
-| `docs/progress/MASTER.md` | Not present at Phase 1 start; this is a fresh spec-driven run. |
+| `docs/progress/MASTER.md` | Created in Phase 4 and now used as the active spec-driven progress index. |
 | Native memory | Use platform/native memory only if explicitly updating durable memory; do not create a repo-local fallback memory file silently. |
 | Other rule files | No active `.cursor`, `.windsurf`, `.codex`, or `.clinerules*` surfaces found in the repo root. |
 

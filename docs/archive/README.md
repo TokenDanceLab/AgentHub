@@ -27,6 +27,7 @@
 | [performance/](performance/) | 旧 load/performance 场景规划和历史参考 |
 | [state/](state/) | 已废弃 root `STATE.md` 历史快照 |
 | [audit/](audit/) | 日期型审计、cross-review、acceptance 报告 |
+| [governance/](governance/) | 旧治理规则面快照；当前项目规则以 `AGENTS.md` 为准 |
 | [release/](release/) | 历史 PR、merge-readiness、release notes |
 | [architecture/](architecture/) | 旧长版架构入口快照 |
 | [security/](security/) | 旧完整安全风险登记表和长证据快照 |
