@@ -5,7 +5,7 @@
 # Each service runs in the background; press Ctrl+C to stop all.
 # URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:8080, Desktop=http://localhost:5173
 #
-# Usage: ./scripts/dev-start.sh
+# Usage: ./scripts/dev/dev-start.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -20,7 +20,7 @@ function Is-ActiveDoc([string]$Path) {
     if ($p -eq "edge-server/README.md") { return $true }
     if ($p -eq "hub-server/README.md" -or $p -eq "hub-server/deployments/README.md" -or $p -eq "hub-server/tests/README.md") { return $true }
     if ($p -eq "app/web/README.md" -or $p -eq "app/desktop/README.md" -or $p -eq "app/mobile-rn/README.md") { return $true }
-    if ($p -eq "scripts/load-test-scenarios.md") { return $true }
+    if ($p -eq "docs/reference/backend-performance-gates.md") { return $true }
     if ($p -eq "docs/README.md" -or $p -eq "docs/history.md" -or $p -eq "docs/decisions.md" -or $p -eq "docs/reference/README.md" -or $p -eq "docs/api-reference.md") { return $true }
     if ($p -eq "docs/roadmap.md") { return $true }
     if ($p -match "^docs/(analysis|plan|progress|governance)/.+\.md$") { return $true }
@@ -91,9 +91,9 @@ $requiredMarkers = @(
     @{ Path = "hub-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
     @{ Path = "hub-server/tests/README.md"; Marker = "Integration Tests" },
-    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Current Scope" },
-    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Gate Matrix" },
-    @{ Path = "scripts/load-test-scenarios.md"; Marker = "Do Not Claim" },
+    @{ Path = "docs/reference/backend-performance-gates.md"; Marker = "Current Scope" },
+    @{ Path = "docs/reference/backend-performance-gates.md"; Marker = "Gate Matrix" },
+    @{ Path = "docs/reference/backend-performance-gates.md"; Marker = "Do Not Claim" },
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南见" },
     @{ Path = "docs/governance/governance-execution.md"; Marker = "D2b. Release dry build topology" }
@@ -103,7 +103,7 @@ $requiredMarkers = @(
     @{ Path = "scripts/release/verify-tauri-package-readiness.ps1"; Marker = "Assert-NoMacOSUnsignedDryReleaseActions" }
     @{ Path = "scripts/release/verify-tauri-package-dry.ps1"; Marker = "windows-desktop-package-dry" }
     @{ Path = "docs/architecture/04-frontend-data-flow.md"; Marker = "Source Owner Map" }
-    @{ Path = "hub-server/README.md"; Marker = "scripts/load-test-scenarios.md" }
+    @{ Path = "hub-server/README.md"; Marker = "docs/reference/backend-performance-gates.md" }
     @{ Path = "edge-server/README.md"; Marker = "verify-backend-perf-leak-gates.ps1" }
 )
 
@@ -180,7 +180,7 @@ $maxLines = @{
     "hub-server/README.md" = 120
     "hub-server/deployments/README.md" = 100
     "hub-server/tests/README.md" = 70
-    "scripts/load-test-scenarios.md" = 115
+    "docs/reference/backend-performance-gates.md" = 115
     "docs/README.md" = 120
     "docs/history.md" = 80
     "docs/decisions.md" = 80

@@ -94,7 +94,7 @@ function Invoke-PreflightScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-approved-real-preflight.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-preflight.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-preflight.ps1"
 $validManifest = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.valid.json"
 $invalidMode = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-mode.json"

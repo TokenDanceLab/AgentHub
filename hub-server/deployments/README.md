@@ -31,7 +31,7 @@ Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维�
 
 ```powershell
 docker compose config
-pwsh ./scripts/verify-oidc-readiness.ps1
+pwsh ./scripts/verify/verify-oidc-readiness.ps1
 ```
 
 `verify-oidc-readiness.ps1` 只检查仓库内配置形状和边界，不连接生产 TokenDance ID，也不证明真实登录。

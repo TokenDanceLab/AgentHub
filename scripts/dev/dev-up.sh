@@ -5,8 +5,8 @@
 # 启动 PostgreSQL 16 + Redis 7，然后可选择运行 Hub Server。
 #
 # 用法:
-#   ./scripts/dev-up.sh          # 启动 postgres + redis（自己 go run hub-server）
-#   ./scripts/dev-up.sh --full   # 启动全部服务（包含 hub-server Docker 镜像）
+#   ./scripts/dev/dev-up.sh          # 启动 postgres + redis（自己 go run hub-server）
+#   ./scripts/dev/dev-up.sh --full   # 启动全部服务（包含 hub-server Docker 镜像）
 # ───────────────────────────────────────────────
 set -euo pipefail
 
@@ -112,5 +112,5 @@ fi
 echo ''
 echo '  Quick commands:'
 echo '    docker compose logs -f              # 查看所有日志'
-printf '    %-37s %s\n' './scripts/dev-down.sh' '# 停止所有服务'
+printf '    %-37s %s\n' './scripts/dev/dev-down.sh' '# 停止所有服务'
 echo ''

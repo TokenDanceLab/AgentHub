@@ -453,7 +453,7 @@ function Write-Report {
         sequence = "Web -> Hub -> Desktop Local Edge sidecar -> fixture/CLI adapter -> Hub replay -> Web render"
         sources = [ordered]@{
             fixture_product_loop = [ordered]@{
-                script = "scripts/verify-localhost-product-loop.ps1"
+                script = "scripts/smoke/verify-localhost-product-loop.ps1"
                 evidence_path = $FixtureEvidencePath
             }
             observed_dispatch_report = $ObservedReportPath
@@ -493,8 +493,8 @@ function Write-Report {
                 "AGENTHUB_LOCAL_STACK_ARTIFACT_ROOT"
             )
             observed_manifest_schema = "agenthub-observed-localhost-dispatch-v1"
-            command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-p0-local-product-loop-evidence.ps1 -RepoRoot . -Mode ApprovedRealReview -ArtifactRoot .tmp\p0-local-product-loop-evidence\approved -ObservedEvidencePath <observed-dispatch.json> -ApproveRealEvidence"
-            local_stack_probe_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-local-stack-e2e-readiness.ps1 -RepoRoot . -Mode ApprovedReal -ArtifactRoot .tmp\local-stack-e2e-readiness\approved -SuppliedEnvironmentNames AGENTHUB_WEB_URL,AGENTHUB_HUB_URL,AGENTHUB_DESKTOP_BRIDGE_URL,AGENTHUB_LOCAL_EDGE_URL,AGENTHUB_LOCAL_STACK_ARTIFACT_ROOT -ProbeServices -ApproveRealEvidence -ObservedEvidencePath <observed-dispatch.json>"
+            command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\verify-p0-local-product-loop-evidence.ps1 -RepoRoot . -Mode ApprovedRealReview -ArtifactRoot .tmp\p0-local-product-loop-evidence\approved -ObservedEvidencePath <observed-dispatch.json> -ApproveRealEvidence"
+            local_stack_probe_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke\verify-local-stack-e2e-readiness.ps1 -RepoRoot . -Mode ApprovedReal -ArtifactRoot .tmp\local-stack-e2e-readiness\approved -SuppliedEnvironmentNames AGENTHUB_WEB_URL,AGENTHUB_HUB_URL,AGENTHUB_DESKTOP_BRIDGE_URL,AGENTHUB_LOCAL_EDGE_URL,AGENTHUB_LOCAL_STACK_ARTIFACT_ROOT -ProbeServices -ApproveRealEvidence -ObservedEvidencePath <observed-dispatch.json>"
         }
         blockers = @($Blockers)
         failures = @($Failures)
@@ -523,7 +523,7 @@ if ($Failures.Count -gt 0) {
 New-Item -ItemType Directory -Force -Path $ArtifactRoot | Out-Null
 
 Step "Fixture product loop"
-$fixtureRun = Invoke-RepoScript "scripts\verify-localhost-product-loop.ps1" @(
+$fixtureRun = Invoke-RepoScript "scripts\smoke\verify-localhost-product-loop.ps1" @(
     "-RepoRoot", $RepoRoot,
     "-EvidencePath", $FixtureEvidencePath,
     "-NodePath", $NodePath
@@ -563,7 +563,7 @@ if ($Mode -eq "ApprovedRealReview") {
         if ($ApproveRealEvidence) {
             $observedArgs += "-AllowRealTestedApproval"
         }
-        $observedRun = Invoke-RepoScript "scripts\verify-observed-localhost-dispatch.ps1" $observedArgs
+        $observedRun = Invoke-RepoScript "scripts\smoke\verify-observed-localhost-dispatch.ps1" $observedArgs
         Write-Host $observedRun.Output
         $GateResults += [pscustomobject][ordered]@{
             name = "verify-observed-localhost-dispatch.ps1"

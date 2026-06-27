@@ -118,7 +118,7 @@ function Get-EventIndex {
     return -1
 }
 
-$gatePath = Join-Path $RepoRoot "scripts\verify-localhost-product-loop.ps1"
+$gatePath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-product-loop.ps1"
 Assert-True (Test-Path -LiteralPath $gatePath) "localhost product-loop harness exists"
 
 $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-localhost-product-loop-$PID"

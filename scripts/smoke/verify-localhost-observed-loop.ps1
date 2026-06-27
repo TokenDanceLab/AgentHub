@@ -548,7 +548,7 @@ function Invoke-ServiceReadiness {
         $serviceArgs += $StartServicePlanPath
     }
 
-    $servicesRun = Invoke-RepoScript "scripts\verify-localhost-real-services.ps1" $serviceArgs
+    $servicesRun = Invoke-RepoScript "scripts\smoke\verify-localhost-real-services.ps1" $serviceArgs
     $script:ServiceProbeExitCode = $servicesRun.ExitCode
     $script:ServiceProbeOutput = $servicesRun.Output
     Write-Host $servicesRun.Output
@@ -816,7 +816,7 @@ if ($Mode -eq "FixtureManifest") {
     if ($Failures.Count -eq 0) {
         Write-JsonFile (New-ObservedFixtureManifest) $ManifestPath
         Pass "fixture observed-dispatch manifest written"
-        $observedRun = Invoke-RepoScript "scripts\verify-observed-localhost-dispatch.ps1" @(
+        $observedRun = Invoke-RepoScript "scripts\smoke\verify-observed-localhost-dispatch.ps1" @(
             "-RepoRoot", $RepoRoot,
             "-ObservedEvidencePath", $ManifestPath,
             "-EvidencePath", $ObservedDispatchReportPath,
@@ -861,13 +861,13 @@ if ($Mode -eq "ApprovedReal") {
             $readinessArgs += "-StartServicePlanPath"
             $readinessArgs += $StartServicePlanPath
         }
-        $readinessRun = Invoke-RepoScript "scripts\verify-local-stack-e2e-readiness.ps1" $readinessArgs
+        $readinessRun = Invoke-RepoScript "scripts\smoke\verify-local-stack-e2e-readiness.ps1" $readinessArgs
         Write-Host $readinessRun.Output
         if ($readinessRun.ExitCode -ne 0) {
             Add-Failure "local-stack ApprovedReal readiness gate failed"
         }
 
-        $observedRun = Invoke-RepoScript "scripts\verify-observed-localhost-dispatch.ps1" @(
+        $observedRun = Invoke-RepoScript "scripts\smoke\verify-observed-localhost-dispatch.ps1" @(
             "-RepoRoot", $RepoRoot,
             "-ObservedEvidencePath", $ObservedEvidencePath,
             "-EvidencePath", $ObservedDispatchReportPath,

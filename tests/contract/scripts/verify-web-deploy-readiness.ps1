@@ -102,8 +102,8 @@ function Invoke-ReadinessScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-web-deploy-readiness.ps1"
-$scriptText = Read-RepoText "scripts\verify-web-deploy-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-web-deploy-readiness.ps1"
+$scriptText = Read-RepoText "scripts\release\verify-web-deploy-readiness.ps1"
 $devEnvText = Read-RepoText "hub-server\.env.example"
 $rootComposeText = Read-RepoText "docker-compose.yml"
 $prodEnvText = Read-RepoText "hub-server\deployments\.env.production.example"

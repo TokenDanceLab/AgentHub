@@ -5,8 +5,8 @@
 #
 # 快速开始：
 #   cp .env.example .env              # 首次：复制环境变量（已提供默认值）
-#   ./scripts/dev-up.sh               # 一键启动全部服务
-#   ./scripts/dev-down.sh             # 停止并清理
+#   ./scripts/dev/dev-up.sh               # 一键启动全部服务
+#   ./scripts/dev/dev-down.sh             # 停止并清理
 #
 # 仅启动基础设施（自己用 go run 启动 Hub Server）：
 #   docker compose up -d postgres redis

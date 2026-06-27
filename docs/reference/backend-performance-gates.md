@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is indexed in [../docs/history.md](../docs/history.md).
+This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is indexed in [../history.md](../history.md).
 
 ## Evidence Classes
 
@@ -15,27 +15,27 @@ This file is the active owner for Hub/Edge backend performance and leak gate cla
 
 ## Current Scope
 
-`scripts/load-test.sh` is a small Bash/curl health-endpoint stress tool:
+`scripts/smoke/load-test.sh` is a small Bash/curl health-endpoint stress tool:
 
 ```bash
-./scripts/load-test.sh
-./scripts/load-test.sh -n 5000 -c 100
-./scripts/load-test.sh -url http://127.0.0.1:3210/v1/health
+./scripts/smoke/load-test.sh
+./scripts/smoke/load-test.sh -n 5000 -c 100
+./scripts/smoke/load-test.sh -url http://127.0.0.1:3210/v1/health
 ```
 
 It proves basic reachability, latency percentiles, throughput, and non-2xx error rate for one HTTP endpoint. It does not prove OIDC login, WebSocket fanout, message ordering, agent dispatch concurrency, process leaks, database contention, or production capacity.
 
-`scripts/verify-backend-perf-leak-gates.ps1` runs the current focused behavior gates and short microbenchmarks:
+`scripts/verify/verify-backend-perf-leak-gates.ps1` runs the current focused behavior gates and short microbenchmarks:
 
 ```powershell
-pwsh ./scripts/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
+pwsh ./scripts/verify/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
 ```
 
 ## Evidence Boundary
 
 | Claim | Required evidence |
 |---|---|
-| Health endpoint regression | `scripts/load-test.sh` output with target URL, request count, concurrency, latency, and error rate |
+| Health endpoint regression | `scripts/smoke/load-test.sh` output with target URL, request count, concurrency, latency, and error rate |
 | API or WS performance | Focused benchmark/load harness for that API/WS path |
 | Goroutine/process leak | Go test/pprof/leak evidence on the touched path |
 | Real production capacity | Approved-real run against an approved environment, with `real_tested=true` manifest |
@@ -60,5 +60,5 @@ Keep performance/load claims tied to the command that actually ran. Stub, fixtur
 
 - Functional Go tests alone are not leak proof.
 - A `100ms` benchmark is a regression smoke, not production capacity evidence.
-- `scripts/load-test.sh` against `/health` does not prove WS, Agent dispatch, DB contention, or process lifecycle behavior.
+- `scripts/smoke/load-test.sh` against `/health` does not prove WS, Agent dispatch, DB contention, or process lifecycle behavior.
 - Stubbed, fixture, readiness-only, or local microbenchmark evidence must not be described as approved-real, production, or real model/API execution.

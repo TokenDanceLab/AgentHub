@@ -94,7 +94,7 @@ function Invoke-ReadinessScript {
     }
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-packaged-login-real-readiness.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\release\verify-packaged-login-real-readiness.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "packaged real login readiness script exists"
 
 if (Test-Path -LiteralPath $scriptPath) {

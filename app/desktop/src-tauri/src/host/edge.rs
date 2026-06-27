@@ -98,7 +98,7 @@ fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
     LocalCliDiscoveryManifest {
         mode: "no-spend-discovery".to_string(),
         readiness_manifest: "docs/audit/p0-edge-cli-real-readiness.md".to_string(),
-        readiness_script: "scripts/verify-edge-cli-real-readiness.ps1".to_string(),
+        readiness_script: "scripts/verify/verify-edge-cli-real-readiness.ps1".to_string(),
         generated_at: None,
         items: vec![
             discover_cli("codex", "Codex CLI", "codex", "AGENTHUB_CODEX_PATH"),
@@ -323,7 +323,7 @@ mod tests {
         );
         assert_eq!(
             manifest.readiness_script,
-            "scripts/verify-edge-cli-real-readiness.ps1"
+            "scripts/verify/verify-edge-cli-real-readiness.ps1"
         );
         assert_eq!(manifest.items.len(), 3);
         assert!(manifest.items.iter().all(|item| item.no_spend));

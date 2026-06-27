@@ -140,11 +140,11 @@ $report = [ordered]@{
 }
 
 Step "Static package readiness gates"
-& (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
+& (Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
 if ($LASTEXITCODE -ne 0) { Fail "static package readiness failed" }
 $report.stages.staticReadiness = "passed"
 
-& (Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1") -RepoRoot $RepoRoot -StrictToolchain:$StrictToolchain
+& (Join-Path $RepoRoot "scripts\release\verify-tauri-installer-smoke.ps1") -RepoRoot $RepoRoot -StrictToolchain:$StrictToolchain
 if ($LASTEXITCODE -ne 0) { Fail "installer smoke preflight failed" }
 $report.stages.installerSmoke = "passed"
 
@@ -173,7 +173,7 @@ if (-not [string]::Equals($sidecarSourceFull, $sidecarArtifactFull, [StringCompa
 }
 
 Step "Prepare Tauri external sidecar"
-& (Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1") -RepoRoot $RepoRoot -SourceBinary $sidecarIntermediate -NoBuild
+& (Join-Path $RepoRoot "scripts\release\prepare-tauri-sidecar-local.ps1") -RepoRoot $RepoRoot -SourceBinary $sidecarIntermediate -NoBuild
 if ($LASTEXITCODE -ne 0) { Fail "prepare Tauri external sidecar failed" }
 $tauriSidecar = Join-Path $RepoRoot "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
 Assert-True (Test-Path -LiteralPath $tauriSidecar) "Tauri external sidecar exists at Windows target triple path"
@@ -219,7 +219,7 @@ Internal dry-run artifact only. This is not a signed public release.
     if ($latestJson -and $signature) {
         Copy-Item $latestJson.FullName (Join-Path $artifactRoot "latest.json") -Force
         Copy-Item $signature.FullName (Join-Path $artifactRoot "AgentHub_${desktopVersion}_x64-setup.exe.sig") -Force
-        & (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot -BuiltArtifactsRoot $artifactRoot -RequireBuiltArtifacts
+        & (Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot -BuiltArtifactsRoot $artifactRoot -RequireBuiltArtifacts
         if ($LASTEXITCODE -ne 0) { Fail "built artifact updater metadata gate failed" }
         $report.stages.updaterMetadata = "passed"
     } else {
@@ -236,7 +236,7 @@ Internal dry-run artifact only. This is not a signed public release.
 }
 
 Step "Post-build static readiness gates"
-& (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
+& (Join-Path $RepoRoot "scripts\release\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
 if ($LASTEXITCODE -ne 0) { Fail "post-build static package readiness failed" }
 $report.stages.postBuildReadiness = "passed"
 
