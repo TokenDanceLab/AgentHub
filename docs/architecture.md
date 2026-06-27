@@ -104,7 +104,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 | Frontend data flow | [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md) |
 | Deployment | [architecture/05-deployment.md](architecture/05-deployment.md) |
 | Auth and identity | [architecture/06-auth-identity.md](architecture/06-auth-identity.md) |
-| Architecture decisions | [adr/](adr/) |
+| Architecture decisions | [decisions.md](decisions.md) |
 
 ## Acceptance Gates
 
