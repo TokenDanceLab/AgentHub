@@ -26,11 +26,13 @@ function Assert-True {
 }
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-edge-sqlite-durable-hardening.ps1"
+$gateImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-hardening.ps1"
 $testPath = Join-Path $RepoRoot "edge-server\internal\store\sqlite_durable_hardening_test.go"
 $cmdPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main.go"
 $cmdTestPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main_test.go"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "Edge SQLite durable hardening gate exists"
+Assert-True (Test-Path -LiteralPath $gateImplementationPath) "Edge SQLite durable hardening gate implementation exists"
 Assert-True (Test-Path -LiteralPath $testPath) "SQLite durable hardening test exists"
 Assert-True (Test-Path -LiteralPath $cmdPath) "agenthub-edge command source exists"
 Assert-True (Test-Path -LiteralPath $cmdTestPath) "agenthub-edge command tests exist"
@@ -63,8 +65,8 @@ if (Test-Path -LiteralPath $cmdTestPath) {
     Assert-True ($cmdTestText -match "latest_migration_version") "command test expects stable snake_case JSON"
 }
 
-if (Test-Path -LiteralPath $gatePath) {
-    $gateText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
+if (Test-Path -LiteralPath $gateImplementationPath) {
+    $gateText = Get-Content -Raw -LiteralPath $gateImplementationPath -Encoding UTF8
     Assert-True ($gateText -match "FixtureOnlyDurable") "gate declares fixture-only durable mode"
     Assert-True ($gateText -match "Non-goal: complete relational CRUD or production DB readiness") "gate preserves non-goal boundary"
     Assert-True ($gateText -match [regex]::Escape('go test ./internal/store -run "SQLite|Durable|Approval|Artifact|Replay|Pins" -count=1')) "gate runs focused durable store regex"

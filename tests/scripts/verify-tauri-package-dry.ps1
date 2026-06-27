@@ -26,9 +26,11 @@ function Read-Text([string]$RelativePath) {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-dry.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-package-dry.ps1"
 Assert-True (Test-Path $scriptPath) "Tauri package dry gate exists"
+Assert-True (Test-Path $scriptImplementationPath) "Tauri package dry gate implementation exists"
 
-$scriptText = Read-Text "scripts\verify-tauri-package-dry.ps1"
+$scriptText = Read-Text "scripts\release\verify-tauri-package-dry.ps1"
 Assert-True ($scriptText -match "RunWindowsBundle" -and $scriptText -match "SkipExecutableCompile") "dry gate separates executable compile from full Windows bundle"
 Assert-True ($scriptText -match "RequireUpdaterMetadata" -and $scriptText -match "not_produced_unsigned_build") "dry gate distinguishes updater metadata from unsigned package output"
 Assert-True ($scriptText -match "macosUnsignedDry.*policy_only" -and $scriptText -match "signing.*out-of-scope") "dry gate keeps macOS/signing/release upload out of local proof"

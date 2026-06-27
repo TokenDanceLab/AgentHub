@@ -70,9 +70,11 @@ function Invoke-CapturedProcess {
 }
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-edge-sqlite-durable-observed-smoke.ps1"
+$gateImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-edge-sqlite-durable-observed-smoke.ps1"
 $goTestPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main_test.go"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "Edge SQLite durable observed smoke gate exists"
+Assert-True (Test-Path -LiteralPath $gateImplementationPath) "Edge SQLite durable observed smoke gate implementation exists"
 Assert-True (Test-Path -LiteralPath $goTestPath) "agenthub-edge Go tests exist"
 
 if (Test-Path -LiteralPath $goTestPath) {
@@ -84,8 +86,8 @@ if (Test-Path -LiteralPath $goTestPath) {
     Assert-True ($goTestText -match "edge_runs") "Go smoke verifies relational run projection"
 }
 
-if (Test-Path -LiteralPath $gatePath) {
-    $gateText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
+if (Test-Path -LiteralPath $gateImplementationPath) {
+    $gateText = Get-Content -Raw -LiteralPath $gateImplementationPath -Encoding UTF8
     Assert-True ($gateText -match "FixtureOnlyObserved") "gate declares FixtureOnlyObserved boundary"
     Assert-True ($gateText -match "alpha durability") "gate states SQLite alpha durability scope"
     Assert-True ($gateText -match [regex]::Escape("go test ./cmd/agenthub-edge ./internal/store -run SQLiteDurableObservedFixtureSmoke -count=1")) "gate runs focused Edge SQLite durable observed Go smoke"

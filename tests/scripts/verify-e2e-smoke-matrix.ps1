@@ -73,12 +73,14 @@ function Invoke-RepoScript {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-e2e-smoke-matrix.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-e2e-smoke-matrix.ps1"
 $appPackagePath = Join-Path $RepoRoot "app\package.json"
 $webPackagePath = Join-Path $RepoRoot "app\web\package.json"
 $desktopPackagePath = Join-Path $RepoRoot "app\desktop\package.json"
 $taskContractSpecPath = Join-Path $RepoRoot "app\web\src\__e2e__\task-contract.spec.ts"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "E2E smoke matrix script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "E2E smoke matrix script implementation exists"
 Assert-True (Test-Path -LiteralPath $appPackagePath) "app package exists"
 Assert-True (Test-Path -LiteralPath $webPackagePath) "web package exists"
 Assert-True (Test-Path -LiteralPath $desktopPackagePath) "desktop package exists"
@@ -89,8 +91,8 @@ try {
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match "agenthub-e2e-smoke-matrix-v1") "matrix writes stable schema"
         Assert-True ($scriptText -match "web-real-mode-playwright") "matrix includes Web real-mode Playwright row"
         Assert-True ($scriptText -match "desktop-renderer-playwright") "matrix includes Desktop renderer Playwright row"
