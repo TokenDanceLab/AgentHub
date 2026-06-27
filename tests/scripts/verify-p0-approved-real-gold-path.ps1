@@ -62,16 +62,18 @@ function Write-Json {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-p0-approved-real-gold-path.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-p0-approved-real-gold-path.ps1"
 $realE2eSkillPath = Join-Path $RepoRoot ".agents\skills\real-e2e-acceptance\SKILL.md"
 $agentsPath = Join-Path $RepoRoot "AGENTS.md"
 
 try {
     Assert-True (Test-Path -LiteralPath $scriptPath -PathType Leaf) "P0 approved-real gold-path harness exists"
+    Assert-True (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) "P0 approved-real gold-path harness implementation exists"
     Assert-True (Test-Path -LiteralPath $realE2eSkillPath -PathType Leaf) "real E2E acceptance skill exists"
     Assert-True (Test-Path -LiteralPath $agentsPath -PathType Leaf) "AGENTS.md exists"
 
-    if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath -PathType Leaf) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match "verify-token-dance-id-login-readiness\.ps1") "harness composes TokenDanceID readiness"
         Assert-True ($scriptText -match "verify-p0-desktop-edge-cli-smoke\.ps1") "harness composes Desktop/Edge/CLI no-spend smoke"
         Assert-True ($scriptText -match "verify-approved-real-demo-readiness\.ps1") "harness composes Hub replay/Web redacted manifest"
