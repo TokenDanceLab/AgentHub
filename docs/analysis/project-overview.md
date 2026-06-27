@@ -12,7 +12,7 @@ This SPEC cleans repository structure, active documentation, archive ownership, 
 | Historical docs | Former in-repo history trees were copied to the external TokenDance docs archive; AgentHub now keeps only `docs/history.md`. |
 | ADR | Old ADR bodies are archived externally; AgentHub keeps `docs/decisions.md` as the current compact summary. Code comments may keep ADR ID tags. |
 | Scripts | Root `scripts/` has many direct CI, docs, package, Desktop, and test references; `scripts/evidence/` and `scripts/git-hooks/` already exist. |
-| Tests | Root `tests/` currently has `fixtures/` and `scripts/`; release-readiness triggers on `tests/scripts/**`. |
+| Tests | Root `tests/` has `fixtures/` and the script contract target `contract/scripts/`; release-readiness triggers on `tests/contract/scripts/**`. |
 | Root artifacts | `css-audit-results.json` is tracked at repo root and appears to be one-off CSS audit evidence. |
 | External archive target | `D:\Code\TokenDance\docs` is an independent Git repo and currently dirty. Receiver worktree: `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive` on `docs/agenthub-archive-receiver`. |
 | GitHub mode | `GITHUB_STANDARD`; `gh project` lacks `read:project` scope, so no project board. |

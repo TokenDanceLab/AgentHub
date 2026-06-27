@@ -7,7 +7,7 @@
 | Move archives directly to `D:\Code\TokenDance\docs` | Do not write to the dirty main checkout directly. Use receiver worktree `D:\Code\TokenDance\.worktrees\tokendance-docs-agenthub-archive` on branch `docs/agenthub-archive-receiver`. |
 | Delete history trees and ADR after migration | Only after links, verifiers, and `docs/history.md` / `docs/decisions.md` are in place. |
 | Move scripts into subdirectories | Must be wrapper-first. CI, docs, tests, Desktop readinessScript, and package scripts reference root script paths. |
-| Move `tests/scripts` | Must update release-readiness workflow path filters and script contract tests. |
+| Move legacy script contract tests | Must update release-readiness workflow path filters and script contract tests. |
 | Root artifact cleanup | `css-audit-results.json` should move to historical evidence unless a current owner is discovered. |
 
 ## Primary Risks

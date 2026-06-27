@@ -73,8 +73,8 @@ Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\[switch\]\$LocalOnly' "O
 Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\$SkipHub\s*=\s*\$true' "-LocalOnly skips live Hub"
 Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\$SkipTD\s*=\s*\$true' "-LocalOnly skips live TokenDance ID"
 Assert-Contains "scripts\verify\verify-oidc-flow.ps1" "Test-PackagedDesktopReadiness" "-LocalOnly includes packaged Desktop static readiness"
-Assert-Contains "tests\scripts\verify-oidc-flow.ps1" "local-only mode skips live TokenDance ID phase" "script tests assert TokenDance ID phase is skipped"
-Assert-Contains "tests\scripts\verify-oidc-flow.ps1" "local-only mode skips live Hub phase" "script tests assert Hub phase is skipped"
+Assert-Contains "tests\contract\scripts\verify-oidc-flow.ps1" "local-only mode skips live TokenDance ID phase" "script tests assert TokenDance ID phase is skipped"
+Assert-Contains "tests\contract\scripts\verify-oidc-flow.ps1" "local-only mode skips live Hub phase" "script tests assert Hub phase is skipped"
 
 Step "packaged readiness gate"
 Assert-Contains "app\desktop\src-tauri\src\oidc_server.rs" 'TcpListener::bind\("127\.0\.0\.1:0"\)' "Desktop callback server binds random loopback port"
