@@ -99,6 +99,9 @@ function assertMetrics(result) {
   if (result.firstMessageIndex < 0 || result.secondMessageIndex <= result.firstMessageIndex) {
     failures.push('expected user messages to remain in chronological transcript order');
   }
+  if (result.transcriptHasModeDebug) {
+    failures.push('expected data-mode/debug status outside main transcript');
+  }
   if (!result.cardStack.exists) {
     failures.push('expected approval and preview cards to render as a merged stack');
   } else {
@@ -270,6 +273,12 @@ try {
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
       firstMessageIndex: text.indexOf(firstMessage),
       secondMessageIndex: text.indexOf(secondMessage),
+      transcriptHasModeDebug: text.includes('Data:') ||
+        text.includes('Hub replay:') ||
+        text.includes('mock (auto fallback)') ||
+        text.includes('demo+edge') ||
+        text.includes('Local Vite') ||
+        text.includes('只读预览'),
       cardStack,
     };
   }, { firstMessage, secondMessage });
