@@ -61,7 +61,7 @@ function Invoke-NodeFixture {
     if (-not $node) {
         throw "node executable is required for fixture manifest validation"
     }
-    $script = Join-Path $RepoRoot "tests\scripts\product-loop-observed-e2e.fixture.mjs"
+    $script = Join-Path $RepoRoot "tests\contract\scripts\product-loop-observed-e2e.fixture.mjs"
     & node $script --output-dir $ReportDir
 }
 

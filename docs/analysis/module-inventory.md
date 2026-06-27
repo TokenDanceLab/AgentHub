@@ -13,6 +13,6 @@
 | `scripts/evidence/` | Evidence helper scripts | Preserve under `scripts/lib/` or `scripts/verify/` based on owner | P/R: avoid breaking approved-real scripts |
 | `scripts/git-hooks/` | Local git hook helpers | Likely keep under `scripts/dev/git-hooks/` or `scripts/lib/git-hooks/` with wrapper | E/R: path used by hook docs/scripts |
 | `tests/fixtures/` | Deterministic fixtures | Keep stable or update references | P: already target shape |
-| `tests/scripts/` | Script contract tests and approved-real fixtures | Move to `tests/contract/scripts/` with workflow/test updates | P/R: release-readiness currently watches old path |
+| `tests/contract/scripts/` | Script contract tests and approved-real fixtures | Keep as the active contract path after workflow/test updates | P/R: release-readiness must watch this path |
 | `.github/workflows/` | CI and release-readiness path contracts | Update only with wrappers and verifier coverage | E/R: validates migration |
 | `app/desktop/src-tauri` + Desktop tests | Readiness script path contract | Update only if wrappers or new path are proven | P/E: hard-coded `scripts/verify-edge-cli-real-readiness.ps1` appears in source and tests |

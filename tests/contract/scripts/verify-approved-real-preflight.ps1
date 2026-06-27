@@ -8,7 +8,7 @@ $Failed = 0
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..\..")).ProviderPath
+    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..\..\..")).ProviderPath
 }
 
 function Assert-True {
@@ -95,21 +95,23 @@ function Invoke-PreflightScript {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-approved-real-preflight.ps1"
-$validManifest = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.valid.json"
-$invalidMode = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.invalid-mode.json"
-$invalidMissingApproval = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.invalid-missing-approval.json"
-$invalidMissingBudgetTimeoutArtifact = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.invalid-missing-budget-timeout-artifact.json"
-$invalidProduction = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.invalid-production-unapproved.json"
-$invalidSecret = Join-Path $RepoRoot "tests\scripts\approved-real-preflight.invalid-secret.json"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-approved-real-preflight.ps1"
+$validManifest = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.valid.json"
+$invalidMode = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-mode.json"
+$invalidMissingApproval = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-missing-approval.json"
+$invalidMissingBudgetTimeoutArtifact = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-missing-budget-timeout-artifact.json"
+$invalidProduction = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-production-unapproved.json"
+$invalidSecret = Join-Path $RepoRoot "tests\contract\scripts\approved-real-preflight.invalid-secret.json"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "approved-real preflight manifest script exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "approved-real preflight manifest script implementation exists"
 Assert-True (Test-Path -LiteralPath $validManifest) "valid approved-real preflight fixture exists"
 foreach ($fixture in @($invalidMode, $invalidMissingApproval, $invalidMissingBudgetTimeoutArtifact, $invalidProduction, $invalidSecret)) {
     Assert-True (Test-Path -LiteralPath $fixture) "invalid fixture exists: $(Split-Path -Leaf $fixture)"
 }
 
-if (Test-Path -LiteralPath $scriptPath) {
-    $scriptText = Get-Content -LiteralPath $scriptPath -Raw
+if (Test-Path -LiteralPath $scriptImplementationPath) {
+    $scriptText = Get-Content -LiteralPath $scriptImplementationPath -Raw
     Assert-True ($scriptText -match '\$ManifestPath') "script requires explicit ManifestPath parameter"
     Assert-True ($scriptText -notmatch 'Start-Process|Invoke-Expression|Invoke-Command|Invoke-WebRequest|Invoke-RestMethod|System\.Diagnostics\.Process|ProcessStartInfo') "script has no process or network execution primitive"
     Assert-True ($scriptText -notmatch '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode|npm|pnpm|git|gh)\b') "script has no direct CLI/deploy command pattern"
