@@ -1,6 +1,6 @@
 # AgentHub 治理执行
 
-最后更新：2026-06-17
+最后更新：2026-06-27
 
 本文件将 TokenDance 系统治理映射为 AgentHub 执行项。AgentHub 是多 Agent 协作平台；它是 TokenDance ID 的 relying party，拥有 Hub、Edge、Desktop、Web 和 Mobile 客户端。
 
@@ -61,7 +61,7 @@ D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）�
 
 - 当队列 ID 从未开始变为部分完成或已完成时，更新本文件。
 - 当主要功能或批次完成时，更新 `docs/roadmap.md`。
-- 当部署版本和 commit hash 变更时，更新根目录 `STATE.md`。
+- 当部署版本和 commit hash 变更时，更新 server workspace 的 AgentHub 运维状态文档；本仓库只保留无密证据指针。
 - 当新增发现、缓解措施或部署验证时，更新 `docs/governance/security-risk-register.md`。
-- 当 Hub session 或 token 规则变更时，更新根 `docs/identity/identity-auth.md` / `docs/identity/authorization-model.md`。
+- 当 Hub session 或 token 规则变更时，更新 workspace 根 `../docs/identity/identity-auth.md` / `../docs/identity/authorization-model.md`。
 - 当 API 契约变更时，更新 `api/openapi.yaml` 和 `api/events.md`。

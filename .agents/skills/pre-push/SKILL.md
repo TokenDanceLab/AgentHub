@@ -1,70 +1,38 @@
 ---
 name: pre-push
-description: Push 前全量验证 —— 编译/测试/覆盖率/格式化/lint/E2E。Agent 应在 commit 后 push 前主动使用。
-最后更新：2026-05-24
+description: Use when AgentHub changes are committed or nearly ready to push, especially before updating a PR branch or claiming CI-ready status.
 ---
 
-# Pre-Push Verification
+# Pre-Push
 
-Push 前运行全量检查，确保 CI 不会红。
+Prefer focused gates while iterating, then run the gates that match the touched surfaces before push. Do not use fixed test-count expectations as acceptance evidence.
 
-## 检查清单
-
-### 1. Go — Edge Server
+## Always
 
 ```powershell
-cd edge-server
-go build ./...                    # 编译
-go vet ./...                      # 静态分析
-go test ./... -short -count=1     # 单元测试（-short 跳过集成）
-# 期望: 11/11 包通过
-```
-
-### 2. Go — Hub Server
-
-```powershell
-cd hub-server
-go build ./...                    # 编译
-go vet ./...                      # 静态分析
-go test ./... -short -count=1     # 单元测试
-# 期望: 12/12 包通过（含 auth/config/cache/service/handler/middleware/jwtutil/model/errcode/ws/uuidv7/tests）
-```
-
-### 3. TypeScript — Desktop
-
-```powershell
-cd app\desktop
-pnpm tsc --noEmit                # 类型检查
-pnpm test                        # 单元测试 + 集成
-# 期望: 278 tests 通过（21 test files）
-pnpm build                       # Vite 构建
-```
-
-### 4. Git
-
-```powershell
-git diff --check                 # 空白检查
-git status --short               # 确认无遗漏文件
-```
-
-### 5. 快速验证（仅改文档/CSS 时）
-
-只改 `.md` 或 `.css` 文件时跳过 Go 检查：
-
-```powershell
-pnpm test && pnpm build
 git diff --check
+bash scripts/check-secrets.sh --range HEAD^..HEAD
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-project-skills.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-doc-ssot.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-ci-gates.ps1
+bash ./scripts/verify-ci-gates.sh
 ```
 
-## 失败处理
+Use `bash scripts/check-secrets.sh --staged` before commit when changes are still staged.
 
-| 检查 | 失败时 |
-|------|--------|
-| go build | 必须修复才能 push |
-| go test | 必须修复才能 push |
-| go vet | 必须修复才能 push |
-| pnpm tsc | 必须修复才能 push |
-| pnpm test | 必须修复才能 push |
-| pnpm build | 必须修复才能 push |
-| E2E (claude-code) | 检查环境（PATH/API key） |
-| E2E (opencode/codex) | 跳过，记录到 ROADMAP |
+## Surface Gates
+
+| Touched surface | Minimum local gate |
+|---|---|
+| `edge-server/` | `cd edge-server && go test ./... -short -count=1` |
+| `hub-server/` | `cd hub-server && go test ./... -short -count=1` |
+| `api/` | parse `api/openapi.yaml` |
+| Desktop UI | `corepack.cmd pnpm --dir app/desktop typecheck` + relevant Vitest/Playwright/Visual QA |
+| Web UI | `corepack.cmd pnpm --dir app/web typecheck` + relevant Vitest/Playwright/Visual QA |
+| Shared frontend | focused `app/shared` tests plus affected consumers |
+| Mobile RN | `corepack.cmd pnpm --dir app/mobile-rn verify` unless Mobile is explicitly out of scope |
+| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md` gate mapping |
+
+## Reporting
+
+Before push or PR update, state what passed, what was not run, and which evidence level each gate proves. Do not merge with required checks failing unless the workflow owner explicitly changes policy.

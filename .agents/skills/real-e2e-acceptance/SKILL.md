@@ -67,7 +67,7 @@ Smoke matrix manifests must be machine-honest:
    - Packaging: Tauri package/sidecar/icon/signing gates only when claiming packaged Desktop behavior.
 4. **Read the output**: record pass counts, failed tests, warnings, screenshot paths, manifests, and artifact paths. A screenshot produced before a timeout is not a pass; fix teardown and rerun.
 5. **Write the boundary**: state what was not tested, especially real login, real CLI/model/API spend, production deploy, installer, signing, and release upload.
-6. **Sync docs and rules**: durable behavior changes go to `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `docs/roadmap.md`, relevant `docs/architecture/*`, or a completed archive `MASTER.md`. Do not create duplicate truth sources.
+6. **Sync docs and rules**: durable behavior changes go to `AGENTS.md`, `docs/architecture.md`, `docs/roadmap.md`, relevant `docs/architecture/*`, active `docs/progress/MASTER.md`, or a completed archive `MASTER.md`. Do not create duplicate truth sources.
 7. **Merge gate**: before merging, verify architecture docs are either unchanged by design or updated, workflow gates passed, and no debug/mock/mode metadata was added to the main chat stream.
 
 ## Common Mistakes

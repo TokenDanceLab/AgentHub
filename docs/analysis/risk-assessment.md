@@ -17,8 +17,8 @@
 ### S.U.P.E.R Violation Hotspots
 
 1. `docs/roadmap.md`: roadmap, current state, architecture, release gates, verification matrix, backlog, and appendix all in one active file of roughly 119 KB and more than 2,000 lines.
-2. `docs/governance/branch-governance.md`: records stale active worktrees and branches that live `git worktree list` no longer confirms.
-3. `AGENTS.md`: mostly improved, but still has stale `dev/delicious223` command text in the branch/worktree sections.
+2. `docs/governance/`: now narrowed to long-lived owner docs, but dated governance evidence must stay archived so it cannot be mistaken for active policy.
+3. Project skills: active skills are allowlisted, but their wording must keep matching the current CI/runtime entrypoints.
 4. `docs/governance/document-standards.md`: says phase plans go directly in `docs/`, conflicting with current spec-driven archive/progress rules.
 5. `app/desktop/stats.html`: tracked generated bundle analysis contains node_modules paths and pollutes source search.
 6. `hub-server`: largest module and current roadmap P0/P1 findings target goroutines, EventBus blocking, Redis TTL, scheduler cancellation, token/session risks, and pprof boundaries.
@@ -71,7 +71,7 @@ Avoid adding tests that only verify mock data or duplicate switch statements.
 
 ### Documentation Source Sprawl
 
-`docs/roadmap.md` itself says current facts belong in `STATE.md`, but it contains current facts, route tables, verification claims, release checklists, and implementation backlog. `docs/architecture.md` still has a 2026-06-19 ChatView hardening banner and phase table while newer Chat UIUX work has been archived. This makes future agents read too much and still get stale facts.
+`docs/roadmap.md` still mixes long-term direction with historical verification claims, release checklists, and implementation backlog. `docs/architecture.md` still has older ChatView hardening context while newer Chat UIUX work has been archived. This makes future agents read too much and still get stale facts.
 
 Mitigation should reduce active docs, not add another governance layer.
 
