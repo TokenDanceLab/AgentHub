@@ -84,9 +84,9 @@ git worktree list
 
 **Active Phase**: Phase 3 - Source And Test Alignment
 
-**Active Task**: #331 / T3.2, next branch not created yet
+**Active Task**: #331 / T3.2 on branch `docs/331-frontend-ssot`
 
-**Current Focus**: frontend architecture docs should now be checked against the shared chat/workbench implementation and the test evidence from #330. Keep backend/package/perf lanes separate unless their issue scope requires them.
+**Current Focus**: frontend architecture docs should now be checked against the shared chat/workbench implementation and the test evidence from #330. Also apply the operator's doc cleanup rule for this lane: active docs stay short and owner-based; duplicate frontend/design evidence or historical material is archived rather than appended. Keep backend/package/perf lanes separate unless their issue scope requires them.
 
 **Blockers**: none. Mobile deep UI/native redesign remains out of scope.
 
@@ -130,6 +130,7 @@ git worktree list
 
 ## Next Steps
 
-1. Start #331 / T3.2 in a fresh branch/worktree from `dev/delicious233`.
-2. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
-3. Keep Mobile native/UI expansion out of this spec unless the operator opens a separate scoped task.
+1. Compare `docs/architecture.md` and `docs/architecture/04-frontend-data-flow.md` with `app/shared/src/workbench`, `app/shared/src/chatview`, `app/shared/src/transcript`, Desktop/Web adapters, and #330 chat-flow evidence.
+2. Trim or redirect duplicated frontend/chat/data-mode prose; archive historical evidence when it must be retained.
+3. Preserve the evidence boundary: fixture/stub/readiness/dry gates stay `real_tested=false` unless an approved-real path is explicitly executed.
+4. Keep Mobile native/UI expansion out of this spec unless the operator opens a separate scoped task.

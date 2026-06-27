@@ -11,7 +11,7 @@
 | **总进度** | `docs/roadmap.md` | 总路线、模块级进度、长期 backlog 和下一步 | Delicious233 |
 | **架构** | `docs/architecture.md` + `docs/architecture/` | 产品定位 + 三层架构 + 数据流 | 三人协商 |
 | **ADR** | `docs/adr/` | 架构决策记录（11 篇） | 任何人 |
-| **设计** | `docs/design-decisions.md`、`docs/adr/` 或 scoped design doc | 当前设计决策；完成或过期设计归档 | 任何人 |
+| **设计** | `docs/architecture.md`、`docs/adr/` 或 scoped design doc | 当前设计决策；完成或过期设计归档 | 任何人 |
 | **治理** | `docs/governance/` | 分支规范、文档标准、安全风险、威胁模型 | 三人协商 |
 | **部署** | `docs/architecture/05-deployment.md` | 部署手册 | 运维 |
 | **参考** | `docs/reference/` | 技术参考 + 竞品调研 | 按需查阅 |

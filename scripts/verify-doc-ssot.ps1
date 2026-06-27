@@ -74,6 +74,7 @@ $requiredMarkers = @(
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
     @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
+    @{ Path = "docs/architecture/04-frontend-data-flow.md"; Marker = "Source Owner Map" }
 )
 
 foreach ($required in $requiredMarkers) {
@@ -149,7 +150,7 @@ $maxLines = @{
     "docs/developer-quickstart.md" = 170
     "docs/roadmap.md" = 220
     "docs/architecture.md" = 170
-    "docs/architecture/04-frontend-data-flow.md" = 230
+    "docs/architecture/04-frontend-data-flow.md" = 150
     "docs/api-reference.md" = 80
     "docs/reference/README.md" = 80
     "docs/reference/sdk-agent-strategy.md" = 120
