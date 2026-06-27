@@ -11,7 +11,7 @@
 | [01-hub-server.md](01-hub-server.md) | Hub 边界、source map、contract map、路由/WS 验收 |
 | [02-edge-server.md](02-edge-server.md) | Edge adapter registry、process lifecycle、EventStore |
 | [03-runtime-adapters.md](03-runtime-adapters.md) | Runtime adapter 注册、事件映射合同、PreflightAdapter、权限桥接 |
-| [04-frontend-data-flow.md](04-frontend-data-flow.md) | Platform adapter、React Query、WebSocket cache、Transcript/chat flow、data mode |
+| [04-frontend-data-flow.md](04-frontend-data-flow.md) | Platform adapter contract、source owner map、Transcript/chat flow、data mode |
 | [05-deployment.md](05-deployment.md) | 仓库内部署资产、开发端口、证据等级和生产边界 |
 | [06-auth-identity.md](06-auth-identity.md) | OIDC PKCE flow、JWT 签发、TokenDance ID 集成、设备注册 |
 

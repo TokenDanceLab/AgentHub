@@ -31,7 +31,7 @@
 | [architecture/](architecture/) | 旧长版架构入口快照 |
 | [security/](security/) | 旧完整安全风险登记表和长证据快照 |
 | [plans/](plans/) | 已完成或过期的行动计划 |
-| [designs/deprecated/](designs/deprecated/) | 已实现或过期的设计文档 |
+| [designs/](designs/) | 旧设计摘要和已实现或过期的设计文档 |
 | [reference/](reference/) | 旧技术参考和外部系统长文 |
 | [reference-projects/](reference-projects/) | 第三方/竞品项目调研 |
 | [test-results/](test-results/) | 历史手工/E2E 结果快照 |
