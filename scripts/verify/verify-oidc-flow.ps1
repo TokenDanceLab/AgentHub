@@ -13,11 +13,11 @@ Prerequisites:
   - Hub Server .env configured with AGENTHUB_TOKENDANCE_ID_* vars
 
 Usage:
-  .\scripts\verify-oidc-flow.ps1                        # Full check
-  .\scripts\verify-oidc-flow.ps1 -LocalOnly             # Local fake/static gate; no live Hub/TokenDance ID calls
-  .\scripts\verify-oidc-flow.ps1 -SkipHub               # Check only TokenDance ID
-  .\scripts\verify-oidc-flow.ps1 -SkipTD                # Check only Hub Server
-  .\scripts\verify-oidc-flow.ps1 -Interactive            # Run manual browser flow guide
+  .\scripts\verify\verify-oidc-flow.ps1                        # Full check
+  .\scripts\verify\verify-oidc-flow.ps1 -LocalOnly             # Local fake/static gate; no live Hub/TokenDance ID calls
+  .\scripts\verify\verify-oidc-flow.ps1 -SkipHub               # Check only TokenDance ID
+  .\scripts\verify\verify-oidc-flow.ps1 -SkipTD                # Check only Hub Server
+  .\scripts\verify\verify-oidc-flow.ps1 -Interactive            # Run manual browser flow guide
 #>
 
 [CmdletBinding()]

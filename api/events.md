@@ -96,7 +96,7 @@ Minimum checks after event contract changes:
 ```powershell
 git diff --check
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
-pwsh ./scripts/verify-real-e2e-contract.ps1
+pwsh ./scripts/verify/verify-real-e2e-contract.ps1
 ```
 
 Add focused Go, shared Vitest, Desktop/Web Playwright, Visual QA, performance/leak, or packaged-release gates based on the touched owner paths and the claim being made.

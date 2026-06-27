@@ -108,7 +108,7 @@ function Get-EventIndex {
     return -1
 }
 
-$scriptPath = Join-Path $RepoRoot "scripts\verify-p0-local-product-loop-evidence.ps1"
+$scriptPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-local-product-loop-evidence.ps1"
 $scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-p0-local-product-loop-evidence.ps1"
 $docPath = Join-Path $RepoRoot "docs\audit\p0-local-product-loop-evidence.md"
 

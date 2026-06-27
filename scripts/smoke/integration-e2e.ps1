@@ -26,7 +26,7 @@ if (-not (Test-Path $target)) {
     exit 2
 }
 
-Write-Warning "scripts/integration-e2e.ps1 is deprecated and now forwards to scripts/edge-runtime-smoke.ps1. This is an Edge runtime smoke gate, not a full Hub/PG/Redis/OIDC E2E gate."
+Write-Warning "scripts/smoke/integration-e2e.ps1 is deprecated and now forwards to scripts/smoke/edge-runtime-smoke.ps1. This is an Edge runtime smoke gate, not a full Hub/PG/Redis/OIDC E2E gate."
 
 $forward = @{}
 foreach ($key in $PSBoundParameters.Keys) {

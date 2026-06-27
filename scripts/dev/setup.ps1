@@ -11,8 +11,8 @@ $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 Push-Location $Root
 try {
-    git config core.hooksPath scripts/git-hooks
-    Write-Host "Git hooks enabled: scripts/git-hooks"
+    git config core.hooksPath scripts/dev/git-hooks
+    Write-Host "Git hooks enabled: scripts/dev/git-hooks"
 
     if ($Reference -ne "none") {
         & (Join-Path $PSScriptRoot "sync-reference.ps1") -Tier $Reference

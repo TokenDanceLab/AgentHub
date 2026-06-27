@@ -55,7 +55,7 @@ corepack.cmd pnpm --dir app/web dev --host 127.0.0.1
 corepack.cmd pnpm --dir app/web typecheck
 corepack.cmd pnpm --dir app/web build
 corepack.cmd pnpm --dir app/web test:e2e:stubbed-hub
-pwsh ./scripts/verify-web-hub-boundary.ps1
+pwsh ./scripts/verify/verify-web-hub-boundary.ps1
 ```
 
 Visual QA:

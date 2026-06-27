@@ -10,9 +10,9 @@ RANGE="${2:-}"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/check-secrets.sh --staged
-  scripts/check-secrets.sh --worktree
-  scripts/check-secrets.sh --range <git-diff-range>
+  scripts/verify/check-secrets.sh --staged
+  scripts/verify/check-secrets.sh --worktree
+  scripts/verify/check-secrets.sh --range <git-diff-range>
 
 Scans changed paths and added lines for secret-like files or values.
 USAGE

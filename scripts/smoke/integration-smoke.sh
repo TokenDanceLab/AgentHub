@@ -6,10 +6,10 @@
 # This script intentionally does not fall back to the mock executor.
 #
 # Usage:
-#   ./scripts/integration-smoke.sh -Agent codex -EdgeAddr 127.0.0.1:3231
-#   ./scripts/integration-smoke.sh -Agent claude-code -EdgeAddr 127.0.0.1:3232
-#   ./scripts/integration-smoke.sh -Agent opencode -EdgeAddr 127.0.0.1:3233
-#   ./scripts/integration-smoke.sh -SkipBuild -Agent codex
+#   ./scripts/smoke/integration-smoke.sh -Agent codex -EdgeAddr 127.0.0.1:3231
+#   ./scripts/smoke/integration-smoke.sh -Agent claude-code -EdgeAddr 127.0.0.1:3232
+#   ./scripts/smoke/integration-smoke.sh -Agent opencode -EdgeAddr 127.0.0.1:3233
+#   ./scripts/smoke/integration-smoke.sh -SkipBuild -Agent codex
 set -euo pipefail
 
 SKIP_BUILD=false
