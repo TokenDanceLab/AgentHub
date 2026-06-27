@@ -97,6 +97,43 @@ UI 能根据 `capabilities` 隐藏或禁用不可用动作，但不能 fork 另�
 
 所有后端数据通过 React Query 管理。Desktop 的 Hub API 查询统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
 
+## Transcript And Chat Flow Contract
+
+共享聊天流的目标链路是：
+
+```text
+Hub/Edge/Mock source
+  -> TranscriptBlock[]
+  -> normalize/order/group
+  -> TranscriptItem[]
+  -> UserMsg / AgentGroup / RowItem
+```
+
+约束：
+
+- 用户消息是 optimistic UI 的第一优先级：发送后立即进入时间线，不能因为 Hub/Edge runtime block、refetch 或 replay 到达而闪消。
+- 所有来源按事件时间归一化后线性排布；用户消息、Agent 文本、tool call/result、approval、subagent report、diff、artifact、deploy、context usage 不分离成第二条消息流。
+- 相邻 tool call/result、run step、subagent report 由 shared normalizer 合并为一个 AgentGroup；不要在 Desktop/Web 各自复制分组逻辑。
+- Markdown、代码块和表格在消息 bubble/card 中由 shared renderer 处理；不能退化成纯文本转义。
+- 自动滚动只在用户处于底部或发送本方消息时跟随；用户主动上滑阅读历史时不强行抢视角。
+- Demo/mock/mode/debug 状态不进入 transcript bubbles；这些信息属于状态栏、设置面板、manifest 或测试报告。
+
+主要实现位置：
+
+| 责任 | 路径 |
+|---|---|
+| Transcript contract 和 normalizer | `app/shared/src/transcript/` |
+| ChatView 渲染组件 | `app/shared/src/chatview/` |
+| Workbench 集成 | `app/shared/src/workbench/AgentHubWorkbench.tsx` |
+| Desktop host adapter | `app/desktop/src/App.tsx`, `app/desktop/src/api/` |
+| Web host adapter | `app/web/src/App.tsx`, `app/web/src/api/` |
+
+测试边界：
+
+- Pure ordering/grouping/markdown 合同放 shared Vitest。
+- Desktop/Web 行为用 Playwright 覆盖发送、顺序、滚动、卡片合并和 transcript 洁净度。
+- Visual QA 证明 `1440x810` 视口下无横向溢出、无遮挡、composer 不遮挡最后消息。
+
 ## WebSocket 实时缓存失效模式
 
 ```text

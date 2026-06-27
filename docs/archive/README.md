@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-`docs/archive/` 保存历史 longform、日期型审计、发布材料、过期设计和参考调研。这里的内容只作追溯，不是当前规则、当前进度或当前实现事实。
+`docs/archive/` 保存历史 longform、日期型审计、发布材料、过期设计、参考调研和旧入口快照。这里的内容只作追溯，不是当前规则、当前进度或当前实现事实。
 
 当前事实入口：
 
@@ -23,6 +23,8 @@
 | [state/](state/) | 已废弃 root `STATE.md` 历史快照 |
 | [audit/](audit/) | 日期型审计、cross-review、acceptance 报告 |
 | [release/](release/) | 历史 PR、merge-readiness、release notes |
+| [architecture/](architecture/) | 旧长版架构入口快照 |
+| [security/](security/) | 旧完整安全风险登记表和长证据快照 |
 | [plans/](plans/) | 已完成或过期的行动计划 |
 | [designs/deprecated/](designs/deprecated/) | 已实现或过期的设计文档 |
 | [reference/](reference/) | 旧技术参考和外部系统长文 |

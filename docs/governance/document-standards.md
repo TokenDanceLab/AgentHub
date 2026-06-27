@@ -15,7 +15,8 @@
 | **治理** | `docs/governance/` | 分支规范、文档标准、安全风险、威胁模型 | 三人协商 |
 | **部署** | `docs/architecture/05-deployment.md` | 部署手册 | 运维 |
 | **参考** | `docs/reference/` | 技术参考 + 竞品调研 | 按需查阅 |
-| **归档** | `docs/archives/` | 已完成 spec-driven 专项和过期项目 skill 的只读归档 | 任务负责人 |
+| **历史归档** | `docs/archive/` | 历史 longform、日期型审计、旧发布材料、过期设计、参考调研和旧入口快照 | 任务负责人 |
+| **SPEC 归档** | `docs/archives/` | 已完成 spec-driven 专项和过期项目 skill 的只读归档 | 任务负责人 |
 
 ## 命名和格式
 
@@ -33,10 +34,11 @@
 3. **总进度唯一**：长期目标、模块进度和 backlog 写入 `docs/roadmap.md`；不要把当前 PR 阻塞、临时验收日志或分支 live 状态长期写进 roadmap。
 4. **架构唯一**：架构说明写进 `docs/architecture.md` + `docs/architecture/`；roadmap 只链接或摘要，不复制协议细节。
 5. **事实 owner 唯一**：同一事实只能有一个 owner 文件；其他文件只链接或保留一句摘要。
-6. **归档边界清楚**：完成的 spec-driven 工件移入 `docs/archives/<topic>/`；过期项目 skill 放入 `docs/archives/project-skills/` 只作历史参考，不能作为 active workflow 加载。
+6. **归档边界清楚**：历史 longform、审计、发布、过期设计、旧入口快照放 `docs/archive/`；完成的 spec-driven 工件移入 `docs/archives/<topic>/`；过期项目 skill 放入 `docs/archives/project-skills/` 只作历史参考，不能作为 active workflow 加载。
 7. **过时即删**：不再使用的长期文档直接删除（git 历史保留追溯能力）；spec-driven 工件和项目 skill 归档是例外。
-8. **避免巨石文档**：`AGENTS.md`、`MASTER.md`、`roadmap.md` 和 `architecture.md` 只保留入口、摘要、当前事实和稳定索引；长表、历史日志、专题设计、验收证据拆到 owner 子文档、`docs/archive/` 或 `docs/archives/`。
-9. 不用过时阶段名描述当前状态。
+8. **避免巨石文档**：`AGENTS.md`、`MASTER.md`、`roadmap.md`、`architecture.md`、`CHANGELOG.md` 和风险登记表只保留入口、摘要、当前事实和稳定索引；长表、历史日志、专题设计、验收证据拆到 owner 子文档、`docs/archive/` 或 `docs/archives/`。
+9. **主动收敛**：发现 active 文档超过入口职责时，优先重写为短入口并归档旧全文；不要继续追加补丁段落。
+10. 不用过时阶段名描述当前状态。
 
 ## 新文档检查清单
 
