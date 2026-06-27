@@ -2,7 +2,7 @@
 
 最后更新：2026-06-28
 
-本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 已归档到 [archive/roadmap-v0.5.1/roadmap-longform-2026-06-27.md](archive/roadmap-v0.5.1/roadmap-longform-2026-06-27.md)。
+本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
 ## 产品北极星
 
@@ -17,7 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前没有 active spec-driven 专项。执行中的专项会重新创建 `docs/progress/MASTER.md`，MASTER 只记录当前专项进度、Issue/PR、阻塞和验收证据；本 roadmap 不复制任务日志。
+当前 active spec-driven 专项：Repo Structure Doc Tooling Cleanup，进度见 [progress/MASTER.md](progress/MASTER.md)。MASTER 只记录当前专项进度、Issue/PR、阻塞和验收证据；本 roadmap 不复制任务日志。
 
 最近完成：
 
@@ -102,7 +102,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 5. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
 6. Mock 和 fixture 模式必须显式；real mode 不能静默降级。
 7. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. 当前 spec 进度只在专项执行中写 `docs/progress/MASTER.md`，规则写 `AGENTS.md`，历史 longform/审计/发布材料放 `docs/archive/`，已完成 spec 工件和过期项目 skill 放 `docs/archives/`。
+8. 当前 spec 进度只在专项执行中写 `docs/progress/MASTER.md`，规则写 `AGENTS.md`，历史 longform、审计、发布材料、已完成 spec 工件和过期项目 skill 放到 [history.md](history.md) 指向的外部归档。
 9. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 10. TokenDance API key 不得暴露给浏览器 UI。
 
@@ -110,5 +110,5 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | 内容 | 位置 |
 |---|---|
-| 历史 roadmap、审计、发布说明、过期设计、旧参考调研 | [archive/README.md](archive/README.md) |
-| 已完成 spec-driven 专项和过期项目 skill | [archives/README.md](archives/README.md) |
+| 历史 roadmap、审计、发布说明、过期设计、旧参考调研 | [history.md](history.md) |
+| 已完成 spec-driven 专项和过期项目 skill | [history.md](history.md) |

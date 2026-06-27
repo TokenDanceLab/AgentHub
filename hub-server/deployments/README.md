@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-本目录只保存 Hub Server 部署资产和本仓库可验证的部署边界。旧长版部署手册已归档到 [../../docs/archive/hub-server/deployments-readme-full-2026-06-27.md](../../docs/archive/hub-server/deployments-readme-full-2026-06-27.md)。
+本目录只保存 Hub Server 部署资产和本仓库可验证的部署边界。旧长版部署手册见 [../../docs/history.md](../../docs/history.md)。
 
 Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维护；以 TokenDance server SSOT 为准。
 

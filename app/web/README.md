@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-`app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。旧长版 README 已归档到 [../../docs/archive/app/web-readme-full-2026-06-27.md](../../docs/archive/app/web-readme-full-2026-06-27.md)。
+`app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
 
 ## Boundary
 

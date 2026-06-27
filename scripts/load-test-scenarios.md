@@ -2,7 +2,7 @@
 
 最后更新：2026-06-27
 
-This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is archived at [../docs/archive/performance/load-test-scenarios-full-2026-06-27.md](../docs/archive/performance/load-test-scenarios-full-2026-06-27.md).
+This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is indexed in [../docs/history.md](../docs/history.md).
 
 ## Evidence Classes
 
