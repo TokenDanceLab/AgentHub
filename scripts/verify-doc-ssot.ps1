@@ -63,9 +63,11 @@ $requiredMarkers = @(
     @{ Path = "AGENTS.md"; Marker = "docs/roadmap.md" },
     @{ Path = "AGENTS.md"; Marker = ".agents/skills/real-e2e-acceptance/SKILL.md" },
     @{ Path = "AGENTS.md"; Marker = "避免巨石文档" },
+    @{ Path = ".agents/skills/real-e2e-acceptance/SKILL.md"; Marker = "Packaged release" },
     @{ Path = "api/events.md"; Marker = "Owner" },
     @{ Path = "app/web/README.md"; Marker = "docs/archive/app/web-readme-full-2026-06-27.md" },
     @{ Path = "app/desktop/README.md"; Marker = "packaged-release" },
+    @{ Path = "app/desktop/README.md"; Marker = "Vite renderer 证据不等于 packaged Desktop" },
     @{ Path = "edge-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/README.md"; Marker = "Source Map" },
     @{ Path = "hub-server/deployments/README.md"; Marker = "Live host" },
@@ -76,6 +78,12 @@ $requiredMarkers = @(
     @{ Path = "reference/INDEX.md"; Marker = "docs/reference/README.md" },
     @{ Path = "CONTRIBUTING.md"; Marker = "旧详细贡献指南已归档" },
     @{ Path = "docs/governance/document-standards.md"; Marker = "避免巨石文档" }
+    @{ Path = "docs/governance/governance-execution.md"; Marker = "D2b. Release dry build topology" }
+    @{ Path = "docs/governance/governance-execution.md"; Marker = "later approval slice" }
+    @{ Path = "docs/architecture/05-deployment.md"; Marker = "Desktop packaged 行为正确" }
+    @{ Path = "scripts/verify-tauri-package-readiness.ps1"; Marker = "Assert-WorkflowCommandExplicitOptIn" }
+    @{ Path = "scripts/verify-tauri-package-readiness.ps1"; Marker = "Assert-NoMacOSUnsignedDryReleaseActions" }
+    @{ Path = "scripts/verify-tauri-package-dry.ps1"; Marker = "windows-desktop-package-dry" }
     @{ Path = "docs/architecture/04-frontend-data-flow.md"; Marker = "Source Owner Map" }
     @{ Path = "hub-server/README.md"; Marker = "scripts/load-test-scenarios.md" }
     @{ Path = "edge-server/README.md"; Marker = "verify-backend-perf-leak-gates.ps1" }
