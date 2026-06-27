@@ -81,7 +81,7 @@ Mitigation should reduce active docs, not add another governance layer.
 - `app/shared` is the right shared UI home, but its responsibilities are broad enough that data-mode/transcript/workbench contracts need stricter boundaries.
 - `scripts` contains useful gates, but several policy checks inspect string patterns in workflow files; these should stay narrow and not become broad governance logic.
 - `docs/archive/` and `docs/archives/` both exist. Their purposes are now documented, but the split is easy to misunderstand.
-- `docs/plan/wave-a-implementation-plan.md` exists in active `docs/plan/` while no active `docs/progress/MASTER.md` exists. This can look like an active spec plan even if it is not current.
+- Old one-off plans, dated audits, release notes, and longform reference research must stay under `docs/archive/`; active `docs/plan/` and `docs/progress/` are reserved for the current spec-driven run only.
 - Archived project skills are correctly moved out of `.agents/skills`, but future scans should enforce that active skill names match the AGENTS whitelist.
 
 ## Testing Risks

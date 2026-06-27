@@ -351,7 +351,7 @@ Invoke-MatrixCommand `
     -BlockedReason "BLOCKED_WITH_EVIDENCE: real login/remote dispatch needs explicit approved test account, callback, Hub URL, artifact boundary, and operator approval metadata." `
     -Skipped:$SkipLoginReadiness `
     -SkipReason "skipped by -SkipLoginReadiness" `
-    -EvidenceLevel "approved-real-readiness" `
+    -EvidenceLevel "approved-real" `
     -RealTested $false `
     -Claim "Readiness gate only unless approved-real login metadata is present"
 
@@ -363,7 +363,7 @@ Invoke-MatrixCommand `
     -WorkingDirectory $RepoRoot `
     -Skipped:$SkipTauriDry `
     -SkipReason "skipped by -SkipTauriDry" `
-    -EvidenceLevel "packaged-release-dry" `
+    -EvidenceLevel "packaged-release" `
     -RealTested $false `
     -Claim "Tauri packaging policy/dry gate; not installer/signing/release upload"
 
