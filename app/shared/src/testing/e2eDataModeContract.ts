@@ -3,7 +3,7 @@ import {
   getWorkbenchDataModeContract,
 } from '../demo/dataMode';
 
-export type E2ESurface = 'desktop' | 'web';
+export type E2ESurface = 'desktop' | 'web' | 'mobile';
 
 export type E2EDataSource =
   | 'local-mock'
@@ -132,8 +132,8 @@ export function validateE2EDataModeScenario(
   if (!mode.allowsFixtureData && scenario.dataSource === 'deterministic-fixture') {
     errors.push(`${scenario.name} dataMode ${scenario.dataMode} does not allow fixture data`);
   }
-  if (scenario.surface === 'web' && scenario.dataMode === 'approved-real' && scenario.directLocalEdge) {
-    errors.push(`${scenario.name} is Web approved-real replay and must not direct-call Local Edge`);
+  if (scenario.surface !== 'desktop' && scenario.directLocalEdge) {
+    errors.push(`${scenario.name} surface ${scenario.surface} must not direct-call Local Edge`);
   }
   if (scenario.dataSource === 'stubbed-hub-session' && scenario.realLoginTested) {
     errors.push(`${scenario.name} uses stubbed-hub-session but claims real login was tested`);
@@ -274,6 +274,8 @@ const DEFAULT_APP_HOSTS = new Set([
   '127.0.0.1:5173',
   'localhost:5174',
   '127.0.0.1:5174',
+  'localhost:5177',
+  '127.0.0.1:5177',
   'localhost:5199',
   '127.0.0.1:5199',
   'localhost:5201',
