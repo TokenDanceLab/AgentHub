@@ -1,25 +1,8 @@
-# AgentHub local setup for Windows / PowerShell.
-
-[CmdletBinding()]
-param(
-    [ValidateSet("none", "core", "all")]
-    [string]$Reference = "none"
-)
-
 $ErrorActionPreference = "Stop"
-$Root = Resolve-Path (Join-Path $PSScriptRoot "..")
-
-Push-Location $Root
-try {
-    git config core.hooksPath scripts/git-hooks
-    Write-Host "Git hooks enabled: scripts/git-hooks"
-
-    if ($Reference -ne "none") {
-        & (Join-Path $PSScriptRoot "sync-reference.ps1") -Tier $Reference
-    }
-
-    Write-Host "Setup complete."
-}
-finally {
-    Pop-Location
-}
+$target = Join-Path $PSScriptRoot "dev\setup.ps1"
+$global:LASTEXITCODE = 0
+& $target @args
+$wrapperSuccess = $?
+$wrapperExitCode = $LASTEXITCODE
+if (-not $wrapperSuccess -and $wrapperExitCode -eq 0) { exit 1 }
+exit $wrapperExitCode

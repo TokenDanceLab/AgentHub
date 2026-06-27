@@ -112,11 +112,15 @@ function Get-HostExecutable {
 
 $preparePath = Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1"
 $smokePath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-binary-smoke.ps1"
+$prepareImplementationPath = Join-Path $RepoRoot "scripts\release\prepare-tauri-sidecar-local.ps1"
+$smokeImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.ps1"
 Assert-True (Test-Path $preparePath) "local sidecar prepare script exists"
 Assert-True (Test-Path $smokePath) "sidecar binary smoke script exists"
+Assert-True (Test-Path $prepareImplementationPath) "local sidecar prepare script implementation exists"
+Assert-True (Test-Path $smokeImplementationPath) "sidecar binary smoke script implementation exists"
 
-$prepareText = Read-Text "scripts\prepare-tauri-sidecar-local.ps1"
-$smokeText = Read-Text "scripts\verify-tauri-sidecar-binary-smoke.ps1"
+$prepareText = Read-Text "scripts\release\prepare-tauri-sidecar-local.ps1"
+$smokeText = Read-Text "scripts\release\verify-tauri-sidecar-binary-smoke.ps1"
 Assert-True ($prepareText -match "NoBuild" -and $prepareText -match "DryRun" -and $prepareText -match "go build") "prepare script supports NoBuild, DryRun, and Go build placement"
 Assert-True ($prepareText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe" -and $prepareText -match "binaries/agenthub-edge") "prepare script derives the Windows Tauri sidecar placement"
 Assert-True ($prepareText -match "check-ignore" -and $smokeText -match "check-ignore") "prepare and smoke scripts verify sidecar binary stays ignored"

@@ -177,7 +177,9 @@ async function start(name, descriptor) {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-localhost-real-services.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\smoke\verify-localhost-real-services.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "real localhost services harness exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "real localhost services harness implementation exists"
 
 try {
     $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-real-services-test-$PID"
@@ -185,8 +187,8 @@ try {
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
 
-    if (Test-Path -LiteralPath $scriptPath) {
-        $scriptText = Get-Content -Raw -LiteralPath $scriptPath
+    if (Test-Path -LiteralPath $scriptImplementationPath) {
+        $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         foreach ($markerParam in @("ExpectedWebMarker", "ExpectedHubMarker", "ExpectedDesktopMarker", "ExpectedEdgeMarker")) {
             Assert-True ($scriptText -match "\[string\]\`$$markerParam = `"`"") "$markerParam defaults to empty and must be caller-supplied"
         }

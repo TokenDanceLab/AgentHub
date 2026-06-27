@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# AgentHub commit-msg hook — enforce Conventional Commits
+# Works on: macOS, Linux, Windows (Git Bash / WSL)
+#
+# Format: type(scope): 中文摘要
+# Scope optional. Type/scope stays English; summary is Chinese-first.
+# This hook only validates local commit messages. GitHub issue and PR text
+# follows the same "English prefix + Chinese content" rule; see AGENTS.md.
+
+set -euo pipefail
+
+MSG_FILE="$1"
+
+# Strip UTF-8 BOM and CR (Windows), then read subject line
+SUBJECT=$(head -1 "$MSG_FILE" | sed 's/^\xEF\xBB\xBF//' | tr -d '\r')
+
+# === 1. Allowed types ===
+TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"
+
+# === 2. Pattern: type(scope): summary  or  type: summary ===
+PATTERN="^($TYPES)(\([a-z0-9._-]+\))?: .+"
+
+if ! echo "$SUBJECT" | grep -qE "$PATTERN"; then
+    echo ""
+    echo "  Invalid commit message format."
+    echo ""
+    echo "  Required: type(scope): 中文摘要"
+    echo "  Allowed types: $TYPES"
+    echo ""
+    echo "  Examples:"
+    echo "    docs: 中文化项目入口和文档规范"
+    echo "    feat(edge): 实现 WebSocket Hub"
+    echo "    fix(edge): 处理子进程超时"
+    echo "    refactor: 重组 reference 文档结构"
+    echo ""
+    exit 1
+fi
+
+# === 3. Check subject line length (120 bytes max) ===
+LEN=$(echo -n "$SUBJECT" | wc -c)
+if [ "$LEN" -gt 120 ]; then
+    echo ""
+    echo "  Subject line too long ($LEN > 120 bytes). Keep it concise."
+    echo ""
+    exit 1
+fi
+
+# === 4. No trailing sentence punctuation ===
+if echo "$SUBJECT" | grep -qE '[。\.]$'; then
+    echo ""
+    echo "  Remove trailing punctuation from subject line."
+    echo ""
+    exit 1
+fi
+
+bash "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" --staged
+
+exit 0

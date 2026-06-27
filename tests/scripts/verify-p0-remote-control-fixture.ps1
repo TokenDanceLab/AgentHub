@@ -91,15 +91,19 @@ function Invoke-RepoScript {
 }
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-p0-remote-control-fixture.ps1"
+$gateImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-p0-remote-control-fixture.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\checks.yml"
 $ciPolicyPath = Join-Path $RepoRoot "scripts\verify-ci-gates.ps1"
+$ciPolicyImplementationPath = Join-Path $RepoRoot "scripts\verify\verify-ci-gates.ps1"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "P0 remote-control fixture total gate exists"
+Assert-True (Test-Path -LiteralPath $gateImplementationPath) "P0 remote-control fixture total gate implementation exists"
 Assert-True (Test-Path -LiteralPath $workflowPath) "CI workflow exists"
 Assert-True (Test-Path -LiteralPath $ciPolicyPath) "CI policy verifier exists"
+Assert-True (Test-Path -LiteralPath $ciPolicyImplementationPath) "CI policy verifier implementation exists"
 
-if (Test-Path -LiteralPath $gatePath) {
-    $scriptText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
+if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $gateImplementationPath)) {
+    $scriptText = Get-Content -Raw -LiteralPath $gateImplementationPath -Encoding UTF8
 
     foreach ($required in @(
         "FixtureRehearsal",
@@ -177,9 +181,9 @@ if (Test-Path -LiteralPath $gatePath) {
     Assert-True ($badClaim.Output -match "FixtureOnly") "bad claim failure names FixtureOnly requirement" $badClaim.Output
 }
 
-if ((Test-Path -LiteralPath $workflowPath) -and (Test-Path -LiteralPath $ciPolicyPath)) {
+if ((Test-Path -LiteralPath $workflowPath) -and (Test-Path -LiteralPath $ciPolicyPath) -and (Test-Path -LiteralPath $ciPolicyImplementationPath)) {
     $workflowText = Get-Content -Raw -LiteralPath $workflowPath -Encoding UTF8
-    $ciPolicyText = Get-Content -Raw -LiteralPath $ciPolicyPath -Encoding UTF8
+    $ciPolicyText = Get-Content -Raw -LiteralPath $ciPolicyImplementationPath -Encoding UTF8
 
     Assert-True ($workflowText -match "P0 remote-control fixture readiness") "CI workflow runs P0 remote-control fixture readiness gate"
     Assert-True ($workflowText -match [regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1")) "CI workflow invokes the P0 fixture gate by script path"

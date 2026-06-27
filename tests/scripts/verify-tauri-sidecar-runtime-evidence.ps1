@@ -74,6 +74,8 @@ function New-MinimalRepoFixture {
         "app\desktop\src\platform\desktopPlatform.test.ts",
         "scripts\verify-tauri-package-readiness.ps1",
         "scripts\verify-tauri-package-dry.ps1",
+        "scripts\release\verify-tauri-package-readiness.ps1",
+        "scripts\release\verify-tauri-package-dry.ps1",
         "docs\audit\p1-tauri-build-package-evidence.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -136,9 +138,11 @@ function New-ArtifactRoot {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-sidecar-runtime-evidence.ps1"
+$scriptImplementationPath = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-runtime-evidence.ps1"
 Assert-True (Test-Path -LiteralPath $scriptPath) "Tauri sidecar runtime evidence gate exists"
+Assert-True (Test-Path -LiteralPath $scriptImplementationPath) "Tauri sidecar runtime evidence gate implementation exists"
 
-$scriptText = Read-Text "scripts\verify-tauri-sidecar-runtime-evidence.ps1"
+$scriptText = Read-Text "scripts\release\verify-tauri-sidecar-runtime-evidence.ps1"
 Assert-True ($scriptText -match "EDGE_SIDECAR_NAME" -and $scriptText -match "agenthub-edge") "gate checks sidecar name"
 Assert-True ($scriptText -match "app_data_dir" -and $scriptText -match "agenthub-edge") "gate checks app-data SQLite policy"
 Assert-True ($scriptText -match "stdout" -and $scriptText -match "stderr" -and $scriptText -match "log") "gate checks Local Edge log paths"
