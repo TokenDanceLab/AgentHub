@@ -167,6 +167,16 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
 	}
 
+	// System prompt: prepend since Codex has no --system-prompt flag.
+	// Without this, user-configured system prompts are silently discarded
+	// for Codex agents. See RunProcessContext.SystemPrompt / AppendSystemPrompt.
+	if ctx.SystemPrompt != "" {
+		prompt = ctx.SystemPrompt + "\n\n---\n\n" + prompt
+	}
+	if ctx.AppendSystemPrompt != "" {
+		prompt = ctx.AppendSystemPrompt + "\n\n---\n\n" + prompt
+	}
+
 	// Context continuity: prepend thread history + pinned messages so Codex
 	// has full Hub conversation context (not just the trigger message).
 	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {

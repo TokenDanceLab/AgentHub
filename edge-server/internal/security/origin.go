@@ -8,16 +8,21 @@ import (
 	"strings"
 )
 
+var (
+	reWhitespace = regexp.MustCompile(`\s+`)
+	reComment    = regexp.MustCompile(`(?:^|\s)#.*$`)
+)
+
 // NormalizeShellCommand strips extra whitespace and removes comments from a
 // shell command string before dangerous-pattern matching. This prevents
 // trivial evasion via whitespace padding or inline comments.
 func NormalizeShellCommand(cmd string) string {
 	cmd = strings.TrimSpace(cmd)
 	// Collapse multiple whitespace characters into a single space.
-	cmd = regexp.MustCompile(`\s+`).ReplaceAllString(cmd, " ")
+	cmd = reWhitespace.ReplaceAllString(cmd, " ")
 	// Remove bash-style comments (# ...) that are not inside quotes.
 	// Simple heuristic: strip from unquoted # to end of line.
-	cmd = regexp.MustCompile(`(?:^|\s)#.*$`).ReplaceAllString(cmd, "")
+	cmd = reComment.ReplaceAllString(cmd, "")
 	cmd = strings.TrimSpace(cmd)
 	return cmd
 }

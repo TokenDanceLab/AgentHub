@@ -61,6 +61,7 @@ type Config struct {
 	SkillsDirs         []string                 // optional SKILL.md search dirs; empty = use defaults
 	EventLogPath       string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
+	ShutdownHooks      []func()                 // called in order during graceful shutdown, before bus.Close()
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -177,6 +178,9 @@ func Run(cfg Config) error {
 	}
 
 	// Flush and close the event log so no events are lost on shutdown.
+	for _, hook := range cfg.ShutdownHooks {
+		hook()
+	}
 	if err := handler.Bus.Close(); err != nil {
 		slog.Error("failed to close event bus event log", "error", err)
 	}
@@ -322,6 +326,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		ccReader := ccswitch.NewReader()
 		h.CCSwitchStatus = &ccStatus
 		h.CCSwitchReader = ccReader
+
+		// Consume cc-switch model aliases into the static config so all
+		// adapters benefit from dynamic model resolution (not just
+		// Claude Code). Graceful degradation: on error, static config
+		// only — never crash because cc-switch is unavailable.
+		if _, err := adapters.ConsumeCCSwitchModels(ccStatus.DBPath); err != nil {
+			slog.Warn("cc-switch model alias consumption failed, using static config only", "error", err)
+		}
 
 		// Wire cc-switch dynamic model resolver into Claude Code adapter
 		// so model aliases are resolved through the transparent proxy mapping.

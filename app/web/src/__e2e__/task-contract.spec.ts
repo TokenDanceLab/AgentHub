@@ -1,17 +1,38 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  buildE2EDataModeManifest,
+  createE2EDataModeScenario,
+  type E2EObservedRequest,
+} from '../../../shared/src/testing/e2eDataModeContract';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'task-contract-replay');
+const HUB_ORIGIN = 'http://localhost:8080';
+const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
+const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
+const WEB_TASK_CONTRACT_SCENARIO = createE2EDataModeScenario({
+  name: 'web-task-contract-replay',
+  surface: 'web',
+  dataMode: 'approved-real',
+  dataSource: 'stubbed-hub-session',
+  appOrigin: WEB_E2E_APP_ORIGIN,
+  hubOrigin: HUB_ORIGIN,
+  mockAdapterUsed: true,
+});
 
 test.describe('Web Hub task approval/artifact contract', () => {
   test('consumes single-task approval and artifact endpoints from a stubbed Hub', async ({ page }) => {
-    const requested = new Set<string>();
+    const requested: BackendRequestLog = {
+      endpoints: new Set<string>(),
+      requests: [],
+    };
 
     await page.route('http://localhost:8080/**', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      requested.add(`${request.method()} ${url.pathname}`);
+      requested.endpoints.add(`${request.method()} ${url.pathname}`);
+      requested.requests.push({ method: request.method(), url: request.url() });
 
       if (request.method() === 'OPTIONS') {
         return route.fulfill({ status: 204 });
@@ -30,7 +51,7 @@ test.describe('Web Hub task approval/artifact contract', () => {
         return route.fulfill(json(hubEnvelope([{
           id: 'session-web-contract',
           type: 'group',
-          name: 'Real Hub task contract',
+          name: 'Stubbed Hub task contract',
           member_count: 2,
         }])));
       }
@@ -237,14 +258,20 @@ test.describe('Web Hub task approval/artifact contract', () => {
 
     await expect(page.getByText('@Agent queued')).toBeVisible();
     await expect(page.getByText('@Agent done')).toBeVisible();
+    await expect.poll(() => requested.endpoints.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
+    await expect.poll(() => requested.endpoints.has('GET /web/agent-tasks/task-web-contract/artifacts')).toBe(true);
+    await page.getByRole('button', { name: /Awaiting approval|Expand/ }).first().click();
     await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
-    await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
-    await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/artifacts')).toBe(true);
 
     writeReplayManifest(requested);
   });
 });
+
+interface BackendRequestLog {
+  endpoints: Set<string>;
+  requests: E2EObservedRequest[];
+}
 
 function hubEnvelope<T>(data: T): { code: string; data: T } {
   return { code: 'ok', data };
@@ -268,21 +295,20 @@ function json(body: unknown): {
   };
 }
 
-function writeReplayManifest(requested: Set<string>): void {
+function writeReplayManifest(requested: BackendRequestLog): void {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
-  const requestedEndpoints = Array.from(requested).sort();
-  const manifest = {
-    schema: 'agenthub.web_task_contract_replay.v1',
+  const requestedEndpoints = Array.from(requested.endpoints).sort();
+  const manifest = buildE2EDataModeManifest(WEB_TASK_CONTRACT_SCENARIO, requested.requests, {
     taskId: 'task-web-contract',
     sessionId: 'session-web-contract',
-    hubOrigin: 'http://localhost:8080',
     approvalReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/approvals'),
     artifactReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/artifacts'),
     summaryReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/summary'),
-    directLocalEdge: false,
+    HubSessionSource: 'stubbed-hub-session',
+    WebReplayObserved: true,
+    RealExecutionSource: 'none',
     realTokenDanceIdLogin: false,
-    realCliOrModelExecuted: false,
-    requestedEndpoints,
-  };
+    hubEndpoints: requestedEndpoints,
+  });
   fs.writeFileSync(path.join(ARTIFACT_DIR, 'task-contract-replay.manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 }

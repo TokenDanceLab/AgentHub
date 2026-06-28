@@ -9,11 +9,13 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -234,8 +236,13 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 				Name:        toolName,
 				Description: "Tool: " + toolName,
 				InputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
+					"type": "object",
+					"properties": map[string]any{
+						"query": map[string]any{
+							"type":        "string",
+							"description": "Input for tool: " + toolName,
+						},
+					},
 				},
 			})
 		}
@@ -285,8 +292,11 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 
 	for attempt := 0; attempt <= anthropicMaxRetries; attempt++ {
 		if attempt > 0 {
-			// Exponential backoff: 1s, 2s, 4s
+			// Exponential backoff with jitter: 1s, 2s, 4s (±25%).
+			// Jitter prevents thundering herd when multiple sub-agents
+			// retry simultaneously after a provider-wide outage.
 			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
+			delay = delay + time.Duration(rand.Int63n(int64(delay/4)))
 			slog.Info("anthropic-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,
@@ -357,7 +367,14 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 
 	// Add thread history messages if present
 	for _, msg := range ctx.Messages {
-		role := msg.Role
+		sanitized, filtered := runnerctx.SanitizeMessage(msg)
+		if filtered {
+			slog.Warn("anthropic-sdk: sanitized message",
+				"role", msg.Role,
+				"originalLen", len(msg.Content),
+			)
+		}
+		role := sanitized.Role
 		if role == "system" {
 			continue // system messages go in the system field
 		}
@@ -368,7 +385,7 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 		}
 		messages = append(messages, anthropicMessage{
 			Role:    role,
-			Content: msg.Content,
+			Content: sanitized.Content,
 		})
 	}
 
@@ -377,9 +394,15 @@ func (a *AnthropicSDKAdapter) buildMessages(ctx RunProcessContext) []anthropicMe
 	if prompt == "" {
 		prompt = "Continue."
 	}
+	sanitizedPrompt, filtered := runnerctx.SanitizeMessage(runnerctx.Message{Role: "user", Content: prompt})
+	if filtered {
+		slog.Warn("anthropic-sdk: sanitized prompt",
+			"originalLen", len(prompt),
+		)
+	}
 	messages = append(messages, anthropicMessage{
 		Role:    "user",
-		Content: prompt,
+		Content: sanitizedPrompt.Content,
 	})
 
 	return messages

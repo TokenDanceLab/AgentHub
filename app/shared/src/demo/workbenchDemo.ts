@@ -64,7 +64,7 @@ const demoConversationsBase: WorkbenchConversation[] = [
   },
   {
     id: TEAMRUN_DEMO_CONVERSATION_ID,
-    title: 'ByteDance TeamRun',
+    title: 'TeamRun Fixture',
     kind: 'group',
     subtitle: 'fixture-only UI evidence capture',
     updatedLabel: '10:11',
@@ -746,11 +746,7 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
             kind: 'text',
             createdAt: now,
             author: { id: 'demo-agent', name: 'AgentHub Demo', role: 'agent' },
-            text: `已收到 mock 输入：${intent.text}`,
-            displayTitle: 'Demo 模式已记录输入',
-            displayDetail: '这条回复由 shared demo runtime store 生成，用于前端开发时验证消息追加、滚动、选择和 inspector evidence 行为。',
-            badgeLabel: 'mock',
-            badgeVariant: 'thinking',
+            text: `收到，我会继续跟进：${intent.text}`,
           },
         ],
       };

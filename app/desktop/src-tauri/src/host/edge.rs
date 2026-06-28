@@ -98,7 +98,7 @@ fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
     LocalCliDiscoveryManifest {
         mode: "no-spend-discovery".to_string(),
         readiness_manifest: "docs/audit/p0-edge-cli-real-readiness.md".to_string(),
-        readiness_script: "scripts/verify-edge-cli-real-readiness.ps1".to_string(),
+        readiness_script: "scripts/verify/verify-edge-cli-real-readiness.ps1".to_string(),
         generated_at: None,
         items: vec![
             discover_cli("codex", "Codex CLI", "codex", "AGENTHUB_CODEX_PATH"),
@@ -193,7 +193,11 @@ fn read_cli_version(path: &str) -> Option<String> {
                     .map(|line| line.chars().take(120).collect());
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(_) => return None,
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
         }
     }
     let _ = child.kill();
@@ -319,7 +323,7 @@ mod tests {
         );
         assert_eq!(
             manifest.readiness_script,
-            "scripts/verify-edge-cli-real-readiness.ps1"
+            "scripts/verify/verify-edge-cli-real-readiness.ps1"
         );
         assert_eq!(manifest.items.len(), 3);
         assert!(manifest.items.iter().all(|item| item.no_spend));

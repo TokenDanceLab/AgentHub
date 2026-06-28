@@ -61,6 +61,7 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
 
 export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
   kind: 'tool_call';
+  callId?: string;
   toolName: string;
   status: EvidenceRefStatus;
   target?: string;
@@ -69,6 +70,7 @@ export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
 
 export interface ToolResultTranscriptBlock extends TranscriptBlockBase {
   kind: 'tool_result';
+  callId?: string;
   toolName: string;
   status: EvidenceRefStatus;
   summary?: string;

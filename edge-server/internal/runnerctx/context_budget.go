@@ -3,9 +3,11 @@
 package runnerctx
 
 import (
+	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 )
 
 // DefaultMaxTokens is the default context window size (Claude Opus 200K).
@@ -14,6 +16,12 @@ const DefaultMaxTokens = 200_000
 // CompactionThreshold is the usage ratio at which auto-compaction triggers.
 // 0.85 = 85% of usable budget consumed.
 const CompactionThreshold = 0.85
+
+// MaxMessageContentSize is the maximum allowed content length per message in bytes.
+// Content exceeding this limit is truncated during sanitization to prevent
+// oversized payloads from consuming excessive context budget or causing
+// argument-length overflows in CLI-based adapters.
+const MaxMessageContentSize = 32 * 1024 // 32KB
 
 // ContextBudget tracks token consumption during a run to detect when
 // the context window is approaching exhaustion. It is in-memory only
@@ -119,7 +127,68 @@ func EstimateTokens(text string) int {
 	if len(text) == 0 {
 		return 0
 	}
-	return (len(text) + 3) / 4
+	// Use rune count instead of byte count for more accurate estimation,
+	// especially for CJK text where each character is 3+ bytes in UTF-8
+	// but tokenization averages ~1.5 tokens per character.
+	return (utf8.RuneCountInString(text) + 3) / 4
+}
+
+// ── Budget Preflight Check ────────────────────────────────────────────────
+
+// CheckTokenBudget evaluates whether the estimated token count fits safely
+// within the model's context window.
+//
+// Levels:
+//   - "ok"      (< 80% of maxTokens): safe to proceed, no action needed
+//   - "warn"    (80%-95% of maxTokens): budget is tight; caller should
+//     consider compaction or warn the user before proceeding
+//   - "critical" (> 95% of maxTokens): budget is exhausted; caller should
+//     reject the request or force compaction
+//
+// This is a pure check function — it does not mutate any state. The caller
+// decides what action to take based on the returned level.
+//
+// Use EstimateTokens() to compute promptTokens before calling this function.
+//
+// Usage example (preflight check in ProcessExecutor.run, before BuildCommand):
+//
+//	promptTokens := EstimateTokens(runCtx.Prompt)
+//	if runCtx.Budget != nil {
+//	    totalTokens := int(runCtx.Budget.UsedTokens.Load()) + promptTokens
+//	    ok, level := CheckTokenBudget(totalTokens, int(runCtx.Budget.MaxTokens))
+//	    switch level {
+//	    case "critical":
+//	        return fmt.Errorf("context budget exhausted: %d/%d tokens used",
+//	            runCtx.Budget.UsedTokens.Load(), runCtx.Budget.MaxTokens)
+//	    case "warn":
+//	        // Emit agent.context_warning event so the frontend can surface
+//	        // a visible warning. Also trigger proactive compaction if the
+//	        // adapter supports it (Claude Code via --continue compaction,
+//	        // SDK adapters via history summarization).
+//	    case "ok":
+//	        // Budget is healthy — proceed normally.
+//	    }
+//	    // Track the prompt tokens now that the preflight has passed.
+//	    // (Adapter-specific costs like tool results and assistant replies
+//	    // are tracked later as they arrive.)
+//	    runCtx.Budget.Track(promptTokens)
+//	}
+func CheckTokenBudget(promptTokens int, maxTokens int) (ok bool, level string) {
+	if maxTokens <= 0 {
+		return true, "ok"
+	}
+	if promptTokens < 0 {
+		return false, "critical"
+	}
+	pct := float64(promptTokens) / float64(maxTokens) * 100
+	switch {
+	case pct < 80:
+		return true, "ok"
+	case pct <= 95:
+		return true, "warn"
+	default:
+		return false, "critical"
+	}
 }
 
 // ── Message Types ────────────────────────────────────────────────────────
@@ -131,11 +200,126 @@ type Message struct {
 	Timestamp time.Time `json:"timestamp"` // when the message was created
 }
 
+// ── Message Sanitization ──────────────────────────────────────────────────
+
+// validRoles is the allowlist of permissible message roles.
+var validRoles = map[string]bool{
+	"user":      true,
+	"assistant": true,
+	"system":    true,
+	"tool":      true,
+}
+
+// isValidRole returns true if the role is in the allowlist.
+func isValidRole(role string) bool {
+	return validRoles[role]
+}
+
+// needsControlCharStrip returns true if the string contains any ASCII control
+// characters other than \t (0x09), \n (0x0A), \r (0x0D).
+func needsControlCharStrip(s string) bool {
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b < 0x20 && b != '\t' && b != '\n' && b != '\r' {
+			return true
+		}
+		if b == 0x7F {
+			return true
+		}
+	}
+	return false
+}
+
+// stripControlChars removes ASCII control characters (except \t, \n, \r) and
+// the DEL character (0x7F) from the string. Returns the original string if no
+// control characters are present.
+func stripControlChars(s string) string {
+	if !needsControlCharStrip(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 0x20 && c != 0x7F {
+			b.WriteByte(c)
+		} else if c == '\t' || c == '\n' || c == '\r' {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// SanitizeMessage applies input sanitization to a single message before it
+// enters the agent's prompt. Sanitization is always-on, always applied
+// internally, and requires no caller opt-in.
+//
+// Three checks are applied in order:
+//  1. Strip ASCII control characters (except \t, \n, \r)
+//  2. Truncate content exceeding MaxMessageContentSize (32KB)
+//  3. Validate role against the allowlist {user, assistant, system, tool};
+//     invalid roles are replaced with "system" and content is prefixed
+//     with "[Filtered] " so operators can see that injection was blocked.
+//
+// Returns the sanitized message and true if any filtering occurred.
+func SanitizeMessage(m Message) (Message, bool) {
+	content := m.Content
+	role := m.Role
+	sanitized := false
+
+	// 1. Strip control characters.
+	if needsControlCharStrip(content) {
+		content = stripControlChars(content)
+		sanitized = true
+	}
+
+	// 2. Truncate oversized content at a rune boundary to avoid splitting
+	// multi-byte UTF-8 characters (e.g. CJK characters at the 32KB cutoff).
+	if len(content) > MaxMessageContentSize {
+		truncateAt := 0
+		for i := 0; i < len(content) && i < MaxMessageContentSize; {
+			_, size := utf8.DecodeRuneInString(content[i:])
+			if i+size > MaxMessageContentSize {
+				break
+			}
+			truncateAt = i + size
+			i += size
+		}
+		if truncateAt == 0 {
+			truncateAt = MaxMessageContentSize // fallback: no complete rune before boundary
+		}
+		content = content[:truncateAt]
+		sanitized = true
+	}
+
+	// 3. Validate role.
+	if !isValidRole(role) {
+		role = "system"
+		content = "[Filtered] " + content
+		sanitized = true
+	}
+
+	return Message{
+		Role:      role,
+		Content:   content,
+		Timestamp: m.Timestamp,
+	}, sanitized
+}
+
+// ── Context Preface ───────────────────────────────────────────────────────
+
 // BuildContextPreface formats thread history and pinned messages into a
 // system-prompt-compatible preface that injects conversation context into
 // any agent runtime. Pinned messages are presented first (highest priority),
 // followed by recent thread history. Returns an empty string when there is
 // no context to inject.
+//
+// Every message is automatically sanitized via SanitizeMessage before
+// inclusion: ASCII control characters are stripped (except \t, \n, \r),
+// content exceeding MaxMessageContentSize (32KB) is truncated at a rune
+// boundary, and invalid roles are replaced with "system" prefixed with
+// "[Filtered] ". Sanitization warnings are logged via slog.Warn so
+// operators can audit when injection was blocked.
 //
 // The output is designed to be prepended to the agent's prompt (Codex,
 // OpenCode) or appended to the system prompt (Claude Code), so that every
@@ -147,9 +331,16 @@ func BuildContextPreface(messages, pinned []Message) string {
 	if len(pinned) > 0 {
 		b.WriteString("[Pinned context - always relevant]\n")
 		for _, m := range pinned {
-			b.WriteString(m.Role)
+			sanitized, filtered := SanitizeMessage(m)
+			if filtered {
+				slog.Warn("runnerctx: sanitized pinned message",
+					"role", m.Role,
+					"originalLen", len(m.Content),
+				)
+			}
+			b.WriteString(sanitized.Role)
 			b.WriteString(": ")
-			b.WriteString(m.Content)
+			b.WriteString(sanitized.Content)
 			b.WriteString("\n")
 		}
 		b.WriteString("[End of pinned context]\n\n")
@@ -158,9 +349,16 @@ func BuildContextPreface(messages, pinned []Message) string {
 	if len(messages) > 0 {
 		b.WriteString("[Previous conversation context - for reference only]\n")
 		for _, m := range messages {
-			b.WriteString(m.Role)
+			sanitized, filtered := SanitizeMessage(m)
+			if filtered {
+				slog.Warn("runnerctx: sanitized message",
+					"role", m.Role,
+					"originalLen", len(m.Content),
+				)
+			}
+			b.WriteString(sanitized.Role)
 			b.WriteString(": ")
-			b.WriteString(m.Content)
+			b.WriteString(sanitized.Content)
 			b.WriteString("\n")
 		}
 		b.WriteString("[End of previous context]\n")
@@ -277,17 +475,25 @@ func EvictToBudget(messages []Message, maxTokens int) []Message {
 	}
 
 	// Evict from the front (oldest), after the preserved system message.
+	// Subtract the preserved system message tokens from the budget so the
+	// eviction loop correctly accounts for the already-reserved space.
 	result := make([]Message, 0, len(messages))
+	remainingBudget := maxTokens
 	if startIdx > 0 {
 		result = append(result, messages[0])
+		remainingBudget -= EstimateTokens(messages[0].Content)
+		if remainingBudget < 0 {
+			remainingBudget = 0
+		}
 	}
 
-	// Work backwards: figure out how many messages from the end we can keep.
+	// Work backwards: figure out how many messages from the end we can keep
+	// within the remaining budget (after system message reservation).
 	keptTokens := 0
 	keepFromEnd := 0
 	for i := len(messages) - 1; i >= startIdx; i-- {
 		t := EstimateTokens(messages[i].Content)
-		if keptTokens+t > maxTokens {
+		if keptTokens+t > remainingBudget {
 			break
 		}
 		keptTokens += t
@@ -305,6 +511,17 @@ func EvictToBudget(messages []Message, maxTokens int) []Message {
 	}
 	result = append(result, messages[keepStart:]...)
 
+	// Safety check: if the result still exceeds the budget (e.g., the system
+	// message alone consumes the entire budget), drop the system prefix message
+	// so at least the recent conversation is preserved.
+	totalAfter := 0
+	for _, m := range result {
+		totalAfter += EstimateTokens(m.Content)
+	}
+	if totalAfter > maxTokens && len(result) > 1 && result[0].Role == "system" {
+		result = result[1:]
+	}
+
 	return result
 }
 
@@ -319,16 +536,26 @@ func summarizeMessages(messages []Message) []string {
 		"decided", "decision", "choose", "chose", "chosen", "will use",
 		"approach", "plan to", "going to", "agreed", "resolved", "conclusion",
 		"final answer", "therefore", "thus", "result",
+		// Chinese equivalents
+		"决定", "选择", "选定", "采用", "方案", "计划", "同意", "已解决",
+		"结论", "最终答案", "因此", "所以", "结果",
 	}
 	fileChangeWords := []string{
 		"created", "deleted", "modified", "updated", "changed", "added",
 		"removed", "renamed", "moved", "wrote", "rewrote", "edited",
 		"installed", "uninstalled", "generated",
+		// Chinese equivalents
+		"创建", "删除", "修改", "更新", "变更", "新增", "添加",
+		"移除", "重命名", "移动", "编写", "重写", "编辑",
+		"安装", "卸载", "生成",
 	}
 	errorWords := []string{
 		"error", "failed", "failure", "panic", "crash", "exception",
 		"timeout", "rejected", "denied", "invalid", "cannot", "unable",
 		"not found", "permission denied",
+		// Chinese equivalents
+		"错误", "失败", "崩溃", "异常", "超时", "拒绝", "无效",
+		"无法", "找不到", "权限不足", "不允许",
 	}
 
 	var lines []string

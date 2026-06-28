@@ -1,7 +1,44 @@
+// Package adapters provides model configuration resolution for all agent runtimes.
+//
+// # Model configuration sources (merge order, later overrides earlier)
+//
+//  1. Static defaults — hardcoded ModelAliases, DefaultModels, ReasoningEfforts maps
+//     in this file. These are the baseline fallback for all agents.
+//  2. cc-switch dynamic aliases — ConsumeCCSwitchModels() reads the cc-switch SQLite
+//     database and merges provider model aliases into the static ModelAliases map.
+//     cc-switch entries override static entries on key match; static entries that
+//     do not conflict are preserved (never removed).
+//
+// # Graceful degradation
+//
+// If the cc-switch database is missing, unreadable, or contains no usable data,
+// ConsumeCCSwitchModels returns an error. Callers log a WARNING and continue with
+// static config only — cc-switch is an optional enhancement, never a hard
+// dependency. Edge Server starts and operates normally without it.
+//
+// # Dynamic routing capability
+//
+// When cc-switch is active, model resolution is transparently rerouted at the Edge
+// layer: a user selecting "claude-sonnet" may actually run against a DeepSeek,
+// GLM, or Qwen backend configured in cc-switch, without changing their AgentHub
+// profile. This is the same transparent proxy mechanism that cc-switch provides
+// for Claude Code / Codex CLI, now surfaced to Edge Server adapter model resolution.
 package adapters
+
+import (
+	"fmt"
+	"log/slog"
+
+	"github.com/agenthub/edge-server/internal/ccswitch"
+)
 
 // ModelAliases resolves short names to full model IDs per agent CLI.
 // Example: "sonnet" → "claude-sonnet-4-6" for Claude Code.
+//
+// This map is the static baseline. At startup, ConsumeCCSwitchModels() may
+// dynamically augment it with cc-switch provider aliases (cc-switch entries
+// override static entries on key conflict; non-conflicting static entries are
+// preserved). Code that reads ModelAliases after startup sees the merged result.
 var ModelAliases = map[string]map[string]string{
 	"claude-code": {
 		"opus":   "claude-opus-4-7",
@@ -123,4 +160,90 @@ func ResolveModelWithDefault(agentID, model string) string {
 		return resolved
 	}
 	return DefaultModels[agentID]
+}
+
+// appTypeToAgentID maps cc-switch app_type values to AgentHub adapter IDs.
+// Only app_types present in this map are consumed; unknown app_types in the
+// cc-switch database are silently skipped.
+var appTypeToAgentID = map[string]string{
+	"claude":   "claude-code",
+	"codex":    "codex",
+	"opencode": "opencode",
+}
+
+// ConsumeCCSwitchModels reads model aliases from the cc-switch SQLite database at
+// dbPath and merges them into the static ModelAliases table.
+//
+// # Merge semantics
+//
+// For each cc-switch provider whose app_type maps to a known AgentHub adapter
+// (claude → claude-code, codex → codex, opencode → opencode), the provider's
+// model aliases (parsed from settings_config env vars like ANTHROPIC_DEFAULT_SONNET_MODEL)
+// are written into ModelAliases[agentID]:
+//
+//   - cc-switch entries override static entries on key match (e.g. if cc-switch
+//     says "sonnet" → "deepseek-v4-pro", that replaces the static "claude-sonnet-4-6").
+//   - Static entries that do not conflict are preserved (never removed).
+//   - Multiple cc-switch providers for the same app_type are merged; the last
+//     provider in iteration order wins on conflict within cc-switch data.
+//   - Providers with empty model aliases are skipped.
+//   - Unknown app_types are silently skipped.
+//
+// # Graceful degradation
+//
+// On error (DB not found, unreadable, empty, no usable providers) the function
+// returns nil and the error. Callers MUST log a WARNING and continue with static
+// config only — cc-switch is an optional enhancement, never a fatal condition.
+// Edge Server starts and serves normally without cc-switch.
+//
+// # Return value
+//
+// On success it returns the set of cc-switch-sourced aliases that were merged
+// (keyed by adapter agentID) and logs the merged count at INFO level.
+func ConsumeCCSwitchModels(dbPath string) (map[string]map[string]string, error) {
+	reader := ccswitch.NewReaderWithPath(dbPath)
+	if reader == nil {
+		return nil, fmt.Errorf("cc-switch database not found at %s", dbPath)
+	}
+
+	result, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("read cc-switch database: %w", err)
+	}
+
+	// Build cc-switch aliases keyed by adapter agentID.
+	ccAliases := make(map[string]map[string]string)
+	for _, p := range result.Providers {
+		agentID, ok := appTypeToAgentID[p.AppType]
+		if !ok {
+			continue
+		}
+		if len(p.ModelAliases) == 0 {
+			continue
+		}
+		if ccAliases[agentID] == nil {
+			ccAliases[agentID] = make(map[string]string)
+		}
+		for alias, model := range p.ModelAliases {
+			ccAliases[agentID][alias] = model
+		}
+	}
+
+	// Merge into static ModelAliases: cc-switch overrides static on key match.
+	totalMerged := 0
+	for agentID, aliases := range ccAliases {
+		if ModelAliases[agentID] == nil {
+			ModelAliases[agentID] = make(map[string]string)
+		}
+		for alias, model := range aliases {
+			ModelAliases[agentID][alias] = model
+			totalMerged++
+		}
+	}
+
+	slog.Info("cc-switch model aliases merged into static config",
+		"db", dbPath,
+		"mergedCount", totalMerged,
+		"adapterCount", len(ccAliases))
+	return ccAliases, nil
 }

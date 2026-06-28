@@ -5,8 +5,133 @@ export type WorkbenchDataMode =
   | 'observed'
   | 'approved-real';
 
+export type WorkbenchDataModeTone =
+  | 'neutral'
+  | 'amber'
+  | 'purple'
+  | 'cyan'
+  | 'green';
+
+export interface WorkbenchDataModeContract {
+  mode: WorkbenchDataMode;
+  statusLabel: WorkbenchDataMode;
+  displayLabel: 'Auto' | 'Mock' | 'Fixture' | 'Observed' | 'Approved real';
+  tone: WorkbenchDataModeTone;
+  title: string;
+  description: string;
+  desktopLabel: string;
+  webLabel: string;
+  allowsMockData: boolean;
+  allowsFixtureData: boolean;
+  allowsDemoRuntimeFallback: boolean;
+  allowsLocalEdgeAutoFallback: boolean;
+  allowsHubData: boolean;
+  requiresHubAuthForWeb: boolean;
+  requiresLocalEdgeForDesktop: boolean;
+  isRealDataMode: boolean;
+  isStrictRealMode: boolean;
+}
+
 export const WORKBENCH_DATA_MODE_STORAGE_KEY = 'agenthub.workbench.dataMode';
 const WORKBENCH_DATA_MODE_EVENT = 'agenthub:workbench-data-mode';
+
+export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchDataModeContract> = {
+  auto: {
+    mode: 'auto',
+    statusLabel: 'auto',
+    displayLabel: 'Auto',
+    tone: 'neutral',
+    title: 'Prefer real data, allow development fallback',
+    description: 'Uses real data when available and fixture data only for explicit development fallback paths.',
+    desktopLabel: '5173: Tauri real / browser fixture',
+    webLabel: '5174: authenticated real / anonymous fixture',
+    allowsMockData: true,
+    allowsFixtureData: true,
+    allowsDemoRuntimeFallback: false,
+    allowsLocalEdgeAutoFallback: true,
+    allowsHubData: true,
+    requiresHubAuthForWeb: false,
+    requiresLocalEdgeForDesktop: false,
+    isRealDataMode: false,
+    isStrictRealMode: false,
+  },
+  mock: {
+    mode: 'mock',
+    statusLabel: 'mock',
+    displayLabel: 'Mock',
+    tone: 'amber',
+    title: 'Pinned mock workbench data',
+    description: 'Uses local mock data only. Hub and local Edge are not contacted.',
+    desktopLabel: '5173: demo transcript',
+    webLabel: '5174: demo transcript',
+    allowsMockData: true,
+    allowsFixtureData: false,
+    allowsDemoRuntimeFallback: true,
+    allowsLocalEdgeAutoFallback: false,
+    allowsHubData: false,
+    requiresHubAuthForWeb: false,
+    requiresLocalEdgeForDesktop: false,
+    isRealDataMode: false,
+    isStrictRealMode: false,
+  },
+  fixture: {
+    mode: 'fixture',
+    statusLabel: 'fixture',
+    displayLabel: 'Fixture',
+    tone: 'purple',
+    title: 'Pinned shared workbench fixture',
+    description: 'Uses deterministic fixture data for UI and screenshot verification.',
+    desktopLabel: '5173: fixture transcript',
+    webLabel: '5174: fixture transcript',
+    allowsMockData: false,
+    allowsFixtureData: true,
+    allowsDemoRuntimeFallback: true,
+    allowsLocalEdgeAutoFallback: false,
+    allowsHubData: false,
+    requiresHubAuthForWeb: false,
+    requiresLocalEdgeForDesktop: false,
+    isRealDataMode: false,
+    isStrictRealMode: false,
+  },
+  observed: {
+    mode: 'observed',
+    statusLabel: 'observed',
+    displayLabel: 'Observed',
+    tone: 'cyan',
+    title: 'Hub observed replay only',
+    description: 'Uses observed Hub sessions, messages, and replayed runtime events. It does not fall back to mock data.',
+    desktopLabel: '5173: observed Edge snapshot',
+    webLabel: '5174: observed Hub replay',
+    allowsMockData: false,
+    allowsFixtureData: false,
+    allowsDemoRuntimeFallback: false,
+    allowsLocalEdgeAutoFallback: false,
+    allowsHubData: true,
+    requiresHubAuthForWeb: true,
+    requiresLocalEdgeForDesktop: true,
+    isRealDataMode: true,
+    isStrictRealMode: false,
+  },
+  'approved-real': {
+    mode: 'approved-real',
+    statusLabel: 'approved-real',
+    displayLabel: 'Approved real',
+    tone: 'green',
+    title: 'Approved real Hub / Edge data only',
+    description: 'Uses authenticated Hub and Edge data only. Empty or signed-out states stay explicit.',
+    desktopLabel: '5173: Edge thread data',
+    webLabel: '5174: Hub session data',
+    allowsMockData: false,
+    allowsFixtureData: false,
+    allowsDemoRuntimeFallback: false,
+    allowsLocalEdgeAutoFallback: false,
+    allowsHubData: true,
+    requiresHubAuthForWeb: true,
+    requiresLocalEdgeForDesktop: true,
+    isRealDataMode: true,
+    isStrictRealMode: true,
+  },
+};
 
 export function normalizeWorkbenchDataMode(value: string | undefined): WorkbenchDataMode {
   switch (value?.trim().toLowerCase()) {
@@ -36,30 +161,25 @@ export function normalizeWorkbenchDataMode(value: string | undefined): Workbench
   }
 }
 
-export function isWorkbenchFixtureDataMode(mode: WorkbenchDataMode): boolean {
-  const normalized = normalizeWorkbenchDataMode(mode);
-  return normalized === 'mock' || normalized === 'fixture';
+export function getWorkbenchDataModeContract(value: string | undefined): WorkbenchDataModeContract {
+  return WORKBENCH_DATA_MODE_CONTRACTS[normalizeWorkbenchDataMode(value)];
 }
 
-export function isWorkbenchRealDataMode(mode: WorkbenchDataMode): boolean {
-  const normalized = normalizeWorkbenchDataMode(mode);
-  return normalized === 'observed' || normalized === 'approved-real';
+export function isWorkbenchFixtureDataMode(mode: string | undefined): boolean {
+  const contract = getWorkbenchDataModeContract(mode);
+  return contract.mode === 'mock' || contract.mode === 'fixture';
 }
 
-export function workbenchDataModeLabel(mode: WorkbenchDataMode): string {
-  switch (normalizeWorkbenchDataMode(mode)) {
-    case 'mock':
-      return 'mock';
-    case 'fixture':
-      return 'fixture';
-    case 'observed':
-      return 'observed';
-    case 'approved-real':
-      return 'approved-real';
-    case 'auto':
-    default:
-      return 'auto';
-  }
+export function isWorkbenchRealDataMode(mode: string | undefined): boolean {
+  return getWorkbenchDataModeContract(mode).isRealDataMode;
+}
+
+export function workbenchDataModeLabel(mode: string | undefined): string {
+  return getWorkbenchDataModeContract(mode).statusLabel;
+}
+
+export function workbenchDataModeDisplayLabel(mode: string | undefined): WorkbenchDataModeContract['displayLabel'] {
+  return getWorkbenchDataModeContract(mode).displayLabel;
 }
 
 export function readWorkbenchDataModeOverride(): WorkbenchDataMode | undefined {

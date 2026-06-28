@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-17
+> 最后更新：2026-06-27
 
 ## 职责
 
@@ -45,6 +45,19 @@ Web shared workbench
 | AgentAdapter | 将不同 Agent Runtime 的协议统一为 `RunEvent` 流 |
 | Artifact index | Agent 产物的索引、预览和应用 |
 | EventStore | 执行事件的持久化存储 |
+
+## Source Map
+
+| 方向 | Source |
+|---|---|
+| CLI/config | `cmd/agenthub-edge/` |
+| REST/WS handlers | `internal/api/`, `internal/httpserver/` |
+| Event bus/replay | `internal/events/` |
+| Store | `internal/store/` |
+| Run lifecycle | `internal/lifecycle/` |
+| Runtime adapters | `internal/adapters/` |
+| Agent registry/queue | `internal/agents/` |
+| Metrics/run context | `internal/metrics/`, `internal/runnerctx/` |
 
 ## 与 Hub 的通信
 
@@ -92,3 +105,4 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 - [01-hub-server.md](01-hub-server.md) — Hub 与 Edge 的同步和中继关系
 - [03-runtime-adapters.md](03-runtime-adapters.md) — 所有 adapter 的详细规范
 - [04-frontend-data-flow.md](04-frontend-data-flow.md) — 前端如何消费 Edge 事件
+- [../reference/backend-performance-gates.md](../reference/backend-performance-gates.md) — Edge lifecycle/store/adapters 的性能和泄漏证据边界

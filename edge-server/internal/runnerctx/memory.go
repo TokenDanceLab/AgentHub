@@ -9,11 +9,19 @@ package runnerctx
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+// DefaultMemoryTTL is the default expiration duration for memory entries.
+// Entries older than this are expired and filtered out on read.
+// Set to 30 days.
+const DefaultMemoryTTL = 30 * 24 * time.Hour
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +33,13 @@ type MemoryEntry struct {
 	CreatedAt string   `json:"createdAt"`
 	UpdatedAt string   `json:"updatedAt"`
 	Source    string   `json:"source"` // "user" | "agent" | "system"
+
+	// ExpiresAt, when set, defines an expiration time after which the entry
+	// is skipped on read. nil means no expiration.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
+	// LastAccessed records the last time this entry was read.
+	LastAccessed *time.Time `json:"lastAccessed,omitempty"`
 }
 
 // MemoryReadResult contains the result of reading memory files from a workspace.
@@ -109,6 +124,8 @@ func ReadMemory(workDir, threadID, agentID string) MemoryReadResult {
 	}
 
 	var promptSections []string
+	now := time.Now()
+	var expiredCount int
 
 	for _, f := range filesToRead {
 		entries, err := readMemoryFile(f.path)
@@ -124,13 +141,29 @@ func ReadMemory(workDir, threadID, agentID string) MemoryReadResult {
 			continue
 		}
 
+		// Filter out expired entries and update LastAccessed.
+		var live []MemoryEntry
+		for i := range entries {
+			if entries[i].ExpiresAt != nil && entries[i].ExpiresAt.Before(now) {
+				expiredCount++
+				continue
+			}
+			accessed := now
+			entries[i].LastAccessed = &accessed
+			live = append(live, entries[i])
+		}
+
+		if len(live) == 0 {
+			continue
+		}
+
 		result.FilesRead++
-		result.Entries = append(result.Entries, entries...)
+		result.Entries = append(result.Entries, live...)
 
 		// Format entries for prompt injection.
 		var sectionLines []string
 		sectionLines = append(sectionLines, fmt.Sprintf("[AgentHub Memory - %s]", f.category))
-		for _, e := range entries {
+		for _, e := range live {
 			tagLine := ""
 			if len(e.Tags) > 0 {
 				tagLine = " (" + strings.Join(e.Tags, ", ") + ")"
@@ -139,6 +172,12 @@ func ReadMemory(workDir, threadID, agentID string) MemoryReadResult {
 				fmt.Sprintf("- [%s%s] %s", e.Source, tagLine, e.Content))
 		}
 		promptSections = append(promptSections, strings.Join(sectionLines, "\n"))
+	}
+
+	if expiredCount > 0 {
+		msg := fmt.Sprintf("memory: skipped %d expired entries", expiredCount)
+		result.Warnings = append(result.Warnings, msg)
+		slog.Warn(msg, "workDir", workDir, "threadID", threadID, "agentID", agentID)
 	}
 
 	if len(promptSections) > 0 {
@@ -274,7 +313,23 @@ func parseFrontmatter(yaml, body string) (MemoryEntry, error) {
 		CreatedAt: created,
 		UpdatedAt: updated,
 		Source:    source,
+		ExpiresAt: parseOptionalTime(fields["expires_at"]),
+		LastAccessed: parseOptionalTime(fields["last_accessed"]),
 	}, nil
+}
+
+// parseOptionalTime parses an optional RFC 3339 timestamp from a frontmatter
+// field. Returns nil if the string is empty or unparseable.
+func parseOptionalTime(s string) *time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 // parseInlineArray parses a YAML inline array like "[tag1, tag2, tag3]".
@@ -411,6 +466,12 @@ func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
 	}
 	sb.WriteString(fmt.Sprintf("created: %s\n", entry.CreatedAt))
 	sb.WriteString(fmt.Sprintf("updated: %s\n", entry.UpdatedAt))
+	if entry.ExpiresAt != nil {
+		sb.WriteString(fmt.Sprintf("expires_at: %s\n", entry.ExpiresAt.Format(time.RFC3339)))
+	}
+	if entry.LastAccessed != nil {
+		sb.WriteString(fmt.Sprintf("last_accessed: %s\n", entry.LastAccessed.Format(time.RFC3339)))
+	}
 	sb.WriteString("---\n\n")
 	sb.WriteString(entry.Content + "\n")
 

@@ -60,10 +60,10 @@ func TestEventEnvelopeValues(t *testing.T) {
 
 func TestBusPublishSubscriberReceives(t *testing.T) {
 	tests := []struct {
-		name     string
-		evtType  string
-		scope    map[string]any
-		payload  any
+		name    string
+		evtType string
+		scope   map[string]any
+		payload any
 	}{
 		{"string payload", "run.started", map[string]any{"runId": "r1"}, "started"},
 		{"map payload", "run.completed", map[string]any{"runId": "r1"}, map[string]any{"exitCode": 0}},
@@ -146,8 +146,8 @@ func TestBusPublishNoSubscribersDoesNotPanic(t *testing.T) {
 
 func TestBusUnsubscribeStopsDelivery(t *testing.T) {
 	tests := []struct {
-		name       string
-		extraPubs  int // extra publish calls after unsubscribe
+		name      string
+		extraPubs int // extra publish calls after unsubscribe
 	}{
 		{"immediate stop after unsubscribe", 0},
 		{"multiple publishes after unsubscribe", 5},
@@ -408,13 +408,43 @@ func TestBusSubscribeReplayThenLive(t *testing.T) {
 
 func TestBusConcurrentPublishSubscriberIntegrity(t *testing.T) {
 	b := NewBus(1000)
+	t.Cleanup(func() {
+		if err := b.Close(); err != nil {
+			t.Fatalf("close bus: %v", err)
+		}
+	})
 
 	var wg sync.WaitGroup
 	const numPublishers = 8
 	const eventsPerPub = 100
+	const totalExpected = numPublishers * eventsPerPub
 
 	// Start subscriber first.
 	_, ch, _ := b.Subscribe(0)
+	stopRead := make(chan struct{})
+	readDone := make(chan struct{})
+	var liveReceived atomic.Int64
+	var gapReceived atomic.Int64
+
+	go func() {
+		defer close(readDone)
+		for {
+			select {
+			case evt := <-ch:
+				if evt.Type == GapEventType {
+					gapReceived.Add(1)
+					continue
+				}
+				if evt.Type != "concurrent" {
+					t.Errorf("subscriber event type = %q, want concurrent or %s", evt.Type, GapEventType)
+					continue
+				}
+				liveReceived.Add(1)
+			case <-stopRead:
+				return
+			}
+		}
+	}()
 
 	// Publish concurrently.
 	for i := 0; i < numPublishers; i++ {
@@ -427,28 +457,22 @@ func TestBusConcurrentPublishSubscriberIntegrity(t *testing.T) {
 		}()
 	}
 
-	// Read concurrently.
-	var receivedCount int
-	var readWg sync.WaitGroup
-	readWg.Add(1)
-	go func() {
-		defer readWg.Done()
-		for range ch {
-			receivedCount++
-			if receivedCount >= numPublishers*eventsPerPub {
-				return
-			}
-		}
-	}()
-
 	wg.Wait()
-	readWg.Wait()
 
-	if receivedCount < numPublishers*eventsPerPub {
-		t.Errorf("received %d events, want %d (some may be dropped, but >= expected)", receivedCount, numPublishers*eventsPerPub)
+	deadline := time.After(time.Second)
+	for liveReceived.Load()+gapReceived.Load() == 0 {
+		select {
+		case <-deadline:
+			t.Fatal("subscriber did not observe any live or gap event")
+		default:
+			time.Sleep(time.Millisecond)
+		}
 	}
+	close(stopRead)
+	<-readDone
 
-	// History integrity from replay.
+	// History integrity is the durable concurrent-publish contract. Live
+	// subscribers are non-blocking and may see gap notifications under load.
 	_, _, replay := b.Subscribe(0)
 	seen := make(map[int64]bool, len(replay))
 	for _, evt := range replay {
@@ -458,8 +482,7 @@ func TestBusConcurrentPublishSubscriberIntegrity(t *testing.T) {
 		seen[evt.Seq] = true
 	}
 
-	totalExpected := int64(numPublishers * eventsPerPub)
-	for seq := int64(1); seq <= totalExpected; seq++ {
+	for seq := int64(1); seq <= int64(totalExpected); seq++ {
 		if !seen[seq] {
 			t.Errorf("missing seq %d in history", seq)
 		}

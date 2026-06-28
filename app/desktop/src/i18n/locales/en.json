@@ -1682,7 +1682,7 @@
   "settings.skill.integrationTestDesc": "Integration E2E workflow for Edge, agent runtimes, and WebSocket events.",
   "settings.skill.prePushDesc": "Pre-push verification checklist for build, tests, coverage, lint, and E2E.",
   "settings.skill.testCoverageDesc": "Test and coverage analysis workflow for identifying weak areas.",
-  "settings.skill.uiScreenshotDesc": "Desktop UI screenshot automation for visual QA and competitor comparison.",
+  "settings.skill.realE2eAcceptanceDesc": "Evidence levels for real E2E, Playwright, Visual QA, approved-real, and packaging acceptance.",
   "settings.skillGovernance": "Skill governance",
   "settings.skillGovernanceDesc": "Local registry, script audit, references, and Hub sync boundaries.",
   "settings.skillGuard": "Skill boundary",

@@ -182,9 +182,9 @@ const WSMessageRateLimit = 10
 const WSMessageBurst = 20
 
 // WSMaxConnsPerUser is the maximum number of concurrent WebSocket connections
-// allowed per user. When this limit is reached, the oldest connection is
-// kicked to make room for the new one.
-const WSMaxConnsPerUser = 5
+// allowed per user. When this limit is reached, new connection attempts are
+// rejected with a warning log.
+const WSMaxConnsPerUser = 10
 
 // ── Event bus ────────────────────────────────────────────────────────────────
 
