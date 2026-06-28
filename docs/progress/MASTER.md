@@ -37,7 +37,7 @@
 | T1.1 | #378 | Define chat-flow evidence manifest contract | closed via #395 |
 | T1.2 | #379 | Align Visual QA viewports and report shape | closed via #396 |
 | T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | closed via #397 |
-| T1.4 | #381 | Document evidence bundle without rule duplication | open; adaptive replan required |
+| T1.4 | #381 | Document evidence bundle without rule duplication | implementation pending PR |
 | T2.1 | #382 | Add golden mixed-source transcript fixtures | open |
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | open |
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | open |
@@ -70,8 +70,8 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 1
-**Active Task**: Phase 1 adaptive replan before T1.4 (#381)
-**Blockers**: Adaptive `drift_score=2` reached the Phase 1 replan threshold. Do not start #381 as a broad docs pass; keep it docs-only and concise. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
+**Active Task**: T1.4 - Document evidence bundle without rule duplication (#381), implementation pending PR
+**Blockers**: None for #381 after adaptive replan narrowed the scope to docs-only owner links. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
 
@@ -88,9 +88,9 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Replan the remaining #381 scope as a narrow docs-only closure task.
-2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-3. Continue Phase 1 only after the #381 replan note is accepted in the task issue.
+1. Validate and merge #381 into `dev/delicious233`.
+2. After #381 closes, mark Phase 1 complete and continue with Phase 2.
+3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
 
 ## Session Log
 
@@ -101,3 +101,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | T1.2 implementation | Aligned Web Visual QA desktop scenes to `1440x810`, added screenshot/DOM-metrics report output, tightened the real-e2e verifier, and generated a failing Visual QA report that now records the remaining shell brand-image assertion. |
 | 2026-06-28 | T1.3 implementation | Added shared E2E request-decision helper and reused it from Desktop/Web Playwright boundary gates; Desktop chat-flow and Web stubbed Hub E2E passed with `real_tested=false` boundaries. |
 | 2026-06-28 | adaptive replan sync | #380 merged via #397; Phase 1 drift reached the replan threshold, so #381 must stay as a narrow docs-only closure task before Phase 1 completes. |
+| 2026-06-28 | T1.4 implementation | Linked the evidence bundle from architecture and roadmap without duplicating the real-e2e skill or AGENTS rules; scope remained docs-only. |
