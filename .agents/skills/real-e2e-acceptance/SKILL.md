@@ -41,6 +41,7 @@ Smoke matrix manifests must be machine-honest:
 - Skipped gates may appear only under `skipped_evidence_levels` and row-level `status: "skipped"`.
 - Stubbed Hub rows use `evidence_level: "stubbed-hub"` and `real_tested: false`; they must not be named or reported as real login/model/API execution.
 - Desktop Vite rows use Playwright/UI wording; packaged Desktop claims require a separate packaged-release row.
+- Rows that set `evidence_level: "approved-real"` and `real_tested: true` must include an explicit approval reference plus real-login and real CLI/model/API evidence claims. Readiness-only approved-real preflight rows keep `real_tested: false`.
 
 ## Gate Matrix
 

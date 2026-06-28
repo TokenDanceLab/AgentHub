@@ -105,6 +105,93 @@ describe('chat-flow evidence manifest contract', () => {
     });
   });
 
+  it('records observed-local rows as read-only and non-real', () => {
+    const manifest = buildChatFlowEvidenceManifest({
+      scenario: 'desktop-observed-local',
+      surface: 'desktop',
+      dataSource: 'observed-hub-replay',
+      authExecution: 'local-only',
+      rows: [
+        {
+          id: 'observed-edge-health',
+          claim: 'Local Edge was observed without model/API spend',
+          evidenceLevel: 'observed-local',
+          realTested: false,
+          status: 'passed',
+          command: 'pwsh ./scripts/smoke/verify-localhost-real-services.ps1',
+        },
+      ],
+    });
+
+    expect(manifest).toMatchObject({
+      evidence_levels: ['observed-local'],
+      real_tested: false,
+      rows: [
+        {
+          id: 'observed-edge-health',
+          evidence_level: 'observed-local',
+          real_tested: false,
+        },
+      ],
+    });
+    expect(validateChatFlowEvidenceManifest(manifest)).toEqual({ ok: true, errors: [] });
+  });
+
+  it('requires approved-real rows to carry approval and real login plus CLI/model evidence claims', () => {
+    const manifest = buildChatFlowEvidenceManifest({
+      scenario: 'approved-real-missing-claims',
+      surface: 'desktop',
+      dataSource: 'approved-real-preflight',
+      authExecution: 'approved-real',
+      rows: [
+        {
+          id: 'approved-real-row',
+          claim: 'Approved real path ran',
+          evidenceLevel: 'approved-real',
+          realTested: true,
+          status: 'passed',
+          command: 'pwsh ./scripts/verify/verify-approved-real-preflight.ps1 -ManifestPath approved.json',
+        },
+      ],
+    });
+
+    expect(validateChatFlowEvidenceManifest(manifest)).toEqual({
+      ok: false,
+      errors: [
+        'approved-real-missing-claims row approved-real-row sets real_tested=true without approval_ref',
+        'approved-real-missing-claims row approved-real-row sets real_tested=true without real_login claim',
+        'approved-real-missing-claims row approved-real-row sets real_tested=true without real_cli_or_model claim',
+      ],
+    });
+  });
+
+  it('accepts approved-real rows only when the real evidence claims are explicit', () => {
+    const manifest = buildChatFlowEvidenceManifest({
+      scenario: 'approved-real-gold-path',
+      surface: 'desktop',
+      dataSource: 'approved-real-preflight',
+      authExecution: 'approved-real',
+      rows: [
+        {
+          id: 'approved-real-row',
+          claim: 'Approved real login and CLI/model path ran',
+          evidenceLevel: 'approved-real',
+          realTested: true,
+          status: 'passed',
+          command: 'pwsh ./scripts/smoke/verify-p0-approved-real-gold-path.ps1',
+          approvalRef: 'approval-2026-06-29-001',
+          claims: {
+            realLogin: true,
+            realCliOrModel: true,
+          },
+        },
+      ],
+    });
+
+    expect(validateChatFlowEvidenceManifest(manifest)).toEqual({ ok: true, errors: [] });
+    expect(manifest.real_tested).toBe(true);
+  });
+
   it('rejects packaged Desktop and release claims without matching evidence levels', () => {
     const manifest = buildChatFlowEvidenceManifest({
       scenario: 'desktop-vite-chat-flow',
@@ -131,8 +218,35 @@ describe('chat-flow evidence manifest contract', () => {
       ok: false,
       errors: [
         'desktop-vite-chat-flow row desktop-vite claims packaged Desktop without packaged-release evidence',
-        'desktop-vite-chat-flow row desktop-vite claims release upload without release evidence',
+        'desktop-vite-chat-flow row desktop-vite claims release upload without packaged-release evidence',
       ],
     });
+  });
+
+  it('keeps packaged Desktop and release upload claims on packaged-release evidence only', () => {
+    const manifest = buildChatFlowEvidenceManifest({
+      scenario: 'desktop-packaged-release',
+      surface: 'desktop',
+      dataSource: 'approved-real-preflight',
+      authExecution: 'approved-real',
+      rows: [
+        {
+          id: 'tauri-package',
+          claim: 'Tauri package policy and release dry gate passed',
+          evidenceLevel: 'packaged-release',
+          realTested: false,
+          status: 'passed',
+          command: 'pwsh ./scripts/release/verify-tauri-package-dry.ps1',
+          claims: {
+            packagedDesktop: true,
+            releaseUpload: true,
+          },
+        },
+      ],
+    });
+
+    expect(validateChatFlowEvidenceManifest(manifest)).toEqual({ ok: true, errors: [] });
+    expect(manifest.real_tested).toBe(false);
+    expect(manifest.evidence_levels).toEqual(['packaged-release']);
   });
 });

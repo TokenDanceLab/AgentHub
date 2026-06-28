@@ -98,6 +98,27 @@ foreach ($required in @(
     }
 }
 
+foreach ($level in @("fixture-unit", "playwright-ui", "visual-qa", "stubbed-hub", "observed-local", "packaged-release")) {
+    $realTestedTruePattern = '(?s)-EvidenceLevel\s+"' + [regex]::Escape($level) + '".{0,500}-RealTested\s+\$true'
+    if ($smokeMatrix -match $realTestedTruePattern) {
+        Fail "smoke matrix must not set real_tested=true for '$level' evidence"
+    }
+}
+$loginReadinessRealTestedPattern = '(?s)-Name\s+"login-real-readiness-gate".{0,1200}-EvidenceLevel\s+"approved-real".{0,500}-RealTested\s+\$true'
+if ($smokeMatrix -match $loginReadinessRealTestedPattern) {
+    Fail "login-real-readiness-gate is readiness-only and must keep real_tested=false"
+}
+foreach ($skillBoundary in @(
+    'real_tested: true',
+    'approval reference',
+    'real-login',
+    'real CLI/model/API'
+)) {
+    if ($skill -notmatch [regex]::Escape($skillBoundary)) {
+        Fail "real-e2e skill must document approved-real row boundary: $skillBoundary"
+    }
+}
+
 $declaredEvidenceLevels = [regex]::Matches($smokeMatrix, '-EvidenceLevel\s+"(?<level>[^"]+)"') |
     ForEach-Object { $_.Groups["level"].Value } |
     Sort-Object -Unique

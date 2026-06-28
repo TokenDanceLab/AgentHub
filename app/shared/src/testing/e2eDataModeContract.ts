@@ -165,6 +165,24 @@ export function validateE2EDataModeScenario(
   if (scenario.dataSource === 'stubbed-hub-session' && scenario.tokenDanceIdSecretUsed) {
     errors.push(`${scenario.name} uses stubbed-hub-session but marks TokenDance ID secret usage`);
   }
+  if (scenario.dataSource === 'observed-hub-replay' && scenario.dataMode !== 'observed') {
+    errors.push(`${scenario.name} uses observed-hub-replay but dataMode is ${scenario.dataMode}`);
+  }
+  if (scenario.dataSource === 'observed-hub-replay' && scenario.realLoginTested) {
+    errors.push(`${scenario.name} uses observed-hub-replay but claims real login was tested`);
+  }
+  if (scenario.dataSource === 'observed-hub-replay' && scenario.realCliOrModelExecuted) {
+    errors.push(`${scenario.name} uses observed-hub-replay but claims real CLI/model execution`);
+  }
+  if (scenario.dataSource === 'observed-hub-replay' && scenario.tokenDanceIdSecretUsed) {
+    errors.push(`${scenario.name} uses observed-hub-replay but marks TokenDance ID secret usage`);
+  }
+  if (scenario.dataSource === 'approved-real-preflight' && scenario.dataMode !== 'approved-real') {
+    errors.push(`${scenario.name} uses approved-real-preflight but dataMode is ${scenario.dataMode}`);
+  }
+  if (scenario.dataSource === 'approved-real-preflight' && scenario.mockAdapterUsed) {
+    errors.push(`${scenario.name} uses approved-real-preflight but marks mock adapter usage`);
+  }
 
   for (const request of requests) {
     const boundary = classifyE2ERequest(request.url, scenario);
