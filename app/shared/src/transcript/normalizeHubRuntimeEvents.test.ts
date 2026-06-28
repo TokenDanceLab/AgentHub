@@ -5,6 +5,36 @@ import {
 } from './normalizeHubRuntimeEvents';
 
 describe('normalizeHubRuntimeEventsToTranscript', () => {
+  it('orders Hub runtime session summaries and replayed blocks by created_at across runs', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-run-a-text',
+        task_id: 'task-a',
+        edge_run_id: 'run-a',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'Run A first response.' },
+        created_at: '2026-06-07T04:00:01Z',
+      },
+      {
+        id: 'evt-run-b-text',
+        task_id: 'task-b',
+        edge_run_id: 'run-b',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'Run B later response.' },
+        created_at: '2026-06-07T04:00:03Z',
+      },
+    ]);
+
+    expect(blocks.map((block) => block.id)).toEqual([
+      'hub-runtime-session-task-a-run-a',
+      'edge-event-hub-runtime-evt-run-a-text',
+      'hub-runtime-session-task-b-run-b',
+      'edge-event-hub-runtime-evt-run-b-text',
+    ]);
+  });
+
   it('projects Hub agent.stream runtime payloads into shared transcript blocks', () => {
     const blocks = normalizeHubRuntimeEventsToTranscript([
       {
@@ -376,6 +406,29 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
       runtimeLabel: 'claude-code',
       targetLabel: 'Online Desktop Edge',
       modeLabel: 'Real',
+    }));
+  });
+
+  it('propagates Hub runtime agent identity onto replayed edge transcript blocks', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-reviewer-text',
+        task_id: 'task-reviewer',
+        edge_run_id: 'run-reviewer',
+        session_id: 'hub-session-reviewer',
+        agent_instance_id: 'agent-instance-reviewer',
+        agent_label: 'Reviewer',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'Reviewer replay report.' },
+        created_at: '2026-06-07T04:00:09Z',
+      },
+    ]);
+
+    expect(blocks[1]).toEqual(expect.objectContaining({
+      kind: 'text',
+      text: 'Reviewer replay report.',
+      author: { id: 'agent-instance-reviewer', name: 'Reviewer', role: 'agent' },
     }));
   });
 

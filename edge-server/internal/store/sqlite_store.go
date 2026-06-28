@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -43,6 +44,7 @@ type SQLiteStore struct {
 	closeOnce    sync.Once
 	lastErr      error
 	lastSnapshot fileSnapshot
+	stopCheckpoint chan struct{} // closed to stop periodic WAL checkpoint
 }
 
 func NewSQLite(path string) (*SQLiteStore, error) {
@@ -68,11 +70,55 @@ func NewSQLite(path string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("verify sqlite store write: %w", err)
 	}
 	s.lastSnapshot = s.store.snapshot()
+
+	// Periodically checkpoint the WAL to prevent unbounded growth and keep the
+	// in-memory page cache small. On Windows the Go runtime is reluctant to
+	// return freed memory to the OS, so keeping the WAL small is critical.
+	s.stopCheckpoint = make(chan struct{})
+	go s.checkpointLoop(5 * time.Minute)
+	// Periodically clean up old terminal runs to prevent unbounded Store map growth.
+	// Without this, Store maps only shrink when a new run is created,
+	// which may never happen on an idle server.
+	go s.cleanupLoop(5 * time.Minute)
+
 	return s, nil
+}
+
+func (s *SQLiteStore) checkpointLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if _, err := s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+				// Non-fatal; the auto-checkpoint will still work.
+			}
+		case <-s.stopCheckpoint:
+			return
+		}
+	}
+}
+// cleanupLoop periodically removes old terminal runs to prevent unbounded
+// in-memory Store map growth. Without this, Store maps only shrink when a
+// new run is explicitly created — which may never happen on an idle server.
+func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.store.CleanupRuns(RunCleanupOptions{TerminalTTL: 24 * time.Hour, MaxTerminalRunsPerThread: 50})
+		case <-s.stopCheckpoint:
+			return
+		}
+	}
 }
 
 func (s *SQLiteStore) Close() {
 	s.closeOnce.Do(func() {
+		close(s.stopCheckpoint)
+		// Final checkpoint to shrink the WAL before close.
+		_, _ = s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 		_ = s.syncPersist()
 		_ = s.db.Close()
 	})

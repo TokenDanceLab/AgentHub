@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../i18n';
 import { buildInspectorEvidenceModel, buildRuntimeEvidenceInspectorModel } from '../inspector';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../inspector';
-import type { EvidenceRef, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
+import type { EvidenceRef, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { FileDiff } from '../types/chat';
 import {
   OverviewPanel,
@@ -125,7 +125,7 @@ export interface RightInspectorProps {
   /** Context usage blocks from the transcript, used for the compact context bar in Overview. */
   contextBlocks?: ContextUsageTranscriptBlock[] | undefined;
   /** Route decision / sub-agent blocks for DagTree visualization. */
-  routeBlocks?: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock> | undefined;
+  routeBlocks?: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock> | undefined;
   /** Deploy preview URL to auto-load in the browser tab. When set, switches to browser. */
   deployPreviewUrl?: string | undefined;
   /** Deploy status indicator for the browser tab. */

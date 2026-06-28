@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime/debug"
+	"strconv"
 	"path/filepath"
 	"strings"
 	"time"
@@ -112,6 +114,18 @@ func main() {
 	}
 	slog.SetDefault(slog.New(handler))
 
+	// Apply soft memory limit to prevent unbounded heap growth on long-running
+	// Edge processes. The Go runtime will trigger GC more aggressively when the
+	// heap approaches this limit and return unused memory to the OS.
+	// Default: 512 MiB. Set AGENTHUB_MEMORY_LIMIT_MB to override (0 = disable).
+	memLimitMB := parseIntEnv("AGENTHUB_MEMORY_LIMIT_MB", 512)
+	if memLimitMB > 0 {
+		limitBytes := int64(memLimitMB) * 1024 * 1024
+		debug.SetMemoryLimit(limitBytes)
+		debug.SetGCPercent(50) // more frequent GC to stay well under the limit
+		slog.Info("memory limit configured", "limit_mb", memLimitMB)
+	}
+
 	cfg, err := buildConfig(os.Args[1:])
 	if err != nil {
 		slog.Error("invalid configuration", "err", err)
@@ -141,11 +155,12 @@ func main() {
 	// definitions from the Hub server's /web/mcp-servers endpoint periodically
 	// and stores them in an in-memory MCPConfigStore for injection into runs.
 	var mcpConfigStore *adapters.MCPConfigStore
+	var mcpSyncer *adapters.HubMCPSyncer
 	if cfg.HubMCPSyncURL != "" {
 		mcpConfigStore = adapters.NewMCPConfigStore()
 		syncInterval := parseDurationOrDefault(cfg.HubMCPSyncInterval, 5*time.Minute)
-		syncer := adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
-		go syncer.Run(context.Background(), syncInterval)
+		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
+		go mcpSyncer.Run(context.Background(), syncInterval)
 		slog.Info("mcp hub sync enabled", "url", cfg.HubMCPSyncURL, "interval", syncInterval)
 	}
 
@@ -167,6 +182,9 @@ func main() {
 		EventLogPath:       cfg.EventLogPath,
 		MCPConfigStore:     mcpConfigStore,
 	}
+		if mcpSyncer != nil {
+			serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
+		}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
 			Command:  cfg.RunnerCommand,
@@ -189,6 +207,15 @@ func runtimeManifestFixtureReplayRequested(args []string) bool {
 func getEnv(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return defaultVal
+}
+
+func parseIntEnv(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return defaultVal
 }

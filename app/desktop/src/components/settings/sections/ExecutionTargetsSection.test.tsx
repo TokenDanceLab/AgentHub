@@ -368,8 +368,8 @@ describe('ExecutionTargetsSection', () => {
     renderSection();
 
     expect(screen.getByText('Local CLI discovery')).toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.textContent === 'Readiness manifest: docs/audit/p0-edge-cli-real-readiness.md')).toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.textContent === 'Readiness script: scripts/verify-edge-cli-real-readiness.ps1')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'Readiness manifest: .tmp/evidence/p0-edge-cli-real-readiness.json')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'Readiness script: scripts/verify/verify-edge-cli-real-readiness.ps1')).toBeInTheDocument();
 
     expect(screen.getByText('Codex CLI')).toBeInTheDocument();
     expect(screen.getByText('version: 0.27.0')).toBeInTheDocument();

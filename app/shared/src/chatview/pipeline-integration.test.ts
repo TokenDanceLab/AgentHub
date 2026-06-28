@@ -27,7 +27,11 @@ import { normalizeHubMessagesToTranscript } from '../transcript/normalizeHubMess
 import type { HubMessageTranscriptInput } from '../transcript/normalizeHubMessages'
 import { blocksToTranscriptItems } from './adapter'
 import { simulateStreaming, verifyStreamingKeyStability } from './streaming.test'
-import type { TranscriptAgentItem, TranscriptUserItem } from './transcript-item'
+import type { TranscriptAgentItem, TranscriptItem, TranscriptUserItem } from './transcript-item'
+
+function isTranscriptAgentItem(item: TranscriptItem): item is TranscriptAgentItem {
+  return !('type' in item && item.type === 'user')
+}
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript/types'
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -201,7 +205,7 @@ describe('Pipeline 1: Edge event -> normalize -> adapter -> TranscriptItem', () 
 
   /* -- 1e. Full run lifecycle -- run.started through run.finished -- */
 
-  it('1e: run.started => run.agent.text_delta => run.finished => structured output', () => {
+  it('1e: lifecycle events stay out of chat while agent text remains visible', () => {
     const events: EventEnvelope[] = [
       edgeEvent({
         type: 'run.started',
@@ -218,21 +222,14 @@ describe('Pipeline 1: Edge event -> normalize -> adapter -> TranscriptItem', () 
     ]
 
     const blocks = normalizeEdgeEventsToTranscript(events)
-    // run.started => text block (Edge author)
-    // run.agent.text_delta => text block (Agent author, different from Edge so not merged)
-    // run.finished => finished kind block (skipped by adapter's mapBlock)
-    expect(blocks).toHaveLength(3)
+    // run.started is lifecycle-only and belongs to run state/activity stores.
+    // run.agent.text_delta remains conversational content.
+    // run.finished is terminal metadata and is skipped by adapter's mapBlock.
+    expect(blocks).toHaveLength(2)
 
     const items = blocksToTranscriptItems(blocks)
-    // run.started (Edge/system text) => one agent block
-    // run.agent.text_delta (Agent text) => another agent block
-    // run.finished => skipped by adapter
-    // But both text blocks won't merge since different authors. Actually:
-    // Edge-author text is role=system => bubble in one agent block
-    // Agent-author text is role=agent => bubble in another agent block
-    expect(items.length).toBeGreaterThanOrEqual(2)
+    expect(items).toHaveLength(1)
 
-    // Verify at least one item has the agent text as a bubble
     const bubbles = items
       .filter((i): i is TranscriptAgentItem => 'bubbles' in i)
       .flatMap((a) => a.bubbles)
@@ -844,12 +841,12 @@ describe('Pipeline 3: Streaming -- incremental append => key stability', () => {
     const items = snapshots[3]!
     expect(items).toHaveLength(4)
     // TranscriptUserItem has type='user'
-    expect(items[0]!.type).toBe('user')
+    expect((items[0] as TranscriptUserItem).type).toBe('user')
     expect((items[0] as TranscriptUserItem).text).toBe('Do task A')
     // TranscriptAgentItem does NOT have a 'type' field -- agent items
     // are discriminated by the presence of 'rows'/'bubbles' fields
     expect('rows' in items[1]!).toBe(true)
-    expect(items[2]!.type).toBe('user')
+    expect((items[2] as TranscriptUserItem).type).toBe('user')
     expect('rows' in items[3]!).toBe(true)
 
     // Key stability
@@ -1160,7 +1157,7 @@ describe('Pipeline 4: Error handling -- malformed blocks => graceful degradation
 
     const items = blocksToTranscriptItems(blocks)
     for (const item of items) {
-      if ('id' in item) {
+      if (isTranscriptAgentItem(item)) {
         expect(item.id).toBeTruthy()
         expect(typeof item.id).toBe('string')
       }
@@ -1270,7 +1267,7 @@ describe('Cross-pipeline: Edge + Hub blocks mixed in same TranscriptItem[]', () 
     // Human-role text block => TranscriptUserItem
     // Agent-role text block => TranscriptAgentItem
     expect(items).toHaveLength(2)
-    expect(items[0]!.type).toBe('user')
+    expect((items[0] as TranscriptUserItem).type).toBe('user')
     expect((items[0] as TranscriptUserItem).text).toBe('User message from Hub')
     // Agent items don't have .type, check for 'bubbles' / 'rows'
     expect('bubbles' in items[1]!).toBe(true)
@@ -1303,7 +1300,7 @@ describe('Cross-pipeline: Edge + Hub blocks mixed in same TranscriptItem[]', () 
 
     // Verify structural invariants hold for cross-pipeline output
     for (const item of items) {
-      if ('id' in item) {
+      if (isTranscriptAgentItem(item)) {
         expect(item.id).toBeTruthy()
       }
     }
@@ -1345,15 +1342,14 @@ describe('Cross-pipeline: Edge + Hub blocks mixed in same TranscriptItem[]', () 
     const items = blocksToTranscriptItems(combined)
 
     // User item first, then agent items
-    expect(items[0]!.type).toBe('user')
+    expect((items[0] as TranscriptUserItem).type).toBe('user')
 
     // All agent items should have valid ids and rows
     for (const item of items) {
-      if ('id' in item) {
+      if (isTranscriptAgentItem(item)) {
         expect(typeof item.id).toBe('string')
         expect(item.id.length).toBeGreaterThan(0)
-        const agent = item as TranscriptAgentItem
-        const allRows = [...agent.rows, ...agent.standaloneRows]
+        const allRows = [...item.rows, ...item.standaloneRows]
         for (const row of allRows) {
           expect(typeof row.id).toBe('string')
           expect(row.id.length).toBeGreaterThan(0)

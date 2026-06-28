@@ -27,24 +27,32 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm verify:brand && pnpm verify:boundaries && pnpm test",
     "verify:qa": "pnpm verify && pnpm run doctor && pnpm run native:check && pnpm run mock:hub:check && pnpm visual:qa"
   },
+  "expo": {
+    "install": {
+      "exclude": [
+        "react",
+        "react-dom"
+      ]
+    }
+  },
   "dependencies": {
     "@agenthub/shared": "workspace:*",
-    "@expo/metro-runtime": "~56.0.14",
-    "expo": "56.0.9",
-    "expo-auth-session": "56.0.13",
-    "expo-constants": "56.0.17",
+    "@expo/metro-runtime": "~56.0.15",
+    "expo": "56.0.12",
+    "expo-auth-session": "56.0.14",
+    "expo-constants": "56.0.18",
     "expo-document-picker": "~56.0.4",
-    "expo-file-system": "~56.0.7",
-    "expo-image-picker": "~56.0.16",
-    "expo-linking": "56.0.13",
+    "expo-file-system": "~56.0.8",
+    "expo-image-picker": "~56.0.18",
+    "expo-linking": "56.0.14",
     "expo-localization": "~56.0.6",
-    "expo-notifications": "56.0.16",
+    "expo-notifications": "56.0.18",
     "expo-secure-store": "56.0.4",
     "expo-status-bar": "56.0.4",
     "expo-web-browser": "56.0.5",
     "lucide-react-native": "^0.560.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "react-native": "0.85.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",

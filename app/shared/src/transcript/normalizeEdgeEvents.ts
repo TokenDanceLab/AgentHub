@@ -1,9 +1,50 @@
 import type { EventEnvelope } from '../events';
 import { normalize as normalizeDiff } from '../diff';
 import type { EvidenceRef, EvidenceRefStatus, TranscriptAuthor, TranscriptBlock } from './types';
+import { isRuntimeDiagnosticText } from './runtimeDiagnostics';
 
 const AGENT_AUTHOR: TranscriptAuthor = { id: 'agent', name: 'Agent', role: 'agent' };
 const EDGE_AUTHOR: TranscriptAuthor = { id: 'edge', name: 'Edge', role: 'system' };
+
+function agentAuthorFromEvent(event: EventEnvelope): TranscriptAuthor {
+  const explicitId = firstString(
+    event.payload.agentId,
+    event.payload.agent_id,
+    event.payload.agentInstanceId,
+    event.payload.agent_instance_id,
+    event.payload.workerId,
+    event.payload.worker_id,
+    event.payload.runnerId,
+    event.payload.runner_id,
+    event.scope.agentId,
+    event.scope.agent_id,
+    event.scope.agentInstanceId,
+    event.scope.agent_instance_id,
+  );
+  const label = firstString(
+    event.payload.agentName,
+    event.payload.agent_name,
+    event.payload.agentLabel,
+    event.payload.agent_label,
+    event.payload.displayName,
+    event.payload.display_name,
+    event.payload.workerName,
+    event.payload.worker_name,
+    event.payload.worker,
+    event.payload.agent,
+    event.payload.runnerName,
+    event.payload.runner_name,
+    event.payload.adapterLabel,
+    event.payload.adapter_label,
+  );
+  const id = explicitId ?? (label ? safeAuthorId(label) : AGENT_AUTHOR.id);
+
+  return {
+    id,
+    name: label ?? explicitId ?? AGENT_AUTHOR.name,
+    role: 'agent',
+  };
+}
 
 export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefined): TranscriptBlock[] {
   if (!events?.length) return [];
@@ -103,7 +144,11 @@ function evidenceRunId(block: TranscriptBlock): string {
 
 // System-level run lifecycle events that should not appear as transcript blocks.
 // These are status indicators, not conversational content.
-const SKIPPED_EVENT_TYPES = new Set<string>([]);
+const SKIPPED_EVENT_TYPES = new Set<string>([
+  'run.queued',
+  'run.started',
+  'run.status.changed',
+]);
 
 function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
   if (SKIPPED_EVENT_TYPES.has(event.type)) return null;
@@ -267,6 +312,7 @@ function runFinishedBlock(event: EventEnvelope): TranscriptBlock | null {
 function outputTextBlock(event: EventEnvelope): TranscriptBlock | null {
   const text = cleanText(stringField(event.payload.text));
   if (!text) return null;
+  if (isRuntimeDiagnosticText(text)) return null;
   const runId = eventRunId(event);
   if (!runId) {
     console.warn('normalizeEdgeEvents: run.output missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
@@ -292,6 +338,7 @@ function outputBatchTextBlock(event: EventEnvelope): TranscriptBlock | null {
       .join(''),
   );
   if (!text) return null;
+  if (isRuntimeDiagnosticText(text)) return null;
   const runId = eventRunId(event);
   if (!runId) {
     console.warn('normalizeEdgeEvents: run.output.batch missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
@@ -307,13 +354,14 @@ function outputBatchTextBlock(event: EventEnvelope): TranscriptBlock | null {
 function agentTextBlock(event: EventEnvelope): TranscriptBlock | null {
   const text = cleanText(stringField(event.payload.content) ?? stringField(event.payload.text));
   if (!text) return null;
+  if (isRuntimeDiagnosticText(text)) return null;
   const runId = eventRunId(event);
   if (!runId) {
     console.warn('normalizeEdgeEvents: agent text block missing runId, using event.id as fallback evidenceRef', { eventId: event.id });
   }
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId ?? event.id, 'running')),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId ?? event.id, 'running')),
     kind: 'text',
     text,
   };
@@ -326,7 +374,7 @@ function thinkingBlock(event: EventEnvelope): TranscriptBlock | null {
   const status = normalizeEvidenceStatus(stringField(event.payload.status) ?? 'running');
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
     kind: 'thinking',
     content,
     isThinking: status === 'running',
@@ -356,7 +404,7 @@ function subagentBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.result));
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
     kind: 'subagent',
     title,
     worker,
@@ -389,7 +437,7 @@ function subtaskBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.result));
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
     kind: 'subtask',
     title,
     status,
@@ -424,7 +472,7 @@ function childAgentBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.error));
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
     kind: 'child_agent',
     title,
     agent,
@@ -450,7 +498,7 @@ function routeDecisionBlock(event: EventEnvelope): TranscriptBlock | null {
     stringField(event.payload.worker);
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, 'running')),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, 'running')),
     kind: 'route_decision',
     action,
     ...(summary ? { summary } : {}),
@@ -486,7 +534,7 @@ function contextUsageBlock(event: EventEnvelope): TranscriptBlock | null {
     stringField(event.payload.provider);
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, 'running')),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, 'running')),
     kind: 'context_usage',
     inputTokens: inputTokens ?? 0,
     outputTokens: outputTokens ?? 0,
@@ -519,11 +567,12 @@ function toolCallBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.reason));
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, [
+    ...blockBase(event, agentAuthorFromEvent(event), [
       ...runEvidence(runId, status),
       ...toolEvidence(callId ?? label, label, status),
     ]),
     kind: 'tool_call',
+    ...(callId ? { callId } : {}),
     toolName: label,
     status,
     ...(target ? { target } : {}),
@@ -544,11 +593,12 @@ function toolResultBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.error));
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, [
+    ...blockBase(event, agentAuthorFromEvent(event), [
       ...runEvidence(runId, status),
       ...toolEvidence(callId ?? toolName, `${toolName} result`, status),
     ]),
     kind: 'tool_result',
+    ...(callId ? { callId } : {}),
     toolName,
     status,
     ...(summary ? { summary } : {}),
@@ -591,7 +641,7 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
     });
 
     return {
-      ...blockBase(event, AGENT_AUTHOR, evidence),
+      ...blockBase(event, agentAuthorFromEvent(event), evidence),
       kind: 'file_change',
       path,
       action,
@@ -607,7 +657,7 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
   }
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, evidence),
+    ...blockBase(event, agentAuthorFromEvent(event), evidence),
     kind: 'file_change',
     path,
     action,
@@ -716,7 +766,7 @@ function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
   const runId = eventRunId(event);
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, [
+    ...blockBase(event, agentAuthorFromEvent(event), [
       ...runEvidence(runId, 'running'),
       {
         id: `artifact-${artifactId}`,
@@ -804,7 +854,7 @@ function agentResultBlock(event: EventEnvelope): TranscriptBlock | null {
   const turns = numberField(event.payload.turns);
 
   return {
-    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
     kind: 'result',
     success,
     summary,
@@ -984,6 +1034,23 @@ function normalizeFileAction(action: string | undefined): 'created' | 'modified'
 
 function stringField(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const parsed = stringField(value);
+    if (parsed) return parsed;
+  }
+  return undefined;
+}
+
+function safeAuthorId(value: string): string {
+  const id = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return id || AGENT_AUTHOR.id;
 }
 
 function numberField(value: unknown): number | undefined {

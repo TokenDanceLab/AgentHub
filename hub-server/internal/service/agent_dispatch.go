@@ -7,7 +7,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -45,6 +47,8 @@ type dispatchPayload struct {
 	// Context continuity: thread history and pinned messages for all agent runtimes.
 	Messages       []dispatchMessage `json:"messages,omitempty"`
 	PinnedMessages []dispatchMessage `json:"pinned_messages,omitempty"`
+	// OutputSchema is the JSON Schema for structured output (--json-schema).
+	OutputSchema *json.RawMessage `json:"structured_output_schema,omitempty"`
 }
 
 // dispatchMessage represents a single message in thread history or pinned context.
@@ -79,6 +83,8 @@ type edgeRunRequest struct {
 	DeliveryID     string               `json:"deliveryId,omitempty"`
 	Messages       []dispatchMessage    `json:"messages,omitempty"`
 	PinnedMessages []dispatchMessage    `json:"pinnedMessages,omitempty"`
+	// StructuredOutputSchema is the JSON Schema for structured output (--json-schema).
+	StructuredOutputSchema string `json:"structuredOutputSchema,omitempty"`
 }
 
 // edgeRunResponse captures the relevant fields from Edge's /v1/runs response.
@@ -98,6 +104,14 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 		edgeURL = "http://127.0.0.1:3210"
 	}
 
+	// AH-SR-053: Warn when AGENTHUB_EDGE_URL is non-loopback and non-HTTPS —
+	// dispatch payloads contain user prompts and system instructions sent in
+	// cleartext over the network.
+	if !strings.HasPrefix(edgeURL, "https://") && !isLoopback(edgeURL) {
+		slog.Error("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", edgeURL)
+		return ""
+	}
+
 	// Build the Edge run request from the dispatch payload.
 	reqBody := edgeRunRequest{
 		ProjectID:      "proj_local",
@@ -110,6 +124,11 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 		DeliveryID:     dp.DeliveryID,
 		Messages:       dp.Messages,
 		PinnedMessages: dp.PinnedMessages,
+	}
+
+	// Serialize OutputSchema to string for Edge HTTP dispatch.
+	if dp.OutputSchema != nil && len(*dp.OutputSchema) > 0 {
+		reqBody.StructuredOutputSchema = string(*dp.OutputSchema)
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -158,6 +177,23 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	runID := edgeResp.Data.RunID
 	slog.Info("edge http dispatch: task dispatched to local Edge", "task_id", task.ID, "edge_run_id", runID, "url", url)
 	return runID
+}
+
+// isLoopback reports whether rawURL has a loopback hostname.
+// Uses url.Parse + net.ParseIP for accurate loopback detection — simple
+// substring matching (e.g. strings.Contains) is vulnerable to bypass via
+// domains like localhost.evil.com.
+func isLoopback(rawURL string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func normalizeRuntimeAgentType(agentType string) string {
@@ -388,6 +424,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			dp.SystemPrompt = customAgent.SystemPrompt
 			dp.ModelParams = customAgent.ModelParams
 			dp.ToolWhitelist = customAgent.ToolWhitelist
+			dp.OutputSchema = customAgent.OutputSchema
 		}
 	}
 	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)

@@ -192,8 +192,8 @@ func TestDefaultOrchestratorPrompt(t *testing.T) {
 	if prompt == "" {
 		t.Fatal("DefaultOrchestratorPrompt should not be empty")
 	}
-	if prompt[0:1] != "Y" && prompt[0:1] != "y" {
-		t.Fatal("prompt should start with greeting")
+	if !containsStr(prompt, "<ROLE>") {
+		t.Fatal("prompt should contain <ROLE> XML section")
 	}
 }
 

@@ -2,6 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
+  it('does not fall back to the demo runtime unless explicitly allowed', async () => {
+    const platform = createDesktopPlatform();
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'thread-live',
+      text: 'should not create mock output',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Local Edge run submission is unavailable');
+  });
+
+  it('allows the demo runtime fallback only when the shell opts in', async () => {
+    const platform = createDesktopPlatform({ demoRuntimeFallback: true });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: 'demo send smoke',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).resolves.toEqual(expect.objectContaining({
+      intentId: expect.stringMatching(/^demo-/),
+    }));
+  });
+
   it('fails closed instead of using the demo runtime when no active Edge thread is selected', async () => {
     const submitRun = vi.fn();
     const platform = createDesktopPlatform({ submitRun });
@@ -282,8 +310,8 @@ describe('createDesktopPlatform', () => {
     const platform = createDesktopPlatform({
       getLocalCliDiscovery: vi.fn().mockResolvedValue({
         mode: 'no-spend-discovery',
-        readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
-        readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+        readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+        readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
         generatedAt: null,
         items: [
           {
@@ -310,8 +338,8 @@ describe('createDesktopPlatform', () => {
 
     expect(discovery).toEqual(expect.objectContaining({
       mode: 'no-spend-discovery',
-      readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
-      readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+      readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+      readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
     }));
     expect(discovery.items[0]).toEqual(expect.objectContaining({
       id: 'codex',

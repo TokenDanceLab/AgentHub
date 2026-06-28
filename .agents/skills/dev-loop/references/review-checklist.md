@@ -1,6 +1,6 @@
 # 代码审查清单
 
-最后更新：2026-05-23
+最后更新：2026-06-27
 
 ## 结构审查
 
@@ -13,9 +13,9 @@
 ## 文档审查
 
 - [ ] README 的安装步骤能跑通吗？
-- [ ] AGENTS.md / CLAUDE.md 需要更新吗？
-- [ ] STATE.md 事实变更了吗？
-- [ ] ROADMAP.md 需要标记完成吗？
+- [ ] `AGENTS.md` 项目总规则需要更新吗？
+- [ ] 当前 spec 进度需要写入 `docs/progress/MASTER.md` 吗？
+- [ ] 总进度或长期路线需要写入 `docs/roadmap.md` 吗？
 - [ ] 新增 API/命令有文档吗？
 - [ ] CHANGELOG 更新了吗？
 

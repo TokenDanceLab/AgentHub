@@ -55,8 +55,18 @@ function edgeAuthTokenPlugin(): Plugin {
   };
 }
 
+function devCspPlugin(): Plugin {
+  return {
+    name: 'agenthub-dev-csp',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'");
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), edgeAuthTokenPlugin()],
+  plugins: [react(), edgeAuthTokenPlugin(), devCspPlugin()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
@@ -76,7 +86,7 @@ export default defineConfig({
     headers: {
       'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         // Embedded Edge sends back inline images as data: URIs for content previews.
