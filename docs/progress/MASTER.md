@@ -34,7 +34,7 @@
 
 | Task ID | Issue | Title | Status |
 |:--|:--|:--|:--|
-| T1.1 | #378 | Define chat-flow evidence manifest contract | open |
+| T1.1 | #378 | Define chat-flow evidence manifest contract | implementation pending PR |
 | T1.2 | #379 | Align Visual QA viewports and report shape | open |
 | T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | open |
 | T1.4 | #381 | Document evidence bundle without rule duplication | open |
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 1
-**Active Task**: T1.1 - Define chat-flow evidence manifest contract (#378)
+**Active Task**: T1.1 - Define chat-flow evidence manifest contract (#378), implementation pending PR
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -97,3 +97,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | Date | Session | Summary |
 |:--|:--|:--|
 | 2026-06-28 | spec setup | Created analysis docs, plan docs, GitHub milestones #17-#21, and task issues #378-#393 from branch `spec/real-foundation-hardening`. |
+| 2026-06-28 | T1.1 implementation | Added shared chat-flow evidence manifest contract and tests; full shared Vitest passed, targeted TypeScript passed, broad `app/shared lint` remains blocked by pre-existing story/test type debt unrelated to this task. |
