@@ -43,7 +43,7 @@
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | closed via #404 |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | closed via #405 |
 | T3.1 | #386 | Web Hub-only guarded-flow check | closed via #406 |
-| T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | open |
+| T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | ready via #408 |
 | T3.3 | #388 | Observed and approved-real manifest boundary | open |
 | T4.1 | #389 | Add focused chat acceptance gate | open |
 | T4.2 | #390 | Add semi-automated Visual QA artifact loop | open |
@@ -88,8 +88,8 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start T3.2 (#387) in a separate task worktree from `origin/dev/delicious233`.
-2. Split Desktop entry preflight from Demo workbench runtime assertions: entry may probe Local Edge health; Demo workbench must not make Hub/Edge runtime requests.
+1. Merge #408 after CI/review passes; close #387 manually if the non-default base does not auto-close it.
+2. Start T3.3 (#388) in a separate task worktree from `origin/dev/delicious233` after #408 lands.
 3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
 4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
@@ -110,3 +110,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-29 | T2.4 implementation | Expanded shared runtime diagnostic filtering, kept Markdown table rendering under shared/Web tests, verified Desktop/Web chat-flow and Visual QA with `real_tested=false`; #405 merged and #385 closed manually because non-default base did not auto-close it. |
 | 2026-06-29 | T3.1 implementation | Enforced Web guarded Hub-only data boundary, added stubbed-Hub manifest `evidence_level`, blocked Local Edge/TDI/Gateway boundary attempts in Playwright, and verified Web/shared gates with `real_tested=false`; #406 merged and #386 closed manually because non-default base did not auto-close it. |
 | 2026-06-29 | Phase 3 sync | Updated Phase 3 live state after #406: milestone #19 is 1/3 complete, T3.2 (#387) is the active next task, and adaptive milestone `completed_tasks` is 1. |
+| 2026-06-29 | T3.2 implementation | Added Desktop entry/workbench data-boundary Playwright coverage, moved chat-flow phase marking to the Demo transition boundary, hardened disabled health polling against in-flight updates, and verified Desktop Vite gates with `real_tested=false`; #408 ready to merge. |
