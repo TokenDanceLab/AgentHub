@@ -26,10 +26,25 @@ export type E2ERequestPhase =
   | 'workbench-runtime'
   | 'manifest-preflight';
 
+export type E2ERequestAction =
+  | 'continue'
+  | 'fulfill-scenario-backend'
+  | 'block-forbidden-backend'
+  | 'abort-external-http';
+
 export interface E2EObservedRequest {
   method: string;
   url: string;
   phase?: E2ERequestPhase;
+}
+
+export interface E2ERequestDecision {
+  request: E2EObservedRequest;
+  boundary: E2ERequestBoundary;
+  phase: E2ERequestPhase;
+  allowed: boolean;
+  action: E2ERequestAction;
+  shouldRecord: boolean;
 }
 
 export interface E2EDataModeScenarioInput {
@@ -167,6 +182,58 @@ export function isE2ERequestAllowed(scenario: E2EDataModeScenario, request: E2EO
   return isBoundaryAllowed(scenario, classifyE2ERequest(request.url, scenario), request);
 }
 
+export function resolveE2ERequestDecision(
+  scenario: E2EDataModeScenario,
+  request: E2EObservedRequest,
+): E2ERequestDecision {
+  const phase = request.phase ?? 'workbench-runtime';
+  const normalizedRequest = { ...request, phase };
+  const boundary = classifyE2ERequest(request.url, scenario);
+
+  if (boundary === 'non-http' || boundary === 'app') {
+    return {
+      request: normalizedRequest,
+      boundary,
+      phase,
+      allowed: true,
+      action: 'continue',
+      shouldRecord: false,
+    };
+  }
+
+  const allowed = isBoundaryAllowed(scenario, boundary, normalizedRequest);
+  if (allowed) {
+    return {
+      request: normalizedRequest,
+      boundary,
+      phase,
+      allowed,
+      action: 'fulfill-scenario-backend',
+      shouldRecord: true,
+    };
+  }
+
+  if (isKnownBackendBoundary(boundary)) {
+    return {
+      request: normalizedRequest,
+      boundary,
+      phase,
+      allowed,
+      action: 'block-forbidden-backend',
+      shouldRecord: true,
+    };
+  }
+
+  return {
+    request: normalizedRequest,
+    boundary,
+    phase,
+    allowed,
+    action: 'abort-external-http',
+    shouldRecord: false,
+  };
+}
+
 export function buildE2EDataModeManifest(
   scenario: E2EDataModeScenario,
   requests: E2EObservedRequest[] = [],
@@ -266,6 +333,15 @@ function usesHubBackplane(scenario: E2EDataModeScenario): boolean {
     scenario.dataSource === 'stubbed-hub-session' ||
     scenario.dataSource === 'observed-hub-replay' ||
     scenario.dataSource === 'approved-real-preflight'
+  );
+}
+
+function isKnownBackendBoundary(boundary: E2ERequestBoundary): boolean {
+  return (
+    boundary === 'hub' ||
+    boundary === 'local-edge' ||
+    boundary === 'tokendance-id' ||
+    boundary === 'gateway'
   );
 }
 

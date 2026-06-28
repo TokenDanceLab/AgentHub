@@ -1,8 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   assertE2EDataModeScenario,
-  classifyE2ERequest,
   createE2EDataModeScenario,
+  resolveE2ERequestDecision,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
 
@@ -123,15 +123,22 @@ function collectPageDiagnostics(page: Page): void {
     console.log(`[pageerror] ${error.message}`);
   });
   page.on('requestfailed', (request) => {
-    console.log(`[requestfailed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
+    const errorText = request.failure()?.errorText ?? '';
+    if (isExpectedRequestFailure(request.url(), errorText)) return;
+    console.log(`[requestfailed] ${request.method()} ${request.url()} ${errorText}`);
   });
 }
 
 function isExpectedBrowserDiagnostic(text: string): boolean {
   return (
     text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
-    text.includes("WebSocket connection to 'ws://localhost:8080/client/ws")
+    text.includes("WebSocket connection to 'ws://localhost:8080/client/ws") ||
+    text.includes('Failed to load resource: net::ERR_BLOCKED_BY_CLIENT')
   );
+}
+
+function isExpectedRequestFailure(url: string, errorText: string): boolean {
+  return errorText.includes('ERR_BLOCKED_BY_CLIENT') && url.startsWith('https://fonts.googleapis.com/');
 }
 
 async function horizontalOverflow(page: Page): Promise<number> {
@@ -182,16 +189,22 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    const boundary = classifyE2ERequest(request.url(), WEB_CHAT_FLOW_SCENARIO);
+    const decision = resolveE2ERequestDecision(WEB_CHAT_FLOW_SCENARIO, {
+      method: request.method(),
+      url: request.url(),
+    });
 
-    if (boundary === 'app') {
+    if (decision.action === 'continue') {
       await route.continue();
       return;
     }
 
-    if (boundary === 'hub') {
+    if (decision.shouldRecord) {
+      requests.push(decision.request);
+    }
+
+    if (decision.action === 'fulfill-scenario-backend' && decision.boundary === 'hub') {
       endpoints.add(`${request.method()} ${url.pathname}`);
-      requests.push({ method: request.method(), url: request.url() });
 
       if (request.method() === 'OPTIONS') {
         await route.fulfill({ status: 204, headers: corsHeaders() });
@@ -202,8 +215,7 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    if (boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
-      requests.push({ method: request.method(), url: request.url() });
+    if (decision.action === 'block-forbidden-backend') {
       await route.fulfill({
         status: 503,
         contentType: 'application/json',
@@ -213,7 +225,7 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    await route.continue();
+    await route.abort('blockedbyclient');
   });
 
   return { endpoints, requests };

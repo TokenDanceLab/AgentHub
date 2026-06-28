@@ -24,7 +24,7 @@
 
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
-| 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 3 | 1 | 4 |
+| 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 2 | 2 | 4 |
 | 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 4 | 0 | 4 |
 | 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 3 | 0 | 3 |
 | 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 3 | 0 | 3 |
@@ -35,8 +35,8 @@
 | Task ID | Issue | Title | Status |
 |:--|:--|:--|:--|
 | T1.1 | #378 | Define chat-flow evidence manifest contract | closed via #395 |
-| T1.2 | #379 | Align Visual QA viewports and report shape | implementation pending PR |
-| T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | open |
+| T1.2 | #379 | Align Visual QA viewports and report shape | closed via #396 |
+| T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | implementation pending PR |
 | T1.4 | #381 | Document evidence bundle without rule duplication | open |
 | T2.1 | #382 | Add golden mixed-source transcript fixtures | open |
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | open |
@@ -61,7 +61,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 
 ## Phase Checklist
 
-- [ ] Phase 1: Evidence Contract Foundation (1/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
+- [ ] Phase 1: Evidence Contract Foundation (2/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
 - [ ] Phase 2: Shared Chat Timeline Hardening (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
 - [ ] Phase 3: Desktop/Web Boundary And Backend Truth (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
 - [ ] Phase 4: Real E2E And Visual QA Closure (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 1
-**Active Task**: T1.2 - Align Visual QA viewports and report shape (#379), implementation pending PR
+**Active Task**: T1.3 - Reuse data-mode boundary helper in acceptance gates (#380)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,8 +88,8 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Validate and merge #379 into `dev/delicious233`.
-2. Continue Phase 1 with #380 and #381 after #379 is merged.
+1. Validate and merge #380 into `dev/delicious233`.
+2. Continue Phase 1 with #381 after #380 is merged.
 3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
 
 ## Session Log
@@ -99,3 +99,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | spec setup | Created analysis docs, plan docs, GitHub milestones #17-#21, and task issues #378-#393 from branch `spec/real-foundation-hardening`. |
 | 2026-06-28 | T1.1 implementation | Added shared chat-flow evidence manifest contract and tests; full shared Vitest passed, targeted TypeScript passed, broad `app/shared lint` remains blocked by pre-existing story/test type debt unrelated to this task. |
 | 2026-06-28 | T1.2 implementation | Aligned Web Visual QA desktop scenes to `1440x810`, added screenshot/DOM-metrics report output, tightened the real-e2e verifier, and generated a failing Visual QA report that now records the remaining shell brand-image assertion. |
+| 2026-06-28 | T1.3 implementation | Added shared E2E request-decision helper and reused it from Desktop/Web Playwright boundary gates; Desktop chat-flow and Web stubbed Hub E2E passed with `real_tested=false` boundaries. |

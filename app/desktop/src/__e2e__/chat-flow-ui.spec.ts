@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   assertE2EDataModeScenario,
-  classifyE2ERequest,
   createE2EDataModeScenario,
+  resolveE2ERequestDecision,
   type E2ERequestPhase,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
@@ -283,16 +283,25 @@ async function blockLiveBackends(page: Page): Promise<BackendRequestLog> {
 
   await page.route('**/*', async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
-    const boundary = classifyE2ERequest(request.url(), DESKTOP_MOCK_CHAT_FLOW_SCENARIO);
+    const decision = resolveE2ERequestDecision(DESKTOP_MOCK_CHAT_FLOW_SCENARIO, {
+      method: request.method(),
+      url: request.url(),
+      phase,
+    });
 
-    if (boundary === 'app') {
+    if (decision.action === 'continue') {
       await route.continue();
       return;
     }
 
-    if (boundary === 'hub' || boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
-      backendRequests.push({ method: request.method(), url: request.url(), phase });
+    if (decision.shouldRecord) {
+      backendRequests.push(decision.request);
+    }
+
+    if (
+      decision.action === 'fulfill-scenario-backend' ||
+      decision.action === 'block-forbidden-backend'
+    ) {
       await route.fulfill({
         contentType: 'application/json',
         status: 503,
@@ -304,7 +313,7 @@ async function blockLiveBackends(page: Page): Promise<BackendRequestLog> {
       return;
     }
 
-    if (url.protocol === 'http:' || url.protocol === 'https:') {
+    if (decision.action === 'abort-external-http') {
       await route.abort('blockedbyclient');
       return;
     }
