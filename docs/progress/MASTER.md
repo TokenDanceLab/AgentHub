@@ -88,10 +88,9 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Merge #405, then close #385 manually if GitHub does not auto-close it from the non-default base branch.
-2. Start T3.1 (#386) in a separate task worktree after #405 lands.
-3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Start T3.1 (#386) in a separate task worktree from `origin/dev/delicious233`.
+2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -107,4 +106,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; #401 ready to merge. |
 | 2026-06-28 | T2.2 implementation | Tightened optimistic send auto-follow so pending-to-confirmed reconciliation does not steal scrollback; Desktop/Web chat-flow E2E and Visual QA passed with `real_tested=false`; #402 merged. |
 | 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 merged and #384 closed manually because non-default base did not auto-close it. |
-| 2026-06-29 | T2.4 implementation | Expanded shared runtime diagnostic filtering, kept Markdown table rendering under shared/Web tests, verified Desktop/Web chat-flow and Visual QA with `real_tested=false`; #405 ready to merge. |
+| 2026-06-29 | T2.4 implementation | Expanded shared runtime diagnostic filtering, kept Markdown table rendering under shared/Web tests, verified Desktop/Web chat-flow and Visual QA with `real_tested=false`; #405 merged and #385 closed manually because non-default base did not auto-close it. |
