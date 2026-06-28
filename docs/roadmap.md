@@ -17,7 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前 active spec-driven 专项：Repo Structure Doc Tooling Cleanup，进度见 [progress/MASTER.md](progress/MASTER.md)。MASTER 只记录当前专项进度、Issue/PR、阻塞和验收证据；本 roadmap 不复制任务日志。
+当前没有 active spec-driven 专项。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)；新的大型任务必须重新建立 SPEC 和临时 `docs/progress/MASTER.md`。
 
 最近完成：
 
@@ -27,6 +27,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | Phase 2 Real E2E Contract | 完成 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
 | Phase 3 Source And Test Alignment | 完成 | API/Hub、模块 README、进度 SSOT、聊天流、前端架构、后端性能/泄漏、Desktop packaged evidence、active docs 和 Web/Mobile client lanes 已对齐 |
 | Phase 4 Acceptance And Merge Readiness | 完成 | 聚合验收、架构审批、归档和合并准备；下一轮仓库结构清理必须单独开 SPEC |
+| Repo Structure Doc Tooling Cleanup | 完成 | 历史归档、ADR 摘要、root evidence、scripts/tests 分层、根级 wrapper 删除、SPEC 外部归档 |
 
 ## 当前优先级
 

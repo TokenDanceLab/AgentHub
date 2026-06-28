@@ -24,7 +24,6 @@ docs/
 ├── architecture/                      ← 模块化架构文档
 ├── decisions.md                       ← 当前架构决策摘要
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
-├── progress/                          ← 当前 spec-driven 专项进度（仅执行中才存在）
 ├── governance/                        ← 治理：执行映射、安全风险、威胁模型
 ├── history.md                         ← 历史归档索引（外部 TokenDance docs）
 ├── images/                            ← 截图与图片资源
@@ -39,7 +38,7 @@ docs/
 | 旧架构决策正文和背景 | [history.md](history.md) |
 | 历史设计、审计、发布、参考调研 | [history.md](history.md) |
 | spec-driven 专项归档 | [history.md](history.md) |
-| 当前 spec-driven 进度 | `progress/MASTER.md` — 仅当该文件存在时有效 |
+| 当前 spec-driven 进度 | 无 active SPEC 时不保留；执行中才临时出现 `progress/MASTER.md` |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
