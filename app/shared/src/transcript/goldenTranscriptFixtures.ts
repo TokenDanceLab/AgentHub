@@ -6,7 +6,7 @@ import { orderTranscriptBlocks } from './order';
 import { isSidebarOnlyTranscriptBlock, type TranscriptBlock } from './types';
 
 export const GOLDEN_MIXED_SOURCE_SESSION_ID = 'session-golden-chat-flow';
-export const GOLDEN_MIXED_SOURCE_TASK_ID = 'task-golden-chat-flow';
+export const GOLDEN_MIXED_SOURCE_TASK_ID = 'golden-chat-flow-task';
 export const GOLDEN_MIXED_SOURCE_RUN_ID = 'run-golden-chat-flow';
 
 export const goldenMixedSourceHubMessages: HubMessageTranscriptInput[] = [
@@ -130,7 +130,7 @@ export const goldenMixedSourceHubRuntimeEvents: HubRuntimeEventTranscriptInput[]
 
 export const goldenMixedSourceFullBlockIds = [
   'hub-message-client-golden-user',
-  'hub-runtime-session-task-golden-chat-flow-run-golden-chat-flow',
+  'hub-runtime-session-golden-chat-flow-task-run-golden-chat-flow',
   'edge-event-hub-runtime-evt-golden-call-read-a',
   'edge-event-hub-runtime-evt-golden-call-read-b',
   'edge-event-hub-runtime-evt-golden-result-read-a',
@@ -150,7 +150,7 @@ export const goldenMixedSourceMainBlockIds = [
 ] as const;
 
 export const goldenMixedSourceInspectorOnlyBlockIds = [
-  'hub-runtime-session-task-golden-chat-flow-run-golden-chat-flow',
+  'hub-runtime-session-golden-chat-flow-task-run-golden-chat-flow',
   'edge-event-hub-runtime-evt-golden-subagent-report',
   'edge-event-hub-runtime-evt-golden-route-report',
 ] as const;
