@@ -17,7 +17,14 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前没有 active spec-driven 专项。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)；新的大型任务必须重新建立 SPEC 和临时 `docs/progress/MASTER.md`。
+当前 active spec-driven 专项是 Real Foundation Hardening，进度入口见 [progress/MASTER.md](progress/MASTER.md)。该专项负责 Desktop/Web chat workflow、shared transcript、data-boundary、real E2E/Visual QA foundation 的基础收口；证据等级矩阵仍只由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)。
+
+当前专项状态：
+
+| Phase | 状态 | 说明 |
+|---|---|---|
+| Phase 1 Evidence Contract Foundation | 收尾中 | evidence manifest、Visual QA viewport/report、data-mode boundary helper 已合并；docs-only evidence bundle 收口见 #381 |
+| Phase 2-5 | 待执行 | shared timeline、Desktop/Web boundary/backend truth、real E2E/Visual QA closure、acceptance/archive 仍按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
 
 最近完成：
 

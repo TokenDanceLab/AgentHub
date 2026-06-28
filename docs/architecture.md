@@ -108,6 +108,8 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 
 ## Acceptance Gates
 
+证据包入口只保留 owner 链接；证据等级矩阵和真实边界规则由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护，当前专项进度和验收记录见 [progress/MASTER.md](progress/MASTER.md)。
+
 | 变更 | 最低验收 |
 |---|---|
 | API/协议 | OpenAPI YAML parse + affected handler/service tests |
