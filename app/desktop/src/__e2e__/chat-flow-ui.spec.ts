@@ -118,6 +118,7 @@ async function enterDemoWorkbench(page: Page, onWorkbenchRuntime?: () => void): 
   const demoButton = page.getByRole('button', { name: '使用 Demo 模式继续' });
   const workbench = page.getByTestId('agenthub-workbench');
   if (await demoButton.isVisible().catch(() => false)) {
+    onWorkbenchRuntime?.();
     await demoButton.click({ timeout: 5_000 }).catch(async (error: unknown) => {
       if (await workbench.isVisible().catch(() => false)) return;
       try {
@@ -128,7 +129,6 @@ async function enterDemoWorkbench(page: Page, onWorkbenchRuntime?: () => void): 
     });
   }
   await expect(workbench).toBeVisible();
-  onWorkbenchRuntime?.();
   await expect(page.getByRole('log')).toBeVisible();
 }
 

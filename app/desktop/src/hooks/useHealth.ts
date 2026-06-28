@@ -22,17 +22,19 @@ export function useHealth(options: UseHealthOptions = {}): HealthState {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const poll = useCallback(async () => {
     if (!enabled) return;
     try {
       const h = await fetchHealth();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !enabledRef.current) return;
       setHealth(h);
       setOnline(true);
       setLastError(null);
     } catch (error) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !enabledRef.current) return;
       setOnline(false);
       setHealth(null);
       setLastError(error instanceof Error ? error.message : 'Local Edge health check failed');
@@ -41,6 +43,7 @@ export function useHealth(options: UseHealthOptions = {}): HealthState {
 
   useEffect(() => {
     mountedRef.current = true;
+    enabledRef.current = enabled;
     if (!enabled) {
       setOnline(false);
       setHealth(null);

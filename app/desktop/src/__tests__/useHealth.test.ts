@@ -42,6 +42,38 @@ describe('useHealth', () => {
     expect(result.current.health).toBeNull();
   });
 
+  it('ignores in-flight health responses after polling is disabled', async () => {
+    let resolveFetch: ((response: Response) => void) | undefined;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useHealth({ enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    rerender({ enabled: false });
+
+    await act(async () => {
+      resolveFetch?.({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok', version: 'v1', edgeId: 'local' }),
+      } as Response);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.online).toBe(false);
+    expect(result.current.health).toBeNull();
+  });
+
   it('transitions to online on successful health check', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

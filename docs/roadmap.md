@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-06-28
+最后更新：2026-06-29
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
@@ -24,7 +24,9 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | Phase | 状态 | 说明 |
 |---|---|---|
 | Phase 1 Evidence Contract Foundation | 完成 | evidence manifest、Visual QA viewport/report、data-mode boundary helper、docs-only evidence bundle owner links 已合并 |
-| Phase 2-5 | 待执行 | shared timeline、Desktop/Web boundary/backend truth、real E2E/Visual QA closure、acceptance/archive 仍按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
+| Phase 2 Shared Chat Timeline Hardening | 完成 | shared transcript fixtures、optimistic send/auto-follow、card grouping、markdown/table/debug filtering 已合并 |
+| Phase 3 Desktop/Web Boundary And Backend Truth | 进行中 | Web Hub-only guarded flow 已合并；Desktop entry/workbench split 和 observed/approved-real boundary 按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
+| Phase 4-5 | 待执行 | real E2E/Visual QA closure、final acceptance、merge readiness 和 archive 仍按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
 
 最近完成：
 
