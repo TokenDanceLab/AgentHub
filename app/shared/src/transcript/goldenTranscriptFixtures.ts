@@ -107,13 +107,27 @@ export const goldenMixedSourceHubRuntimeEvents: HubRuntimeEventTranscriptInput[]
     created_at: '2026-06-26T08:00:06Z',
   },
   {
-    id: 'evt-golden-markdown-summary',
+    id: 'evt-golden-runtime-diagnostic',
     task_id: GOLDEN_MIXED_SOURCE_TASK_ID,
     edge_run_id: GOLDEN_MIXED_SOURCE_RUN_ID,
     session_id: GOLDEN_MIXED_SOURCE_SESSION_ID,
     agent_instance_id: 'agent-golden-builder',
     agent_label: 'Builder',
     event_seq: 7,
+    event_type: 'run.agent.text_block',
+    payload: {
+      content: 'Runtime: mock replay',
+    },
+    created_at: '2026-06-26T08:00:06.500Z',
+  },
+  {
+    id: 'evt-golden-markdown-summary',
+    task_id: GOLDEN_MIXED_SOURCE_TASK_ID,
+    edge_run_id: GOLDEN_MIXED_SOURCE_RUN_ID,
+    session_id: GOLDEN_MIXED_SOURCE_SESSION_ID,
+    agent_instance_id: 'agent-golden-builder',
+    agent_label: 'Builder',
+    event_seq: 8,
     event_type: 'run.agent.text_block',
     payload: {
       content: [

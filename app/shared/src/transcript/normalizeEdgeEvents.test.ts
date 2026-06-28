@@ -20,6 +20,30 @@ describe('normalizeEdgeEventsToTranscript', () => {
     expect(blocks).toEqual([]);
   });
 
+  it('drops mode and runtime diagnostics while keeping normal markdown replies', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-mode-label', 1, 'run.agent.text_block', {
+        runId: 'run-live',
+        content: 'Data: approved-real',
+      }),
+      edgeEvent('evt-runtime-label', 2, 'run.agent.text_block', {
+        runId: 'run-live',
+        content: 'Runtime: mock replay',
+      }),
+      edgeEvent('evt-markdown-table', 3, 'run.agent.text_block', {
+        runId: 'run-live',
+        content: '| Check | Status |\n| --- | --- |\n| render | ok |',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      id: 'edge-event-evt-markdown-table',
+      kind: 'text',
+      text: '| Check | Status |\n| --- | --- |\n| render | ok |',
+    }));
+  });
+
   it('projects live Edge agent events into transcript blocks with evidence', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-start', 1, 'run.started', {

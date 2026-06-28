@@ -14,6 +14,14 @@ describe('normalizeHubMessagesToTranscript', () => {
         },
         created_at: '2026-06-07T07:00:02Z',
       },
+      {
+        id: 'hub-mode-diagnostic',
+        sender_type: 'agent',
+        sender_id: 'agent-1',
+        sender: { nickname: 'Hub Builder' },
+        content: { text: 'Hub replay: task task-web-smoke' },
+        created_at: '2026-06-07T07:00:03Z',
+      },
     ]);
 
     expect(blocks).toEqual([]);

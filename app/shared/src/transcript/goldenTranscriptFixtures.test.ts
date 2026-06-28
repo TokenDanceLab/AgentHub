@@ -48,6 +48,7 @@ describe('golden mixed-source transcript fixture', () => {
     expect(mainText).not.toContain('Deep report should stay in inspector');
     expect(mainText).not.toContain('Reviewer QA');
     expect(mainText).not.toContain('Route details belong to the inspector DAG.');
+    expect(mainText).not.toContain('Runtime: mock replay');
   });
 
   it('adapts the main fixture into stable ChatView items without losing tool/result ordering', () => {
