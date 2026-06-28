@@ -25,7 +25,7 @@
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
 | 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 0 | 4 | 4 |
-| 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 4 | 0 | 4 |
+| 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 3 | 1 | 4 |
 | 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 3 | 0 | 3 |
 | 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 3 | 0 | 3 |
 | 5 | Acceptance, Merge, Archive | https://github.com/TokenDanceLab/AgentHub/milestone/21 | 2 | 0 | 2 |
@@ -38,7 +38,7 @@
 | T1.2 | #379 | Align Visual QA viewports and report shape | closed via #396 |
 | T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | closed via #397 |
 | T1.4 | #381 | Document evidence bundle without rule duplication | closed via #399 |
-| T2.1 | #382 | Add golden mixed-source transcript fixtures | pending via #401 |
+| T2.1 | #382 | Add golden mixed-source transcript fixtures | closed via #401 |
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | open |
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | open |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | open |
@@ -62,7 +62,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Phase Checklist
 
 - [x] Phase 1: Evidence Contract Foundation (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
-- [ ] Phase 2: Shared Chat Timeline Hardening (0/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
+- [ ] Phase 2: Shared Chat Timeline Hardening (1/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
 - [ ] Phase 3: Desktop/Web Boundary And Backend Truth (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
 - [ ] Phase 4: Real E2E And Visual QA Closure (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
 - [ ] Phase 5: Acceptance, Merge, Archive (0/2 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/21)
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 2
-**Active Task**: T2.1 - Add golden mixed-source transcript fixtures (#382, PR #401)
+**Active Task**: T2.2 - Harden optimistic send and auto-follow contract (#383)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,10 +88,9 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Merge #401 after checks pass, then close #382 if GitHub does not auto-close it on the non-default base branch.
-2. Start T2.2 (#383) in a separate task worktree after #401 lands.
-3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Start T2.2 (#383) in a separate task worktree after #401 lands.
+2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -104,4 +103,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | adaptive replan sync | #380 merged via #397; Phase 1 drift reached the replan threshold, so #381 must stay as a narrow docs-only closure task before Phase 1 completes. |
 | 2026-06-28 | T1.4 implementation | Linked the evidence bundle from architecture and roadmap without duplicating the real-e2e skill or AGENTS rules; scope remained docs-only. |
 | 2026-06-28 | Phase 1 complete | #381 merged via #399; milestone #17 closed with 4/4 tasks complete and Phase 2 is now active. |
-| 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; PR #401 pending. |
+| 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; #401 ready to merge. |
