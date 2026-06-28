@@ -116,6 +116,13 @@ describe('e2e data-mode contract', () => {
       ok: false,
       errors: ['web-stubbed-hub-replay-smoke uses stubbed-hub-session but claims real login was tested'],
     });
+    expect(validateE2EDataModeScenario({
+      ...scenario,
+      tokenDanceIdSecretUsed: true,
+    }, [])).toMatchObject({
+      ok: false,
+      errors: ['web-stubbed-hub-replay-smoke uses stubbed-hub-session but marks TokenDance ID secret usage'],
+    });
     expect(validateE2EDataModeScenario(scenario, [
       { method: 'GET', url: 'http://127.0.0.1:3210/v1/runs' },
     ])).toEqual({
@@ -193,6 +200,7 @@ describe('e2e data-mode contract', () => {
       dataSource: 'stubbed-hub-session',
       hubOrigin: 'http://127.0.0.1:8088',
       directLocalEdge: false,
+      evidence_level: 'stubbed-hub',
       realLoginTested: false,
       realCliOrModelExecuted: false,
       mockAdapterUsed: true,
@@ -239,6 +247,45 @@ describe('e2e data-mode contract', () => {
         'GET http://localhost:8080/web/agent-tasks/task-web-created/events',
         'POST http://localhost:8080/web/agent-tasks',
       ],
+    });
+  });
+
+  it('rejects TokenDance ID and Gateway traffic in Web stubbed Hub replay', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'web-stubbed-hub-replay-smoke',
+      surface: 'web',
+      dataMode: 'approved-real',
+      dataSource: 'stubbed-hub-session',
+      appOrigin: 'http://127.0.0.1:5174',
+      hubOrigin: 'http://localhost:8080',
+      mockAdapterUsed: true,
+    });
+
+    expect(validateE2EDataModeScenario(scenario, [
+      { method: 'GET', url: 'https://id.vectorcontrol.tech/oidc/authorize' },
+      { method: 'GET', url: 'https://api.vectorcontrol.tech/v1/models' },
+    ])).toEqual({
+      ok: false,
+      errors: [
+        'web-stubbed-hub-replay-smoke forbids tokendance-id request GET https://id.vectorcontrol.tech/oidc/authorize',
+        'web-stubbed-hub-replay-smoke forbids gateway request GET https://api.vectorcontrol.tech/v1/models',
+      ],
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'https://id.vectorcontrol.tech/oidc/authorize',
+    })).toMatchObject({
+      boundary: 'tokendance-id',
+      action: 'block-forbidden-backend',
+      shouldRecord: true,
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'https://api.vectorcontrol.tech/v1/models',
+    })).toMatchObject({
+      boundary: 'gateway',
+      action: 'block-forbidden-backend',
+      shouldRecord: true,
     });
   });
 

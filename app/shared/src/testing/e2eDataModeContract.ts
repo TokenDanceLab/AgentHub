@@ -12,6 +12,12 @@ export type E2EDataSource =
   | 'observed-hub-replay'
   | 'approved-real-preflight';
 
+export type E2EDataModeEvidenceLevel =
+  | 'fixture-unit'
+  | 'stubbed-hub'
+  | 'observed-local'
+  | 'approved-real';
+
 export type E2ERequestBoundary =
   | 'app'
   | 'hub'
@@ -156,6 +162,9 @@ export function validateE2EDataModeScenario(
   if (scenario.dataSource === 'stubbed-hub-session' && scenario.realCliOrModelExecuted) {
     errors.push(`${scenario.name} uses stubbed-hub-session but claims real CLI/model execution`);
   }
+  if (scenario.dataSource === 'stubbed-hub-session' && scenario.tokenDanceIdSecretUsed) {
+    errors.push(`${scenario.name} uses stubbed-hub-session but marks TokenDance ID secret usage`);
+  }
 
   for (const request of requests) {
     const boundary = classifyE2ERequest(request.url, scenario);
@@ -256,6 +265,7 @@ export function buildE2EDataModeManifest(
     scenario: scenario.name,
     surface: scenario.surface,
     dataMode: scenario.dataMode,
+    evidence_level: evidenceLevelForDataSource(scenario.dataSource),
     dataSource: scenario.dataSource,
     appOrigin: scenario.appOrigin,
     ...(scenario.hubOrigin ? { hubOrigin: scenario.hubOrigin } : {}),
@@ -273,6 +283,13 @@ export function buildE2EDataModeManifest(
     requestedEndpoints,
     ...extra,
   };
+}
+
+function evidenceLevelForDataSource(dataSource: E2EDataSource): E2EDataModeEvidenceLevel {
+  if (dataSource === 'stubbed-hub-session') return 'stubbed-hub';
+  if (dataSource === 'observed-hub-replay') return 'observed-local';
+  if (dataSource === 'approved-real-preflight') return 'approved-real';
+  return 'fixture-unit';
 }
 
 function isBoundaryAllowed(

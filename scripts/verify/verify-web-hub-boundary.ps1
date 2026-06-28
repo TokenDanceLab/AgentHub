@@ -56,7 +56,10 @@ $SourceFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
     Where-Object { $_.Extension -in @(".ts", ".tsx", ".js", ".jsx") }
 
 $BoundaryFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
-    Where-Object { $_.Extension -in @(".ts", ".tsx", ".js", ".jsx", ".json") }
+    Where-Object {
+        $_.Extension -in @(".ts", ".tsx", ".js", ".jsx", ".json") -and
+        (Relative $_.FullName) -notmatch "^app/web/src/__e2e__/"
+    }
 
 $JsonFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
     Where-Object { $_.Extension -eq ".json" }
@@ -121,6 +124,26 @@ if (-not (Test-Path -LiteralPath $WebPlatformPath)) {
         Pass "app/web/src/platform/webPlatform.ts declares no Local Edge or local file capability"
     } else {
         Fail "app/web/src/platform/webPlatform.ts must declare localEdge: false and localFiles: false"
+    }
+}
+
+$StubbedHubE2EPath = Join-Path $RepoRoot "app/web/src/__e2e__/web-stubbed-hub-replay-smoke.spec.ts"
+if (-not (Test-Path -LiteralPath $StubbedHubE2EPath)) {
+    Fail "Web stubbed Hub replay E2E is missing"
+} else {
+    $stubbedHubE2E = Get-Content -Raw -LiteralPath $StubbedHubE2EPath
+    foreach ($requiredMarker in @(
+        "blocked_by_e2e_data_mode_contract",
+        "127.0.0.1:3210/v1/health",
+        "https://id.vectorcontrol.tech/oidc/authorize",
+        "https://api.vectorcontrol.tech/v1/models",
+        "classifyE2ERequest"
+    )) {
+        if ($stubbedHubE2E.Contains($requiredMarker)) {
+            Pass "Web stubbed Hub E2E covers forbidden boundary marker: $requiredMarker"
+        } else {
+            Fail "Web stubbed Hub E2E must cover forbidden boundary marker: $requiredMarker"
+        }
     }
 }
 

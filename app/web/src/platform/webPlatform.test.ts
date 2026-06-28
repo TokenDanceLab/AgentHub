@@ -203,6 +203,31 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
+  it('does not use demo runtime fallback in approved-real mode even when fallback is enabled', async () => {
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const platform = createWebPlatform({
+      dataMode: 'approved-real',
+      demoRuntimeFallback: true,
+      demoRuntimeStore,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: 'approved-real cannot fall back to demo runtime',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        author: expect.objectContaining({ role: 'human' }),
+        text: 'approved-real cannot fall back to demo runtime',
+      }),
+    ]));
+  });
+
   it('opens the auth guard instead of silently using demo fallback when the Web root mounts auth', async () => {
     localStorage.clear();
     sessionStorage.clear();

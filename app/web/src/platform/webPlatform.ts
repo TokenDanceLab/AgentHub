@@ -59,6 +59,7 @@ export interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
   queryClient?: QueryClient;
   createClientMessageId?: () => string;
+  dataMode?: WorkbenchDataMode;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
   demoRuntimeFallback?: boolean;
   now?: () => string;
@@ -231,7 +232,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
-        const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
+        const dataMode = options.dataMode ?? normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
         const shouldUseDemoFallback = options.demoRuntimeFallback === true && !hasInjectedHubClient && !ensureAuth && (
           isWorkbenchFixtureDataMode(dataMode) ||
