@@ -250,6 +250,101 @@ describe('e2e data-mode contract', () => {
     });
   });
 
+  it('keeps observed replay read-only and non-real', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'desktop-observed-replay',
+      surface: 'desktop',
+      dataMode: 'observed',
+      dataSource: 'observed-hub-replay',
+      appOrigin: 'http://127.0.0.1:5199',
+      hubOrigin: 'http://localhost:8080',
+    });
+
+    expect(validateE2EDataModeScenario(scenario, [
+      { method: 'GET', url: 'http://localhost:8080/client/sessions/session-1/messages' },
+    ])).toEqual({ ok: true, errors: [] });
+    expect(buildE2EDataModeManifest(scenario, [
+      { method: 'GET', url: 'http://localhost:8080/client/sessions/session-1/messages' },
+    ])).toMatchObject({
+      evidence_level: 'observed-local',
+      dataSource: 'observed-hub-replay',
+      realLoginTested: false,
+      realCliOrModelExecuted: false,
+      tokenDanceIdSecretUsed: false,
+      mockAdapterUsed: false,
+      real_tested: false,
+      requestedBoundaries: ['hub'],
+    });
+  });
+
+  it('rejects observed replay that claims login, model execution, secrets, or the wrong mode', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'desktop-observed-replay',
+      surface: 'desktop',
+      dataMode: 'observed',
+      dataSource: 'observed-hub-replay',
+      appOrigin: 'http://127.0.0.1:5199',
+      hubOrigin: 'http://localhost:8080',
+    });
+
+    expect(validateE2EDataModeScenario({
+      ...scenario,
+      dataMode: 'approved-real',
+      realLoginTested: true,
+      realCliOrModelExecuted: true,
+      tokenDanceIdSecretUsed: true,
+    }, [])).toEqual({
+      ok: false,
+      errors: [
+        'desktop-observed-replay uses observed-hub-replay but dataMode is approved-real',
+        'desktop-observed-replay uses observed-hub-replay but claims real login was tested',
+        'desktop-observed-replay uses observed-hub-replay but claims real CLI/model execution',
+        'desktop-observed-replay uses observed-hub-replay but marks TokenDance ID secret usage',
+      ],
+    });
+  });
+
+  it('keeps approved-real preflight separate from mock and readiness-only evidence', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'approved-real-preflight',
+      surface: 'desktop',
+      dataMode: 'approved-real',
+      dataSource: 'approved-real-preflight',
+      appOrigin: 'http://127.0.0.1:5199',
+      hubOrigin: 'http://localhost:8080',
+      realLoginTested: true,
+      realCliOrModelExecuted: true,
+      directLocalEdge: true,
+    });
+
+    expect(buildE2EDataModeManifest(scenario, [
+      { method: 'GET', url: 'http://localhost:8080/client/auth/me' },
+      { method: 'GET', url: 'http://127.0.0.1:3210/v1/health' },
+      { method: 'GET', url: 'https://id.vectorcontrol.tech/oidc/userinfo' },
+      { method: 'POST', url: 'https://api.vectorcontrol.tech/v1/responses' },
+    ])).toMatchObject({
+      evidence_level: 'approved-real',
+      dataSource: 'approved-real-preflight',
+      realLoginTested: true,
+      realCliOrModelExecuted: true,
+      mockAdapterUsed: false,
+      real_tested: true,
+      requestedBoundaries: ['gateway', 'hub', 'local-edge', 'tokendance-id'],
+    });
+
+    expect(validateE2EDataModeScenario({
+      ...scenario,
+      dataMode: 'observed',
+      mockAdapterUsed: true,
+    }, [])).toEqual({
+      ok: false,
+      errors: [
+        'approved-real-preflight uses approved-real-preflight but dataMode is observed',
+        'approved-real-preflight uses approved-real-preflight but marks mock adapter usage',
+      ],
+    });
+  });
+
   it('rejects TokenDance ID and Gateway traffic in Web stubbed Hub replay', () => {
     const scenario = createE2EDataModeScenario({
       name: 'web-stubbed-hub-replay-smoke',

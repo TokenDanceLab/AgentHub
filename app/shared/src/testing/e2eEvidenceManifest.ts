@@ -194,6 +194,17 @@ function validateEvidenceRow(
   if (row.real_tested && row.evidence_level !== REAL_EXECUTION_LEVEL) {
     errors.push(`${scenario} row ${row.id} uses ${row.evidence_level} evidence but sets real_tested=true`);
   }
+  if (row.real_tested && row.evidence_level === REAL_EXECUTION_LEVEL) {
+    if (!row.approval_ref) {
+      errors.push(`${scenario} row ${row.id} sets real_tested=true without approval_ref`);
+    }
+    if (row.claims?.real_login !== true) {
+      errors.push(`${scenario} row ${row.id} sets real_tested=true without real_login claim`);
+    }
+    if (row.claims?.real_cli_or_model !== true) {
+      errors.push(`${scenario} row ${row.id} sets real_tested=true without real_cli_or_model claim`);
+    }
+  }
   if (row.claims?.real_login && row.evidence_level !== REAL_EXECUTION_LEVEL) {
     errors.push(`${scenario} row ${row.id} claims real login without approved-real evidence`);
   }
@@ -203,8 +214,8 @@ function validateEvidenceRow(
   if (row.claims?.packaged_desktop && row.evidence_level !== 'packaged-release') {
     errors.push(`${scenario} row ${row.id} claims packaged Desktop without packaged-release evidence`);
   }
-  if (row.claims?.release_upload && row.evidence_level !== REAL_EXECUTION_LEVEL) {
-    errors.push(`${scenario} row ${row.id} claims release upload without release evidence`);
+  if (row.claims?.release_upload && row.evidence_level !== 'packaged-release') {
+    errors.push(`${scenario} row ${row.id} claims release upload without packaged-release evidence`);
   }
   validateScreenshots(scenario, row, errors);
   validateMetrics(scenario, row, errors);

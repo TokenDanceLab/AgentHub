@@ -94,7 +94,7 @@ try {
     if (Test-Path -LiteralPath $scriptImplementationPath) {
         $scriptText = Get-Content -Raw -LiteralPath $scriptImplementationPath
         Assert-True ($scriptText -match "agenthub-e2e-smoke-matrix-v1") "matrix writes stable schema"
-        Assert-True ($scriptText -match "web-real-mode-playwright") "matrix includes Web real-mode Playwright row"
+        Assert-True ($scriptText -match "web-stubbed-hub-playwright") "matrix includes Web stubbed-Hub Playwright row"
         Assert-True ($scriptText -match "desktop-renderer-playwright") "matrix includes Desktop renderer Playwright row"
         Assert-True ($scriptText -match "localhost-services-smoke") "matrix includes local services smoke row"
         Assert-True ($scriptText -match "edge-client-smoke") "matrix includes Edge client smoke row"
@@ -141,15 +141,16 @@ try {
     Assert-True ([string]$appPackage.scripts."test:smoke:matrix" -match "verify-e2e-smoke-matrix\.ps1") "app package exposes matrix script"
     Assert-True ([string]$appPackage.scripts."test:e2e:web" -match "agenthub-web") "app package exposes Web E2E script"
     Assert-True ([string]$appPackage.scripts."test:e2e:desktop" -match "agenthub-desktop") "app package exposes Desktop E2E script"
-    Assert-True ([string]$webPackage.scripts."test:e2e:real-mode" -match "web-hub-real-mode-smoke\.spec\.ts" -and [string]$webPackage.scripts."test:e2e:real-mode" -match "task-contract\.spec\.ts") "web package exposes real-mode and replay E2E"
+    Assert-True ([string]$webPackage.scripts."test:e2e:stubbed-hub" -match "web-stubbed-hub-replay-smoke\.spec\.ts" -and [string]$webPackage.scripts."test:e2e:stubbed-hub" -match "task-contract\.spec\.ts") "web package exposes stubbed-Hub replay E2E"
     Assert-True ([string]$desktopPackage.scripts."test:e2e:smoke" -match "smoke\.spec\.ts") "desktop package exposes renderer smoke E2E"
 
     if (Test-Path -LiteralPath $taskContractSpecPath) {
         $taskSpecText = Get-Content -Raw -LiteralPath $taskContractSpecPath
-        Assert-True ($taskSpecText -match "agenthub\.web_task_contract_replay\.v1") "task contract writes replay manifest schema"
+        Assert-True ($taskSpecText -match "buildE2EDataModeManifest") "task contract writes data-mode replay manifest"
+        Assert-True ($taskSpecText -match "dataSource:\s*'stubbed-hub-session'") "task contract records stubbed Hub source"
         Assert-True ($taskSpecText -match "approvalReplayObserved") "task contract records approval replay"
         Assert-True ($taskSpecText -match "artifactReplayObserved") "task contract records artifact replay"
-        Assert-True ($taskSpecText -match "directLocalEdge:\s*false") "task contract records no direct Local Edge path"
+        Assert-True ($taskSpecText -notmatch "127\.0\.0\.1:3210|localhost:3210") "task contract does not use direct Local Edge path"
     }
 }
 finally {
