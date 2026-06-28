@@ -26,7 +26,7 @@
 |:--|:--|:--|--:|--:|--:|
 | 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 0 | 4 | 4 |
 | 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 0 | 4 | 4 |
-| 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 1 | 2 | 3 |
+| 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 0 | 3 | 3 |
 | 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 3 | 0 | 3 |
 | 5 | Acceptance, Merge, Archive | https://github.com/TokenDanceLab/AgentHub/milestone/21 | 2 | 0 | 2 |
 
@@ -44,7 +44,7 @@
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | closed via #405 |
 | T3.1 | #386 | Web Hub-only guarded-flow check | closed via #406 |
 | T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | closed via #408 |
-| T3.3 | #388 | Observed and approved-real manifest boundary | open |
+| T3.3 | #388 | Observed and approved-real manifest boundary | closed via #410 |
 | T4.1 | #389 | Add focused chat acceptance gate | open |
 | T4.2 | #390 | Add semi-automated Visual QA artifact loop | open |
 | T4.3 | #391 | Keep packaged Desktop claim separate | open |
@@ -63,15 +63,15 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 
 - [x] Phase 1: Evidence Contract Foundation (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
 - [x] Phase 2: Shared Chat Timeline Hardening (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
-- [ ] Phase 3: Desktop/Web Boundary And Backend Truth (2/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
+- [x] Phase 3: Desktop/Web Boundary And Backend Truth (3/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
 - [ ] Phase 4: Real E2E And Visual QA Closure (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
 - [ ] Phase 5: Acceptance, Merge, Archive (0/2 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/21)
 
 ## Current Status
 
-**Active Phase**: Phase 3
-**Active Task**: T3.3 - Observed and approved-real manifest boundary (#388)
-**Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
+**Active Phase**: Phase 4 checkpoint
+**Active Task**: Adaptive checkpoint before T4.1 - Add focused chat acceptance gate (#389)
+**Blockers**: Phase 3 completed at adaptive drift_score 2, which reaches the Phase 3 replan/rescope threshold; run a lightweight checkpoint before starting Phase 4. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
 
@@ -88,8 +88,8 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start T3.3 (#388) in a separate task worktree from `origin/dev/delicious233`.
-2. Keep #388 focused on observed/approved-real manifest boundaries; do not expand it into packaging or live-runtime claims.
+1. Run a lightweight adaptive checkpoint because Phase 3 reached drift_score 2 at completion.
+2. If the checkpoint does not change scope, start T4.1 (#389) in a separate task worktree from `origin/dev/delicious233`.
 3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
 4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
@@ -113,3 +113,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-29 | T3.2 implementation | Added Desktop entry/workbench data-boundary Playwright coverage, moved chat-flow phase marking to the Demo transition boundary, hardened disabled health polling against in-flight updates, and verified Desktop Vite gates with `real_tested=false`; #408 merged and #387 closed manually because non-default base did not auto-close it. |
 | 2026-06-29 | Phase 3 sync | Updated Phase 3 live state after #408: milestone #19 is 2/3 complete, adaptive drift_score is 1, #388 has a drift warning, and T3.3 (#388) is the active next task. |
 | 2026-06-29 | T3.3 implementation | Hardened observed/approved-real manifest boundaries, kept packaged-release claims separate, aligned smoke-matrix contract checks with current stubbed-Hub replay names, and verified shared/contract gates with `real_tested=false`; PR pending. |
+| 2026-06-29 | Phase 3 complete | #388 merged via #410 and closed manually because non-default base did not auto-close it; milestone #19 is closed at 3/3 with adaptive drift_score 2, so Phase 4 requires a lightweight checkpoint before T4.1. |
