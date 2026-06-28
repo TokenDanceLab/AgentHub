@@ -2,7 +2,7 @@
 
 > **Task**: Desktop/Web chat workflow, shared transcript, data-boundary, and real E2E/Visual QA foundation hardening
 > **Started**: 2026-06-28
-> **Last Updated**: 2026-06-28
+> **Last Updated**: 2026-06-29
 > **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
 
@@ -26,7 +26,7 @@
 |:--|:--|:--|--:|--:|--:|
 | 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 0 | 4 | 4 |
 | 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 0 | 4 | 4 |
-| 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 3 | 0 | 3 |
+| 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 2 | 1 | 3 |
 | 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 3 | 0 | 3 |
 | 5 | Acceptance, Merge, Archive | https://github.com/TokenDanceLab/AgentHub/milestone/21 | 2 | 0 | 2 |
 
@@ -42,7 +42,7 @@
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | closed via #402 |
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | closed via #404 |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | closed via #405 |
-| T3.1 | #386 | Web Hub-only guarded-flow check | ready via #406 |
+| T3.1 | #386 | Web Hub-only guarded-flow check | closed via #406 |
 | T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | open |
 | T3.3 | #388 | Observed and approved-real manifest boundary | open |
 | T4.1 | #389 | Add focused chat acceptance gate | open |
@@ -63,14 +63,14 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 
 - [x] Phase 1: Evidence Contract Foundation (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
 - [x] Phase 2: Shared Chat Timeline Hardening (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
-- [ ] Phase 3: Desktop/Web Boundary And Backend Truth (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
+- [ ] Phase 3: Desktop/Web Boundary And Backend Truth (1/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
 - [ ] Phase 4: Real E2E And Visual QA Closure (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
 - [ ] Phase 5: Acceptance, Merge, Archive (0/2 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/21)
 
 ## Current Status
 
 **Active Phase**: Phase 3
-**Active Task**: T3.1 - Web Hub-only guarded-flow check (#386 / PR #406)
+**Active Task**: T3.2 - Desktop entry-preflight vs workbench-runtime split (#387)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,8 +88,8 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Merge #406 after CI/review passes; close #386 manually if the non-default base does not auto-close it.
-2. Start T3.2 (#387) in a separate task worktree from `origin/dev/delicious233` after #406 lands.
+1. Start T3.2 (#387) in a separate task worktree from `origin/dev/delicious233`.
+2. Split Desktop entry preflight from Demo workbench runtime assertions: entry may probe Local Edge health; Demo workbench must not make Hub/Edge runtime requests.
 3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
 4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
@@ -108,4 +108,5 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | T2.2 implementation | Tightened optimistic send auto-follow so pending-to-confirmed reconciliation does not steal scrollback; Desktop/Web chat-flow E2E and Visual QA passed with `real_tested=false`; #402 merged. |
 | 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 merged and #384 closed manually because non-default base did not auto-close it. |
 | 2026-06-29 | T2.4 implementation | Expanded shared runtime diagnostic filtering, kept Markdown table rendering under shared/Web tests, verified Desktop/Web chat-flow and Visual QA with `real_tested=false`; #405 merged and #385 closed manually because non-default base did not auto-close it. |
-| 2026-06-29 | T3.1 implementation | Enforced Web guarded Hub-only data boundary, added stubbed-Hub manifest `evidence_level`, blocked Local Edge/TDI/Gateway boundary attempts in Playwright, and verified Web/shared gates with `real_tested=false`; #406 ready to merge. |
+| 2026-06-29 | T3.1 implementation | Enforced Web guarded Hub-only data boundary, added stubbed-Hub manifest `evidence_level`, blocked Local Edge/TDI/Gateway boundary attempts in Playwright, and verified Web/shared gates with `real_tested=false`; #406 merged and #386 closed manually because non-default base did not auto-close it. |
+| 2026-06-29 | Phase 3 sync | Updated Phase 3 live state after #406: milestone #19 is 1/3 complete, T3.2 (#387) is the active next task, and adaptive milestone `completed_tasks` is 1. |
