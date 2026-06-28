@@ -25,7 +25,7 @@
 | Phase | Name | Milestone URL | Open | Closed | Total |
 |:--|:--|:--|--:|--:|--:|
 | 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 0 | 4 | 4 |
-| 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 2 | 2 | 4 |
+| 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 1 | 3 | 4 |
 | 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 3 | 0 | 3 |
 | 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 3 | 0 | 3 |
 | 5 | Acceptance, Merge, Archive | https://github.com/TokenDanceLab/AgentHub/milestone/21 | 2 | 0 | 2 |
@@ -40,7 +40,7 @@
 | T1.4 | #381 | Document evidence bundle without rule duplication | closed via #399 |
 | T2.1 | #382 | Add golden mixed-source transcript fixtures | closed via #401 |
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | closed via #402 |
-| T2.3 | #384 | Harden card grouping and rounded-stack rules | open |
+| T2.3 | #384 | Harden card grouping and rounded-stack rules | closed via #404 |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | open |
 | T3.1 | #386 | Web Hub-only guarded-flow check | open |
 | T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | open |
@@ -62,7 +62,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Phase Checklist
 
 - [x] Phase 1: Evidence Contract Foundation (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
-- [ ] Phase 2: Shared Chat Timeline Hardening (2/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
+- [ ] Phase 2: Shared Chat Timeline Hardening (3/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
 - [ ] Phase 3: Desktop/Web Boundary And Backend Truth (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
 - [ ] Phase 4: Real E2E And Visual QA Closure (0/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
 - [ ] Phase 5: Acceptance, Merge, Archive (0/2 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/21)
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 2
-**Active Task**: T2.3 - Harden card grouping and rounded-stack rules (#384)
+**Active Task**: T2.4 - Keep markdown/table rendering and debug filtering clean (#385)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,9 +88,10 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start T2.3 (#384) in a separate task worktree from `origin/dev/delicious233`.
-2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Merge #404, then close #384 manually if GitHub does not auto-close it from the non-default base branch.
+2. Start T2.4 (#385) in a separate task worktree after #404 lands.
+3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -105,3 +106,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | Phase 1 complete | #381 merged via #399; milestone #17 closed with 4/4 tasks complete and Phase 2 is now active. |
 | 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; #401 ready to merge. |
 | 2026-06-28 | T2.2 implementation | Tightened optimistic send auto-follow so pending-to-confirmed reconciliation does not steal scrollback; Desktop/Web chat-flow E2E and Visual QA passed with `real_tested=false`; #402 merged. |
+| 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 ready to merge. |
