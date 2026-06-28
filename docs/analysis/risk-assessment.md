@@ -19,7 +19,7 @@
 | Visual QA evidence split | High | Automated Playwright, manual visual scripts, and Web visual QA do not yet produce one honest acceptance bundle. |
 | Chat flow source/event merge | High | User sends, Hub messages, Edge runtime events, tool results, subagent reports, and inspector-only details must remain one linear product timeline. |
 | Evidence wording | High | Stubbed Hub, Vite renderer, readiness, approved-real, and packaged Desktop can be accidentally overclaimed. |
-| Web visual viewport drift | Medium | `app/web/scripts/visual-qa.mjs` still uses `1440x920` while architecture contract requires `1440x810`. |
+| Web visual viewport drift | Medium | T1.2 keeps `app/web/scripts/visual-qa.mjs` aligned with the `1440x810` architecture contract and guards against stale active script references. |
 | Backend/frontend contract drift | Medium | Hub/Edge event shapes can change without immediately breaking a shared transcript golden fixture. |
 
 ## Risk Matrix

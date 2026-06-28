@@ -70,7 +70,7 @@ Useful existing coverage:
 
 Current gaps:
 
-- Web full visual QA still uses `1440x920` scene naming/viewport while architecture acceptance names `1440x810`.
+- T1.2 aligns the full Web visual QA scene naming/viewport with the `1440x810` architecture acceptance contract.
 - Visual QA is split between manual chat-flow scripts and broader Web visual QA; there is no project-level manifest that clearly records automated vs semi-automated evidence.
 - Existing tests protect key regressions, but the acceptance bundle is not yet a single reusable gate for "chat workflow is merge-ready".
 - Packaged Desktop sidecar/sqlite/icon/installer claims remain outside Vite Playwright and must stay separately gated.
