@@ -38,7 +38,7 @@
 | T1.2 | #379 | Align Visual QA viewports and report shape | closed via #396 |
 | T1.3 | #380 | Reuse data-mode boundary helper in acceptance gates | closed via #397 |
 | T1.4 | #381 | Document evidence bundle without rule duplication | closed via #399 |
-| T2.1 | #382 | Add golden mixed-source transcript fixtures | open |
+| T2.1 | #382 | Add golden mixed-source transcript fixtures | pending via #401 |
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | open |
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | open |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | open |
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 2
-**Active Task**: T2.1 - Add golden mixed-source transcript fixtures (#382)
+**Active Task**: T2.1 - Add golden mixed-source transcript fixtures (#382, PR #401)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,9 +88,10 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start Phase 2 with #382 in a separate task worktree.
-2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Merge #401 after checks pass, then close #382 if GitHub does not auto-close it on the non-default base branch.
+2. Start T2.2 (#383) in a separate task worktree after #401 lands.
+3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -103,3 +104,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | adaptive replan sync | #380 merged via #397; Phase 1 drift reached the replan threshold, so #381 must stay as a narrow docs-only closure task before Phase 1 completes. |
 | 2026-06-28 | T1.4 implementation | Linked the evidence bundle from architecture and roadmap without duplicating the real-e2e skill or AGENTS rules; scope remained docs-only. |
 | 2026-06-28 | Phase 1 complete | #381 merged via #399; milestone #17 closed with 4/4 tasks complete and Phase 2 is now active. |
+| 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; PR #401 pending. |
