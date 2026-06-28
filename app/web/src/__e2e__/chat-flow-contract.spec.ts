@@ -5,12 +5,19 @@ import {
   resolveE2ERequestDecision,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import {
+  GOLDEN_MIXED_SOURCE_RUN_ID,
+  GOLDEN_MIXED_SOURCE_SESSION_ID,
+  GOLDEN_MIXED_SOURCE_TASK_ID,
+  goldenMixedSourceHubMessages,
+  goldenMixedSourceHubRuntimeEvents,
+} from '../../../shared/src/transcript';
 
 const HUB_ORIGIN = 'http://localhost:8080';
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
-const SESSION_ID = 'session-chat-flow';
-const TASK_ID = 'task-chat-flow';
+const SESSION_ID = GOLDEN_MIXED_SOURCE_SESSION_ID;
+const TASK_ID = GOLDEN_MIXED_SOURCE_TASK_ID;
 const DESKTOP_WORKSPACE_VIEWPORT = { width: 1440, height: 810 };
 const WEB_CHAT_FLOW_SCENARIO = createE2EDataModeScenario({
   name: 'web-chat-flow-contract',
@@ -39,8 +46,8 @@ test.describe('Web shared chat flow contract', () => {
 
     await expect(page.getByRole('heading', { name: 'Chat flow contract' })).toBeVisible();
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-data-mode', 'approved-real');
-    await expect(transcript).toContainText('Kick off the chat flow contract.');
-    await expect(transcript).toContainText('The replay summary is below.');
+    await expect(transcript).toContainText('Kick off the golden mixed-source contract.');
+    await expect(transcript).toContainText('The golden replay summary is below.');
     await expect(transcript.locator('table')).toContainText('Status');
     await expect(transcript.locator('table')).toContainText('ordered');
     await expectTranscriptWithoutModeDebug(transcript);
@@ -60,10 +67,10 @@ test.describe('Web shared chat flow contract', () => {
     const order = await transcript.evaluate((node) => {
       const text = node.textContent ?? '';
       return {
-        user: text.indexOf('Kick off the chat flow contract.'),
+        user: text.indexOf('Kick off the golden mixed-source contract.'),
         toolA: text.indexOf('A result belongs to src/a.ts'),
         toolB: text.indexOf('B result belongs to src/b.ts'),
-        reply: text.indexOf('The replay summary is below.'),
+        reply: text.indexOf('The golden replay summary is below.'),
       };
     });
     expect(order.user).toBeGreaterThanOrEqual(0);
@@ -98,7 +105,7 @@ test.describe('Web shared chat flow contract', () => {
     const order = await transcript.evaluate((node, text) => {
       const transcriptText = node.textContent ?? '';
       return {
-        replaySummary: transcriptText.indexOf('The replay summary is below.'),
+        replaySummary: transcriptText.indexOf('The golden replay summary is below.'),
         submitted: transcriptText.indexOf(text),
       };
     }, submittedText);
@@ -269,18 +276,7 @@ async function fulfillHubRoute(
   }
 
   if (pathname === `/client/sessions/${SESSION_ID}/messages`) {
-    await route.fulfill(json(hubEnvelope([{
-      id: 'message-chat-flow-user',
-      session_id: SESSION_ID,
-      seq_id: 1,
-      client_msg_id: 'client-chat-flow-user',
-      sender_type: 'user',
-      sender_id: 'user-chat-flow',
-      sender: { nickname: 'Chat Flow' },
-      content_type: 'text',
-      content: 'Kick off the chat flow contract.',
-      created_at: '2026-06-26T08:00:00Z',
-    }])));
+    await route.fulfill(json(hubEnvelope(goldenMixedSourceHubMessages)));
     return;
   }
 
@@ -328,7 +324,7 @@ async function fulfillHubRoute(
   if (pathname === `/web/agent-tasks/${TASK_ID}/summary`) {
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
+      edge_run_id: GOLDEN_MIXED_SOURCE_RUN_ID,
       status: 'running',
       total_events: chatFlowEvents().length,
       last_event_seq: chatFlowEvents().length,
@@ -349,7 +345,7 @@ async function fulfillHubRoute(
   if (pathname === `/web/agent-tasks/${TASK_ID}/approvals`) {
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
+      edge_run_id: GOLDEN_MIXED_SOURCE_RUN_ID,
       session_id: SESSION_ID,
       approvals: [],
       pending: [],
@@ -362,7 +358,7 @@ async function fulfillHubRoute(
   if (pathname === `/web/agent-tasks/${TASK_ID}/artifacts`) {
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
+      edge_run_id: GOLDEN_MIXED_SOURCE_RUN_ID,
       session_id: SESSION_ID,
       artifacts: [],
       last_event_seq: chatFlowEvents().length,
@@ -422,109 +418,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function chatFlowEvents(): unknown[] {
-  return [
-    {
-      id: 'evt-call-read-a',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 1,
-      event_type: 'run.agent.tool_call',
-      payload: { callId: 'read-a', toolName: 'Read', path: 'src/a.ts' },
-      created_at: '2026-06-26T08:00:01Z',
-    },
-    {
-      id: 'evt-call-read-b',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 2,
-      event_type: 'run.agent.tool_call',
-      payload: { callId: 'read-b', toolName: 'Read', path: 'src/b.ts' },
-      created_at: '2026-06-26T08:00:02Z',
-    },
-    {
-      id: 'evt-result-read-a',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 3,
-      event_type: 'run.agent.tool_result',
-      payload: { callId: 'read-a', toolName: 'Read', summary: 'A result belongs to src/a.ts' },
-      created_at: '2026-06-26T08:00:03Z',
-    },
-    {
-      id: 'evt-result-read-b',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 4,
-      event_type: 'run.agent.tool_result',
-      payload: { callId: 'read-b', toolName: 'Read', summary: 'B result belongs to src/b.ts' },
-      created_at: '2026-06-26T08:00:04Z',
-    },
-    {
-      id: 'evt-subtask-report',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 5,
-      event_type: 'run.agent.subagent_task',
-      payload: {
-        title: 'Deep report should stay in inspector',
-        worker: 'Reviewer QA',
-        status: 'running',
-        summary: 'Inspector-only orchestration detail.',
-      },
-      created_at: '2026-06-26T08:00:05Z',
-    },
-    {
-      id: 'evt-route-report',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 6,
-      event_type: 'run.agent.route_decision',
-      payload: {
-        action: 'fanout',
-        nextWorker: 'Reviewer QA',
-        summary: 'Route details belong to the inspector DAG.',
-      },
-      created_at: '2026-06-26T08:00:06Z',
-    },
-    {
-      id: 'evt-markdown-summary',
-      task_id: TASK_ID,
-      edge_run_id: 'run-chat-flow',
-      session_id: SESSION_ID,
-      agent_instance_id: 'agent-builder',
-      agent_label: 'Builder',
-      event_seq: 7,
-      event_type: 'run.agent.text_block',
-      payload: {
-        content: [
-          'The replay summary is below.',
-          '',
-          '| Check | Status |',
-          '| --- | --- |',
-          '| order | ordered |',
-        ].join('\n'),
-      },
-      created_at: '2026-06-26T08:00:07Z',
-    },
-  ];
+  return goldenMixedSourceHubRuntimeEvents;
 }
 
 function hubEnvelope<T>(data: T): { code: string; data: T } {

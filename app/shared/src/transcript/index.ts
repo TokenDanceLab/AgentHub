@@ -5,6 +5,18 @@ export { hubRuntimeEventFromPayload, normalizeHubRuntimeEventsToTranscript } fro
 export { normalizeThreadItemsToTranscript } from './normalizeThreadItems';
 export { orderTranscriptBlocks, transcriptBlockTimestampMs } from './order';
 export {
+  GOLDEN_MIXED_SOURCE_RUN_ID,
+  GOLDEN_MIXED_SOURCE_SESSION_ID,
+  GOLDEN_MIXED_SOURCE_TASK_ID,
+  goldenMixedSourceFullBlockIds,
+  goldenMixedSourceHubMessages,
+  goldenMixedSourceHubRuntimeEvents,
+  goldenMixedSourceInspectorOnlyBlockIds,
+  goldenMixedSourceMainBlockIds,
+  resolveGoldenMixedSourceMainTranscript,
+  resolveGoldenMixedSourceTranscript,
+} from './goldenTranscriptFixtures';
+export {
   createAgentActivityStore,
   getAgentActivityStore,
   type AgentActivityStore,
