@@ -80,7 +80,7 @@ Current gaps:
 | Surface | Current Resolution |
 |:--|:--|
 | Shared agent rules | `AGENTS.md` is the only project rule entry |
-| Claude-specific rules | None; root `CLAUDE.md` intentionally removed |
+| Claude-specific rules | None; no separate Claude-only rule surface is active |
 | Current SPEC state | No active `docs/progress/MASTER.md` before this branch |
 | Durable project skill | `.agents/skills/real-e2e-acceptance/SKILL.md` |
 | Native memory | Codex memory is available for prior AgentHub worktree and approved-real guidance |

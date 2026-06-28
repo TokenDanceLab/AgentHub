@@ -30,8 +30,8 @@ Establish a clean, real engineering foundation for Desktop/Web AgentHub chat: sh
 
 ## Phase 1: Evidence Contract Foundation
 
-**Goal**: Make the acceptance target machine-honest before changing product behavior.  
-**Prerequisite**: SPEC analysis accepted.  
+**Goal**: Make the acceptance target machine-honest before changing product behavior.
+**Prerequisite**: SPEC analysis accepted.
 **S.U.P.E.R Focus**: P, U, E.
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -50,8 +50,8 @@ Establish a clean, real engineering foundation for Desktop/Web AgentHub chat: sh
 
 ## Phase 2: Shared Chat Timeline Hardening
 
-**Goal**: Fix the user-visible chat flow contract at the shared layer first.  
-**Prerequisite**: Phase 1 manifest/Visual QA contract.  
+**Goal**: Fix the user-visible chat flow contract at the shared layer first.
+**Prerequisite**: Phase 1 manifest/Visual QA contract.
 **S.U.P.E.R Focus**: S, U, P, R.
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -70,8 +70,8 @@ Establish a clean, real engineering foundation for Desktop/Web AgentHub chat: sh
 
 ## Phase 3: Desktop/Web Boundary And Backend Truth
 
-**Goal**: Keep product mode, data source, auth, and execution truth separate across Desktop/Web.  
-**Prerequisite**: Phase 2 shared timeline stable.  
+**Goal**: Keep product mode, data source, auth, and execution truth separate across Desktop/Web.
+**Prerequisite**: Phase 2 shared timeline stable.
 **S.U.P.E.R Focus**: U, P, E.
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -90,8 +90,8 @@ Establish a clean, real engineering foundation for Desktop/Web AgentHub chat: sh
 
 ## Phase 4: Real E2E And Visual QA Closure
 
-**Goal**: Turn tests into a repeatable acceptance loop for agents and CI.  
-**Prerequisite**: Phase 3 boundaries stable.  
+**Goal**: Turn tests into a repeatable acceptance loop for agents and CI.
+**Prerequisite**: Phase 3 boundaries stable.
 **S.U.P.E.R Focus**: S, P, E, R.
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -110,8 +110,8 @@ Establish a clean, real engineering foundation for Desktop/Web AgentHub chat: sh
 
 ## Phase 5: Acceptance, Merge, Archive
 
-**Goal**: Prove the foundation and merge without leaving active SPEC clutter.  
-**Prerequisite**: Phases 1-4 complete.  
+**Goal**: Prove the foundation and merge without leaving active SPEC clutter.
+**Prerequisite**: Phases 1-4 complete.
 **S.U.P.E.R Focus**: P, E.
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |

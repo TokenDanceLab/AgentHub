@@ -1,9 +1,9 @@
 # Real Foundation Hardening - Progress Tracker
 
-> **Task**: Desktop/Web chat workflow, shared transcript, data-boundary, and real E2E/Visual QA foundation hardening  
-> **Started**: 2026-06-28  
-> **Last Updated**: 2026-06-28  
-> **Mode**: GITHUB_STANDARD  
+> **Task**: Desktop/Web chat workflow, shared transcript, data-boundary, and real E2E/Visual QA foundation hardening
+> **Started**: 2026-06-28
+> **Last Updated**: 2026-06-28
+> **Mode**: GITHUB_STANDARD
 > **Repo**: TokenDanceLab/AgentHub
 
 ## GitHub Resources
@@ -69,17 +69,17 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 
 ## Current Status
 
-**Active Phase**: Phase 1  
-**Active Task**: T1.1 - Define chat-flow evidence manifest contract (#378)  
+**Active Phase**: Phase 1
+**Active Task**: T1.1 - Define chat-flow evidence manifest contract (#378)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
 
-**Shared instruction surface**: `AGENTS.md`  
-**Claude Code instruction surface**: unavailable; root `CLAUDE.md` is intentionally not used  
-**Other platform rule surfaces**: none active for this SPEC  
-**Memory surface**: native Codex memory available; no repo fallback selected  
-**Memory fallback path**: none  
+**Shared instruction surface**: `AGENTS.md`
+**Claude Code instruction surface**: unavailable; no separate Claude-only rule surface is active
+**Other platform rule surfaces**: none active for this SPEC
+**Memory surface**: native Codex memory available; no repo fallback selected
+**Memory fallback path**: none
 **Project skill**: `.agents/skills/real-e2e-acceptance/SKILL.md`
 
 ## Execution Telemetry
