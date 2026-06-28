@@ -222,7 +222,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             )}
           </div>
 
-          {error?.stack && (
+          {import.meta.env.DEV && error?.stack && (
             <details className={styles.stackDetails}>
               <summary className={styles.stackSummary}>
                 {stackLabel}

@@ -143,7 +143,7 @@ func (e *recordingRunExecutor) Cancel(runID string) lifecycle.CancelResult {
 func TestInitialize(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rec := doJSONRPC(t, srv, "initialize", 1, map[string]any{
-		"protocolVersion": "2024-11-05",
+		"protocolVersion": "2025-06-18",
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "test-client", "version": "1.0"},
 	})
@@ -232,6 +232,162 @@ func TestToolsList(t *testing.T) {
 		if _, ok := toolMap["inputSchema"]; !ok {
 			t.Errorf("tool %d missing inputSchema", i)
 		}
+	}
+}
+
+// TestToolsListDescriptionsNotEmpty verifies that every tool in tools/list has
+// a non-empty description. This is a quality gate: MCP clients rely on
+// descriptions to present tool choices to users.
+func TestToolsListDescriptionsNotEmpty(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := doJSONRPC(t, srv, "tools/list", 1, nil)
+
+	resp := parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %+v", resp.Error)
+	}
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("result is not a map: %T", resp.Result)
+	}
+	tools, ok := result["tools"].([]any)
+	if !ok {
+		t.Fatalf("tools is not an array: %T", result["tools"])
+	}
+
+	for i, tool := range tools {
+		toolMap, ok := tool.(map[string]any)
+		if !ok {
+			t.Errorf("tool %d is not a map", i)
+			continue
+		}
+		name, _ := toolMap["name"].(string)
+		desc, _ := toolMap["description"].(string)
+		if desc == "" {
+			t.Errorf("tool %q has empty description", name)
+		}
+	}
+}
+
+// TestPrefixedToolNamesWork verifies that calling tools with the new
+// agenthub_ prefix works correctly (canonical names).
+func TestPrefixedToolNamesWork(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	// Test agenthub_list_projects
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name":      "agenthub_list_projects",
+		"arguments": map[string]any{},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("agenthub_list_projects: expected 200, got %d", rec.Code)
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("agenthub_list_projects: unexpected error: %+v", resp.Error)
+	}
+
+	// Test agenthub_list_threads
+	rec = doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "agenthub_list_threads",
+		"arguments": map[string]any{
+			"projectId": "proj_test",
+		},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("agenthub_list_threads: expected 200, got %d", rec.Code)
+	}
+	resp = parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("agenthub_list_threads: unexpected error: %+v", resp.Error)
+	}
+
+	// Test agenthub_get_thread
+	rec = doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "agenthub_get_thread",
+		"arguments": map[string]any{
+			"threadId": "thread_test",
+		},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("agenthub_get_thread: expected 200, got %d", rec.Code)
+	}
+	resp = parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("agenthub_get_thread: unexpected error: %+v", resp.Error)
+	}
+
+	// Test agenthub_get_run_status (with nonexistent run — should get tool error)
+	rec = doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "agenthub_get_run_status",
+		"arguments": map[string]any{
+			"runId": "nonexistent",
+		},
+	})
+	resp = parseResponse(t, rec)
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("agenthub_get_run_status: result is not a map: %T", resp.Result)
+	}
+	if result["isError"] != true {
+		t.Error("agenthub_get_run_status: expected isError for nonexistent run")
+	}
+
+	// Test agenthub_send_message
+	rec = doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "agenthub_send_message",
+		"arguments": map[string]any{
+			"threadId": "thread_test",
+			"content":  "Hello via prefixed name",
+			"role":     "user",
+		},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("agenthub_send_message: expected 200, got %d", rec.Code)
+	}
+	resp = parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("agenthub_send_message: unexpected error: %+v", resp.Error)
+	}
+}
+
+// TestDeprecatedToolAliasesWork verifies that calling tools with the old
+// unprefixed names still works (backward compatibility).
+func TestDeprecatedToolAliasesWork(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	deprecatedNames := []struct {
+		name     string
+		args     map[string]any
+	}{
+		{"list_projects", map[string]any{}},
+		{"list_threads", map[string]any{"projectId": "proj_test"}},
+		{"get_thread", map[string]any{"threadId": "thread_test"}},
+		{"get_run_status", map[string]any{"runId": "nonexistent"}}, // expect isError
+		{"send_message", map[string]any{"threadId": "thread_test", "content": "Hello deprecated", "role": "user"}},
+	}
+
+	for _, dn := range deprecatedNames {
+		t.Run(dn.name, func(t *testing.T) {
+			rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+				"name":      dn.name,
+				"arguments": dn.args,
+			})
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s: expected 200, got %d", dn.name, rec.Code)
+			}
+			resp := parseResponse(t, rec)
+			if resp.Error != nil {
+				t.Fatalf("%s: unexpected JSON-RPC error: %+v", dn.name, resp.Error)
+			}
+			// For nonexistent run, isError=true is expected (tool error, not JSON-RPC error)
+			result, _ := resp.Result.(map[string]any)
+			if dn.name == "get_run_status" {
+				if result == nil || result["isError"] != true {
+					t.Errorf("%s: expected isError for nonexistent run", dn.name)
+				}
+			}
+		})
 	}
 }
 

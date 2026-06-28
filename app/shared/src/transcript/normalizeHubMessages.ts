@@ -1,5 +1,6 @@
 import type { AttachmentRef } from '../composer';
 import type { TranscriptAuthor, TranscriptBlock, BadgeVariant } from './types';
+import { isRuntimeDiagnosticText } from './runtimeDiagnostics';
 
 export interface HubMessageAgentRef {
   id?: string;
@@ -103,6 +104,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
   const metadata = recalled ? null : hubContentMetadata(message.content);
   const text = recalled ? '消息已撤回' : renderHubContent(message.content, metadata?.record);
   if (!text.trim()) return null;
+  if (isRuntimeDiagnosticText(text)) return null;
 
   if (metadata?.routeDecision) {
     return {

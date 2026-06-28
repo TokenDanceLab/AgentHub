@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 
 import type { TranscriptUserItem } from '../transcript-item'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
+import MarkdownContent from '../../ui/Markdown'
+import { MessageDisplayMeta } from './MessageDisplayMeta'
 
 interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
 
@@ -16,7 +18,16 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
       <div className="grp-row user-row-right">
         <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
         <div className="grp-content user-content-right">
-          <div className="user-bubble">{item.text}</div>
+          <MessageDisplayMeta
+            align="right"
+            badgeLabel={item.badgeLabel}
+            badgeVariant={item.badgeVariant}
+            detail={item.displayDetail}
+            title={item.displayTitle}
+          />
+          <div className="user-bubble">
+            <MarkdownContent content={item.text} />
+          </div>
         </div>
         <div className="dm-avatar"><div className="ag-av user-av">D</div></div>
       </div>
@@ -31,7 +42,16 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
           <span className="ag-time">{item.time}</span>
           <span className="ag-name">{item.name || t('chat.you')}</span>
         </div>
-        <div className="user-bubble">{item.text}</div>
+        <MessageDisplayMeta
+          align="right"
+          badgeLabel={item.badgeLabel}
+          badgeVariant={item.badgeVariant}
+          detail={item.displayDetail}
+          title={item.displayTitle}
+        />
+        <div className="user-bubble">
+          <MarkdownContent content={item.text} />
+        </div>
       </div>
       <div className="dm-avatar"><div className="ag-av user-av">D</div></div>
     </div>

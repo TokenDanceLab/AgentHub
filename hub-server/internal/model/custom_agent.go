@@ -10,6 +10,12 @@ import (
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
+// MaxOutputSchemaSize caps the raw JSON Schema string size for structured output.
+// Schemas exceeding 16 KB are rejected at create/update time to prevent silent
+// failures when the schema exceeds OS command-line argument limits (Windows
+// CreateProcess ~32KB) or Claude Code's --json-schema argument limit.
+const MaxOutputSchemaSize = 16 << 10 // 16 KB
+
 type CustomAgent struct {
 	ID             string     `gorm:"primaryKey;type:uuid" json:"id"`
 	OwnerUserID    string     `gorm:"type:uuid;not null" json:"owner_user_id"`
@@ -19,8 +25,9 @@ type CustomAgent struct {
 	SystemPrompt   string     `gorm:"type:text;not null" json:"system_prompt"`
 	CapabilityTags string     `gorm:"type:jsonb;default:'[]'" json:"capability_tags,omitempty"`
 	ToolWhitelist  string     `gorm:"type:jsonb;default:'[]'" json:"tool_whitelist,omitempty"`
-	ModelParams    string     `gorm:"type:jsonb;default:'[]'" json:"model_params,omitempty"`
-	DeletedAt      *time.Time `gorm:"type:timestamptz" json:"deleted_at,omitempty"`
+	ModelParams    string          `gorm:"type:jsonb;default:'{}'" json:"model_params,omitempty"`
+	OutputSchema   *json.RawMessage `gorm:"type:jsonb" json:"output_schema,omitempty"`
+	DeletedAt      *time.Time      `gorm:"type:timestamptz" json:"deleted_at,omitempty"`
 	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -110,6 +117,9 @@ func (c *CustomAgent) validateJSONB() error {
 		if field.value == "" {
 			continue
 		}
+		if len(field.value) > MaxOutputSchemaSize {
+			return fmt.Errorf("%s exceeds maximum size of %d bytes", field.name, MaxOutputSchemaSize)
+		}
 		var decoded any
 		if err := json.Unmarshal([]byte(field.value), &decoded); err != nil {
 			return fmt.Errorf("invalid JSON in %s: %w", field.name, err)
@@ -122,6 +132,31 @@ func (c *CustomAgent) validateJSONB() error {
 		}
 		if _, ok := decoded.(map[string]any); !ok {
 			return fmt.Errorf("%s must be a JSON object", field.name)
+		}
+	}
+	// Validate output_schema: must be a valid JSON object if set,
+	// must not exceed MaxOutputSchemaSize, and must have basic JSON Schema
+	// structure (a "type" field at minimum) to catch common mistakes like
+	// empty objects or bare strings.
+	if c.OutputSchema != nil && len(*c.OutputSchema) > 0 {
+		raw := *c.OutputSchema
+		// Size check: json.RawMessage is []byte, len checks byte count.
+		if len(raw) > MaxOutputSchemaSize {
+			return fmt.Errorf("output_schema exceeds maximum size of %d bytes", MaxOutputSchemaSize)
+		}
+		var decoded any
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			return fmt.Errorf("invalid JSON in output_schema: %w", err)
+		}
+		obj, ok := decoded.(map[string]any)
+		if !ok {
+			return fmt.Errorf("output_schema must be a JSON object")
+		}
+		// Basic JSON Schema structural check: the object must have a "type"
+		// field. This catches empty objects {} and unrelated JSON objects
+		// like {"foo": "bar"} that are not valid schemas.
+		if _, hasType := obj["type"]; !hasType {
+			return fmt.Errorf("output_schema must contain a \"type\" field (valid JSON Schema required)")
 		}
 	}
 	return nil

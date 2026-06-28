@@ -208,6 +208,48 @@ describe('useWebWorkbenchModel helpers', () => {
     ]);
   });
 
+  it('normalizes project group list envelopes before projecting project cards', () => {
+    const projected = workspaceProjectToProjectInfo({
+      id: 'project-1',
+      name: 'AgentHub Web',
+      description: 'Project Group envelope shape',
+    }, {
+      threads: {
+        items: [{
+          id: 'thread-1',
+          project_id: 'project-1',
+          type: 'group',
+          name: 'Envelope Thread',
+          owner_user_id: 'owner-1',
+          role: 'owner',
+          member_count: 2,
+          created_at: '2026-06-09T12:00:00Z',
+        }],
+      } as unknown as never,
+      messages: {
+        items: [{
+          id: 'message-1',
+          project_id: 'project-1',
+          thread_id: 'thread-1',
+          seq_id: 1,
+          sender_type: 'user',
+          sender_id: 'user-1',
+          content_type: 'text',
+          content: 'Envelope message',
+          created_at: '2026-06-09T12:01:00Z',
+        }],
+      } as unknown as never,
+    });
+
+    expect(projected).toMatchObject({
+      status: 'Hub group',
+      meta: '1 threads · 1 messages',
+      members: ['owner'],
+      runs: expect.arrayContaining([expect.objectContaining({ id: 'thread-thread-1' })]),
+      feed: expect.arrayContaining([expect.objectContaining({ id: 'message-message-1' })]),
+    });
+  });
+
   it('treats auto mode with a ready Hub as real Projects status', () => {
     const loadError = new Error('Hub Projects unavailable');
     const actionError = new Error('Hub Projects create failed');
@@ -462,6 +504,44 @@ describe('useWebWorkbenchModel helpers', () => {
           { id: 'run-run-1', kind: 'run', label: 'Run run-1', status: 'running' },
         ],
       }),
+    ]);
+  });
+
+  it('orders Hub messages and runtime transcript blocks by their event time', () => {
+    const transcript = resolveWebWorkbenchTranscript(
+      true,
+      'hub-session-1',
+      [
+        {
+          id: 'message-after-runtime',
+          session_id: 'hub-session-1',
+          sender_type: 'user',
+          sender_id: 'user-1',
+          content_type: 'text',
+          content: '这条用户消息发生在 runtime 输出之后',
+          created_at: '2026-06-07T05:00:02Z',
+        },
+      ],
+      [
+        {
+          id: 'evt-runtime-before-user',
+          task_id: 'task-1',
+          edge_run_id: 'run-1',
+          edge_device_id: 'desktop-device-1',
+          adapter_id: 'codex',
+          session_id: 'hub-session-1',
+          event_seq: 1,
+          event_type: 'run.agent.text_block',
+          payload: { content: 'runtime 先输出' },
+          created_at: '2026-06-07T05:00:01Z',
+        },
+      ],
+    );
+
+    expect(transcript.map((block) => block.id)).toEqual([
+      'hub-runtime-session-task-1-run-1',
+      'edge-event-hub-runtime-evt-runtime-before-user',
+      'hub-message-message-after-runtime',
     ]);
   });
 

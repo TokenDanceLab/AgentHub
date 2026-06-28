@@ -7,7 +7,6 @@ import styles from './AgentHubWorkbench.module.css';
 
 export interface WorkspaceHeaderProps {
   activeConversation: WorkbenchConversation | undefined;
-  dataMode?: string | undefined;
   inspectorCollapsed: boolean;
   onToggleInspector: () => void;
   /** Called when the user clicks the search icon. */
@@ -16,7 +15,6 @@ export interface WorkspaceHeaderProps {
 
 export function WorkspaceHeader({
   activeConversation,
-  dataMode,
   inspectorCollapsed,
   onToggleInspector,
   onOpenSearch,
@@ -27,7 +25,6 @@ export function WorkspaceHeader({
   const runtimeLabel = activeConversation?.runtimeLabel ?? activeConversation?.subtitle;
   const threadLabel = activeConversation?.threadLabel
     ?? (activeConversation?.kind === 'group' ? '协作群' : '私聊');
-  const dataModeValue = dataModeControlValue(dataMode);
 
   return (
     <header className={styles.workspaceHeader}>
@@ -143,8 +140,4 @@ export function WorkspaceHeader({
       </div>
     </header>
   );
-}
-
-function dataModeControlValue(value: string | undefined): string {
-  return value?.trim().toLowerCase() ?? 'auto';
 }

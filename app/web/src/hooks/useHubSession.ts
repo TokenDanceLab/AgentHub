@@ -19,7 +19,7 @@ export function getWebHubToken(): string | null {
   if (typeof window === 'undefined') return null;
 
   for (const key of HUB_TOKEN_KEYS) {
-    const token = readStorageToken(window.sessionStorage, key) ?? readStorageToken(window.localStorage, key);
+    const token = readStorageToken(window.sessionStorage, key);
     if (token) return token;
   }
 

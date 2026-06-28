@@ -158,6 +158,19 @@ func NewReader() *Reader {
 	return &Reader{dbPath: dbPath}
 }
 
+// NewReaderWithPath creates a new Reader for the cc-switch database at the given
+// path. Returns nil if dbPath is empty or the file does not exist. Use this when
+// the db path is already known (e.g. from Detect()) to avoid re-deriving it.
+func NewReaderWithPath(dbPath string) *Reader {
+	if dbPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		return nil
+	}
+	return &Reader{dbPath: dbPath}
+}
+
 // ReadProviders reads all providers from the cc-switch database, grouped by
 // app_type. Only providers that are not in the failover queue are included by
 // default. The settings_config is parsed to extract model alias mappings.

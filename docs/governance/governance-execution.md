@@ -1,6 +1,6 @@
 # AgentHub 治理执行
 
-最后更新：2026-06-17
+最后更新：2026-06-27
 
 本文件将 TokenDance 系统治理映射为 AgentHub 执行项。AgentHub 是多 Agent 协作平台；它是 TokenDance ID 的 relying party，拥有 Hub、Edge、Desktop、Web 和 Mobile 客户端。
 
@@ -36,11 +36,32 @@
 5. Web 客户端仅连接 Hub（无本地 Edge loopback）；无直接第三方 provider 登录。
 6. 生产部署和运维证据保留在 server workspace；不得将主机/路径/密钥复制到本仓库。
 
+## Login fixture topology gate
+
+P0 remote-control fixture 只验证拓扑合同和离线证据形状：`Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter`。
+
+- Web 侧只用 Hub-issued session 和 Hub execution-target inventory fixture，不直连 Local Edge。
+- Desktop receives Hub dispatch -> Local Edge starts CLI adapter 是真实远控链路的后续验收，不属于登录 fixture slice。
+- future real TokenDanceID/OIDC login remains approval-gated；未获审批时，脚本不得打开真实浏览器登录、访问 TokenDance ID、启动真实 CLI/model 或部署。
+
+## Package and real-readiness gates
+
+D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）验证；它检查版本、workflow、sidecar 名称、ignore 策略和 artifact 合同，不运行发布流程。
+
+- full Tauri build / `pnpm tauri build` 是单独 opt-in 范围；Windows unsigned NSIS/portable 是未来显式启用的 artifact scope。
+- Windows sidecar 名称固定为 `agenthub-edge-x86_64-pc-windows-msvc.exe`；updater metadata 必须成对记录 `latest.json` 和 `.sig`。
+- macOS arm64 unsigned 边界只记录 `agenthub-edge-aarch64-apple-darwin`、`AgentHub.app` 和 `AgentHub_${version}_aarch64.dmg` 的未来包形状。
+- `notarytool` notarization、codesign、stapling、GitHub Release、release asset upload 和 updater 生产 metadata publication 都是 later approval slice（后续审批范围）。
+- dry artifacts 只允许作为 workflow artifact 上传；不发布到 release channel。
+- Packaged Desktop OIDC readiness 是 proposal-only gate；Packaged real login dry readiness 只读仓库，不访问 Hub/TokenDance ID、不打开浏览器、不读取 secrets。
+- unknown runtime fallback is forbidden; agentId must resolve through adapter registry without fallback.
+- Edge CLI real-readiness is proposal-only unless explicitly approved: No real CLI/model run, operator approval, runtime path/env ownership, budget/redaction policy, artifact root, and evidence mode must be recorded before RealTested or Submission.
+
 ## 同步清单
 
 - 当队列 ID 从未开始变为部分完成或已完成时，更新本文件。
 - 当主要功能或批次完成时，更新 `docs/roadmap.md`。
-- 当部署版本和 commit hash 变更时，更新根目录 `STATE.md`。
+- 当部署版本和 commit hash 变更时，更新 server workspace 的 AgentHub 运维状态文档；本仓库只保留无密证据指针。
 - 当新增发现、缓解措施或部署验证时，更新 `docs/governance/security-risk-register.md`。
-- 当 Hub session 或 token 规则变更时，更新根 `docs/identity/identity-auth.md` / `docs/identity/authorization-model.md`。
+- 当 Hub session 或 token 规则变更时，更新 workspace 根 `../docs/identity/identity-auth.md` / `../docs/identity/authorization-model.md`。
 - 当 API 契约变更时，更新 `api/openapi.yaml` 和 `api/events.md`。

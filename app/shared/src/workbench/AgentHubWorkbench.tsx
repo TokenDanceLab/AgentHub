@@ -13,7 +13,7 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationHost, type MainchainSummary } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
@@ -61,8 +61,8 @@ const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
-  readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
-  readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+  readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+  readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
   generatedAt: null,
   items: [
     { id: 'codex', name: 'Codex CLI', installed: false, version: null, path: 'codex', noSpend: true },
@@ -328,8 +328,8 @@ export function AgentHubWorkbench({
 
   // ── Inspector data: route decisions, context usage, deploy preview ──
   const inspectorRouteBlocks = useMemo(
-    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock =>
-      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'child_agent',
+    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock =>
+      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent',
     ),
     [transcript],
   );
@@ -1299,6 +1299,7 @@ export function AgentHubWorkbench({
       data-selection-mode={selectionMode ? 'true' : 'false'}
       data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}
       data-sidebar-resizing={sidebarResizing ? 'true' : 'false'}
+      data-data-mode={workbenchStatus?.dataMode}
       data-testid="agenthub-workbench"
       style={shellStyle}
     >

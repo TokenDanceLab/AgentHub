@@ -244,10 +244,17 @@ func typingSessionID(payload any) string {
 	return ""
 }
 
-func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) bool {
+func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (ok bool) {
 	if userID == "" || sessionID == "" || h.manager.ResolveMembers == nil {
 		return false
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("ws canTypeInSession panic recovered in ResolveMembers callback",
+				"user_id", userID, "session_id", sessionID, "panic", r)
+			ok = false
+		}
+	}()
 	for _, memberID := range h.manager.ResolveMembers(sessionID) {
 		if memberID == userID {
 			return true

@@ -1,6 +1,7 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript';
+import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '../transcript';
 import type { ComposerMention } from '../composer';
 import { buildComposerIntent, composerReducer, createInitialComposerState } from '../composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
@@ -18,22 +19,6 @@ import styles from './AgentHubWorkbench.module.css';
 export interface MainchainSummary {
   nodes: Array<{ id: string; label: string; detail: string; state: 'done' | 'active' | 'waiting' | 'blocked' | 'empty' }>;
   exportEnabled: boolean; exportLabel: string; exportDetail: string;
-}
-
-function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
-  switch (block.kind) {
-    case 'run_step_group':
-    case 'run_session':
-    case 'agent_timeline':
-    case 'route_decision':
-    case 'subagent':
-    case 'subtask':
-    case 'child_agent':
-    case 'context_usage':
-      return true;
-    default:
-      return false;
-  }
 }
 
 export interface ConversationHostProps {
@@ -68,6 +53,11 @@ export interface ConversationHostProps {
   onSearchOpenChange: (open: boolean) => void;
 }
 
+type PendingUserBlock = TextTranscriptBlock & {
+  ackBaselineCount: number;
+  ackOrdinal: number;
+};
+
 export const ConversationHost = React.memo(function ConversationHost({
   transcript, activeConversation, connectionStatus, inspectorCollapsed, onToggleInspector,
   showMainchainStatus, mainchainSummary, onExportMainchainEvidence, workbenchStatus,
@@ -82,19 +72,23 @@ export const ConversationHost = React.memo(function ConversationHost({
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
-  const [pendingUserBlock, setPendingUserBlock] = useState<TextTranscriptBlock | null>(null);
+  const [pendingUserBlocks, setPendingUserBlocks] = useState<PendingUserBlock[]>([]);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const composerSubmitBehavior = useComposerSubmitBehavior();
 
   const displayTranscript = useMemo(() => {
     const chat = transcript.filter((b) => !isSidebarOnlyTranscriptBlock(b));
-    return pendingUserBlock ? [...chat, pendingUserBlock] : chat;
-  }, [transcript, pendingUserBlock]);
+    const unacknowledged = unacknowledgedPendingUserBlocks(chat, pendingUserBlocks);
+    return orderTranscriptBlocks([
+      ...chat,
+      ...unacknowledged,
+    ]);
+  }, [transcript, pendingUserBlocks]);
 
   useEffect(() => {
-    if (pendingUserBlock && transcript.some((b) => b.id === pendingUserBlock.id)) setPendingUserBlock(null);
-  }, [transcript, pendingUserBlock]);
+    setPendingUserBlocks((current) => unacknowledgedPendingUserBlocks(transcript, current));
+  }, [transcript]);
 
   const submitComposer = useCallback(async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -105,16 +99,25 @@ export const ConversationHost = React.memo(function ConversationHost({
     const capturedConversationId = currentConversationId;
     isSubmittingRef.current = true;
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
+    let optimisticId: string | undefined;
     try {
       const intent = buildComposerIntent(composer);
       const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
       const capturedAttachments = composer.attachments;
       const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
-      setPendingUserBlock({
-        id: `pending-user-${Date.now()}`, kind: 'text', text: liveText.trim(),
+      optimisticId = `pending-user-${Date.now()}`;
+      const pendingText = liveText.trim();
+      const pendingUserBlock: PendingUserBlock = {
+        id: optimisticId, kind: 'text', text: liveText.trim(),
         author: { id: 'user', name: 'You', role: 'human' as const }, createdAt: new Date().toISOString(),
+        ackBaselineCount: countMatchingConfirmedUserBlocks(transcript, pendingText),
+        ackOrdinal: 1,
         ...(composer.replyTo ? { replyToMessageId: composer.replyTo.messageId, replyPreview: composer.replyTo.preview, replyAuthor: composer.replyTo.author } : {}),
         ...(composer.quote ? { quote: composer.quote.text } : {}),
+      };
+      setPendingUserBlocks((current) => {
+        const ackOrdinal = current.filter((pending) => pending.text.trim() === pendingText).length + 1;
+        return [...current, { ...pendingUserBlock, ackOrdinal }];
       });
       dispatchComposer({ type: 'resetAfterSubmit' });
       dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
@@ -135,15 +138,16 @@ export const ConversationHost = React.memo(function ConversationHost({
       const finalIntent = enrichedAttachments.length > 0 ? { ...intentWithLiveText, attachments: enrichedAttachments } : intentWithLiveText;
       const submitPayload = { ...finalIntent, ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}) };
       await platform.runs.submitComposerIntent(submitPayload);
-      setPendingUserBlock(null);
       dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
     } catch (err) {
-      setPendingUserBlock(null);
+      if (optimisticId) {
+        setPendingUserBlocks((current) => current.filter((pending) => pending.id !== optimisticId));
+      }
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
       setUploadProgresses({});
       onToast(err instanceof Error ? err.message : '提交失败，请重试');
     } finally { isSubmittingRef.current = false; }
-  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer]);
+  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, transcript]);
 
   const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
   const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);
@@ -151,7 +155,7 @@ export const ConversationHost = React.memo(function ConversationHost({
 
   return (
     <>
-      <WorkspaceHeader activeConversation={activeConversation} dataMode={workbenchStatus?.dataMode}
+      <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
       <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
@@ -179,6 +183,34 @@ export const ConversationHost = React.memo(function ConversationHost({
     </>
   );
 });
+
+function unacknowledgedPendingUserBlocks(
+  blocks: TranscriptBlock[],
+  pendingBlocks: PendingUserBlock[],
+): PendingUserBlock[] {
+  return pendingBlocks.filter((pending) => {
+    const pendingText = pending.text.trim();
+    const matchingConfirmedCount = countMatchingConfirmedUserBlocks(blocks, pendingText);
+    return !hasAcknowledgedPendingUserBlock(blocks, pending, matchingConfirmedCount);
+  });
+}
+
+function hasAcknowledgedPendingUserBlock(
+  blocks: TranscriptBlock[],
+  pending: PendingUserBlock,
+  matchingConfirmedCount: number,
+): boolean {
+  if (blocks.some((block) => block.id === pending.id)) return true;
+  return matchingConfirmedCount >= pending.ackBaselineCount + pending.ackOrdinal;
+}
+
+function countMatchingConfirmedUserBlocks(blocks: TranscriptBlock[], text: string): number {
+  return blocks.filter((block) => (
+    block.kind === 'text' &&
+    block.author.role === 'human' &&
+    block.text.trim() === text
+  )).length;
+}
 
 function MainchainStatusStrip({ onExportEvidence, summary }: {
   onExportEvidence: () => void;

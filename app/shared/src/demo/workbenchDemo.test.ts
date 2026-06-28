@@ -110,13 +110,13 @@ describe('workbench v4 demo data source', () => {
     expect(collabTranscript[0]).toHaveProperty('id');
   });
 
-  it('exposes the ByteDance TeamRun fixture without live-runtime claims', () => {
+  it('exposes the TeamRun fixture without live-runtime claims', () => {
     const store = createWorkbenchDemoStore();
     const teamRun = store.conversations.find((conversation) => conversation.id === TEAMRUN_DEMO_CONVERSATION_ID);
     const transcript = resolveDemoWorkbenchTranscript(TEAMRUN_DEMO_CONVERSATION_ID);
 
     expect(teamRun).toEqual(expect.objectContaining({
-      title: 'ByteDance TeamRun',
+      title: 'TeamRun Fixture',
       model: 'fixture-only',
     }));
     expect(teamRunDemoScenario.fixtureOnly).toBe(true);
@@ -164,8 +164,11 @@ describe('workbench v4 demo data source', () => {
     }));
     expect(agentBlock).toEqual(expect.objectContaining({
       kind: 'text',
-      text: expect.stringContaining('已收到 mock 输入'),
+      text: expect.stringContaining('收到，我会继续跟进'),
     }));
+    expect(agentBlock).not.toHaveProperty('displayTitle');
+    expect(agentBlock).not.toHaveProperty('displayDetail');
+    expect(agentBlock).not.toHaveProperty('badgeLabel');
     expect(emits).toBe(1);
   });
 

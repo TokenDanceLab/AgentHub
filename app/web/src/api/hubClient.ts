@@ -1039,6 +1039,64 @@ export function createHubClient(opts: HubClientOptions = {}) {
     const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: formData, signal: controller.signal });
     clearTimeout(timeoutId);
     const body = res.status === 204 ? undefined : await readJsonBody(res);
+
+    // ── Token refresh recovery on 401 ──────────────────
+    if (res.status === 401 && opts.onRefreshToken) {
+      try {
+        const newToken = await opts.onRefreshToken();
+        if (newToken) {
+          // Retry once with fresh token
+          headers.Authorization = `Bearer ${newToken}`;
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), 30_000);
+          let retryRes: Response;
+          try {
+            retryRes = await fetch(`${base}${path}`, { method: 'POST', headers, body: formData, signal: retryController.signal });
+          } catch (retryErr) {
+            clearTimeout(retryTimeoutId);
+            throw retryErr;
+          }
+          clearTimeout(retryTimeoutId);
+          const retryBody = retryRes.status === 204 ? undefined : await readJsonBody(retryRes);
+
+          if (!retryRes.ok) {
+            if (isSharedErrorBody(retryBody)) {
+              throw new AppError({ error: retryBody.error }, retryRes.status, retryBody);
+            }
+            if (isHubEnvelope(retryBody)) {
+              throw new AppError(
+                {
+                  error: {
+                    code: retryBody.code || 'hub_error',
+                    message: retryBody.message || retryRes.statusText || 'Hub upload failed',
+                  },
+                },
+                retryRes.status,
+                retryBody,
+              );
+            }
+            throw new AppError(
+              {
+                error: {
+                  code: retryRes.status >= 500 ? 'internal_error' : 'bad_request',
+                  message: `HTTP ${retryRes.status}: ${retryRes.statusText}`,
+                },
+              },
+              retryRes.status,
+              retryBody,
+            );
+          }
+
+          if (retryRes.status === 204) return undefined as T;
+          if (isHubEnvelope<T>(retryBody)) return retryBody.data as T;
+          return retryBody as T;
+        }
+      } catch (refreshErr) {
+        if (refreshErr instanceof AppError) throw refreshErr;
+        console.error('[hubClient] Token refresh failed during upload, proceeding with original 401', refreshErr);
+      }
+    }
+
     if (!res.ok) {
       if (isSharedErrorBody(body)) {
         throw new AppError({ error: body.error }, res.status, body);

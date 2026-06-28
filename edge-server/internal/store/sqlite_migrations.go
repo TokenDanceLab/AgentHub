@@ -269,6 +269,12 @@ func openSQLiteDatabase(path string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("enable sqlite foreign keys: %w", err)
 	}
+	// Auto-checkpoint WAL every 100 frames to prevent unbounded WAL growth.
+	// Default is 1000; lowering to 100 keeps the WAL and in-memory page cache small.
+	if _, err := db.Exec(`PRAGMA wal_autocheckpoint = 100`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("configure sqlite wal autocheckpoint: %w", err)
+	}
 	return db, nil
 }
 

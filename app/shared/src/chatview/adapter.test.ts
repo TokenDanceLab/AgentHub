@@ -41,6 +41,27 @@ describe('blocksToTranscriptItems', () => {
     expect(agent.rows[1]!.type).toBe('tool')
   })
 
+  it('preserves the chronological order of agent tool cards and text bubbles', () => {
+    const blocks: TranscriptBlock[] = [
+      { id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'), toolName: 'Read', status: 'completed' },
+      { id: 't1', kind: 'text', createdAt: makeTime(2), author: makeAuthor('b1'), text: '我先定位 AgentHub 项目。' },
+      { id: 'tc2', kind: 'tool_call', createdAt: makeTime(3), author: makeAuthor('b1'), toolName: 'Glob', status: 'running' },
+    ] as TranscriptBlock[]
+
+    const items = blocksToTranscriptItems(blocks)
+    const agent = items[0] as AgentTranscriptBlock & {
+      parts?: Array<{ type: 'row'; row: { toolName?: string } } | { type: 'bubble'; text: string }>
+    }
+
+    expect(agent.parts?.map((part) => (
+      part.type === 'bubble' ? `bubble:${part.text}` : `row:${part.row.toolName}`
+    ))).toEqual([
+      'row:read',
+      'bubble:我先定位 AgentHub 项目。',
+      'row:glob',
+    ])
+  })
+
   it('splits different agents into separate blocks', () => {
     const blocks: TranscriptBlock[] = [
       {
@@ -81,6 +102,58 @@ describe('blocksToTranscriptItems', () => {
     expect(rows![0]!.type).toBe('tool')
     expect(rows![0]!.status).toBe('ok')
     expect(rows![0]!.isResult).toBe(true)
+  })
+
+  it('matches interleaved same-name tool results by backend call id', () => {
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'call-a',
+        kind: 'tool_call',
+        createdAt: makeTime(1),
+        author: makeAuthor('b1'),
+        toolName: 'Read',
+        callId: 'toolu-a',
+        status: 'running',
+        target: 'a.ts',
+      },
+      {
+        id: 'call-b',
+        kind: 'tool_call',
+        createdAt: makeTime(2),
+        author: makeAuthor('b1'),
+        toolName: 'Read',
+        callId: 'toolu-b',
+        status: 'running',
+        target: 'b.ts',
+      },
+      {
+        id: 'result-b',
+        kind: 'tool_result',
+        createdAt: makeTime(3),
+        author: makeAuthor('b1'),
+        toolName: 'Read',
+        callId: 'toolu-b',
+        status: 'completed',
+        summary: 'b result',
+      },
+      {
+        id: 'result-a',
+        kind: 'tool_result',
+        createdAt: makeTime(4),
+        author: makeAuthor('b1'),
+        toolName: 'Read',
+        callId: 'toolu-a',
+        status: 'completed',
+        summary: 'a result',
+      },
+    ] as TranscriptBlock[]
+
+    const items = blocksToTranscriptItems(blocks)
+    const rows = (items[0] as AgentTranscriptBlock).rows
+
+    expect(rows).toHaveLength(2)
+    expect(rows![0]).toMatchObject({ id: 'call-a', content: 'a result', toolCallId: 'toolu-a' })
+    expect(rows![1]).toMatchObject({ id: 'call-b', content: 'b result', toolCallId: 'toolu-b' })
   })
 
   it('maps file_change with patch to diffLines', () => {

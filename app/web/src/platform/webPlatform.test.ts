@@ -152,9 +152,33 @@ describe('webPlatform workbench agent mapping', () => {
     expect(webConversationWithPinnedMessages(conversation, [])).not.toHaveProperty('pinnedAnnouncement');
   });
 
-  it('routes auto unauthenticated submits into the demo runtime store', async () => {
+  it('does not route unauthenticated auto submits into the demo runtime store by default', async () => {
     const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
     const platform = createWebPlatform({
+      demoRuntimeStore,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: '不能静默写入 demo runtime',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        author: expect.objectContaining({ role: 'human' }),
+        text: '不能静默写入 demo runtime',
+      }),
+    ]));
+  });
+
+  it('routes unauthenticated auto submits into the demo runtime only when explicitly allowed', async () => {
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const platform = createWebPlatform({
+      demoRuntimeFallback: true,
       demoRuntimeStore,
     });
 
@@ -174,7 +198,7 @@ describe('webPlatform workbench agent mapping', () => {
       }),
       expect.objectContaining({
         author: expect.objectContaining({ name: 'AgentHub Demo' }),
-        displayTitle: 'Demo 模式已记录输入',
+        text: expect.stringContaining('收到，我会继续跟进'),
       }),
     ]));
   });

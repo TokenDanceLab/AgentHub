@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ── parseFrontmatter Tests ───────────────────────────────────────────────────
@@ -643,5 +644,261 @@ func TestWriteThenReadRoundTrip(t *testing.T) {
 	}
 	if result.PromptText == "" {
 		t.Error("PromptText is empty after round-trip")
+	}
+}
+
+// ── Memory TTL Tests ─────────────────────────────────────────────────────────
+
+func TestParseFrontmatterWithExpiresAt(t *testing.T) {
+	expTime := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	yaml := "id: mem_ttl\ncreated: 2026-06-10T08:00:00Z\nexpires_at: 2026-07-01T00:00:00Z\nsource: user"
+	entry, err := parseFrontmatter(yaml, "TTL content.")
+	if err != nil {
+		t.Fatalf("parseFrontmatter returned error: %v", err)
+	}
+	if entry.ExpiresAt == nil {
+		t.Fatal("ExpiresAt is nil, expected non-nil")
+	}
+	if !entry.ExpiresAt.Equal(expTime) {
+		t.Errorf("ExpiresAt = %v, want %v", entry.ExpiresAt, expTime)
+	}
+}
+
+func TestParseFrontmatterWithLastAccessed(t *testing.T) {
+	accessedTime := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	yaml := "id: mem_la\ncreated: 2026-06-10T08:00:00Z\nlast_accessed: 2026-06-20T12:00:00Z"
+	entry, err := parseFrontmatter(yaml, "content")
+	if err != nil {
+		t.Fatalf("parseFrontmatter returned error: %v", err)
+	}
+	if entry.LastAccessed == nil {
+		t.Fatal("LastAccessed is nil, expected non-nil")
+	}
+	if !entry.LastAccessed.Equal(accessedTime) {
+		t.Errorf("LastAccessed = %v, want %v", entry.LastAccessed, accessedTime)
+	}
+}
+
+func TestParseFrontmatterWithoutOptionalFields(t *testing.T) {
+	yaml := "id: mem_basic\ncreated: 2026-06-10T08:00:00Z"
+	entry, err := parseFrontmatter(yaml, "basic content")
+	if err != nil {
+		t.Fatalf("parseFrontmatter returned error: %v", err)
+	}
+	if entry.ExpiresAt != nil {
+		t.Errorf("ExpiresAt = %v, want nil", entry.ExpiresAt)
+	}
+	if entry.LastAccessed != nil {
+		t.Errorf("LastAccessed = %v, want nil", entry.LastAccessed)
+	}
+}
+
+func TestParseOptionalTimeEmpty(t *testing.T) {
+	result := parseOptionalTime("")
+	if result != nil {
+		t.Errorf("expected nil for empty string, got %v", result)
+	}
+}
+
+func TestParseOptionalTimeInvalid(t *testing.T) {
+	result := parseOptionalTime("not-a-timestamp")
+	if result != nil {
+		t.Errorf("expected nil for invalid string, got %v", result)
+	}
+}
+
+func TestDefaultMemoryTTL(t *testing.T) {
+	expected := 30 * 24 * time.Hour
+	if DefaultMemoryTTL != expected {
+		t.Errorf("DefaultMemoryTTL = %v, want %v", DefaultMemoryTTL, expected)
+	}
+}
+
+func TestReadMemoryFiltersExpiredEntries(t *testing.T) {
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Entry that expired 1 hour ago
+	expiredTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+	expiredContent := "---\nid: expired_entry\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\nexpires_at: " + expiredTime + "\nsource: user\n---\n\nExpired content."
+	if err := os.WriteFile(filepath.Join(memDir, "project.md"), []byte(expiredContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := ReadMemory(dir, "", "")
+	if len(result.Entries) != 0 {
+		t.Errorf("expected 0 entries (expired filtered), got %d", len(result.Entries))
+	}
+	if result.FilesRead != 0 {
+		t.Errorf("FilesRead = %d, want 0 (expired file treated as empty)", result.FilesRead)
+	}
+	// Should have a warning about expired entries
+	if len(result.Warnings) != 1 {
+		t.Fatalf("expected 1 warning for expired entries, got %d: %v", len(result.Warnings), result.Warnings)
+	}
+	if !strings.Contains(result.Warnings[0], "expired") {
+		t.Errorf("warning should mention expired: %q", result.Warnings[0])
+	}
+}
+
+func TestReadMemoryKeepsNonExpiredEntries(t *testing.T) {
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Entry that expires 1 hour in the future
+	futureTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
+	content := "---\nid: future_entry\ncreated: 2026-06-10T08:00:00Z\nupdated: 2026-06-10T08:00:00Z\nexpires_at: " + futureTime + "\nsource: user\n---\n\nFuture content."
+	if err := os.WriteFile(filepath.Join(memDir, "project.md"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := ReadMemory(dir, "", "")
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry (not expired), got %d", len(result.Entries))
+	}
+	if result.Entries[0].ID != "future_entry" {
+		t.Errorf("ID = %q, want %q", result.Entries[0].ID, "future_entry")
+	}
+	if result.Entries[0].LastAccessed == nil {
+		t.Error("LastAccessed should be set on read")
+	}
+}
+
+func TestReadMemorySetsLastAccessed(t *testing.T) {
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := "---\nid: no_last_access\ncreated: 2026-06-10T08:00:00Z\nupdated: 2026-06-10T08:00:00Z\nsource: user\n---\n\nContent without last_accessed."
+	if err := os.WriteFile(filepath.Join(memDir, "project.md"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	before := time.Now()
+	result := ReadMemory(dir, "", "")
+	after := time.Now()
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	la := result.Entries[0].LastAccessed
+	if la == nil {
+		t.Fatal("LastAccessed is nil after read")
+	}
+	if la.Before(before) || la.After(after) {
+		t.Errorf("LastAccessed = %v, expected between %v and %v", la, before, after)
+	}
+}
+
+func TestReadMemoryMixedExpiredAndLive(t *testing.T) {
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Two entries: one expired, one live
+	futureTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
+	pastTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+
+	content := "---\nid: live_one\ncreated: 2026-06-10T08:00:00Z\nupdated: 2026-06-10T08:00:00Z\nexpires_at: " + futureTime + "\nsource: user\n---\n\nLive content.\n\n" +
+		"---\nid: dead_one\ncreated: 2026-06-10T08:00:00Z\nupdated: 2026-06-10T08:00:00Z\nexpires_at: " + pastTime + "\nsource: agent\n---\n\nDead content."
+
+	if err := os.WriteFile(filepath.Join(memDir, "project.md"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := ReadMemory(dir, "", "")
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 live entry (1 expired filtered), got %d", len(result.Entries))
+	}
+	if result.Entries[0].ID != "live_one" {
+		t.Errorf("ID = %q, want %q", result.Entries[0].ID, "live_one")
+	}
+	if len(result.Warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(result.Warnings))
+	}
+	if !strings.Contains(result.Warnings[0], "expired") {
+		t.Errorf("warning should mention expired: %q", result.Warnings[0])
+	}
+}
+
+func TestWriteMemoryEntryWithTTLFields(t *testing.T) {
+	dir := t.TempDir()
+
+	expTime := time.Now().Add(24 * time.Hour)
+	accessedTime := time.Now()
+
+	entry, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:           "ttl-entry",
+			Content:      "Entry with TTL fields.",
+			Source:       "user",
+			ExpiresAt:    &expTime,
+			LastAccessed: &accessedTime,
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMemoryEntry returned error: %v", err)
+	}
+
+	if entry.ExpiresAt == nil || !entry.ExpiresAt.Equal(expTime) {
+		t.Errorf("ExpiresAt lost after write: %v", entry.ExpiresAt)
+	}
+	if entry.LastAccessed == nil || !entry.LastAccessed.Equal(accessedTime) {
+		t.Errorf("LastAccessed lost after write: %v", entry.LastAccessed)
+	}
+
+	// Verify the fields appear in the written file
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	data, err := os.ReadFile(filepath.Join(memDir, "project.md"))
+	if err != nil {
+		t.Fatalf("project.md not found: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "expires_at:") {
+		t.Errorf("written file missing expires_at: %q", content)
+	}
+	if !strings.Contains(content, "last_accessed:") {
+		t.Errorf("written file missing last_accessed: %q", content)
+	}
+}
+
+func TestWriteMemoryEntryWithoutTTLFields(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "no-ttl",
+			Content: "Entry without TTL fields.",
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMemoryEntry returned error: %v", err)
+	}
+
+	// Verify the file does NOT contain the optional fields
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	data, err := os.ReadFile(filepath.Join(memDir, "project.md"))
+	if err != nil {
+		t.Fatalf("project.md not found: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "expires_at:") {
+		t.Errorf("written file should not have expires_at when nil: %q", content)
+	}
+	if strings.Contains(content, "last_accessed:") {
+		t.Errorf("written file should not have last_accessed when nil: %q", content)
 	}
 }

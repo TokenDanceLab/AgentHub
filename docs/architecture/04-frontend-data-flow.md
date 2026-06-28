@@ -2,18 +2,36 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-17
+> 最后更新：2026-06-27
 
-## 概述
+本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
-前端通过 Platform Adapter 统一消费后端数据。shared UI 不直接调用 Tauri invoke、Hub client 或 Edge client。
+## 设计边界
 
-## Platform Adapter Pattern
+前端分三层：
+
+```text
+Desktop/Web/Mobile app shell
+  -> platform adapter
+  -> app/shared workbench + chatview
+  -> transcript normalizer + renderer
+```
+
+规则：
+
+- `app/shared/` 拥有 workbench、transcript、composer、inspector 和 chatview 组件合同。
+- Desktop/Web/Mobile 只提供 platform adapter、认证、查询、runtime bridge 和壳层能力。
+- Shared UI 不直接调用 Tauri invoke、Hub client 或 Edge client。
+- Desktop renderer 不直接执行 CLI；本地执行走 Tauri host typed API、Local Edge 和 Edge adapter。
+- Web/Mobile 只走 Hub-facing adapter；不能直连 Local Edge 或 raw runtime。
+- Demo/mock/mode/debug 状态不进入 transcript bubbles；这些信息属于状态栏、设置、manifest 或测试报告。
+
+## Platform Adapter Contract
 
 ```ts
 interface AgentHubPlatform {
-  surface: AgentHubSurface;           // "desktop" | "web"
-  capabilities: SurfaceCapabilities;  // { localEdge, localFiles, browserPreview }
+  surface: AgentHubSurface;           // "desktop" | "web" | "mobile"
+  capabilities: SurfaceCapabilities;  // localEdge, localFiles, browserPreview...
   conversations: ConversationPort;
   runs: RunPort;
   attachments?: AttachmentPort;
@@ -23,143 +41,105 @@ interface AgentHubPlatform {
 }
 ```
 
-### Desktop Adapter
+Desktop adapter 负责 Local Edge、Hub REST/WS、Tauri file/dialog/window/keyring/notification、workspace allowlist 和 TokenDance ID loopback callback。Web/Mobile adapters 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval；Mobile native capability proof 另走 Mobile gates。
 
-- Local Edge status/start/stop
-- Edge REST/WS（Thread / Run / Artifact / Agent）
-- **Hub REST/WS**（认证 / 联系人 / 会话 / 消息 / 项目 / 文档）—— 通过 `hubClient.ts` 直连 Hub Server，不经过 Edge
-- Tauri file/dialog/window/keyring/notification
-- Local workspace allowlist
-- TokenDance ID loopback callback
+UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套组件。
 
-### Web Adapter
+## Source Owner Map
 
-- Hub REST/WS
-- Hub session
-- Remote Edge/Cloud target routing
-- Browser-safe preview
-- Remote approval
-
-UI 能根据 `capabilities` 隐藏或禁用不可用动作，但不能 fork 另一套组件。
-
-## Desktop Query Hooks (`app/desktop/src/api/`)
-
-| 文件 | 用途 |
+| 责任 | Owner |
 |---|---|
-| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/reactions） |
-| `hubQueries.ts` | Hub 联系人/会话/消息 React Query hooks |
-| `sessionQueries.ts` | 会话 CRUD + 消息操作 hooks（pin/unpin/forward/markRead/reactions） |
-| `hubWS.ts` | Hub WebSocket 连接管理 |
-| `hubAuth.ts` | Hub 认证 + token 管理 |
-| `hubTokenStorage.ts` | Token 持久化 |
-| `edgeClient.ts` | Edge REST 客户端 |
-| `edgeAuth.ts` | Edge 认证 |
-| `eventClient.ts` | Edge EventStore 客户端 |
-| `runQueries.ts` | Edge run lifecycle hooks |
-| `runEvidenceQueries.ts` | Run evidence 查询 |
-| `threadQueries.ts` | Thread CRUD hooks |
-| `agentQueries.ts` | Agent 列表查询 |
-| `agentProfileQueries.ts` | Hub Agent Profile CRUD hooks |
-| `agentTeamQueries.ts` | Agent Team Run hooks |
-| `contactQueries.ts` | 联系人 hooks |
-| `projectQueries.ts` | Hub projects hooks |
-| `documentQueries.ts` | Hub documents CRUD hooks |
-| `executionTargetQueries.ts` | Execution target hooks |
-| `modelCatalogQueries.ts` | 模型目录发现 |
-| `teamRunQueries.ts` | TeamRun 编排 hooks |
-| `deviceId.ts` | 设备 ID 管理 |
-| `schemas.ts` | Zod schema 验证 |
-| `allowlistValidation.ts` | Tool allowlist 验证 |
-| `transport.ts` | HTTP transport 层 |
-| `queryClient.ts` | React Query client 配置 |
+| Workbench shell / rail / inspector / routes | `app/shared/src/workbench/` |
+| Chat transcript renderer | `app/shared/src/chatview/` |
+| Transcript block types, ordering, Hub/Edge normalization, evidence | `app/shared/src/transcript/` |
+| Data mode compatibility contract | `app/shared/src/demo/dataMode.ts`, `app/shared/src/testing/e2eDataModeContract.ts` |
+| Desktop app shell and adapter wiring | `app/desktop/src/App.tsx`, `app/desktop/src/platform/`, `app/desktop/src/api/` |
+| Web/Mobile app shell and adapter wiring | `app/web/src/App.tsx`, `app/web/src/platform/`, `app/web/src/api/`, `app/mobile-rn/src/platform/`, `app/mobile-rn/src/api/` |
+| Client lane E2E/contract gates | `app/desktop/src/__e2e__/chat-flow-ui.spec.ts`, `app/web/src/__e2e__/`, `app/mobile-rn/src/importBoundary.test.ts`, `app/mobile-rn/src/api/` |
 
-## Web Query Hooks (`app/web/src/api/`)
+Do not add per-hook inventory tables here. If a file moves, update this owner map and the nearest README/source test, not a duplicate implementation checklist.
 
-| 文件 | 用途 |
-|---|---|
-| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/forward/reactions/search） |
-| `hubWS.ts` | Hub WebSocket 连接管理 |
-| `hubAuth.ts` | Hub 认证 + token 管理 |
-| `hubTokenStorage.ts` | Token 持久化 |
-| `edgeClient.ts` | Edge REST 客户端 |
-| `transport.ts` | HTTP transport 层 |
-| `queryClient.ts` | React Query client 配置 |
-| `runQueries.ts` | Edge run lifecycle hooks |
-| `threadQueries.ts` | Thread CRUD hooks |
-| `agentQueries.ts` | Agent 列表查询 |
-| `agentTeamQueries.ts` | Agent Team hooks |
-| `contactQueries.ts` | 联系人 hooks |
-| `projectQueries.ts` | Hub projects hooks |
-| `executionTargetQueries.ts` | Execution target hooks |
-| `deviceId.ts` | 设备 ID 管理 |
+## Transcript Pipeline
 
-## React Query Hooks
-
-所有后端数据通过 React Query 管理。Desktop 的 Hub API 查询统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
-
-## WebSocket 实时缓存失效模式
+The visible chat flow is a single timeline:
 
 ```text
-Hub WS event (message.new / session.updated / ...)
-  -> useHubWebSocket event handler
-  -> React Query queryClient.invalidateQueries([queryKey])
-  -> UI 自动重新获取最新数据
+Hub / Edge / fixture / mock source
+  -> TranscriptBlock[]
+  -> order + normalize + filter diagnostics
+  -> ChatViewBridge
+  -> ChatViewTranscript
+  -> blocksToTranscriptItems
+  -> TranscriptItem[]
+  -> UserMessage / AgentGroup / RowItem
 ```
 
-覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
+Stable behavior:
 
-## Settings 三层回退模式
+- User messages are optimistic and must appear immediately after submit; refetch, replay, or runtime events must not make them flash away.
+- All sources are ordered by event time, then stable input order. User text, agent text, tool call/result, approval, subagent report, diff, artifact, deploy, context usage and preview stay in one linear transcript.
+- Adjacent agent blocks from the same author are grouped by shared chatview adapter. Tool result replaces its matching tool call when a call id or tool name matches.
+- Runtime diagnostics and mock/mode/debug labels are filtered before rendering as chat bubbles.
+- Markdown, code blocks and tables render inside shared bubble/card components, not as escaped plaintext.
+- Auto-follow scrolls on first render, near-bottom updates, or a local user submit; user-initiated scrollback must not be forcibly overridden.
 
-Desktop 设置读取按以下优先级回退：
+## Realtime And Cache Flow
+
+Hub realtime events follow this pattern:
 
 ```text
-Edge settings API (本地实时配置)
-  -> Hub settings API (跨设备同步)
-    -> localStorage (离线兜底)
+Hub WS event
+  -> platform event bridge
+  -> React Query invalidation or runtime event append
+  -> transcript normalization
+  -> shared renderer
 ```
 
-Hub 设置优先于本地默认，Edge 设置优先于 Hub（本地执行相关配置优先本地）。
+Desktop may also consume Local Edge EventStore / Run lifecycle events through the Desktop adapter. The UI layer only sees normalized transcript blocks and evidence refs.
 
-## Agent Profile 合并策略
+## Settings And Profiles
 
-Desktop 的 Agent 列表按以下优先级合并：
+Settings and agent profile data are surface-aware but render through shared UI:
 
-```text
-Edge local profiles (本地已安装的 Agent)
-  > Hub agent profiles (云端共享的 Agent)
-    > raw adapter list (运行时自动发现的 Agent)
-```
+- Desktop settings prefer Edge local settings, then Hub settings, then localStorage fallback.
+- Agent profiles merge Edge local profiles, Hub shared profiles and raw adapter discovery, with local availability taking precedence for offline use.
+- Web guarded Hub work must ask for auth instead of silently falling back to mock data.
 
-实现位置：`useHubAgentProfiles` 等 hooks + Desktop workbench model。
+## Data Mode And E2E Boundary
 
-- Edge 本地 profile 优先保证离线可用
-- Hub profile 提供跨设备共享
-- Raw adapter 是底层 runtime 的可用列表
+`dataMode` remains a compatibility field. It does not by itself prove data source, auth state or real execution. Tests and PR evidence must label all three axes:
 
-## 数据模式 (`app/shared/src/demo/dataMode.ts`)
-
-工作台数据模式控制 UI 数据来源和展示行为：
-
-| 模式 | 值 | 用途 |
+| Axis | Meaning | Examples |
 |---|---|---|
-| Auto | `auto` | 根据环境自动选择，默认回落到 mock |
-| Mock | `mock` | 纯内存硬编码数据，无后端依赖 |
-| Fixture | `fixture` | 基于 runtime manifest 的静态 fixture 数据 |
-| Observed | `observed` | 读取已持久化的真实运行记录（replay） |
-| Approved Real | `approved-real` | 真实 API/CLI 调用，需审批和 API key |
+| Surface | Running shell | Desktop Vite, Web Vite, Desktop Tauri, Mobile RN Expo Web |
+| Data Source | UI data source | `local-mock`, `deterministic-fixture`, `stubbed-hub-session`, `observed-hub-replay`, approved real source |
+| Auth/Execution | Login/execution truth | anonymous, local-only, hub-signed-in, approved-real |
 
-- 持久化 key：`agenthub.workbench.dataMode`（localStorage）
-- `isWorkbenchFixtureDataMode()` / `isWorkbenchRealDataMode()` — 模式判断 helper
+| Product mode | `dataMode` | Runtime boundary | Forbidden claim |
+|---|---|---|---|
+| Demo | `mock` | Workbench runtime does not access Hub/Edge; Desktop entry preflight may probe Local Edge health | real replay, real login, real execution |
+| Fixture | `fixture` | No Hub/Edge runtime access | real replay, real user data |
+| Local | `auto` / local target | Desktop may use `127.0.0.1:3210`; Web/Mobile must not | Hub login or cloud sync |
+| Login/Hub | `auto` / Hub session | Desktop/Web/Mobile use Hub; real login needs Hub session evidence | TokenDance API key or model spend |
+| Observed | `observed` | Read-only replay/observation | new CLI/model/API execution |
+| Approved Real | `approved-real` | Only explicitly approved Hub/Edge/CLI/API paths | silent fallback, stubbed real, packaged release |
 
-## 安全边界
+Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_tested=false`. Vite renderer evidence does not prove packaged Desktop sidecar, icon, installer, signing, updater or release upload.
 
-- UI 不能直接启动 Agent CLI
-- Web 不能持有 TokenDance API key 或本机文件系统能力
-- Desktop 文件操作必须经过 allowlist 和 typed Host API
+## Acceptance Gates
 
-## 相关文档
+| Claim | Minimum useful gate |
+|---|---|
+| Transcript ordering/grouping/markdown | Shared Vitest over `app/shared/src/transcript/` and `app/shared/src/chatview/` |
+| Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until a dedicated UI slice |
+| Layout cleanliness | Desktop/Web Visual QA at 16:9 `1440x810`, checking overflow and final-message visibility |
+| Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
+| Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 
-- [01-hub-server.md](01-hub-server.md) — Hub Server API 详情
-- [02-edge-server.md](02-edge-server.md) — Edge Server 事件源
-- [03-runtime-adapters.md](03-runtime-adapters.md) — Runtime adapter 事件映射
-- [06-auth-identity.md](06-auth-identity.md) — Auth token 管道完整流程
+## Related Docs
+
+- [architecture.md](../architecture.md) — system overview and non-negotiable boundaries
+- [01-hub-server.md](01-hub-server.md) — Hub API and realtime ownership
+- [02-edge-server.md](02-edge-server.md) — Edge EventStore and local run ownership
+- [06-auth-identity.md](06-auth-identity.md) — TokenDance ID and Hub session flow
+- [../roadmap.md](../roadmap.md) — current priority and evidence boundaries

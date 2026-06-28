@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/router"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
@@ -1143,6 +1144,17 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Defense-in-depth: validate structured output schema size at the Edge
+	// entry point. The Hub already enforces MaxOutputSchemaSize (16 KB) at
+	// create/update time, but this check guards against direct Edge POSTs
+	// (e.g., via Hub HTTP dispatch or future code paths that skip
+	// CustomAgent.OutputSchema validation).
+	const maxOutputSchemaSize = 16 << 10
+	if len(req.StructuredOutputSchema) > maxOutputSchemaSize {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("structuredOutputSchema exceeds 16KB limit")))
+		return
+	}
+
 	// Merge profile defaults: profile fields fill in blanks, request fields win.
 	if req.ProfileID != "" {
 		if profile, ok := ensureStore(h).GetAgentProfile(req.ProfileID); ok {
@@ -1281,6 +1293,13 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("run.create", "agentId", req.AgentID, "threadId", req.ThreadID, "model", req.Model, "adapterResolved", resolvedAdapterID, "hasExecutor", h.Executor != nil)
 
 	runID := genID("run_")
+
+	// Classify prompt complexity for execution strategy selection.
+	// Complex tasks may benefit from orchestration/TeamRun; Simple tasks
+	// can dispatch directly to a single agent.
+	promptComplexity := router.ClassifyComplexity(req.Prompt)
+	slog.Debug("run.complexity", "runId", runID, "complexity", promptComplexity,
+		"promptLen", len(req.Prompt), "agentId", req.AgentID)
 	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
 	h.runCreateMu.Unlock()
 	if err != nil {
