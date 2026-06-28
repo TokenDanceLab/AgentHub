@@ -75,6 +75,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   const [pendingUserBlocks, setPendingUserBlocks] = useState<PendingUserBlock[]>([]);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const pendingUserSequenceRef = useRef(0);
   const composerSubmitBehavior = useComposerSubmitBehavior();
 
   const displayTranscript = useMemo(() => {
@@ -105,7 +106,8 @@ export const ConversationHost = React.memo(function ConversationHost({
       const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
       const capturedAttachments = composer.attachments;
       const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
-      optimisticId = `pending-user-${Date.now()}`;
+      pendingUserSequenceRef.current += 1;
+      optimisticId = `pending-user-${Date.now()}-${pendingUserSequenceRef.current}`;
       const pendingText = liveText.trim();
       const pendingUserBlock: PendingUserBlock = {
         id: optimisticId, kind: 'text', text: liveText.trim(),
