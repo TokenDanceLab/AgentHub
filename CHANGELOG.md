@@ -5,7 +5,7 @@
 ## [Unreleased]
 
 - 当前开发基线：`dev/delicious233`。
-- 当前 spec-driven 专项进度见 [docs/progress/MASTER.md](docs/progress/MASTER.md)。
+- 当前没有 active spec-driven 专项；已完成专项见 [docs/history.md](docs/history.md)。
 - Release/merge-readiness 结论必须带真实证据等级；stub/fixture/readiness-only 不得写成真实登录、真实模型/API、packaged Desktop 或 production deploy。
 
 ## [v0.5.2] - 2026-06-25
