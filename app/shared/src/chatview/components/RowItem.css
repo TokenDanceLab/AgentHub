@@ -213,13 +213,13 @@
   display: flex;
   align-items: stretch;
   gap: 10px;
-  max-width: 420px;
+  max-width: 100%;
   max-height: 100px;
-  padding: 8px 10px;
-  margin: 4px 0;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  padding: 8px 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   text-decoration: none;
   color: inherit;
   overflow: hidden;
@@ -229,8 +229,7 @@
 }
 
 .preview-card:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-2);
+  box-shadow: none;
 }
 
 .preview-card:focus-visible {

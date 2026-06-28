@@ -56,6 +56,56 @@ describe('AgentGroup rendering', () => {
     expect(bubble.compareDocumentPosition(glob!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('keeps related approval and preview cards in one visual stack', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-stack',
+      agent: 'Agent',
+      role: 'agent',
+      time: '',
+      rows: [],
+      standaloneRows: [],
+      runs: [],
+      bubbles: [],
+      parts: [
+        { type: 'row', row: { id: 'approval-1', type: 'approval', label: 'Approval', status: 'waiting', collapsible: false } },
+        { type: 'row', row: { id: 'preview-1', type: 'preview', label: 'Preview', status: 'ok', collapsible: false, url: 'https://preview.example.com' } },
+      ],
+    };
+
+    const { container } = render(<AgentGroup item={item} chatMode="group" />);
+    const stacks = Array.from(container.querySelectorAll('.card-stack'));
+    const approval = container.querySelector('[data-block-id="approval-1"]');
+    const preview = container.querySelector('[data-block-id="preview-1"]');
+
+    expect(stacks).toHaveLength(1);
+    expect(stacks[0]!.contains(approval)).toBe(true);
+    expect(stacks[0]!.contains(preview)).toBe(true);
+  });
+
+  it('does not collapse unrelated consecutive cards into the same stack', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-unrelated',
+      agent: 'Agent',
+      role: 'agent',
+      time: '',
+      rows: [],
+      standaloneRows: [],
+      runs: [],
+      bubbles: [],
+      parts: [
+        { type: 'row', row: { id: 'approval-1', type: 'approval', label: 'Approval', status: 'waiting', collapsible: false } },
+        { type: 'row', row: { id: 'session-1', type: 'session', label: 'Session', status: 'running', collapsible: false } },
+      ],
+    };
+
+    const { container } = render(<AgentGroup item={item} chatMode="group" />);
+    const stacks = Array.from(container.querySelectorAll('.card-stack'));
+
+    expect(stacks).toHaveLength(2);
+    expect(stacks[0]!.querySelector('[data-block-id="approval-1"]')).not.toBeNull();
+    expect(stacks[1]!.querySelector('[data-block-id="session-1"]')).not.toBeNull();
+  });
+
   it('renders Hub display metadata on agent reply cards without replacing the reply body', () => {
     const item: TranscriptAgentItem = {
       id: 'agent-meta',

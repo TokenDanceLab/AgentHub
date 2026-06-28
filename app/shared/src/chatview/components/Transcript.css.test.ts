@@ -76,4 +76,31 @@ describe('ChatViewTranscript CSS contract', () => {
     expect(metaRule).not.toMatch(/\bbackground\s*:/);
     expect(detailRule).toMatch(/\btext-overflow\s*:\s*ellipsis/);
   });
+
+  it('keeps card stack radii on the outer rows without nesting preview cards', () => {
+    const transcriptCssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
+    const rowItemCssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/RowItem.css');
+    const transcriptCss = readFileSync(transcriptCssPath, 'utf8');
+    const rowItemCss = readFileSync(rowItemCssPath, 'utf8');
+    const stackRule = cssRule(transcriptCss, '.card-stack');
+    const stackedRowRule = cssRule(rowItemCss, '.card-stack > .row-item');
+    const stackedSiblingRule = cssRule(rowItemCss, '.card-stack > .row-item + .row-item');
+    const firstRule = cssRule(rowItemCss, '.card-stack > .row-item:first-child');
+    const lastRule = cssRule(rowItemCss, '.card-stack > .row-item:last-child');
+    const onlyRule = cssRule(rowItemCss, '.card-stack > .row-item:only-child');
+    const previewRule = cssRule(rowItemCss, '.preview-card');
+
+    expect(stackRule).toMatch(/\bgap\s*:\s*0\b/);
+    expect(stackedRowRule).toMatch(/\bwidth\s*:\s*100%/);
+    expect(stackedRowRule).toMatch(/\bborder-radius\s*:\s*0\b/);
+    expect(stackedSiblingRule).toMatch(/\bborder-top\s*:\s*none\b/);
+    expect(stackedSiblingRule).toMatch(/\bmargin-top\s*:\s*-1px\b/);
+    expect(firstRule).toMatch(/\bborder-radius\s*:\s*var\(--r-md\)\s+var\(--r-md\)\s+0\s+0\b/);
+    expect(lastRule).toMatch(/\bborder-radius\s*:\s*0\s+0\s+var\(--r-md\)\s+var\(--r-md\)/);
+    expect(onlyRule).toMatch(/\bborder-radius\s*:\s*var\(--r-md\)/);
+    expect(previewRule).toMatch(/\bborder\s*:\s*0\b/);
+    expect(previewRule).toMatch(/\bborder-radius\s*:\s*0\b/);
+    expect(previewRule).toMatch(/\bbackground\s*:\s*transparent\b/);
+    expect(previewRule).toMatch(/\bmargin\s*:\s*0\b/);
+  });
 });
