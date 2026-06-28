@@ -23,7 +23,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | Phase | 状态 | 说明 |
 |---|---|---|
-| Phase 1 Evidence Contract Foundation | 收尾中 | evidence manifest、Visual QA viewport/report、data-mode boundary helper 已合并；docs-only evidence bundle 收口见 #381 |
+| Phase 1 Evidence Contract Foundation | 完成 | evidence manifest、Visual QA viewport/report、data-mode boundary helper、docs-only evidence bundle owner links 已合并 |
 | Phase 2-5 | 待执行 | shared timeline、Desktop/Web boundary/backend truth、real E2E/Visual QA closure、acceptance/archive 仍按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
 
 最近完成：
