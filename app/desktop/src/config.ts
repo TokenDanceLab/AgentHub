@@ -84,7 +84,7 @@ export const HUB_URL = envOrDev('VITE_HUB_URL', 'https://api.hub.vectorcontrol.t
 export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'wss://api.hub.vectorcontrol.tech/client/ws');
 export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
-export const HEALTH_POLL_MS = 5000;
-export const RUNNERS_POLL_MS = 5000;
+export const HEALTH_POLL_MS = 30_000;
+export const RUNNERS_POLL_MS = 30_000;
 export const EVENT_LOG_MAX = 1000;
 export const APP_VERSION = '0.4.1';

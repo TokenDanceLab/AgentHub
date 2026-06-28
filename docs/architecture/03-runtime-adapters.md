@@ -39,6 +39,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 无外部 SDK 依赖，纯 `net/http`
 - Key 缺失时 `Available=false`，不阻塞 Edge 启动
 - 属于 `sdkAdapterIDs`，`IsSDKAdapter()` 返回 true
+- 重试机制：指数退避 + jitter（最大 3 次，1s/2s/4s (±25%)），匹配 `anthropic_sdk.go` 的 `doRequestWithRetry` 模式（v0.5.2+）
 
 ## Orchestrator Adapter
 
@@ -50,6 +51,35 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 - 作为 `orchestrator` 角色的默认 adapter
 - 自动发现已注册的子 Agent（`claude-code`、`codex`、`opencode`、`anthropic-sdk`、`openai-sdk`），生成调度提示
 - 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
+
+### Dispatch Interceptor 内部组件
+
+Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchInterceptor`，负责拦截文本事件、解析 dispatch JSON、执行分发和结果回注。Interceptor 内部包含以下子层：
+
+| 子层 | 位置 | 职责 |
+|------|------|------|
+| **Rule Engine** (T2-A08) | `orchestrator.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
+| **Plan Approval Gate** (P0 #3) | `plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
+| **Fan-Out Pool** | `orchestrator.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
+| **Result Listener** | `orchestrator.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
+| **Failure Recovery** | `orchestrator_failure.go` `FailureRecoveryManager` | 错误分类（transient/capability/cancel 三分类 + 模式匹配）、恢复决策（retry 指数退避/switch agent/skip/fail）、per-agentName 断路器（Closed/Open/Half-Open 三态）、Reflexion 批判生成用于学习性重试 |
+
+**Rule Engine 规则说明**（按评估顺序）：
+
+1. **完成信号检测**：匹配独立完成信号（`done`、`finish`、`all tasks done` 等），短路跳过 JSON 解析并发出进度汇总。多词短语在任意长度文本匹配；单词信号仅在 80 字符内匹配以避免误触发。
+2. **审批决策关键词**：当 `PlanApprovalBroker` 存在且文本 ≤40 字符时，匹配独立决策关键词（`yes`/`no`/`approve`/`reject`/`deny` 等），短路跳过 JSON 解析。
+3. **单 finish dispatch 跳过**：当 orchestrator 发出仅含完成语义描述的单个 dispatch 时，跳过 fanOut 直接发出进度汇总。
+4. **同 Agent 顺序执行**：当所有 dispatch 都指向同一 Agent 时，自动从并发 fanOut 降级为顺序执行，避免单个 adapter 的实例内竞争。
+
+**Failure Recovery 决策矩阵**：
+
+| 分类 | 策略 | 断路器行为 |
+|------|------|-----------|
+| `transient`（超时/限流/网络） | 指数退避重试（1s 起，±25% jitter，最大 30s），最多 3 次 | 不触发 |
+| `capability`（工具缺失/权限/不可用） | 切换到可用替代 Agent；无替代时 fail | 不触发 |
+| `cancel`（无效输入/深度超限/取消） | skip + 通知父 orchestrator | 不触发 |
+| 断路器 Open | 直接 skip，不分类 | 30s cooldown 后允许一次 Half-Open 探测 |
+| 累计重试超 `MaxRetryDepth`(3) | 强制 fail | 记录断路器失败 |
 
 ## Runtime Manifest / Fixture（测试/开发辅助，不计入生产 adapter 数）
 
@@ -95,6 +125,26 @@ Agent 原生输出 -> Adapter normalize -> RunEvent -> EventStore -> WS -> Trans
 | artifact | artifact |
 | deploy | deploy |
 | error | error |
+
+## 动态模型路由（cc-switch 集成）
+
+Edge Server 支持通过 cc-switch 透明代理实现动态模型路由。当 cc-switch 在本机安装并激活时，Edge 启动阶段会调用 `ConsumeCCSwitchModels()` 读取 `~/.cc-switch/cc-switch.db`，将 cc-switch 配置的 provider 模型别名合并到静态 `ModelAliases` 表中。
+
+### 合并规则
+
+- cc-switch 动态别名覆盖同 key 的静态别名（例如 cc-switch 将 `sonnet` 映射到 `deepseek-v4-pro` 时，静态 `claude-sonnet-4-6` 被替换）。
+- 未冲突的静态条目保留（不会被删除）。
+- 只消费 `appTypeToAgentID` 映射中已知的 app_type（claude → claude-code, codex → codex, opencode → opencode）。
+
+### 优雅降级
+
+cc-switch 是可选增强，不是硬依赖。数据库缺失、不可读或无可用 provider 时，`ConsumeCCSwitchModels()` 返回 error，Edge 记录 WARNING 日志后以静态配置继续运行——不影响 Edge 正常启动和服务。
+
+### 对用户的意义
+
+当 cc-switch 激活时，用户在 AgentHub 中选择 "claude-sonnet" 可能实际运行在 DeepSeek、GLM 或 Qwen 等后端上，无需修改 AgentHub Profile。这是 cc-switch 为 Claude Code / Codex CLI 提供的同一透明代理机制，现在已对 Edge Server adapter 模型解析层开放。
+
+实现细节见 `edge-server/internal/adapters/model_config.go`（`ConsumeCCSwitchModels`）和 `edge-server/internal/ccswitch/reader.go`。
 
 ## 权限桥接
 

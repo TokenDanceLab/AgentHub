@@ -1,0 +1,8 @@
+reviews:
+  profile: chill
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - dev/delicious233

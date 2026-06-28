@@ -117,19 +117,24 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			if sqlDB, err := a.DB.DB(); err == nil {
-				stats := sqlDB.Stats()
-				metrics.DBPoolInUse.Set(float64(stats.InUse))
-			}
-			if a.mgr != nil {
-				metrics.WSConnections.Set(float64(a.mgr.Count()))
-			}
-			if a.CacheClient != nil {
-				metrics.RedisPoolHits.Set(float64(a.CacheClient.PoolStats().Hits))
-			}
-			if a.bus != nil {
-				metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
+		for {
+			select {
+			case <-ticker.C:
+				if sqlDB, err := a.DB.DB(); err == nil {
+					stats := sqlDB.Stats()
+					metrics.DBPoolInUse.Set(float64(stats.InUse))
+				}
+				if a.mgr != nil {
+					metrics.WSConnections.Set(float64(a.mgr.Count()))
+				}
+				if a.CacheClient != nil {
+					metrics.RedisPoolHits.Set(float64(a.CacheClient.PoolStats().Hits))
+				}
+				if a.bus != nil {
+					metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
+				}
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()

@@ -1,277 +1,50 @@
-# Hub Server 部署指南
+# Hub Server Deployments
 
-## 前置条件
+最后更新：2026-06-27
 
-| 组件 | 最低版本 | 说明 |
-|------|---------|------|
-| Go | 1.25 | 开发机/CI 构建所需；生产服务器不编译 |
-| PostgreSQL | 16 | 主数据库 |
-| Redis | 7 | 缓存 / 会话 / WebSocket 路由 |
+本目录只保存 Hub Server 部署资产和本仓库可验证的部署边界。旧长版部署手册见 [../../docs/history.md](../../docs/history.md)。
 
-## 环境变量
+Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维护；以 TokenDance server SSOT 为准。
 
-Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值。以下是全部可用变量：
+## Files
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `AGENTHUB_SERVER_PORT` | HTTP 服务端口 | `8080` |
-| `AGENTHUB_SERVER_LOG_LEVEL` | 日志级别 (`debug` / `info`) | `info` |
-| `AGENTHUB_SERVER_LOG_FILE` | 日志文件路径（空 = stdout） | `` |
-| `AGENTHUB_SERVER_ADMIN_PORT` | pprof + metrics 端口 | `6060` |
-| `AGENTHUB_DB_HOST` | PostgreSQL 主机 | `localhost` |
-| `AGENTHUB_DB_PORT` | PostgreSQL 端口 | `5432` |
-| `AGENTHUB_DB_USER` | PostgreSQL 用户 | `agenthub` |
-| `AGENTHUB_DB_PASSWORD` | PostgreSQL 密码 | **必填** |
-| `AGENTHUB_DB_NAME` | PostgreSQL 库名 | `agenthub` |
-| `AGENTHUB_REDIS_HOST` | Redis 主机 | `localhost` |
-| `AGENTHUB_REDIS_PORT` | Redis 端口 | `6379` |
-| `AGENTHUB_REDIS_PASSWORD` | Redis 密码 | `` |
-| `AGENTHUB_REDIS_DB` | Redis 数据库编号 | `0` |
-| `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | `20` |
-| `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | `2` |
-| `AGENTHUB_POSTGRES_MEM_LIMIT` / `AGENTHUB_POSTGRES_CPUS` / `AGENTHUB_POSTGRES_PIDS_LIMIT` | 生产 PostgreSQL 容器资源上限 | `512m` / `1.0` / `256` |
-| `AGENTHUB_REDIS_CONTAINER_MEM_LIMIT` / `AGENTHUB_REDIS_CPUS` / `AGENTHUB_REDIS_PIDS_LIMIT` | 生产 Redis 容器资源上限；Redis 内部仍有 `--maxmemory 256mb` | `384m` / `0.5` / `128` |
-| `AGENTHUB_HUB_MEM_LIMIT` / `AGENTHUB_HUB_CPUS` / `AGENTHUB_HUB_PIDS_LIMIT` | 生产 Hub Server 容器资源上限 | `256m` / `1.0` / `256` |
-| `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 32 字符**） | — |
-| `AGENTHUB_JWT_ACCESS_TTL` | Access Token 有效期 | `15m` |
-| `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
-| `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.vectorcontrol.tech` |
-| `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS；为空时由 issuer 拼出 `/oidc/jwks` | `https://id.vectorcontrol.tech/oidc/jwks` |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；用于 Hub code exchange 和 TokenDance bearer 兼容路径的 `aud` 校验 | — |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；只从 secret store 注入，不得写入仓库 | — |
-| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | Hub OIDC callback/exchange redirect URI，必须与 TokenDance ID client 注册值一致 | — |
-| `AGENTHUB_UPLOAD_DIR` | 上传文件存储目录 | `./uploads` |
-| `AGENTHUB_UPLOAD_MAX_SIZE` | 上传文件最大字节数 | `10485760` |
-| `AGENTHUB_PPROF_USER` | 管理端点 HTTP Basic 用户名 | **必填** |
-| `AGENTHUB_PPROF_PASS` | 管理端点 HTTP Basic 密码 | **必填** |
+| 文件 | 用途 |
+|---|---|
+| `Dockerfile` | Hub Server 镜像构建 |
+| `docker-compose.prod.yml` | 生产形状 compose 模板 |
+| `docker-compose.us1.yml`, `hk2/` | 历史/环境模板；使用前必须核对 server SSOT |
+| `nginx.prod.conf` | 反向代理参考配置 |
+| `.env.production.example` | 生产环境变量占位模板，不含 secret |
 
-`AGENTHUB_JWT_SECRET` 必须通过环境变量设置；配置文件中的硬编码默认值会被拒绝。参见 `.env.example`。
+## Required Runtime
 
-TokenDance ID 相关变量启用 Hub Server 的 TokenDance ID OIDC Authorization Code + PKCE 登录交换，同时保留 RS256 bearer token 兼容校验路径。Hub OIDC callback/exchange 路由为 `POST /client/auth/oidc/callback`：服务端用 `client_secret` 交换 code、校验 ID token 的 RS256/JWKS、`exp`、`iss`、`aud`，再签发 Hub 本地 access/refresh session 和 device proof。TokenDance ID bearer token 兼容路径仍只作为身份校验，不会自动创建 Hub refresh session，也不能作为 Edge `desktop` device proof。完整边界见 `../README.md` 的 TokenDance ID 鉴权章节。
+| 组件 | 版本/边界 |
+|---|---|
+| Go | 1.25，用于开发机或 CI 构建 |
+| PostgreSQL | 16 |
+| Redis | 7 |
+| Hub JWT secret | 环境注入，至少 32 字符 |
+| TokenDance ID client secret | secret store 注入，不能写入 repo |
+| Admin pprof/metrics | 独立 admin 端口 + Basic Auth + loopback/internal exposure |
 
-`AGENTHUB_TOKENDANCE_*` 旧变量名仍被配置加载器兼容；生产和新文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
-
-## 快速启动（Docker Compose）
-
-开发环境 compose 位于仓库根目录 `docker-compose.yml`，会启动 PostgreSQL 16、Redis 7 和 Hub Server。
+## Local Shape Check
 
 ```powershell
-# 在 AgentHub 仓库根目录
-copy .env.example .env
-docker compose up -d
+docker compose config
+pwsh ./scripts/verify/verify-oidc-readiness.ps1
 ```
 
-生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build --force-recreate`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。生产 compose 默认给 Hub/PostgreSQL/Redis 设置内存、CPU、pids 和日志轮转护栏，防止低流量实例被异常请求或日志放大拖垮宿主机。
+`verify-oidc-readiness.ps1` 只检查仓库内配置形状和边界，不连接生产 TokenDance ID，也不证明真实登录。
 
-## 生产部署
+## Production Boundary
 
-### 方案 A：二进制 + systemd
+生产发布需要独立批准和证据：
 
-```powershell
-# 1. 构建
-cd hub-server
-go build -ldflags="-s -w -X 'github.com/agenthub/hub-server/internal/app.Version=1.0.0'" -o /usr/local/bin/hub-server ./cmd/server-hub
+- 镜像构建与 digest。
+- secret 注入和 OIDC client 注册。
+- PostgreSQL/Redis 可用性。
+- `/health`、CORS、WS upgrade、OIDC callback smoke。
+- admin 端口不可公网访问。
+- rollback 方案和备份状态。
 
-# 2. 配置文件
-mkdir -p /etc/hub-server /var/log/hub-server /var/lib/hub-server/uploads
-cp configs/config.yaml /etc/hub-server/config.yaml
-# 编辑 /etc/hub-server/config.yaml 填入生产环境地址
-
-# 3. 环境变量
-cat > /etc/hub-server/env <<'EOF'
-AGENTHUB_JWT_SECRET=<生成一个 32+ 字符的随机密钥>
-AGENTHUB_DB_PASSWORD=<数据库密码>
-AGENTHUB_PPROF_USER=admin
-AGENTHUB_PPROF_PASS=<管理端点密码>
-EOF
-
-# 4. systemd unit
-cat > /etc/systemd/system/hub-server.service <<'EOF'
-[Unit]
-Description=AgentHub Hub Server
-After=network.target postgresql.service redis.service
-Wants=postgresql.service redis.service
-
-[Service]
-Type=simple
-User=agenthub
-EnvironmentFile=/etc/hub-server/env
-ExecStart=/usr/local/bin/hub-server
-WorkingDirectory=/etc/hub-server
-Restart=always
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable --now hub-server
-```
-
-### 方案 B：Docker 单容器
-
-```powershell
-# 在开发机/CI 构建镜像
-docker build -f deployments/Dockerfile -t hub-server:latest .
-
-# 运行
-docker run -d \
-  --name hub-server \
-  --restart always \
-  -p 8080:8080 \
-  -e AGENTHUB_DB_HOST=<数据库主机> \
-  -e AGENTHUB_DB_PASSWORD=<数据库密码> \
-  -e AGENTHUB_REDIS_HOST=<Redis 主机> \
-  -e AGENTHUB_JWT_SECRET=<JWT 密钥> \
-  -e AGENTHUB_PPROF_USER=admin \
-  -e AGENTHUB_PPROF_PASS=<管理密码> \
-  -v /var/log/hub-server:/var/log/hub-server \
-  hub-server:latest
-```
-
-## 反向代理
-
-### Caddy
-
-```caddy
-hub.example.com {
-    reverse_proxy localhost:8080
-    header / {
-        X-Forwarded-Proto https
-    }
-}
-```
-
-### Nginx
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name hub.example.com;
-
-    ssl_certificate     /etc/ssl/hub.example.com.crt;
-    ssl_certificate_key /etc/ssl/hub.example.com.key;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # WebSocket 升级
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-## 备份与恢复
-
-### 数据库备份
-
-```powershell
-# 全量导出
-pg_dump -h <host> -U agenthub -Fc agenthub > hub-server-$(Get-Date -Format 'yyyyMMdd-HHmmss').dump
-
-# 定时备份 (crontab / Task Scheduler)
-# 每日凌晨 2:00 备份，保留 7 天
-0 2 * * * pg_dump -h localhost -U agenthub -Fc agenthub > /backup/hub-server-$(date +\%Y\%m\%d).dump && find /backup -name 'hub-server-*.dump' -mtime +7 -delete
-```
-
-### 数据库恢复
-
-```powershell
-# 1. 停止服务
-systemctl stop hub-server
-
-# 2. 恢复
-pg_restore -h <host> -U agenthub -d agenthub --clean --if-exists hub-server-20260524.dump
-
-# 3. 重新启动服务，启动过程会自动执行缺失迁移
-cd hub-server && go run ./cmd/server-hub
-
-# 4. 启动服务
-systemctl start hub-server
-```
-
-### Redis 备份
-
-Redis 通过 `--save` 参数自动持久化。Docker 部署中配置为 `--save 60 1`（60 秒内至少 1 个 key 变化则保存）。如需手动备份：
-
-```powershell
-docker exec <redis-container> redis-cli BGSAVE
-```
-
-## 健康检查监控
-
-`GET /health` 端点供负载均衡器和 uptime 监控使用，无需认证。
-
-```json
-{
-  "status": "ok",
-  "version": "1.0.0",
-  "uptime": "2h34m",
-  "checks": {
-    "database": "ok",
-    "redis": "ok",
-    "migrations": {
-      "version": 17,
-      "dirty": false
-    }
-  }
-}
-```
-
-字段说明：
-- `status`: `ok` 表示所有组件正常，`degraded` 表示至少一个组件异常
-- `version`: 构建版本（通过 `-ldflags` 注入，未设置时显示 `dev`）
-- `uptime`: 服务运行时长
-- `checks.database`: PostgreSQL 连接状态
-- `checks.redis`: Redis 连接状态
-- `checks.migrations`: 当前迁移版本号；`dirty=true` 时标记迁移脏状态
-
-Docker 内置 health check：
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health || exit 1
-```
-
-Kubernetes liveness/readiness probe：
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 10
-  periodSeconds: 30
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 5
-  periodSeconds: 10
-```
-
-## 日志配置
-
-日志通过 `AGENTHUB_SERVER_LOG_LEVEL` 和 `AGENTHUB_SERVER_LOG_FILE` 控制。
-
-| 配置 | 值 | 说明 |
-|------|-----|------|
-| `log_level: debug` | 调试模式 | 输出所有日志，禁用 Gin Release 模式 |
-| `log_level: info` | 生产模式 | 仅输出 info 及以上级别 |
-| `log_file: ""` | 空字符 | 输出到 stdout（Docker / systemd 推荐） |
-| `log_file: /var/log/hub-server/server.log` | 文件路径 | 带自动轮转（10MB / 保留 5 个 / 最多 30 天） |
-
-结构化日志格式（slog JSON handler）：
-```json
-{"time":"2026-05-24T10:30:00Z","level":"INFO","msg":"server starting","port":8080}
-```
-
-## 迁移管理
-
-Hub Server 启动时自动执行 `migrations/` 下的待执行迁移。当前 `cmd/server-hub` 没有单独的 `migrate up/down` 子命令；需要回滚时使用数据库备份恢复或手动执行对应 down SQL，并在恢复后重启服务确认 `/health` 中的迁移状态。
+未运行这些 gate 时，PR 只能声明配置/readiness 形状，不得写“生产已验证”。

@@ -12,13 +12,19 @@ export interface HealthState {
   refetch: () => void;
 }
 
-export function useHealth(): HealthState {
+export interface UseHealthOptions {
+  enabled?: boolean;
+}
+
+export function useHealth(options: UseHealthOptions = {}): HealthState {
+  const enabled = options.enabled ?? true;
   const [online, setOnline] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   const poll = useCallback(async () => {
+    if (!enabled) return;
     try {
       const h = await fetchHealth();
       if (!mountedRef.current) return;
@@ -31,17 +37,42 @@ export function useHealth(): HealthState {
       setHealth(null);
       setLastError(error instanceof Error ? error.message : 'Local Edge health check failed');
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     mountedRef.current = true;
+    if (!enabled) {
+      setOnline(false);
+      setHealth(null);
+      setLastError(null);
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    let interval = setInterval(poll, HEALTH_POLL_MS);
     queueMicrotask(() => {
       void poll();
     });
-    const id = setInterval(poll, HEALTH_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        clearInterval(interval);
+        queueMicrotask(() => {
+          void poll();
+        });
+        interval = setInterval(poll, HEALTH_POLL_MS);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       mountedRef.current = false;
-      clearInterval(id);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [poll]);
 

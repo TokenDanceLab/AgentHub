@@ -74,7 +74,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['Alice', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Delicious233', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['消息', '云文档', '任务', '项目', '更多'],
@@ -85,7 +85,7 @@ const scenes = [
     locale: 'en-US',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['Alice', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Delicious233', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['Chats', 'Docs', 'Tasks', 'Projects', 'More'],
@@ -134,7 +134,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Alice'],
+    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Delicious233'],
     expectTabsHidden: true,
     actions: [
       { role: 'button', namePattern: 'Open account drawer|打开账号抽屉' },
@@ -745,8 +745,10 @@ function startServer() {
       CI: '1',
       EXPO_NO_TELEMETRY: '1',
     },
+    detached: process.platform !== 'win32',
     shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
 
   const appendLog = (chunk) => {
@@ -774,6 +776,7 @@ function startMockHub() {
       AGENTHUB_MOBILE_MOCK_HUB_PORT: String(mockHubPort),
       CI: '1',
     },
+    detached: process.platform !== 'win32',
     shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -810,7 +813,62 @@ async function stopServer(child) {
     return;
   }
 
-  child.kill('SIGTERM');
+  await terminateProcessTree(child);
+}
+
+async function terminateProcessTree(child) {
+  const exited = waitForExit(child, 5_000);
+
+  try {
+    if (child.pid) {
+      process.kill(-child.pid, 'SIGTERM');
+    } else {
+      child.kill('SIGTERM');
+    }
+  } catch {
+    child.kill('SIGTERM');
+  }
+
+  if (await exited) {
+    return;
+  }
+
+  try {
+    if (child.pid) {
+      process.kill(-child.pid, 'SIGKILL');
+    } else {
+      child.kill('SIGKILL');
+    }
+  } catch {
+    child.kill('SIGKILL');
+  }
+
+  await waitForExit(child, 2_000);
+}
+
+function waitForExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(false);
+    }, timeoutMs);
+    const done = () => {
+      cleanup();
+      resolve(true);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.off('exit', done);
+      child.off('error', done);
+    };
+
+    child.once('exit', done);
+    child.once('error', done);
+  });
 }
 
 async function waitForServer(logs) {
@@ -1341,5 +1399,5 @@ async function run() {
 
 run().catch((error) => {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+  process.exit(1);
 });

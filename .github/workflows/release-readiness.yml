@@ -9,9 +9,8 @@ on:
       - "app/desktop/src-tauri/Cargo.toml"
       - "app/desktop/src-tauri/Cargo.lock"
       - "app/desktop/src-tauri/tauri.conf.json"
-      - "scripts/**release**"
-      - "scripts/**tauri**"
-      - "tests/scripts/**"
+      - "scripts/release/**"
+      - "tests/contract/scripts/**"
   workflow_dispatch:
     inputs:
       run_windows_package_dry:
@@ -39,7 +38,7 @@ jobs:
 
       - name: Verify Tauri package readiness policy
         shell: pwsh
-        run: ./scripts/verify-tauri-package-readiness.ps1 -RepoRoot .
+        run: ./scripts/release/verify-tauri-package-readiness.ps1 -RepoRoot .
 
   windows-installer-smoke-preflight:
     name: Windows installer smoke preflight
@@ -65,7 +64,7 @@ jobs:
 
       - name: Verify Windows installer smoke preflight
         shell: pwsh
-        run: ./scripts/verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain
+        run: ./scripts/release/verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain
 
   windows-package-dry:
     name: Windows NSIS and portable dry package
@@ -94,7 +93,7 @@ jobs:
 
       - name: Build unsigned Windows package dry run
         shell: pwsh
-        run: ./scripts/verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
+        run: ./scripts/release/verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
 
       - name: Upload dry package artifacts
         uses: actions/upload-artifact@v4

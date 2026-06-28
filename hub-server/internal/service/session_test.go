@@ -627,31 +627,39 @@ func TestRemoveGroupMember_CleansUpInvitedAgents(t *testing.T) {
 		WithArgs("sess-1", "user", "u2").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	// ListAgentInstancesByInviter for target user
+	// ListAgentInstancesByInviterPage for target user (page 0, size 100).
+	// GORM omits OFFSET when offset=0, so only 3 args: session, inviter, limit.
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
 		WithArgs("sess-1", "u2", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
 			AddRow("agent-1", "claude-code", "sess-1", "u2", "Claude"))
 
-	// CancelTasksByAgentInstance
+	// Per-agent cleanup for page-0 results happens BEFORE the page-1 query.
+	// CancelTasksByAgentInstance (wrapped in auto-transaction by GORM)
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "pending_agent_tasks" SET`)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	// DeleteAgentInstance
+	// DeleteAgentInstance (wrapped in auto-transaction by GORM)
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id = $1`)).
 		WithArgs("agent-1").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	// SoftDeleteMember for agent
+	// SoftDeleteMember for agent (wrapped in auto-transaction by GORM)
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
 		WithArgs(sqlmock.AnyArg(), "sess-1", "agent_instance", "agent-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
+
+	// Second page: empty, terminates pagination loop.
+	// GORM includes OFFSET when offset > 0, so 4 args: session, inviter, limit, offset.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
+		WithArgs("sess-1", "u2", 100, 100).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}))
 
 	// SoftDeleteMember for target user
 	mock.ExpectBegin()
@@ -746,6 +754,87 @@ func TestDissolveGroup_PublishesDissolvedEvent(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "sessions" SET`)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.dissolved")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	err := svc.DissolveGroup(context.Background(), "owner-1", "sess-1")
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "sess-1", payload["session_id"])
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDissolveGroup_CleansUpAgentTasks(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	// getSession: SELECT * FROM "sessions" WHERE id = $1
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "owner-1"))
+
+	// requireMember: IsMemberActive for owner-1
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
+		WithArgs("sess-1", "user", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	// requireMember: GetActiveMember for owner-1 (role=owner)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
+		WithArgs("sess-1", "user", "owner-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
+
+	// UpdateSession (mark dissolved): BEGIN + UPDATE + COMMIT
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "sessions" SET`)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// ListActiveMembers: returns owner-1 (human) + u2 (human, has agent)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE`)).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "owner-1", "owner").
+			AddRow("mem-2", "sess-1", "user", "u2", "member"))
+
+	// cleanupInvitedAgents for owner-1: no agents (page 0 empty)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
+		WithArgs("sess-1", "owner-1", 100).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	// cleanupInvitedAgents for u2: page 0 returns agent-1
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
+		WithArgs("sess-1", "u2", 100).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
+			AddRow("agent-1", "claude-code", "sess-1", "u2", "Claude"))
+
+	// Agent cleanup: CancelTasksByAgentInstance
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "pending_agent_tasks" SET`)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// Agent cleanup: DeleteAgentInstance
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id = $1`)).
+		WithArgs("agent-1").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	// Agent cleanup: SoftDeleteMember for agent
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
+		WithArgs(sqlmock.AnyArg(), "sess-1", "agent_instance", "agent-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// cleanupInvitedAgents for u2: page 1 empty
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
+		WithArgs("sess-1", "u2", 100, 100).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	bus := newTestBus(t)
 	events := captureServiceEvents(bus, "session.dissolved")

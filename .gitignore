@@ -183,12 +183,8 @@ app/mobile/
 !.agents/skills/adapter-dev/**
 !.agents/skills/env-sandbox/
 !.agents/skills/env-sandbox/**
-!.agents/skills/ui-screenshot/
-!.agents/skills/ui-screenshot/**
-!.agents/skills/dev-team/
-!.agents/skills/dev-team/**
-!.agents/skills/dev-team-codex/
-!.agents/skills/dev-team-codex/**
+!.agents/skills/real-e2e-acceptance/
+!.agents/skills/real-e2e-acceptance/**
 
 # =============================================================================
 # Screenshots & Raster Images (dev artifacts, not production assets)
