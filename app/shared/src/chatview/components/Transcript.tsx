@@ -56,7 +56,9 @@ function containsNewUserMessage(
   previousIdentities: string[],
 ): boolean {
   return items.some((item, index) => (
-    isUser(item) && currentIdentities[index] !== previousIdentities[index]
+    isUser(item) &&
+    index >= previousIdentities.length &&
+    currentIdentities[index] !== previousIdentities[index]
   ))
 }
 

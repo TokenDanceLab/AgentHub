@@ -79,6 +79,22 @@ describe('Transcript auto-follow', () => {
     await waitFor(() => expect(log.scrollTop).toBe(820));
   });
 
+  it('does not steal scroll when a pending user message is reconciled while reading scrollback', async () => {
+    const pending = user('pending-user-1', '继续修复聊天流');
+    const confirmed = user('hub-message-confirmed', '继续修复聊天流');
+    const { getByRole, rerender } = render(<Transcript items={[agent('a1'), pending]} chatMode="group" />);
+    const log = getByRole('log');
+
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 700, scrollTop: 120 });
+    fireEvent.scroll(log);
+
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 700, scrollTop: 120 });
+    rerender(<Transcript items={[agent('a1'), confirmed]} chatMode="group" />);
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(log.scrollTop).toBe(120);
+  });
+
   it('uses item ids so repeated user text does not collide during reconciliation', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
