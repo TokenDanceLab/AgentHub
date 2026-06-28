@@ -38,6 +38,7 @@ foreach ($stalePath in @(
     "docs/roadmap",
     "docs/adr",
     "docs/audit",
+    "docs/handoffs",
     "docs/reference/projects",
     "docs/release/screenshot-checklist.md",
     "docs/governance/document-standards.md",
