@@ -18,12 +18,14 @@ $rulesPath = "AGENTS.md"
 $architecturePath = "docs/architecture.md"
 $roadmapPath = "docs/roadmap.md"
 $smokeMatrixPath = "scripts/smoke/verify-e2e-smoke-matrix.ps1"
+$webVisualQaPath = "app/web/scripts/visual-qa.mjs"
 
 $skill = Read-Text $skillPath
 $rules = Read-Text $rulesPath
 $architecture = Read-Text $architecturePath
 $roadmap = Read-Text $roadmapPath
 $smokeMatrix = Read-Text $smokeMatrixPath
+$webVisualQa = Read-Text $webVisualQaPath
 
 $canonicalLevels = [ordered]@{
     "Fixture/unit" = "fixture-unit"
@@ -60,6 +62,17 @@ if ($architecture -match "1440x920") {
 }
 if ($architecture -notmatch "1440x810") {
     Fail "architecture Visual QA must name the 16:9 1440x810 desktop viewport"
+}
+if ($webVisualQa -match "1440x920") {
+    Fail "active Web Visual QA script still references stale 1440x920 viewport"
+}
+if ($webVisualQa -notmatch "width:\s*1440,\s*height:\s*810") {
+    Fail "active Web Visual QA script must use 16:9 1440x810 for desktop scenes"
+}
+foreach ($requiredVisualReportField in @("visual-qa-report.json", "screenshotPath", "domMetrics")) {
+    if ($webVisualQa -notmatch [regex]::Escape($requiredVisualReportField)) {
+        Fail "active Web Visual QA script report is missing '$requiredVisualReportField'"
+    }
 }
 
 foreach ($pattern in @(

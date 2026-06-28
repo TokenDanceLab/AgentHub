@@ -993,11 +993,7 @@
   gap: 8px;
   padding: 12px 22px 20px;
   border-top: none;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--app-bg) 86%, transparent) 0,
-    var(--app-bg) 24px
-  );
+  background: var(--app-bg);
   pointer-events: none;
 }
 

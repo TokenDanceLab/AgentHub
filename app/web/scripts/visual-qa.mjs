@@ -4,7 +4,7 @@ import path from "node:path";
 
 const baseUrl = process.env.WEB_QA_URL ?? "http://127.0.0.1:5174/";
 const outDir = path.resolve("screenshots");
-const desktopViewport = { width: 1440, height: 920 };
+const desktopViewport = { width: 1440, height: 810 };
 const mobileViewport = { width: 390, height: 844 };
 const hubUrlPattern = /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
@@ -77,6 +77,46 @@ const contacts = [
   },
 ];
 
+const workspaceProjects = [
+  {
+    id: "agenthub-mobile",
+    name: "AgentHub Mobile",
+    description: "Visual QA project loaded from the Hub stub.",
+    owner_id: "user_visual",
+    created_at: "2026-05-30T01:00:00Z",
+    updated_at: "2026-05-30T01:25:00Z",
+  },
+];
+
+const workspaceProjectThreads = [
+  {
+    id: "thread_visual_qa",
+    project_id: "agenthub-mobile",
+    type: "group",
+    name: "Visual QA Handoff",
+    owner_user_id: "user_visual",
+    role: "owner",
+    member_count: 2,
+    last_message_at: "2026-05-30T01:25:00Z",
+    created_at: "2026-05-30T01:05:00Z",
+  },
+];
+
+const workspaceProjectThreadMessages = [
+  {
+    id: "project_msg_1",
+    project_id: "agenthub-mobile",
+    thread_id: "thread_visual_qa",
+    seq_id: 1,
+    client_msg_id: "project_msg_1",
+    sender_type: "user",
+    sender_id: "user_visual",
+    content_type: "text",
+    content: "Use the same clean visual contract across Web and Desktop.",
+    created_at: "2026-05-30T01:06:00Z",
+  },
+];
+
 const messages = [
   {
     id: "msg_1",
@@ -113,15 +153,8 @@ const messages = [
     session_id: "session_web_design",
     sender_id: "profile_codex",
     sender_type: "agent",
-    content_type: "json",
-    content: JSON.stringify({
-      event_type: "run.agent.session_init",
-      payload: {
-        model: "gpt-5",
-        tools: ["Read", "Edit", "Bash"],
-        permissionMode: "approval",
-      },
-    }),
+    content_type: "text",
+    content: "Session initialized - gpt-5 with Read, Edit, and Bash tools.",
     seq_id: 4,
     created_at: "2026-05-30T01:22:00Z",
   },
@@ -130,11 +163,8 @@ const messages = [
     session_id: "session_web_design",
     sender_id: "profile_codex",
     sender_type: "agent",
-    content_type: "json",
-    content: JSON.stringify({
-      success: true,
-      tokenUsage: { input: 1420, output: 318 },
-    }),
+    content_type: "text",
+    content: "Completed - 1420 in / 318 out tokens.",
     seq_id: 5,
     created_at: "2026-05-30T01:23:00Z",
   },
@@ -143,13 +173,8 @@ const messages = [
     session_id: "session_web_design",
     sender_id: "profile_codex",
     sender_type: "agent",
-    content_type: "json",
-    content: JSON.stringify({
-      callId: "call_visual_shell",
-      toolName: "Bash",
-      input: { command: "pnpm visual:qa" },
-      status: "running",
-    }),
+    content_type: "text",
+    content: "Bash running - pnpm visual:qa",
     seq_id: 6,
     created_at: "2026-05-30T01:24:00Z",
   },
@@ -158,13 +183,8 @@ const messages = [
     session_id: "session_web_design",
     sender_id: "profile_codex",
     sender_type: "agent",
-    content_type: "json",
-    content: JSON.stringify({
-      callId: "call_visual_shell",
-      toolName: "Bash",
-      output: "Web visual QA passed (10 scenes)",
-      status: "completed",
-    }),
+    content_type: "text",
+    content: "Bash completed - Web visual QA passed (10 scenes)",
     seq_id: 7,
     created_at: "2026-05-30T01:25:00Z",
   },
@@ -173,16 +193,13 @@ const messages = [
     session_id: "session_web_design",
     sender_id: "profile_codex",
     sender_type: "agent",
-    content_type: "json",
-    content: JSON.stringify({
-      path: "app/web/src/components/ChatView.tsx",
-      action: "modified",
-      diff: [
-        "@@ shared preview @@",
-        "- <details className={styles.fileCard}>",
-        "+ <CodePreviewCard title={block.path} code={block.diff} />",
-      ].join("\n"),
-    }),
+    content_type: "text",
+    content: [
+      "app/web/src/components/ChatView.tsx",
+      "@@ shared preview @@",
+      "- <details className={styles.fileCard}>",
+      "+ <CodePreviewCard title={block.path} code={block.diff} />",
+    ].join("\n"),
     seq_id: 8,
     created_at: "2026-05-30T01:26:00Z",
   },
@@ -233,6 +250,25 @@ async function installMockHub(context, { emptyAgents = false } = {}) {
         items: emptyAgents ? [] : agentProfiles,
         page: { hasMore: false },
       })));
+    }
+
+    if (pathname === "/web/projects") {
+      return route.fulfill(json(hubEnvelope({
+        items: workspaceProjects,
+        page: { hasMore: false },
+      })));
+    }
+
+    if (pathname === "/web/projects/agenthub-mobile") {
+      return route.fulfill(json(hubEnvelope(workspaceProjects[0])));
+    }
+
+    if (pathname === "/web/projects/agenthub-mobile/threads") {
+      return route.fulfill(json(hubEnvelope(workspaceProjectThreads)));
+    }
+
+    if (pathname === "/web/projects/agenthub-mobile/threads/thread_visual_qa/messages") {
+      return route.fulfill(json(hubEnvelope(workspaceProjectThreadMessages)));
     }
 
     if (pathname === "/client/auth/me") {
@@ -313,16 +349,28 @@ async function preparePage(page, { authenticated = false, language = "en", theme
     window.localStorage.setItem("agenthub-theme", selectedTheme);
     window.localStorage.setItem("agenthub_hub_url", "http://localhost:8080");
     if (isAuthenticated) {
+      window.localStorage.setItem("agenthub.workbench.dataMode", "approved-real");
       window.sessionStorage.setItem("agenthub_hub_token", "visual-qa-token");
+      window.sessionStorage.setItem("agenthub_token_source", "hub");
       window.sessionStorage.setItem("agenthub_hub_user", JSON.stringify({
         userId: "user_visual",
         username: "visual-reviewer",
       }));
     } else {
+      window.localStorage.removeItem("agenthub.workbench.dataMode");
       window.sessionStorage.removeItem("agenthub_hub_token");
+      window.sessionStorage.removeItem("agenthub_token_source");
       window.sessionStorage.removeItem("agenthub_hub_user");
     }
   }, { authenticated, language, theme });
+}
+
+function isExpectedBrowserDiagnostic(text) {
+  return (
+    /Download the React DevTools/i.test(text) ||
+    text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
+    /WebSocket connection to 'ws:\/\/localhost:8080\/client\/ws\?access_token=visual-qa-token' failed/i.test(text)
+  );
 }
 
 function assert(condition, message, details) {
@@ -785,10 +833,7 @@ async function visitAndCapture(page, scene) {
   const onConsole = (message) => {
     if (["warning", "error"].includes(message.type())) {
       const text = message.text();
-      if (
-        !/Download the React DevTools/i.test(text) &&
-        !/WebSocket connection to 'ws:\/\/localhost:8080\/client\/ws\?access_token=visual-qa-token' failed/i.test(text)
-      ) {
+      if (!isExpectedBrowserDiagnostic(text)) {
         consoleIssues.push({ type: message.type(), text });
       }
     }
@@ -797,6 +842,9 @@ async function visitAndCapture(page, scene) {
   page.on("console", onConsole);
   await preparePage(page, scene);
   await page.goto(url, { waitUntil: "networkidle" });
+  if (scene.authenticated) {
+    await page.getByRole("status").filter({ hasText: "Hub replay:" }).waitFor({ state: "visible", timeout: 5000 });
+  }
 
   if (scene.openRun) {
     await page.locator("nav button[aria-label='Open run detail']").click();
@@ -813,8 +861,8 @@ async function visitAndCapture(page, scene) {
       await targetThread.first().click();
     }
     await page.getByText("desktop-aligned").waitFor({ state: "visible", timeout: 5000 });
-    await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
-    await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Session initialized - gpt-5").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Completed - 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
   }
   if (scene.verifyThreadRows) {
     await page.waitForFunction(() => {
@@ -941,7 +989,19 @@ async function visitAndCapture(page, scene) {
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
   const metrics = await collectMetrics(page, { mobile: scene.mobile });
-  await writeFile(path.join(outDir, `${scene.name}.probe.json`), JSON.stringify({ ...metrics, consoleIssues }, null, 2));
+  await writeFile(
+    path.join(outDir, `${scene.name}.probe.json`),
+    JSON.stringify(
+      {
+        screenshotPath,
+        viewport: page.viewportSize(),
+        domMetrics: metrics,
+        consoleIssues,
+      },
+      null,
+      2,
+    ),
+  );
   page.off("console", onConsole);
 
   assert(consoleIssues.length === 0, `${scene.name}: unexpected console warnings/errors`, consoleIssues);
@@ -1040,7 +1100,7 @@ async function visitAndCapture(page, scene) {
     assert(metrics.sharedSettingsCalloutCount >= 1, `${scene.name}: settings callouts should use shared StatusNotice structure`, metrics);
   }
 
-  return { screenshotPath, metrics };
+  return { screenshotPath, viewport: page.viewportSize(), domMetrics: metrics };
 }
 
 async function main() {
@@ -1049,7 +1109,7 @@ async function main() {
 
   const scenes = [
     {
-      name: "web-design-workspace-desktop-1440x920",
+      name: "web-design-workspace-desktop-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1116,7 +1176,7 @@ async function main() {
       openIMConversation: true,
     },
     {
-      name: "web-design-workspace-desktop-status-1440x920",
+      name: "web-design-workspace-desktop-status-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1125,7 +1185,7 @@ async function main() {
       selectThread: true,
     },
     {
-      name: "web-design-thread-sidebar-desktop-1440x920",
+      name: "web-design-thread-sidebar-desktop-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1134,7 +1194,7 @@ async function main() {
       verifyThreadRows: true,
     },
     {
-      name: "web-design-search-dialog-desktop-1440x920",
+      name: "web-design-search-dialog-desktop-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1143,7 +1203,7 @@ async function main() {
       openSearch: true,
     },
     {
-      name: "web-design-run-detail-tool-call-desktop-1440x920",
+      name: "web-design-run-detail-tool-call-desktop-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1152,7 +1212,7 @@ async function main() {
       openRunWithToolCall: true,
     },
     {
-      name: "web-design-workspace-desktop-empty-agents-1440x920",
+      name: "web-design-workspace-desktop-empty-agents-1440x810",
       path: "/",
       viewport: desktopViewport,
       authenticated: true,
@@ -1170,7 +1230,7 @@ async function main() {
       theme: "dark",
     },
     {
-      name: "web-design-settings-account-desktop-1440x920",
+      name: "web-design-settings-account-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1179,7 +1239,7 @@ async function main() {
       openSettingsAccount: true,
     },
     {
-      name: "web-design-settings-tasks-desktop-1440x920",
+      name: "web-design-settings-tasks-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1188,7 +1248,7 @@ async function main() {
       openSettingsTasks: true,
     },
     {
-      name: "web-design-settings-skills-desktop-1440x920",
+      name: "web-design-settings-skills-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1198,7 +1258,7 @@ async function main() {
       expectSettingsCallout: true,
     },
     {
-      name: "web-design-settings-targets-desktop-1440x920",
+      name: "web-design-settings-targets-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1207,7 +1267,7 @@ async function main() {
       openSettingsTargets: true,
     },
     {
-      name: "web-design-settings-connections-desktop-1440x920",
+      name: "web-design-settings-connections-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1216,7 +1276,7 @@ async function main() {
       openSettingsConnections: true,
     },
     {
-      name: "web-design-settings-model-mapping-desktop-1440x920",
+      name: "web-design-settings-model-mapping-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1225,7 +1285,7 @@ async function main() {
       openSettingsModelMapping: true,
     },
     {
-      name: "web-design-settings-cc-switch-desktop-1440x920",
+      name: "web-design-settings-cc-switch-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1234,7 +1294,7 @@ async function main() {
       openSettingsCcSwitch: true,
     },
     {
-      name: "web-design-settings-archived-empty-desktop-1440x920",
+      name: "web-design-settings-archived-empty-desktop-1440x810",
       path: "/settings",
       viewport: desktopViewport,
       authenticated: true,
@@ -1283,6 +1343,8 @@ async function main() {
   ];
 
   try {
+    const sceneReports = [];
+    let firstFailure = null;
     for (const scene of scenes) {
       const context = await browser.newContext({
         viewport: scene.viewport,
@@ -1290,10 +1352,51 @@ async function main() {
       });
       await installMockHub(context, { emptyAgents: scene.emptyAgents });
       const page = await context.newPage();
-      await page.setViewportSize(scene.viewport);
-      await visitAndCapture(page, scene);
-      await page.close();
-      await context.close();
+      try {
+        await page.setViewportSize(scene.viewport);
+        const report = await visitAndCapture(page, scene);
+        sceneReports.push({
+          name: scene.name,
+          path: scene.path,
+          status: "passed",
+          viewport: scene.viewport,
+          screenshotPath: report.screenshotPath,
+          domMetrics: report.domMetrics,
+        });
+      } catch (error) {
+        firstFailure = error;
+        sceneReports.push({
+          name: scene.name,
+          path: scene.path,
+          status: "failed",
+          viewport: scene.viewport,
+          screenshotPath: path.join(outDir, `${scene.name}.png`),
+          probePath: path.join(outDir, `${scene.name}.probe.json`),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        break;
+      } finally {
+        await page.close().catch(() => {});
+        await context.close().catch(() => {});
+      }
+    }
+    const reportPath = path.join(outDir, "visual-qa-report.json");
+    await writeFile(
+      reportPath,
+      JSON.stringify(
+        {
+          baseUrl,
+          generatedAt: new Date().toISOString(),
+          status: firstFailure ? "failed" : "passed",
+          scenes: sceneReports,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(`Web visual QA report: ${reportPath}`);
+    if (firstFailure) {
+      throw firstFailure;
     }
   } finally {
     await browser.close();

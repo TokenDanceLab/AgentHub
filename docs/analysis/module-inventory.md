@@ -104,7 +104,7 @@
 - **Path**: `app/desktop/scripts/manual-chat-flow-check.mjs`, `app/web/scripts/manual-chat-flow-check.mjs`, `app/web/scripts/visual-qa.mjs`
 - **Responsibility**: Produce screenshots plus DOM geometry metrics for visual and interaction acceptance.
 - **Complexity Rating**: Medium.
-- **Transformation Notes**: Desktop/Web chat-flow scripts already use `1440x810`; broader Web visual QA still uses stale `1440x920` naming/viewport.
+- **Transformation Notes**: Desktop/Web chat-flow scripts and broader Web visual QA are aligned on the `1440x810` desktop acceptance viewport by T1.2.
 - **S.U.P.E.R Assessment**:
   - **S**: Partial. Scripts combine server startup, stubbing, actions, metrics, and report output.
   - **U**: Good. Inputs are URL/stubs; outputs are screenshots/JSON.
