@@ -3,6 +3,7 @@ import {
   buildE2EDataModeManifest,
   classifyE2ERequest,
   createE2EDataModeScenario,
+  resolveE2ERequestDecision,
   validateE2EDataModeScenario,
 } from './e2eDataModeContract';
 
@@ -63,6 +64,28 @@ describe('e2e data-mode contract', () => {
         'desktop-chat-flow forbids local-edge request during workbench-runtime GET http://127.0.0.1:3210/v1/health',
       ],
     });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'http://127.0.0.1:3210/v1/health',
+      phase: 'entry-preflight',
+    })).toMatchObject({
+      boundary: 'local-edge',
+      phase: 'entry-preflight',
+      allowed: true,
+      action: 'fulfill-scenario-backend',
+      shouldRecord: true,
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'http://127.0.0.1:3210/v1/health',
+      phase: 'workbench-runtime',
+    })).toMatchObject({
+      boundary: 'local-edge',
+      phase: 'workbench-runtime',
+      allowed: false,
+      action: 'block-forbidden-backend',
+      shouldRecord: true,
+    });
   });
 
   it('rejects stubbed approved-real Web scenarios that claim real execution or direct Local Edge', () => {
@@ -98,6 +121,16 @@ describe('e2e data-mode contract', () => {
     ])).toEqual({
       ok: false,
       errors: ['web-stubbed-hub-replay-smoke forbids local-edge request GET http://127.0.0.1:3210/v1/runs'],
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'http://127.0.0.1:3210/v1/runs',
+    })).toMatchObject({
+      boundary: 'local-edge',
+      phase: 'workbench-runtime',
+      allowed: false,
+      action: 'block-forbidden-backend',
+      shouldRecord: true,
     });
   });
 
@@ -215,5 +248,42 @@ describe('e2e data-mode contract', () => {
     expect(classifyE2ERequest('https://id.vectorcontrol.tech/oauth/authorize')).toBe('tokendance-id');
     expect(classifyE2ERequest('https://api.vectorcontrol.tech/v1/chat/completions')).toBe('gateway');
     expect(classifyE2ERequest('http://127.0.0.1:5174/')).toBe('app');
+  });
+
+  it('resolves route actions without duplicating data-mode switch logic in Playwright specs', () => {
+    const scenario = createE2EDataModeScenario({
+      name: 'web-stubbed-hub-replay-smoke',
+      surface: 'web',
+      dataMode: 'approved-real',
+      dataSource: 'stubbed-hub-session',
+      appOrigin: 'http://127.0.0.1:5174',
+      hubOrigin: 'http://localhost:8080',
+      mockAdapterUsed: true,
+    });
+
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'http://127.0.0.1:5174/',
+    })).toMatchObject({
+      boundary: 'app',
+      action: 'continue',
+      shouldRecord: false,
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'http://localhost:8080/client/auth/me',
+    })).toMatchObject({
+      boundary: 'hub',
+      action: 'fulfill-scenario-backend',
+      shouldRecord: true,
+    });
+    expect(resolveE2ERequestDecision(scenario, {
+      method: 'GET',
+      url: 'https://example.invalid/telemetry',
+    })).toMatchObject({
+      boundary: 'other-http',
+      action: 'abort-external-http',
+      shouldRecord: false,
+    });
   });
 });

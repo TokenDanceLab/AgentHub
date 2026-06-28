@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   buildE2EDataModeManifest,
   createE2EDataModeScenario,
+  resolveE2ERequestDecision,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
 
@@ -28,14 +29,48 @@ test.describe('Web Hub task approval/artifact contract', () => {
       requests: [],
     };
 
-    await page.route('http://localhost:8080/**', async (route) => {
+    await page.route('**/*', async (route) => {
       const request = route.request();
+      const decision = resolveE2ERequestDecision(WEB_TASK_CONTRACT_SCENARIO, {
+        method: request.method(),
+        url: request.url(),
+      });
+
+      if (decision.action === 'continue') {
+        return route.continue();
+      }
+
+      if (decision.shouldRecord) {
+        requested.requests.push(decision.request);
+      }
+
+      if (decision.action === 'block-forbidden-backend') {
+        return route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+          headers: corsHeaders(),
+        });
+      }
+
+      if (decision.action === 'abort-external-http') {
+        return route.abort('blockedbyclient');
+      }
+
+      if (decision.boundary !== 'hub') {
+        return route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'unexpected_e2e_backend_boundary' }),
+          headers: corsHeaders(),
+        });
+      }
+
       const url = new URL(request.url());
       requested.endpoints.add(`${request.method()} ${url.pathname}`);
-      requested.requests.push({ method: request.method(), url: request.url() });
 
       if (request.method() === 'OPTIONS') {
-        return route.fulfill({ status: 204 });
+        return route.fulfill({ status: 204, headers: corsHeaders() });
       }
 
       if (url.pathname === '/client/auth/me') {
@@ -287,11 +322,15 @@ function json(body: unknown): {
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(body),
-    headers: {
-      'access-control-allow-origin': '*',
-      'access-control-allow-headers': 'authorization,content-type',
-      'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
-    },
+    headers: corsHeaders(),
+  };
+}
+
+function corsHeaders(): Record<string, string> {
+  return {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'authorization,content-type',
+    'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
   };
 }
 

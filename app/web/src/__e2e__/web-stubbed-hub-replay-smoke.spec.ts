@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildE2EDataModeManifest,
-  classifyE2ERequest,
   createE2EDataModeScenario,
+  resolveE2ERequestDecision,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
 
@@ -169,7 +169,9 @@ function collectPageDiagnostics(page: Page): void {
     console.log(`[pageerror] ${error.message}`);
   });
   page.on('requestfailed', (request) => {
-    console.log(`[requestfailed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
+    const errorText = request.failure()?.errorText ?? '';
+    if (isExpectedRequestFailure(request.url(), errorText)) return;
+    console.log(`[requestfailed] ${request.method()} ${request.url()} ${errorText}`);
   });
 }
 
@@ -178,8 +180,13 @@ function isExpectedBrowserDiagnostic(text: string): boolean {
     text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
     text.includes("WebSocket connection to 'ws://localhost:8080/client/ws") ||
     text.includes('Failed to load resource: the server responded with a status of 503') ||
-    text.includes('[API] target_inventory_unavailable (HTTP 503): Hub target inventory unavailable')
+    text.includes('[API] target_inventory_unavailable (HTTP 503): Hub target inventory unavailable') ||
+    text.includes('Failed to load resource: net::ERR_BLOCKED_BY_CLIENT')
   );
+}
+
+function isExpectedRequestFailure(url: string, errorText: string): boolean {
+  return errorText.includes('ERR_BLOCKED_BY_CLIENT') && url.startsWith('https://fonts.googleapis.com/');
 }
 
 type HubScenario = 'no-target' | 'healthy-target' | 'target-error';
@@ -242,15 +249,21 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    const boundary = classifyE2ERequest(request.url(), WEB_HUB_SMOKE_SCENARIO);
+    const decision = resolveE2ERequestDecision(WEB_HUB_SMOKE_SCENARIO, {
+      method: request.method(),
+      url: request.url(),
+    });
 
-    if (boundary === 'app') {
+    if (decision.action === 'continue') {
       return route.continue();
     }
 
-    if (boundary === 'hub') {
+    if (decision.shouldRecord) {
+      requests.push(decision.request);
+    }
+
+    if (decision.action === 'fulfill-scenario-backend' && decision.boundary === 'hub') {
       endpoints.add(`${request.method()} ${url.pathname}`);
-      requests.push({ method: request.method(), url: request.url() });
 
       if (request.method() === 'OPTIONS') {
         return route.fulfill({ status: 204, headers: corsHeaders() });
@@ -259,8 +272,7 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       return fulfillHubRoute(page, route, url.pathname, scenario);
     }
 
-    if (boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
-      requests.push({ method: request.method(), url: request.url() });
+    if (decision.action === 'block-forbidden-backend') {
       return route.fulfill({
         status: 503,
         contentType: 'application/json',
@@ -269,7 +281,7 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       });
     }
 
-    return route.continue();
+    return route.abort('blockedbyclient');
   });
 
   return { endpoints, requests };
