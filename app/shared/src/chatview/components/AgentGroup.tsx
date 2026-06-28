@@ -31,6 +31,15 @@ interface Props {
   actionedBlockIds?: Set<string>
 }
 
+type AgentRow = TranscriptAgentItem['rows'][number]
+
+function shouldStackRows(previous: AgentRow, next: AgentRow): boolean {
+  return (
+    (previous.type === 'approval' && next.type === 'preview') ||
+    (previous.type === 'preview' && next.type === 'approval')
+  )
+}
+
 /** Render an agent item in the transcript: avatar, name, time, card stack,
  *  standalone cards, chat bubbles, and evidence chips.
  *  Dispatches orchestrator cards via {@link OrchestratorCard} and
@@ -100,22 +109,40 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
     );
   }, [actionedBlockIds, handleApprove, handleReject, handleRetry, onBlockContextMenu, onBlockSelect, onDeploySubmit, onReviewFile, selectedBlockIds, selectionMode, softHiddenBlockIds])
 
+  const renderRowStacks = useCallback((rows: AgentRow[], keyPrefix: string): ReactNode[] => {
+    const stacks: AgentRow[][] = [];
+    let currentStack: AgentRow[] = [];
+
+    rows.forEach((row) => {
+      const previous = currentStack[currentStack.length - 1];
+      if (previous && !shouldStackRows(previous, row)) {
+        stacks.push(currentStack);
+        currentStack = [];
+      }
+      currentStack.push(row);
+    });
+
+    if (currentStack.length > 0) stacks.push(currentStack);
+
+    return stacks.map((rowsInStack, index) => (
+      <div className="card-stack" key={`${keyPrefix}-${index}`}>
+        {rowsInStack.map(renderRow)}
+      </div>
+    ));
+  }, [renderRow])
+
   const orderedBodyContent = useMemo(() => {
     const parts = item.parts;
     if (!parts?.length) return null;
     let bubbleIndex = 0;
     let stackIndex = 0;
-    let rowStack: ReactNode[] = [];
+    let rowStack: AgentRow[] = [];
     const content: ReactNode[] = [];
     const flushRowStack = () => {
       if (rowStack.length === 0) return;
       const rows = rowStack;
       rowStack = [];
-      content.push(
-        <div className="card-stack" key={`stack-${stackIndex}`}>
-          {rows}
-        </div>,
-      );
+      content.push(...renderRowStacks(rows, `stack-${stackIndex}`));
       stackIndex += 1;
     };
 
@@ -127,12 +154,12 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         content.push(renderBubble(part, `bubble-${index}`, currentBubbleIndex === 0));
         return;
       }
-      rowStack.push(renderRow(part.row));
+      rowStack.push(part.row);
     });
 
     flushRowStack();
     return content;
-  }, [item.parts, renderBubble, renderRow])
+  }, [item.parts, renderBubble, renderRowStacks])
 
   const fallbackBubblesContent = useMemo(() => item.bubbles.map((text, i) => (
     renderBubble({ text }, `bubble-${i}`, i === 0)
@@ -165,14 +192,10 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         </div>
       )}
       {item.rows.length > 0 && (
-        <div className="card-stack">
-          {item.rows.map(renderRow)}
-        </div>
+        renderRowStacks(item.rows, 'rows')
       )}
       {item.standaloneRows.length > 0 && (
-        <div className="card-stack">
-          {item.standaloneRows.map(renderRow)}
-        </div>
+        renderRowStacks(item.standaloneRows, 'standalone')
       )}
       {fallbackBubblesContent}
       {evidenceChipsContent}
