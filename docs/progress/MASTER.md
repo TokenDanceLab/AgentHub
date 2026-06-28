@@ -42,7 +42,7 @@
 | T2.2 | #383 | Harden optimistic send and auto-follow contract | closed via #402 |
 | T2.3 | #384 | Harden card grouping and rounded-stack rules | closed via #404 |
 | T2.4 | #385 | Keep markdown/table rendering and debug filtering clean | closed via #405 |
-| T3.1 | #386 | Web Hub-only guarded-flow check | open |
+| T3.1 | #386 | Web Hub-only guarded-flow check | ready via #406 |
 | T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | open |
 | T3.3 | #388 | Observed and approved-real manifest boundary | open |
 | T4.1 | #389 | Add focused chat acceptance gate | open |
@@ -70,7 +70,7 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 ## Current Status
 
 **Active Phase**: Phase 3
-**Active Task**: T3.1 - Web Hub-only guarded-flow check (#386)
+**Active Task**: T3.1 - Web Hub-only guarded-flow check (#386 / PR #406)
 **Blockers**: None for GitHub Standard. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
@@ -88,9 +88,10 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start T3.1 (#386) in a separate task worktree from `origin/dev/delicious233`.
-2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Merge #406 after CI/review passes; close #386 manually if the non-default base does not auto-close it.
+2. Start T3.2 (#387) in a separate task worktree from `origin/dev/delicious233` after #406 lands.
+3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -107,3 +108,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | T2.2 implementation | Tightened optimistic send auto-follow so pending-to-confirmed reconciliation does not steal scrollback; Desktop/Web chat-flow E2E and Visual QA passed with `real_tested=false`; #402 merged. |
 | 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 merged and #384 closed manually because non-default base did not auto-close it. |
 | 2026-06-29 | T2.4 implementation | Expanded shared runtime diagnostic filtering, kept Markdown table rendering under shared/Web tests, verified Desktop/Web chat-flow and Visual QA with `real_tested=false`; #405 merged and #385 closed manually because non-default base did not auto-close it. |
+| 2026-06-29 | T3.1 implementation | Enforced Web guarded Hub-only data boundary, added stubbed-Hub manifest `evidence_level`, blocked Local Edge/TDI/Gateway boundary attempts in Playwright, and verified Web/shared gates with `real_tested=false`; #406 ready to merge. |

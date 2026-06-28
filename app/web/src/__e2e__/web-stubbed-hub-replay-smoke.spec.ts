@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildE2EDataModeManifest,
+  classifyE2ERequest,
   createE2EDataModeScenario,
   resolveE2ERequestDecision,
   type E2EObservedRequest,
@@ -45,6 +46,63 @@ test.describe('Web stubbed Hub replay smoke', () => {
     buildE2EDataModeManifest(WEB_HUB_SMOKE_SCENARIO, requests.requests, {
       scenario: 'signed-out',
     });
+  });
+
+  test('blocks Local Edge, TokenDance ID, and Gateway requests during guarded Web replay', async ({ page }) => {
+    const requests = await startAuthenticatedHubSmoke(page, 'healthy-target', { activeTask: false });
+
+    await expect(page.getByText('Target: ready - Smoke Desktop Edge (target-web-smoke)')).toBeVisible();
+    const blocked = await page.evaluate(async () => {
+      const urls = [
+        'http://127.0.0.1:3210/v1/health',
+        'https://id.vectorcontrol.tech/oidc/authorize',
+        'https://api.vectorcontrol.tech/v1/models',
+      ];
+      return Promise.all(urls.map(async (url) => {
+        try {
+          const response = await fetch(url);
+          return {
+            url,
+            status: response.status,
+            body: await response.json(),
+          };
+        } catch (error) {
+          return {
+            url,
+            status: 'blocked-by-browser',
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }));
+    });
+
+    expect(blocked).toEqual([
+      {
+        url: 'http://127.0.0.1:3210/v1/health',
+        status: 'blocked-by-browser',
+        error: 'Failed to fetch',
+      },
+      {
+        url: 'https://id.vectorcontrol.tech/oidc/authorize',
+        status: 503,
+        body: { code: 'blocked_by_e2e_data_mode_contract' },
+      },
+      {
+        url: 'https://api.vectorcontrol.tech/v1/models',
+        status: 503,
+        body: { code: 'blocked_by_e2e_data_mode_contract' },
+      },
+    ]);
+
+    expect(Array.from(new Set(
+      requests.requests
+        .map((request) => classifyE2ERequest(request.url, WEB_HUB_SMOKE_SCENARIO))
+        .filter((boundary) => boundary !== 'hub'),
+    )).sort()).toEqual(['gateway', 'tokendance-id']);
+    expect(requests.requests.filter((request) => (
+      classifyE2ERequest(request.url, WEB_HUB_SMOKE_SCENARIO) === 'hub'
+    )).length).toBeGreaterThan(0);
+    await expect(page.getByText('mock (auto fallback)')).toHaveCount(0);
   });
 
   test('renders Hub session and no-target blocker from a stubbed Hub replay', async ({ page }) => {
@@ -178,6 +236,8 @@ function collectPageDiagnostics(page: Page): void {
 function isExpectedBrowserDiagnostic(text: string): boolean {
   return (
     text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
+    text.includes("Connecting to 'http://127.0.0.1:3210/v1/health' violates the following Content Security Policy directive") ||
+    text.includes('Fetch API cannot load http://127.0.0.1:3210/v1/health') ||
     text.includes("WebSocket connection to 'ws://localhost:8080/client/ws") ||
     text.includes('Failed to load resource: the server responded with a status of 503') ||
     text.includes('[API] target_inventory_unavailable (HTTP 503): Hub target inventory unavailable') ||

@@ -60,10 +60,11 @@ function WebWorkbenchRoot() {
   const realMode = dataModeContract.isRealDataMode;
   const webPlatform = useMemo(
     () => createWebPlatform({
+      dataMode,
       ensureAuth,
       demoRuntimeFallback: dataModeContract.mode !== 'auto' && dataModeContract.allowsDemoRuntimeFallback,
     }),
-    [dataModeContract.allowsDemoRuntimeFallback, dataModeContract.mode, ensureAuth],
+    [dataMode, dataModeContract.allowsDemoRuntimeFallback, dataModeContract.mode, ensureAuth],
   );
   const agentList = useAgentList(true);
   const createAgentProfile = useCreateAgentProfile();
