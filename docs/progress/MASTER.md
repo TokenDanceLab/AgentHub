@@ -88,10 +88,9 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Merge #404, then close #384 manually if GitHub does not auto-close it from the non-default base branch.
-2. Start T2.4 (#385) in a separate task worktree after #404 lands.
-3. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
-4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+1. Start T2.4 (#385) in a separate task worktree from `origin/dev/delicious233`.
+2. Keep full Web Visual QA brand-shell failure scoped to the Visual QA/design acceptance lane; do not overclaim it as green.
+3. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
 
 ## Session Log
 
@@ -106,4 +105,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-28 | Phase 1 complete | #381 merged via #399; milestone #17 closed with 4/4 tasks complete and Phase 2 is now active. |
 | 2026-06-28 | T2.1 implementation | Added shared golden mixed-source transcript fixtures and switched Web chat-flow E2E to consume the shared fixture; #401 ready to merge. |
 | 2026-06-28 | T2.2 implementation | Tightened optimistic send auto-follow so pending-to-confirmed reconciliation does not steal scrollback; Desktop/Web chat-flow E2E and Visual QA passed with `real_tested=false`; #402 merged. |
-| 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 ready to merge. |
+| 2026-06-28 | T2.3 implementation | Split related card stacks from unrelated consecutive cards, removed nested preview-card framing, and verified Desktop/Web chat-flow geometry with `real_tested=false`; #404 merged and #384 closed manually because non-default base did not auto-close it. |
