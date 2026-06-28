@@ -22,6 +22,8 @@ describe('AgentGroup rendering', () => {
     const { container, queryByText } = render(<AgentGroup item={item} chatMode="group" />);
 
     expect(container.querySelector('table')).not.toBeNull();
+    expect(container.querySelectorAll('thead th')).toHaveLength(2);
+    expect(container.querySelectorAll('tbody td')).toHaveLength(2);
     expect(queryByText('Run run-1')).toBeNull();
   });
 

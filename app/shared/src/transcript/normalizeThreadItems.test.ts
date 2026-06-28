@@ -13,6 +13,15 @@ describe('normalizeThreadItemsToTranscript', () => {
         runId: 'run-1',
         createdAt: '2026-06-07T01:00:02Z',
       },
+      {
+        itemId: 'diag-2',
+        threadId: 'thread-1',
+        type: 'agent_message',
+        role: 'assistant',
+        content: 'mock (auto fallback)',
+        runId: 'run-1',
+        createdAt: '2026-06-07T01:00:03Z',
+      },
     ]);
 
     expect(blocks).toEqual([]);

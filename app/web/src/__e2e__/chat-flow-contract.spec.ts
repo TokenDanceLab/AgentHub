@@ -50,6 +50,8 @@ test.describe('Web shared chat flow contract', () => {
     await expect(transcript).toContainText('The golden replay summary is below.');
     await expect(transcript.locator('table')).toContainText('Status');
     await expect(transcript.locator('table')).toContainText('ordered');
+    await expect(transcript.locator('table thead th')).toHaveCount(2);
+    await expect(transcript.locator('table tbody td')).toHaveCount(2);
     await expectTranscriptWithoutModeDebug(transcript);
 
     await expect(transcript.locator('[data-block-id="call-read-a"]')).toBeVisible();
@@ -162,6 +164,7 @@ async function transcriptScrollGap(page: Page): Promise<number> {
 async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['getByRole']>): Promise<void> {
   await expect(transcript).not.toContainText('Data:');
   await expect(transcript).not.toContainText('Hub replay:');
+  await expect(transcript).not.toContainText('Runtime: mock replay');
   await expect(transcript).not.toContainText('mock (auto fallback)');
   await expect(transcript).not.toContainText('demo+edge');
 }
