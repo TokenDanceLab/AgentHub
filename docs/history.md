@@ -1,6 +1,6 @@
 # AgentHub History
 
-最后更新：2026-06-28
+最后更新：2026-06-29
 
 本文件是 AgentHub 源仓的历史材料索引。历史 longform、日期型审计、旧发布材料、过期设计、参考调研、完成的 spec-driven 工件和过期项目 skill 不再保存在 AgentHub active source tree。
 
@@ -17,6 +17,8 @@
 | Root evidence archive commit | `bc774192` merge commit; source archive commit `6cb00e9` |
 | Repo structure SPEC archive PR | TokenDanceLab/docs#4 |
 | Repo structure SPEC archive commit | `b7c6478d` merge commit; source archive commit `b845480` |
+| Real Foundation Hardening SPEC archive PR | TokenDanceLab/docs#5 |
+| Real Foundation Hardening SPEC archive commit | `c6bd127` merge commit; source archive commit `f8206d2` |
 | Archive root | `archive/agenthub/` |
 
 ## Migrated Paths
@@ -29,6 +31,7 @@
 | archived project skills | `archive/agenthub/repo/docs/archives/project-skills/` |
 | `css-audit-results.json` | `archive/agenthub/repo/root-evidence/css-audit-results.json` |
 | repo structure cleanup SPEC | `archive/agenthub/repo/specs/repo-structure-doc-tooling-cleanup/` |
+| real foundation hardening SPEC | `archive/agenthub/repo/specs/real-foundation-hardening/` |
 
 ## Rules
 

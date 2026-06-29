@@ -17,16 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前 active spec-driven 专项是 Real Foundation Hardening，进度入口见 [progress/MASTER.md](progress/MASTER.md)。该专项负责 Desktop/Web chat workflow、shared transcript、data-boundary、real E2E/Visual QA foundation 的基础收口；证据等级矩阵仍只由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)。
-
-当前专项状态：
-
-| Phase | 状态 | 说明 |
-|---|---|---|
-| Phase 1 Evidence Contract Foundation | 完成 | evidence manifest、Visual QA viewport/report、data-mode boundary helper、docs-only evidence bundle owner links 已合并 |
-| Phase 2 Shared Chat Timeline Hardening | 完成 | shared transcript fixtures、optimistic send/auto-follow、card grouping、markdown/table/debug filtering 已合并 |
-| Phase 3 Desktop/Web Boundary And Backend Truth | 进行中 | Web Hub-only guarded flow 已合并；Desktop entry/workbench split 和 observed/approved-real boundary 按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
-| Phase 4-5 | 待执行 | real E2E/Visual QA closure、final acceptance、merge readiness 和 archive 仍按 [progress/MASTER.md](progress/MASTER.md) 跟踪 |
+当前没有 active spec-driven 专项。Real Foundation Hardening 已完成并外部归档，负责收口 Desktop/Web chat workflow、shared transcript、data-boundary、real E2E/Visual QA foundation；归档入口见 [history.md](history.md)。证据等级矩阵仍只由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护。
 
 最近完成：
 
@@ -37,6 +28,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | Phase 3 Source And Test Alignment | 完成 | API/Hub、模块 README、进度 SSOT、聊天流、前端架构、后端性能/泄漏、Desktop packaged evidence、active docs 和 Web/Mobile client lanes 已对齐 |
 | Phase 4 Acceptance And Merge Readiness | 完成 | 聚合验收、架构审批、归档和合并准备；下一轮仓库结构清理必须单独开 SPEC |
 | Repo Structure Doc Tooling Cleanup | 完成 | 历史归档、ADR 摘要、root evidence、scripts/tests 分层、根级 wrapper 删除、SPEC 外部归档 |
+| Real Foundation Hardening | 完成 | Chat-flow evidence manifest、Desktop/Web Playwright、Visual QA、data-boundary、observed/approved-real manifest boundary、packaged-release skipped boundary 和最终 acceptance matrix 已收口并归档 |
 
 ## 当前优先级
 

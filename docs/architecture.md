@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-06-28
+最后更新：2026-06-29
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
@@ -108,7 +108,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 
 ## Acceptance Gates
 
-证据包入口只保留 owner 链接；证据等级矩阵和真实边界规则由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护，当前专项进度和验收记录见 [progress/MASTER.md](progress/MASTER.md)。
+证据包入口只保留 owner 链接；证据等级矩阵和真实边界规则由 [.agents/skills/real-e2e-acceptance/SKILL.md](../.agents/skills/real-e2e-acceptance/SKILL.md) 维护。已完成 SPEC 的验收记录只从 [history.md](history.md) 指向的外部归档追溯。
 
 | 变更 | 最低验收 |
 |---|---|
@@ -122,6 +122,6 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 ## 文档权威
 
 - 当前规则：[../AGENTS.md](../AGENTS.md)
-- 当前 SPEC 进度：`docs/progress/MASTER.md`（仅当文件存在时有效）
+- 当前 SPEC 进度：执行中才临时存在 `docs/progress/MASTER.md`；完成后从 [history.md](history.md) 追溯
 - 总进度：[roadmap.md](roadmap.md)
 - 安全风险：[governance/security-risk-register.md](governance/security-risk-register.md)
