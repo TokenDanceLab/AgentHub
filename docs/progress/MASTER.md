@@ -120,3 +120,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-29 | Phase 4 sync | #390 merged via #414 and closed manually because non-default base did not auto-close it; milestone #20 is 2/3 complete with drift_score 1, and #391 is the active next task. |
 | 2026-06-29 | T4.3 implementation | Added an explicit skipped `packaged-release` boundary row to chat acceptance, kept packaged Desktop proof opt-in, and verified docs/real-e2e/Tauri readiness contracts; PR pending. |
 | 2026-06-29 | Phase 4 complete | #391 merged via #416 and closed manually because non-default base did not auto-close it; milestone #20 is closed at 3/3 with drift_score 1, and Phase 5 / #392 is active. |
+| 2026-06-29 | T5.1 final matrix | Ran final chat acceptance, Visual QA artifact contracts, governance verifiers, and Tauri readiness contract; chat acceptance passed with only the opt-in `packaged-release` row skipped and `real_tested=false`; PR pending. |
