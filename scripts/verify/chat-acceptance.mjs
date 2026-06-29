@@ -79,7 +79,11 @@ await runGate({
   cwd: path.join(repoRoot, 'app', 'desktop'),
   command: corepack,
   args: ['pnpm', '--dir', path.join(repoRoot, 'app', 'desktop'), 'run', 'test:visual:chat-flow'],
-  artifacts: ['app/desktop/.tmp/manual-chat-flow-uiux/desktop-1440x810-chat-flow.png'],
+  artifacts: [
+    'app/desktop/.tmp/manual-chat-flow-uiux/desktop-1440x810-chat-flow.png',
+    'app/desktop/.tmp/manual-chat-flow-uiux/desktop-1440x810-chat-flow.metrics.json',
+    'app/desktop/.tmp/manual-chat-flow-uiux/desktop-chat-flow-visual-qa.json',
+  ],
   skip: args.skipDesktopVisualQa,
   skipReason: 'skipped by --skip-desktop-visual-qa',
 });
@@ -92,7 +96,11 @@ await runGate({
   cwd: path.join(repoRoot, 'app', 'web'),
   command: corepack,
   args: ['pnpm', '--dir', path.join(repoRoot, 'app', 'web'), 'run', 'test:visual:chat-flow'],
-  artifacts: ['app/web/.tmp/manual-chat-flow-uiux/web-1440x810-chat-flow.png'],
+  artifacts: [
+    'app/web/.tmp/manual-chat-flow-uiux/web-1440x810-chat-flow.png',
+    'app/web/.tmp/manual-chat-flow-uiux/web-1440x810-chat-flow.metrics.json',
+    'app/web/.tmp/manual-chat-flow-uiux/web-chat-flow-visual-qa.json',
+  ],
   skip: args.skipWebVisualQa,
   skipReason: 'skipped by --skip-web-visual-qa',
 });
