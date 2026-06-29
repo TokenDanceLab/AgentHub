@@ -70,6 +70,10 @@ try {
     assert(json.rows.filter((row) => row.name === 'web-chat-playwright' && row.evidence_level === 'playwright-ui').length === 1, 'manifest has Web Playwright row');
     assert(json.rows.filter((row) => row.name === 'desktop-chat-visual-qa' && row.evidence_level === 'visual-qa').length === 1, 'manifest has Desktop Visual QA row');
     assert(json.rows.filter((row) => row.name === 'web-chat-visual-qa' && row.evidence_level === 'visual-qa').length === 1, 'manifest has Web Visual QA row');
+    assert(json.rows.find((row) => row.name === 'desktop-chat-visual-qa')?.artifacts?.includes('app/desktop/.tmp/manual-chat-flow-uiux/desktop-1440x810-chat-flow.metrics.json'), 'Desktop Visual QA row includes metrics artifact');
+    assert(json.rows.find((row) => row.name === 'desktop-chat-visual-qa')?.artifacts?.includes('app/desktop/.tmp/manual-chat-flow-uiux/desktop-chat-flow-visual-qa.json'), 'Desktop Visual QA row includes report artifact');
+    assert(json.rows.find((row) => row.name === 'web-chat-visual-qa')?.artifacts?.includes('app/web/.tmp/manual-chat-flow-uiux/web-1440x810-chat-flow.metrics.json'), 'Web Visual QA row includes metrics artifact');
+    assert(json.rows.find((row) => row.name === 'web-chat-visual-qa')?.artifacts?.includes('app/web/.tmp/manual-chat-flow-uiux/web-chat-flow-visual-qa.json'), 'Web Visual QA row includes report artifact');
     assert(!/sk-[A-Za-z0-9]|client_secret|Authorization:\s*Bearer/.test(jsonText), 'manifest is redacted');
   }
 

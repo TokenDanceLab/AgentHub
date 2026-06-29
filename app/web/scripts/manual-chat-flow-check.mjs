@@ -9,6 +9,8 @@ const baseURL = process.env.AGENTHUB_WEB_MANUAL_URL ?? `http://127.0.0.1:${port}
 const hubOrigin = 'http://localhost:8080';
 const outputDir = path.resolve(process.cwd(), '.tmp', 'manual-chat-flow-uiux');
 const screenshot = path.join(outputDir, 'web-1440x810-chat-flow.png');
+const metricsPath = path.join(outputDir, 'web-1440x810-chat-flow.metrics.json');
+const reportPath = path.join(outputDir, 'web-chat-flow-visual-qa.json');
 const sessionId = 'session-web-manual-chat-flow';
 const taskId = 'task-web-manual-chat-flow';
 
@@ -294,6 +296,49 @@ function assertMetrics(result) {
   }
 }
 
+function writeVisualQaReport({ status, viewport, metrics, failure }) {
+  const report = {
+    schema: 'agenthub.chat_visual_qa.v1',
+    surface: 'web',
+    status,
+    evidence_level: 'visual-qa',
+    real_tested: false,
+    generated_at: new Date().toISOString(),
+    baseURL,
+    dataSource: 'stubbed-hub-session',
+    viewport,
+    screenshot,
+    metricsPath,
+    reportPath,
+    metrics,
+    failure: failure ? { message: failure } : null,
+    inspection: {
+      screenshot,
+      metricsPath,
+      checks: [
+        'Confirm transcript order is user, tool result, then agent reply.',
+        'Confirm Markdown tables render in the transcript.',
+        'Confirm subagent report details stay in the inspector.',
+        'Confirm no mock, debug, or data-mode text appears inside the transcript.',
+      ],
+    },
+    boundaries: {
+      real_tokendance_id_login: false,
+      real_cli_or_model_api: false,
+      packaged_desktop: false,
+      signing: false,
+      release_upload: false,
+      production_deploy: false,
+    },
+  };
+  fs.writeFileSync(metricsPath, `${JSON.stringify(metrics, null, 2)}\n`);
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`Visual QA screenshot: ${screenshot}`);
+  console.log(`Visual QA metrics: ${metricsPath}`);
+  console.log(`Visual QA report: ${reportPath}`);
+  return report;
+}
+
 let server = null;
 let browser = null;
 
@@ -410,16 +455,22 @@ try {
     };
   });
 
-  const report = {
-    baseURL,
+  let failure = null;
+  try {
+    assertMetrics(result);
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  const report = writeVisualQaReport({
+    status: failure ? 'failed' : 'passed',
     viewport: page.viewportSize(),
-    screenshot,
-    dataSource: 'stubbed-hub-session',
-    real_tested: false,
-    ...result,
-  };
+    metrics: result,
+    failure,
+  });
   console.log(JSON.stringify(report, null, 2));
-  assertMetrics(result);
+  if (failure) {
+    throw new Error(failure);
+  }
 } finally {
   if (browser) await browser.close();
   stopDevServer(server);
