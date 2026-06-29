@@ -118,3 +118,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-29 | Phase 4 sync | #389 merged via #412 and closed manually because non-default base did not auto-close it; milestone #20 is 1/3 complete with drift_score 1, and #390 is the active next task with a drift warning. |
 | 2026-06-29 | T4.2 implementation | Added Desktop/Web Visual QA metrics and report artifacts, locked their paths in the chat acceptance manifest, and verified the full chat acceptance bundle with `real_tested=false`; PR pending. |
 | 2026-06-29 | Phase 4 sync | #390 merged via #414 and closed manually because non-default base did not auto-close it; milestone #20 is 2/3 complete with drift_score 1, and #391 is the active next task. |
+| 2026-06-29 | T4.3 implementation | Added an explicit skipped `packaged-release` boundary row to chat acceptance, kept packaged Desktop proof opt-in, and verified docs/real-e2e/Tauri readiness contracts; PR pending. |

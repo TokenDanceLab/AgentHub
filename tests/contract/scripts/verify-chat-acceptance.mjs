@@ -30,10 +30,11 @@ try {
     'web-chat-playwright',
     'desktop-chat-visual-qa',
     'web-chat-visual-qa',
+    'packaged-desktop-release',
   ]) {
     assert(scriptText.includes(row), `runner includes ${row} row`);
   }
-  for (const level of ['fixture-unit', 'playwright-ui', 'visual-qa']) {
+  for (const level of ['fixture-unit', 'playwright-ui', 'visual-qa', 'packaged-release']) {
     assert(scriptText.includes(level), `runner records ${level} evidence`);
   }
   assert(scriptText.includes('real_tested: false'), 'runner records real_tested=false');
@@ -70,6 +71,11 @@ try {
     assert(json.rows.filter((row) => row.name === 'web-chat-playwright' && row.evidence_level === 'playwright-ui').length === 1, 'manifest has Web Playwright row');
     assert(json.rows.filter((row) => row.name === 'desktop-chat-visual-qa' && row.evidence_level === 'visual-qa').length === 1, 'manifest has Desktop Visual QA row');
     assert(json.rows.filter((row) => row.name === 'web-chat-visual-qa' && row.evidence_level === 'visual-qa').length === 1, 'manifest has Web Visual QA row');
+    assert(json.rows.filter((row) => row.name === 'packaged-desktop-release' && row.evidence_level === 'packaged-release').length === 1, 'manifest has separate packaged-release row');
+    assert(json.rows.find((row) => row.name === 'packaged-desktop-release')?.status === 'skipped', 'packaged-release row is skipped by chat acceptance');
+    assert(json.rows.find((row) => row.name === 'packaged-desktop-release')?.real_tested === false, 'packaged-release row keeps real_tested=false when skipped');
+    assert(!json.evidence_levels.includes('packaged-release'), 'skipped packaged-release row is not executed evidence');
+    assert(json.planned_evidence_levels.includes('packaged-release'), 'planned evidence levels name packaged-release boundary');
     assert(json.rows.find((row) => row.name === 'desktop-chat-visual-qa')?.artifacts?.includes('app/desktop/.tmp/manual-chat-flow-uiux/desktop-1440x810-chat-flow.metrics.json'), 'Desktop Visual QA row includes metrics artifact');
     assert(json.rows.find((row) => row.name === 'desktop-chat-visual-qa')?.artifacts?.includes('app/desktop/.tmp/manual-chat-flow-uiux/desktop-chat-flow-visual-qa.json'), 'Desktop Visual QA row includes report artifact');
     assert(json.rows.find((row) => row.name === 'web-chat-visual-qa')?.artifacts?.includes('app/web/.tmp/manual-chat-flow-uiux/web-1440x810-chat-flow.metrics.json'), 'Web Visual QA row includes metrics artifact');
