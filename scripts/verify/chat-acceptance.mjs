@@ -105,6 +105,18 @@ await runGate({
   skipReason: 'skipped by --skip-web-visual-qa',
 });
 
+await runGate({
+  name: 'packaged-desktop-release',
+  surface: 'desktop',
+  evidenceLevel: 'packaged-release',
+  claim: 'Packaged Desktop sidecar, icon, installer, signing, updater, and release evidence is a separate opt-in gate; chat acceptance does not run it',
+  cwd: repoRoot,
+  command: 'pwsh',
+  args: ['./scripts/release/verify-tauri-package-readiness.ps1', '-RequireBuiltArtifacts'],
+  skip: true,
+  skipReason: 'separate opt-in packaged-release gate; not run by chat acceptance',
+});
+
 const endedAt = new Date();
 const counts = {
   passed: rows.filter((row) => row.status === 'passed').length,

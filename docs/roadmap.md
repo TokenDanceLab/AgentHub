@@ -55,7 +55,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | 方向 | 目标 | 验收 |
 |---|---|---|
 | Web/Mobile client test lanes | Web 保持 Hub-only；Mobile 只澄清 RN-safe shared contract gate，不做 native/UI 深入重构 | Web data-boundary checks + Mobile mock-Hub/Expo Doctor boundary notes |
-| Desktop packaged boundary | 区分 Vite renderer、Tauri packaged、sidecar、icon、installer/signing | packaged-release gate 或明确 `real_tested=false` |
+| Desktop packaged boundary | 区分 Vite renderer、Tauri packaged、sidecar、icon、installer/signing | chat acceptance 只列 skipped `packaged-release` 边界；真实证明走独立 packaged-release gate 或明确 `real_tested=false` |
 | Source/test alignment | Shared transcript/data-mode normalizer 和 Desktop/Web 实现一致 | shared unit + app E2E |
 | Backend performance/leak | 对 Hub EventBus/outbox/scheduler/Redis TTL、Edge lifecycle/store/adapters 建立路径级检查 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` |
 | API contract hygiene | REST 以 `api/openapi.yaml` 为准，WS 以 `api/events.md` 为准 | OpenAPI parse + endpoint tests |

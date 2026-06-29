@@ -116,7 +116,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 | Hub/Edge 逻辑 | focused Go tests; broad changes run `go test ./... -short -count=1` in touched service |
 | Backend performance/leak | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) maps behavior gates, microbenchmarks, load smoke, and pprof/leak blockers |
 | Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；Desktop/Web 主视口为 16:9 `1440x810` |
-| Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
+| Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only; chat acceptance may list this as a skipped `packaged-release` boundary, but the proof is a separate opt-in gate |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
 
 ## 文档权威
