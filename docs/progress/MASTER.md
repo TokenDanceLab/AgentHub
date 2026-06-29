@@ -27,7 +27,7 @@
 | 1 | Evidence Contract Foundation | https://github.com/TokenDanceLab/AgentHub/milestone/17 | 0 | 4 | 4 |
 | 2 | Shared Chat Timeline Hardening | https://github.com/TokenDanceLab/AgentHub/milestone/18 | 0 | 4 | 4 |
 | 3 | Desktop/Web Boundary And Backend Truth | https://github.com/TokenDanceLab/AgentHub/milestone/19 | 0 | 3 | 3 |
-| 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 2 | 1 | 3 |
+| 4 | Real E2E And Visual QA Closure | https://github.com/TokenDanceLab/AgentHub/milestone/20 | 1 | 2 | 3 |
 | 5 | Acceptance, Merge, Archive | https://github.com/TokenDanceLab/AgentHub/milestone/21 | 2 | 0 | 2 |
 
 ## Issue Mapping
@@ -46,7 +46,7 @@
 | T3.2 | #387 | Desktop entry-preflight vs workbench-runtime split | closed via #408 |
 | T3.3 | #388 | Observed and approved-real manifest boundary | closed via #410 |
 | T4.1 | #389 | Add focused chat acceptance gate | closed via #412 |
-| T4.2 | #390 | Add semi-automated Visual QA artifact loop | open |
+| T4.2 | #390 | Add semi-automated Visual QA artifact loop | closed via #414 |
 | T4.3 | #391 | Keep packaged Desktop claim separate | open |
 | T5.1 | #392 | Run final acceptance matrix | open |
 | T5.2 | #393 | Merge readiness and archive SPEC | open |
@@ -64,14 +64,14 @@ gh issue list -R TokenDanceLab/AgentHub --label "spec-driven" --state all --json
 - [x] Phase 1: Evidence Contract Foundation (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/17)
 - [x] Phase 2: Shared Chat Timeline Hardening (4/4 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/18)
 - [x] Phase 3: Desktop/Web Boundary And Backend Truth (3/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/19)
-- [ ] Phase 4: Real E2E And Visual QA Closure (1/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
+- [ ] Phase 4: Real E2E And Visual QA Closure (2/3 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/20)
 - [ ] Phase 5: Acceptance, Merge, Archive (0/2 tasks) - [milestone](https://github.com/TokenDanceLab/AgentHub/milestone/21)
 
 ## Current Status
 
 **Active Phase**: Phase 4
-**Active Task**: T4.2 - Add semi-automated Visual QA artifact loop (#390)
-**Blockers**: None for execution. Phase 4 drift_score is 1, so #390 carries an adaptive drift warning to keep the Visual QA artifact loop focused and avoid adding large PowerShell core scripts. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
+**Active Task**: T4.3 - Keep packaged Desktop claim separate (#391)
+**Blockers**: None for execution. Phase 4 drift_score is 1 after #390, below the replan threshold. GitHub Project board requires refreshed `project` scope and is intentionally skipped.
 
 ## Governance Status
 
@@ -88,10 +88,10 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 
 ## Next Steps
 
-1. Start T4.2 (#390) in a separate task worktree from `origin/dev/delicious233`.
-2. Keep the Visual QA artifact loop focused on screenshot plus machine-readable geometry/overflow metrics.
+1. Start T4.3 (#391) in a separate task worktree from `origin/dev/delicious233`.
+2. Keep packaged Desktop, sidecar, installer, signing, and release claims separate from Vite renderer and fixture Visual QA evidence.
 3. Prefer Node/TypeScript/Playwright aggregation for cross-platform frontend acceptance; keep PowerShell for OS-specific Windows/Tauri/release gates.
-4. Preserve `real_tested=false` boundaries unless an approved-real run is explicitly approved and executed.
+4. Preserve `real_tested=false` boundaries unless an approved-real or packaged-release run is explicitly approved and executed.
 
 ## Session Log
 
@@ -117,3 +117,4 @@ Per-task telemetry is stored in GitHub issue comments before task closure. Adapt
 | 2026-06-29 | T4.1 implementation | Added a Node-based focused chat acceptance bundle for shared unit, Desktop/Web Playwright, and Desktop/Web Visual QA; package entry passed with `real_tested=false`; PR pending. |
 | 2026-06-29 | Phase 4 sync | #389 merged via #412 and closed manually because non-default base did not auto-close it; milestone #20 is 1/3 complete with drift_score 1, and #390 is the active next task with a drift warning. |
 | 2026-06-29 | T4.2 implementation | Added Desktop/Web Visual QA metrics and report artifacts, locked their paths in the chat acceptance manifest, and verified the full chat acceptance bundle with `real_tested=false`; PR pending. |
+| 2026-06-29 | Phase 4 sync | #390 merged via #414 and closed manually because non-default base did not auto-close it; milestone #20 is 2/3 complete with drift_score 1, and #391 is the active next task. |
