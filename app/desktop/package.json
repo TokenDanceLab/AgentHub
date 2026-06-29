@@ -16,6 +16,7 @@
     "test:e2e:chat-flow": "playwright test --config playwright.config.ts --project=chromium chat-flow-ui.spec.ts",
     "test:e2e:data-boundary": "playwright test --config playwright.config.ts --project=chromium desktop-data-boundary.spec.ts",
     "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
+    "test:acceptance:chat-flow": "pnpm test:e2e:chat-flow && pnpm test:visual:chat-flow",
     "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium smoke.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "analyze": "pnpm build && npx vite-bundle-visualizer",

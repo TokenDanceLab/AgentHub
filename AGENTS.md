@@ -216,6 +216,8 @@ cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
 
 UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + Desktop/Web Playwright + Visual QA，证据等级按 `real-e2e-acceptance` 标注。Vite renderer 不等于 packaged Desktop；stub/fixture/readiness-only 必须写 `real_tested=false`。
 
+跨平台前端 acceptance、Playwright/Visual QA 聚合和 manifest 生成优先用 Node/TypeScript runner。PowerShell 只用于 Windows、Tauri、installer、sidecar、release、签名等 OS-specific gate；不要为普通前端验收继续新增大型 `.ps1` 核心脚本。
+
 禁止无保护力测试：
 
 | 反模式 | 禁止原因 |

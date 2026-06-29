@@ -21,6 +21,7 @@
     "test:e2e:web": "pnpm --filter agenthub-web test:e2e",
     "test:e2e:desktop": "pnpm --filter agenthub-desktop test:e2e",
     "test:smoke:matrix": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/smoke/verify-e2e-smoke-matrix.ps1 -RepoRoot ..",
+    "test:acceptance:chat-flow": "node ../scripts/verify/chat-acceptance.mjs --repo-root ..",
     "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore"
   },
   "pnpm": {
