@@ -7,6 +7,8 @@ on:
       - "hub-server/**"
       - "pkg/**"
       - "go.*"
+      - ".github/workflows/cd-hub-server.yml"
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: ghcr.io/tokendancelab/agenthub-hub-server
