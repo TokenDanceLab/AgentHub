@@ -13,7 +13,7 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and push Hub Server
+    name: Build and push Hub Server (multi-arch)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,6 +22,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,6 +50,7 @@ jobs:
         with:
           context: .
           file: hub-server/deployments/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
