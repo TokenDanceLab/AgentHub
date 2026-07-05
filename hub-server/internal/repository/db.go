@@ -90,6 +90,9 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 		)
 	case elapsed > l.SlowThreshold && l.SlowThreshold > 0 && l.LogLevel >= gormlogger.Warn:
 		sql, rows := fc()
+		if rows == 0 {
+			return // empty result set — slow is almost certainly steal, not a query problem
+		}
 		sql = scrubSQLContent(sql)
 		slog.Warn("slow query",
 			"elapsed_ms", float64(elapsed.Nanoseconds())/1e6,
