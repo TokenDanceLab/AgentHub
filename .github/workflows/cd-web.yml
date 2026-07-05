@@ -42,8 +42,10 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value={{date '20060102'}},enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value={{date 'YYYYMMDD'}},enable=${{ github.ref == 'refs/heads/master' }}
             type=sha,prefix=,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push
         uses: docker/build-push-action@v6

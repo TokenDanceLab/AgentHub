@@ -154,6 +154,13 @@ services:
       - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问
     volumes:
       - agenthub_uploads:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64M
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 15s
