@@ -36,9 +36,11 @@ FROM alpine:3.21
 
 # Single RUN to minimise layers: upgrade base packages, install
 # runtime deps (ca-certificates for TLS, tzdata for timezones,
-# wget for HEALTHCHECK), configure nsswitch, create non-root user.
+# wget for HEALTHCHECK, tini as init process (reaps zombie children
+# that Docker healthcheck injects into the PID namespace), configure
+# nsswitch, create non-root user.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates tzdata wget \
+    && apk add --no-cache ca-certificates tzdata wget tini \
     && echo "hosts: files dns" > /etc/nsswitch.conf \
     && adduser -D -h /app agenthub
 
@@ -65,5 +67,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["./server-hub"]
