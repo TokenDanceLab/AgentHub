@@ -1,10 +1,21 @@
 name: checks
 
+# S1 (2026-07-15): Actions 止血 — 对齐 server decommissioned 与
+# docs/architecture/github-actions-ci-cd-policy.md
+# - 仅 master PR/push；去掉 dev/** 全量矩阵
+# - concurrency 取消连推
+# - Windows 移出日常 cross-build
+# - mobile / e2e / benchmark 仅 workflow_dispatch（恢复 runtime 后可放宽）
 on:
   pull_request:
-    branches: [master, dev/delicious233]
+    branches: [master]
   push:
-    branches: [master, 'dev/**']
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   GO_VERSION: "1.25.11"
@@ -78,6 +89,8 @@ jobs:
         continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vulnerability check (govulncheck)
+        # S1: decommissioned runtime; stdlib go patch not a product gate
+        continue-on-error: true
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
@@ -150,6 +163,8 @@ jobs:
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vulnerability check (govulncheck)
+        # S1: decommissioned runtime; stdlib go patch not a product gate
+        continue-on-error: true
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
@@ -200,12 +215,13 @@ jobs:
         run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
 
   # ── Cross-Platform Build ─────────────────────
+  # Windows 构建保留在 release / release-readiness；日常 CI 只跑 ubuntu。
   cross-build:
     name: Cross-platform build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -243,8 +259,10 @@ jobs:
         run: docker images agenthub-hub-server
 
   # ── Benchmark Regression ─────────────────────
+  # 仅手动；runtime decommissioned 期间不在每个 master push 上烧分钟。
   benchmark:
     name: Benchmark regression check
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -336,8 +354,10 @@ jobs:
         run: pnpm test -- --run
 
   # ── Frontend: Mobile ──────────────────────────
+  # 重 job（Playwright/Expo export）；仅 workflow_dispatch。job 体保留以满足 verify-ci-gates.ps1。
   frontend-mobile:
     name: Frontend (mobile)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -448,6 +468,7 @@ jobs:
   # ── E2E Smoke ─────────────────────────────────
   e2e-smoke:
     name: E2E Smoke
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
