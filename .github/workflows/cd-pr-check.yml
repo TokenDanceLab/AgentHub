@@ -12,6 +12,10 @@ on:
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   GO_VERSION: "1.25"
 
