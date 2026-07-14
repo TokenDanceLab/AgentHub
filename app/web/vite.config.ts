@@ -1,20 +1,13 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-function devCspPlugin(): Plugin {
-  return {
-    name: 'agenthub-dev-csp',
-    apply: 'serve',
-    transformIndexHtml(html) {
-      return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'");
-    },
-  };
-}
+// Base path: VITE_BASE_PATH env var or default '/workbench/'
+const basePath = process.env.VITE_BASE_PATH || '/workbench/';
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/workbench/' : '/',
-  plugins: [react(), devCspPlugin()],
+export default defineConfig(() => ({
+  base: basePath,
+  plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
@@ -33,17 +26,6 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
     host: '127.0.0.1',
     headers: {
-      'Content-Security-Policy': [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: blob: https://avatars.githubusercontent.com",
-        "connect-src 'self' ws://127.0.0.1:5174 http://localhost:* ws://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-        "base-uri 'self'",
-      ].join('; '),
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -51,6 +33,7 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     target: ['es2021', 'chrome100', 'safari15'],
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: {
