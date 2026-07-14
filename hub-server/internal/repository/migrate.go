@@ -25,8 +25,8 @@ func RunMigrationsFrom(cfg *config.DBConfig, sourceURL string) error {
 // there are pending migrations.
 func VerifyMigrations(cfg *config.DBConfig) (version uint, dirty bool, err error) {
 	password := url.QueryEscape(cfg.Password)
-	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.User, password, cfg.Host, cfg.Port, cfg.Name)
+	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.User, password, cfg.Host, cfg.Port, cfg.Name, cfg.SSLMode)
 
 	m, err := migrate.New("file://migrations", pgURL)
 	if err != nil {
@@ -43,8 +43,8 @@ func VerifyMigrations(cfg *config.DBConfig) (version uint, dirty bool, err error
 
 func runMigrations(cfg *config.DBConfig, sourceURL string) error {
 	password := url.QueryEscape(cfg.Password)
-	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.User, password, cfg.Host, cfg.Port, cfg.Name)
+	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.User, password, cfg.Host, cfg.Port, cfg.Name, cfg.SSLMode)
 
 	m, err := migrate.New(sourceURL, pgURL)
 	if err != nil {
