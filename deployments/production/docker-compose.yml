@@ -35,11 +35,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
 
   # ── Redis 7（agenthub 专用）──
   redis:
@@ -75,11 +70,6 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: "0.3"
 
   # ── Hub Server（Go 后端 API）──
   hub-server:
@@ -145,11 +135,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-          cpus: "1.0"
 
 volumes:
   pg_data:
