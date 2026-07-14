@@ -10,6 +10,10 @@ on:
       - ".github/workflows/cd-hub-server.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   IMAGE_NAME: ghcr.io/tokendancelab/agenthub-hub-server
 

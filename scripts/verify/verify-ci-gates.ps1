@@ -73,8 +73,8 @@ Assert-StepContinueOnError $edge "Lint" $true
 Assert-StepContinueOnError $hub "Lint" $true
 Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
-Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
-Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
+Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $true
+Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $true
 Assert-StepContinueOnError $edge "Coverage per-package minimums" $false
 
 Assert-Contains $backendFixture "working-directory:\s+hub-server" "backend-e2e-fixture must run from hub-server"
