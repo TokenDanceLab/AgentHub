@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-06-28
+最后更新：2026-07-16
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
@@ -17,7 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-当前没有 active spec-driven 专项。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)；新的大型任务必须重新建立 SPEC 和临时 `docs/progress/MASTER.md`。
+Cleanup baseline SPEC 进行中：进度见 [progress/MASTER.md](progress/MASTER.md)（worktree `.worktrees/cleanup-baseline`）。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)。
 
 最近完成：
 
