@@ -271,7 +271,7 @@ Highest product risk: chat sits in workbench under host `data-theme` but **does 
 - Documents SSOT relationship; unblocks later consumers that already use `--space-md`.
 - **Does not** retarget `--sp-lg` / `--sp-xl` (no base 20/28; inventing tokens out of scope).
 
-**Align 2b — color blocked with evidence (no value change)**  
+**Align 2b — color blocked with evidence (no value change)**
 Dark palette fork + light `success/warning-bg` opacity drift documented in §6.7–6.8. Full dark → `themes.css` merge deferred (high visual QA; separate issue). Light opacity inherit (2a) skipped for standalone fallback safety.
 
 ### 6.12 Residual after #491
