@@ -46,7 +46,7 @@ const { workbenchZhMap, chatviewZhMap } = vi.hoisted(() => {
     agents: { 'nav.installed':'已安装', 'nav.market':'Agent 市场', 'detail.tools':'工具权限', 'installed.search':'搜索已安装 Agent', 'installed.title':'Agent管理', 'market.title':'Agent 市场', 'market.search':'搜索 Agent', 'market.install':'安装', 'market.installed':'已安装' },
     contacts: { 'nav.internal':'组织内联系人', 'nav.external':'外部联系人', 'nav.newFriend':'新的联系人', 'search.placeholder':'搜索联系人' },
     tasks: { 'nav.all':'全部任务', 'nav.assigned':'分配给我', 'nav.created':'我创建的', 'nav.watching':'我关注的', 'view.list':'列表', 'view.board':'看板', 'view.timeline':'时间线', 'newTask':'新建任务', 'status.pending':'待执行', 'status.active':'进行中', 'status.done':'已完成', 'status.failed':'失败', 'status.cancelled':'已取消' },
-    projects: { 'nav.all':'全部项目', 'nav.running':'运行中', 'nav.completed':'已完成', 'nav.archived':'已归档', 'tab.overview':'概览', 'tab.settings':'设置', 'tab.members':'成员', 'newProject':'新建项目' },
+    projects: { 'nav.all':'全部项目', 'nav.running':'运行中', 'nav.completed':'已完成', 'nav.archived':'已归档', 'tab.overview':'概览', 'tab.settings':'设置', 'tab.members':'成员', 'newProject':'新建项目', loading:'正在加载项目…', 'empty.title':'暂无项目', 'empty.description':'创建第一个项目以开始协作。', 'empty.createFirst':'创建第一个项目' },
     docs: { 'tab.recent':'最近访问', 'tab.mine':'归我所有', 'tab.shared':'与我共享', 'tab.starred':'收藏', 'newDoc':'新建文档', 'search.placeholder':'搜索云文档' },
     'settings.nav.appearance': '外观', 'settings.nav.appearanceDesc': '主题、语言和界面风格',
     'settings.nav.notifications': '通知', 'settings.nav.notificationsDesc': '消息提醒和声音',
@@ -401,7 +401,7 @@ const { workbenchZhMap, chatviewZhMap } = vi.hoisted(() => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) => {
+    t: (key: string, options?: string | Record<string, unknown>) => {
       const translations: Record<string, string> = {
         ...workbenchZhMap,
         ...chatviewZhMap,
@@ -410,8 +410,8 @@ vi.mock('react-i18next', () => ({
         'nav.contacts': '联系人',
       };
       const base = translations[key];
-      if (base === undefined) return key;
-      if (options) {
+      if (base === undefined) return typeof options === 'string' ? options : key;
+      if (options && typeof options === 'object') {
         return base.replace(/\{\{(\w+)\}\}/g, (_m: string, name: string) =>
           String(options[name] ?? options[name.toLowerCase()] ?? '{{${name}}}'));
       }
