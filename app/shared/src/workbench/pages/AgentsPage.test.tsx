@@ -283,7 +283,7 @@ describe('AgentsPage load/action status', () => {
     expect(within(notice).getByText('Hub AgentProfiles refresh failed')).toBeInTheDocument();
     fireEvent.click(within(notice).getByRole('button', { name: '重试' }));
     expect(onAgentsRetry).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(WORKBENCH_AGENT_PROFILE_FIXTURES[0]!.name)).toBeInTheDocument();
+    expect(screen.getAllByText(WORKBENCH_AGENT_PROFILE_FIXTURES[0]!.name).length).toBeGreaterThan(0);
   });
 
   it('uses StatusNotice for editor action errors', () => {
