@@ -74,13 +74,13 @@
 
 | Task ID | Issue | Title | Status |
 |:--------|:------|:------|:-------|
-| T1.1 | #424 | 建立 GitHub Project + Issues 并把 MASTER 改为 GITHUB_FULL | open → completing |
-| T1.2 | #425 | 冻结 ad-hoc fleets：实现只允许 issue-bound PR | open → completing |
-| T1.3 | #426 | 统一镜像名/CD 叙事决策 | open |
-| T2.1 | #427 | 主工作区 dirty 政策 | open |
-| T2.2 | #428 | 中和 .agenthub/memory 假进度指针 | open |
-| T2.3 | #429 | 降级旧 prod 模板为非权威 | open |
-| T3.1 | #430 | hubClient 类型/矩阵 slice1 | open |
+| T1.1 | #424 | 建立 GitHub Project + Issues 并把 MASTER 改为 GITHUB_FULL | closed |
+| T1.2 | #425 | 冻结 ad-hoc fleets：实现只允许 issue-bound PR | closed |
+| T1.3 | #426 | 统一镜像名/CD 叙事决策 | closed |
+| T2.1 | #427 | 主工作区 dirty 政策 | closed |
+| T2.2 | #428 | 中和 .agenthub/memory 假进度指针 | closed |
+| T2.3 | #429 | 降级旧 prod 模板为非权威 | closed |
+| T3.1 | #430 | hubClient 类型/矩阵 slice1 | closed |
 | T3.2 | #431 | shared hubClient 方法补齐 + contract tests | open |
 | T3.3 | #432 | Desktop thin re-export cutover | open |
 | T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | open |
@@ -102,15 +102,15 @@ gh project item-list 6 --owner @me --format json --limit 50
 
 ## Phase Checklist
 - [x] Phase 0: Analysis baseline（`347642b6` 等）
-- [ ] Phase 1: Governance Lock (T1.1/T1.2 completing)
-- [ ] Phase 2: Hygiene Residual (0/3)
+- [x] Phase 1: Governance Lock (3/3 closed: #424-#426)
+- [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
 - [ ] Phase 3: Frontend Strangler (0/4)
 - [ ] Phase 4: Edge Seams + Security (0/4)
 - [ ] Phase 5: Closure Decisions (0/3)
 
 ## Current Status
-**Active Phase**: Phase 1 Governance Lock  
-**Active Task**: T1.1 #424 / T1.2 #425  
+**Active Phase**: Phase 3 Frontend Strangler  
+**Active Task**: T3.2 #431 hubClient method parity  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
