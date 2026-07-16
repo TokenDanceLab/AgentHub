@@ -527,11 +527,21 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                 title="暂无 Agent Profile"
                 description="当前 Hub 账号还没有已安装 Agent。"
                 titleLevel={3}
-                className={(styles['agent-empty-compact'] ?? '')}
-                contentClassName={(styles['agent-empty-compact-content'] ?? '')}
-                titleClassName={(styles['agent-empty-compact-title'] ?? '')}
-                descriptionClassName={(styles['agent-empty-compact-description'] ?? '')}
-                actionClassName={(styles['agent-empty-compact-action'] ?? '')}
+                {...(styles['agent-empty-compact']
+                  ? { className: styles['agent-empty-compact'] }
+                  : {})}
+                {...(styles['agent-empty-compact-content']
+                  ? { contentClassName: styles['agent-empty-compact-content'] }
+                  : {})}
+                {...(styles['agent-empty-compact-title']
+                  ? { titleClassName: styles['agent-empty-compact-title'] }
+                  : {})}
+                {...(styles['agent-empty-compact-description']
+                  ? { descriptionClassName: styles['agent-empty-compact-description'] }
+                  : {})}
+                {...(styles['agent-empty-compact-action']
+                  ? { actionClassName: styles['agent-empty-compact-action'] }
+                  : {})}
                 {...(onAgentAdd
                   ? { action: { label: '添加 Agent', onClick: onAgentAdd } }
                   : {})}
@@ -1558,10 +1568,18 @@ const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
             title="暂无公共 Skill"
             description="Hub 上暂无已发布的 Skill，发布后在此浏览安装。"
             titleLevel={3}
-            className={(styles['agent-empty-compact'] ?? '')}
-            contentClassName={(styles['agent-empty-compact-content'] ?? '')}
-            titleClassName={(styles['agent-empty-compact-title'] ?? '')}
-            descriptionClassName={(styles['agent-empty-compact-description'] ?? '')}
+            {...(styles['agent-empty-compact']
+              ? { className: styles['agent-empty-compact'] }
+              : {})}
+            {...(styles['agent-empty-compact-content']
+              ? { contentClassName: styles['agent-empty-compact-content'] }
+              : {})}
+            {...(styles['agent-empty-compact-title']
+              ? { titleClassName: styles['agent-empty-compact-title'] }
+              : {})}
+            {...(styles['agent-empty-compact-description']
+              ? { descriptionClassName: styles['agent-empty-compact-description'] }
+              : {})}
           />
         )}
         <div className={styles['market-list']}>
@@ -1675,10 +1693,18 @@ const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
             title="暂无公共 MCP Server"
             description="Hub 上暂无已发布的 MCP Server，发布后在此浏览安装。"
             titleLevel={3}
-            className={(styles['agent-empty-compact'] ?? '')}
-            contentClassName={(styles['agent-empty-compact-content'] ?? '')}
-            titleClassName={(styles['agent-empty-compact-title'] ?? '')}
-            descriptionClassName={(styles['agent-empty-compact-description'] ?? '')}
+            {...(styles['agent-empty-compact']
+              ? { className: styles['agent-empty-compact'] }
+              : {})}
+            {...(styles['agent-empty-compact-content']
+              ? { contentClassName: styles['agent-empty-compact-content'] }
+              : {})}
+            {...(styles['agent-empty-compact-title']
+              ? { titleClassName: styles['agent-empty-compact-title'] }
+              : {})}
+            {...(styles['agent-empty-compact-description']
+              ? { descriptionClassName: styles['agent-empty-compact-description'] }
+              : {})}
           />
         )}
         <div className={styles['market-list']}>
