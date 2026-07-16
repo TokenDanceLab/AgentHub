@@ -13,6 +13,7 @@ import {
   resolveWorkbenchProfile,
   type WorkbenchProfileSource,
 } from '../profileRegistry';
+import { EmptyState } from '../../ui';
 import styles from './DocsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -365,9 +366,41 @@ export function DocsPage({
             <span>创建时间</span>
             <span />
           </div>
-          {rows.map((doc) => (
-            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} onDelete={onDeleteDoc ? () => onDeleteDoc(doc.id) : undefined} profiles={profiles} />
-          ))}
+          {rows.length === 0 ? (
+            <EmptyState
+              title={t('docs.empty.title')}
+              description={t('docs.empty.description')}
+              titleLevel={3}
+              {...(styles['docs-empty-compact']
+                ? { className: styles['docs-empty-compact'] }
+                : {})}
+              {...(styles['docs-empty-compact-content']
+                ? { contentClassName: styles['docs-empty-compact-content'] }
+                : {})}
+              {...(styles['docs-empty-compact-title']
+                ? { titleClassName: styles['docs-empty-compact-title'] }
+                : {})}
+              {...(styles['docs-empty-compact-description']
+                ? { descriptionClassName: styles['docs-empty-compact-description'] }
+                : {})}
+              {...(styles['docs-empty-compact-action']
+                ? { actionClassName: styles['docs-empty-compact-action'] }
+                : {})}
+              {...(onCreateDoc
+                ? { action: { label: t('docs.newDoc'), onClick: onCreateDoc } }
+                : {})}
+            />
+          ) : (
+            rows.map((doc) => (
+              <DocTableRow
+                key={doc.id}
+                doc={doc}
+                onClick={onDocClick}
+                onDelete={onDeleteDoc ? () => onDeleteDoc(doc.id) : undefined}
+                profiles={profiles}
+              />
+            ))
+          )}
         </div>
         {activePreview && (
           <section className={`${styles.previewPanel} doc-preview-panel`} data-card-surface>
