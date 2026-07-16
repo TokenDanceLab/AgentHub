@@ -5,31 +5,44 @@ import { ContextMenu, MultiSelectBar, ProfilePopover, Toast, type ContextMenuIte
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
+import type { MainchainNode, MainchainStatusKind, MainchainSummary } from './mainchain';
 import { workbenchProfileInitials, workbenchAgentColor } from './profileRegistry';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
+import {
+  INSPECTOR_COLLAPSE_SNAP_WIDTH,
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_MIN_WIDTH,
+  INSPECTOR_READABLE_WIDTH,
+  SIDEBAR_COLLAPSE_SNAP_WIDTH,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  WORKSPACE_AUTO_COLLAPSE_WIDTH,
+} from './workbenchLayoutConstants';
 import styles from './AgentHubWorkbench.module.css';
 
-// Layout constants
-export const INSPECTOR_MIN_WIDTH = 48;
-export const INSPECTOR_MAX_WIDTH = 760;
-export const INSPECTOR_DEFAULT_WIDTH = 400;
-export const INSPECTOR_READABLE_WIDTH = 360;
-export const INSPECTOR_COLLAPSE_SNAP_WIDTH = 96;
-export const SIDEBAR_MIN_WIDTH = 180;
-export const SIDEBAR_MAX_WIDTH = 360;
-export const SIDEBAR_DEFAULT_WIDTH = 260;
-export const SIDEBAR_COLLAPSE_SNAP_WIDTH = 96;
-export const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
+// Layout constants (re-exported for compatibility)
+export {
+  INSPECTOR_MIN_WIDTH,
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_READABLE_WIDTH,
+  INSPECTOR_COLLAPSE_SNAP_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_COLLAPSE_SNAP_WIDTH,
+  WORKSPACE_AUTO_COLLAPSE_WIDTH,
+};
 
 // Types
 export interface AgentProfileState { id: string; name: string; role: string; engine: string; model: string; state: string; skills: string[]; anchor: HTMLElement; }
 export interface HumanProfileState { id: string; name: string; initials: string; org: string; status: string; tag: string; subtitle: string; avatarColor?: string; anchor: HTMLElement; }
 export interface GroupProfileState { id: string; name: string; memberNames: string[]; anchor: HTMLElement; }
-export type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
-export interface MainchainNode { id: string; label: string; detail: string; state: MainchainStatusKind; }
-export interface MainchainSummary { nodes: MainchainNode[]; exportEnabled: boolean; exportLabel: string; exportDetail: string; }
+export type { MainchainNode, MainchainStatusKind, MainchainSummary };
 
 export interface InspectorResizeDelegates { onResizeBy(delta: number): void; onResizeStart(clientX: number): void; }
 

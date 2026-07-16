@@ -10,16 +10,15 @@ import type { AttachmentUploadState } from './UnifiedComposer';
 import type { FileItem } from './inspector';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewBridge } from './ChatViewBridge';
+import { MainchainStatusStrip } from './MainchainStatusStrip';
+import type { MainchainSummary } from './mainchain';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 
-export interface MainchainSummary {
-  nodes: Array<{ id: string; label: string; detail: string; state: 'done' | 'active' | 'waiting' | 'blocked' | 'empty' }>;
-  exportEnabled: boolean; exportLabel: string; exportDetail: string;
-}
+export type { MainchainSummary } from './mainchain';
 
 export interface ConversationHostProps {
   transcript: TranscriptBlock[];
@@ -210,25 +209,4 @@ function countMatchingConfirmedUserBlocks(blocks: TranscriptBlock[], text: strin
     block.author.role === 'human' &&
     block.text.trim() === text
   )).length;
-}
-
-function MainchainStatusStrip({ onExportEvidence, summary }: {
-  onExportEvidence: () => void;
-  summary: MainchainSummary;
-}): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  return (
-    <section className={styles.mainchainStrip} aria-label={t('aria.mainChainStatus')}>
-      <div className={styles.mainchainTrack} role="list">
-        {summary.nodes.map((n) => (
-          <div className={styles.mainchainNode} data-state={n.state} key={n.id} role="listitem">
-            <span className={styles.mainchainDot} aria-hidden="true" />
-            <span className={styles.mainchainCopy}><strong>{n.label}</strong><em>{n.detail}</em></span>
-          </div>
-        ))}
-      </div>
-      <button type="button" className={styles.mainchainExport} disabled={!summary.exportEnabled}
-        onClick={onExportEvidence} title={summary.exportDetail}>{summary.exportLabel}</button>
-    </section>
-  );
 }

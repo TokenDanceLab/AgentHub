@@ -18,7 +18,12 @@ export {
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_COLLAPSE_SNAP_WIDTH,
   WORKSPACE_AUTO_COLLAPSE_WIDTH,
-} from './WorkbenchShell';
+} from './workbenchLayoutConstants';
+export {
+  buildMainchainSummary,
+  runtimeEvidenceSourceSummary,
+} from './mainchain';
+export { MainchainStatusStrip } from './MainchainStatusStrip';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export * from './mockData';
 export {
@@ -86,11 +91,15 @@ export type {
   AgentProfileState,
   HumanProfileState,
   GroupProfileState,
+  InspectorResizeDelegates,
+} from './WorkbenchShell';
+export type {
   MainchainNode,
   MainchainSummary,
   MainchainStatusKind,
-  InspectorResizeDelegates,
-} from './WorkbenchShell';
+  MainchainWorkbenchStatus,
+} from './mainchain';
+export type { MainchainStatusStripProps } from './MainchainStatusStrip';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,
