@@ -1,21 +1,22 @@
-# AgentHub Cleanup Baseline — Progress Tracker
+# AgentHub Progress Tracker
 
-> **Task**: knowledge-first strangler cleanup + lightweight wiki（非第二 SSOT）
+> **Task**: post-baseline security closeout + product polish
 > **Started**: 2026-07-16
-> **Last Updated**: 2026-07-16
+> **Last Updated**: 2026-07-17
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Worktree**: `.worktrees/cleanup-baseline` @ `chore/cleanup-baseline`
-> **PR**: https://github.com/TokenDanceLab/AgentHub/pull/446
+> **Integration branch**: `chore/phase9-product-polish` (tracks `master`)
+> **Hygiene branch**: `chore/469-repo-hygiene` → #469
+> **Merged PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) cleanup-baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 security
 
 ## Two task surfaces (do not mix)
 
 | Surface | Role | NOT for |
 |---|---|---|
-| **GitHub Project + Issues** (`cleanup-baseline`) | **程序唯一任务清单 / 进度 SSOT** | 会话临时想法 |
+| **GitHub Project + Issues** | **程序唯一任务清单 / 进度 SSOT** | 会话临时想法 |
 | **Claude TaskList** | 仅本会话微编排 | 程序 backlog、跨会话进度 |
 
-规则：跨会话可交付工作只进 GitHub Issue；Workflow/PR 必须绑定 Issue；看进度用 `gh issue list --label cleanup-baseline`。
+规则：跨会话可交付工作只进 GitHub Issue；Workflow/PR 必须绑定 Issue；看进度用 `gh issue list --label cleanup-baseline --state all` 或 milestone filters。
 
 ## Management model
 
@@ -28,8 +29,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **All Issues**: `gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline --state all`
-- **Label**: `cleanup-baseline` + `spec-driven`
+- **Phase 9 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 9: Product polish — architecture, UI/UX, design system, hygiene"`
+- **Label**: `cleanup-baseline` + `spec-driven` (historical) · Phase 9 issues under milestone 30
 
 ## References
 
@@ -42,45 +43,46 @@
 
 | Phase | Name | Milestone | Open | Closed | Total |
 |:------|:-----|:----------|-----:|-------:|------:|
-| 1 | Governance Lock | [#22](https://github.com/TokenDanceLab/AgentHub/milestone/22) | 0 | 3 | 3 |
-| 2 | Hygiene Residual | [#23](https://github.com/TokenDanceLab/AgentHub/milestone/23) | 0 | 3 | 3 |
-| 3 | Frontend Strangler | [#24](https://github.com/TokenDanceLab/AgentHub/milestone/24) | 0 | 4 | 4 |
-| 4 | Edge Seams + Security | [#25](https://github.com/TokenDanceLab/AgentHub/milestone/25) | 0 | 4 | 4 |
-| 5 | Closure Decisions | [#26](https://github.com/TokenDanceLab/AgentHub/milestone/26) | 0 | 3 | 3 |
-| 6 | Baseline Hardening | [#27](https://github.com/TokenDanceLab/AgentHub/milestone/27) | 0 | 5 | 5 |
-| 7 | Baseline CI Green | [#28](https://github.com/TokenDanceLab/AgentHub/milestone/28) | 0 | 11 | 11 |
+| 1–7 | Cleanup baseline | [#22](https://github.com/TokenDanceLab/AgentHub/milestone/22)–[#28](https://github.com/TokenDanceLab/AgentHub/milestone/28) | 0 | 33 | 33 |
+| 8 | Post-baseline security & hygiene | [#29](https://github.com/TokenDanceLab/AgentHub/milestone/29) | 0 | 5 | 5 |
+| 9 | Product polish | [#30](https://github.com/TokenDanceLab/AgentHub/milestone/30) | 7 | 0 | 7 |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
 | #424–#440 Phases 1–5 | closed |
-| #441–#445 Phase 6 | closed (`8fd3625f` … `83f5e1ea`) |
-| #447–#457 Phase 7 CI/SDD | closed (tip `22832670` + MASTER note) |
+| #441–#445 Phase 6 | closed |
+| #447–#457 Phase 7 CI/SDD | closed (PR #446 MERGED) |
+| #458–#462 / #464 Phase 8 security residuals | closed (PR #464 MERGED @ `11c799b8`) |
+| #460 → #465 AH-SR-044 residual | open under Phase 9 |
+| #465–#470 Phase 9 polish | open (milestone 30) |
 
 Full mapping history: archive `docs/archives/cleanup-baseline/progress/MASTER.md` and GitHub issue list.
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=22 and .number<=28) | "\(.title): \(.open_issues)/\(.closed_issues)"'
-gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline --state open
-gh pr checks 446 -R TokenDanceLab/AgentHub
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=30) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 30 --state open
+git worktree list
 ```
 
 ## Phase Checklist
 
 - [x] Phase 0–5 baseline program (#424–#440)
 - [x] Phase 6 Baseline Hardening (#441–#445)
-- [x] Phase 7 CI Green + SDD closeout (#447–#457); PR #446 required checks green
+- [x] Phase 7 CI Green + SDD closeout (#447–#457); PR #446 MERGED
+- [x] Phase 8 security residuals (#458–#462); PR #464 MERGED
+- [ ] Phase 9 product polish (#465–#470)
 
 ## Current Status
 
-**Active Phase**: COMPLETE — PR #446 merge-ready
-**Active Task**: none
+**Active Phase**: Phase 9 — Product polish (milestone 30)
+**Active Tasks**: #465–#470 (hygiene #469 in flight)
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: `22832670` Phase 7 CI gate; MASTER update may follow for ≤150-line SSOT
+**Tip**: `11c799b8` Phase 8 merge on `master`
 
 ## Governance Status
 
@@ -91,20 +93,22 @@ gh pr checks 446 -R TokenDanceLab/AgentHub
 
 ## Next Steps
 
-1. Review/merge PR #446 (`chore/cleanup-baseline` → `master`)
-2. 新工作必须新 Issue / 新 SPEC；禁止 freestyle fleets
-3. 可选非阻塞：live Hub→Edge capability E2E；journal offline/replay E2E
+1. Execute Phase 9 issues #465–#470 under milestone 30
+2. Keep MASTER ≤150 lines; archive detail, do not dump here
+3. New work must use new Issue / SPEC; no freestyle fleets
+4. Hold unmerged locals (`task/super-governance-baseline`, orphan task/ci tips) for separate review
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-16 | lead | GITHUB_FULL Project #6 + Phases 1–6 + residual closeout |
-| 2026-07-16 | lead | Phase 7 CI green #447–#457; PR #446 required checks pass |
+| 2026-07-16 | lead | GITHUB_FULL Project #6 + Phases 1–7; PR #446 MERGED |
+| 2026-07-16 | lead | Phase 8 security PR #464 MERGED (AH-SR-043/045/046/049) |
+| 2026-07-17 | hygiene | #469 prune phase8 worktree + merged locals; MASTER Phase 8→9 |
 
-## Baseline completion
+## Baseline + Phase 8 completion
 
-- cleanup-baseline + hardening + residual + Phase 7 CI green closed 2026-07-16.
-- Landed: hubClient SSOT cutover; Edge handlers/journal; capability purpose/action/target/thread; orphan UI delete; archives.
-- PR #446 required checks green; mobile/E2E/benchmark remain workflow_dispatch skips.
-- Next work: new SPEC/Issues only.
+- cleanup-baseline + hardening + Phase 7 CI green closed 2026-07-16 (PR #446).
+- Phase 8 post-baseline security residuals closed 2026-07-16 (PR #464 @ `11c799b8`).
+- Landed: hubClient SSOT; Edge handlers/journal; capability purpose/action/target/thread; AH-SR-043/045/046/049.
+- Phase 9 active: architecture, design system, UI/UX, repo hygiene (#465–#470).
