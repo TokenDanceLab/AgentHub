@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import en from './locales/en.json';
 import zh from './locales/zh.json';
 
-const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Product Settings SSOT is shared workbench SettingsPage (own i18n surface).
-// Desktop orphan SettingsPage was deleted; residual desktop settings helpers only
-// keep sectionIds typing. Locale completeness for desktop settings remains the
-// runtime category keys that desktop still owns.
-const settingsRoots = [
-  join(srcRoot, 'components', 'settings'),
-];
-
+// Desktop orphan SettingsPage + residual SectionId menu cluster were deleted
+// (#443 / #541). Locale completeness for desktop settings remains the
+// runtime category keys that desktop still owns (no components/settings scan).
 const runtimeSettingsKeys = [
   'settings.dataCategory.settings',
   'settings.dataCategory.modelSettings',
@@ -32,29 +24,8 @@ const runtimeSettingsKeys = [
   'settings.dataCategory.other',
 ];
 
-function listSourceFiles(path: string): string[] {
-  const stat = statSync(path);
-  if (stat.isFile()) {
-    return /\.(ts|tsx)$/.test(path) && !/\.(test|spec|stories)\.(ts|tsx)$/.test(path) ? [path] : [];
-  }
-
-  return readdirSync(path).flatMap((entry) => listSourceFiles(join(path, entry)));
-}
-
 function collectStaticSettingsKeys(): string[] {
-  const keys = new Set<string>();
-  const callPattern = /\bt\(\s*['"]([^'"]+)['"]/g;
-
-  for (const file of settingsRoots.flatMap(listSourceFiles)) {
-    const source = readFileSync(file, 'utf8');
-    for (const match of source.matchAll(callPattern)) {
-      const key = match[1];
-      if (key) keys.add(key);
-    }
-  }
-
-  for (const key of runtimeSettingsKeys) keys.add(key);
-  return [...keys].sort();
+  return [...runtimeSettingsKeys].sort();
 }
 
 describe('Desktop settings i18n locales', () => {
