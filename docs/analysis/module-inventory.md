@@ -1,269 +1,249 @@
-# AgentHub Module Inventory
+# AgentHub 模块清单（Cleanup Baseline）
 
 > last-updated: 2026-07-16  
-> purpose: per-module inventory for cleanup prioritization  
+> purpose: per-module inventory for strangler prioritization  
 > companion: `project-overview.md`, `risk-assessment.md`, `cleanup-strategy.md`
+
+规模来自 cleanup-baseline worktree 扫描（`.go/.ts/.tsx/.rs/.css`，排除 `node_modules/dist/target` 等），**约数**。测试判定基于 `*_test.go` / `*.test.ts(x)` / `e2e|tests` 启发式。
 
 ## Legend
 
 | 字段 | 含义 |
 |---|---|
-| **Complexity** | L / M / H / VH（体量 + 耦合 + 变更风险） |
-| **Cleanup priority** | P0 / P1 / P2 / P3（对本轮 strangler 的先后） |
-| **Role** | 产品职责摘要 |
-| **Hotspots** | 优先拆/对齐的路径 |
-| **Do not** | 清理红线 |
+| **Files / Lines** | 生产文件数 / 生产 LOC（估）；测试另列 |
+| **Complexity** | L / M / H / VH |
+| **Priority** | P0 / P1 / P2 / P3（本轮 strangler） |
+| **S.U.P.E.R** | `S` 单职责 · `U` 单向 · `P` 端口 · `E` 环境无关 · `R` 可替换；灯号 🟢🟡🔴 |
 
 ---
 
-## 1. Control & execution backends
+## 总表
 
-### 1.1 Hub Server (`hub-server/`)
+| 模块 | 路径 | Files（prod估） | Lines prod / test | Complexity | S.U.P.E.R | Priority | Role |
+|---|---|---:|---:|---|---|---|---|
+| Hub Server | `hub-server/` | ~156 | ~29k / ~46k | VH | S🟢 U🟢 P🟡 E🟡 R🟡 | P0–P1 | 控制面 |
+| Hub service | `hub-server/internal/service/` | ~41 | ~12.1k / ~14.1k | VH | S🔴 U🟢 P🟡 E🟡 R🟡 | **P0** | 绞杀核心 |
+| Hub handler | `hub-server/internal/handler/` | ~27 | ~5.8k / ~10.5k | H | S🟢 U🟢 P🟢 E🟢 R🟢 | P1 | 保持薄 |
+| Hub ws | `hub-server/internal/ws/` | ~2 | ~0.5k / ~1.1k | M | S🟢 U🟢 P🟡 E🟢 R🟡 | P2 | WS frame owner |
+| Hub repository | `hub-server/internal/repository/` | ~25 | ~3.0k / ~3.3k | M | S🟢 U🟢 P🟡 E🟡 R🟡 | P1 | 统一风格 |
+| Edge Server | `edge-server/` | ~86 | ~33k / ~47k | VH | S🟡 U🟡 P🟡 E🟡 R🟡 | P0–P1 | 执行面 |
+| Edge adapters | `edge-server/internal/adapters/` | ~30 | ~12.0k / ~15.8k | VH | S🟡 U🟡 P🟢 E🟡 R🟢 | P1 | CLI/SDK；迁出 orchestrator |
+| Edge lifecycle | `edge-server/internal/lifecycle/` | ~14 | ~4.9k / ~6.4k | VH | S🔴 U🔴 P🟡 E🟡 R🔴 | **P0** | ProcessExecutor god-object |
+| Edge api | `edge-server/internal/api/` | ~5 | ~3.9k / ~4.5k | VH | S🔴 U🔴 P🟡 E🟡 R🔴 | **P0** | handlers ~2375 |
+| Edge store | `edge-server/internal/store/` | ~7 | ~4.4k / ~5.1k | H | S🟡 U🟢 P🟡 E🟢 R🟡 | P2 | memory+sqlite |
+| Edge hub-callback | `edge-server/internal/hub/` | ~3 | ~1.1k all | M | S🟢 U🟢 P🔴 E🟢 R🟡 | **P0** | AH-SR-049 关键 |
+| Shared frontend | `app/shared/` | ~272 | ~62k / ~17k | VH | S🟢 U🟢 P🟢 E🟢 R🟡 | P0–P1 | cleanup 支点 |
+| Shared workbench | `app/shared/src/workbench/` | 巨文件 | Workbench~1768 + test~2987 | VH | S🟡 U🟡 P🟡 E🟢 R🔴 | P1 | 继续拆 |
+| Shared transcript | `app/shared/src/transcript/` | — | 高覆盖 | H | S🟢 U🟢 P🟢 E🟢 R🟢 | P1 保护 | 勿重写 pipeline |
+| Shared platform | `app/shared/src/platform/` | — | 小而清晰 | M | S🟢 U🟢 P🟢 E🟢 R🟢 | P0 对齐 | ports 合同 |
+| Desktop | `app/desktop/` | ~290 | ~54k / ~16k | VH | S🟡 U🟡 P🟡 E🔴 R🟡 | P0–P1 | shell + Local Edge |
+| Web | `app/web/` | ~124 | ~26k / ~8k | H | S🟡 U🟡 P🟡 E🟢 R🟡 | P0–P1 | Hub-only |
+| Mobile RN | `app/mobile-rn/` | ~51 | ~12k / ~7k | M | S🟡 U🟢 P🟡 E🟡 R🟡 | P1–P2 | **boundary only** |
+| API contracts | `api/` | ~5 | openapi~7.5k | H | S🟢 U— P🟢 E🟢 R🟢 | P1 | REST/WS SSOT |
+| Scripts/verify | `scripts/` | ~63 ps1 | ~18k | H | S🟡 U— P🟡 E🟡 R🟡 | P1 | readiness 分层 |
+| pkg | `pkg/` | ~9 | ~1.2k | L | S🟢 U🟢 P🟢 E🟢 R🟢 | P3 | 小工具 |
+| Deploy/CI narrative | `deployments/` + `.github/workflows/` | 多模板 | — | H 治理 | S🔴 U🔴 P🔴 E🟡 R🟢 | **P0** | LIVE 对齐 |
+| reference | `reference/` | INDEX only | 本机~3.7G clones | 卫生 | S🟡 — — — — | P2 本机 | 非 SSOT |
+| worktrees | `.worktrees/` | 本地 | ~4.6G | 卫生 | — | 持续 | 任务后删 |
+
+---
+
+## 1. Hub Server
+
+### 1.1 总览
 
 | | |
 |---|---|
 | **Role** | 控制平面：OIDC RP → Hub-local JWT session、IM/sync、agent dispatch、TeamRun、审计、WS fanout |
 | **Entry** | `hub-server/cmd/server-hub/main.go` → config / PG / Redis / `app.Run` |
 | **Layering** | `app → router → handler → service → repository/model` + `middleware` / `ws` / `cache` |
-| **Complexity** | **VH**（~66k LOC-ish；flat service ~12k prod lines / 41 files） |
-| **Cleanup priority** | **P0**（outbox 接线 + AgentService 拆分）→ P1 领域包抽取 |
-| **S.U.P.E.R (summary)** | single-purpose 强；单向大多成立；ports 强；env-agnostic 中；replaceable 中 |
-| **Hotspots** | `internal/service/agent_dispatch.go`；`delivery_outbox.go`；flat `internal/service`；`router/router.go`；`message.go`；`agent_run_event.go` |
-| **Strengths** | handler 多数依赖 service interface；model 叶子干净；migrations 至 0055 可演进；auth 边界（OIDC 只换身份，产品 API 要 Hub session）与代码一致 |
-| **Debt** | AgentService 集中 dispatch/outbox/run-events/edge-callback；`StartDeliveryRetryLoop` **未接入** `app` 启动；repository 风格双轨；OpenAPI 双 surface 路径漂移 |
-| **Do not** | 不要把 membership 塞进 JWT；不要在未完成 durable/device proof 前放开 remote/hub_relay 产品路径 |
+| **Complexity** | VH（flat service ~12k prod / 41 files） |
+| **Priority** | **P0** outbox 接线 + AgentService 拆分 → P1 领域包 |
+| **S.U.P.E.R** | S🟢 U🟢 P🟡 E🟡 R🟡 |
+| **Hotspots** | `service/agent_dispatch.go`（~781）；`delivery_outbox.go`；flat `service`；`router/router.go`；`message.go`（~860）；`agent_run_event.go`（~694） |
+| **Strengths** | handler 多依赖 service interface；auth 边界与文档一致（OIDC 身份，产品 API 要 Hub session）；migrations 可演进 |
+| **Debt** | AgentService 集中 dispatch/outbox/run-events/edge-callback；`StartDeliveryRetryLoop` **未接入** app 启动；repository 风格双轨；OpenAPI 路径漂移 |
+| **Do not** | membership 塞进 JWT；未完成 durable/device proof 前放开 remote/hub_relay 产品路径 |
 
-子包速查：
+### 1.2 子模块
 
-| 子模块 | Complexity | Priority | 备注 |
-|---|---|---|---|
-| `internal/app` | M | P1 | composition root；events fanout 与 domain 反应略混 |
-| `internal/router` | M–H | P1 | SetupRoutes 巨参函数；宜按 public/client/web/edge/cloud 拆 |
-| `internal/handler` | M | P1 | 方向正确；health 直连 gorm 是例外 |
-| `internal/service` (flat) | **VH** | **P0–P1** | 主 strangler 战场 |
-| `internal/service/agentteam` | H | P1 | 已有最佳领域抽取范本；仍耦合 parent Bus/AgentService |
-| `internal/repository` | M | P1 | 函数式 vs struct 双风格；outbox 模型仍在 service |
-| `internal/model` | L–M | P2 | 干净；`agent_team.go` 过大可按类型切 |
-| `internal/middleware` | L–M | P2 | Auth/RequireHubSession 清晰 |
-| `internal/ws` | M | P2 | frame 所有者明确 |
-| `internal/cache` | M–H | P2 | Client 多域 Redis 门面 |
-| `migrations` | M | P2 | 增量历史好，outbox/agent team 已在 |
+| 子模块 | Complexity | Priority | S.U.P.E.R | 备注 |
+|---|---|---|---|---|
+| `internal/app` | M | P1 | S🟡 U🟢 P🟡 E🟡 R🟡 | composition root；需接 outbox retry |
+| `internal/router` | M–H | P1 | S🟡 U🟢 P🔴 E🟢 R🟡 | SetupRoutes 巨参；按 public/client/web/edge/admin 拆 |
+| `internal/handler` | M | P1 | S🟢 U🟢 P🟢 E🟢 R🟢 | 方向正确 |
+| `internal/service` (flat) | **VH** | **P0–P1** | S🔴 U🟢 P🟡 E🟡 R🟡 | 主 strangler 战场 |
+| `internal/service/agentteam` | H | P1 | S🟢 U🟡 P🟢 E🟢 R🟡 | 领域抽取范本 |
+| `internal/repository` | M | P1 | S🟢 U🟢 P🟡 E🟡 R🟡 | struct vs pure func |
+| `internal/model` | L–M | P2 | S🟢 U🟢 P— E🟢 R🟢 | 叶子干净 |
+| `internal/middleware` | L–M | P2 | S🟢 U🟢 P🟡 E🟡 R🟢 | Auth/RequireHubSession |
+| `internal/ws` | M | P2 | S🟢 U🟢 P🟡 E🟢 R🟡 | frame 所有者明确 |
+| `internal/cache` | M–H | P2 | S🟡 U🟢 P🟡 E🟡 R🟡 | 多域 Redis 门面 |
 
-### 1.2 Edge Server (`edge-server/`)
+### 1.3 Dispatch / Outbox 成熟度
+
+- `validateDispatchTarget` **仅允许 `local_edge`**；`hub_relay` 残码 ≠ 产品完成。
+- Delivery outbox：migration + service 方法 + 测试存在；`RecordDelivery` 在 dispatch 路径；**自动 retry 可能未运行**。
+- 与 AH-SR-049 PARTIAL 一致。
+
+---
+
+## 2. Edge Server
+
+### 2.1 总览
 
 | | |
 |---|---|
 | **Role** | 本地执行权威：ProcessExecutor + AdapterRegistry + store + events |
 | **Entry** | `edge-server/cmd/agenthub-edge`（默认 `127.0.0.1:3210`） |
 | **Runtime model** | `AgentAdapter`（BuildCommand / ParseStream / NeedsStdin / Available）；**不是** `internal/runners` |
-| **Complexity** | **VH**（~76k；handlers ~2374，process_executor ~2279） |
-| **Cleanup priority** | **P0**（capability / callback seams）→ P1 god-file 拆分 |
-| **S.U.P.E.R** | 执行职责强；lifecycle 单目的弱（混 callback/spawn）；adapter ports 强；runners 高可替换 |
-| **Hotspots** | `internal/api/handlers.go`；`lifecycle/process_executor.go`；`hub/callback.go`；`jwtutil/capability.go`；`store/store.go`；`adapters/orchestrator.go` |
-| **Strengths** | CLI/SDK adapter 可替换；EventBus 本地 cursor 重放；memory+sqlite store 双实现 |
-| **Debt** | AH-SR-046 半成品；AH-SR-049 Edge→Hub fire-and-forget；AH-SR-045 remote read 偏软；orchestrator 放在 adapters 包破坏边界 |
-| **Do not** | 不要把 execution center 迁回 `runners`；不要在无 outbox 前继续堆 callback 载荷 |
+| **Complexity** | VH（handlers ~2375，process_executor ~2280） |
+| **Priority** | **P0** capability / callback seams → P1 god-file 拆 |
+| **S.U.P.E.R** | S🟡 U🟡 P🟡 E🟡 R🟡（adapters 可替换高；lifecycle 低） |
+| **Hotspots** | `api/handlers.go`；`lifecycle/process_executor.go`；`hub/callback.go`；`jwtutil/capability.go`；`store/store.go`；`adapters/orchestrator.go` |
+| **Strengths** | CLI/SDK 可替换；EventBus 本地 cursor；memory+sqlite 双实现 |
+| **Debt** | AH-SR-046 PARTIAL；AH-SR-049 best-effort callback；AH-SR-045 owner filter 偏软；orchestrator 污染 adapters |
+| **Do not** | 执行中心迁回 `runners`；无 outbox 前堆 callback 载荷 |
 
-子包速查：
+### 2.2 子模块
 
-| 子模块 | Complexity | Priority | 备注 |
-|---|---|---|---|
-| `adapters` (CLI/SDK) | H | P1 | 保留 claude/codex/opencode/sdk；迁出 orchestrator |
-| `lifecycle` | **VH** | **P0** | 保留 Start/Cancel 状态机；抽出 CallbackReporter / SubAgentSpawner / output pipeline |
-| `api.Handler` | **VH** | **P0–P1** | 按 runs/threads/events/agents/approvals/health 拆文件，路径不变 |
-| `hub.CallbackClient` | L–M | **P0** | 最佳 effort → durable outbox/journal 端口 |
-| `events.Bus` | M | P2 | 本地 WS 恢复 ≠ Hub 投递合同 |
-| `store` | H | P2 | 已有 Repository 接口；按 domain 切 |
-| `runners` | L | P2 | 兼容摘要；可改由 AdapterRegistry 投影 |
-| `jwtutil` | L | **P0** | 扩展 capability claims + purpose 强制 |
-| `httpserver` | M | P1 | CORS 补 capability header；auth 保持 identity-only |
+| 子模块 | Complexity | Priority | S.U.P.E.R | 备注 |
+|---|---|---|---|---|
+| `adapters` CLI/SDK | H | P1 | S🟡 U🟡 P🟢 E🟡 R🟢 | claude/codex/opencode/sdk；迁出 orchestrator |
+| `lifecycle` | **VH** | **P0** | S🔴 U🔴 P🟡 E🟡 R🔴 | 抽 CallbackReporter / SubAgentSpawner / output |
+| `api.Handler` | **VH** | **P0–P1** | S🔴 U🔴 P🟡 E🟡 R🔴 | 按 runs/threads/events/agents/approvals/health 拆，路径不变 |
+| `hub.CallbackClient` | L–M | **P0** | S🟢 U🟢 P🔴 E🟢 R🟡 | fire-and-forget → journal 端口 |
+| `events.Bus` | M | P2 | S🟢 U🟢 P🟡 E🟢 R🟡 | 本地恢复 ≠ Hub 投递合同 |
+| `store` | H | P2 | S🟡 U🟢 P🟡 E🟢 R🟡 | 域接口渐进；保留 Repository 外观 |
+| `runners` | L | P2 | S🟢 U🟢 P🟡 E🟢 R🟢 | 兼容摘要；可 AdapterRegistry 投影 |
+| `jwtutil` | L | **P0** | S🟢 U🟢 P🟡 E🟢 R🟢 | 扩展 claims + purpose 强制 |
+| `httpserver` | M | P1 | S🟡 U🟢 P🟡 E🟡 R🟡 | CORS 补 capability header |
 
-### 1.3 Shared Go packages (`pkg/`)
+### 2.3 Adapter 家族
 
-| | |
+| ID | 形态 |
 |---|---|
-| **Role** | 跨模块小工具：`errcode`, `reqlog`, `debug` |
-| **Complexity** | L |
-| **Cleanup priority** | P3 |
-| **Do not** | 不要把 domain 逻辑下沉到这里 |
-
-### 1.4 API contract (`api/`)
-
-| | |
-|---|---|
-| **Role** | REST/WS 约定与 OpenAPI SSOT 意图 |
-| **Complexity** | H（`openapi.yaml` ~7.5k lines / ~197 paths / ~232KB） |
-| **Cleanup priority** | P1 |
-| **Hotspots** | `openapi.yaml` 混 Edge `/v1` + Hub `/client|/web|/edge`；ghost deprecated paths；`deprecations.md` 落后（2026-06-05） |
-| **Do not** | 不以 OpenAPI 覆盖 runtime router；router 是路径运行时 SSOT |
+| `claude-code` | CLI NDJSON / stream-json |
+| `codex` | CLI JSONL |
+| `opencode` | CLI JSON |
+| `anthropic-sdk` / `openai-sdk` | HTTP in ParseStream |
+| Orchestrator | 包装 ClaudeCode + SubAgentSpawn（应迁出 adapters） |
 
 ---
 
-## 2. Frontend surfaces
+## 3. Shared frontend / Desktop / Web / Mobile
 
-### 2.1 Shared platform & workbench (`app/shared/`)
+### 3.1 Shared（`app/shared/`）
 
 | | |
 |---|---|
 | **Role** | workbench / transcript / composer / inspector / platform / demo 合同 |
-| **Complexity** | **VH**（~60k；Workbench 1768 + test 2987；Routes 1404） |
-| **Cleanup priority** | **P0**（hubClient SSOT + dataMode 门禁）→ P1 分解巨文件 |
-| **S.U.P.E.R** | platform/transcript 强；workbench 多关注点；hubClient 未成为 Desktop/Web SSOT |
-| **Hotspots** | `hubClient.ts`；`demo/dataMode.ts`；`workbench/AgentHubWorkbench.tsx`；`WorkbenchRoutes.tsx`；`workbenchDataMode.ts`（旧词汇） |
-| **Strengths** | `AgentHubPlatform` surface/capabilities 清晰；transcript 多源归一健康；Desktop/Web 已挂共享 workbench |
-| **Debt** | ConversationPort.list 非产品会话真相；demo 被 platform 默认导入；双 dataMode 词汇 |
-| **Do not** | 清理期不要重写 transcript pipeline；不要把 product UI 迁回 surface-local forks |
+| **Complexity** | VH |
+| **Priority** | **P0** hubClient SSOT + dataMode 门禁 → P1 巨文件分解 |
+| **S.U.P.E.R** | S🟢 U🟢 P🟢 E🟢 R🟡（workbench/hubClient 拉低 R） |
+| **Hotspots** | `hubClient.ts`~1533；`demo/dataMode.ts`；`AgentHubWorkbench.tsx`~1768；`WorkbenchRoutes.tsx`~1404；`workbenchDataMode.ts` 旧词表 |
+| **Do not** | 清理期重写 transcript；product UI 迁回 surface-local forks |
 
-子域：
+| 子域 | Complexity | Priority | S.U.P.E.R | 备注 |
+|---|---|---|---|---|
+| `platform/` | M | P0 对齐 | S🟢 U🟢 P🟢 E🟢 R🟢 | ConversationPort.list 未承载真实会话 |
+| `transcript/` | H | P1 保护 | S🟢 U🟢 P🟢 E🟢 R🟢 | 多源归一 |
+| `chatview/` | H | P2 | S🟢 U🟢 P🟢 E🟢 R🟡 | 测试巨大但健康 |
+| `workbench/` | VH | P1 | S🟡 U🟡 P🟡 E🟢 R🔴 | ConversationHost 式继续抽 |
+| `hubClient` + stores | H | **P0** | S🟡 U🟡 P🔴 E🟢 R🔴 | 目标 SSOT |
+| `demo/` | M | **P0** | S🟢 U🟢 P🟡 E🟡 R🟡 | AH-SR-043 |
 
-| 子域 | Complexity | Priority | 备注 |
-|---|---|---|---|
-| `platform/` | M | P0 对齐 | contract 小而清晰；真实数据常在 model hooks |
-| `transcript/` | H | P1 保护 | 高覆盖；只加必要 filter/parity tests |
-| `chatview/` | H | P2 | adapter 测试巨大；先按 concern 拆测试 |
-| `workbench/` | **VH** | P1 | 继续 ConversationHost 式抽取 |
-| `hubClient` + stores | H | **P0** | 目标 SSOT |
-| `demo/` | M | **P0** 门禁 | AH-SR-043 |
-
-### 2.2 Desktop (`app/desktop/` + Tauri)
+### 3.2 Desktop（`app/desktop/` + Tauri）
 
 | | |
 |---|---|
-| **Role** | shell + Desktop adapter + Local Edge host/sidecar + keyring/tray |
-| **Complexity** | H（~51k + native） |
-| **Cleanup priority** | **P0** hubClient 收敛 / demo 默认值；P1 orphan UI |
-| **Hotspots** | `src/api/hubClient.ts`（~1854）；`platform/desktopPlatform.ts`；orphan `components/SettingsPage.tsx` + `settings/sections/*`；orphan `views/TeamRunConsole.tsx`；`src-tauri/gen/` 脏树 |
-| **Strengths** | `localEdge:true`；renderer 不 raw spawn；host diagnostics 扩展共享合同 |
-| **Debt** | demo conversations 默认；Settings/TeamRun 分叉；gen/android 政策债 |
-| **Do not** | 删除 Edge host 能力；不要恢复 Tauri Mobile 主线 |
+| **Role** | shell + adapter + Local Edge host/sidecar + keyring/tray |
+| **Complexity** | H–VH（~54k + native） |
+| **Priority** | **P0** hubClient / demo 默认；P1 orphan UI |
+| **S.U.P.E.R** | S🟡 U🟡 P🟡 E🔴 R🟡 |
+| **Hotspots** | `api/hubClient.ts`~1854；`platform/desktopPlatform.ts`；orphan Settings / TeamRun；`src-tauri/gen` 脏树策略 |
+| **Do not** | 删除 Edge host；恢复 Tauri Mobile 主线 |
 
-### 2.3 Web (`app/web/`)
+### 3.3 Web（`app/web/`）
 
 | | |
 |---|---|
 | **Role** | Hub-only remote workbench |
-| **Complexity** | H（~27k；SettingsPage orphan ~2386 单独） |
-| **Cleanup priority** | **P0** hubClient + AH-SR-037/043；P1 orphan 清理 |
-| **Hotspots** | `api/hubClient.ts`；`api/hubTokenStorage.ts`（sessionStorage）；`platform/webPlatform.ts`；orphan `components/SettingsPage.tsx`；orphan `views/TeamRunConsole.tsx` |
-| **Strengths** | `localEdge:false` / `localFiles:false`；thin `App.tsx` + shared workbench |
-| **Debt** | sessionStorage 会话；optimistic mutation 逻辑过重塞进 adapter；Settings 巨 orphan |
+| **Complexity** | H（~26k；orphan Settings~2386） |
+| **Priority** | **P0** hubClient + AH-SR-037/043；P1 orphan |
+| **S.U.P.E.R** | S🟡 U🟡 P🟡 E🟢 R🟡（sessionStorage 安全维 🔴） |
+| **Hotspots** | `api/hubClient.ts`~1705；`api/hubTokenStorage.ts`；`platform/webPlatform.ts`；orphan Settings / TeamRun |
 | **Do not** | 给 Web 加 Local Edge 直连 |
 
-### 2.4 Mobile RN (`app/mobile-rn/`)
+### 3.4 Mobile RN（`app/mobile-rn/`）— boundary only
 
 | | |
 |---|---|
-| **Role** | Hub-facing Expo RN；UI 深度非当前主线 |
+| **Role** | Hub-facing Expo RN；UI 深度非主线 |
 | **Complexity** | M |
-| **Cleanup priority** | P1 fail-closed fixture；P2 边界保持 |
-| **Hotspots** | `platform/mobilePlatform.ts`（hub 失败静默 fixture） |
-| **Strengths** | import boundary 测试；复用 shared hubClient |
-| **Do not** | 本轮不要强上 shared workbench 全 UI |
+| **Priority** | P1 fail-closed fixture；P2 边界保持 |
+| **S.U.P.E.R** | S🟡 U🟢 P🟡 E🟡 R🟡 |
+| **Hotspots** | `platform/mobilePlatform.ts`（失败静默 fixture） |
+| **Do not** | 本轮强上 shared workbench 全 UI；不恢复旧 Tauri Mobile |
 
-### 2.5 Legacy Mobile Tauri (`app/mobile/`)
+### 3.5 前端分叉速查
 
-| | |
-|---|---|
-| **Role** | **非主线残渣** |
-| **Complexity** | L（~9M local；常 ignored） |
-| **Cleanup priority** | P1 inventory → archive/delete |
-| **Do not** | 不要当作 dual-mobile 架构继续演进 |
-
----
-
-## 3. Deploy, CI, scripts, docs, research
-
-### 3.1 Deploy / Ops narrative
-
-| 资产 | Complexity | Priority | 说明 |
-|---|---|---|---|
-| `deployments/production/docker-compose.yml` | M | **P0–P1** | 最接近 hk3；默认 `PG_USER=tdadmin` 需对齐 `agenthub` |
-| `.github/workflows/cd-hub-server.yml` | L | P1 | 镜像 `agenthub-hub-server` |
-| `.github/workflows/cd-production.yml` | M | **P0–P1** | `IMAGE_NAME=.../agenthub-hub`；deploy 多为 echo/docs |
-| `hub-server/deployments/docker-compose.prod.yml` (+ hk2/us1) | M | P1 | 本地 PG 历史形态；应降级 non-authoritative |
-| server `STATE.md` | L | **P0** | LIVE 权威；验证命令需去 hk2/us1 残留 |
-
-### 3.2 CI (`.github/workflows/checks.yml`)
-
-| | |
-|---|---|
-| **Complexity** | M |
-| **Priority** | **P0** 叙事 / P1 policy 文档 |
-| **Debt** | S1 decommissioned 注释；mobile/e2e/benchmark 仅 `workflow_dispatch`；引用缺失的 `docs/architecture/github-actions-ci-cd-policy.md`（server 侧 policy 亦滞后） |
-| **Do not** | 不要在未写明证据等级前把所有 heavy gate 一键全开 |
-
-### 3.3 Scripts (`scripts/`)
-
-| | |
-|---|---|
-| **Taxonomy** | `verify` / `dev` / `release` / `smoke` / `lib` —— **保持** |
-| **Complexity** | H（重叠 readiness 矩阵；大量 ps1/sh） |
-| **Priority** | P1 smoke matrix 收敛 |
-| **Hotspots** | `scripts/smoke/*` 多条 400–900 LOC 近重复；`integration-e2e.ps1` 已自标 deprecated |
-| **Do not** | 新增 root wrapper |
-
-### 3.4 Docs / governance SSOT
-
-| 资产 | Priority | 说明 |
+| 项 | 路径 | 问题 |
 |---|---|---|
-| `AGENTS.md` | keep | 唯一根规则；MASTER 缺失时措辞需容忍 “if present” |
-| `docs/roadmap.md` | keep | 当前无 active SPEC |
-| `docs/progress/MASTER.md` | **P1** | 有意缺失；需 stub 或 AGENTS 改写 |
-| `docs/governance/*` | P0 状态刷新 | risk register 落后于 partial 046/049 代码 |
-| `.agenthub/memory/project.md` | **P0** | 过期本地 memory（SUPER/MASTER/CLAUDE.md）；gitignored |
-| `docs/history.md` + TokenDanceLab archive | keep | 历史/ADR 外置归档 |
+| 三份 hubClient | shared / desktop / web | 类型与方法集漂移 |
+| Settings 孤儿 | desktop/web 本地 SettingsPage | live UI = shared SettingsPage |
+| TeamRunConsole | desktop/web views | 基本无产品 importer |
+| 双 dataMode | `demo/dataMode.ts` vs `workbenchDataMode.ts` | 语义漂移 |
 
-### 3.5 Research (`reference/`)
+---
+
+## 4. API contracts（`api/`）
 
 | | |
 |---|---|
-| **Role** | 第三方研究克隆工作区 |
-| **Complexity** | disk H / 管理 L |
-| **Priority** | P2 INDEX 刷新 + 剪枝 |
-| **Rule** | 仅 `INDEX.md` 入仓；非产品 SSOT |
-
-### 3.6 Local hygiene artifacts
-
-| 路径 | Priority | 说明 |
-|---|---|---|
-| `hub-server/server-hub` | **P0** | tracked ELF ~47MB；应移除并补 `.gitignore` |
-| `app/desktop/src-tauri/gen/` | **P0** | 31 deleted tracked android/schema 脏树 |
-| `.worktrees/` | P1 | ~5.6G 本地 |
-| `dist/`, `tmp/`, `*/.tmp/` | P2 | ignored 构建/草稿 |
-| `app/mobile/` leftover | P2 | 本地残渣 |
+| **Role** | REST/WS 约定与 OpenAPI SSOT 意图 |
+| **Complexity** | H（`openapi.yaml` ~7.5k / ~197 paths） |
+| **Priority** | P1 |
+| **S.U.P.E.R** | S🟢 U— P🟢 E🟢 R🟢 |
+| **Hotspots** | 混 Edge `/v1` + Hub `/client|/web|/edge`；ghost deprecated paths；`deprecations.md` 滞后 |
+| **Do not** | 以 OpenAPI 覆盖 runtime router；router 是路径运行时 SSOT |
+| **兼容债** | Hub `{code:OK,data}` vs Edge bare JSON — 禁止 big-bang 同时改 |
 
 ---
 
-## 4. Cross-cutting product domains
+## 5. Scripts / verify
 
-| Domain | Owner modules | Maturity | Cleanup note |
+| 目录 | 约计数 | 用途 | 原则 |
+|---|---:|---|---|
+| `scripts/verify/` | ~29 | doc-ssot、CI gates、boundary、OIDC readiness | 保留有保护力的；标 readiness |
+| `scripts/smoke/` | ~25 | 烟测 / 形状 | 不得冒充 approved-real |
+| `scripts/release/` | ~11 | 发布门禁 | 对齐 risk register |
+| `scripts/dev/` + `lib/` | 少 | 开发 / 复用 | 禁止根级 wrapper |
+| 全仓 ps1 | ~63 | — | 主会话“~80 家族”含体感与历史 |
+
+**S.U.P.E.R：** S🟡 U— P🟡 E🟡 R🟡
+
+---
+
+## 6. 卫生与外围
+
+| 表面 | 规模 | Priority | 处理 |
 |---|---|---|---|
-| Auth / session | Hub middleware + OIDC service；Web/Desktop token storage | 边界正确；Web storage 风险 | AH-SR-037 决策；JWT 文档去 membership overclaim |
-| Local dispatch | Hub `agent_dispatch` + Edge PostRuns | **local_edge-first** 产品化 | 保持 validate 硬闸；hub_relay 分支标 incomplete |
-| Remote/relay | Hub relay + Edge remote auth | **incomplete** | 先 capability + durable delivery，再谈产品路径 |
-| TeamRun | Hub `agentteam` + hubClient APIs；UI orphan | 后端产品模型真；专用 console UI 未挂载 | 先定 UI owner 再合并 forks |
-| Transcript | shared transcript/chatview | 健康 | 清理期保护 |
-| Settings | shared SettingsPage + SettingsPort | UI SSOT = shared；desktop/web page orphan | adapter 非 orphan |
-| Runners inventory | Edge runners + Desktop hooks | 兼容面 | 响应 shape 保留，数据源改 adapters |
-| Delivery | Hub outbox + Edge callback | partial | 接线 retry + Edge journal |
+| `reference/` | ~3.7G ignored | P2 本机 | 只跟踪 INDEX；研究克隆非依赖 |
+| `.worktrees/` | ~4.6G | 持续 | 合并后删 |
+| dirty main noise | android gen / `server-hub` binary | P0 hygiene | ignore + 不提交噪声 |
+| Deploy templates | 多 SSOT | P0–P1 | `deployments/production` + STATE 权威 |
 
 ---
 
-## 5. Complexity × priority matrix（执行视图）
+## 7. 建议切割顺序（模块视角）
 
-| Priority | Modules / assets |
-|---|---|
-| **P0** | Prod narrative SSOT；image name；tracked binary + gen dirty tree；stale agent memory；Hub outbox wire；AgentService dispatch strangler start；Edge capability complete + callback outbox seam；hubClient SSOT；AH-SR-043/037/045/046 门禁决策或接线；risk register partial 状态 |
-| **P1** | Router/OpenAPI path audit；service domain packages（agentteam 模式）；handlers/process_executor/store 拆分；orphan Settings/TeamRun 决策；CI policy doc；smoke matrix；deploy template demotion；MASTER stub；STATE 验证命令 |
-| **P2** | runners 重源；response envelope 收敛计划；test mega-file hygiene；reference INDEX；legacy workbenchDataMode；local disk reclaim；mechanical god-file continues |
-| **P3** | `pkg/*` 微调；纯文档措辞；非关键 UI polish |
+1. Deploy/CI 叙事 + security register partial 校准
+2. Edge capability + callback outbox 端口
+3. Hub Dispatch/RunEvent/Callback 绞杀 + retry 接线
+4. Frontend hubClient SSOT + 孤儿删除 + AH-SR-043
+5. Edge handlers / ProcessExecutor / store 域拆
+6. scripts readiness 分层、reference/worktree 卫生
+7. Mobile boundary；envelope / runners 退役靠后
 
----
-
-## 6. Inventory rules for cleanup agents
-
-1. **先读 import graph / 运行时挂载**，再删 fork（Settings / TeamRun / app/mobile 尤甚）。
-2. **平台边界是硬约束**：Web/Mobile 无 Local Edge；Desktop renderer 无 raw CLI。
-3. **兼容响应 shape 可保留**（`/v1/runners`、Hub envelope），但数据源与文档语言要迁到 Runtime/Profile/Target。
-4. **测试与脚本按证据等级使用**：`go test -short` / unit ≠ real OIDC browser / Desktop reconnect。
-5. **生产事实以 server STATE Current Role 为准**，不以 checks.yml 页眉为准。
+详见 `cleanup-strategy.md`。
