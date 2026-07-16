@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-17
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 10 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 31 --state open`
-- **Labels**: `spec-driven` · `phase:10`
+- **Phase 11 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 32 --state open`
+- **Labels**: `spec-driven` · `phase:11`
 
 ## References
 
@@ -43,7 +43,8 @@
 | 1–7 | Cleanup baseline | #22–#28 | closed |
 | 8 | Post-baseline security | #29 | closed (PR #464) |
 | 9 | Product polish | #30 | closed (PRs #471–#476) |
-| 10 | Product depth | #31 | active (#477–#482) |
+| 10 | Product depth | #31 | closed (PRs #483–#488) |
+| 11 | Residual polish | #32 | active (#489–#494) |
 
 ## Issue Mapping (summary)
 
@@ -52,13 +53,14 @@
 | #424–#457 cleanup Phases 1–7 | closed (PR #446) |
 | #458–#464 Phase 8 security | closed (PR #464) |
 | #465–#470 Phase 9 polish | closed (PRs #471–#476) |
-| #477–#482 Phase 10 depth | open (milestone 31) |
+| #477–#482 Phase 10 depth | closed (PRs #483–#488) |
+| #489–#494 Phase 11 residual | open (milestone 32) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=31) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 31 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=32) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 32 --state open
 git worktree list
 ```
 
@@ -67,15 +69,16 @@ git worktree list
 - [x] Phase 0–7 cleanup baseline (PR #446)
 - [x] Phase 8 security residuals (PR #464)
 - [x] Phase 9 product polish (#465–#470 / PRs #471–#476)
-- [ ] Phase 10 product depth (#477–#482)
+- [x] Phase 10 product depth (#477–#482 / PRs #483–#488)
+- [ ] Phase 11 residual polish (#489–#494)
 
 ## Current Status
 
-**Active Phase**: Phase 10 — Product depth (milestone 31)
-**Active Tasks**: #477 MASTER · #478 RunEventService · #479 settings error UX · #480 spacing tokens · #481 workbench slice2 · #482 welcome glass
+**Active Phase**: Phase 11 — Residual polish (milestone 32)
+**Active Tasks**: #489 MASTER · #490 useWorkbenchCallbacks · #491 chatview tokens · #492 EmptyState · #493 hub boundary map · #494 workbench residual
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: Phase 9 tip on `master` (PR #475/#476 line)
+**Tip**: Phase 10 tip on `master` (PR #483–#488 line)
 
 ## Governance Status
 
@@ -86,9 +89,9 @@ git worktree list
 
 ## Next Steps
 
-1. Land Phase 10 issues under milestone 31 (issue-bound Workflows)
+1. Land Phase 11 issues under milestone 32 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. After #480 CSS, run #481 workbench TSX second strangler
+3. Prefer #490 dead-code cleanup before further workbench strangler
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -98,8 +101,10 @@ git worktree list
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9 #465–#470 closed via #471–#476 |
 | 2026-07-17 | lead | Phase 10 opened #477–#482 |
+| 2026-07-17 | lead | Phase 10 closed via #483–#488; Phase 11 #489–#494 active |
 
 ## Completion notes
 
 - Phase 9: runtime inventory (#465), design SSOT (#466), workbench extract (#467), hub `agentevent` (#468), hygiene (#469), settings inventory (#470).
-- Phase 10 targets: RunEventService, settings load/error UX, spacing tokens, workbench slice2, welcome glass tokens, MASTER sync.
+- Phase 10: RunEventService (#478/#484), settings load/error UX (#479/#486), spacing tokens (#480/#485), workbench slice2 (#481/#488), welcome glass (#482), MASTER sync (#477/#487).
+- Phase 11 targets: MASTER sync, delete/quarantine `useWorkbenchCallbacks`, chatview token align, EmptyState consistency, hub boundary map refresh, workbench residual strangler.
