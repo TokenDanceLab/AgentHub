@@ -42,16 +42,25 @@ type AgentService struct {
 	// Constructed in NewAgentService; tests using struct literals fall back to
 	// a lazy facade via edgeCallbackService().
 	edgeCallbacks *EdgeCallbackService
+	// deliveryOutbox owns journal + retry-loop orchestration.
+	// Constructed in NewAgentService; tests using struct literals fall back to
+	// a lazy facade via deliveryOutboxService(). Redispatch stays on AgentService
+	// behind the Redispatcher port.
+	deliveryOutbox *DeliveryOutbox
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
 	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
+	// Construct outbox first (nil redispatcher), then inject adapter after s exists
+	// to avoid init cycles with agentRedispatcher{s}.
+	s.deliveryOutbox = NewDeliveryOutbox(db, nil)
+	s.deliveryOutbox.SetRedispatcher(agentRedispatcher{s})
 	s.edgeCallbacks = NewEdgeCallbackService(
 		db,
 		bus,
 		seqAllocatorFunc(s.allocateSeq),
-		&deliveryOutboxAcker{db: db},
+		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
 	)
 	return s
 }

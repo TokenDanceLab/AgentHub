@@ -59,6 +59,7 @@ const (
 // deliveryOutboxRecord models a single row in the delivery_outbox table.
 // It is defined in the service package to keep the outbox self-contained
 // within the allowed modification boundaries (service/ + migrations/).
+// Model/repository move is intentionally deferred (post thin type extract).
 type deliveryOutboxRecord struct {
 	ID           string     `gorm:"primaryKey;type:uuid"`
 	TaskID       string     `gorm:"type:uuid;not null;index:idx_delivery_outbox_task_id"`
@@ -94,11 +95,42 @@ func (deliveryOutboxRecord) TableName() string {
 	return "delivery_outbox"
 }
 
-// ── Outbox operations on AgentService ──────────────────────────────────────
+// ── Redispatcher port + DeliveryOutbox type ────────────────────────────────
+
+// Redispatcher re-sends a stored outbox payload for a delivery attempt.
+// The outbox never unmarshals dispatchPayload; the implementer owns route
+// selection (HTTP / WS / offline queue).
+type Redispatcher interface {
+	RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error
+}
+
+// DeliveryOutbox owns delivery journal operations and retry-loop orchestration.
+// Redispatch implementation stays on AgentService (or an adapter) behind Redispatcher.
+type DeliveryOutbox struct {
+	db           *gorm.DB
+	redispatcher Redispatcher // nil → journal only; retry loop skips redispatch
+}
+
+// NewDeliveryOutbox constructs a DeliveryOutbox. redispatcher may be nil for
+// journal-only paths; retry loop then no-ops redispatch.
+func NewDeliveryOutbox(db *gorm.DB, redispatcher Redispatcher) *DeliveryOutbox {
+	return &DeliveryOutbox{db: db, redispatcher: redispatcher}
+}
+
+// SetRedispatcher injects (or replaces) the redispatch port.
+// Useful after construct to avoid AgentService init cycles.
+func (o *DeliveryOutbox) SetRedispatcher(redispatcher Redispatcher) {
+	if o == nil {
+		return
+	}
+	o.redispatcher = redispatcher
+}
+
+// ── Journal operations ─────────────────────────────────────────────────────
 
 // RecordDelivery inserts a delivery_outbox entry in status=pending before
 // the Hub dispatches a task to the Edge. Returns the generated delivery_id.
-func (s *AgentService) RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
+func (o *DeliveryOutbox) RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
 	deliveryID, err := uuidv7.New()
 	if err != nil {
 		return "", fmt.Errorf("generate delivery id: %w", err)
@@ -113,7 +145,7 @@ func (s *AgentService) RecordDelivery(ctx context.Context, taskID, payload, edge
 		EdgeDeviceID: edgeDeviceID,
 	}
 
-	if err := s.db.WithContext(ctx).Create(rec).Error; err != nil {
+	if err := o.db.WithContext(ctx).Create(rec).Error; err != nil {
 		return "", fmt.Errorf("record delivery outbox: %w", err)
 	}
 
@@ -127,8 +159,8 @@ func (s *AgentService) RecordDelivery(ctx context.Context, taskID, payload, edge
 
 // MarkDeliverySent transitions an outbox record from pending to sent after
 // the Hub has dispatched the task to the Edge.
-func (s *AgentService) MarkDeliverySent(ctx context.Context, deliveryID string) error {
-	result := s.db.WithContext(ctx).
+func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string) error {
+	result := o.db.WithContext(ctx).
 		Model(&deliveryOutboxRecord{}).
 		Where("delivery_id = ? AND status = ?", deliveryID, DeliveryStatusPending).
 		Updates(map[string]interface{}{
@@ -147,9 +179,9 @@ func (s *AgentService) MarkDeliverySent(ctx context.Context, deliveryID string) 
 
 // AckDelivery marks an outbox record as delivered when the Edge acknowledges
 // the dispatch with the matching delivery_id.
-func (s *AgentService) AckDelivery(ctx context.Context, deliveryID string) error {
+func (o *DeliveryOutbox) AckDelivery(ctx context.Context, deliveryID string) error {
 	now := time.Now()
-	result := s.db.WithContext(ctx).
+	result := o.db.WithContext(ctx).
 		Model(&deliveryOutboxRecord{}).
 		Where("delivery_id = ? AND status IN ?", deliveryID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
 		Updates(map[string]interface{}{
@@ -162,7 +194,7 @@ func (s *AgentService) AckDelivery(ctx context.Context, deliveryID string) error
 	if result.RowsAffected == 0 {
 		// Check if already delivered (idempotent ack).
 		var existing deliveryOutboxRecord
-		if err := s.db.WithContext(ctx).
+		if err := o.db.WithContext(ctx).
 			Where("delivery_id = ? AND status = ?", deliveryID, DeliveryStatusDelivered).
 			First(&existing).Error; err == nil {
 			return nil
@@ -175,12 +207,12 @@ func (s *AgentService) AckDelivery(ctx context.Context, deliveryID string) error
 
 // ScanRetryableDeliveries returns deliveries eligible for retry: pending records
 // past their pending timeout, and sent records past their sent timeout.
-func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]deliveryOutboxRecord, error) {
+func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]deliveryOutboxRecord, error) {
 	now := time.Now()
 	var records []deliveryOutboxRecord
 
 	// Pending deliveries past their initial timeout → retryable.
-	err := s.db.WithContext(ctx).
+	err := o.db.WithContext(ctx).
 		Where("status = ? AND created_at <= ?", DeliveryStatusPending, now.Add(-DeliveryPendingTimeout)).
 		Limit(DeliveryOutboxMaxBatch).
 		Find(&records).Error
@@ -190,7 +222,7 @@ func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]deliveryO
 
 	// Sent deliveries past their ack timeout → retryable.
 	var sentRecords []deliveryOutboxRecord
-	err = s.db.WithContext(ctx).
+	err = o.db.WithContext(ctx).
 		Where("status = ? AND updated_at <= ?", DeliveryStatusSent, now.Add(-DeliverySentTimeout)).
 		Limit(DeliveryOutboxMaxBatch).
 		Find(&sentRecords).Error
@@ -200,7 +232,7 @@ func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]deliveryO
 
 	// Retrying deliveries past their next_retry_at → retryable.
 	var retryingRecords []deliveryOutboxRecord
-	err = s.db.WithContext(ctx).
+	err = o.db.WithContext(ctx).
 		Where("status = ? AND next_retry_at IS NOT NULL AND next_retry_at <= ?", DeliveryStatusRetrying, now).
 		Limit(DeliveryOutboxMaxBatch).
 		Find(&retryingRecords).Error
@@ -222,9 +254,9 @@ func computeNextRetryAt(attempt int) time.Time {
 // MarkDeliveryRetrying transitions a delivery to retrying status and increments
 // the attempt counter. Returns true if the retry should proceed, false if max
 // attempts have been exceeded (caller should move to dead-letter).
-func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID string, lastError string) (shouldRetry bool, err error) {
+func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID string, lastError string) (shouldRetry bool, err error) {
 	var rec deliveryOutboxRecord
-	err = s.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
+	err = o.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
 	if err != nil {
 		return false, fmt.Errorf("find delivery for retry: %w", err)
 	}
@@ -232,7 +264,7 @@ func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID stri
 	newAttempt := rec.AttemptCount + 1
 	if newAttempt >= rec.MaxAttempts {
 		// Move to dead-letter.
-		updateErr := s.db.WithContext(ctx).
+		updateErr := o.db.WithContext(ctx).
 			Model(&deliveryOutboxRecord{}).
 			Where("delivery_id = ? AND status IN ?", deliveryID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
 			Updates(map[string]interface{}{
@@ -255,7 +287,7 @@ func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID stri
 	}
 
 	nextRetry := computeNextRetryAt(newAttempt)
-	result := s.db.WithContext(ctx).
+	result := o.db.WithContext(ctx).
 		Model(&deliveryOutboxRecord{}).
 		Where("delivery_id = ? AND status IN ?", deliveryID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
 		Updates(map[string]interface{}{
@@ -280,8 +312,8 @@ func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID stri
 
 // MoveDeliveryToDeadLetter explicitly moves a delivery to dead-letter status.
 // This is used when a retry attempt encounters a non-retryable error.
-func (s *AgentService) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error {
-	result := s.db.WithContext(ctx).
+func (o *DeliveryOutbox) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error {
+	result := o.db.WithContext(ctx).
 		Model(&deliveryOutboxRecord{}).
 		Where("delivery_id = ? AND status IN ?", deliveryID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
 		Updates(map[string]interface{}{
@@ -299,9 +331,9 @@ func (s *AgentService) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID 
 }
 
 // GetDeliveryStatus returns the current status of a delivery record.
-func (s *AgentService) GetDeliveryStatus(ctx context.Context, deliveryID string) (string, error) {
+func (o *DeliveryOutbox) GetDeliveryStatus(ctx context.Context, deliveryID string) (string, error) {
 	var rec deliveryOutboxRecord
-	err := s.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
+	err := o.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", errcode.ErrBadRequest.WithMessage("delivery not found")
@@ -311,9 +343,76 @@ func (s *AgentService) GetDeliveryStatus(ctx context.Context, deliveryID string)
 	return rec.Status, nil
 }
 
+// CleanupOldDeliveries removes delivered and dead-letter records older than
+// the given duration. This should be called periodically to prevent unbounded
+// outbox growth.
+func (o *DeliveryOutbox) CleanupOldDeliveries(ctx context.Context, olderThan time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-olderThan)
+	result := o.db.WithContext(ctx).
+		Where("status IN ? AND updated_at <= ?", []string{DeliveryStatusDelivered, DeliveryStatusDead}, cutoff).
+		Delete(&deliveryOutboxRecord{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("cleanup old deliveries: %w", result.Error)
+	}
+	if result.RowsAffected > 0 {
+		slog.Info("cleaned up old delivery outbox records",
+			"count", result.RowsAffected,
+			"cutoff", cutoff.Format(time.RFC3339),
+		)
+	}
+	return result.RowsAffected, nil
+}
+
+// GetDeliveryStats returns aggregate stats for the delivery outbox.
+func (o *DeliveryOutbox) GetDeliveryStats(ctx context.Context) (map[string]int64, error) {
+	type statusCount struct {
+		Status string
+		Count  int64
+	}
+	var rows []statusCount
+	err := o.db.WithContext(ctx).
+		Model(&deliveryOutboxRecord{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get delivery stats: %w", err)
+	}
+	stats := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		stats[r.Status] = r.Count
+	}
+	return stats, nil
+}
+
+// autoAckDeliveriesForTask marks all pending/sent/retrying delivery outbox
+// entries for a task as delivered. Satisfies edgeCallbackOutbox when rebound.
+func (o *DeliveryOutbox) autoAckDeliveriesForTask(ctx context.Context, taskID string) {
+	if o == nil || o.db == nil {
+		return
+	}
+	now := time.Now()
+	result := o.db.WithContext(ctx).
+		Model(&deliveryOutboxRecord{}).
+		Where("task_id = ? AND status IN ?", taskID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
+		Updates(map[string]interface{}{
+			"status":       DeliveryStatusDelivered,
+			"delivered_at": &now,
+		})
+	if result.Error != nil {
+		slog.Warn("failed to auto-ack deliveries for task", "task_id", taskID, "error", result.Error)
+		return
+	}
+	if result.RowsAffected > 0 {
+		slog.Debug("auto-acked deliveries for task", "task_id", taskID, "count", result.RowsAffected)
+	}
+}
+
+// ── Retry loop orchestration ───────────────────────────────────────────────
+
 // StartDeliveryRetryLoop starts a background goroutine that periodically scans
 // for retryable deliveries and re-dispatches them.
-func (s *AgentService) StartDeliveryRetryLoop(ctx context.Context) {
+func (o *DeliveryOutbox) StartDeliveryRetryLoop(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(DeliveryRetryScanInterval)
 		defer ticker.Stop()
@@ -322,22 +421,23 @@ func (s *AgentService) StartDeliveryRetryLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				s.retryDeliveries(ctx)
+				o.retryDeliveries(ctx)
 			}
 		}
 	}()
 }
 
-// retryDeliveries scans for retryable deliveries and re-dispatches them.
-func (s *AgentService) retryDeliveries(ctx context.Context) {
-	records, err := s.ScanRetryableDeliveries(ctx)
+// retryDeliveries scans for retryable deliveries and re-dispatches them via
+// the injected Redispatcher (opaque payload bytes — no dispatchPayload here).
+func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
+	records, err := o.ScanRetryableDeliveries(ctx)
 	if err != nil {
 		slog.Warn("failed to scan retryable deliveries", "error", err)
 		return
 	}
 
 	for _, rec := range records {
-		shouldRetry, err := s.MarkDeliveryRetrying(ctx, rec.DeliveryID, rec.LastError)
+		shouldRetry, err := o.MarkDeliveryRetrying(ctx, rec.DeliveryID, rec.LastError)
 		if err != nil {
 			slog.Warn("failed to mark delivery retrying", "delivery_id", rec.DeliveryID, "error", err)
 			continue
@@ -347,13 +447,47 @@ func (s *AgentService) retryDeliveries(ctx context.Context) {
 			continue
 		}
 
-		// Re-dispatch the task payload through the dispatch pipeline.
-		s.redispatchDelivery(ctx, &rec)
+		if o.redispatcher == nil {
+			slog.Debug("delivery retry skipped: no redispatcher",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+			)
+			continue
+		}
+
+		if err := o.redispatcher.RedispatchDelivery(ctx, rec.TaskID, rec.DeliveryID, rec.Payload, rec.EdgeDeviceID); err != nil {
+			slog.Warn("redispatch failed",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+				"error", err,
+			)
+		}
 	}
 }
 
+// ── Redispatch implementation (stays on AgentService) ──────────────────────
+
+// agentRedispatcher adapts *AgentService to the Redispatcher port without
+// exporting dispatchPayload to DeliveryOutbox.
+type agentRedispatcher struct {
+	s *AgentService
+}
+
+func (a agentRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	if a.s == nil {
+		return fmt.Errorf("redispatch: nil agent service")
+	}
+	a.s.redispatchDelivery(ctx, &deliveryOutboxRecord{
+		TaskID:       taskID,
+		DeliveryID:   deliveryID,
+		Payload:      payloadJSON,
+		EdgeDeviceID: edgeDeviceID,
+	})
+	return nil
+}
+
 // redispatchDelivery re-dispatches a delivery by parsing the stored payload
-// and routing it to the target Edge device.
+// and routing it to the target Edge device. Owns dispatchPayload unmarshal.
 func (s *AgentService) redispatchDelivery(ctx context.Context, rec *deliveryOutboxRecord) {
 	// Parse the payload to get dispatch info.
 	var dp dispatchPayload
@@ -547,46 +681,69 @@ func truncateString(s string, maxLen int) string {
 	return deliveryoutbox.TruncateString(s, maxLen)
 }
 
-// ── Outbox maintenance ─────────────────────────────────────────────────────
+// ── AgentService facade (wiring/handler stability) ───────────────────────────
+
+// deliveryOutboxService returns the composed DeliveryOutbox, lazily constructing
+// one from AgentService deps when tests use struct literals without NewAgentService.
+func (s *AgentService) deliveryOutboxService() *DeliveryOutbox {
+	if s.deliveryOutbox != nil {
+		return s.deliveryOutbox
+	}
+	return NewDeliveryOutbox(s.db, agentRedispatcher{s})
+}
+
+// RecordDelivery inserts a delivery_outbox entry in status=pending before
+// the Hub dispatches a task to the Edge. Returns the generated delivery_id.
+func (s *AgentService) RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
+	return s.deliveryOutboxService().RecordDelivery(ctx, taskID, payload, edgeDeviceID)
+}
+
+// MarkDeliverySent transitions an outbox record from pending to sent after
+// the Hub has dispatched the task to the Edge.
+func (s *AgentService) MarkDeliverySent(ctx context.Context, deliveryID string) error {
+	return s.deliveryOutboxService().MarkDeliverySent(ctx, deliveryID)
+}
+
+// AckDelivery marks an outbox record as delivered when the Edge acknowledges
+// the dispatch with the matching delivery_id.
+func (s *AgentService) AckDelivery(ctx context.Context, deliveryID string) error {
+	return s.deliveryOutboxService().AckDelivery(ctx, deliveryID)
+}
+
+// ScanRetryableDeliveries returns deliveries eligible for retry.
+func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]deliveryOutboxRecord, error) {
+	return s.deliveryOutboxService().ScanRetryableDeliveries(ctx)
+}
+
+// MarkDeliveryRetrying transitions a delivery to retrying status and increments
+// the attempt counter.
+func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID string, lastError string) (shouldRetry bool, err error) {
+	return s.deliveryOutboxService().MarkDeliveryRetrying(ctx, deliveryID, lastError)
+}
+
+// MoveDeliveryToDeadLetter explicitly moves a delivery to dead-letter status.
+func (s *AgentService) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error {
+	return s.deliveryOutboxService().MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
+}
+
+// GetDeliveryStatus returns the current status of a delivery record.
+func (s *AgentService) GetDeliveryStatus(ctx context.Context, deliveryID string) (string, error) {
+	return s.deliveryOutboxService().GetDeliveryStatus(ctx, deliveryID)
+}
+
+// StartDeliveryRetryLoop starts a background goroutine that periodically scans
+// for retryable deliveries and re-dispatches them.
+func (s *AgentService) StartDeliveryRetryLoop(ctx context.Context) {
+	s.deliveryOutboxService().StartDeliveryRetryLoop(ctx)
+}
 
 // CleanupOldDeliveries removes delivered and dead-letter records older than
-// the given duration. This should be called periodically to prevent unbounded
-// outbox growth.
+// the given duration.
 func (s *AgentService) CleanupOldDeliveries(ctx context.Context, olderThan time.Duration) (int64, error) {
-	cutoff := time.Now().Add(-olderThan)
-	result := s.db.WithContext(ctx).
-		Where("status IN ? AND updated_at <= ?", []string{DeliveryStatusDelivered, DeliveryStatusDead}, cutoff).
-		Delete(&deliveryOutboxRecord{})
-	if result.Error != nil {
-		return 0, fmt.Errorf("cleanup old deliveries: %w", result.Error)
-	}
-	if result.RowsAffected > 0 {
-		slog.Info("cleaned up old delivery outbox records",
-			"count", result.RowsAffected,
-			"cutoff", cutoff.Format(time.RFC3339),
-		)
-	}
-	return result.RowsAffected, nil
+	return s.deliveryOutboxService().CleanupOldDeliveries(ctx, olderThan)
 }
 
 // GetDeliveryStats returns aggregate stats for the delivery outbox.
 func (s *AgentService) GetDeliveryStats(ctx context.Context) (map[string]int64, error) {
-	type statusCount struct {
-		Status string
-		Count  int64
-	}
-	var rows []statusCount
-	err := s.db.WithContext(ctx).
-		Model(&deliveryOutboxRecord{}).
-		Select("status, COUNT(*) as count").
-		Group("status").
-		Scan(&rows).Error
-	if err != nil {
-		return nil, fmt.Errorf("get delivery stats: %w", err)
-	}
-	stats := make(map[string]int64, len(rows))
-	for _, r := range rows {
-		stats[r.Status] = r.Count
-	}
-	return stats, nil
+	return s.deliveryOutboxService().GetDeliveryStats(ctx)
 }
