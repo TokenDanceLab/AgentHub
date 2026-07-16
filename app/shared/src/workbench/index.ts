@@ -5,7 +5,6 @@ export { GlobalRail } from './GlobalRail';
 export { RightInspector } from './RightInspector';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
-export { WorkbenchShell } from './WorkbenchShell';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export {
   INSPECTOR_MIN_WIDTH,
@@ -86,13 +85,6 @@ export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage, ConnectionStatusKind } from './GlobalRail';
 export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
 export type { UnifiedComposerProps } from './UnifiedComposer';
-export type {
-  WorkbenchShellProps,
-  AgentProfileState,
-  HumanProfileState,
-  GroupProfileState,
-  InspectorResizeDelegates,
-} from './WorkbenchShell';
 export type {
   MainchainNode,
   MainchainSummary,
