@@ -1,8 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query';
 import {
+  allowsWorkbenchDemoRuntimeMutation,
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
-  isWorkbenchFixtureDataMode,
   isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
@@ -60,7 +60,13 @@ export interface WebPlatformOptions {
   queryClient?: QueryClient;
   createClientMessageId?: () => string;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
+  /**
+   * Explicit product-shell opt-in for demo/fixture composer mutations (AH-SR-043).
+   * Must be paired with a mock/fixture dataMode; auto/real never succeed via demo.
+   */
   demoRuntimeFallback?: boolean;
+  /** Resolved workbench data mode (env + browser override). Defaults to env-only. */
+  dataMode?: WorkbenchDataMode | string;
   now?: () => string;
   ensureAuth?: () => boolean;
 }
@@ -231,13 +237,18 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
-        const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
-        const hasHubToken = Boolean(getAccessToken());
-        // AH-SR-043: demoRuntimeFallback must be explicitly enabled by App for mock/fixture only.
-        const shouldUseDemoFallback = options.demoRuntimeFallback === true && !hasInjectedHubClient && !ensureAuth && (
-          isWorkbenchFixtureDataMode(dataMode) ||
-          (dataMode === 'auto' && !hasHubToken)
+        const dataMode = normalizeWorkbenchDataMode(
+          options.dataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
         );
+        const hasHubToken = Boolean(getAccessToken());
+        // AH-SR-043: demo success only via shared fail-closed gate (explicit mock/fixture opt-in).
+        // Never silent-fallback from auto/observed/approved-real, even when unsigned-out.
+        // ensureAuth is for the real Hub path only; it must not block intentional fixture demos.
+        const shouldUseDemoFallback = allowsWorkbenchDemoRuntimeMutation({
+          demoRuntimeFallback: options.demoRuntimeFallback,
+          dataMode,
+          hasInjectedHubClient,
+        });
         if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);
         }
