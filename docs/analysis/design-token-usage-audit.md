@@ -1,7 +1,7 @@
 # Design token usage audit (inventory)
 
 最后更新：2026-07-17
-Issue: #466
+Issue: #466 / #482
 Companion SSOT map: [../architecture/07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
 
 > Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
@@ -21,13 +21,15 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 
 | Rank | File | ~matches | Notes |
 |---:|---|---:|---|
-| 1 | `app/web/src/components/WelcomeScreen.module.css` | 53 | heavy rgba/hex glass |
+| 1 | `app/web/src/components/WelcomeScreen.module.css` | was 53 → **0** | **#482**: glass/status hardcodes → `--glass-*` / semantic tokens |
 | 2 | `app/desktop/src/components/ApprovalCard.module.css` | was 45 | **#466**: semantic status fallbacks removed; residual font-stack fallbacks may remain |
-| 3 | `app/web/src/components/AuthPage.module.css` | 42 | auth glass hardcodes |
+| 3 | `app/web/src/components/AuthPage.module.css` | was 42 → **0** | **#482**: auth glass hardcodes → `--glass-*` / elevated-card tokens |
 | 4 | `app/desktop/src/contexts/ThemeContext.tsx` | was 36 | **#466**: preview hex moved to shared `themePresets.ts` meta only |
 | 5 | `app/desktop/src/components/FileExplorer.module.css` | 31 | explorer chrome |
 | 6 | `app/web/src/components/IM/TeamApprovalPanel.module.css` | 28 | IM status colors |
 | 7 | `app/desktop/src/components/DesktopEntryGate.module.css` | 26 | entry chrome |
+| entry | `app/desktop/src/components/WelcomeScreen.module.css` | was 5 → **0** | **#482**: residual elevation rgba → `--glass-shadow*` |
+| entry | `app/desktop/src/components/AuthPage.module.css` | was 7 → **0** | **#482**: residual identity/logo glass literals tokenized |
 | workbench | `app/shared/src/workbench/AgentHubWorkbench.module.css` | few hex; many raw px | spacing not using `--sp-*` |
 | chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | spacing differs (`--sp-md: 12px` vs base `16px`) |
 
@@ -52,12 +54,29 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 
 ## 4. Deferred (out of smallest #466 slice)
 
-1. Wholesale WelcomeScreen / AuthPage glass rewrite
+1. ~~Wholesale WelcomeScreen / AuthPage glass rewrite~~ → landed in **#482** (module CSS only; no theme runtime rewrite)
 2. Full chatview token merge
 3. Workbench `px` → `--sp-*` pass
 4. Mobile RN color SSOT merge
 5. Shared React `ThemeProvider` with `enablePresets`
 6. Package export for `./designTokens` and/or `./styles/*`
+7. DesktopEntryGate / FileExplorer / IM panel hardcode passes
+
+## 4b. #482 Welcome/Auth glass migration notes
+
+### Visual parity intent
+
+- Keep web WelcomeScreen as the quiet Codex-style empty state (`launcher`/`brandMark` remain `display: none` / `contents`); token migration only rewires latent glass styles for future re-enable paths.
+- Keep web AuthPage glass card/sheet chrome (blur, elevated panel, soft borders) but source fills/borders/tints from shared `--glass-*` / `--elevated-card-*` tokens so light/dark theme SSOT wins.
+- Desktop Welcome/Auth already mostly tokenized; residual elevation rgba / light identity hex cleaned for the same token set.
+- No theme runtime rewrite (`theme.ts` / `themes.css` / `tokens-base.css` unchanged).
+
+### Residual / not rewritten
+
+- Exact blur amounts (`blur(24|28px)`) and saturate factors remain component-local (not tokenized; visual recipe, not color SSOT).
+- Web Auth submit remains glass-muted (web product choice); desktop Auth submit remains solid `var(--primary)` — intentional surface delta, not a fork of token values.
+- Desktop light identity button gradient still composes multiple glass tokens for specular highlight; acceptable residual complexity.
+- Other top offenders (EntryGate, FileExplorer, IM panels) remain deferred.
 
 ## 5. How to re-audit
 
