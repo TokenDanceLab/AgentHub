@@ -828,12 +828,17 @@ export function isHubResponseEnvelope(
   return isRecord(body) && typeof body.code === 'string';
 }
 
+export function isHubSuccessCode(code: string): boolean {
+  return String(code).toUpperCase() === 'OK';
+}
+
 export function unwrapHubResponse<T>(body: unknown, status = 200): T {
   if (!isHubResponseEnvelope(body)) {
     return body as T;
   }
 
-  if (body.code !== 'OK') {
+  // Accept case-insensitive OK/ok so fixtures and legacy mocks stay compatible.
+  if (!isHubSuccessCode(body.code)) {
     throw new AppError(
       {
         error: {
