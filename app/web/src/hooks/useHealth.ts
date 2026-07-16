@@ -1,5 +1,6 @@
 // Health hook. Reports browser Hub runtime availability.
 // Stub data — no real HTTP health endpoint exists for Web yet.
+// Product health SSOT for Web is Hub Execution Target inventory, not Edge runners.
 
 import { useState, useEffect } from 'react';
 import type { HealthResponse } from '@shared/types';
@@ -26,8 +27,9 @@ export function useHealth(): HealthState {
       version: 'web-preview',
       edgeId: 'web-hub-only',
       checks: {
+        // Connectivity/runtime stubs only. Do not invent runner inventory for product UI.
         executor: { status: 'stubbed' },
-        runners: { status: 'stubbed', total: 0, available: 0, items: [] },
+        adapters: { status: 'hub-execution-target' },
       },
     });
     setOnline(true);

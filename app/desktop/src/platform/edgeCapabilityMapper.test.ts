@@ -25,8 +25,6 @@ const localEdgeTarget = {
   name: 'Local Edge' as const,
   status: 'healthy' as const,
   route: 'local-edge-api' as const,
-  runnerCount: 1,
-  onlineRunnerCount: 1,
   agentCount: 1,
   modelCount: 1,
   capabilityIds: ['streaming'],
@@ -37,8 +35,6 @@ const registeredLocalEdgeTarget = {
   device_id: 'desktop-device-1',
   name: 'Current Desktop Local Edge',
   target_type: 'local_edge' as const,
-  workspace_allowlist: [],
-  trust_level: 'local' as const,
   health_state: 'healthy' as const,
   is_online: true,
 };
@@ -130,11 +126,12 @@ describe('edgeCapabilityMapper', () => {
     expect(JSON.stringify(agents)).not.toMatch(/https?:|tauri|access_token|bearer/i);
   });
 
-  it('summarizes the Local Edge execution target from Edge-only inventory', () => {
+  it('summarizes the Local Edge execution target from Runtime inventory (agents/models/health)', () => {
     const snapshot: EdgeRuntimeInventorySnapshot = {
       edgeOnline: true,
       healthStatus: 'healthy',
-      runners: [
+      // Diagnostics residual must not drive product status or counts.
+      diagnosticRunners: [
         { id: 'runner-1', status: 'online' },
         { id: 'runner-2', status: 'offline' },
       ],
@@ -168,12 +165,58 @@ describe('edgeCapabilityMapper', () => {
         name: 'Local Edge',
         status: 'healthy',
         route: 'local-edge-api',
-        runnerCount: 2,
-        onlineRunnerCount: 1,
         agentCount: 1,
         modelCount: 1,
+        capabilityIds: expect.arrayContaining(['streaming', 'tool-calls', 'mcp']),
       }),
     );
+    expect(mapLocalEdgeExecutionTarget(snapshot)).not.toHaveProperty('runnerCount');
+    expect(mapLocalEdgeExecutionTarget(snapshot)).not.toHaveProperty('onlineRunnerCount');
+  });
+
+  it('does not mark Local Edge healthy from runner diagnostics alone', () => {
+    const snapshot: EdgeRuntimeInventorySnapshot = {
+      edgeOnline: true,
+      healthStatus: 'unknown',
+      diagnosticRunners: [
+        { id: 'runner-1', status: 'online' },
+        { id: 'runner-2', status: 'online' },
+      ],
+      agents: [],
+      modelCatalog: { items: [], sources: [] },
+    };
+
+    expect(mapLocalEdgeExecutionTarget(snapshot).status).toBe('unknown');
+  });
+
+  it('treats online Edge with runtime inventory but no healthy status as degraded', () => {
+    const snapshot: EdgeRuntimeInventorySnapshot = {
+      edgeOnline: true,
+      healthStatus: undefined,
+      agents: [
+        {
+          id: 'codex-local',
+          name: 'Codex Local',
+          status: 'available',
+          capabilities,
+        },
+      ],
+      modelCatalog: {
+        items: [
+          {
+            id: 'codex-gpt-5.1',
+            value: 'gpt-5.1-codex',
+            label: 'GPT-5.1 Codex',
+            sourceId: 'codex',
+            sourceLabel: 'Codex',
+            status: 'available',
+          },
+        ],
+        sources: [],
+      },
+    };
+
+    expect(mapLocalEdgeExecutionTarget(snapshot).status).toBe('degraded');
   });
 
   it('marks dispatch ready only when Desktop device, Hub local_edge target, Local Edge health, and host preflight match', () => {

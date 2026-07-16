@@ -4,7 +4,6 @@ import {
   listArtifacts,
   listPreviews,
   listProjects,
-  listRunners,
   listRuns,
   listThreads,
   workbenchReducer,
@@ -14,6 +13,8 @@ import {
 const initialWorkbenchProjectionState: WorkbenchState = {
   projects: [],
   threads: [],
+  // Product catalog SSOT is projects/threads/runs/artifacts/approvals.
+  // Edge runners remain diagnostics-only and are not loaded here.
   runners: [],
   runs: [],
   threadItems: [],
@@ -59,11 +60,11 @@ export function useWorkbenchProjection() {
     async function loadSnapshot() {
       dispatch({ type: 'connection.loading' });
       try {
-        const [projects, threads, runners, runs, approvals, artifacts, previews] =
+        // Product live catalog does not depend on Edge /v1/runners diagnostics.
+        const [projects, threads, runs, approvals, artifacts, previews] =
           await withTimeout(Promise.all([
             listProjects({ pageSize: 50 }),
             listThreads({ pageSize: 50 }),
-            listRunners(),
             listRuns({ pageSize: 50 }),
             listApprovals(),
             listArtifacts(),
@@ -77,7 +78,7 @@ export function useWorkbenchProjection() {
           snapshot: {
             projects,
             threads,
-            runners,
+            runners: [],
             runs,
             approvals,
             artifacts,

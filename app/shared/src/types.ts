@@ -17,6 +17,11 @@ export interface HealthCheck {
   message?: string;
 }
 
+/**
+ * Edge `/v1/health` may still report runner diagnostics.
+ * Product health SSOT is Runtime inventory (agents/models/adapters) + Execution Target health.
+ * Keep these wire shapes for Edge compatibility only — do not surface as product inventory.
+ */
 export interface RunnerHealthItem {
   id: string;
   name: string;
@@ -24,6 +29,7 @@ export interface RunnerHealthItem {
   capabilities?: string[];
 }
 
+/** Edge diagnostics residual; not product Execution Target inventory. */
 export interface RunnerHealthCheck {
   status: string;
   detail?: string;
@@ -36,8 +42,13 @@ export interface RunnerHealthCheck {
 
 export interface HealthChecks {
   store?: HealthCheck;
+  /** Runtime adapter readiness signal when present. */
   adapters?: HealthCheck;
   executor?: HealthCheck;
+  /**
+   * Edge runner diagnostics compatibility only.
+   * Product UI should prefer adapters + agents/models + Hub Execution Targets.
+   */
   runners?: RunnerHealthCheck;
   [name: string]: HealthCheck | RunnerHealthCheck | undefined;
 }
@@ -125,7 +136,9 @@ export interface ThreadPinInfo {
   item?: ThreadItemInfo;
 }
 
-// ── Execution / Runner ─────────────────────────
+// ── Execution / Runner (Edge diagnostics wire shape) ─────────────────────────
+// Product execution inventory SSOT is Runtime adapters + Hub Execution Targets.
+// `Runner` remains for Edge `/v1/runners` local diagnostics/tests only.
 
 export interface Runner {
   id: string;

@@ -248,7 +248,9 @@ export function createThreadMessage(
   );
 }
 
-// ── Runners ───────────────────────────────────
+// ── Runners (Edge local diagnostics only) ───────────────────────────────────
+// Product inventory SSOT is Runtime (agents/models/adapters) + Hub Execution Targets.
+// Keep these for Edge diagnostics/tests; do not use as product health/catalog SSOT.
 
 export function listRunners(): Promise<ListResponse<Runner>> {
   return request('/v1/runners');
