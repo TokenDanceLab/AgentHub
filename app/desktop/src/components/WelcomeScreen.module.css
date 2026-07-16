@@ -42,7 +42,7 @@
 [data-theme='dark'] .brandMark {
   border-color: transparent;
   background: var(--glass-panel);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 18px 44px var(--glass-shadow);
 }
 
 .header span {
@@ -80,7 +80,7 @@
 [data-theme='dark'] .launcher {
   border-color: transparent;
   background: var(--glass-panel);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 24px 64px var(--glass-shadow);
 }
 
 .dispatchPanel {
@@ -126,7 +126,7 @@
 
 [data-theme='dark'] .modePillActive {
   background: var(--glass-bg-heavy);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 4px var(--glass-shadow-subtle);
 }
 
 .runtimeList {
@@ -348,13 +348,13 @@
   font-weight: 650;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 20px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .commandBox {
   border-color: transparent;
   background: var(--glass-bg-medium);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 10px 24px var(--glass-shadow);
 }
 
 .commandBox span {
