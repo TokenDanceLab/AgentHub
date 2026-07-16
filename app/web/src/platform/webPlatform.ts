@@ -233,6 +233,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
+        // AH-SR-043: demoRuntimeFallback must be explicitly enabled by App for mock/fixture only.
         const shouldUseDemoFallback = options.demoRuntimeFallback === true && !hasInjectedHubClient && !ensureAuth && (
           isWorkbenchFixtureDataMode(dataMode) ||
           (dataMode === 'auto' && !hasHubToken)
