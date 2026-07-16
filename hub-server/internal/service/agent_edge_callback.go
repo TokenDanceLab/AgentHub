@@ -484,11 +484,19 @@ func (s *AgentService) edgeCallbackService() *EdgeCallbackService {
 	if s.edgeCallbacks != nil {
 		return s.edgeCallbacks
 	}
+	// Prefer composed DeliveryOutbox (implements edgeCallbackOutbox); fall back
+	// to the narrow deliveryOutboxAcker when only db is set.
+	var outbox edgeCallbackOutbox
+	if s.deliveryOutbox != nil {
+		outbox = s.deliveryOutbox
+	} else {
+		outbox = s.deliveryOutboxService()
+	}
 	return NewEdgeCallbackService(
 		s.db,
 		s.bus,
 		seqAllocatorFunc(s.allocateSeq),
-		&deliveryOutboxAcker{db: s.db},
+		outbox,
 	)
 }
 
