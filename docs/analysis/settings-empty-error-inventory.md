@@ -1,8 +1,7 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479 / #492 / #504
-> status: inventory + settings load/error UX + Agents EmptyState (#492) + Contacts EmptyState (#504)
+> issue: #470 / residual #479 / #492 / #503 / #504
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -84,8 +83,8 @@ but no longer remain silent in the Settings product surface.
 | Path | Pattern |
 |---|---|
 | `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors still ad-hoc `agent-inline-state` |
-| `pages/TasksPage.tsx` | ad-hoc `emptyState` + optional `emptyStateLabel` |
-| `pages/ContactsPage.tsx` | primary `new` empty uses shared `EmptyState` (#504); residual search loading text + blank list panes |
+| `pages/TasksPage.tsx` | primary empty uses shared `EmptyState` (#503); public `emptyStateLabel` maps to description |
+| `pages/ContactsPage.tsx` | primary empty uses shared `EmptyState` (#504); residual search loading text |
 | `pages/ProjectsPage.tsx` | loading caption / error alert / editor error |
 | Shell lists (desktop/web AgentList, NotificationBell, WelcomeScreen, DiffViewer, IMContactList) | shared `@shared/ui/EmptyState` |
 
@@ -132,23 +131,12 @@ but no longer remain silent in the Settings product surface.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
+## 9.1 Residual after Agents/Tasks/Contacts EmptyState (#492 / #503 / #504)
 
-## 9.1 Residual after Agents EmptyState (#492) / Contacts EmptyState (#504)
-
-| Surface | After #492 / #504 | Next |
+| Surface | After | Next |
 |---|---|---|
-| Agents installed empty | shared `EmptyState` + compact overrides | — |
-| Agents skill/MCP market empty | shared `EmptyState` + compact overrides | — |
-| Agents load/action error | still `agent-inline-state` | later `StatusNotice` / `RecoveryPanel` |
-| TasksPage | ad-hoc `emptyState` + `emptyStateLabel` | follow-up (#503 ownership) |
-| ContactsPage | primary `new` empty → shared `EmptyState` + compact overrides (#504) | residual: blank internal/external/starred/groups/service lists; search loading / no-result still ad-hoc/absent |
-| ProjectsPage | loading/error captions | follow-up (not pure empty) |
-| DocsPage | no EmptyState usage found in this inventory | verify when touching Docs |
-| Settings StatesPane previews | custom `StatePanel` | separate design-system task |
-| Shell lists | already `EmptyState` | done |
-
-## 10. Evidence
-
-- Real entry path: GlobalRail → workbench `settings` page.
-- Residual desktop/web settings affordances are mostly **dead code + leftover i18n/surface metadata**, not alternate Settings UIs.
-- Settings page has design-system empty/invalid/missing **previews**, plus real load/error UX for settings persistence via shared StatusNotice/RecoveryPanel (#479).
+| Agents installed/market empty | shared `EmptyState` (#492) | load/action errors still ad-hoc |
+| TasksPage primary empty | shared `EmptyState` (#503) | — |
+| ContactsPage primary empty | shared `EmptyState` (#504) | residual search loading text |
+| ProjectsPage | loading/error captions | follow-up |
+| DocsPage | verify when touched | follow-up |
