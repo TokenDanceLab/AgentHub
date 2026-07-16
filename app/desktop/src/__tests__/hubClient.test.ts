@@ -152,7 +152,7 @@ describe('hubClient', () => {
       const client = createHubClient({ baseUrl: 'http://test.local' });
       mockFetch(503, {}, 'Service Unavailable');
 
-      await expect(client.me()).rejects.toThrow('HTTP 503: Service Unavailable');
+      await expect(client.me()).rejects.toThrow('Service Unavailable');
     });
   });
 
@@ -266,7 +266,7 @@ describe('hubClient', () => {
 
       expect(res.id).toBe('dev_1');
       const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe('http://test.local/edge/devices/register');
+      expect(url).toBe('http://test.local/edge/devices:register');
       expect(JSON.parse(init.body as string)).toMatchObject({
         device_id: 'dev_1',
         app_version: '1.0',
@@ -340,7 +340,7 @@ describe('hubClient', () => {
       const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('http://test.local/web/agent-teams');
       expect(init.method).toBeUndefined();
-      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+      expect(getHeader(init, 'Authorization')).toBe('Bearer tok');
     });
 
     it('creates teams, adds members, and starts TeamRuns with Hub request bodies', async () => {
@@ -434,7 +434,7 @@ describe('hubClient', () => {
       const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('http://test.local/web/agent-teams');
       expect(init.method).toBeUndefined();
-      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+      expect(getHeader(init, 'Authorization')).toBe('Bearer tok');
     });
 
     it('creates teams, adds members, and starts TeamRuns with Hub request bodies', async () => {

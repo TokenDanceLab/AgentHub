@@ -41,6 +41,12 @@ describe('hubClient helpers', () => {
     expect(unwrapHubResponse<{ id: string }>({ code: 'OK', data: { id: '1' } })).toEqual({
       id: '1',
     });
+    expect(unwrapHubResponse<{ id: string }>({ code: 'ok', data: { id: '2' } })).toEqual({
+      id: '2',
+    });
+    expect(unwrapHubResponse<{ id: string }>({ code: 'Ok', data: { id: '3' } })).toEqual({
+      id: '3',
+    });
     expect(unwrapHubResponse<{ id: string }>({ id: 'raw' })).toEqual({ id: 'raw' });
 
     const sessionWithSessionId: HubSession = { session_id: 's1', type: 'private' };
