@@ -80,7 +80,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | 2 | Same-package **interface boundary only** (export `RunEventProjector` / ports; methods stay) | Very low | Medium | Optional doc-only next |
 | 3 | Mechanical move of already-standalone small services (`public_stats`, `user_settings`) | Low | Low | LOC theater — defer |
 | 4 | `MessageReactionService` / `WorkspaceService` subpkg | Low–med | Medium | Independent but not concentration core |
-| 5 | `RunEventService` type split (methods + inject control) | Medium | High | **Next** after #468 |
+| 5 | `RunEventService` type split (methods + inject control) | Medium | High | Landed in #478 (type extract + injected control) |
 | 6 | `DeliveryOutbox` service + repository model | **High** | High | Tied to `dispatchPayload` + redispatch |
 | 7 | Full `DispatchService` extract | **Highest** | Highest | Last among runtime |
 

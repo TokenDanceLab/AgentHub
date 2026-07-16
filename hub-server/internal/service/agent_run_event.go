@@ -15,8 +15,32 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentevent"
 )
 
+// runEventControl delivers Hub control commands to the exact Desktop/Edge device
+// that owns a local Edge run. Implemented by *AgentControlService.
+type runEventControl interface {
+	DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error
+}
+
+// RunEventService owns task run-event list/summary/approval/artifact orchestration.
+// Pure projection/validation lives in service/agentevent; control delivery is injected.
+type RunEventService struct {
+	db         *gorm.DB
+	controlSvc runEventControl
+}
+
+// NewRunEventService constructs a RunEventService. controlSvc may be nil when
+// approval decisions do not need desktop/edge delivery (read-only paths).
+func NewRunEventService(db *gorm.DB, controlSvc runEventControl) *RunEventService {
+	return &RunEventService{db: db, controlSvc: controlSvc}
+}
+
+// SetControlService injects (or replaces) the control delivery port.
+func (s *RunEventService) SetControlService(controlSvc runEventControl) {
+	s.controlSvc = controlSvc
+}
+
 // ListTaskRunEvents returns run events for a pending task, filtered and paginated.
-func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+func (s *RunEventService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -38,7 +62,7 @@ func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID str
 }
 
 // GetTaskRunEventSummary returns a rollup summary for a task's run events.
-func (s *AgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+func (s *RunEventService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -57,7 +81,7 @@ func (s *AgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskI
 	return &summary, nil
 }
 
-func (s *AgentService) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
+func (s *RunEventService) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
 	task, events, err := s.taskRunEventsForOwner(userID, taskID)
 	if err != nil {
 		return nil, err
@@ -65,7 +89,7 @@ func (s *AgentService) ListTaskApprovals(ctx context.Context, userID, taskID str
 	return agentevent.ProjectTaskApprovals(task, events), nil
 }
 
-func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
+func (s *RunEventService) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
 	approvalID = strings.TrimSpace(approvalID)
 	decision.Decision = strings.ToLower(strings.TrimSpace(decision.Decision))
 	decision.Reason = strings.TrimSpace(decision.Reason)
@@ -124,9 +148,8 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 		return nil, err
 	}
 
-	if controlCache, ok := s.cacheClient.(agentControlCache); ok {
-		controlSvc := &AgentControlService{cacheClient: controlCache, mgr: s.mgr}
-		if err := controlSvc.DeliverToDesktopDevice(ctx, userID, task.EdgeDeviceID, model.AgentControlPayload{
+	if s.controlSvc != nil {
+		if err := s.controlSvc.DeliverToDesktopDevice(ctx, userID, task.EdgeDeviceID, model.AgentControlPayload{
 			Kind:          model.AgentControlKindPermissionDecide,
 			AgentTaskID:   task.ID,
 			TargetID:      strings.TrimSpace(task.TargetID),
@@ -150,7 +173,7 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 	return &decided, nil
 }
 
-func (s *AgentService) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
+func (s *RunEventService) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
 	task, events, err := s.taskRunEventsForOwner(userID, taskID)
 	if err != nil {
 		return nil, err
@@ -158,7 +181,7 @@ func (s *AgentService) ListTaskArtifacts(ctx context.Context, userID, taskID str
 	return agentevent.ProjectTaskArtifacts(task, events), nil
 }
 
-func (s *AgentService) taskRunEventsForOwner(userID, taskID string) (*model.PendingAgentTask, []model.AgentRunEvent, error) {
+func (s *RunEventService) taskRunEventsForOwner(userID, taskID string) (*model.PendingAgentTask, []model.AgentRunEvent, error) {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -174,4 +197,41 @@ func (s *AgentService) taskRunEventsForOwner(userID, taskID string) (*model.Pend
 		return nil, nil, err
 	}
 	return task, events, nil
+}
+
+// ── AgentService facade (wiring/handler stability) ───────────────────────────
+
+// runEventService returns the composed RunEventService, lazily constructing one
+// from AgentService deps when tests use struct literals without NewAgentService.
+func (s *AgentService) runEventService() *RunEventService {
+	if s.runEvents != nil {
+		return s.runEvents
+	}
+	var control runEventControl
+	if controlCache, ok := s.cacheClient.(agentControlCache); ok {
+		control = &AgentControlService{cacheClient: controlCache, mgr: s.mgr}
+	}
+	return NewRunEventService(s.db, control)
+}
+
+// ListTaskRunEvents returns run events for a pending task, filtered and paginated.
+func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+	return s.runEventService().ListTaskRunEvents(ctx, userID, taskID, filter)
+}
+
+// GetTaskRunEventSummary returns a rollup summary for a task's run events.
+func (s *AgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+	return s.runEventService().GetTaskRunEventSummary(ctx, userID, taskID)
+}
+
+func (s *AgentService) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
+	return s.runEventService().ListTaskApprovals(ctx, userID, taskID)
+}
+
+func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
+	return s.runEventService().DecideTaskApproval(ctx, userID, taskID, approvalID, decision)
+}
+
+func (s *AgentService) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
+	return s.runEventService().ListTaskArtifacts(ctx, userID, taskID)
 }
