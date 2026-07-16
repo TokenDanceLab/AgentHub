@@ -18,6 +18,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -73,16 +74,16 @@ type dispatchTargetSnapshot struct {
 
 // edgeRunRequest is the payload POSTed to the Edge /v1/runs endpoint for HTTP dispatch.
 type edgeRunRequest struct {
-	ProjectID      string               `json:"projectId"`
-	ThreadID       string               `json:"threadId"`
-	Prompt         string               `json:"prompt"`
-	AgentID        string               `json:"agentId,omitempty"`
-	Model          string               `json:"model,omitempty"`
-	SystemPrompt   string               `json:"systemPrompt,omitempty"`
-	HubTaskID      string               `json:"hubTaskId"`
-	DeliveryID     string               `json:"deliveryId,omitempty"`
-	Messages       []dispatchMessage    `json:"messages,omitempty"`
-	PinnedMessages []dispatchMessage    `json:"pinnedMessages,omitempty"`
+	ProjectID      string            `json:"projectId"`
+	ThreadID       string            `json:"threadId"`
+	Prompt         string            `json:"prompt"`
+	AgentID        string            `json:"agentId,omitempty"`
+	Model          string            `json:"model,omitempty"`
+	SystemPrompt   string            `json:"systemPrompt,omitempty"`
+	HubTaskID      string            `json:"hubTaskId"`
+	DeliveryID     string            `json:"deliveryId,omitempty"`
+	Messages       []dispatchMessage `json:"messages,omitempty"`
+	PinnedMessages []dispatchMessage `json:"pinnedMessages,omitempty"`
 	// StructuredOutputSchema is the JSON Schema for structured output (--json-schema).
 	StructuredOutputSchema string `json:"structuredOutputSchema,omitempty"`
 }
@@ -151,6 +152,10 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	// dispatch. In dev mode (AGENTHUB_DEV=1) the Edge skips auth entirely.
 	if edgeAuthToken := strings.TrimSpace(os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN")); edgeAuthToken != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+edgeAuthToken)
+	}
+	// AH-SR-046: attach per-run capability when Hub JWT secret and Edge device are known.
+	if capToken := s.issueRunStartCapability(dp); capToken != "" {
+		httpReq.Header.Set("X-AgentHub-Capability-Token", capToken)
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -779,4 +784,32 @@ func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID s
 	}})
 
 	return newTask, nil
+}
+
+// issueRunStartCapability mints a short-lived capability token for Edge dual-token auth.
+// Returns empty string when secret/device are unavailable so local/dev dispatch still works.
+func (s *AgentService) issueRunStartCapability(dp *dispatchPayload) string {
+	secret := strings.TrimSpace(os.Getenv("AGENTHUB_JWT_SECRET"))
+	if secret == "" {
+		return ""
+	}
+	deviceID := strings.TrimSpace(dp.EdgeDeviceID)
+	if deviceID == "" {
+		deviceID = strings.TrimSpace(os.Getenv("AGENTHUB_EDGE_DEVICE_ID"))
+	}
+	if deviceID == "" {
+		return ""
+	}
+	userID := strings.TrimSpace(dp.TriggerUserID)
+	if userID == "" {
+		userID = "hub-dispatch"
+	}
+	// Edge HTTP dispatch currently uses proj_local; keep capability project aligned.
+	projectID := "proj_local"
+	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, "run-start", 5*time.Minute)
+	if err != nil {
+		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", deviceID)
+		return ""
+	}
+	return token
 }
