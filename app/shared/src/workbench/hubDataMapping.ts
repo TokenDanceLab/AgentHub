@@ -216,9 +216,11 @@ export function resolveHubDocuments(
  * Both Desktop and Web hubClients define a compatible `Session` type.
  */
 export interface HubSessionLike {
-  id: string;
+  id?: string;
+  session_id?: string;
   type: string;
   name?: string;
+  title?: string;
   owner_user_id?: string;
   members?: Array<{ member_id: string; role?: string }>;
   pinned?: boolean;
@@ -232,6 +234,7 @@ export interface HubSessionLike {
 }
 
 export function hubSessionToConversation(session: HubSessionLike): WorkbenchConversation {
+  const sessionId = session.id || session.session_id || '';
   const kind: WorkbenchConversation['kind'] = session.type === 'private' ? 'direct' : 'group';
   const title = session.name?.trim() || resolveSessionFallbackTitle(session);
   const updatedLabel = session.updated_at || session.last_message_at
@@ -243,7 +246,7 @@ export function hubSessionToConversation(session: HubSessionLike): WorkbenchConv
     .map((m) => m.member_id);
 
   return {
-    id: session.id,
+    id: sessionId,
     title,
     kind,
     subtitle: session.member_count != null ? `${session.member_count} 人` : undefined,
@@ -258,7 +261,10 @@ export function hubSessionToConversation(session: HubSessionLike): WorkbenchConv
 
 function resolveSessionFallbackTitle(session: HubSessionLike): string {
   if (session.type === 'private') return '私聊';
-  return `群会话 ${session.id.slice(0, 4)}`;
+  if (session.title?.trim()) return session.title.trim();
+  if (session.name?.trim()) return session.name.trim();
+  const sid = session.id || session.session_id || '';
+  return sid ? `群会话 ${sid.slice(0, 4)}` : '群会话';
 }
 
 function formatSessionTime(value: string | undefined): string | undefined {
