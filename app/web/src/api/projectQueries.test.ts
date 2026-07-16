@@ -28,6 +28,14 @@ function getHeader(init: RequestInit | undefined, name: string): string | null {
   return record[name] ?? record[name.toLowerCase()] ?? null;
 }
 
+function getCallInit(calls: readonly unknown[][], index: number): RequestInit {
+  const call = calls[index];
+  expect(call).toBeDefined();
+  const init = call![1];
+  expect(init).toBeDefined();
+  return init as unknown as RequestInit;
+}
+
 describe('web project queries', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -135,15 +143,15 @@ describe('web project queries', () => {
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
-    expect(getHeader(fetchMock.mock.calls[0]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
     expect(fetchMock.mock.calls[1]?.[0]).toBe('http://localhost:8080/web/projects');
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).body).toBe(
+    expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: 'Created Project', description: 'Created from Web' }),
     );
     expect(fetchMock.mock.calls[2]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
-    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe('PATCH');
-    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).body).toBe(
+    expect(getCallInit(fetchMock.mock.calls, 2).method).toBe('PATCH');
+    expect(getCallInit(fetchMock.mock.calls, 2).body).toBe(
       JSON.stringify({ name: 'Updated Project', description: 'Updated from Web' }),
     );
     expect(detail).toMatchObject({ name: 'Existing Project' });
@@ -249,23 +257,23 @@ describe('web project queries', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads',
     );
-    expect(getHeader(fetchMock.mock.calls[0]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads',
     );
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).body).toBe(
+    expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: '新项目群' }),
     );
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
     );
-    expect(getHeader(fetchMock.mock.calls[2]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
     expect(fetchMock.mock.calls[3]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages',
     );
-    expect((fetchMock.mock.calls[3]?.[1] as RequestInit).method).toBe('POST');
-    expect((fetchMock.mock.calls[3]?.[1] as RequestInit).body).toBe(
+    expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
       JSON.stringify({
         client_msg_id: 'client-message-2',
         content_type: 'text',
