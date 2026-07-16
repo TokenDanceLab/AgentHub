@@ -332,6 +332,13 @@ describe('hubClient helpers', () => {
     expect(error.message).toBe('Unauthorized');
   });
 
+  it('exposes T3.4 shared task approval methods (#433)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { task_id: 't1', approvals: [] } }));
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+    await expect(client.listTaskApprovals('t1')).resolves.toMatchObject({ task_id: 't1', approvals: [] });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://hub.local/web/agent-tasks/t1/approvals');
+  });
+
   it('exposes T3.2 shared team/settings methods (#431)', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: [{ id: 'team-1', name: 'T' }] }));
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { theme: 'dark' } }));
@@ -360,7 +367,7 @@ describe('hubClient helpers', () => {
     expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('listAgentTeams');
     expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('fetchSettings');
     expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopOnly)).toBe(true);
-    expect(HUBCLIENT_SSOT_GAPS.webOnly).toContain('listTaskApprovals');
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.webOnly)).toBe(true);
     // Guard against accidental empty inventory during later edits.
     expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
   });
