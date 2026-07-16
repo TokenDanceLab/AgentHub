@@ -1,7 +1,7 @@
 # AgentHub 模块清单（Cleanup Baseline）
 
-> last-updated: 2026-07-16  
-> purpose: per-module inventory for strangler prioritization  
+> last-updated: 2026-07-16
+> purpose: per-module inventory for strangler prioritization
 > companion: `project-overview.md`, `risk-assessment.md`, `cleanup-strategy.md`
 
 规模来自 cleanup-baseline worktree 扫描（`.go/.ts/.tsx/.rs/.css`，排除 `node_modules/dist/target` 等），**约数**。测试判定基于 `*_test.go` / `*.test.ts(x)` / `e2e|tests` 启发式。

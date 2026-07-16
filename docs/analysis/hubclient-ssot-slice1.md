@@ -1,16 +1,16 @@
 # hubClient SSOT Slice1
 
-最后更新：2026-07-16  
-Issue: #430 (T3.1)  
-SSOT target: `app/shared/src/hubClient.ts`  
-Surface forks (transitional): `app/desktop/src/api/hubClient.ts`, `app/web/src/api/hubClient.ts`  
+最后更新：2026-07-16
+Issue: #430 (T3.1)
+SSOT target: `app/shared/src/hubClient.ts`
+Surface forks (transitional): `app/desktop/src/api/hubClient.ts`, `app/web/src/api/hubClient.ts`
 Good pattern: `app/mobile-rn/src/api/hubClient.ts` (re-export/extend shared)
 
 ## Goal (this slice only)
 
-1. Freeze desktop/web forks: **no new Hub methods/DTOs** on surface files.  
-2. Expand shared **compatibility aliases** for historical desktop/web type names.  
-3. Publish a **method matrix** and machine-readable gap list (`HUBCLIENT_SSOT_GAPS`).  
+1. Freeze desktop/web forks: **no new Hub methods/DTOs** on surface files.
+2. Expand shared **compatibility aliases** for historical desktop/web type names.
+3. Publish a **method matrix** and machine-readable gap list (`HUBCLIENT_SSOT_GAPS`).
 4. **Do not** switch all callers or delete surface implementations (that is T3.2–T3.4).
 
 ## Counts (createHubClient return keys)
@@ -53,12 +53,12 @@ Prefer **Hub\*** names in new shared code. Aliases exist so T3.3/T3.4 re-exports
 
 ## Freeze comments
 
-- `app/desktop/src/api/hubClient.ts` header: no new methods  
-- `app/web/src/api/hubClient.ts` header: no new methods + AH-SR-043 note  
+- `app/desktop/src/api/hubClient.ts` header: no new methods
+- `app/web/src/api/hubClient.ts` header: no new methods + AH-SR-043 note
 
 ## Tests
 
-- Existing `app/shared/src/hubClient.test.ts` still covers envelope helpers.  
+- Existing `app/shared/src/hubClient.test.ts` still covers envelope helpers.
 - Slice1 adds export-surface assertion for aliases + `HUBCLIENT_SSOT_GAPS` shape.
 
 ## Next slices
@@ -71,10 +71,10 @@ Prefer **Hub\*** names in new shared code. Aliases exist so T3.3/T3.4 re-exports
 
 ## Non-goals (explicit)
 
-- No mass caller rewrite  
-- No auth storage changes  
-- No Web Local Edge  
-- No deletion of desktop/web hubClient files yet  
+- No mass caller rewrite
+- No auth storage changes
+- No Web Local Edge
+- No deletion of desktop/web hubClient files yet
 
 ## T3.2 status
 
