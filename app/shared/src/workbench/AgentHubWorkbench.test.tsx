@@ -1838,8 +1838,8 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
 
     const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
-    const emptyState = within(page).getByRole('status');
-    expect(within(emptyState).getByText('暂无 Agent Profile')).toBeInTheDocument();
+    const emptyState = within(page).getByRole('region', { name: '暂无 Agent Profile' });
+    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装 Agent。')).toBeInTheDocument();
     expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
 
     fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
@@ -1903,7 +1903,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
     const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
     expect(within(agentsPage).getByRole('alert')).toHaveTextContent('Hub AgentProfiles unavailable');
-    expect(within(agentsPage).getByRole('status')).toHaveTextContent('暂无 Agent Profile');
+    expect(within(agentsPage).getByRole('region', { name: '暂无 Agent Profile' })).toBeInTheDocument();
     expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
 
