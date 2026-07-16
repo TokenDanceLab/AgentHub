@@ -146,10 +146,31 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token purpose %q must be run-start", capClaims.Purpose)))
 			return
 		}
+		// Action binding: when set, must match purpose (run-start for PostRuns).
+		if action := strings.TrimSpace(capClaims.Action); action != "" && action != "run-start" {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token action %q must be run-start", action)))
+			return
+		}
 		// Cross-check capability claims against the request.
 		if capClaims.ProjectID != req.ProjectID {
 			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token project_id %q does not match request project %q", capClaims.ProjectID, req.ProjectID)))
 			return
+		}
+		// Thread/workspace binding when capability includes thread_id.
+		if threadID := strings.TrimSpace(capClaims.ThreadID); threadID != "" && threadID != req.ThreadID {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token thread_id %q does not match request thread %q", threadID, req.ThreadID)))
+			return
+		}
+		// Target binding when capability includes target_id (header or query).
+		if targetID := strings.TrimSpace(capClaims.TargetID); targetID != "" {
+			reqTarget := strings.TrimSpace(r.Header.Get("X-AgentHub-Target-Id"))
+			if reqTarget == "" {
+				reqTarget = strings.TrimSpace(r.URL.Query().Get("targetId"))
+			}
+			if reqTarget == "" || reqTarget != targetID {
+				writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token target_id %q does not match request target %q", targetID, reqTarget)))
+				return
+			}
 		}
 		// Cross-check identity: if the middleware injected Hub identity into the
 		// context, verify the capability token binds the same user.
