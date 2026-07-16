@@ -124,7 +124,12 @@ export const sharedWorkbenchResources = {
       tab: { overview: '概览', settings: '设置', members: '成员' },
       newProject: '新建项目',
       projectRuns: '项目运行',
-      empty: { title: '暂无项目', description: '创建或加入项目，与 Agent 队友协作' },
+      loading: '正在加载项目…',
+      empty: {
+        title: '暂无项目',
+        description: '创建第一个项目以开始协作。',
+        createFirst: '创建第一个项目',
+      },
     },
     contacts: {
       nav: { internal: '组织内联系人', external: '外部联系人', newFriend: '新的朋友' },
@@ -299,7 +304,12 @@ export const sharedWorkbenchResources = {
       tab: { overview: 'Overview', settings: 'Settings', members: 'Members' },
       newProject: 'New project',
       projectRuns: 'Project runs',
-      empty: { title: 'No projects yet', description: 'Create or join a project to collaborate with Agent teammates' },
+      loading: 'Loading projects…',
+      empty: {
+        title: 'No projects yet',
+        description: 'Create your first project to start collaborating.',
+        createFirst: 'Create first project',
+      },
     },
     contacts: {
       nav: { internal: 'Internal contacts', external: 'External contacts', newFriend: 'New friends' },

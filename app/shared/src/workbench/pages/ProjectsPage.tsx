@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
+import { EmptyState, StatusNotice } from '../../ui';
 import {
   DesignFileIcon,
   DesignNavIcon,
@@ -1065,11 +1066,27 @@ export function ProjectsPage({
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
         <div className={styles.navCaption}>{t('nav.projects')}</div>
-        {projectsLoading ? (
-          <div className={styles.navCaption} role="status">{t('nav.projects')}</div>
-        ) : null}
-        {projectsError ? (
-          <div className={styles.navCaption} role="alert">{projectsError}</div>
+        {projectsLoading || projectsError ? (
+          <div className={styles.statusStack}>
+            {projectsLoading ? (
+              <StatusNotice
+                {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
+                icon={<DesignNavIcon name="running" size={14} />}
+                role="status"
+              >
+                {t('projects.loading')}
+              </StatusNotice>
+            ) : null}
+            {projectsError ? (
+              <StatusNotice
+                {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
+                icon={<DesignNavIcon name="error404" size={14} />}
+                role="alert"
+              >
+                {projectsError}
+              </StatusNotice>
+            ) : null}
+          </div>
         ) : null}
         {projects.map((project) => (
           <ProjectNavRow
@@ -1135,23 +1152,33 @@ export function ProjectsPage({
             />
           </>
         ) : (
-          <div className={`${styles.detailHead} workbench-head`}>
-            <div>
-              <h1>暂无项目</h1>
-              <p>{projectsError || '创建第一个项目以开始协作。'}</p>
-            </div>
-            <div className={styles.headActions}>
-              {canCreateProject ? (
-                <button
-                  type="button"
-                  className={styles.newProjectBtn}
-                  onClick={startProjectCreate}
-                >
-                  创建第一个项目
-                </button>
-              ) : null}
-              <span className={styles.statusBadge}>空项目</span>
-            </div>
+          <div className={styles.emptyMain}>
+            <EmptyState
+              title={t('projects.empty.title')}
+              description={t('projects.empty.description')}
+              titleLevel={1}
+              {...(styles['projects-empty'] ? { className: styles['projects-empty'] } : {})}
+              {...(styles['projects-empty-content']
+                ? { contentClassName: styles['projects-empty-content'] }
+                : {})}
+              {...(styles['projects-empty-title']
+                ? { titleClassName: styles['projects-empty-title'] }
+                : {})}
+              {...(styles['projects-empty-description']
+                ? { descriptionClassName: styles['projects-empty-description'] }
+                : {})}
+              {...(styles['projects-empty-action']
+                ? { actionClassName: styles['projects-empty-action'] }
+                : {})}
+              {...(canCreateProject
+                ? {
+                    action: {
+                      label: t('projects.empty.createFirst'),
+                      onClick: startProjectCreate,
+                    },
+                  }
+                : {})}
+            />
             {editorMode ? (
               <ProjectEditor
                 mode={editorMode}
