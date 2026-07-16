@@ -790,7 +790,7 @@ function SettingsTab({
           <h2>
             <DesignNavIcon name="tools" size={15} />项目设置
           </h2>
-          <span>{settings.length} items</span>
+          <span>{settings.length} 项</span>
         </div>
         {settings.map((item) => (
           <div key={item.label} className={styles.settingRow}>
