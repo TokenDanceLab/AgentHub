@@ -1,7 +1,7 @@
 # Dirty Tree Policy (AgentHub)
 
-最后更新：2026-07-16  
-Issue: #427 (T2.1)  
+最后更新：2026-07-16
+Issue: #427 (T2.1)
 Branch: `chore/cleanup-baseline`
 
 ## Goal

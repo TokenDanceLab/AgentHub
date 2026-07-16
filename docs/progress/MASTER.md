@@ -1,10 +1,10 @@
 # AgentHub Cleanup Baseline — Progress Tracker
 
-> **Task**: knowledge-first strangler cleanup + lightweight wiki（非第二 SSOT）  
-> **Started**: 2026-07-16  
-> **Last Updated**: 2026-07-16  
-> **Mode**: `GITHUB_FULL`  
-> **Repo**: `TokenDanceLab/AgentHub`  
+> **Task**: knowledge-first strangler cleanup + lightweight wiki（非第二 SSOT）
+> **Started**: 2026-07-16
+> **Last Updated**: 2026-07-16
+> **Mode**: `GITHUB_FULL`
+> **Repo**: `TokenDanceLab/AgentHub`
 > **Worktree**: `.worktrees/cleanup-baseline` @ `chore/cleanup-baseline`
 
 ## Management model (locked)
@@ -26,11 +26,11 @@
 
 现代软件工程 + SDD 收口，**不再用 ad-hoc multi-workflow 当 backlog**：
 
-1. **SPEC in-repo**：`docs/analysis/*` + `docs/plan/*` + 本文件  
-2. **GitHub Project board**：活状态 / WIP  
-3. **Milestones = Phases**  
-4. **Issues = 原子任务**（验收标准在 Issue body）  
-5. **PR closes Issue**；Workflow/subagent **只能执行已建 Issue**  
+1. **SPEC in-repo**：`docs/analysis/*` + `docs/plan/*` + 本文件
+2. **GitHub Project board**：活状态 / WIP
+3. **Milestones = Phases**
+4. **Issues = 原子任务**（验收标准在 Issue body）
+5. **PR closes Issue**；Workflow/subagent **只能执行已建 Issue**
 6. wiki 是编译知识层，**不覆盖** AGENTS / architecture / api / risk register
 
 参考：
@@ -40,7 +40,7 @@
 
 ## GitHub Resources
 
-- **Project Board**: https://github.com/users/DeliciousBuding/projects/6  
+- **Project Board**: https://github.com/users/DeliciousBuding/projects/6
   （用户级 Project；Issues 在 `TokenDanceLab/AgentHub`。跨 owner `project link` 有限制，但不阻塞 item 跟踪）
 - **All Issues**: `gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline --state all`
 - **Label**: `cleanup-baseline` + `spec-driven`
@@ -116,24 +116,24 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 6: Baseline Hardening (5/5 closed: #441-#445)
 
 ## Current Status
-**Active Phase**: COMPLETE (baseline + hardening + residual closeout)  
-**Active Task**: none  
-**Blockers**: None  
-**Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
+**Active Phase**: COMPLETE (baseline + hardening + residual closeout)
+**Active Task**: none
+**Blockers**: None
+**Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）
 **Baseline commits**:
 - `347642b6` docs(cleanup): baseline analysis, wiki, LIVE narrative
 - Phase 6: `8fd3625f` #443 · `e41ed1ed` #444 · `342cc711` #445 · `83f5e1ea` #441/#442
 
 ## Governance Status
-**Shared instruction surface**: `AGENTS.md`  
-**Claude Code instruction surface**: none（本仓仅 AGENTS）  
-**Memory surface**: Claude native project memory  
+**Shared instruction surface**: `AGENTS.md`
+**Claude Code instruction surface**: none（本仓仅 AGENTS）
+**Memory surface**: Claude native project memory
 **Memory note**: `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
-1. push `chore/cleanup-baseline` 并开 PR 汇总 #424–#445 + residual closeout commits  
-2. 禁止 freestyle multi-workflow 实现 fleets；新工作必须新 Issue  
-3. 可选增强（非基线阻塞）：live Hub→Edge capability E2E；cross-service journal offline/replay E2E  
+1. push `chore/cleanup-baseline` 并开 PR 汇总 #424–#445 + residual closeout commits
+2. 禁止 freestyle multi-workflow 实现 fleets；新工作必须新 Issue
+3. 可选增强（非基线阻塞）：live Hub→Edge capability E2E；cross-service journal offline/replay E2E
 
 ## Session Log
 | Date | Session | Summary |
