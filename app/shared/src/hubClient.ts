@@ -87,6 +87,7 @@ export interface HubOidcCallbackRequest {
 }
 
 export interface HubOidcCallbackResponse extends HubAuthResponse {
+  // Desktop/Web auth layers historically require a user object on callback success.
   user?: HubUserProfile;
 }
 
@@ -222,10 +223,11 @@ export interface HubSendMessageResponse {
 export interface HubReplyToInfo {
   id: string;
   sender_id: string;
-  content_type: HubContentType;
-  content: string;
-  recalled: boolean;
-  created_at: string;
+  content_type: HubContentType | string;
+  /** Full reply body when available; clients may send a stub without content. */
+  content?: string;
+  recalled?: boolean;
+  created_at?: string;
 }
 
 export interface HubMessageAttachment {
@@ -234,7 +236,8 @@ export interface HubMessageAttachment {
   size: number;
   mime_type: string;
   original_name?: string;
-  uploader_user_id: string;
+  /** Present on server-persisted attachments; may be omitted on optimistic local stubs. */
+  uploader_user_id?: string;
   metadata?: string;
   created_at?: string;
 }
@@ -339,7 +342,7 @@ export interface HubWorkspaceProject {
   id: string;
   name: string;
   description?: string;
-  owner_id: string;
+  owner_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -495,7 +498,6 @@ export interface HubExecutionTarget {
   config?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
-  [key: string]: unknown;
 }
 
 export interface HubExecutionTargetRequest {
@@ -969,6 +971,7 @@ export interface HubAgentTeamRun {
   session_id?: string;
   trigger_user_id?: string;
   trigger_message?: string;
+  target_id?: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
   created_at?: string;
   updated_at?: string;
@@ -1169,6 +1172,7 @@ export interface HubAddAgentTeamMemberRequest {
 
 export interface HubStartAgentTeamRunRequest {
   trigger_message: string;
+  target_id?: string;
 }
 
 export interface HubAttachmentRef {
@@ -1911,7 +1915,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       body: HubAddAgentToSessionRequest,
     ) =>
-      request<void>(
+      request<HubAgentInstance>(
         `/client/sessions/${encodeURIComponent(sessionId)}/agents`,
         {
           method: 'POST',
@@ -1937,7 +1941,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'POST',
       }),
 
-    listExecutionTargets: async (params?: { pageSize?: number; pageCursor?: string }) => {
+    listExecutionTargets: async (params?: {
+      pageSize?: number;
+      pageCursor?: string;
+      target_type?: string;
+    }) => {
       const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
         `/web/execution-targets${qs(params ?? {})}`,
       );

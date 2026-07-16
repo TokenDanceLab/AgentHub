@@ -72,7 +72,7 @@ export default function ExecutionTargetsSection({
       }
       return t('settings.localEdgeTargetReadinessRegistered', {
         name: registeredLocalEdgeTarget.name,
-        targetId: shortId(registeredLocalEdgeTarget.id),
+        targetId: shortId(String(registeredLocalEdgeTarget.id ?? '')),
       });
     }
     if (hubTargetsPaginationLimited) return t('settings.localEdgeTargetReadinessPaginationLimited');
