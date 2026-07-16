@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
@@ -27,7 +28,6 @@ import (
 	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
-	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
@@ -103,7 +103,7 @@ func Run(cfg Config) error {
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
-		slog.Debug("auto-generated local auth token for Edge Server API protection; "+
+		slog.Debug("auto-generated local auth token for Edge Server API protection; " +
 			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections")
 	}
 
@@ -251,6 +251,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		})
 	}
 
+	var hubCallbackClient *hub.CallbackClient
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor
 		if execCfg.Command == "" && hasAdapter {
@@ -275,6 +276,16 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		// Wire Hub callback client for Edge-to-Hub direct bridge
 		if cfg.HubURL != "" {
 			hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+			hubCallbackClient = hubClient
+			// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
+			// Falls back to in-memory journal on open failure so callback path never blocks startup.
+			if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
+				if err := hubClient.EnableSQLiteJournal(journalPath); err != nil {
+					slog.Warn("durable delivery journal unavailable; using memory journal", "path", journalPath, "error", err)
+				} else {
+					slog.Info("durable delivery journal enabled", "path", journalPath)
+				}
+			}
 			processExecutor.WithHubCallback(hubClient)
 			slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
 		}
@@ -317,6 +328,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		LocalAuthToken:     cfg.LocalAuthToken,
 		HubJWTSecret:       cfg.HubJWTSecret,
 		EdgeDeviceID:       cfg.EdgeDeviceID,
+		CallbackClient:     hubCallbackClient,
 	}
 
 	// Detect cc-switch and wire into handler for API endpoints and model

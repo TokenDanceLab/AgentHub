@@ -347,10 +347,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     (target.health_state === 'online' || target.health_state === 'healthy')
   );
   const composerExecutionTargets = hubReady || realMode
-    ? onlineLocalEdgeTargets.map((target) => ({
-        id: target.id,
-        label: target.name ? `${target.name} (${target.id})` : target.id,
-      }))
+    ? onlineLocalEdgeTargets.map((target) => {
+        const id = String(target.id ?? '');
+        const name = target.name ? String(target.name) : '';
+        return {
+          id,
+          label: name ? `${name} (${id})` : id,
+        };
+      })
     : undefined;
   const executionTargetStatus = resolveWebExecutionTargetStatus({
     hubReady,
@@ -1085,8 +1089,9 @@ function targetStatus(state: Exclude<WebExecutionTargetStatusState, 'hidden' | '
   };
 }
 
-function executionTargetLabel(target: Pick<ExecutionTargetInventoryItem, 'id' | 'name'>): string {
-  return target.name ? `${target.name} (${target.id})` : target.id;
+function executionTargetLabel(target: { id?: string; name?: string }): string {
+  const id = target.id ?? '';
+  return target.name ? `${target.name} (${id})` : id;
 }
 
 function targetStatusBlock(state: WebExecutionTargetStatusState, text: string): TranscriptBlock {

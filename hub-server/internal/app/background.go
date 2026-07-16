@@ -36,7 +36,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 		a.bus.Close()
 	}
 
-	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector).
+	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector, delivery outbox retry).
 	if a.coreCancel != nil {
 		a.coreCancel()
 	}

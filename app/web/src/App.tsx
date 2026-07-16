@@ -61,7 +61,11 @@ function WebWorkbenchRoot() {
   const webPlatform = useMemo(
     () => createWebPlatform({
       ensureAuth,
-      demoRuntimeFallback: dataModeContract.mode !== 'auto' && dataModeContract.allowsDemoRuntimeFallback,
+      // AH-SR-043: only explicit mock/fixture modes may use demo runtime fallback.
+      // Never silent-fallback from auto/real/observed/approved-real.
+      demoRuntimeFallback:
+        (dataModeContract.mode === 'mock' || dataModeContract.mode === 'fixture') &&
+        dataModeContract.allowsDemoRuntimeFallback,
     }),
     [dataModeContract.allowsDemoRuntimeFallback, dataModeContract.mode, ensureAuth],
   );

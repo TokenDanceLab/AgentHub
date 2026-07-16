@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchExecutionTargets } from './executionTargetQueries';
+import { getAuthorization } from './requestInitTestUtils';
 
 const DEVICE_ID = '00000000-0000-0000-0000-00000000a101';
 
@@ -24,7 +25,7 @@ describe('web Hub auth token auto-login', () => {
       const url = String(input);
 
       if (url.endsWith('/client/auth/me')) {
-        expect(init?.headers).toMatchObject({ Authorization: 'Bearer stored-access-token' });
+        expect(getAuthorization(init)).toBe('Bearer stored-access-token');
         return new Response(
           JSON.stringify({
             id: '00000000-0000-0000-0000-00000000b101',
@@ -152,7 +153,7 @@ describe('web Hub auth token auto-login', () => {
       }
 
       if (url.endsWith('/web/execution-targets?pageSize=50')) {
-        expect(init?.headers).toMatchObject({ Authorization: 'Bearer web-fixture-access-token' });
+        expect(getAuthorization(init)).toBe('Bearer web-fixture-access-token');
         return new Response(
           JSON.stringify({
             code: 'OK',

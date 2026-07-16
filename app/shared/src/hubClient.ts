@@ -66,9 +66,10 @@ export interface HubChangePasswordRequest {
 
 export interface HubOidcAuthorizeRequest {
   code_challenge: string;
-  code_challenge_method?: 'S256' | 'plain';
+  code_challenge_method?: 'S256' | 'plain' | string;
   device_type?: string;
   device_id?: string;
+  redirect_uri?: string;
 }
 
 export interface HubOidcAuthorizeResponse {
@@ -82,9 +83,11 @@ export interface HubOidcCallbackRequest {
   code_verifier: string;
   device_type?: string;
   device_id?: string;
+  redirect_uri?: string;
 }
 
 export interface HubOidcCallbackResponse extends HubAuthResponse {
+  // Desktop/Web auth layers historically require a user object on callback success.
   user?: HubUserProfile;
 }
 
@@ -220,10 +223,11 @@ export interface HubSendMessageResponse {
 export interface HubReplyToInfo {
   id: string;
   sender_id: string;
-  content_type: HubContentType;
-  content: string;
-  recalled: boolean;
-  created_at: string;
+  content_type: HubContentType | string;
+  /** Full reply body when available; clients may send a stub without content. */
+  content?: string;
+  recalled?: boolean;
+  created_at?: string;
 }
 
 export interface HubMessageAttachment {
@@ -232,7 +236,8 @@ export interface HubMessageAttachment {
   size: number;
   mime_type: string;
   original_name?: string;
-  uploader_user_id: string;
+  /** Present on server-persisted attachments; may be omitted on optimistic local stubs. */
+  uploader_user_id?: string;
   metadata?: string;
   created_at?: string;
 }
@@ -337,7 +342,7 @@ export interface HubWorkspaceProject {
   id: string;
   name: string;
   description?: string;
-  owner_id: string;
+  owner_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -475,18 +480,49 @@ export type HubExecutionTargetType =
 export interface HubExecutionTarget {
   id: string;
   name: string;
-  type: HubExecutionTargetType;
+  type?: HubExecutionTargetType;
+  target_type?: HubExecutionTargetType | string;
   status?: string;
+  endpoint?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: string;
+  health_state?: string;
+  is_online?: boolean;
+  device_id?: string;
+  owner_id?: string;
+  capabilities?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown> | string;
   config?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
-  [key: string]: unknown;
 }
 
 export interface HubExecutionTargetRequest {
   name: string;
-  type: HubExecutionTargetType;
+  type?: HubExecutionTargetType;
   config?: Record<string, unknown>;
+  // desktop-rich fields accepted and folded into config by callers/wrappers
+  target_type?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: string;
+  device_id?: string;
+  capabilities?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown> | string;
+  auth_method?: string;
+}
+
+export interface HubExecutionTargetListResponse {
+  items: HubExecutionTarget[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
 }
 
 export interface HubAuditEvent {
@@ -792,12 +828,17 @@ export function isHubResponseEnvelope(
   return isRecord(body) && typeof body.code === 'string';
 }
 
+export function isHubSuccessCode(code: string): boolean {
+  return String(code).toUpperCase() === 'OK';
+}
+
 export function unwrapHubResponse<T>(body: unknown, status = 200): T {
   if (!isHubResponseEnvelope(body)) {
     return body as T;
   }
 
-  if (body.code !== 'OK') {
+  // Accept case-insensitive OK/ok so fixtures and legacy mocks stay compatible.
+  if (!isHubSuccessCode(body.code)) {
     throw new AppError(
       {
         error: {
@@ -857,6 +898,570 @@ export async function parseHubError(response: Response): Promise<AppError> {
     body,
   );
 }
+
+
+// ── T3.2 Team / profile / attachment types (ported from desktop∩web) ──
+export interface HubAgentRunEventSummary {
+  task_id: string;
+  edge_run_id?: string;
+  status: string;
+  total_events: number;
+  last_event_seq: number;
+  event_type_counts: Record<string, number>;
+  tool_call_count: number;
+  step_count: number;
+  artifact_count: number;
+  approval_count: number;
+  pending_approvals: number;
+  decided_approvals: number;
+  input_tokens: number;
+  output_tokens: number;
+  output_bytes: number;
+  started_at?: string;
+  finished_at?: string;
+  elapsed_ms?: number;
+}
+
+export interface HubAgentRunEvent {
+  id: string;
+  task_id: string;
+  edge_run_id?: string;
+  session_id: string;
+  agent_instance_id: string;
+  event_seq: number;
+  event_type: string;
+  payload: unknown;
+  created_at: string;
+}
+
+export interface HubCoordinatorRouteDecision {
+  action: string;
+  next_worker?: string;
+  instructions?: string;
+  reasoning?: string;
+  context?: string;
+  approved?: boolean;
+  feedback?: string;
+  summary?: string;
+  blocked_reason?: string;
+  correlation_id?: string;
+}
+
+export interface HubAgentTeam {
+  id: string;
+  owner_id?: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubAgentTeamMember {
+  id: string;
+  team_id: string;
+  agent_profile_id?: string;
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+  position?: number;
+  created_at?: string;
+}
+
+export interface HubAgentTeamDetail extends HubAgentTeam {
+  members?: HubAgentTeamMember[];
+}
+
+export interface HubAgentTeamRun {
+  id: string;
+  team_id: string;
+  session_id?: string;
+  trigger_user_id?: string;
+  trigger_message?: string;
+  target_id?: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubAgentTeamAssignment {
+  id: string;
+  team_run_id: string;
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  task_prompt?: string;
+  context?: string;
+  status?: string;
+  run_id?: string;
+  result?: string;
+  depth?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubAgentTeamTask {
+  id: string;
+  team_run_id: string;
+  assignment_id?: string;
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: 'pending' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled' | string;
+  objective?: string;
+  input_refs?: Record<string, unknown>;
+  run_id?: string;
+  attempt?: number;
+  risk_level?: 'normal' | 'high' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubAgentTeamEvent {
+  id: string;
+  team_run_id: string;
+  seq: number;
+  type: string;
+  payload?: string | Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface HubTeamMemberState {
+  member_id: string;
+  agent_profile_id?: string;
+  role: string;
+  active_tasks?: number;
+  completed_tasks?: number;
+}
+
+export interface HubTeamTaskState {
+  task_id: string;
+  assignment_id?: string;
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: string;
+  objective?: string;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+  attempt?: number;
+  risk_level?: string;
+}
+
+export interface HubTeamAssignmentState {
+  assignment_id: string;
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  status?: string;
+  depth?: number;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+}
+
+export interface HubTeamApprovalState {
+  approval_id: string;
+  agent_task_id?: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface HubTeamArtifactState {
+  agent_task_id?: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  conflict_id?: string;
+  created_at?: string;
+}
+
+export interface HubTeamConflictState {
+  conflict_id: string;
+  path: string;
+  status: string;
+  agent_task_ids?: string[];
+  team_task_ids?: string[];
+  assignment_ids?: string[];
+  member_ids?: string[];
+  edge_run_ids?: string[];
+  actions?: string[];
+  first_seen_at?: string;
+  last_seen_at?: string;
+  resolution?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  reason?: string;
+  selected_agent_task_id?: string;
+}
+
+export interface HubTeamRunEventState {
+  agent_task_id: string;
+  edge_run_id?: string;
+  event_seq: number;
+  event_type: string;
+  payload?: string;
+  created_at?: string;
+}
+
+export interface HubTeamBudget {
+  total_tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  token_limit?: number;
+  remaining_tokens?: number;
+  usage_percent?: number;
+  run_count?: number;
+  context_warnings?: number;
+  compactions?: number;
+}
+
+export interface HubTeamRunState {
+  run_id: string;
+  team_id: string;
+  status: string;
+  members?: HubTeamMemberState[];
+  tasks?: HubTeamTaskState[];
+  dependencies?: Array<Record<string, unknown>>;
+  assignments?: HubTeamAssignmentState[];
+  approvals?: HubTeamApprovalState[];
+  artifacts?: HubTeamArtifactState[];
+  conflicts?: HubTeamConflictState[];
+  run_events?: HubTeamRunEventState[];
+  route_log?: HubCoordinatorRouteDecision[];
+  budget?: HubTeamBudget;
+  terminal_reason?: string;
+}
+
+export interface HubTeamApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export interface HubTeamConflictResolutionRequest {
+  resolution: string;
+  path?: string;
+  selected_agent_task_id?: string;
+  reason?: string;
+}
+
+export interface HubCreateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface HubUpdateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface HubAddAgentTeamMemberRequest {
+  agent_profile_id: string;
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+}
+
+export interface HubStartAgentTeamRunRequest {
+  trigger_message: string;
+  target_id?: string;
+}
+
+export interface HubAttachmentRef {
+  id: string;
+  hash: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
+export interface HubProbeAttachmentResponse {
+  exists: boolean;
+  attachment?: HubAttachmentRef;
+}
+
+export interface HubAgentProfile {
+  id: string;
+  owner_id?: string;
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  model_mapping?: string;
+  skills?: string;
+  mcp_servers?: string;
+  tool_allowlist?: string;
+  memory_policy?: string;
+  approval_policy?: string;
+  permission_mode?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+  is_public?: boolean;
+  install_count?: number;
+  rating_avg?: number;
+  rating_count?: number;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubAgentProfileListResponse {
+  items: HubAgentProfile[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface HubCreateAgentProfileRequest {
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  permission_mode?: string;
+  skills?: string;
+  mcp_servers?: string;
+  tool_allowlist?: string;
+  approval_policy?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+}
+
+export type HubUpdateAgentProfileRequest = Partial<HubCreateAgentProfileRequest>;
+
+// ── Hub workspace projects ──────────────────
+
+// Compatibility aliases (desktop/web historical names)
+export type AgentRunEventSummary = HubAgentRunEventSummary;
+export type AgentRunEvent = HubAgentRunEvent;
+export type CoordinatorRouteDecision = HubCoordinatorRouteDecision;
+export type AgentTeam = HubAgentTeam;
+export type AgentTeamMember = HubAgentTeamMember;
+export type AgentTeamDetail = HubAgentTeamDetail;
+export type AgentTeamRun = HubAgentTeamRun;
+export type AgentTeamAssignment = HubAgentTeamAssignment;
+export type AgentTeamTask = HubAgentTeamTask;
+export type AgentTeamEvent = HubAgentTeamEvent;
+export type TeamMemberState = HubTeamMemberState;
+export type TeamTaskState = HubTeamTaskState;
+export type TeamAssignmentState = HubTeamAssignmentState;
+export type TeamApprovalState = HubTeamApprovalState;
+export type TeamArtifactState = HubTeamArtifactState;
+export type TeamConflictState = HubTeamConflictState;
+export type TeamRunEventState = HubTeamRunEventState;
+export type TeamBudget = HubTeamBudget;
+export type TeamRunState = HubTeamRunState;
+export type TeamApprovalDecisionRequest = HubTeamApprovalDecisionRequest;
+export type TeamConflictResolutionRequest = HubTeamConflictResolutionRequest;
+export type CreateAgentTeamRequest = HubCreateAgentTeamRequest;
+export type UpdateAgentTeamRequest = HubUpdateAgentTeamRequest;
+export type AddAgentTeamMemberRequest = HubAddAgentTeamMemberRequest;
+export type StartAgentTeamRunRequest = HubStartAgentTeamRunRequest;
+export type AttachmentRef = HubAttachmentRef;
+export type ProbeAttachmentResponse = HubProbeAttachmentResponse;
+export type AgentProfile = HubAgentProfile;
+export type AgentProfileListResponse = HubAgentProfileListResponse;
+export type CreateAgentProfileRequest = HubCreateAgentProfileRequest;
+export type UpdateAgentProfileRequest = HubUpdateAgentProfileRequest;
+
+
+// ── T3.3 desktop-only remainder (documents + stream event options) ──
+export interface HubDocumentListItem {
+  id: string;
+  owner_id: string;
+  project_id?: string;
+  title: string;
+  type: string;
+  source: string;
+  source_ref?: string;
+  tag?: string;
+  location: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubDocumentListResponse {
+  items: HubDocumentListItem[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface HubCreateDocumentRequest {
+  title: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
+export interface HubUpdateDocumentRequest {
+  title?: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  status?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
+export interface HubDocument {
+  id: string;
+  owner_id: string;
+  project_id?: string;
+  title: string;
+  type: string;
+  source: 'user' | 'artifact' | 'upload' | 'external' | string;
+  source_ref?: string;
+  tag?: string;
+  location: string;
+  status: 'active' | 'archived' | 'deleted' | string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubAgentTaskStreamEventOptions {
+  runId?: string;
+  clientMsgId?: string;
+}
+
+export type CreateHubDocumentRequest = HubCreateDocumentRequest;
+export type UpdateHubDocumentRequest = HubUpdateDocumentRequest;
+export type AgentTaskStreamEventOptions = HubAgentTaskStreamEventOptions;
+
+
+// ── T3.4 web-only task approval/artifact types ──
+export interface HubAgentTaskApproval {
+  approval_id: string;
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status?: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface HubAgentTaskApprovalList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  approvals: HubAgentTaskApproval[];
+  pending?: HubAgentTaskApproval[];
+  decided?: HubAgentTaskApproval[];
+  last_event_seq?: number;
+}
+
+export interface HubAgentTaskArtifact {
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path?: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  artifact_id?: string;
+  name?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  diff?: string;
+  patch?: string;
+  edit_id?: string;
+  review_status?: string;
+  can_apply?: boolean;
+  can_revert?: boolean;
+  type?: string;
+  kind?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface HubAgentTaskArtifactList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  artifacts: HubAgentTaskArtifact[];
+  last_event_seq?: number;
+}
+
+export interface HubTaskApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export type AgentTaskApproval = HubAgentTaskApproval;
+export type AgentTaskApprovalList = HubAgentTaskApprovalList;
+export type AgentTaskArtifact = HubAgentTaskArtifact;
+export type AgentTaskArtifactList = HubAgentTaskArtifactList;
+export type TaskApprovalDecisionRequest = HubTaskApprovalDecisionRequest;
+
+export interface HubAgentInstance {
+  id: string;
+  agent_type: string;
+  custom_agent_id?: string;
+  session_id: string;
+  inviter_user_id: string;
+  workspace_id?: string;
+  display_name: string;
+  created_at?: string;
+}
+
+export interface HubPendingAgentTask {
+  id: string;
+  agent_instance_id: string;
+  triggered_by_user_id: string;
+  trigger_message_id: string;
+  target_id?: string;
+  status: string;
+  edge_run_id?: string;
+  edge_device_id?: string;
+  error_message?: string;
+  created_at?: string;
+  dispatched_at?: string;
+  finished_at?: string;
+  expire_at?: string;
+}
+
+export type AgentInstance = HubAgentInstance;
+export type PendingAgentTask = HubPendingAgentTask;
 
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
@@ -994,6 +1599,39 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     throw fallbackError;
   }
+
+
+  async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
+    const token = opts.getToken?.();
+    const headers = new Headers();
+    // Let the runtime set multipart boundary; do not force JSON content-type.
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    const timeoutMs = opts.timeoutMs ?? 30_000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw await parseHubError(response);
+      }
+      if (response.status === 204) {
+        return undefined as T;
+      }
+      return unwrapHubResponse<T>(await readJson(response), response.status);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
 
   return {
     request,
@@ -1282,7 +1920,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       body: HubAddAgentToSessionRequest,
     ) =>
-      request<void>(
+      request<HubAgentInstance>(
         `/client/sessions/${encodeURIComponent(sessionId)}/agents`,
         {
           method: 'POST',
@@ -1308,8 +1946,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'POST',
       }),
 
-    listExecutionTargets: () =>
-      request<HubListResponse<HubExecutionTarget>>('/web/execution-targets'),
+    listExecutionTargets: async (params?: {
+      pageSize?: number;
+      pageCursor?: string;
+      target_type?: string;
+    }) => {
+      const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
+        `/web/execution-targets${qs(params ?? {})}`,
+      );
+      if (Array.isArray(data)) {
+        return { items: data, page: { hasMore: false } };
+      }
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        page: data.page ?? { hasMore: false },
+      };
+    },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>('/web/execution-targets', {
         method: 'POST',
@@ -1436,11 +2088,269 @@ export function createHubClient(opts: HubClientOptions = {}) {
           body: JSON.stringify(data),
         },
       ),
+
+    // ── T3.2 parity: team/settings/attachments/message extras (desktop∩web) ──
+    editMessage: (messageId: string, body: { content: string }) =>
+      request<HubMessage>(`/client/messages/${encodeURIComponent(messageId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+
+    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
+      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+      }),
+
+    removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
+      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+        method: 'DELETE',
+        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+      }),
+
+    listMessageReactions: (messageId: string, sessionId: string) =>
+      request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
+
+    getTaskRunEventSummary: (taskId: string) =>
+      request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events/summary`),
+
+    /** List all run events for a task (used for initial load / full replay). */
+    listTaskRunEvents: (taskId: string) =>
+      request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
+
+    /** Fetch task run events with event_seq strictly after the given value (for replay gap fill). */
+    listTaskRunEventsAfter: (taskId: string, afterSeq: number) =>
+      request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
+
+    createAgentTeam: (data: HubCreateAgentTeamRequest) =>
+      request<HubAgentTeam>('/web/agent-teams', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listAgentTeams: () =>
+      request<HubAgentTeam[]>('/web/agent-teams'),
+
+    getAgentTeam: (teamId: string) =>
+      request<HubAgentTeamDetail>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+
+    updateAgentTeam: (teamId: string, data: HubUpdateAgentTeamRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentTeam: (teamId: string) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' }),
+
+    addAgentTeamMember: (teamId: string, data: HubAddAgentTeamMemberRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    startTeamRun: (teamId: string, data: HubStartAgentTeamRunRequest) =>
+      request<HubAgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listTeamRuns: (teamId: string) =>
+      request<HubAgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
+
+    getTeamRun: (teamId: string, runId: string) =>
+      request<HubAgentTeamRun>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`,
+      ),
+
+    getTeamRunState: (teamId: string, runId: string) =>
+      request<HubTeamRunState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`,
+      ),
+
+    listTeamEvents: (teamId: string, runId: string) =>
+      request<HubAgentTeamEvent[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
+      ),
+
+    listTeamTasks: (teamId: string, runId: string) =>
+      request<HubAgentTeamTask[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`,
+      ),
+
+    decideTeamApproval: (
+      teamId: string,
+      runId: string,
+      approvalId: string,
+      decision: HubTeamApprovalDecisionRequest,
+    ) =>
+      request<HubTeamApprovalState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    resolveTeamConflict: (
+      teamId: string,
+      runId: string,
+      conflictId: string,
+      resolution: HubTeamConflictResolutionRequest,
+    ) =>
+      request<HubTeamConflictState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`,
+        {
+          method: 'POST',
+          body: JSON.stringify(resolution),
+        },
+      ),
+
+    listAgentProfiles: (params?: {
+      runtime_id?: string;
+      q?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubAgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
+
+    createAgentProfile: (data: HubCreateAgentProfileRequest) =>
+      request<HubAgentProfile>('/web/agent-profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateAgentProfile: (id: string, data: HubUpdateAgentProfileRequest) =>
+      request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentProfile: (id: string) =>
+      request<undefined>(`/web/agent-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    fetchSettings: () =>
+      request<Record<string, string>>('/client/settings'),
+
+    patchSettings: (values: Record<string, string>) =>
+      request<Record<string, string>>('/client/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ values }),
+      }),
+
+    /** Check if an attachment with the given SHA-256 hash already exists. */
+    probeAttachment: (hash: string) =>
+      request<HubProbeAttachmentResponse>('/client/attachments/probe', {
+        method: 'POST',
+        body: JSON.stringify({ hash }),
+      }),
+
+    /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
+    uploadAttachment: (file: File, hash: string) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('hash', hash);
+      formData.append('original_name', file.name);
+      return uploadMultipart<HubAttachmentRef>('/client/attachments', formData);
+    },
+
+    /** Get the download URL for an attachment (relative to Hub base). */
+    downloadAttachmentUrl: (attachmentId: string) =>
+      `${baseUrl}/client/attachments/${encodeURIComponent(attachmentId)}`,
+
+
+
+    // ── T3.3 desktop remainder methods ──
+    listDocuments: (params?: {
+      status?: string;
+      source?: string;
+      tag?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubDocumentListResponse>(`/web/documents${qs(params ?? {})}`),
+
+    getDocument: (id: string) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`),
+
+    createDocument: (data: HubCreateDocumentRequest) =>
+      request<HubDocument>('/web/documents', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateDocument: (id: string, data: HubUpdateDocumentRequest) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteDocument: (id: string) =>
+      request<undefined>(`/web/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    getAgentProfile: (id: string) =>
+      request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`),
+
+    removeAgentTeamMember: (teamId: string, memberId: string) =>
+      request<undefined>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+        { method: 'DELETE' },
+      ),
+
+    postTeamRouteDecision: (teamId: string, runId: string, decision: HubCoordinatorRouteDecision) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    streamTaskEvent: (
+      taskId: string,
+      eventType: string,
+      payload: unknown,
+      options: HubAgentTaskStreamEventOptions = {},
+    ) =>
+      request<undefined>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event_type: eventType,
+          payload,
+          ...(options.runId ? { run_id: options.runId } : {}),
+          ...(options.clientMsgId ? { client_msg_id: options.clientMsgId } : {}),
+        }),
+      }),
+
+
+    // ── T3.4 web task approvals/artifacts ──
+    listTaskApprovals: (taskId: string) =>
+      request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+
+    decideTaskApproval: (taskId: string, approvalId: string, decision: HubTaskApprovalDecisionRequest) =>
+      request<HubAgentTaskApproval>(
+        `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    listTaskArtifacts: (taskId: string) =>
+      request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
+
   };
 }
 
 export type HubClient = ReturnType<typeof createHubClient>;
+export type EmptyHubResponse = undefined;
 
+// ---------------------------------------------------------------------------
+// Compatibility aliases (desktop/web historical names → shared Hub* types)
+// Slice1 (#430): align names without moving method implementations yet.
+// Prefer Hub* names in new shared code; aliases exist so surface forks can
+// re-export shared types without a big-bang rename.
+// ---------------------------------------------------------------------------
 export type RegisterRequest = HubRegisterRequest;
 export type LoginRequest = HubLoginRequest;
 export type AuthResponse = HubAuthResponse;
@@ -1450,6 +2360,7 @@ export type ChangePasswordRequest = HubChangePasswordRequest;
 export type SearchResult = HubSearchResult;
 export type FriendRequestInfo = HubFriendRequest;
 export type ContactInfo = HubContactInfo;
+/** @deprecated Prefer HubContactInfo / relationship fields; kept for desktop/web parity. */
 export interface Contact {
   id: string;
   user_id: string;
@@ -1459,7 +2370,9 @@ export interface Contact {
   friend?: UserProfile;
   created_at?: string;
 }
+/** Alias: desktop/web historically used Session; shared canonical type is HubSession. */
 export type Session = HubSession;
+export type HubSessionAlias = HubSession;
 export type SessionMember = HubSessionMember;
 export type CreatePrivateSessionRequest = HubCreatePrivateSessionRequest;
 export type CreateGroupSessionRequest = HubCreateGroupSessionRequest;
@@ -1467,10 +2380,53 @@ export type SendMessageRequest = HubSendMessageRequest;
 export type SendMessageResponse = HubSendMessageResponse;
 export type ReplyToInfo = HubReplyToInfo;
 export type MessageResponse = HubMessage;
+export type MessageAttachment = HubMessageAttachment;
 export type RegisterDeviceRequest = HubRegisterDeviceRequest;
 export type Device = HubDevice;
 export type AddAgentToSessionRequest = HubAddAgentToSessionRequest;
 export type CustomAgentRequest = HubCustomAgentRequest;
+export type CustomAgent = HubCustomAgent;
+export type Notification = HubNotification;
+export type ExecutionTarget = HubExecutionTarget;
+export type ExecutionTargetType = HubExecutionTargetType;
+export type ExecutionTargetRequest = HubExecutionTargetRequest;
+export type ExecutionTargetListResponse = HubExecutionTargetListResponse;
+export type WorkspaceProject = HubWorkspaceProject;
+export type WorkspaceProjectListResponse = HubWorkspaceProjectListResponse;
+export type CreateWorkspaceProjectRequest = HubCreateWorkspaceProjectRequest;
+export type UpdateWorkspaceProjectRequest = HubUpdateWorkspaceProjectRequest;
+export type WorkspaceProjectThread = HubWorkspaceProjectThread;
+export type CreateWorkspaceProjectThreadRequest = HubCreateWorkspaceProjectThreadRequest;
+export type SendWorkspaceProjectThreadMessageRequest = HubSendWorkspaceProjectThreadMessageRequest;
+export type WorkspaceProjectThreadMessage = HubWorkspaceProjectThreadMessage;
+export type AgentTask = HubAgentTask;
+export type TriggerAgentTaskOptions = HubTriggerAgentTaskOptions;
+export type OIDCAuthorizeRequest = HubOidcAuthorizeRequest;
+export type OIDCAuthorizeResponse = HubOidcAuthorizeResponse;
+export type OIDCCallbackRequest = HubOidcCallbackRequest;
+export type OIDCCallbackResponse = HubOidcCallbackResponse;
+export type Skill = HubSkill;
+export type MCPServer = HubMCPServer;
+
+/**
+ * Method groups still owned by desktop/web forks (not yet on shared createHubClient).
+ * Tracked for T3.2 method parity — do not implement ad-hoc only on one surface.
+ * @see docs/analysis/hubclient-ssot-slice1.md
+ */
+export const HUBCLIENT_SSOT_GAPS = {
+  /** Present on both desktop and web, missing from shared createHubClient return. */
+  desktopAndWebNotShared: [
+    // T3.2 landed these on shared createHubClient
+  ],
+  /** Desktop-only relative to web (keep desktop-local until product decision). */
+  desktopOnly: [
+    // create/updateExecutionTarget request-shape differences may remain surface-local
+  ],
+  /** Web-only relative to desktop. */
+  webOnly: [
+    // T3.4 landed task approvals/artifacts on shared
+  ],
+} as const;
 
 function isRouteFallbackError(error: unknown): boolean {
   return error instanceof AppError && (error.status === 404 || error.status === 405);
