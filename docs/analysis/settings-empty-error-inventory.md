@@ -1,8 +1,8 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479
-> status: inventory + trivial consistency fixes + settings load/error UX landed
+> issue: #470 / residual #479 / #492
+> status: inventory + settings load/error UX + Agents EmptyState (#492)
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -83,7 +83,7 @@ but no longer remain silent in the Settings product surface.
 
 | Path | Pattern |
 |---|---|
-| `pages/AgentsPage.tsx` | ad-hoc `agent-empty-state` / `role="alert"` (not `EmptyState`) |
+| `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors still ad-hoc `agent-inline-state` |
 | `pages/TasksPage.tsx` | ad-hoc `emptyState` + optional `emptyStateLabel` |
 | `pages/ContactsPage.tsx` | ad-hoc `emptyState` + search loading text |
 | `pages/ProjectsPage.tsx` | loading caption / error alert / editor error |
@@ -131,6 +131,21 @@ but no longer remain silent in the Settings product surface.
 - Stop hardcoding Desktop demo `spaceTitle` / `spaceMeta` for Web mounts.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
+
+
+## 9.1 Residual after Agents EmptyState (#492)
+
+| Surface | After #492 | Next |
+|---|---|---|
+| Agents installed empty | shared `EmptyState` + compact overrides | — |
+| Agents skill/MCP market empty | shared `EmptyState` + compact overrides | — |
+| Agents load/action error | still `agent-inline-state` | later `StatusNotice` / `RecoveryPanel` |
+| TasksPage | ad-hoc `emptyState` + `emptyStateLabel` | follow-up |
+| ContactsPage | ad-hoc `emptyState` | follow-up |
+| ProjectsPage | loading/error captions | follow-up (not pure empty) |
+| DocsPage | no EmptyState usage found in this inventory | verify when touching Docs |
+| Settings StatesPane previews | custom `StatePanel` | separate design-system task |
+| Shell lists | already `EmptyState` | done |
 
 ## 10. Evidence
 
