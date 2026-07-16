@@ -233,13 +233,14 @@ function buildLocalEdgeTargetPayload(
     trust_level: 'local',
     auth_method: 'hub_jwt',
     workspace_allowlist: [],
+    // Product SSOT for Local Edge readiness is Runtime inventory + Execution Target health.
+    // Do not publish Edge runner diagnostics as Hub target capability inventory.
     capabilities: {
       route: localEdgeTarget.route,
-      runner_count: localEdgeTarget.runnerCount,
-      online_runner_count: localEdgeTarget.onlineRunnerCount,
       agent_count: localEdgeTarget.agentCount,
       model_count: localEdgeTarget.modelCount,
       capability_ids: localEdgeTarget.capabilityIds,
+      runtime_inventory: 'agents-models',
     },
     metadata: {
       source: 'agenthub-desktop',

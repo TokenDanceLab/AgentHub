@@ -45,7 +45,7 @@
 | ID | 状态 | 风险 | 下一步 |
 |---|---|---|---|
 | AH-SR-043 | Mitigated in repo (web + shared gates; residual desktop seeds) | Web composer demo success 仅允许显式 `mock`/`fixture` + shell `demoRuntimeFallback`；共享 `allowsWorkbenchDemoRuntimeMutation` fail-closed，`auto`/`observed`/`approved-real` 不静默假成功；mutation path inventory + unit tests。Desktop 仍有 demo seed conversations / isDemo fallback（非本 issue 主范围）。 | 可选：Desktop seed 去默认 + live Hub mutation E2E 证据。 |
-| AH-SR-044 | Open | Runner compatibility health 仍进入 Desktop/Web settings/workbench，和 Runtime adapter + Execution Target 模型不一致。 | 用 Runtime inventory + Execution Target health 替代 runner-centric UI 假设。 |
+| AH-SR-044 | Mitigated in repo (#465) | Desktop/Web product health 不再把 Edge runners 当 inventory SSOT；Local Edge status 由 health + agents/models 推导，Hub sync 发布 agent/model capability；`/v1/runners` 与 `health.checks.runners` 保留为 diagnostics。 | 可选：settings UI 若仍插值旧 runner 文案键则清理；live Desktop/Web 健康面板截图证据。 |
 | AH-SR-013 | Local-only | 本机未跟踪 `.env` 可能包含 secret-looking 值。 | 保持 `.env` ignored；不要 zip/paste/force-add；必要时本机轮换。 |
 
 ## Dependency Watch
