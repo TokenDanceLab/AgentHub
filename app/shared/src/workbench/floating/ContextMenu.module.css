@@ -8,7 +8,7 @@
   position: fixed;
   z-index: var(--z-context-menu);
   width: 244px;
-  padding: 6px;
+  padding: var(--sp-xxs);
   border: 1px solid var(--bdr-strong);
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
@@ -31,7 +31,7 @@
 .title {
   padding: 7px 8px 8px;
   border-bottom: 1px solid var(--bdr);
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-xs);
 }
 
 .title span {
@@ -45,13 +45,13 @@
 
 .title small {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
   color: var(--text-3);
   font: 500 0.625rem var(--font-sans);
 }
 
 .group {
-  padding: 4px 0;
+  padding: var(--sp-xs) 0;
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -70,7 +70,7 @@
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   text-align: left;
   font: 500 0.8125rem var(--font-sans);
   cursor: pointer;

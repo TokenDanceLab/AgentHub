@@ -26,7 +26,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   background: var(--surface);
 }
 
@@ -45,8 +45,8 @@
   max-width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
   border-radius: var(--r-sm);
   background: var(--surface-low);
   border: 1px solid var(--bdr);
@@ -54,7 +54,7 @@
 
 .modeTab {
   height: 22px;
-  padding: 0 6px;
+  padding: 0 var(--sp-xxs);
   border: 0;
   border-radius: calc(var(--r-sm) - 1px);
   background: transparent;
@@ -122,7 +122,7 @@
   width: 212px;
   max-height: 284px;
   overflow-y: auto;
-  padding: 6px;
+  padding: var(--sp-xxs);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 94%, var(--surface-low) 6%);
@@ -137,7 +137,7 @@
 .openWithMenu button {
   width: 100%;
   min-height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--sp-sm);
   border: 0;
   border-radius: var(--r-sm);
   display: flex;
@@ -283,7 +283,7 @@
 /* ── Meta bar (workspace, encoding, lines) ── */
 .meta {
   min-height: 22px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border-bottom: 1px solid var(--bdr);
   display: flex;
   align-items: center;
@@ -306,7 +306,7 @@
   content: '';
   width: 4px;
   height: 4px;
-  margin-right: 8px;
+  margin-right: var(--sp-sm);
   border-radius: var(--r-full);
   background: var(--bdr-strong);
   display: inline-block;
@@ -335,7 +335,7 @@
 .codeInner {
   display: block;
   min-width: max-content;
-  padding: 8px 0;
+  padding: var(--sp-sm) 0;
 }
 
 /* ── Single code line (grid: line-number | content) ── */
@@ -351,7 +351,7 @@
 
 /* ── Line number ── */
 .lineNum {
-  padding-right: 8px;
+  padding-right: var(--sp-sm);
   color: var(--text-3);
   text-align: right;
   font-style: normal;
@@ -361,7 +361,7 @@
 
 /* ── Line content ── */
 .lineContent {
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   font-weight: 400;
   white-space: pre;
 }
@@ -424,7 +424,7 @@
 }
 
 .markdownPreview h1 {
-  margin: 0 0 10px;
+  margin: 0 0 var(--sp-10);
   color: var(--text-1);
   font: 700 1.125rem/1.2 var(--font-sans);
 }
@@ -436,19 +436,19 @@
 }
 
 .markdownPreview p {
-  margin: 0 0 6px;
+  margin: 0 0 var(--sp-xxs);
   color: var(--text-2);
 }
 
 .markdownListItem {
   position: relative;
-  padding-left: 16px;
+  padding-left: var(--sp-md);
 }
 
 .markdownListItem::before {
   content: '';
   position: absolute;
-  left: 2px;
+  left: var(--sp-2);
   top: 0.72em;
   width: 4px;
   height: 4px;
@@ -499,7 +499,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--sp-lg);
   overflow: auto;
   min-height: 0;
 }
@@ -508,7 +508,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   color: var(--text-3);
   font: 400 0.75rem var(--font-sans);
   text-align: center;

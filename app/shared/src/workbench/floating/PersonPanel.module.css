@@ -48,7 +48,7 @@
 }
 
 .status {
-  margin-top: 10px;
+  margin-top: var(--sp-10);
   height: 24px;
   padding: 0 9px;
   display: inline-flex;
@@ -97,7 +97,7 @@
 .projects {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .projects span {

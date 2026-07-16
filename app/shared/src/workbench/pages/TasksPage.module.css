@@ -8,7 +8,7 @@
 /* ── Left nav (310px) ── */
 .nav {
   composes: wbNav from './workbench-page-shared.module.css';
-  padding: 24px 12px 14px;
+  padding: var(--sp-lg) var(--space-md) var(--sp-14);
   position: relative;
 }
 
@@ -16,8 +16,8 @@
 
 .navMore {
   position: absolute;
-  top: 24px;
-  right: 14px;
+  top: var(--sp-lg);
+  right: var(--sp-14);
   width: 30px;
   height: 30px;
   border: 0;
@@ -55,7 +55,7 @@
 
 .navMenu {
   margin: -8px 4px 10px;
-  padding: 6px;
+  padding: var(--sp-xxs);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -71,8 +71,8 @@
   color: var(--text-2);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: var(--sp-sm);
+  padding: 0 var(--sp-sm);
   text-align: left;
   font: 500 0.75rem var(--font-sans);
   cursor: pointer;
@@ -87,15 +87,15 @@
 .navRow {
   width: 100%;
   min-height: 42px;
-  padding: 0 12px;
-  margin: 2px 0;
+  padding: 0 var(--space-md);
+  margin: var(--sp-2) 0;
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   text-align: left;
   font: 500 0.9375rem var(--font-sans);
   cursor: pointer;
@@ -158,7 +158,7 @@
 
 .navDivider {
   height: 1px;
-  margin: 12px 12px;
+  margin: var(--space-md) var(--space-md);
   background: var(--bdr);
 }
 
@@ -183,13 +183,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-md);
 }
 
 .headTitle {
   font: 600 1.375rem/1.2 var(--font-sans);
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-xxs);
 }
 
 .headSubcopy {
@@ -202,7 +202,7 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: var(--sp-sm);
   min-width: 0;
 }
 
@@ -277,13 +277,13 @@
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 160px));
-  gap: 10px;
+  gap: var(--sp-10);
   margin-bottom: 18px;
 }
 
 .stat {
   min-height: 64px;
-  padding: 12px 14px;
+  padding: var(--space-md) var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -303,7 +303,7 @@
   display: block;
   color: var(--text-3);
   font: 500 0.75rem var(--font-sans);
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-xxs);
 }
 
 .statValue {
@@ -319,7 +319,7 @@
   flex-wrap: nowrap;
   gap: 22px;
   border-bottom: 1px solid var(--bdr);
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-10);
   min-width: 0;
   overflow: hidden;
 }
@@ -357,8 +357,8 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-sm);
   overflow: auto hidden;
   scrollbar-width: none;
 }
@@ -371,14 +371,14 @@
   flex: 0 0 auto;
   max-width: 168px;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   font: 500 0.75rem var(--font-sans);
   white-space: nowrap;
   overflow: hidden;
@@ -444,7 +444,7 @@
   color: var(--text-2);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   font: 500 0.75rem var(--font-sans);
 }
 
@@ -458,7 +458,7 @@
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   color: var(--text-1);
 }
 
@@ -498,7 +498,7 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .selectionFeedback {
@@ -554,7 +554,7 @@
     minmax(92px, 0.62fr)
     minmax(92px, 0.62fr);
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-14);
   min-height: 46px;
   border-bottom: 1px solid var(--bdr);
   color: var(--text-3);
@@ -582,7 +582,7 @@
   min-height: 38px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   color: var(--text-2);
   border-bottom: 1px solid var(--bdr);
   font: 600 0.8125rem var(--font-sans);
@@ -602,7 +602,7 @@
   min-height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   border-bottom: 1px solid var(--bdr);
   color: var(--text-2);
   background: var(--surface-low);
@@ -627,7 +627,7 @@
     minmax(92px, 0.62fr)
     minmax(92px, 0.62fr);
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-14);
   min-height: 46px;
   border-left: 0;
   border-right: 0;
@@ -687,7 +687,7 @@
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text-1);
-  padding: 0 8px;
+  padding: 0 var(--sp-sm);
   font: 500 0.75rem var(--font-sans);
   outline: none;
 }
@@ -701,7 +701,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .editActions button {
@@ -724,14 +724,14 @@
 .tableFiveColumns .editActions {
   grid-column: 1 / -1;
   justify-content: flex-start;
-  padding-bottom: 8px;
+  padding-bottom: var(--sp-sm);
 }
 
 .profileCell {
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   color: var(--text-2);
 }
 
@@ -798,7 +798,7 @@
 }
 
 .nameBadge {
-  margin-left: 2px;
+  margin-left: var(--sp-2);
   padding: 1px 6px;
   border-radius: var(--r-xs);
   background: var(--surface-high);
@@ -818,7 +818,7 @@
   color: var(--text-3);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   padding: 0;
   font: 500 0.8125rem var(--font-sans);
   cursor: pointer;
