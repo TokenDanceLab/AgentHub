@@ -59,23 +59,21 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--glass-input-bg);
   color: var(--primary);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.74),
-    0 16px 38px rgba(15, 23, 42, 0.08);
+    inset 0 1px 0 var(--glass-input-bg-hover),
+    0 16px 38px var(--glass-bg-strong);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
 }
 
 [data-theme='dark'] .brandMark {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(42, 42, 52, 0.54);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 44px rgba(0, 0, 0, 0.2);
+  border-color: transparent;
+  background: var(--glass-panel);
+  box-shadow: 0 18px 44px var(--glass-shadow);
 }
 
 .header span {
@@ -99,22 +97,20 @@
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.48);
+  background: var(--glass-input-bg);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 22px 58px rgba(15, 23, 42, 0.08);
+    inset 0 1px 0 var(--glass-input-bg-hover),
+    0 22px 58px var(--glass-bg-strong);
   backdrop-filter: blur(28px) saturate(1.22);
   -webkit-backdrop-filter: blur(28px) saturate(1.22);
 }
 
 [data-theme='dark'] .launcher {
-  border-color: rgba(255, 255, 255, 0.085);
-  background: rgba(31, 31, 38, 0.56);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 24px 64px rgba(0, 0, 0, 0.26);
+  border-color: transparent;
+  background: var(--glass-panel);
+  box-shadow: 0 24px 64px var(--glass-shadow);
 }
 
 .dispatchPanel {
@@ -127,11 +123,11 @@
   gap: 6px;
   padding: 4px;
   border-radius: 13px;
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .modeRow {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .modePill {
@@ -153,14 +149,14 @@
 }
 
 .modePillActive {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass-input-bg-hover);
   color: var(--foreground);
-  box-shadow: 0 1px 10px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 10px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .modePillActive {
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-heavy);
+  box-shadow: inset 0 1px 0 var(--glass-bg-medium);
 }
 
 .runtimeList {
@@ -187,12 +183,12 @@
 
 .runtimeItem:hover,
 .runtimeItemActive {
-  background: rgba(255, 255, 255, 0.48);
+  background: var(--glass-input-bg);
 }
 
 [data-theme='dark'] .runtimeItem:hover,
 [data-theme='dark'] .runtimeItemActive {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 .runtimeItem:disabled {
@@ -207,13 +203,13 @@
   height: 34px;
   place-items: center;
   border-radius: 11px;
-  background: rgba(0, 0, 0, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 [data-theme='dark'] .runtimeIcon,
 [data-theme='dark'] .profileIcon {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 .runtimeText {
@@ -257,7 +253,7 @@
   min-width: 56px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 760;
@@ -265,32 +261,32 @@
 }
 
 .status_available {
-  background: rgba(52, 199, 89, 0.14);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
 .status_configuring {
-  background: rgba(255, 204, 0, 0.16);
+  background: var(--glass-tint-amber);
   color: var(--warning);
 }
 
 .status_unavailable {
-  background: rgba(255, 69, 58, 0.13);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
 }
 
 .emptyRuntime {
   min-height: 112px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--glass-border-subtle);
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.035);
+  background: var(--glass-bg-light);
   box-shadow: none;
 }
 
 [data-theme='dark'] .emptyRuntime {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-medium);
 }
 
 .emptyRuntimeContent {
@@ -302,11 +298,11 @@
   width: 34px;
   height: 34px;
   border-radius: 11px;
-  background: rgba(0, 0, 0, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='dark'] .emptyRuntimeIcon {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 .emptyRuntimeTitle {
@@ -354,11 +350,11 @@
   gap: 3px;
   padding: 8px 10px;
   border-radius: 11px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .metric {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 .metric em {
@@ -385,17 +381,17 @@
   height: 9px;
   border-radius: 999px;
   background: var(--muted-foreground);
-  box-shadow: 0 0 0 5px rgba(142, 142, 147, 0.1);
+  box-shadow: 0 0 0 5px var(--glass-bg-medium);
 }
 
 .targetDotOnline {
   background: var(--success);
-  box-shadow: 0 0 0 5px rgba(52, 199, 89, 0.14);
+  box-shadow: 0 0 0 5px var(--glass-tint-moss);
 }
 
 .targetDotOffline {
   background: var(--destructive);
-  box-shadow: 0 0 0 5px rgba(255, 69, 58, 0.13);
+  box-shadow: 0 0 0 5px var(--glass-tint-danger);
 }
 
 .commandBox {
@@ -404,22 +400,22 @@
   align-items: center;
   gap: 13px;
   padding: 0 18px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass-input-bg);
   color: var(--foreground);
   font: inherit;
   font-size: 15px;
   font-weight: 650;
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+  box-shadow: inset 0 1px 0 var(--glass-input-bg-hover);
 }
 
 [data-theme='dark'] .commandBox {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  border-color: transparent;
+  background: var(--glass-bg-medium);
+  box-shadow: inset 0 1px 0 var(--glass-bg-subtle);
 }
 
 .commandBox span {
@@ -443,9 +439,9 @@
   align-items: center;
   gap: 7px;
   padding: 0 11px;
-  border: 1px solid rgba(0, 0, 0, 0.055);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--glass-bg-light);
   color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 700;
@@ -453,8 +449,8 @@
 
 [data-theme='dark'] .controlRow span,
 [data-theme='dark'] .chip {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
+  background: var(--glass-bg-medium);
 }
 
 .suggestions {
@@ -485,7 +481,7 @@
   padding: 0 10px;
   border-radius: 8px;
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-weight: 620;
@@ -494,7 +490,7 @@
 }
 
 .chip:hover {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-hover);
   color: var(--foreground);
 }
 
