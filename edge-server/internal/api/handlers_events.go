@@ -35,6 +35,11 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Capture Hub JWT ownership scope before the long-lived WS loop.
+	// Local auth (empty userID) keeps full event stream access.
+	userID := hubUserFromRequest(r)
+	repo := ensureStore(h)
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Error("websocket upgrade failed", "error", err)
@@ -52,13 +57,16 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		defer h.Metrics.RecordWSDisconnect()
 	}
 
-	slog.Info("websocket connected", "cursor", cursor)
+	slog.Info("websocket connected", "cursor", cursor, "hubUser", userID != "")
 
 	subID, ch, replay := h.Bus.Subscribe(cursor)
 	defer h.Bus.Unsubscribe(subID)
 
-	// Send replayed events.
+	// Send replayed events, filtered by ownership under Hub JWT (AH-SR-045).
 	for _, evt := range replay {
+		if !eventVisibleToUser(repo, evt, userID) {
+			continue
+		}
 		if err := conn.WriteJSON(evt); err != nil {
 			slog.Info("websocket write error during replay", "error", err)
 			return
@@ -126,6 +134,9 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 					"event gap: dropped events detected, reconnect to resync")
 				_ = conn.WriteMessage(websocket.CloseMessage, closeMsg)
 				return
+			}
+			if !eventVisibleToUser(repo, evt, userID) {
+				continue
 			}
 			if err := conn.WriteJSON(evt); err != nil {
 				slog.Info("websocket write error", "error", err)

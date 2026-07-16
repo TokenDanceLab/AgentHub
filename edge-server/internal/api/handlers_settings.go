@@ -15,6 +15,11 @@ import (
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	// Settings are Edge-local shared config with no per-user owner binding.
+	// Hub JWT remote reads fail closed (AH-SR-045); local auth keeps full access.
+	if denyRemoteHubSharedConfig(w, r) {
+		return
+	}
 	settings := ensureStore(h).GetSettings()
 	writeSuccess(w, http.StatusOK, settings)
 }
