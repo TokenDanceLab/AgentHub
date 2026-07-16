@@ -66,9 +66,10 @@ export interface HubChangePasswordRequest {
 
 export interface HubOidcAuthorizeRequest {
   code_challenge: string;
-  code_challenge_method?: 'S256' | 'plain';
+  code_challenge_method?: 'S256' | 'plain' | string;
   device_type?: string;
   device_id?: string;
+  redirect_uri?: string;
 }
 
 export interface HubOidcAuthorizeResponse {
@@ -82,6 +83,7 @@ export interface HubOidcCallbackRequest {
   code_verifier: string;
   device_type?: string;
   device_id?: string;
+  redirect_uri?: string;
 }
 
 export interface HubOidcCallbackResponse extends HubAuthResponse {
@@ -475,8 +477,21 @@ export type HubExecutionTargetType =
 export interface HubExecutionTarget {
   id: string;
   name: string;
-  type: HubExecutionTargetType;
+  type?: HubExecutionTargetType;
+  target_type?: HubExecutionTargetType | string;
   status?: string;
+  endpoint?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: string;
+  health_state?: string;
+  is_online?: boolean;
+  device_id?: string;
+  owner_id?: string;
+  capabilities?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown> | string;
   config?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
@@ -485,8 +500,27 @@ export interface HubExecutionTarget {
 
 export interface HubExecutionTargetRequest {
   name: string;
-  type: HubExecutionTargetType;
+  type?: HubExecutionTargetType;
   config?: Record<string, unknown>;
+  // desktop-rich fields accepted and folded into config by callers/wrappers
+  target_type?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: string;
+  device_id?: string;
+  capabilities?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown> | string;
+  auth_method?: string;
+}
+
+export interface HubExecutionTargetListResponse {
+  items: HubExecutionTarget[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
 }
 
 export interface HubAuditEvent {
@@ -1241,6 +1275,80 @@ export type AgentProfileListResponse = HubAgentProfileListResponse;
 export type CreateAgentProfileRequest = HubCreateAgentProfileRequest;
 export type UpdateAgentProfileRequest = HubUpdateAgentProfileRequest;
 
+
+// ── T3.3 desktop-only remainder (documents + stream event options) ──
+export interface HubDocumentListItem {
+  id: string;
+  owner_id: string;
+  project_id?: string;
+  title: string;
+  type: string;
+  source: string;
+  source_ref?: string;
+  tag?: string;
+  location: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubDocumentListResponse {
+  items: HubDocumentListItem[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface HubCreateDocumentRequest {
+  title: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
+export interface HubUpdateDocumentRequest {
+  title?: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  status?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
+export interface HubDocument {
+  id: string;
+  owner_id: string;
+  project_id?: string;
+  title: string;
+  type: string;
+  source: 'user' | 'artifact' | 'upload' | 'external' | string;
+  source_ref?: string;
+  tag?: string;
+  location: string;
+  status: 'active' | 'archived' | 'deleted' | string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubAgentTaskStreamEventOptions {
+  runId?: string;
+  clientMsgId?: string;
+}
+
+export type CreateHubDocumentRequest = HubCreateDocumentRequest;
+export type UpdateHubDocumentRequest = HubUpdateDocumentRequest;
+export type AgentTaskStreamEventOptions = HubAgentTaskStreamEventOptions;
+
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
   const fetchImpl = opts.fetch;
@@ -1724,8 +1832,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'POST',
       }),
 
-    listExecutionTargets: () =>
-      request<HubListResponse<HubExecutionTarget>>('/web/execution-targets'),
+    listExecutionTargets: async (params?: { pageSize?: number; pageCursor?: string }) => {
+      const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
+        `/web/execution-targets${qs(params ?? {})}`,
+      );
+      if (Array.isArray(data)) {
+        return { items: data, page: { hasMore: false } };
+      }
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        page: data.page ?? { hasMore: false },
+      };
+    },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>('/web/execution-targets', {
         method: 'POST',
@@ -2023,6 +2141,69 @@ export function createHubClient(opts: HubClientOptions = {}) {
       `${baseUrl}/client/attachments/${encodeURIComponent(attachmentId)}`,
 
 
+
+    // ── T3.3 desktop remainder methods ──
+    listDocuments: (params?: {
+      status?: string;
+      source?: string;
+      tag?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubDocumentListResponse>(`/web/documents${qs(params ?? {})}`),
+
+    getDocument: (id: string) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`),
+
+    createDocument: (data: HubCreateDocumentRequest) =>
+      request<HubDocument>('/web/documents', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateDocument: (id: string, data: HubUpdateDocumentRequest) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteDocument: (id: string) =>
+      request<undefined>(`/web/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    getAgentProfile: (id: string) =>
+      request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`),
+
+    removeAgentTeamMember: (teamId: string, memberId: string) =>
+      request<undefined>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+        { method: 'DELETE' },
+      ),
+
+    postTeamRouteDecision: (teamId: string, runId: string, decision: HubCoordinatorRouteDecision) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    streamTaskEvent: (
+      taskId: string,
+      eventType: string,
+      payload: unknown,
+      options: HubAgentTaskStreamEventOptions = {},
+    ) =>
+      request<undefined>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event_type: eventType,
+          payload,
+          ...(options.runId ? { run_id: options.runId } : {}),
+          ...(options.clientMsgId ? { client_msg_id: options.clientMsgId } : {}),
+        }),
+      }),
+
   };
 }
 
@@ -2074,6 +2255,7 @@ export type Notification = HubNotification;
 export type ExecutionTarget = HubExecutionTarget;
 export type ExecutionTargetType = HubExecutionTargetType;
 export type ExecutionTargetRequest = HubExecutionTargetRequest;
+export type ExecutionTargetListResponse = HubExecutionTargetListResponse;
 export type WorkspaceProject = HubWorkspaceProject;
 export type WorkspaceProjectListResponse = HubWorkspaceProjectListResponse;
 export type CreateWorkspaceProjectRequest = HubCreateWorkspaceProjectRequest;
@@ -2103,17 +2285,7 @@ export const HUBCLIENT_SSOT_GAPS = {
   ],
   /** Desktop-only relative to web (keep desktop-local until product decision). */
   desktopOnly: [
-    'createDocument',
-    'createExecutionTarget',
-    'deleteDocument',
-    'getAgentProfile',
-    'getDocument',
-    'listDocuments',
-    'postTeamRouteDecision',
-    'removeAgentTeamMember',
-    'streamTaskEvent',
-    'updateDocument',
-    'updateExecutionTarget',
+    // create/updateExecutionTarget request-shape differences may remain surface-local
   ],
   /** Web-only relative to desktop. */
   webOnly: ['decideTaskApproval', 'listTaskApprovals', 'listTaskArtifacts'],
