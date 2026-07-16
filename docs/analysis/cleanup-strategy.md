@@ -4,7 +4,7 @@
 > program: **knowledge-first strangler cleanup** + **lightweight llmwiki as compiler only**
 > hard rule: **NO big-bang rewrite**
 
-本文是 cleanup-baseline 的程序决策。规则 SSOT 仍是 `AGENTS.md`；架构/API SSOT 仍是 `docs/architecture*` 与 `api/*`；生产 live SSOT 仍是 server `projects/agenthub/STATE.md`。**任务编号以 GitHub Issues #424–#440 为准（label `cleanup-baseline`）。**
+本文是 cleanup-baseline 的程序决策。规则 SSOT 仍是 `AGENTS.md`；架构/API SSOT 仍是 `docs/architecture*` 与 `api/*`；生产 live SSOT 仍是 server `projects/agenthub` external ops SSOT。**任务编号以 GitHub Issues #424–#440 为准（label `cleanup-baseline`）。**
 
 ---
 
@@ -379,6 +379,6 @@ Stop: when slice green; open next Phase item, do not expand scope
 | `docs/analysis/_raw_lane_results.json` | 五条 lane 原始结果 |
 | `AGENTS.md` | 规则 SSOT |
 | `docs/governance/security-risk-register.md` | 安全发布门禁 |
-| server `projects/agenthub/STATE.md` | 生产 LIVE SSOT |
+| server `projects/agenthub` external ops SSOT | 生产 LIVE SSOT |
 
 **Strategy one-liner：** 在 hk3 LIVE 前提下，用绞杀式增量清理 + 轻量 `wiki/` 编译知识层，先对齐叙事与安全半落地，再切 Edge/Hub 巨石与前端 hubClient 分叉，绝不 big-bang rewrite。

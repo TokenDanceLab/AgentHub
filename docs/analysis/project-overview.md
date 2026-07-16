@@ -145,7 +145,7 @@ shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
 | Mobile Expo Web | `app/mobile-rn` `:5177` | boundary |
 | REST | `api/openapi.yaml` | 运行时路径以 router 为准 |
 | WS | `api/events.md` | Edge envelope vs Hub flat frame |
-| 生产 live | server `projects/agenthub/STATE.md` | **hk3 LIVE** |
+| 生产 live | server `projects/agenthub` external ops SSOT | **hk3 LIVE** |
 | 本基线 | `docs/analysis/*` | overview / inventory / risk / strategy |
 
 ## Build & Run
