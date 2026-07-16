@@ -24,7 +24,9 @@ concurrency:
 env:
   GO_VERSION: "1.25"
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/agenthub-hub
+  # Image SSOT: ghcr.io/tokendancelab/agenthub-hub-server (see docs/analysis/image-name-ssot.md / #426).
+  # Do not reintroduce agenthub-hub as a second product image name.
+  IMAGE_NAME: tokendancelab/agenthub-hub-server
 
 jobs:
   # ── Gate: only proceed on Release success or manual dispatch ──
@@ -190,12 +192,12 @@ jobs:
       #   Prerequisites: SSH access to the production server.
       #   1. SSH into the production host.
       #   2. List available Docker images:
-      #        docker images ghcr.io/tokendancelab/agenthub-hub --format '{{.ID}} {{.Tag}} {{.CreatedAt}}'
+      #        docker images ghcr.io/tokendancelab/agenthub-hub-server --format '{{.ID}} {{.Tag}} {{.CreatedAt}}'
       #   3. Tag the last known-good image as rollback:
-      #        docker tag <safe-image-id> ghcr.io/tokendancelab/agenthub-hub:rollback
+      #        docker tag <safe-image-id> ghcr.io/tokendancelab/agenthub-hub-server:rollback
       #   4. Execute rollback via the deployment script:
       #        cd /path/to/hub-server/deployments
-      #        AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub:rollback ./deploy.sh rollback
+      #        AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub-server:rollback ./deploy.sh rollback
       #   5. Verify recovery:
       #        curl -s https://<hub-host>/health | jq .
       #        curl -sf https://<hub-host>/api/public/stats
@@ -205,7 +207,7 @@ jobs:
       #   1. SSH into the production host.
       #   2. cd /path/to/hub-server/deployments
       #   3. Set the image to the previous working tag:
-      #        export AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub:<previous-tag>
+      #        export AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub-server:<previous-tag>
       #   4. Recreate the container:
       #        docker compose -f docker-compose.prod.yml --env-file .env.production \
       #          up -d --no-build --no-deps --force-recreate hub-server
