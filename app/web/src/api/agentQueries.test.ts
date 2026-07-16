@@ -6,6 +6,7 @@ import {
   fetchAgentList,
   mapHubAgentProfileToAgentInfo,
 } from './agentQueries';
+import { getAuthorization } from './requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),
@@ -74,7 +75,7 @@ describe('web agent profile queries', () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('http://localhost:8080/web/agent-profiles?pageSize=50');
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer hub-access' });
+      expect(getAuthorization(init)).toBe('Bearer hub-access');
       return new Response(
         JSON.stringify({
           code: 'ok',

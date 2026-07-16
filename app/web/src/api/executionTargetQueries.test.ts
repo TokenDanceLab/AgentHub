@@ -5,6 +5,7 @@ import {
   summarizeExecutionTargets,
   type ExecutionTargetInventoryItem,
 } from './executionTargetQueries';
+import { getAuthorization } from './requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),
@@ -21,7 +22,7 @@ describe('web execution target queries', () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('http://localhost:8080/web/execution-targets?pageSize=50');
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer hub-access' });
+      expect(getAuthorization(init)).toBe('Bearer hub-access');
       return new Response(
         JSON.stringify({
           code: 'ok',

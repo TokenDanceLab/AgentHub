@@ -241,7 +241,7 @@ interface HubTokenResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  user: UserProfile;
+  user?: UserProfile | null;
 }
 
 async function exchangeCodeForToken(
@@ -271,7 +271,16 @@ async function exchangeCodeForToken(
     body.redirect_uri = redirectUri;
   }
 
-  return client.oidcCallback(body);
+  const resp = await client.oidcCallback(body);
+  const out: HubTokenResponse = {
+    access_token: resp.access_token,
+    refresh_token: resp.refresh_token,
+    expires_in: resp.expires_in,
+  };
+  if (resp.user) {
+    out.user = resp.user as UserProfile;
+  }
+  return out;
 }
 
 // ── Auth factory ──────────────────────────────────
@@ -499,7 +508,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         tokenResp.access_token,
         tokenResp.refresh_token,
         'tokendance',
-        tokenResp.user,
+        tokenResp.user ?? undefined,
       );
     },
 
@@ -552,7 +561,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
             tokenResp.access_token,
             tokenResp.refresh_token,
             'tokendance',
-            tokenResp.user,
+            tokenResp.user ?? undefined,
           );
           window.history.replaceState({}, document.title, '/');
           return true;

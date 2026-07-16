@@ -42,13 +42,27 @@ function DesktopHubTaskBridgeActive() {
     () => findRegisteredLocalEdgeTarget(hubTargets.data?.items ?? [], deviceRegistration.deviceId),
     [deviceRegistration.deviceId, hubTargets.data?.items],
   );
+  const registeredSnapshot = useMemo(
+    () =>
+      registeredLocalEdgeTarget
+        ? {
+            id: String(registeredLocalEdgeTarget.id ?? ''),
+            name: registeredLocalEdgeTarget.name,
+            device_id: registeredLocalEdgeTarget.device_id ?? null,
+            target_type: registeredLocalEdgeTarget.target_type,
+            health_state: registeredLocalEdgeTarget.health_state,
+            is_online: registeredLocalEdgeTarget.is_online,
+          }
+        : null,
+    [registeredLocalEdgeTarget],
+  );
   const dispatchReadiness = useMemo(
     () => resolveDesktopEdgeDispatchReadiness({
       hubSessionActive: true,
       deviceId: deviceReady ? deviceRegistration.deviceId : null,
       edgeOnline,
       localEdgeTarget,
-      registeredLocalEdgeTarget,
+      registeredLocalEdgeTarget: registeredSnapshot,
       hubTargetsLoading: hubTargets.isLoading,
       hubTargetsError: hubTargets.isError,
       hubTargetsPaginationLimited: hubTargets.data?.page.hasMore === true,
@@ -61,7 +75,7 @@ function DesktopHubTaskBridgeActive() {
       hubTargets.isError,
       hubTargets.isLoading,
       localEdgeTarget,
-      registeredLocalEdgeTarget,
+      registeredSnapshot,
     ],
   );
 
@@ -92,7 +106,7 @@ function DesktopHubTaskBridgeActive() {
     void syncLocalEdgeTarget.mutateAsync({
       deviceId: deviceRegistration.deviceId,
       localEdgeTarget,
-      ...(registeredLocalEdgeTarget ? { registeredTargetId: registeredLocalEdgeTarget.id } : {}),
+      ...(registeredLocalEdgeTarget?.id ? { registeredTargetId: String(registeredLocalEdgeTarget.id) } : {}),
     });
   }, [
     deviceReady,

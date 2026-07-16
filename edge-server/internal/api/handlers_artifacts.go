@@ -1,0 +1,115 @@
+package api
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/store"
+)
+
+// Handler holds dependencies for HTTP and WebSocket handlers.
+func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListArtifacts(runID)))
+}
+
+func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID string) {
+	artifactID = strings.TrimSpace(artifactID)
+	if artifactID == "" || strings.Contains(artifactID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+		return
+	}
+	if artifact, ok := ensureStore(h).GetArtifact(artifactID); ok {
+		writeSuccess(w, http.StatusOK, artifact)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+}
+
+func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
+}
+
+func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PreviewID string `json:"previewId"`
+		RunID     string `json:"runId"`
+		ThreadID  string `json:"threadId"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("runId is required")))
+		return
+	}
+	if strings.TrimSpace(req.PreviewID) == "" {
+		req.PreviewID = genID("preview_")
+	}
+
+	repository := ensureStore(h)
+	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
+		PreviewID: req.PreviewID,
+		RunID:     req.RunID,
+		ThreadID:  req.ThreadID,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, preview)
+}
+
+func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	if preview, ok := ensureStore(h).GetPreview(previewID); ok {
+		writeSuccess(w, http.StatusOK, preview)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+}
+
+func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	repository := ensureStore(h)
+	preview, ok := repository.GetPreview(previewID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	stopped, err := ensurePreviewRunner(h, repository).StopPreview(preview.ID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, stopped)
+}
+
+func runDiffFilesResponse(files []store.RunDiffFile) []map[string]any {
+	out := make([]map[string]any, 0, len(files))
+	for _, file := range files {
+		out = append(out, map[string]any{
+			"path":   file.Path,
+			"diff":   file.Diff,
+			"status": file.Status,
+		})
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/agents
+// ---------------------------------------------------------------------------
