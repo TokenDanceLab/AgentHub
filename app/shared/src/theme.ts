@@ -3,6 +3,18 @@ export type AgentHubThemeMode = AgentHubTheme | 'system';
 
 export const AGENTHUB_THEME_STORAGE_KEY = 'agenthub-v4-theme';
 
+// Preset registry / apply helpers — shared SSOT (see themePresets.ts + presets-base.css)
+export {
+  AGENTHUB_THEME_PRESET_STORAGE_KEY,
+  THEME_PRESETS,
+  THEME_PRESET_META,
+  applyAgentHubThemePreset,
+  getStoredAgentHubThemePreset,
+  isThemePreset,
+  persistAgentHubThemePreset,
+  type ThemePreset,
+} from './themePresets';
+
 const TRANSITION_SYNC_ATTR = 'data-theme-sync';
 let transitionSyncTimer: number | undefined;
 
