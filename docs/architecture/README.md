@@ -14,6 +14,7 @@
 | [04-frontend-data-flow.md](04-frontend-data-flow.md) | Platform adapter contract、source owner map、Transcript/chat flow、data mode |
 | [05-deployment.md](05-deployment.md) | 仓库内部署资产、开发端口、证据等级和生产边界 |
 | [06-auth-identity.md](06-auth-identity.md) | OIDC PKCE flow、JWT 签发、TokenDance ID 集成、设备注册 |
+| [07-design-system-ssot.md](07-design-system-ssot.md) | Design tokens / theme runtime / surface CSS ownership map |
 
 ## 约定
 
