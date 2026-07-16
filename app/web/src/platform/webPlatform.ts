@@ -233,6 +233,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
+        // AH-SR-043: demoRuntimeFallback must be explicitly enabled by App for mock/fixture only.
         const shouldUseDemoFallback = options.demoRuntimeFallback === true && !hasInjectedHubClient && !ensureAuth && (
           isWorkbenchFixtureDataMode(dataMode) ||
           (dataMode === 'auto' && !hasHubToken)
@@ -448,7 +449,18 @@ export function optimisticHubMessageFromIntent(
     content_type: contentType,
     content,
     created_at: createdAt,
-    ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author, content_type: 'text' } } : {}),
+    ...(intent.replyTo
+      ? {
+          reply_to: {
+            id: intent.replyTo.messageId,
+            sender_id: intent.replyTo.author,
+            content_type: 'text',
+            content: '',
+            recalled: false,
+            created_at: createdAt,
+          },
+        }
+      : {}),
     ...(attachmentRefs.length > 0
       ? {
           attachments: attachmentRefs.map((a) => ({

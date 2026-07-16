@@ -17,7 +17,11 @@ type CapabilityClaims struct {
 	UserID    string `json:"user_id"`
 	DeviceID  string `json:"device_id"`
 	ProjectID string `json:"project_id"`
-	Purpose   string `json:"purpose"` // e.g. "run-start"
+	Purpose   string `json:"purpose"` // e.g. "run-start" (action family)
+	// Optional fine-grained bindings (AH-SR-046). Empty means unbound / not enforced.
+	Action   string `json:"action,omitempty"`    // must equal purpose when set
+	TargetID string `json:"target_id,omitempty"` // execution target id
+	ThreadID string `json:"thread_id,omitempty"` // workspace/thread binding
 	jwt.RegisteredClaims
 }
 

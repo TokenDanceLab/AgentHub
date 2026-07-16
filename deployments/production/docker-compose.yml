@@ -54,7 +54,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Azure PG（复用 tokendance-pg，与其他 6 库统一）
+      # Azure PG（agenthub 库）。live 角色为 agenthub（见 server projects/agenthub/STATE.md）；
+      # 默认值 tdadmin 仅为本地/兼容占位，生产 .env 必须显式设置 PG_USER=agenthub。
       AGENTHUB_DB_HOST: ${PG_HOST:?请设置 PG_HOST}
       AGENTHUB_DB_PORT: "${PG_PORT:-5432}"
       AGENTHUB_DB_USER: ${PG_USER:-tdadmin}

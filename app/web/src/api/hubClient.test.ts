@@ -2,6 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@shared/errors';
 import { createHubClient } from './hubClient';
 
+
+function getHeader(init: RequestInit | undefined, name: string): string | null {
+  const headers = init?.headers;
+  if (!headers) return null;
+  if (headers instanceof Headers) return headers.get(name);
+  if (Array.isArray(headers)) {
+    const hit = headers.find(([key]) => key.toLowerCase() === name.toLowerCase());
+    return hit?.[1] ?? null;
+  }
+  const record = headers as Record<string, string>;
+  return record[name] ?? record[name.toLowerCase()] ?? null;
+}
+
+function getCallInit(calls: readonly unknown[][], index: number): RequestInit {
+  const call = calls[index];
+  expect(call).toBeDefined();
+  const init = call![1];
+  expect(init).toBeDefined();
+  return init as unknown as RequestInit;
+}
+
 describe('createHubClient', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -99,10 +120,9 @@ describe('createHubClient', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://hub.example.test/web/execution-targets?target_type=local_edge&pageCursor=cursor-1&pageSize=20',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
+      expect.any(Object),
     );
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
     expect(res.items[0]).toMatchObject({
       name: 'Workstation',
       target_type: 'local_edge',
@@ -125,12 +145,12 @@ describe('createHubClient', () => {
     await client.pingExecutionTarget('target/id');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/execution-targets/target%2Fid/ping',
+      'https://hub.example.test/web/execution-targets/target%2Fid:ping',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
       }),
     );
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
   });
 
   it('lists, creates, gets, and updates Hub workspace projects through the Web-owned route', async () => {
@@ -206,35 +226,21 @@ describe('createHubClient', () => {
     const detail = await client.getWorkspaceProject('project/id');
     const updated = await client.updateWorkspaceProject('project/id', { description: '' });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://hub.example.test/web/projects?q=AgentHub&pageCursor=cursor-1&pageSize=20',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://hub.example.test/web/projects',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ name: 'New Project', description: 'Created from Web' }),
-      }),
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://hub.example.test/web/projects');
+    expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
+      JSON.stringify({ name: 'New Project', description: 'Created from Web' }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      'https://hub.example.test/web/projects/project%2Fid',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
-      'https://hub.example.test/web/projects/project%2Fid',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ description: '' }),
-      }),
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://hub.example.test/web/projects/project%2Fid');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[3]?.[0]).toBe('https://hub.example.test/web/projects/project%2Fid');
+    expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('PATCH');
+    expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
+      JSON.stringify({ description: '' }),
     );
     expect(list.items[0]).toMatchObject({ name: 'AgentHub Demo', description: 'Competition workspace' });
     expect(created).toMatchObject({ name: 'New Project', description: 'Created from Web' });
@@ -346,38 +352,30 @@ describe('createHubClient', () => {
       content: JSON.stringify(a2aContent),
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://hub.example.test/web/projects/project%2Fid/threads',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
       'https://hub.example.test/web/projects/project%2Fid/threads',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ name: 'Follow-up Group' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
+      JSON.stringify({ name: 'Follow-up Group' }),
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
       'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          client_msg_id: 'client-message-2',
-          content_type: 'text',
-          content: JSON.stringify(a2aContent),
-        }),
+    );
+    expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
+      JSON.stringify({
+        client_msg_id: 'client-message-2',
+        content_type: 'text',
+        content: JSON.stringify(a2aContent),
       }),
     );
     expect(threads[0]).toMatchObject({ id: 'thread-1', name: 'Project Group', member_count: 3 });
@@ -517,27 +515,20 @@ describe('createHubClient', () => {
     const artifacts = await client.listTaskArtifacts('task/1');
     const decision = await client.decideTaskApproval('task/1', 'approval/1', { decision: 'allow' });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://hub.example.test/web/agent-tasks/task%2F1/approvals',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
       'https://hub.example.test/web/agent-tasks/task%2F1/artifacts',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 1), 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'https://hub.example.test/web/agent-tasks/task%2F1/approvals/approval%2F1/decide',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ decision: 'allow' }),
-      }),
+    );
+    expect(getCallInit(fetchMock.mock.calls, 2).method).toBe('POST');
+    expect(getCallInit(fetchMock.mock.calls, 2).body).toBe(
+      JSON.stringify({ decision: 'allow' }),
     );
     expect(approvals.approvals[0]).toMatchObject({ approval_id: 'approval-1', status: 'pending' });
     expect(artifacts.artifacts[0]).toMatchObject({

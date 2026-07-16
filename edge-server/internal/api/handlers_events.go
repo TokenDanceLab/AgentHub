@@ -1,0 +1,278 @@
+package api
+
+import (
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+
+	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/store"
+)
+
+// Handler holds dependencies for HTTP and WebSocket handlers.
+func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
+	// Parse cursor from query.
+	cursorStr := r.URL.Query().Get("cursor")
+	if cursorStr == "" {
+		cursorStr = r.URL.Query().Get("pageCursor")
+	}
+
+	var cursor int64
+	if cursorStr != "" {
+		if n, err := strconv.ParseInt(cursorStr, 10, 64); err == nil {
+			cursor = n
+		}
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("websocket upgrade failed", "error", err)
+		return
+	}
+	defer conn.Close()
+
+	// 2.3a: Limit maximum WebSocket frame read size to 64 KB for Edge
+	// connections.  Edge frames are command/control messages that are much
+	// smaller than Hub frames, so a tighter limit is appropriate.
+	conn.SetReadLimit(64 * 1024)
+
+	if h.Metrics != nil {
+		h.Metrics.RecordWSConnect()
+		defer h.Metrics.RecordWSDisconnect()
+	}
+
+	slog.Info("websocket connected", "cursor", cursor)
+
+	subID, ch, replay := h.Bus.Subscribe(cursor)
+	defer h.Bus.Unsubscribe(subID)
+
+	// Send replayed events.
+	for _, evt := range replay {
+		if err := conn.WriteJSON(evt); err != nil {
+			slog.Info("websocket write error during replay", "error", err)
+			return
+		}
+	}
+
+	// Heartbeat ticker: every 30 seconds.
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+
+	clientControl := make(chan map[string]any, 8)
+
+	// Read goroutine to detect close and handle pong timeout.
+	// When the read deadline expires (no pong within 60s), the connection
+	// is closed to force the write loop to exit.
+	done := make(chan struct{})
+	readDone := make(chan struct{})
+	defer close(done)
+	go func() {
+		defer close(readDone)
+		defer conn.Close()
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetPongHandler(func(string) error {
+			_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			if response, ok := websocketClientControlResponse(message); ok {
+				select {
+				case clientControl <- response:
+				case <-done:
+					return
+				}
+			}
+		}
+	}()
+
+	// Write loop: push events and heartbeats.
+	for {
+		select {
+		case <-readDone:
+			return
+		case response := <-clientControl:
+			if err := conn.WriteJSON(response); err != nil {
+				slog.Info("websocket control write error", "error", err)
+				return
+			}
+		case evt, ok := <-ch:
+			if !ok {
+				return
+			}
+			if evt.Type == events.GapEventType {
+				slog.Warn("event bus gap detected, closing websocket to force client resync",
+					"subscriber", subID)
+				closeMsg := websocket.FormatCloseMessage(CloseCodeEventGap,
+					"event gap: dropped events detected, reconnect to resync")
+				_ = conn.WriteMessage(websocket.CloseMessage, closeMsg)
+				return
+			}
+			if err := conn.WriteJSON(evt); err != nil {
+				slog.Info("websocket write error", "error", err)
+				return
+			}
+		case <-heartbeat.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				slog.Info("websocket heartbeat error", "error", err)
+				return
+			}
+		}
+	}
+}
+
+func websocketClientControlResponse(message []byte) (map[string]any, bool) {
+	var frame struct {
+		Type string `json:"type"`
+		Ts   any    `json:"ts,omitempty"`
+	}
+	if err := json.Unmarshal(message, &frame); err != nil || frame.Type != "ping" {
+		return nil, false
+	}
+	response := map[string]any{"type": "pong"}
+	if frame.Ts != nil {
+		response["ts"] = frame.Ts
+	}
+	return response, true
+}
+
+func runtimeSessionIDForThread(threadID string) string {
+	seed := sha1.Sum([]byte("agenthub-runtime-session:" + threadID))
+	session := make([]byte, 16)
+	copy(session, seed[:16])
+	session[6] = (session[6] & 0x0f) | 0x50
+	session[8] = (session[8] & 0x3f) | 0x80
+	return strings.Join([]string{
+		hex.EncodeToString(session[0:4]),
+		hex.EncodeToString(session[4:6]),
+		hex.EncodeToString(session[6:8]),
+		hex.EncodeToString(session[8:10]),
+		hex.EncodeToString(session[10:16]),
+	}, "-")
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// extractRunID extracts the run ID from paths like
+// "/v1/runs/{runId}:cancel" by stripping the prefix and suffix.
+func extractRunID(path, suffix string) string {
+	trimmed := strings.TrimPrefix(path, "/v1/runs/")
+	trimmed = strings.TrimSuffix(trimmed, suffix)
+	return trimmed
+}
+
+func decodeOptionalJSON(r *http.Request, dst any) error {
+	if r.Body == nil || r.Body == http.NoBody {
+		return nil
+	}
+	defer r.Body.Close()
+	if r.ContentLength == 0 {
+		return nil
+	}
+	// Limit request body to 1MB to prevent memory exhaustion.
+	// Use io.LimitReader instead of http.MaxBytesReader to avoid needing a ResponseWriter.
+	r.Body = io.NopCloser(io.LimitReader(r.Body, 1<<20))
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	return nil
+}
+
+func runToResponse(run store.Run) map[string]any {
+	return lifecycle.RunResponse(run)
+}
+
+func activeRunExistsResponse(run store.Run) map[string]any {
+	body := errcode.ErrorBody(errcode.ErrActiveRunExists)
+	body["runId"] = run.ID
+	body["projectId"] = run.ProjectID
+	body["threadId"] = run.ThreadID
+	body["status"] = run.Status
+	return body
+}
+
+func activeRunForThread(runs []store.Run) (store.Run, bool) {
+	for _, run := range runs {
+		if isActiveRunStatus(run.Status) {
+			return run, true
+		}
+	}
+	return store.Run{}, false
+}
+
+// threadHasAssistantHistory returns true when the thread contains at least one
+// message from the agent (role "agent"), indicating the adapter should resume
+// rather than start a fresh conversation.
+func threadHasAssistantHistory(repo store.Repository, threadID string) bool {
+	for _, item := range repo.ListThreadItems(threadID) {
+		if item.Role == "agent" {
+			return true
+		}
+	}
+	return false
+}
+
+func isActiveRunStatus(status string) bool {
+	switch status {
+	case "queued", "started", "cancelling":
+		return true
+	default:
+		return false
+	}
+}
+
+// validatePermissionMode returns an error if mode is not a recognised
+// Claude Code --permission-mode value. An empty mode is allowed and means
+// "use the adapter default".
+func validatePermissionMode(mode string) error {
+	if mode == "" {
+		return nil
+	}
+	// SEC-02: Reject 'bypassPermissions' — it disables ALL security hooks at
+	// the CLI level, giving the agent unrestricted shell access regardless
+	// of SecurityHook settings. Only the whitelist modes are allowed.
+	switch mode {
+	case "default", "acceptEdits", "plan", "dontAsk":
+		return nil
+	default:
+		return fmt.Errorf("unknown permission mode %q: valid values are default, acceptEdits, plan, dontAsk", mode)
+	}
+}
+
+func cleanupRuns(repository store.Repository) store.RunCleanupResult {
+	cleaner, ok := repository.(store.RunCleaner)
+	if !ok {
+		return store.RunCleanupResult{}
+	}
+	return cleaner.CleanupRuns(store.RunCleanupOptions{
+		TerminalTTL:              defaultRunCleanupTerminalTTL,
+		MaxTerminalRunsPerThread: defaultRunCleanupMaxTerminalRunsPerThread,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// POST /v1/permissions/decide  (Desktop permission gate)
+// ---------------------------------------------------------------------------

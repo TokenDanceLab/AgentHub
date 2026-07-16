@@ -1,14 +1,18 @@
 # ──────────────────────────────────────────────
-# AgentHub Hub Server — 生产部署配置 (production)
+# AgentHub Hub Server — HISTORICAL production-shaped template (NON-AUTHORITATIVE)
 # ──────────────────────────────────────────────
-# 与 AIhub 完全隔离：独立的 PostgreSQL + Redis 容器。
-# DB/Redis 端口不对外暴露，仅 Docker 内部网络访问。
+# ⚠ NOT the live production SSOT (2026-07-16).
+# Live facts: server projects/agenthub/STATE.md (hk3 LIVE).
+# In-repo production shape: deployments/production/docker-compose.yml
+#   (Azure PG role agenthub + redis; image agenthub-hub-server).
 #
-# 部署步骤（在生产服务器上执行）：
-#   1. 在开发机/CI 构建镜像并传输到服务器，服务器只执行 docker load
-#   2. 配置环境变量（必须设置 AGENTHUB_JWT_SECRET）
+# This file keeps an older standalone PG+Redis topology for reference only.
+# Do not recreate it as current production without an explicit ops decision.
+#
+# Historical deploy notes (obsolete topology):
+#   1. Build/load image on server
+#   2. Set AGENTHUB_JWT_SECRET and DB password env
 #   3. docker compose up -d --no-build
-#   4. 配置 nginx 反代：api.hub.vectorcontrol.tech → 127.0.0.1:8090
 # ──────────────────────────────────────────────
 
 services:

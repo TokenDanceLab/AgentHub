@@ -1,0 +1,175 @@
+package api
+
+import (
+	"log/slog"
+	"net/http"
+	"strings"
+
+	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/runnerctx"
+)
+
+// Handler holds dependencies for HTTP and WebSocket handlers.
+func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.AgentRegistry == nil {
+		writeSuccess(w, http.StatusOK, listResponse([]any{}))
+		return
+	}
+	statusFilter := r.URL.Query().Get("status")
+	parentFilter := r.URL.Query().Get("parentId")
+
+	var instances []agents.AgentInstance
+	switch {
+	case statusFilter != "":
+		instances = h.AgentRegistry.ListByStatus(agents.Status(statusFilter))
+	case parentFilter != "":
+		instances = h.AgentRegistry.ListByParent(parentFilter)
+	default:
+		instances = h.AgentRegistry.List()
+	}
+
+	writeSuccess(w, http.StatusOK, listResponse(instances))
+}
+
+// GetAgentInstance returns a single agent instance by ID.
+func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, instanceID string) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.AgentRegistry == nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentRegistryNotConfigured))
+		return
+	}
+	inst, ok := h.AgentRegistry.Get(instanceID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
+		return
+	}
+	writeSuccess(w, http.StatusOK, inst)
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/ccswitch/status
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetCCSwitchStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.CCSwitchStatus == nil {
+		writeSuccess(w, http.StatusOK, map[string]any{
+			"installed":     false,
+			"routingActive": false,
+		})
+		return
+	}
+	writeSuccess(w, http.StatusOK, h.CCSwitchStatus)
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/ccswitch/providers
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.CCSwitchReader == nil {
+		writeSuccess(w, http.StatusOK, listResponse([]any{}))
+		return
+	}
+
+	appType := r.URL.Query().Get("appType")
+	if appType == "" {
+		appType = "claude" // default to claude app type
+	}
+
+	providers, err := h.CCSwitchReader.ReadProviders(appType)
+	if err != nil {
+		slog.Warn("cc-switch: failed to read providers", "error", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to read cc-switch providers")))
+		return
+	}
+
+	writeSuccess(w, http.StatusOK, listResponse(providers))
+}
+
+// ---------------------------------------------------------------------------
+// GET/POST /v1/memory — read/write AgentHub memory files
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetMemory(w http.ResponseWriter, r *http.Request) {
+	workDir := r.URL.Query().Get("workDir")
+	threadID := r.URL.Query().Get("threadId")
+	agentID := r.URL.Query().Get("agentId")
+
+	if err := h.validateWorkDirAllowed(workDir); err != nil {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		return
+	}
+
+	result := runnerctx.ReadMemory(workDir, threadID, agentID)
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		WorkDir   string   `json:"workDir"`
+		ThreadID  string   `json:"threadId"`
+		AgentID   string   `json:"agentId"`
+		ID        string   `json:"id"`
+		Content   string   `json:"content"`
+		Source    string   `json:"source"`
+		Tags      []string `json:"tags"`
+		Overwrite bool     `json:"overwrite"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	if req.WorkDir == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("workDir is required")))
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("content is required")))
+		return
+	}
+	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		return
+	}
+	if req.ID == "" {
+		req.ID = genID("mem_")
+	}
+
+	entry, err := runnerctx.WriteMemoryEntry(runnerctx.MemoryWriteRequest{
+		WorkDir:  req.WorkDir,
+		ThreadID: req.ThreadID,
+		AgentID:  req.AgentID,
+		Entry: runnerctx.MemoryEntry{
+			ID:      req.ID,
+			Content: req.Content,
+			Source:  req.Source,
+			Tags:    req.Tags,
+		},
+		Overwrite: req.Overwrite,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
+		return
+	}
+	writeSuccess(w, http.StatusCreated, entry)
+}
+
+// ---------------------------------------------------------------------------
+// RegisterRoutes registers all routes on the given mux.
+// ---------------------------------------------------------------------------
