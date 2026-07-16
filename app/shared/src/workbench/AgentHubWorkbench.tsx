@@ -15,9 +15,8 @@ import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
-import { ConversationHost, type MainchainSummary } from './ConversationHost';
+import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
-import type { MainchainNode } from './WorkbenchShell';
 import {
   ContextMenu,
   MultiSelectBar,
@@ -28,33 +27,29 @@ import {
 } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
+import { buildMainchainSummary } from './mainchain';
 import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
-import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
-import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { createSettingsService, type SettingsService } from './settingsService';
+import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
+import {
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+} from './workbenchLayoutConstants';
 import styles from './AgentHubWorkbench.module.css';
 
-const INSPECTOR_MIN_WIDTH = 48;
-const INSPECTOR_MAX_WIDTH = 760;
-const INSPECTOR_DEFAULT_WIDTH = 400;
-const INSPECTOR_READABLE_WIDTH = 360;
-const INSPECTOR_COLLAPSE_SNAP_WIDTH = 96;
-const SIDEBAR_MIN_WIDTH = 180;
-const SIDEBAR_MAX_WIDTH = 360;
-const SIDEBAR_DEFAULT_WIDTH = 260;
-const SIDEBAR_COLLAPSE_SNAP_WIDTH = 96;
-const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
@@ -257,13 +252,29 @@ export function AgentHubWorkbench({
     : localConversationExists
       ? localConversationId
       : fallbackConversationId;
-  const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
-  const [inspectorResizing, setInspectorResizing] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarResizing, setSidebarResizing] = useState(false);
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
+  const isChatPage = activePage === 'chat';
+  const {
+    inspectorWidth,
+    inspectorCollapsed,
+    inspectorResizing,
+    sidebarWidth,
+    sidebarCollapsed,
+    sidebarResizing,
+    toggleInspector,
+    navigateRail,
+    beginInspectorResize,
+    beginSidebarResize,
+    resizeInspectorBy,
+    resizeSidebarBy,
+    openInspector,
+    shellStyle,
+  } = useWorkbenchPanelLayout({
+    activePage,
+    isChatPage,
+    platformSurface: platform.surface,
+    setActivePage,
+  });
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [contextMenu, setContextMenu] = useState<{
     blockId: string;
@@ -294,9 +305,6 @@ export function AgentHubWorkbench({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
-  const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
-  const sidebarShouldCollapseRef = useRef(false);
   const selectionModeRef = useRef(false);
   const selectionHoldRef = useRef<{
     blockId: string;
@@ -360,27 +368,7 @@ export function AgentHubWorkbench({
     selectionModeRef.current = selectionMode;
   }, [selectionMode]);
 
-  useEffect(() => {
-    inspectorWidthRef.current = inspectorWidth;
-  }, [inspectorWidth]);
-
-  useEffect(() => {
-    sidebarWidthRef.current = sidebarWidth;
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (platform.surface !== 'desktop' || activePage !== 'chat') return undefined;
-
-    function handleDesktopToggleSidebar(): void {
-      toggleSidebar();
-    }
-
-    window.addEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
-    return () => window.removeEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
-  }, [activePage, platform.surface, sidebarWidth]);
-
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
-  const isChatPage = activePage === 'chat';
   const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
     id: agent.id,
     label: agent.name,
@@ -423,65 +411,6 @@ export function AgentHubWorkbench({
       cancelled = true;
     };
   }, [activePage, platform]);
-
-  useEffect(() => {
-    if (!inspectorResizing) return;
-
-    function updateFromPointer(event: PointerEvent): void {
-      updateInspectorWidthFromClientX(event.clientX);
-    }
-
-    function stopResize(): void {
-      setInspectorResizing(false);
-      if (inspectorWidthRef.current <= INSPECTOR_COLLAPSE_SNAP_WIDTH) {
-        const collapse = () => setInspectorCollapsed(true);
-        if (typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(collapse);
-          return;
-        }
-        collapse();
-      }
-    }
-
-    window.addEventListener('pointermove', updateFromPointer);
-    window.addEventListener('pointerup', stopResize);
-    window.addEventListener('pointercancel', stopResize);
-    return () => {
-      window.removeEventListener('pointermove', updateFromPointer);
-      window.removeEventListener('pointerup', stopResize);
-      window.removeEventListener('pointercancel', stopResize);
-    };
-  }, [inspectorResizing]);
-
-  useEffect(() => {
-    if (!sidebarResizing) return;
-
-    function updateFromPointer(event: PointerEvent): void {
-      updateSidebarWidthFromClientX(event.clientX);
-    }
-
-    function stopResize(): void {
-      setSidebarResizing(false);
-      if (sidebarShouldCollapseRef.current) {
-        sidebarShouldCollapseRef.current = false;
-        const collapse = () => setSidebarCollapsed(true);
-        if (typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(collapse);
-          return;
-        }
-        collapse();
-      }
-    }
-
-    window.addEventListener('pointermove', updateFromPointer);
-    window.addEventListener('pointerup', stopResize);
-    window.addEventListener('pointercancel', stopResize);
-    return () => {
-      window.removeEventListener('pointermove', updateFromPointer);
-      window.removeEventListener('pointerup', stopResize);
-      window.removeEventListener('pointercancel', stopResize);
-    };
-  }, [sidebarResizing]);
 
   useEffect(() => {
     if (!selectionMode) return;
@@ -559,156 +488,6 @@ export function AgentHubWorkbench({
     window.addEventListener('resize', updateSelectBarRect);
     return () => window.removeEventListener('resize', updateSelectBarRect);
   }, [selectionMode, inspectorCollapsed, inspectorWidth]);
-
-  function clampInspectorWidth(value: number): number {
-    return Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, Math.round(value)));
-  }
-
-  function clampSidebarWidth(value: number): number {
-    return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
-  }
-
-  function setSyncedInspectorWidth(width: number): void {
-    inspectorWidthRef.current = width;
-    setInspectorWidth(width);
-  }
-
-  function setSyncedSidebarWidth(width: number): void {
-    sidebarWidthRef.current = width;
-    setSidebarWidth(width);
-  }
-
-  function restoreInspectorWidth(width = INSPECTOR_DEFAULT_WIDTH): void {
-    setInspectorWidth((currentWidth) => {
-      const nextWidth = currentWidth < INSPECTOR_READABLE_WIDTH
-        ? clampInspectorWidth(width)
-        : currentWidth;
-      inspectorWidthRef.current = nextWidth;
-      return nextWidth;
-    });
-  }
-
-  function openInspector(width = INSPECTOR_DEFAULT_WIDTH): void {
-    restoreInspectorWidth(width);
-    setInspectorCollapsed(false);
-  }
-
-  function collapseSidebarForWorkspacePressure(nextInspectorWidth: number): void {
-    if (!isChatPage || sidebarCollapsed) return;
-    const availableWorkspaceWidth = window.innerWidth - 52 - sidebarWidthRef.current - nextInspectorWidth;
-    if (availableWorkspaceWidth < WORKSPACE_AUTO_COLLAPSE_WIDTH) {
-      setSidebarCollapsed(true);
-    }
-  }
-
-  function restoreSidebarWidth(width = SIDEBAR_DEFAULT_WIDTH): void {
-    setSidebarWidth((currentWidth) => {
-      const nextWidth = currentWidth < SIDEBAR_MIN_WIDTH
-        ? clampSidebarWidth(width)
-        : currentWidth;
-      sidebarWidthRef.current = nextWidth;
-      return nextWidth;
-    });
-  }
-
-  function toggleSidebar(): void {
-    setSidebarCollapsed((collapsed) => {
-      if (collapsed || sidebarWidth < SIDEBAR_MIN_WIDTH) {
-        setSyncedSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
-        return false;
-      }
-      return true;
-    });
-  }
-
-  function navigateRail(page: GlobalRailPage): void {
-    if (page === 'chat') {
-      setActivePage('chat');
-      setSidebarCollapsed(false);
-      restoreSidebarWidth();
-      return;
-    }
-    setActivePage(page);
-  }
-
-  function updateInspectorWidthFromClientX(clientX: number): void {
-    const nextWidth = window.innerWidth - clientX;
-    setInspectorCollapsed(false);
-    const clampedWidth = clampInspectorWidth(nextWidth);
-    collapseSidebarForWorkspacePressure(clampedWidth);
-    if (nextWidth <= INSPECTOR_COLLAPSE_SNAP_WIDTH) {
-      setSyncedInspectorWidth(INSPECTOR_MIN_WIDTH);
-      setInspectorResizing(false);
-      const collapse = () => setInspectorCollapsed(true);
-      if (typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(collapse);
-        return;
-      }
-      collapse();
-      return;
-    }
-    setSyncedInspectorWidth(
-      clampedWidth,
-    );
-  }
-
-  function updateSidebarWidthFromClientX(clientX: number): void {
-    const nextWidth = clientX - 52;
-    setSidebarCollapsed(false);
-    if (nextWidth <= SIDEBAR_COLLAPSE_SNAP_WIDTH) {
-      sidebarShouldCollapseRef.current = true;
-      setSyncedSidebarWidth(SIDEBAR_MIN_WIDTH);
-      return;
-    }
-    sidebarShouldCollapseRef.current = false;
-    setSyncedSidebarWidth(clampSidebarWidth(nextWidth));
-  }
-
-  function beginInspectorResize(clientX: number): void {
-    if (inspectorCollapsed) return;
-    setInspectorResizing(true);
-    updateInspectorWidthFromClientX(clientX);
-  }
-
-  function beginSidebarResize(clientX: number): void {
-    if (sidebarCollapsed) return;
-    sidebarShouldCollapseRef.current = false;
-    setSidebarResizing(true);
-    updateSidebarWidthFromClientX(clientX);
-  }
-
-  function resizeInspectorBy(delta: number): void {
-    const nextWidth = clampInspectorWidth(inspectorWidth + delta);
-    setInspectorCollapsed(false);
-    collapseSidebarForWorkspacePressure(nextWidth);
-    if (nextWidth <= INSPECTOR_COLLAPSE_SNAP_WIDTH) {
-      setSyncedInspectorWidth(INSPECTOR_MIN_WIDTH);
-      setInspectorCollapsed(true);
-      return;
-    }
-    setSyncedInspectorWidth(nextWidth);
-  }
-
-  function resizeSidebarBy(delta: number): void {
-    const rawWidth = sidebarWidth + delta;
-    setSidebarCollapsed(false);
-    if (rawWidth <= SIDEBAR_COLLAPSE_SNAP_WIDTH || (sidebarWidth <= SIDEBAR_MIN_WIDTH && rawWidth < SIDEBAR_MIN_WIDTH)) {
-      setSyncedSidebarWidth(SIDEBAR_MIN_WIDTH);
-      setSidebarCollapsed(true);
-      return;
-    }
-    setSyncedSidebarWidth(clampSidebarWidth(rawWidth));
-  }
-
-  function toggleInspector(): void {
-    setInspectorCollapsed((collapsed) => {
-      if (collapsed || inspectorWidth < INSPECTOR_READABLE_WIDTH) {
-        setInspectorWidth(INSPECTOR_DEFAULT_WIDTH);
-        return false;
-      }
-      return true;
-    });
-  }
 
   function handleToggleTheme(): void {
     toggleAppliedAgentHubTheme();
@@ -1285,11 +1064,6 @@ export function AgentHubWorkbench({
     },
   ];
 
-  const shellStyle = {
-    '--inspector-w': `${inspectorWidth}px`,
-    '--sidebar-w': `${sidebarWidth}px`,
-  } as React.CSSProperties;
-
   return (
     <div
       className={styles.shell}
@@ -1575,166 +1349,6 @@ export function AgentHubWorkbench({
       <Toast message={toastMessage} visible={toastVisible} />
     </div>
   );
-}
-
-function buildMainchainSummary({
-  composerTargetLabel,
-  evidence,
-  platformSurface,
-  runtimeEvidence,
-  selectedExecutionTargetId,
-  targetRequired,
-  transcript,
-  workbenchStatus,
-  t,
-}: {
-  composerTargetLabel?: string | undefined;
-  evidence: EvidenceRef[];
-  platformSurface: AgentHubPlatform['surface'];
-  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
-  selectedExecutionTargetId: string;
-  targetRequired: boolean;
-  transcript: TranscriptBlock[];
-  workbenchStatus?: AgentHubWorkbenchProps['workbenchStatus'];
-  t: (key: string, options?: Record<string, unknown>) => string;
-}): MainchainSummary {
-  const runSession = transcript.find((block) => block.kind === 'run_session');
-  const taskId = runSession?.kind === 'run_session' ? runSession.taskId : undefined;
-  const edgeRunId = runSession?.kind === 'run_session' ? runSession.edgeRunId : undefined;
-  const runId = runtimeEvidence?.runId ?? (runSession?.kind === 'run_session' ? runSession.runId : undefined);
-  const artifactCount = runtimeEvidence
-    ? runtimeEvidence.artifacts.length
-    : evidence.filter((item) => item.kind === 'artifact').length;
-  const approvalCount = evidence.filter((item) => item.kind === 'approval').length
-    + transcript.filter((block) => block.kind === 'approval' || block.kind === 'permission_request').length;
-  const diffCount = runtimeEvidence?.diffs.length ?? evidence.filter((item) => item.kind === 'file').length;
-  const previewCount = runtimeEvidence?.previews.length ?? evidence.filter((item) => item.kind === 'preview').length;
-  const routeBlocks = transcript.filter((block) => block.kind === 'route_decision');
-  const workerBlocks = transcript.filter((block) => (
-    block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent'
-  ));
-  const eventBlocks = transcript.filter((block) => (
-    block.kind === 'agent_timeline' || block.kind === 'tool_call' || block.kind === 'run_step_group'
-  ));
-  const supervisorLabel = runSession?.kind === 'run_session'
-    ? runSession.agentLabel ?? runSession.author.name
-    : routeBlocks[0]?.author.name ?? 'Supervisor';
-  const workerLabel = workerBlocks.map((block) => {
-    if (block.kind === 'subagent' || block.kind === 'subtask') return block.worker;
-    return block.agent;
-  }).find(Boolean) ?? routeBlocks.find((block) => block.kind === 'route_decision')?.targetAgent;
-  const evidencePathDetail = `${approvalCount} approval / ${artifactCount} artifact`;
-  const hasRuntimeEvidence = Boolean(runtimeEvidence && (
-    runtimeEvidence.diffs.length > 0
-    || runtimeEvidence.artifacts.length > 0
-    || runtimeEvidence.previews.length > 0
-    || runtimeEvidence.runId
-    || runtimeEvidence.loading?.diff
-    || runtimeEvidence.loading?.artifacts
-    || runtimeEvidence.loading?.previews
-    || runtimeEvidence.errors?.diff
-    || runtimeEvidence.errors?.artifacts
-    || runtimeEvidence.errors?.previews
-  ));
-  const hasExportEvidence = evidence.length > 0 || hasRuntimeEvidence || Boolean(runSession);
-  const targetLabel = composerTargetLabel
-    ?? workbenchStatus?.targetLabel
-    ?? (runSession?.kind === 'run_session' ? runSession.targetLabel : undefined);
-  const targetBlocked = targetRequired
-    && !selectedExecutionTargetId
-    && (workbenchStatus?.targetState === 'no-target' || !targetLabel);
-  const targetState = targetBlocked
-    ? 'blocked'
-    : targetLabel
-      ? 'done'
-      : targetRequired
-        ? 'waiting'
-        : 'empty';
-
-  const nodes: MainchainNode[] = [
-    {
-      id: 'web',
-      label: platformSurface === 'web' ? 'Web' : 'Shared UI',
-      detail: platformSurface === 'web' ? 'Shared/Web workbench' : 'Desktop shared workbench',
-      state: 'done',
-    },
-    {
-      id: 'hub-task',
-      label: 'Hub task',
-      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? t('mainchain.waitingTask'),
-      state: taskId ? 'done' : workbenchStatus?.replayLabel ? 'active' : 'waiting',
-    },
-    {
-      id: 'supervisor',
-      label: 'Supervisor',
-      detail: supervisorLabel,
-      state: supervisorLabel === 'Supervisor' ? 'waiting' : 'done',
-    },
-    {
-      id: 'worker',
-      label: 'Worker',
-      detail: workerLabel ?? t('mainchain.waitingWorker'),
-      state: workerLabel ? 'active' : 'waiting',
-    },
-    {
-      id: 'route-event',
-      label: 'Route + event',
-      detail: `${routeBlocks.length} route / ${eventBlocks.length} event`,
-      state: routeBlocks.length + eventBlocks.length > 0 ? 'done' : 'empty',
-    },
-    {
-      id: 'target',
-      label: 'Exact target',
-      detail: targetLabel ?? (targetBlocked ? t('mainchain.noTarget') : t('mainchain.pickTarget')),
-      state: targetState,
-    },
-    {
-      id: 'edge',
-      label: 'Active run',
-      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence, t),
-      state: runId || edgeRunId ? 'active' : hasRuntimeEvidence ? 'done' : 'waiting',
-    },
-    {
-      id: 'replay',
-      label: 'Replay',
-      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : t('mainchain.noTranscript'),
-      state: transcript.length > 0 ? 'done' : 'empty',
-    },
-    {
-      id: 'evidence-path',
-      label: 'Approval/artifact',
-      detail: artifactCount + approvalCount + diffCount + previewCount > 0
-        ? `${evidencePathDetail} / ${diffCount} diff / ${previewCount} preview`
-        : t('mainchain.noApprovalArtifact'),
-      state: approvalCount > 0 ? 'active' : artifactCount + diffCount + previewCount > 0 ? 'done' : 'empty',
-    },
-  ];
-
-  return {
-    nodes,
-    exportEnabled: hasExportEvidence,
-    exportLabel: hasExportEvidence ? t('mainchain.exportJson') : t('mainchain.waitingEvidence'),
-    exportDetail: hasExportEvidence
-      ? 'Copy Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
-      : t('mainchain.noRuntimeEvidence'),
-  };
-}
-
-function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined, t: (key: string) => string): string {
-  if (!runtimeEvidence) return t('mainchain.waitingEdgeEvidence');
-  const loading = [
-    runtimeEvidence.loading?.diff ? 'diff loading' : undefined,
-    runtimeEvidence.loading?.artifacts ? 'artifact loading' : undefined,
-    runtimeEvidence.loading?.previews ? 'preview loading' : undefined,
-  ].filter(Boolean);
-  if (loading.length > 0) return loading.join(' / ');
-  const errors = [
-    runtimeEvidence.errors?.diff ? 'diff error' : undefined,
-    runtimeEvidence.errors?.artifacts ? 'artifact error' : undefined,
-    runtimeEvidence.errors?.previews ? 'preview error' : undefined,
-  ].filter(Boolean);
-  if (errors.length > 0) return errors.join(' / ');
-  return 'Edge evidence empty';
 }
 
 function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {
