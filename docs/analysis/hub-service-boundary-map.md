@@ -1,8 +1,8 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-17
-> issue: #505 (refresh after EdgeCallback extract; prior #493 / #478 / #468)
-> status: map current — `service/agentevent` (#468) + `RunEventService` (#478) + `EdgeCallbackService` (#505) landed
+> issue: #514 (pure outbox helpers; prior #505 / #493 / #478 / #468)
+> status: map current — `service/agentevent` (#468) + `RunEventService` (#478) + `EdgeCallbackService` (#505) + pure `service/deliveryoutbox` (#514) landed
 > companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014)
 
 This document is the authoritative **read-only boundary map** for
@@ -19,6 +19,7 @@ an acceptance sketch.
 | Pure extract `service/agentevent` | ~620 | unit tests | pure helpers | no DB/WS/cache/`*AgentService` (#468) |
 | Same-package type extract `RunEventService` | ~200 methods + facade | existing `agent_run_event_test.go` | still in flat `service` | injected `runEventControl` (#478) |
 | Same-package type extract `EdgeCallbackService` | ~500 methods + facade | existing HandleTask*/outbox auto-ack tests | still in flat `service` | injected bus/seq/outbox (#505) |
+| Pure extract `service/deliveryoutbox` | ~30–40 | unit tests | pure helpers | backoff/truncate + retry constants; no DB/WS/cache/`*AgentService` (#514) |
 
 **Shape note:** not one god struct — **25+ `*Service` types** already exist
 (including `RunEventService`, `EdgeCallbackService`). Concentration remains
@@ -43,13 +44,14 @@ Precedent: `service/agentteam` uses **local interfaces**
 | **infra_shared** | ~493 | `eventbus.go`, `cache_fallback.go`, `audit.go`, `public_stats.go` | Bus, nil-cache guards, audit, public stats |
 | **agentteam/** (subpkg) | ~3,012 | CRUD/member/run/routing/approval/guard/compete | **Already extracted** team domain |
 | **agentevent/** (subpkg) | ~620 | pure project/validate/helpers | **Extracted in #468** |
+| **deliveryoutbox/** (subpkg) | ~30–40 | pure retry/truncate helpers | **Extracted in #514** |
 
 ### Named hotspots
 
 | File | LOC | Owns | Couples to |
 |------|----:|------|------------|
 | `agent_dispatch.go` | 819 | `TriggerAgentTask`, `dispatchTask`, edge HTTP, capability, history/pins | outbox `RecordDelivery`/`MarkDeliverySent`; private `dispatchPayload`; cache/ws/relay |
-| `delivery_outbox.go` | 599 | `deliveryOutboxRecord` model + retry loop | **same-package** `dispatchPayload` + `dispatchToEdgeHTTP`; `deliveryOutboxAcker` used by EdgeCallback |
+| `delivery_outbox.go` | ~590 | `deliveryOutboxRecord` model + retry loop | pure helpers → `deliveryoutbox` (#514); still **same-package** `dispatchPayload` + `dispatchToEdgeHTTP`; `deliveryOutboxAcker` used by EdgeCallback |
 | `message.go` | 860 | send/edit/pin/forward/search | `Bus`, cache seq, attachments |
 | `session.go` | 728 | private/group lifecycle | cache, bus, agent cleanup helpers |
 | `agent_edge_callback.go` | ~513 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**) |
@@ -61,6 +63,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 - **Handlers:** per-domain interfaces already in `handler/*` (good extract seam)
 - **Subpkg:** `agentteam` → `service.Bus` + agent/control interfaces
 - **Subpkg:** `agentevent` → pure helpers used by `RunEventService` + `EdgeCallbackService`
+- **Subpkg:** `deliveryoutbox` → pure backoff/truncate helpers used by `delivery_outbox.go`
 - **Composition:** `AgentService` holds `runEvents *RunEventService` and
   `edgeCallbacks *EdgeCallbackService` (set in `NewAgentService`); facade
   methods keep handler signatures stable
@@ -92,7 +95,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | 4 | `MessageReactionService` / `WorkspaceService` subpkg | Low–med | Medium | Independent but not concentration core |
 | **5** | **`RunEventService` type split (methods + inject control)** | Medium | High | **DONE in #478** |
 | **6** | **`EdgeCallbackService` type split (ack/stream/done/fail + ports)** | Medium | High | **DONE in #505** |
-| 6b | Pure outbox helpers only (`computeNextRetryAt`, `truncateString`, status/backoff constants) | Low | Low–med | Optional micro-step before full outbox move |
+| **6b** | **Pure outbox helpers only** (`NextRetryDelay`/`TruncateString` + retry constants in `service/deliveryoutbox`) | Low | Low–med | **DONE in #514** |
 | 7 | `DeliveryOutbox` service + repository model | **High** | High | Tied to `dispatchPayload` + redispatch — with explicit `Redispatcher` port |
 | 8 | Full `DispatchService` extract | **Highest** | Highest | **Last among runtime** — no big-bang |
 
@@ -152,6 +155,30 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 - Did not change OpenAPI / handler signatures
 - No frontend
 
+### 4d. `hub-server/internal/service/deliveryoutbox` (#514)
+
+**Moved (from `delivery_outbox.go`, pure only):**
+
+- Retry/TTL constants: `DefaultMaxAttempts`, `RetryBaseInterval`, `RetryMaxInterval`,
+  `RetryScanInterval`, `PendingTimeout`, `SentTimeout`, `MaxBatch`
+- Backoff helpers: `NextRetryDelay(attempt)`, `NextRetryAt(attempt, now)` (clock-injectable)
+- String helper: `TruncateString(s, maxLen)` (guards `maxLen < 3`)
+
+**Kept in flat `service` package:**
+
+- Status strings (`DeliveryStatus*`)
+- `deliveryOutboxRecord` + GORM hooks / `TableName`
+- All `*AgentService` outbox orchestration methods and redispatch glue
+- Thin aliases for constants / `computeNextRetryAt` / `truncateString` so existing
+  `TestOutbox_*` names stay stable
+
+**Explicit non-goals (honored in #514)**
+
+- Did not extract `DispatchService`
+- Did not move `deliveryOutboxRecord` to model/repository
+- Did not introduce `Redispatcher` / redesign redispatch
+- Did not change OpenAPI / handler / frontend surfaces
+
 ## 5. Test plan & evidence (landed)
 
 ### Pure package
@@ -159,6 +186,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 ```bash
 cd hub-server
 go test ./internal/service/agentevent/ -count=1
+go test ./internal/service/deliveryoutbox/ -count=1
 ```
 
 ### Run-event orchestration / facade
@@ -185,30 +213,29 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] Bus / seq / outbox auto-ack injected; no full outbox or dispatch move
 - [x] Handler interfaces / OpenAPI unchanged via `AgentService` facade
 - [x] Follow-up extract order refreshed below (#505)
+- [x] Pure outbox helpers package (`deliveryoutbox`, #514)
+- [x] `deliveryoutbox` has **no** `*gorm.DB` / `*AgentService` / ws / cache imports
+- [x] Existing `TestOutbox_*` + `go test ./internal/service/ -short` green after pure extract
 
 ## 6. Suggested follow-up extract order
 
 1. ~~**`RunEventService`**~~ — **DONE #478**
 2. ~~**`EdgeCallbackService`**~~ — **DONE #505**
-3. **Optional pure outbox helpers** — extract `computeNextRetryAt` + `truncateString` (+ retry constants if needed) into a tiny pure package or `service/deliveryoutbox` helpers file **only if** it unblocks tests without touching `dispatchPayload` / redispatch. Not a full outbox service.
-4. **Outbox service + model move** — `deliveryOutboxRecord` → `model`/`repository`; `DeliveryOutbox` with `Redispatcher` interface implemented by dispatch. Reuse `#505` `edgeCallbackOutbox` port shape.
+3. ~~**Optional pure outbox helpers**~~ — **DONE #514** (`service/deliveryoutbox`)
+4. **Outbox service + model move** — `deliveryOutboxRecord` → `model`/`repository`; `DeliveryOutbox` with `Redispatcher` interface implemented by dispatch. Reuse `#505` `edgeCallbackOutbox` port shape and `#514` pure helpers.
 5. **`DispatchService`** — **last** among runtime; owns `dispatchPayload` + capability. **No big-bang.**
 6. **IM subpackages** (`service/im` or message/session/contact) — agentteam-style, lower urgency than runtime.
 7. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
 
-### Follow-up issue acceptance sketch: pure outbox helpers / DeliveryOutbox
+### Follow-up issue acceptance sketch: DeliveryOutbox + Redispatcher
 
-**Goal:** next lowest-risk seam after EdgeCallback — either pure helpers micro-step or full `DeliveryOutbox` + `Redispatcher` once dispatch boundary is ready.
-
-**Scope (micro-step)**
-
-- Move pure functions `computeNextRetryAt` + `truncateString` (+ retry constants)
-- Keep DB/retry/redispatch methods until `Redispatcher` exists
+**Goal:** next lowest-risk seam after pure outbox helpers — full `DeliveryOutbox` + `Redispatcher` once dispatch boundary is ready. **Not** DispatchService big-bang.
 
 **Scope (full outbox)**
 
 - `deliveryOutboxRecord` → model/repository
 - `DeliveryOutbox` service with `Redispatcher` implemented by dispatch
+- Reuse pure `deliveryoutbox` helpers (#514)
 - Keep EdgeCallback's `edgeCallbackOutbox` port (or rebind to new type)
 
 **Non-goals**
@@ -218,23 +245,24 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 
 **Tests / acceptance**
 
-- [ ] Existing `TestOutbox_*` green
+- [ ] Existing `TestOutbox_*` green after service/model move
 - [ ] `go test ./internal/service/ -short` green
-- [ ] Boundary map status updated; next points at `DispatchService` or IM
+- [ ] Boundary map status updated; next points at `DispatchService` (last among runtime) or IM
 
 ## 7. Bottom line
 
-- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** is the pure seam; **`RunEventService`** and **`EdgeCallbackService`** are the first orchestration type extracts.
+- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** are pure seams; **`RunEventService`** and **`EdgeCallbackService`** are the first orchestration type extracts.
 - **Highest remaining coupling:** `AgentService` × (`dispatch` ↔ `outbox` via `dispatchPayload`).
-- **Landed:** pure **`agentevent`** (#468) + **`RunEventService` + injected control** (#478) + **`EdgeCallbackService` + injected bus/seq/outbox** (#505).
-- **Next:** pure outbox helpers micro-step **or** **`DeliveryOutbox` + `Redispatcher`** — not DispatchService big-bang.
+- **Landed:** pure **`agentevent`** (#468) + **`RunEventService` + injected control** (#478) + **`EdgeCallbackService` + injected bus/seq/outbox** (#505) + pure **`deliveryoutbox`** (#514).
+- **Next:** **`DeliveryOutbox` + model + `Redispatcher`** — not DispatchService big-bang.
 
 ## Key paths
 
 - `hub-server/internal/service/`
 - `hub-server/internal/service/agentevent/`
+- `hub-server/internal/service/deliveryoutbox/`
 - `hub-server/internal/service/agentteam/`
 - `hub-server/internal/service/agent_run_event.go` (`RunEventService`)
 - `hub-server/internal/service/agent_edge_callback.go` (`EdgeCallbackService`)
-- `hub-server/internal/service/delivery_outbox.go` (next)
+- `hub-server/internal/service/delivery_outbox.go` (orchestration remaining; next full outbox/`Redispatcher`)
 - `docs/analysis/cleanup-strategy.md`
