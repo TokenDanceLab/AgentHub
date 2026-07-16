@@ -86,10 +86,10 @@
 | T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | closed |
 | T4.1 | #434 | Edge handlers 机械拆分 | closed |
 | T4.2 | #435 | ProcessExecutor 接口抽取 | closed |
-| T4.3 | #436 | AH-SR-046 capability 闭环 | open |
+| T4.3 | #436 | AH-SR-046 capability 闭环 | closed (issuer landed) |
 | T4.4 | #437 | AH-SR-049 outbox retry / journal | open (retry loop wired; Edge journal remaining) |
-| T5.1 | #438 | AH-SR-037 决策 | open |
-| T5.2 | #439 | Settings/TeamRun orphan 决策 | open |
+| T5.1 | #438 | AH-SR-037 决策 | closed accepted |
+| T5.2 | #439 | Settings/TeamRun orphan 决策 | closed |
 | T5.3 | #440 | 专项收口与归档计划 | open |
 
 ## Quick Status Commands
@@ -106,11 +106,11 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
 - [x] Phase 3: Frontend Strangler (4/4 closed: #430-#433)
 - [ ] Phase 4: Edge Seams + Security (0/4)
-- [ ] Phase 5: Closure Decisions (0/3)
+- [ ] Phase 5: Closure Decisions (2/3 closed: #438 #439; open #440)
 
 ## Current Status
-**Active Phase**: Phase 4 Edge Seams + Security  
-**Active Task**: #436 capability; #437 remaining Edge journal; Phase 5 decisions  
+**Active Phase**: Phase 4 residual + Phase 5 closeout  
+**Active Task**: #437 Edge journal residual; #440 program closeout  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
