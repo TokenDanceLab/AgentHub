@@ -332,6 +332,18 @@ describe('hubClient helpers', () => {
     expect(error.message).toBe('Unauthorized');
   });
 
+  it('exposes T3.2 shared team/settings methods (#431)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: [{ id: 'team-1', name: 'T' }] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { theme: 'dark' } }));
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+    await expect(client.listAgentTeams()).resolves.toEqual([{ id: 'team-1', name: 'T' }]);
+    await expect(client.fetchSettings()).resolves.toEqual({ theme: 'dark' });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://hub.local/web/agent-teams',
+      'http://hub.local/client/settings',
+    ]);
+  });
+
   it('exports compatibility aliases and SSOT gap inventory for slice1 (#430)', () => {
     // Type-level aliases must remain assignable (compile-time); runtime checks inventory shape.
     const session: Session = { session_id: 's-alias', type: 'private' };
@@ -345,11 +357,11 @@ describe('hubClient helpers', () => {
     };
     expect(auth.access_token).toBe('a');
 
-    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).toContain('listAgentTeams');
-    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).toContain('fetchSettings');
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('listAgentTeams');
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('fetchSettings');
     expect(HUBCLIENT_SSOT_GAPS.desktopOnly).toContain('streamTaskEvent');
     expect(HUBCLIENT_SSOT_GAPS.webOnly).toContain('listTaskApprovals');
     // Guard against accidental empty inventory during later edits.
-    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared.length).toBeGreaterThan(10);
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
   });
 });

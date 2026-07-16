@@ -75,3 +75,7 @@ Prefer **Hub\*** names in new shared code. Aliases exist so T3.3/T3.4 re-exports
 - No auth storage changes  
 - No Web Local Edge  
 - No deletion of desktop/web hubClient files yet  
+
+## T3.2 status
+
+Landed on shared `createHubClient`: former `desktopAndWebNotShared` methods + Hub* team/profile/attachment types. `HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared` cleared. Remaining: surface-only methods + caller cutover (#432/#433).
