@@ -67,6 +67,6 @@ All 10 page bodies under `wiki/pages/` have been compiled from SSOT sources. The
 | module-api-contracts | covered in [[module-hub]] / [[module-edge]] / api/ SSOT |
 | flow-control-run, flow-event-transcript, flow-auth-session, flow-web-remote-control | covered in [[flow-control-event]] |
 | ci-decommission-drift, deploy-image-name-divergence, deploy-template-divergence, edge-runners-compat, mobile-path-residue | covered in [[hotspots]] and [[ops-hk3]] |
-| risk-evidence-grade-confusion, risk-secret-and-session-boundary, risk-ah-sr-register | covered in [[risks-open]] and [[architecture-seams]] |
+| risk-evid-grade-confusion, risk-session-secret-boundary, risk-ah-sr-register | covered in [[risks-open]] and [[architecture-seams]] |
 | decision-wiki-is-compiled, decision-incremental-cleanup, decision-production-live-narrative | covered in [[cleanup-playbook]] and [[overview]] |
 | ops-evidence-boundary | covered in [[ops-hk3]] |

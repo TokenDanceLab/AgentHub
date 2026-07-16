@@ -26,7 +26,7 @@ related:
   - flow-control-run
   - flow-event-transcript
   - risk-ah-sr-register
-  - risk-evidence-grade-confusion
+  - risk-evid-grade-confusion
   - production-live-hk3
 summary: >
   AgentHub 的六条非协商架构边界、五层结构缝合线、平台 contract 及授权/证据门禁。所有边界以 docs/architecture.md 和 AGENTS.md 为 SSOT。
@@ -43,7 +43,7 @@ AgentHub 架构的关键约束已经以**非协商边界**形式写死在 `docs/
 | 3 | **Desktop renderer 无 raw process 权限** | Desktop 的 React renderer 不能获得操作系统级进程执行权限。危险能力必须经过 typed Tauri host API 和 allowlist。本地执行由 Local Edge 承担。 | `docs/architecture.md` 边界 3；`AGENTS.md` §2 |
 | 4 | **TokenDance ID 只证明身份** | Hub 权限由 Hub-local membership/resource/action 决定，不由 TokenDance ID 直接推导。TokenDance bearer 不能直接授权 `/client/*`、`/web/*`、`/edge/*`。 | `docs/architecture.md` 边界 4；`AGENTS.md` §4 授权；ADR-017 |
 | 5 | **统一 transcript contract** | 所有 Agent 来源（Codex、OpenCode、Claude Code 等）必须 normalize 到统一 transcript contract 后再渲染。消息流按事件时间线性展示，不区分 runtime 来源。 | `docs/architecture.md` 边界 5；ADR-002 |
-| 6 | **证据等级不可混淆** | Mock、fixture、observed、approved-real、production 必须显式区分。stub/fixture/readiness-only 不能冒充真实登录、真实模型/API、packaged Desktop 或 release。 | `docs/architecture.md` 边界 6；`AGENTS.md` §10 验证纪律；[[risk-evidence-grade-confusion]] |
+| 6 | **证据等级不可混淆** | Mock、fixture、observed、approved-real、production 必须显式区分。stub/fixture/readiness-only 不能冒充真实登录、真实模型/API、packaged Desktop 或 release。 | `docs/architecture.md` 边界 6；`AGENTS.md` §10 验证纪律；[[risk-evid-grade-confusion]] |
 
 ## 五层结构与缝合线
 
@@ -121,7 +121,7 @@ Hub Server (Hub-local membership/resource/action 决定权限)
 - [[flow-control-run]] — 控制线端到端流程
 - [[flow-event-transcript]] — 事件到 transcript 流程
 - [[risk-ah-sr-register]] — 安全风险登记表中与本页边界直接相关的项
-- [[risk-evidence-grade-confusion]] — 证据等级混淆风险
+- [[risk-evid-grade-confusion]] — 证据等级混淆风险
 - [[production-live-hk3]] — 生产环境事实指针
 
 ## 变更规则
