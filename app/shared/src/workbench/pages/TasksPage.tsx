@@ -495,20 +495,20 @@ function TaskTable({
           title={t('tasks.empty.title')}
           titleLevel={3}
           {...(emptyStateLabel ? { description: emptyStateLabel } : {})}
-          {...(styles['task-empty-compact']
-            ? { className: styles['task-empty-compact'] }
+          {...(styles['tasks-empty-compact']
+            ? { className: styles['tasks-empty-compact'] }
             : {})}
-          {...(styles['task-empty-compact-content']
-            ? { contentClassName: styles['task-empty-compact-content'] }
+          {...(styles['tasks-empty-compact-content']
+            ? { contentClassName: styles['tasks-empty-compact-content'] }
             : {})}
-          {...(styles['task-empty-compact-title']
-            ? { titleClassName: styles['task-empty-compact-title'] }
+          {...(styles['tasks-empty-compact-title']
+            ? { titleClassName: styles['tasks-empty-compact-title'] }
             : {})}
-          {...(styles['task-empty-compact-description']
-            ? { descriptionClassName: styles['task-empty-compact-description'] }
+          {...(styles['tasks-empty-compact-description']
+            ? { descriptionClassName: styles['tasks-empty-compact-description'] }
             : {})}
-          {...(styles['task-empty-compact-action']
-            ? { actionClassName: styles['task-empty-compact-action'] }
+          {...(styles['tasks-empty-compact-action']
+            ? { actionClassName: styles['tasks-empty-compact-action'] }
             : {})}
           {...(onAddRow
             ? { action: { label: t('tasks.newTask'), onClick: onAddRow } }

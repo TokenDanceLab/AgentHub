@@ -599,7 +599,7 @@
 }
 
 /* Compact EmptyState overrides for in-table density (#503) */
-.task-empty-compact {
+.tasks-empty-compact {
   max-width: 100%;
   margin: 0;
   min-height: 96px;
@@ -614,24 +614,24 @@
   text-align: left;
 }
 
-.task-empty-compact-content {
+.tasks-empty-compact-content {
   align-items: flex-start;
   gap: var(--sp-xxs);
   max-width: 100%;
 }
 
-.task-empty-compact-title {
+.tasks-empty-compact-title {
   color: var(--text-1);
   font: 600 0.875rem/1.3 var(--font-sans);
 }
 
-.task-empty-compact-description {
+.tasks-empty-compact-description {
   max-width: none;
   color: var(--text-2);
   font: 400 0.75rem/1.4 var(--font-sans);
 }
 
-.task-empty-compact-action {
+.tasks-empty-compact-action {
   height: 28px;
   min-height: 28px;
   margin-top: var(--sp-xxs);
@@ -645,7 +645,7 @@
   box-shadow: none;
 }
 
-.task-empty-compact-action:hover {
+.tasks-empty-compact-action:hover {
   border-color: var(--bdr-strong);
   background: var(--surface-high);
   box-shadow: none;
