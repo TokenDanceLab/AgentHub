@@ -58,6 +58,22 @@
   font: 500 0.75rem var(--font-sans);
 }
 
+/* ── Status stack (loading / load error) ── */
+.statusStack {
+  display: grid;
+  gap: 8px;
+  margin: 0 12px 10px;
+}
+
+.statusNotice {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-high, var(--surface));
+  color: var(--text-2);
+}
+
 /* ── Project nav row ── */
 .navRow {
   width: 100%;
@@ -229,6 +245,65 @@
   margin-top: var(--sp-xs);
   color: var(--text-2);
   font: 400 0.875rem var(--font-sans);
+}
+
+/* ── Primary empty (shared EmptyState) ── */
+.emptyMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-14);
+  max-width: 720px;
+}
+
+.projects-empty {
+  max-width: 100%;
+  margin: 0;
+  min-height: 180px;
+  padding: 28px 24px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+  color: var(--text-2);
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.projects-empty-content {
+  align-items: flex-start;
+  gap: var(--sp-xs);
+}
+
+.projects-empty-title {
+  color: var(--text-1);
+  font: 650 1.5rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.projects-empty-description {
+  max-width: none;
+  margin: 0;
+  color: var(--text-2);
+  font: 400 0.875rem var(--font-sans);
+}
+
+.projects-empty-action {
+  height: 36px;
+  min-height: 36px;
+  margin-top: var(--sp-xs);
+  padding: 0 var(--sp-14);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--primary);
+  font: 500 0.875rem var(--font-sans);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.projects-empty-action:hover {
+  background: var(--primary-light);
 }
 
 /* ── Head actions ── */
