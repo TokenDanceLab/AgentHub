@@ -9,6 +9,21 @@
 
 ## Management model (locked)
 
+## Two task surfaces (do not mix)
+
+| Surface | Role | NOT for |
+|---|---|---|
+| **GitHub Project + Issues** (`cleanup-baseline`) | **程序唯一任务清单 / 进度 SSOT** | 会话临时想法 |
+| **Claude TaskList** | 仅本会话微编排（读文件、等 workflow、commit 步骤） | 程序 backlog、跨会话进度 |
+
+规则：
+1. 跨会话、可交付、可验收的工作 **只** 进 GitHub Issue。
+2. Workflow / subagent / 实现 PR **必须** 绑定 Issue number。
+3. Claude TaskList 可以丢弃、重建，不影响程序进度。
+4. 看进度：`gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline` 或 Project board。
+
+
+
 现代软件工程 + SDD 收口，**不再用 ad-hoc multi-workflow 当 backlog**：
 
 1. **SPEC in-repo**：`docs/analysis/*` + `docs/plan/*` + 本文件  
