@@ -207,6 +207,10 @@ func (a *App) Run(ctx context.Context) error {
 	// Background goroutines
 	a.startTaskScheduler(a.coreCtx)
 	a.startWebSocketCleanup(a.coreCtx)
+	// AH-SR-049: durable Hub->Edge delivery retry loop (delivery_outbox).
+	if a.AgentService != nil {
+		a.AgentService.StartDeliveryRetryLoop(a.coreCtx)
+	}
 
 	// Admin server (pprof + metrics)
 	a.startAdminServer()

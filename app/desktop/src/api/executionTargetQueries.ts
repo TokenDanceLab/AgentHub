@@ -126,7 +126,7 @@ export async function fetchExecutionTargets(
       ...(pageCursor ? { pageCursor } : {}),
     });
     items.push(...res.items.map(normalizeExecutionTarget));
-    page = res.page;
+    page = res.page ?? { hasMore: false };
     if (!page.hasMore || !page.nextCursor) {
       return { items, page };
     }
@@ -152,7 +152,7 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
   let unknown = 0;
 
   for (const target of targets) {
-    byType[target.target_type] += 1;
+    byType[String(target.target_type) as ExecutionTargetType] = (byType[String(target.target_type) as ExecutionTargetType] ?? 0) + 1;
     if (target.is_online) online += 1;
     if (target.health_state === 'healthy') healthy += 1;
     else if (target.health_state === 'degraded') degraded += 1;

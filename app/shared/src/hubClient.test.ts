@@ -3,9 +3,11 @@ import { HUB_EVENTS } from './hubEvents';
 import { AppError } from './errors';
 import {
   createHubClient,
+  HUBCLIENT_SSOT_GAPS,
   HubError,
   parseHubError,
   unwrapHubResponse,
+  type AuthResponse,
   type HubAgentDoneFrame,
   type HubAgentFailedFrame,
   type HubAgentStreamFrame,
@@ -16,6 +18,7 @@ import {
   type HubFriendRequestFrame,
   type HubNotificationNewFrame,
   type HubSession,
+  type Session,
 } from './hubClient';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -37,6 +40,12 @@ describe('hubClient helpers', () => {
   it('unwraps Hub response envelopes and keeps raw bodies compatible', () => {
     expect(unwrapHubResponse<{ id: string }>({ code: 'OK', data: { id: '1' } })).toEqual({
       id: '1',
+    });
+    expect(unwrapHubResponse<{ id: string }>({ code: 'ok', data: { id: '2' } })).toEqual({
+      id: '2',
+    });
+    expect(unwrapHubResponse<{ id: string }>({ code: 'Ok', data: { id: '3' } })).toEqual({
+      id: '3',
     });
     expect(unwrapHubResponse<{ id: string }>({ id: 'raw' })).toEqual({ id: 'raw' });
 
@@ -327,5 +336,45 @@ describe('hubClient helpers', () => {
     expect(error.status).toBe(401);
     expect(error.code).toBe('auth_failed');
     expect(error.message).toBe('Unauthorized');
+  });
+
+  it('exposes T3.4 shared task approval methods (#433)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { task_id: 't1', approvals: [] } }));
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+    await expect(client.listTaskApprovals('t1')).resolves.toMatchObject({ task_id: 't1', approvals: [] });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://hub.local/web/agent-tasks/t1/approvals');
+  });
+
+  it('exposes T3.2 shared team/settings methods (#431)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: [{ id: 'team-1', name: 'T' }] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { theme: 'dark' } }));
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+    await expect(client.listAgentTeams()).resolves.toEqual([{ id: 'team-1', name: 'T' }]);
+    await expect(client.fetchSettings()).resolves.toEqual({ theme: 'dark' });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://hub.local/web/agent-teams',
+      'http://hub.local/client/settings',
+    ]);
+  });
+
+  it('exports compatibility aliases and SSOT gap inventory for slice1 (#430)', () => {
+    // Type-level aliases must remain assignable (compile-time); runtime checks inventory shape.
+    const session: Session = { session_id: 's-alias', type: 'private' };
+    const hubSession: HubSession = session;
+    expect(hubSession.session_id).toBe('s-alias');
+
+    const auth: AuthResponse = {
+      access_token: 'a',
+      refresh_token: 'r',
+      expires_in: 3600,
+    };
+    expect(auth.access_token).toBe('a');
+
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('listAgentTeams');
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('fetchSettings');
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopOnly)).toBe(true);
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.webOnly)).toBe(true);
+    // Guard against accidental empty inventory during later edits.
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
   });
 });
