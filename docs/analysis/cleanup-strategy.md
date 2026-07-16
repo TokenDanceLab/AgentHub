@@ -1,7 +1,7 @@
 # AgentHub Cleanup Strategy（权威程序决策）
 
-> last-updated: 2026-07-16  
-> program: **knowledge-first strangler cleanup** + **lightweight llmwiki as compiler only**  
+> last-updated: 2026-07-16
+> program: **knowledge-first strangler cleanup** + **lightweight llmwiki as compiler only**
 > hard rule: **NO big-bang rewrite**
 
 本文是 cleanup-baseline 的程序决策。规则 SSOT 仍是 `AGENTS.md`；架构/API SSOT 仍是 `docs/architecture*` 与 `api/*`；生产 live SSOT 仍是 server `projects/agenthub/STATE.md`。**任务编号以 GitHub Issues #424–#440 为准（label `cleanup-baseline`）。**
@@ -48,31 +48,31 @@ AgentHub 已具备正确的 **Hub/Edge 双平面 + shared platform/transcript** 
 
 ## 3. Non-negotiables（硬约束）
 
-1. 生产是 **LIVE on hk3**；禁止把 offline/decommissioned 写成当前状态  
-2. 不合并 Edge 进 Hub；Web/Mobile 无 Local Edge  
-3. 不 big-bang 改协议信封 / 同时重写 OpenAPI 双平面  
-4. Desktop renderer 无 raw process execution  
-5. 不新增 root script wrappers  
-6. High 风险未修 / 未验 / 未 accepted 前不公开发布  
-7. llmwiki：sources → compile → wiki；**禁止 wiki 覆盖 SSOT**  
-8. 不发明 issue 编号；路径尽量 repo-relative  
-9. 秘密 / 真实 token / 用户数据不进仓库文档  
-10. 远程 Execution Target 产品化不得早于 capability + durable delivery 合同  
+1. 生产是 **LIVE on hk3**；禁止把 offline/decommissioned 写成当前状态
+2. 不合并 Edge 进 Hub；Web/Mobile 无 Local Edge
+3. 不 big-bang 改协议信封 / 同时重写 OpenAPI 双平面
+4. Desktop renderer 无 raw process execution
+5. 不新增 root script wrappers
+6. High 风险未修 / 未验 / 未 accepted 前不公开发布
+7. llmwiki：sources → compile → wiki；**禁止 wiki 覆盖 SSOT**
+8. 不发明 issue 编号；路径尽量 repo-relative
+9. 秘密 / 真实 token / 用户数据不进仓库文档
+10. 远程 Execution Target 产品化不得早于 capability + durable delivery 合同
 
 ---
 
 ## 4. Explicit non-goals
 
-1. 整仓 rewrite 或“为拆而拆”的微服务化  
-2. 放弃 Local Edge 改成纯云 IDE  
-3. Mobile UI 深改、商店发布、Tauri Mobile 复活  
-4. 默认自动化真实模型消耗 / 签名 / 公证 / 生产上传（需单独审批）  
-5. 用 wiki/RAG 产品替代 AGENTS 与 architecture  
-6. 把 `reference/` 3.7G 研究树提交进 git  
-7. 一次 PR 收敛全部 Hub/Edge JSON 包络  
-8. 无差别把 CI 全开昂贵 e2e（应按 LIVE 产品**重选** gate）  
-9. 顺手视觉品牌重做  
-10. 合并 TeamRun 双 fork 却不决定产品 owner  
+1. 整仓 rewrite 或“为拆而拆”的微服务化
+2. 放弃 Local Edge 改成纯云 IDE
+3. Mobile UI 深改、商店发布、Tauri Mobile 复活
+4. 默认自动化真实模型消耗 / 签名 / 公证 / 生产上传（需单独审批）
+5. 用 wiki/RAG 产品替代 AGENTS 与 architecture
+6. 把 `reference/` 3.7G 研究树提交进 git
+7. 一次 PR 收敛全部 Hub/Edge JSON 包络
+8. 无差别把 CI 全开昂贵 e2e（应按 LIVE 产品**重选** gate）
+9. 顺手视觉品牌重做
+10. 合并 TeamRun 双 fork 却不决定产品 owner
 
 ---
 
@@ -113,9 +113,9 @@ AgentHub 已具备正确的 **Hub/Edge 双平面 + shared platform/transcript** 
 
 **Exit**
 
-- [ ] 任何 cleanup agent 先读四件套 + `AGENTS.md` + server STATE Current Role  
-- [ ] 不再从 CI 页眉或过期 memory 推断 offline  
-- [ ] 风险表承认 046/049 **PARTIAL**（register 校准可在 Phase 1 合入）  
+- [ ] 任何 cleanup agent 先读四件套 + `AGENTS.md` + server STATE Current Role
+- [ ] 不再从 CI 页眉或过期 memory 推断 offline
+- [ ] 风险表承认 046/049 **PARTIAL**（register 校准可在 Phase 1 合入）
 
 ### Phase 1 — Truth & hygiene（1–3 短 PR）
 
@@ -134,10 +134,10 @@ AgentHub 已具备正确的 **Hub/Edge 双平面 + shared platform/transcript** 
 
 **Exit**
 
-- [ ] 新人/agent 不会把产品当 decommissioned  
-- [ ] clone 不依赖 tracked ELF  
-- [ ] 工作树 hygiene 政策明确  
-- [ ] 无新根级脚本 wrapper  
+- [ ] 新人/agent 不会把产品当 decommissioned
+- [ ] clone 不依赖 tracked ELF
+- [ ] 工作树 hygiene 政策明确
+- [ ] 无新根级脚本 wrapper
 
 ### Phase 2 — Lightweight llmwiki（可与 Phase 1 并行）
 
@@ -156,17 +156,17 @@ wiki/ (derived, disposable)
 
 **Rules**
 
-1. Wiki **只读派生**；冲突以 sources 为准  
-2. 不写密钥、不写 live 密码、不替代 server STATE  
-3. 不进入产品运行时  
-4. 可整目录删除而不损 SSOT  
-5. 维护税 > 导航收益 → 关掉  
+1. Wiki **只读派生**；冲突以 sources 为准
+2. 不写密钥、不写 live 密码、不替代 server STATE
+3. 不进入产品运行时
+4. 可整目录删除而不损 SSOT
+5. 维护税 > 导航收益 → 关掉
 
 **Exit**
 
-- [ ] `wiki/Home.md` 声明 compiled layer / not SSOT  
-- [ ] 全文可回链 SSOT  
-- [ ] 新 Agent 阅读路径 ≤ 5 个入口  
+- [ ] `wiki/Home.md` 声明 compiled layer / not SSOT
+- [ ] 全文可回链 SSOT
+- [ ] 新 Agent 阅读路径 ≤ 5 个入口
 
 ### Phase 3 — Security minimum loops（行为改变，小切片）
 
@@ -181,11 +181,11 @@ wiki/ (derived, disposable)
 
 **Exit**
 
-- [ ] register 与代码同态  
-- [ ] remote run-start 不再“Edge 验、Hub 不发”  
-- [ ] outbox retry 在进程内真实运行  
-- [ ] 发布门禁可引用 evidence / accepted  
-- [ ] 触达服务 `go test -short` 绿  
+- [ ] register 与代码同态
+- [ ] remote run-start 不再“Edge 验、Hub 不发”
+- [ ] outbox retry 在进程内真实运行
+- [ ] 发布门禁可引用 evidence / accepted
+- [ ] 触达服务 `go test -short` 绿
 
 ### Phase 4 — Backend strangler（行为稳定）
 
@@ -193,48 +193,48 @@ wiki/ (derived, disposable)
 
 #### Hub
 
-1. 抽 `DispatchService` / `RunEventService` / `EdgeCallbackService`（名可变）出 `AgentService`  
-2. delivery 模型进 `model`/`repository`  
-3. target maturity：代码保持 local_edge-only；hub_relay 标 incomplete 或死代码闸  
-4. router 按 surface 拆注册 + deps struct  
-5. 后续 im/catalog 等 agentteam 风格子包  
-6. 测试卫生：拆 mega-test、减 Sleep（不降保护力）  
+1. 抽 `DispatchService` / `RunEventService` / `EdgeCallbackService`（名可变）出 `AgentService`
+2. delivery 模型进 `model`/`repository`
+3. target maturity：代码保持 local_edge-only；hub_relay 标 incomplete 或死代码闸
+4. router 按 surface 拆注册 + deps struct
+5. 后续 im/catalog 等 agentteam 风格子包
+6. 测试卫生：拆 mega-test、减 Sleep（不降保护力）
 
 #### Edge
 
-1. `ProcessExecutor` 抽 `CallbackReporter`、`SubAgentSpawner`、output pipeline  
-2. `handlers.go` 按路由域拆文件（OpenAPI 路径不变）  
-3. orchestrator/failure 迁出 `adapters` → lifecycle/agents  
-4. store domain interfaces 渐进  
-5. `/v1/runners` 保留 shape，数据改 AdapterRegistry 投影  
+1. `ProcessExecutor` 抽 `CallbackReporter`、`SubAgentSpawner`、output pipeline
+2. `handlers.go` 按路由域拆文件（OpenAPI 路径不变）
+3. orchestrator/failure 迁出 `adapters` → lifecycle/agents
+4. store domain interfaces 渐进
+5. `/v1/runners` 保留 shape，数据改 AdapterRegistry 投影
 
 **Exit**
 
-- [ ] 对外路径兼容  
-- [ ] 关键路径不再只有“一个 2k 文件可改”  
-- [ ] dispatch 成熟度在代码与文档一致  
-- [ ] 无循环依赖回潮  
-- [ ] 触达包 short tests 绿  
+- [ ] 对外路径兼容
+- [ ] 关键路径不再只有“一个 2k 文件可改”
+- [ ] dispatch 成熟度在代码与文档一致
+- [ ] 无循环依赖回潮
+- [ ] 触达包 short tests 绿
 
 ### Phase 5 — Frontend dedupe & honesty
 
-1. **shared hubClient SSOT**：types → methods → 删 desktop/web forks（auth storage 留 surface）  
-2. import-graph 后删除/归档孤儿 Settings / TeamRunConsole  
-3. ConversationPort 对齐真实会话 **或** 明确 port 非 list SSOT  
-4. 统一 dataMode 词表；退役/改名 `workbenchDataMode.ts`  
-5. 继续拆 `AgentHubWorkbench` / mega-tests  
-6. Settings：shared page = UI SSOT；Edge diagnostics 走 SettingsPort  
-7. TeamRun：**先产品决策** 再 merge 或 archive  
-8. Mobile：fail-closed + shared client；**不上**全量 workbench  
+1. **shared hubClient SSOT**：types → methods → 删 desktop/web forks（auth storage 留 surface）
+2. import-graph 后删除/归档孤儿 Settings / TeamRunConsole
+3. ConversationPort 对齐真实会话 **或** 明确 port 非 list SSOT
+4. 统一 dataMode 词表；退役/改名 `workbenchDataMode.ts`
+5. 继续拆 `AgentHubWorkbench` / mega-tests
+6. Settings：shared page = UI SSOT；Edge diagnostics 走 SettingsPort
+7. TeamRun：**先产品决策** 再 merge 或 archive
+8. Mobile：fail-closed + shared client；**不上**全量 workbench
 
 **Exit**
 
-- [ ] 产品路径不再维护第二份完整 hubClient  
-- [ ] 孤儿删除有引用扫描证据  
-- [ ] AH-SR-043 相关断言存在  
-- [ ] shared + 触达 app typecheck/test 绿  
-- [ ] UI 行为变更有 Playwright/Visual QA 或“无 UI 行为变化”说明  
-- [ ] Mobile boundary tests 绿  
+- [ ] 产品路径不再维护第二份完整 hubClient
+- [ ] 孤儿删除有引用扫描证据
+- [ ] AH-SR-043 相关断言存在
+- [ ] shared + 触达 app typecheck/test 绿
+- [ ] UI 行为变更有 Playwright/Visual QA 或“无 UI 行为变化”说明
+- [ ] Mobile boundary tests 绿
 
 ---
 
@@ -252,11 +252,11 @@ wiki/ (derived, disposable)
 
 ### 协作规则
 
-1. **security-capability** 定义跨服务合同（header、claims、ack 语义）；实现队服从合同  
-2. **frontend-dedupe** 不绕过 platform ports 直打新 API  
-3. **wiki** 只在其他队合并后刷新链接，不阻塞代码队  
-4. **hygiene** 先合叙事，减少 PR 描述写错生产状态  
-5. 每 PR：范围、验证命令、证据等级、非目标  
+1. **security-capability** 定义跨服务合同（header、claims、ack 语义）；实现队服从合同
+2. **frontend-dedupe** 不绕过 platform ports 直打新 API
+3. **wiki** 只在其他队合并后刷新链接，不阻塞代码队
+4. **hygiene** 先合叙事，减少 PR 描述写错生产状态
+5. 每 PR：范围、验证命令、证据等级、非目标
 
 ### 建议分支命名
 
@@ -276,13 +276,13 @@ chore/frontend-orphan-settings
 
 ## 8. Strangler 执行原则
 
-1. **先端口后搬家**  
-2. **先删真孤儿，再合并相似实现**  
-3. **兼容外壳可留一个版本**（runners、旧 envelope）  
-4. **一个 PR 一个可叙述行为**  
-5. **测试与实现同向绞杀**  
-6. **产品成熟度以代码强制为准**  
-7. **证据诚实**：readiness ≠ real；partial ≠ closed  
+1. **先端口后搬家**
+2. **先删真孤儿，再合并相似实现**
+3. **兼容外壳可留一个版本**（runners、旧 envelope）
+4. **一个 PR 一个可叙述行为**
+5. **测试与实现同向绞杀**
+6. **产品成熟度以代码强制为准**
+7. **证据诚实**：readiness ≠ real；partial ≠ closed
 
 ---
 
@@ -303,16 +303,16 @@ chore/frontend-orphan-settings
 
 ## 10. Top priorities（有序）
 
-1. 生产叙事 SSOT：STATE + `deployments/production` + CI 去 decommissioned 误导  
-2. 镜像名统一 + CD 诚实（真部署或 dry-run 标注）  
-3. AH-SR-046 闭环（Hub 签发 + claims + 负例）  
-4. AH-SR-049：Hub outbox retry 接线 + Edge journal 最小切片  
-5. AH-SR-045 remote 作用域授权  
-6. AH-SR-037 决策（修或 accept）  
-7. AH-SR-043 dataMode / demo 门禁  
-8. hubClient SSOT 收敛 Desktop/Web  
-9. Hub AgentService / Edge ProcessExecutor+handlers 端口化拆分  
-10. Hygiene：binary、gen dirty tree、scripts readiness、orphan UI 决策  
+1. 生产叙事 SSOT：STATE + `deployments/production` + CI 去 decommissioned 误导
+2. 镜像名统一 + CD 诚实（真部署或 dry-run 标注）
+3. AH-SR-046 闭环（Hub 签发 + claims + 负例）
+4. AH-SR-049：Hub outbox retry 接线 + Edge journal 最小切片
+5. AH-SR-045 remote 作用域授权
+6. AH-SR-037 决策（修或 accept）
+7. AH-SR-043 dataMode / demo 门禁
+8. hubClient SSOT 收敛 Desktop/Web
+9. Hub AgentService / Edge ProcessExecutor+handlers 端口化拆分
+10. Hygiene：binary、gen dirty tree、scripts readiness、orphan UI 决策
 
 ---
 
@@ -331,14 +331,14 @@ chore/frontend-orphan-settings
 
 ## 12. Open questions（不阻塞基线）
 
-1. AH-SR-037：公开 Web 时间表是否强制 BFF，还是短期 Accepted risk？  
-2. TeamRun UI：workbench 内嵌 vs 独立 console vs 暂缓？  
-3. CI 恢复集：live 后哪些 gate 必须 push 自动？  
-4. capability 字段最小集：本轮是否一次包含 workspace/target/action？  
-5. Tauri gen schemas：打包是否仍依赖已删文件？  
-6. 镜像发布权：`cd-hub-server` vs `cd-production` 谁为 build 权威？  
-7. Envelope 收敛：是否立季度目标，还是仅登记债务？  
-8. llmwiki：Phase 3 前启用只读 compile，还是等清理稳定后？  
+1. AH-SR-037：公开 Web 时间表是否强制 BFF，还是短期 Accepted risk？
+2. TeamRun UI：workbench 内嵌 vs 独立 console vs 暂缓？
+3. CI 恢复集：live 后哪些 gate 必须 push 自动？
+4. capability 字段最小集：本轮是否一次包含 workspace/target/action？
+5. Tauri gen schemas：打包是否仍依赖已删文件？
+6. 镜像发布权：`cd-hub-server` vs `cd-production` 谁为 build 权威？
+7. Envelope 收敛：是否立季度目标，还是仅登记债务？
+8. llmwiki：Phase 3 前启用只读 compile，还是等清理稳定后？
 
 ---
 
@@ -346,12 +346,12 @@ chore/frontend-orphan-settings
 
 Cleanup 成功 **不是** “目录更少” 或 “重写完成”，而是：
 
-1. Live 生产叙事与 CI/模板一致  
-2. Open High 要么 closed with evidence，要么 partial 有关闭条件，要么 accepted  
-3. 关键执行/控制路径可在端口边界上改，而不必编辑 2k 行神文件  
-4. Desktop/Web 共享合同与客户端不再三叉漂移  
-5. Agent 入场只依赖 AGENTS + roadmap + architecture +（可选）compiled wiki  
-6. 全程无架构红线破坏、无假 real 证据、无 big-bang rewrite  
+1. Live 生产叙事与 CI/模板一致
+2. Open High 要么 closed with evidence，要么 partial 有关闭条件，要么 accepted
+3. 关键执行/控制路径可在端口边界上改，而不必编辑 2k 行神文件
+4. Desktop/Web 共享合同与客户端不再三叉漂移
+5. Agent 入场只依赖 AGENTS + roadmap + architecture +（可选）compiled wiki
+6. 全程无架构红线破坏、无假 real 证据、无 big-bang rewrite
 
 ---
 

@@ -1,8 +1,8 @@
 # Task Breakdown — AgentHub Cleanup Baseline
 
-> last-updated: 2026-07-16  
-> program: knowledge-first strangler cleanup + lightweight wiki (non-SSOT)  
-> tracking: GITHUB_FULL (Issues + Milestones + Project board)  
+> last-updated: 2026-07-16
+> program: knowledge-first strangler cleanup + lightweight wiki (non-SSOT)
+> tracking: GITHUB_FULL (Issues + Milestones + Project board)
 > hard rule: **NO big-bang rewrite**
 
 ## Overview
@@ -26,8 +26,8 @@
 - **禁止无 Issue 的自由发挥重构**；Workflow/subagent 只能执行已建 Issue
 
 ## Phase 1: Governance Lock (GITHUB_FULL)
-**Goal**: 把清理程序从 ad-hoc Workflow 切到 SPEC + GitHub Project 正规管理  
-**Prerequisite**: analysis 四件套 + hygiene baseline commits  
+**Goal**: 把清理程序从 ad-hoc Workflow 切到 SPEC + GitHub Project 正规管理
+**Prerequisite**: analysis 四件套 + hygiene baseline commits
 **S.U.P.E.R Focus**: E/R（权威面与可替换工作流）
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -43,7 +43,7 @@
 | B | T1.3 | Low | `docs/plan/*`, CD docs |
 
 ## Phase 2: Truth & Hygiene residual
-**Goal**: 清完 P0 叙事/脏树/权威面残留  
+**Goal**: 清完 P0 叙事/脏树/权威面残留
 **S.U.P.E.R Focus**: E
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -53,7 +53,7 @@
 | T2.3 | 降级 `hub-server/deployments/*` 旧 prod 模板 banner（非权威） | P1 | S | T1.3 | A | E | docs-only | None | banner 指向 `deployments/production` + server STATE |
 
 ## Phase 3: Frontend strangler (hubClient SSOT)
-**Goal**: 按 frontend-dedupe-plan 收敛 client，不改 UX  
+**Goal**: 按 frontend-dedupe-plan 收敛 client，不改 UX
 **S.U.P.E.R Focus**: S,P,R
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -71,7 +71,7 @@
 | C | T3.4 | Med | `app/web/src/api/**`, platform |
 
 ## Phase 4: Edge seams + security half-loops
-**Goal**: god-file 可维护 + capability/outbox 半闭环可继续  
+**Goal**: god-file 可维护 + capability/outbox 半闭环可继续
 **S.U.P.E.R Focus**: S,U,P
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
@@ -82,7 +82,7 @@
 | T4.4 | AH-SR-049：启动 Hub outbox retry + 失败不 silent continue；Edge journal 最小合同 | P0 | L | T4.2 | B | U,P | service/outbox tests | risk register | retry loop 在 app wiring 运行；剩余关闭条件明确 |
 
 ## Phase 5: Closure decisions & residual
-**Goal**: 发布门禁可解释；orphan UI 决策；程序可继续或归档  
+**Goal**: 发布门禁可解释；orphan UI 决策；程序可继续或归档
 **S.U.P.E.R Focus**: R
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |

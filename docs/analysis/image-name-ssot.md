@@ -1,6 +1,6 @@
 # Image name SSOT decision
 
-最后更新：2026-07-16  
+最后更新：2026-07-16
 Issue: #426 (T1.3)
 
 ## Decision
