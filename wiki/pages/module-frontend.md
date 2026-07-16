@@ -25,7 +25,7 @@ related:
   - module-edge-server
   - architecture-seams
   - flow-control-event
-  - risk-evidence-grade-confusion
+  - risk-evid-grade-confusion
 summary: >
   前端三平台（Desktop/Web/Mobile RN）共享 workbench/transcript/composer/inspector 合同；
   桌面走 Local Edge，Web 走 Hub-only，Mobile 主线 Expo+RN；
@@ -208,8 +208,8 @@ Settings 和 Agent profile 数据感知 surface 但通过共享 UI 渲染：
 |---|---|---|
 | [[mobile-path-residue]] | P2 | 旧 Tauri Mobile 路径/文档残留，如仍被引用则需清理。 |
 | [[edge-runners-compat]] | P2 | Runner compatibility health 进入 UI，与 Runtime adapter 模型不一致。 |
-| [[risk-evidence-grade-confusion]] | P0 | Fixture/stub/readiness-only 不得声称 real login、real model 或 production。 |
-| [[risk-secret-and-session-boundary]] | P1 | Web `sessionStorage` Hub session（AH-SR-037）；Gateway key 不入浏览器 UI。 |
+| [[risk-evid-grade-confusion]] | P0 | Fixture/stub/readiness-only 不得声称 real login、real model 或 production。 |
+| [[risk-session-secret-boundary]] | P1 | Web `sessionStorage` Hub session（AH-SR-037）；Gateway key 不入浏览器 UI。 |
 | Web preview/mock surfaces（AH-SR-043） | P2 | 可能和生产 UI 路径共享，误报 fake execution 或 fake private-chat success。需显式 gate。 |
 
 ## 参考决策
