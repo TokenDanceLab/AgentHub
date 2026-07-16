@@ -1,7 +1,7 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479 / #492 / #503 / #504
+> issue: #470 / residual #479 / #492 / #503 / #504 / #517
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -86,6 +86,7 @@ but no longer remain silent in the Settings product surface.
 | `pages/TasksPage.tsx` | primary empty uses shared `EmptyState` (#503); public `emptyStateLabel` maps to description |
 | `pages/ContactsPage.tsx` | primary empty uses shared `EmptyState` (#504); residual search loading text |
 | `pages/ProjectsPage.tsx` | loading caption / error alert / editor error |
+| `pages/DocsPage.tsx` | primary empty uses shared `EmptyState` (#517); loading/error status not plumbed |
 | Shell lists (desktop/web AgentList, NotificationBell, WelcomeScreen, DiffViewer, IMContactList) | shared `@shared/ui/EmptyState` |
 
 ## 6. Copy / structure divergences after orphan deletion
@@ -131,7 +132,7 @@ but no longer remain silent in the Settings product surface.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
-## 9.1 Residual after Agents/Tasks/Contacts EmptyState (#492 / #503 / #504)
+## 9.1 Residual after Agents/Tasks/Contacts/Docs EmptyState (#492 / #503 / #504 / #517)
 
 | Surface | After | Next |
 |---|---|---|
@@ -139,4 +140,4 @@ but no longer remain silent in the Settings product surface.
 | TasksPage primary empty | shared `EmptyState` (#503) | — |
 | ContactsPage primary empty | shared `EmptyState` (#504) | residual search loading text |
 | ProjectsPage | loading/error captions | follow-up |
-| DocsPage | verify when touched | follow-up |
+| DocsPage primary empty | shared `EmptyState` (#517) | loading/error status not plumbed; mock fallback can mask real empty/error; tab/search filter empty residual |
