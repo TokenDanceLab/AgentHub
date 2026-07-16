@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { type TopMenuDefinition } from '@/components/TopMenuBar';
-import type { SectionId as SettingsSectionId } from '@/components/SettingsPage';
+import type { SectionId as SettingsSectionId } from '@/components/settings/sectionIds';
 
 type EditCommand = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll';
 type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';
