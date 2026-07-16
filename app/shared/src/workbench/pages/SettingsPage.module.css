@@ -19,8 +19,8 @@
 .navSearch {
   width: 100%;
   height: 40px;
-  margin: 0 0 10px;
-  padding: 0 14px;
+  margin: 0 0 var(--sp-10);
+  padding: 0 var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -46,15 +46,15 @@
 .navRow {
   width: 100%;
   min-height: 42px;
-  padding: 0 12px;
-  margin: 2px 0;
+  padding: 0 var(--space-md);
+  margin: var(--sp-2) 0;
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   text-align: left;
   font: 500 0.9375rem var(--font-sans);
   cursor: pointer;
@@ -104,7 +104,7 @@
 /* ── Scope rows ── */
 .scopeRow {
   min-height: 42px;
-  margin: 2px 8px;
+  margin: var(--sp-2) var(--sp-sm);
   padding: 7px 10px 7px 34px;
   border-radius: var(--r-sm);
   color: var(--text-2);
@@ -129,7 +129,7 @@
 
 .scopeRow span {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -151,8 +151,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
 }
 
 .headTitle {
@@ -208,7 +208,7 @@
 
 .sectionTitleRow {
   min-height: 32px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -243,9 +243,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sp-md);
   min-height: 62px;
-  padding: 12px 14px;
+  padding: var(--space-md) var(--sp-14);
   border: 0;
   border-bottom: 1px solid var(--bdr);
   border-radius: 0;
@@ -293,7 +293,7 @@
 .value {
   max-width: 240px;
   height: 36px;
-  padding: 0 14px;
+  padding: 0 var(--sp-14);
   border: 1px solid var(--primary);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -324,12 +324,12 @@
   background: var(--surface-low);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-2);
 }
 
 .segmentBtn {
   height: 26px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
@@ -362,7 +362,7 @@
 .switch {
   width: 42px;
   height: 24px;
-  padding: 2px;
+  padding: var(--sp-2);
   border: 1px solid var(--bdr);
   border-radius: var(--r-full);
   background: var(--surface-high);
@@ -401,13 +401,13 @@
   min-width: 0;
   max-width: 390px;
   height: 34px;
-  padding: 0 4px 0 10px;
+  padding: 0 var(--sp-xs) 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface-low);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease);
@@ -458,7 +458,7 @@
 .modeStatus {
   max-width: 920px;
   margin: -8px 0 18px;
-  padding: 14px;
+  padding: var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -476,11 +476,11 @@
 
 .modeStatusHead {
   min-height: 32px;
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-10);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--sp-14);
 }
 
 .modeStatusHead span {
@@ -523,15 +523,15 @@
 }
 
 .modeFacts {
-  margin-top: 12px;
+  margin-top: var(--space-md);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--sp-sm);
 }
 
 .modeFacts div {
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--sp-10) var(--space-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
@@ -551,7 +551,7 @@
 }
 
 .modeFacts dd {
-  margin-top: 4px;
+  margin-top: var(--sp-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -566,7 +566,7 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
-  padding: 14px;
+  padding: var(--sp-14);
   transition:
     border-color var(--dur-normal) var(--ease),
     box-shadow var(--dur-medium) var(--ease);
@@ -575,13 +575,13 @@
 .stateGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--sp-10);
 }
 
 /* ── State panels ── */
 .statePanel {
   min-height: 190px;
-  padding: 16px;
+  padding: var(--sp-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface-low);
@@ -614,21 +614,21 @@
 }
 
 .statePanel h3 {
-  margin-top: 14px;
+  margin-top: var(--sp-14);
   font: 600 0.9375rem var(--font-sans);
   color: var(--text-1);
 }
 
 .statePanel p {
-  margin-top: 6px;
+  margin-top: var(--sp-xxs);
   color: var(--text-2);
   font: 400 0.75rem/1.5 var(--font-sans);
 }
 
 .statePanel button {
-  margin-top: 16px;
+  margin-top: var(--sp-md);
   height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -667,15 +667,15 @@
 /* ── Agent config link section ── */
 .agentConfigLink {
   max-width: 920px;
-  margin-top: 8px;
-  padding: 16px;
+  margin-top: var(--sp-sm);
+  padding: var(--sp-md);
   border: 1px solid var(--primary);
   border-radius: var(--r-lg);
   background: var(--primary-light);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sp-md);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -699,14 +699,14 @@
 }
 
 .agentConfigLinkContent p {
-  margin: 4px 0 0;
+  margin: var(--sp-xs) 0 0;
   color: var(--text-2);
   font: 400 0.75rem/1.45 var(--font-sans);
 }
 
 .agentConfigLinkBtn {
   height: 36px;
-  padding: 0 14px;
+  padding: 0 var(--sp-14);
   border: 1px solid var(--primary);
   border-radius: var(--r-md);
   background: var(--primary);
@@ -714,7 +714,7 @@
   font: 600 0.8125rem var(--font-sans);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   white-space: nowrap;
   cursor: pointer;
   transition:

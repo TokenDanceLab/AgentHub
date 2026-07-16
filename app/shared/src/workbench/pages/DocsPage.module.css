@@ -13,8 +13,8 @@
 .search {
   width: 100%;
   height: 40px;
-  margin: 0 0 10px;
-  padding: 0 14px;
+  margin: 0 0 var(--sp-10);
+  padding: 0 var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -36,15 +36,15 @@
 .navRow {
   width: 100%;
   min-height: 42px;
-  padding: 0 12px;
-  margin: 2px 0;
+  padding: 0 var(--space-md);
+  margin: var(--sp-2) 0;
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   text-align: left;
   font: 500 0.9375rem var(--font-sans);
   cursor: pointer;
@@ -130,8 +130,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
 }
 
 .headTitle {
@@ -173,8 +173,8 @@
 .docActions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
+  gap: var(--sp-14);
+  margin-bottom: var(--sp-lg);
   overflow: hidden;
 }
 
@@ -188,7 +188,7 @@
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-14);
   font: 500 0.9375rem var(--font-sans);
   white-space: nowrap;
   overflow: hidden;
@@ -243,7 +243,7 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: 26px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-sm);
   color: var(--text-2);
   font: 500 0.9375rem var(--font-sans);
   min-width: 0;
@@ -309,7 +309,7 @@
   display: grid;
   grid-template-columns: minmax(260px, 1.6fr) minmax(150px, 1fr) minmax(110px, 0.7fr) minmax(120px, 0.8fr) 42px;
   align-items: center;
-  gap: 16px;
+  gap: var(--sp-md);
   min-height: 54px;
   border-bottom: 1px solid var(--bdr);
   color: var(--text-3);
@@ -320,7 +320,7 @@
   display: grid;
   grid-template-columns: minmax(260px, 1.6fr) minmax(150px, 1fr) minmax(110px, 0.7fr) minmax(120px, 0.8fr) 42px;
   align-items: center;
-  gap: 16px;
+  gap: var(--sp-md);
   min-height: 54px;
   border-bottom: 1px solid var(--bdr);
   color: var(--text-2);
@@ -342,7 +342,7 @@
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   color: var(--text-2);
 }
 
@@ -371,7 +371,7 @@
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -432,7 +432,7 @@
 
 /* ── Doc delete button ── */
 .docDeleteBtn {
-  padding: 4px;
+  padding: var(--sp-xs);
   border: 0;
   background: transparent;
   color: var(--text-3);
@@ -461,7 +461,7 @@
 }
 
 .confirmDeleteBtn {
-  padding: 2px 8px;
+  padding: var(--sp-2) var(--sp-sm);
   border: 0;
   border-radius: var(--r-xs);
   background: var(--danger, #e5484d);
@@ -472,7 +472,7 @@
 }
 
 .cancelDeleteBtn {
-  padding: 2px 8px;
+  padding: var(--sp-2) var(--sp-sm);
   border: 1px solid var(--bdr);
   border-radius: var(--r-xs);
   background: var(--surface);
@@ -483,7 +483,7 @@
 }
 
 .previewPanel {
-  margin-top: 14px;
+  margin-top: var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface-low);
@@ -493,19 +493,19 @@
 
 .previewHead {
   min-height: 44px;
-  padding: 8px 12px;
+  padding: var(--sp-sm) var(--space-md);
   border-bottom: 1px solid var(--bdr);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .previewHead div {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
 }
 
 .previewHead span,

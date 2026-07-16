@@ -7,16 +7,16 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 /* ── Run result banner ── */
 .runResult {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: var(--sp-10) var(--space-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -52,7 +52,7 @@
 
 .runResultSummary {
   width: 100%;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
   color: var(--text-2);
   font: 400 0.75rem/1.55 var(--font-sans);
 }
@@ -61,8 +61,8 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px 12px;
+  gap: var(--sp-sm);
+  padding: var(--sp-10) var(--space-md) var(--space-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -103,12 +103,12 @@
 .sectionHead {
   width: 100%;
   min-height: 30px;
-  padding: 0 0 0 2px;
+  padding: 0 0 0 var(--sp-2);
   color: var(--text-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-10);
   font: 500 0.75rem/1.5 var(--font-sans);
 }
 
@@ -179,8 +179,8 @@
 .task {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0;
+  gap: var(--sp-sm);
+  padding: var(--sp-xxs) 0;
   font: 400 0.75rem/1.4 var(--font-sans);
   color: var(--text-2);
 }
@@ -253,7 +253,7 @@
 .subhead {
   font: 500 0.6875rem var(--font-sans);
   color: var(--text-2);
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 
 /* ── File list ── */
@@ -268,7 +268,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   min-width: 0;
   min-height: 32px;
   padding: 4px 7px;

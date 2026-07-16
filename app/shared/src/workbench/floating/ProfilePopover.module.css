@@ -5,7 +5,7 @@
   z-index: var(--z-profile-popover);
   width: 352px;
   max-width: calc(100vw - 24px);
-  padding: 12px;
+  padding: var(--space-md);
   border: 1px solid var(--bdr-strong);
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
@@ -31,7 +31,7 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding-bottom: 12px;
+  padding-bottom: var(--space-md);
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -108,7 +108,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-sm);
-  padding: 12px 0;
+  padding: var(--space-md) 0;
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -156,7 +156,7 @@
 .meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-2);
   padding-top: 9px;
 }
 
@@ -165,7 +165,7 @@
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
+  gap: var(--sp-10);
   color: var(--text-3);
   font: 400 0.75rem/1.45 var(--font-sans);
 }
@@ -182,7 +182,7 @@
    ══════════════════════════════════════════════════════════════════ */
 
 .account {
-  padding: 10px;
+  padding: var(--sp-10);
   background: color-mix(in srgb, var(--surface) 97%, white 3%);
   box-shadow: 0 16px 42px rgba(16, 24, 40, 0.12), 0 2px 8px rgba(16, 24, 40, 0.06);
 }
@@ -191,7 +191,7 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: var(--sp-xs) var(--sp-xs) 10px;
+  padding: var(--sp-xs) var(--sp-xs) var(--sp-10);
 }
 
 .accountAvatar {
@@ -237,7 +237,7 @@
 }
 
 .accountActions {
-  padding: 10px 0;
+  padding: var(--sp-10) 0;
 }
 
 /* ── Account Menu ── */
@@ -246,7 +246,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 2px 0;
+  padding: var(--sp-2) 0;
 }
 
 .accountMenuRow {
