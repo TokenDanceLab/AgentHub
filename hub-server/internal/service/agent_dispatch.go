@@ -804,9 +804,13 @@ func (s *AgentService) issueRunStartCapability(dp *dispatchPayload) string {
 	if userID == "" {
 		userID = "hub-dispatch"
 	}
-	// Edge HTTP dispatch currently uses proj_local; keep capability project aligned.
+	// Edge HTTP dispatch currently uses proj_local / thread_local; keep capability bindings aligned.
 	projectID := "proj_local"
-	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, "run-start", 5*time.Minute)
+	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, "run-start", 5*time.Minute, jwtutil.CapabilityIssueOptions{
+		Action:   "run-start",
+		TargetID: strings.TrimSpace(dp.TargetID),
+		ThreadID: "thread_local",
+	})
 	if err != nil {
 		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", deviceID)
 		return ""

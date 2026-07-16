@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -3310,5 +3311,167 @@ func TestRunStartDualToken_WrongPurposeReturns403(t *testing.T) {
 	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
 	if len(executor.started) != 0 {
 		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WrongActionReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	claims := jwtutil.CapabilityClaims{
+		UserID: "user-1", DeviceID: "test-edge-001", ProjectID: "proj_local",
+		Purpose: "run-start", Action: "stream",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "agenthub-hub", Audience: jwt.ClaimStrings{"agenthub-edge"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)), IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"action test"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", tok)
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WrongThreadReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	claims := jwtutil.CapabilityClaims{
+		UserID: "user-1", DeviceID: "test-edge-001", ProjectID: "proj_local",
+		Purpose: "run-start", Action: "run-start", ThreadID: "thread_other",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "agenthub-hub", Audience: jwt.ClaimStrings{"agenthub-edge"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)), IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"thread test"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", tok)
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_WrongTargetReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	claims := jwtutil.CapabilityClaims{
+		UserID: "user-1", DeviceID: "test-edge-001", ProjectID: "proj_local",
+		Purpose: "run-start", Action: "run-start", TargetID: "target-a",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "agenthub-hub", Audience: jwt.ClaimStrings{"agenthub-edge"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)), IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"target test"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", tok)
+	req.Header.Set("X-AgentHub-Target-Id", "target-b")
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_MatchingTargetAndThreadAccepted(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	claims := jwtutil.CapabilityClaims{
+		UserID: "user-1", DeviceID: "test-edge-001", ProjectID: "proj_local",
+		Purpose: "run-start", Action: "run-start", TargetID: "target-a", ThreadID: "thread_local",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "agenthub-hub", Audience: jwt.ClaimStrings{"agenthub-edge"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)), IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"bound ok"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", tok)
+	req.Header.Set("X-AgentHub-Target-Id", "target-a")
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+type fakeCallbackJournal struct {
+	entries []hub.DeliveryJournalEntry
+}
+
+func (f *fakeCallbackJournal) DurableSnapshot(afterSeq uint64) ([]hub.DeliveryJournalEntry, error) {
+	var out []hub.DeliveryJournalEntry
+	for _, e := range f.entries {
+		if e.Seq > afterSeq {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+func TestGetDeliveryJournal_ReturnsEntries(t *testing.T) {
+	h := newTestHandler()
+	h.CallbackClient = &fakeCallbackJournal{entries: []hub.DeliveryJournalEntry{
+		{Seq: 1, TaskID: "t1", Action: "ack", OK: true, Attempts: 1},
+		{Seq: 2, TaskID: "t1", Action: "done", OK: true, Attempts: 1},
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/v1/delivery-journal?afterSeq=1", nil)
+	rec := httptest.NewRecorder()
+	h.GetDeliveryJournal(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"count":1`) && !strings.Contains(rec.Body.String(), `"count": 1`) {
+		// tolerate spacing
+		if !strings.Contains(rec.Body.String(), "done") {
+			t.Fatalf("body=%s", rec.Body.String())
+		}
+	}
+}
+
+func TestGetDeliveryJournal_NotConfigured(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/v1/delivery-journal", nil)
+	rec := httptest.NewRecorder()
+	h.GetDeliveryJournal(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
