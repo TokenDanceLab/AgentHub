@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type ComposerMention,
@@ -13,22 +13,14 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
-import type { ApprovalDecisionAction } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock, ApprovalDecisionAction } from '../transcript';
 import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
-import {
-  ContextMenu,
-  MultiSelectBar,
-  ProfilePopover,
-  Toast,
-  type ContextMenuItem,
-  type MultiSelectBarAction,
-} from './floating';
+import { ProfilePopover } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { buildMainchainSummary } from './mainchain';
-import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
+import { type TranscriptContextMenuEvent } from './transcriptEventTypes';
 import type { FileItem } from './inspector';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
@@ -42,6 +34,8 @@ import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { createSettingsService, type SettingsService } from './settingsService';
 import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
+import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
 import {
   INSPECTOR_MAX_WIDTH,
   INSPECTOR_MIN_WIDTH,
@@ -50,8 +44,6 @@ import {
 } from './workbenchLayoutConstants';
 import styles from './AgentHubWorkbench.module.css';
 
-const SELECTION_HOLD_DELAY_MS = 520;
-const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
@@ -276,19 +268,6 @@ export function AgentHubWorkbench({
     setActivePage,
   });
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
-  const [contextMenu, setContextMenu] = useState<{
-    blockId: string;
-    title: string;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
-  const [actionedBlockIds, setActionedBlockIds] = useState<string[]>([]);
-  const [softHiddenBlockIds, setSoftHiddenBlockIds] = useState<string[]>([]);
-  const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastVisible, setToastVisible] = useState(false);
   const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
   const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
   const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
@@ -305,22 +284,40 @@ export function AgentHubWorkbench({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const selectionModeRef = useRef(false);
-  const selectionHoldRef = useRef<{
-    blockId: string;
-    timer: number | null;
-    x: number;
-    y: number;
-  } | null>(null);
-  const suppressSelectionPointerUpRef = useRef(false);
-  const runMultiActionRef = useRef<((action: string) => void) | null>(null);
-  const toastTimerRef = useRef<number | null>(null);
-  const pulseTimersRef = useRef<Map<string, number>>(new Map());
   const [composer, dispatchComposer] = useReducer(
     composerReducer,
     currentConversationId,
     createInitialComposerState,
   );
+  const {
+    selectionMode,
+    selectedBlockIds,
+    softHiddenBlockIds,
+    actionedBlockIds,
+    contextMenu,
+    setContextMenu,
+    toastMessage,
+    toastVisible,
+    selectBarRect,
+    multiSelectActions,
+    contextMenuGroups,
+    showWorkbenchToast,
+    openBlockContextMenu,
+    handleBlockSelect,
+    handleTranscriptBlockAction,
+    copyText,
+    resetSelection,
+  } = useWorkbenchTranscriptChrome({
+    transcript,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
+    onApprovalDecision,
+    onRegenerate,
+    dispatchComposer,
+    composerInputRef,
+    workspaceRef,
+    inspectorCollapsed,
+    inspectorWidth,
+  });
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
     composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
@@ -363,10 +360,6 @@ export function AgentHubWorkbench({
     }
     return undefined;
   }, [transcript]);
-
-  useEffect(() => {
-    selectionModeRef.current = selectionMode;
-  }, [selectionMode]);
 
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
   const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
@@ -412,35 +405,6 @@ export function AgentHubWorkbench({
     };
   }, [activePage, platform]);
 
-  useEffect(() => {
-    if (!selectionMode) return;
-
-    function handleSelectionKey(event: KeyboardEvent): void {
-      if (event.key === 'Escape') {
-        setSelectionMode(false);
-        setSelectedBlockIds([]);
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
-        event.preventDefault();
-        setSelectedBlockIds(transcript.map((block) => block.id));
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        runMultiActionRef.current?.('copy');
-        return;
-      }
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        runMultiActionRef.current?.('delete');
-      }
-    }
-
-    document.addEventListener('keydown', handleSelectionKey);
-    return () => document.removeEventListener('keydown', handleSelectionKey);
-  }, [selectedBlockIds, selectionMode, transcript]);
-
   // Ctrl/Cmd+F opens search when on chat page
   useEffect(() => {
     if (!isChatPage) return;
@@ -456,50 +420,8 @@ export function AgentHubWorkbench({
     return () => document.removeEventListener('keydown', handleSearchShortcut);
   }, [isChatPage]);
 
-  useEffect(() => () => {
-    if (selectionHoldRef.current?.timer) {
-      window.clearTimeout(selectionHoldRef.current.timer);
-    }
-    selectionHoldRef.current = null;
-  }, []);
-
-  useEffect(() => () => {
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    pulseTimersRef.current.forEach((id) => window.clearTimeout(id));
-    pulseTimersRef.current.clear();
-  }, []);
-
-  useEffect(() => {
-    if (!selectionMode) return;
-
-    function updateSelectBarRect(): void {
-      const rect = workspaceRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setSelectBarRect({
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-
-    updateSelectBarRect();
-    window.addEventListener('resize', updateSelectBarRect);
-    return () => window.removeEventListener('resize', updateSelectBarRect);
-  }, [selectionMode, inspectorCollapsed, inspectorWidth]);
-
   function handleToggleTheme(): void {
     toggleAppliedAgentHubTheme();
-  }
-
-  function showWorkbenchToast(message: string): void {
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-    setToastMessage(message);
-    setToastVisible(true);
-    toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 1700);
   }
 
   function openAgentProfile(agentName: string, anchor: HTMLElement): void {
@@ -659,338 +581,11 @@ export function AgentHubWorkbench({
     showWorkbenchToast(t('toast.deployPreviewOpened'));
   }
 
-  function blockTitle(block: TranscriptBlock): string {
-    switch (block.kind) {
-      case 'text':
-        return block.text.slice(0, 28) || block.author.name;
-      case 'tool_call':
-        return block.toolName;
-      case 'tool_result':
-        return `${block.toolName} result`;
-      case 'file_change':
-        return block.path;
-      case 'permission_request':
-      case 'permission_result':
-      case 'failure':
-      case 'finished':
-        return block.title;
-      case 'preview':
-        return block.url ?? block.previewId;
-      case 'diff':
-      case 'approval':
-      case 'artifact':
-      case 'subagent':
-      case 'subtask':
-      case 'child_agent':
-      case 'run_session':
-      case 'run_step_group':
-        return block.title;
-      case 'agent_timeline':
-        return block.title ?? t('mainchain.timeline');
-      case 'result':
-        return block.summary || (block.success ? t('mainchain.result') : t('mainchain.fail'));
-      case 'thinking':
-        return t('mainchain.thinking');
-      case 'route_decision':
-        return block.targetAgent || block.action;
-      case 'context_usage':
-        return block.modelLabel || '上下文用量';
-      default:
-        return '消息卡片';
-    }
-  }
-
-  function blockTitleById(blockId: string): string {
-    const block = transcript.find((item) => item.id === blockId);
-    return block ? blockTitle(block) : t('mainchain.selectedCard');
-  }
-
-  function openBlockContextMenu(
-    block: TranscriptBlock,
-    event: TranscriptContextMenuEvent,
-  ): void {
-    event.preventDefault();
-    setContextMenu({
-      blockId: block.id,
-      title: blockTitle(block),
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }
-
-  function selectBlock(blockId: string): void {
-    setSelectedBlockIds((current) => (
-      current.includes(blockId)
-        ? current.filter((id) => id !== blockId)
-        : [...current, blockId]
-    ));
-  }
-
-  function selectRangeTo(blockId: string): void {
-    const selectedIndexes = selectedBlockIds
-      .map((id) => transcript.findIndex((block) => block.id === id))
-      .filter((index) => index >= 0);
-    const anchorIndex = selectedIndexes.length
-      ? selectedIndexes[selectedIndexes.length - 1]!
-      : transcript.findIndex((block) => block.id === blockId);
-    const targetIndex = transcript.findIndex((block) => block.id === blockId);
-
-    if (anchorIndex < 0 || targetIndex < 0) {
-      selectBlock(blockId);
-      return;
-    }
-
-    const [from, to] = anchorIndex < targetIndex
-      ? [anchorIndex, targetIndex]
-      : [targetIndex, anchorIndex];
-    const rangeIds = transcript.slice(from, to + 1).map((block) => block.id);
-    setSelectionMode(true);
-    setSelectedBlockIds((current) => Array.from(new Set([...current, ...rangeIds])));
-  }
-
-  function handleBlockSelect(blockId: string, event?: { shiftKey?: boolean }): void {
-    if (event?.shiftKey) {
-      selectRangeTo(blockId);
-      return;
-    }
-    selectBlock(blockId);
-  }
-
   function selectConversation(conversationId: string): void {
     setLocalConversationId(conversationId);
-    setContextMenu(null);
-    setSelectionMode(false);
-    setSelectedBlockIds([]);
-    setActionedBlockIds([]);
-    setSoftHiddenBlockIds([]);
+    resetSelection();
     onActiveConversationChange?.(conversationId);
   }
-
-  function enterSelection(blockId: string): void {
-    selectionModeRef.current = true;
-    setSelectionMode(true);
-    setSelectedBlockIds([blockId]);
-  }
-
-  function clearSelectionHold(): void {
-    if (selectionHoldRef.current?.timer) {
-      window.clearTimeout(selectionHoldRef.current.timer);
-    }
-    selectionHoldRef.current = null;
-  }
-
-  function beginBlockHoldSelection(block: TranscriptBlock, event: TranscriptPointerEvent): void {
-    if (event.button !== 0 || isNestedInteractiveTarget(event.target, event.currentTarget)) return;
-    clearSelectionHold();
-    selectionHoldRef.current = {
-      blockId: block.id,
-      timer: window.setTimeout(() => {
-        enterSelection(block.id);
-        suppressSelectionPointerUpRef.current = true;
-        selectionHoldRef.current = null;
-      }, SELECTION_HOLD_DELAY_MS),
-      x: event.clientX,
-      y: event.clientY,
-    };
-  }
-
-  function updateBlockHoldSelection(event: TranscriptPointerEvent): void {
-    const hold = selectionHoldRef.current;
-    if (!hold) return;
-    const dx = Math.abs(event.clientX - hold.x);
-    const dy = Math.abs(event.clientY - hold.y);
-    if (dx > SELECTION_HOLD_CANCEL_DISTANCE || dy > SELECTION_HOLD_CANCEL_DISTANCE) {
-      clearSelectionHold();
-    }
-  }
-
-  function handleBlockPointerUp(block: TranscriptBlock, event: TranscriptPointerEvent): void {
-    clearSelectionHold();
-    if (suppressSelectionPointerUpRef.current) {
-      suppressSelectionPointerUpRef.current = false;
-      return;
-    }
-    if (!selectionModeRef.current || event.button !== 0 || isNestedInteractiveTarget(event.target, event.currentTarget)) return;
-    handleBlockSelect(block.id, { shiftKey: event.shiftKey });
-  }
-
-  function isNestedInteractiveTarget(target: EventTarget | null, card: HTMLElement): boolean {
-    if (!(target instanceof Element)) return false;
-    const interactive = target.closest('button, a, input, textarea, select, label, [contenteditable="true"]');
-    return Boolean(interactive && interactive !== card && !interactive.hasAttribute('data-selectable-card'));
-  }
-
-  function copyText(text: string): void {
-    try {
-      navigator.clipboard?.writeText?.(text)?.catch?.(() => {});
-    } catch {
-      // Clipboard is optional in local preview and test environments.
-    }
-  }
-
-  function pulseBlock(blockId: string): void {
-    const existing = pulseTimersRef.current.get(blockId);
-    if (existing !== undefined) {
-      window.clearTimeout(existing);
-    }
-    setActionedBlockIds((current) => (
-      current.includes(blockId) ? current : [...current, blockId]
-    ));
-    const timerId = window.setTimeout(() => {
-      setActionedBlockIds((current) => current.filter((id) => id !== blockId));
-      pulseTimersRef.current.delete(blockId);
-    }, 900);
-    pulseTimersRef.current.set(blockId, timerId);
-  }
-
-  function cardActionLabel(action: string, title: string): string {
-    const labels: Record<string, string> = {
-      copy: t('toast.cardCopied'),
-      react: t('toast.reactOpened'),
-      reply: `${t('context.reply')} ${title}`,
-      forward: t('toast.forwardQueued'),
-      topic: t('toast.topicDraft'),
-      pin: t('toast.pinUpdated'),
-      link: t('toast.linkCopied'),
-      translate: t('toast.translateQueued'),
-      task: t('toast.taskDraft'),
-      export: t('toast.exportDraft'),
-      apps: t('toast.appsOpened'),
-      delete: t('toast.deleteQueued'),
-    };
-    return labels[action] ?? t('toast.actionRecorded');
-  }
-
-  function multiActionLabel(action: string, count: number): string {
-    const labels: Record<string, string> = {
-      copy: t('toast.multiCopy', { count }),
-      forward: t('toast.multiForward', { count }),
-      task: t('toast.multiTaskDraft', { count }),
-      export: t('toast.multiExport', { count }),
-      delete: t('toast.multiDelete', { count }),
-    };
-    return labels[action] ?? t('toast.multiProcessed', { count });
-  }
-
-  function runContextAction(action: string, blockId: string): void {
-    const title = blockTitleById(blockId);
-    const block = transcript.find((item) => item.id === blockId);
-    if (action === 'copy') copyText(title);
-    if (action === 'link') copyText(`agenthub://card/${blockId}`);
-    if (action === 'delete') {
-      setSoftHiddenBlockIds((current) => (
-        current.includes(blockId) ? current : [...current, blockId]
-      ));
-    }
-    if (action === 'reply' && block) {
-      dispatchComposer({
-        type: 'setReplyTo',
-        replyTo: {
-          messageId: blockId,
-          author: block.author.name,
-          preview: title,
-        },
-      });
-      window.setTimeout(() => composerInputRef.current?.focus(), 0);
-    }
-    if (action === 'quote' && block && block.kind === 'text') {
-      const selectedText = window.getSelection()?.toString().trim();
-      const quoteText = selectedText || block.text.slice(0, 80);
-      const quoted = `> ${quoteText.split('\n').join('\n> ')}\n\n`;
-      dispatchComposer({ type: 'setText', text: quoted });
-      dispatchComposer({
-        type: 'setQuote',
-        quote: {
-          text: quoteText,
-          author: block.author.name,
-          messageId: block.id,
-        },
-      });
-      window.setTimeout(() => composerInputRef.current?.focus(), 0);
-    }
-    if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
-      // Mark old message as having a newer version so it renders grayed out
-      setSoftHiddenBlockIds((current) => {
-        const next = new Set(current);
-        next.add(block.id);
-        return Array.from(next);
-      });
-      onRegenerate?.(blockId);
-      pulseBlock(blockId);
-      showWorkbenchToast(cardActionLabel(action, title));
-      return;
-    }
-    pulseBlock(blockId);
-    showWorkbenchToast(cardActionLabel(action, title));
-  }
-
-  /** Handles block actions (approve/deny/retry/copy/regenerate) from the ChatViewTranscript component chain. */
-  function handleTranscriptBlockAction(action: string, blockId: string, metadata?: Record<string, unknown>): void {
-    const block = transcript.find((b) => b.id === blockId);
-    if (!block) return;
-
-    if (action === 'approve' || action === 'deny') {
-      // Approval blocks carry PermissionRequestTranscriptBlock data
-      if (block.kind === 'permission_request') {
-        const decision: ApprovalDecisionAction = {
-          approvalId: block.requestId,
-          decision: action === 'approve' ? 'allow' : 'deny',
-          ...(block.teamId !== undefined ? { teamId: block.teamId } : {}),
-          ...(block.teamRunId !== undefined ? { teamRunId: block.teamRunId } : {}),
-          ...(block.agentTaskId !== undefined ? { agentTaskId: block.agentTaskId } : {}),
-          ...(block.targetId !== undefined ? { targetId: block.targetId } : {}),
-          ...(block.edgeDeviceId !== undefined ? { edgeDeviceId: block.edgeDeviceId } : {}),
-          ...(block.correlationId !== undefined ? { correlationId: block.correlationId } : {}),
-        };
-        onApprovalDecision?.(decision);
-        pulseBlock(blockId);
-        showWorkbenchToast(action === 'approve' ? t('action.approved') : t('action.denied'));
-      }
-    }
-
-    if (action === 'retry' || action === 'regenerate') {
-      // Retry a failed agent message -- dispatch regeneration
-      if (block.kind === 'text' && block.author.role === 'agent') {
-        setSoftHiddenBlockIds((current) => {
-          const next = new Set(current);
-          next.add(block.id);
-          return Array.from(next);
-        });
-        onRegenerate?.(blockId);
-        pulseBlock(blockId);
-        showWorkbenchToast(t('action.regenerating'));
-      }
-    }
-
-    if (action === 'copy') {
-      const title = (metadata?.text as string) || blockTitle(block);
-      copyText(title);
-      pulseBlock(blockId);
-      showWorkbenchToast(cardActionLabel('copy', title));
-    }
-  }
-
-  function runMultiAction(action: string): void {
-    const count = selectedBlockIds.length;
-    if (!count) {
-      showWorkbenchToast(t('toast.noCardSelected'));
-      return;
-    }
-    if (action === 'copy') {
-      copyText(selectedBlockIds.map(blockTitleById).join('\n'));
-    }
-    if (action === 'delete') {
-      setSoftHiddenBlockIds((current) => {
-        const next = new Set(current);
-        selectedBlockIds.forEach((id) => next.add(id));
-        return Array.from(next);
-      });
-      setSelectionMode(false);
-      setSelectedBlockIds([]);
-    }
-    showWorkbenchToast(multiActionLabel(action, count));
-  }
-  runMultiActionRef.current = runMultiAction;
 
   function exportMainchainEvidence(): void {
     if (!mainchainSummary.exportEnabled) {
@@ -1007,62 +602,6 @@ export function AgentHubWorkbench({
     }, null, 2));
     showWorkbenchToast(t('toast.evidenceCopied'));
   }
-
-  function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
-    const block = transcript.find((item) => item.id === blockId);
-    const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
-    const isTextBlock = block?.kind === 'text';
-    return [
-      [
-        { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
-        { label: t('context.react'), icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
-        { label: t('context.reply'), icon: 'notes', onClick: () => runContextAction('reply', blockId) },
-        ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
-        { label: t('context.forward'), icon: 'external', onClick: () => runContextAction('forward', blockId) },
-      ],
-      [
-        { label: t('context.createTopic'), icon: 'groups', onClick: () => runContextAction('topic', blockId) },
-        { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
-        { label: t('context.pinMessage'), icon: 'bell', onClick: () => runContextAction('pin', blockId) },
-        { label: t('context.copyLink'), icon: 'external', onClick: () => runContextAction('link', blockId) },
-        { label: t('context.translate'), icon: 'library', onClick: () => runContextAction('translate', blockId) },
-      ],
-      [
-        ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
-        { label: t('context.addTask'), icon: 'running', onClick: () => runContextAction('task', blockId) },
-        { label: t('context.exportDoc'), icon: 'download', onClick: () => runContextAction('export', blockId) },
-        { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
-        { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
-      ],
-    ];
-  }
-
-  const multiSelectActions: Array<MultiSelectBarAction> = [
-    {
-      label: t('bar.selectAll'),
-      icon: 'done',
-      onClick: () => setSelectedBlockIds(transcript.map((block) => block.id)),
-    },
-    {
-      label: t('bar.clear'),
-      icon: 'filter',
-      onClick: () => setSelectedBlockIds([]),
-    },
-    { label: t('context.copy'), icon: 'fileText', onClick: () => runMultiAction('copy') },
-    { label: t('context.forward'), icon: 'external', onClick: () => runMultiAction('forward') },
-    { label: t('context.addTask'), icon: 'running', onClick: () => runMultiAction('task') },
-    { label: t('context.exportDoc'), icon: 'download', onClick: () => runMultiAction('export') },
-    { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
-    {
-      label: t('bar.exit'),
-      icon: 'close',
-      ghost: true,
-      onClick: () => {
-        setSelectionMode(false);
-        setSelectedBlockIds([]);
-      },
-    },
-  ];
 
   return (
     <div
@@ -1241,25 +780,19 @@ export function AgentHubWorkbench({
           width={inspectorWidth}
         />
       )}
-      {isChatPage && contextMenu && (
-        <ContextMenu
-          groups={contextMenuGroups(contextMenu.blockId)}
-          isOpen={Boolean(contextMenu)}
-          title={contextMenu.title}
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
-      {isChatPage && selectionMode && (
-        <MultiSelectBar
-          actions={multiSelectActions}
-          count={selectedBlockIds.length}
-          total={transcript.length}
-          workspaceLeft={selectBarRect?.left}
-          workspaceWidth={selectBarRect?.width}
-        />
-      )}
+      <WorkbenchTranscriptOverlays
+        isChatPage={isChatPage}
+        contextMenu={contextMenu}
+        contextMenuGroups={contextMenuGroups}
+        onCloseContextMenu={() => setContextMenu(null)}
+        selectionMode={selectionMode}
+        multiSelectActions={multiSelectActions}
+        selectedCount={selectedBlockIds.length}
+        totalCount={transcript.length}
+        selectBarRect={selectBarRect}
+        toastMessage={toastMessage}
+        toastVisible={toastVisible}
+      />
       {activeAgentProfile && (
         <ProfilePopover
           actions={[
@@ -1346,7 +879,6 @@ export function AgentHubWorkbench({
           variant="group"
         />
       )}
-      <Toast message={toastMessage} visible={toastVisible} />
     </div>
   );
 }
