@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-17
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11 · [#507](https://github.com/TokenDanceLab/AgentHub/pull/507)–[#512](https://github.com/TokenDanceLab/AgentHub/pull/512) Phase 12 · [#519](https://github.com/TokenDanceLab/AgentHub/pull/519)–[#524](https://github.com/TokenDanceLab/AgentHub/pull/524) Phase 13 · [#531](https://github.com/TokenDanceLab/AgentHub/pull/531)–[#536](https://github.com/TokenDanceLab/AgentHub/pull/536) Phase 14
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11 · [#507](https://github.com/TokenDanceLab/AgentHub/pull/507)–[#512](https://github.com/TokenDanceLab/AgentHub/pull/512) Phase 12 · [#519](https://github.com/TokenDanceLab/AgentHub/pull/519)–[#524](https://github.com/TokenDanceLab/AgentHub/pull/524) Phase 13 · [#531](https://github.com/TokenDanceLab/AgentHub/pull/531)–[#536](https://github.com/TokenDanceLab/AgentHub/pull/536) Phase 14 · [#543](https://github.com/TokenDanceLab/AgentHub/pull/543)–[#547](https://github.com/TokenDanceLab/AgentHub/pull/547) Phase 15
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 15 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 36 --state open`
-- **Labels**: `spec-driven` · `phase:15`
+- **Phase 16 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 37 --state open`
+- **Labels**: `spec-driven` · `phase:16`
 
 ## References
 
@@ -48,7 +48,8 @@
 | 12 | Product polish continue | #33 | closed (PRs #507–#512) |
 | 13 | Architecture depth | #34 | closed (PRs #519–#524) |
 | 14 | Hotspot strangler | #35 | closed (PRs #531–#536) |
-| 15 | Residual hotspots | #36 | active (#537–#542) |
+| 15 | Residual hotspots | #36 | closed (PRs #543–#547) |
+| 16 | Residual strangler continue | #37 | active (#548–#553) |
 
 ## Issue Mapping (summary)
 
@@ -62,13 +63,14 @@
 | #501–#506 Phase 12 polish continue | closed (PRs #507–#512) |
 | #513–#518 Phase 13 architecture depth | closed (PRs #519–#524) |
 | #525–#530 Phase 14 hotspot strangler | closed (PRs #531–#536) |
-| #537–#542 Phase 15 residual hotspots | open (milestone 36) |
+| #537–#542 Phase 15 residual hotspots | closed (PRs #543–#547) |
+| #548–#553 Phase 16 residual strangler continue | open (milestone 37) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=36) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 36 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=37) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 37 --state open
 git worktree list
 ```
 
@@ -82,15 +84,17 @@ git worktree list
 - [x] Phase 12 product polish continue (#501–#506 / PRs #507–#512)
 - [x] Phase 13 architecture depth (#513–#518 / PRs #519–#524)
 - [x] Phase 14 hotspot strangler (#525–#530 / PRs #531–#536)
-- [ ] Phase 15 residual hotspots (#537–#542)
+- [x] Phase 15 residual hotspots (#537–#542 / PRs #543–#547)
+- [ ] Phase 16 residual strangler continue (#548–#553)
 
 ## Current Status
 
-**Active Phase**: Phase 15 — Residual hotspots (milestone 36)
-**Active Tasks**: #537 MASTER · #538 WorkbenchRoutes · #539 RightInspector · #540 DeliveryOutbox · #541 Settings SectionId · #542 hygiene
+**Active Phase**: Phase 16 — Residual strangler continue (milestone 37)
+**Active Tasks**: #548 MASTER · #549 WorkbenchRoutes 3rd · #550 RightInspector 3rd · #551 DeliveryOutbox model move · #552 AgentsPage first slice · #553 hygiene
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: Phase 14 tip on `master` (PR #531–#536 line)
+**Tip**: ~56d12250 on `master` (Phase 15 PR #543–#547 line)
+**Residual after P15**: WorkbenchRoutes ~625 · RightInspector ~762 · AgentHubWorkbench ~323 · AgentsPage ~1939 · delivery_outbox.go ~749
 
 ## Governance Status
 
@@ -101,9 +105,9 @@ git worktree list
 
 ## Next Steps
 
-1. Land Phase 15 issues under milestone 36 (issue-bound Workflows)
+1. Land Phase 16 issues under milestone 37 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #538 WorkbenchRoutes and #539 RightInspector second slices; #540 DeliveryOutbox thin extract
+3. Prefer #549 WorkbenchRoutes / #550 RightInspector third slices; #551 DeliveryOutbox model move; #552 AgentsPage first slice
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -118,10 +122,12 @@ git worktree list
 | 2026-07-17 | lead | Phase 12 closed via #507–#512; Phase 13 #513–#518 active |
 | 2026-07-17 | lead | Phase 13 closed via #519–#524; Phase 14 #525–#530 active |
 | 2026-07-17 | lead | Phase 14 closed via #531–#536; Phase 15 #537–#542 active |
+| 2026-07-17 | lead | Phase 15 closed via #543–#547; Phase 16 #548–#553 active |
 
 ## Completion notes
 
 - Phase 9–12: see earlier closed PRs (runtime inventory → EdgeCallbackService / workbench slices).
 - Phase 13: MASTER sync (#513/#519), pure outbox helpers (#514/#522), workbench fifth residual (#515/#524), Projects/Docs EmptyState (#516/#523, #517/#521), design residual (#518/#520).
 - Phase 14: MASTER sync (#525/#531), WorkbenchRoutes first slice (#526/#533), RightInspector first slice (#527/#535), DeliveryOutbox sketch (#528/#532), Agents StatusNotice (#529/#536), Settings residual (#530/#534).
-- Phase 15 targets: MASTER sync, WorkbenchRoutes/RightInspector second slices, DeliveryOutbox thin type extract, Settings SectionId collapse, post-merge hygiene.
+- Phase 15: MASTER sync (#537/#543), DeliveryOutbox thin (#540/#544), WorkbenchRoutes slice2 (#538/#545), RightInspector slice2 (#539/#546), SectionId collapse A (#541/#547).
+- Phase 16 targets: MASTER sync, WorkbenchRoutes/RightInspector third slices, DeliveryOutbox model move, AgentsPage first slice, post-merge hygiene.
