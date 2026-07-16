@@ -51,7 +51,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | Item | Status | Follow-up |
 |---|---|---|
 | ThemeContext dual providers | **Mitigated in #466** — preset constants + apply moved to shared; providers are thin wrappers | Optional: one shared React provider with `enablePresets` |
-| Stale CSS status fallbacks | **Partial fix in #466** — `ApprovalCard.module.css` uses bare status tokens | Continue on WelcomeScreen / AuthPage / EntryGate glass hardcodes |
+| Stale CSS status fallbacks | **Partial fix in #466** — `ApprovalCard.module.css` uses bare status tokens; **#482** Welcome/Auth glass hardcodes → `--glass-*` | Continue on EntryGate / FileExplorer / IM panels |
 | Chatview parallel spacing (`--sp-md: 12px` vs base `16px`) | Open | Dedicated chatview token merge |
 | Workbench raw `px` spacing | Open | `px` → `--sp-*` pass |
 | `designTokens.ts` not package-exported | Open | Export when mobile/web path aliases stabilize |
