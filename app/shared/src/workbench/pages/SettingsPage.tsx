@@ -196,7 +196,7 @@ function SettingsSection({ title, children }: SettingsSectionProps): React.React
     <section className={`${styles.section} settings-section`}>
       <div className={styles.sectionTitleRow}>
         <h2>{title}</h2>
-        <span>{count} items</span>
+        <span>{count} 项</span>
       </div>
       <div className={styles.list}>
         {children}
