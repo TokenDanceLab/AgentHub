@@ -1,6 +1,5 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -739,7 +738,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
           <div className={styles.statusStack}>
             <StatusNotice
               {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
-              icon={<Loader2 size={14} aria-hidden="true" />}
+              icon={<DesignNavIcon name="running" size={14} />}
               role="status"
             >
               正在加载设置…
@@ -751,7 +750,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
           <div className={styles.statusStack}>
             <StatusNotice
               {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
-              icon={<AlertCircle size={14} aria-hidden="true" />}
+              icon={<DesignNavIcon name="error404" size={14} />}
               role="alert"
               {...(onDismissSettingsError
                 ? {
@@ -776,7 +775,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
           <div className={styles.statusStack}>
             <RecoveryPanel
               {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
-              icon={<AlertCircle size={18} aria-hidden="true" />}
+              icon={<DesignNavIcon name="error404" size={18} />}
               eyebrow="Settings recovery"
               title="设置加载失败"
               description="无法从当前平台适配器读取已保存的设置。页面会暂时使用默认值，重试后可恢复远端偏好。"
@@ -785,7 +784,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
                 label: '重试加载',
                 busyLabel: '重试中…',
                 busy: settingsLoading,
-                icon: <RefreshCw size={14} aria-hidden="true" />,
+                icon: <DesignNavIcon name="refresh" size={14} />,
                 onClick: () => {
                   onRetrySettingsLoad?.();
                 },
