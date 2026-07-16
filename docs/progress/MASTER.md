@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-17
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11 · [#507](https://github.com/TokenDanceLab/AgentHub/pull/507)–[#512](https://github.com/TokenDanceLab/AgentHub/pull/512) Phase 12
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 12 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 33 --state open`
-- **Labels**: `spec-driven` · `phase:12`
+- **Phase 13 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 34 --state open`
+- **Labels**: `spec-driven` · `phase:13`
 
 ## References
 
@@ -45,7 +45,8 @@
 | 9 | Product polish | #30 | closed (PRs #471–#476) |
 | 10 | Product depth | #31 | closed (PRs #483–#488) |
 | 11 | Residual polish | #32 | closed (PRs #495–#500) |
-| 12 | Product polish continue | #33 | active (#501–#506) |
+| 12 | Product polish continue | #33 | closed (PRs #507–#512) |
+| 13 | Architecture depth | #34 | active (#513–#518) |
 
 ## Issue Mapping (summary)
 
@@ -56,13 +57,14 @@
 | #465–#470 Phase 9 polish | closed (PRs #471–#476) |
 | #477–#482 Phase 10 depth | closed (PRs #483–#488) |
 | #489–#494 Phase 11 residual | closed (PRs #495–#500) |
-| #501–#506 Phase 12 polish continue | open (milestone 33) |
+| #501–#506 Phase 12 polish continue | closed (PRs #507–#512) |
+| #513–#518 Phase 13 architecture depth | open (milestone 34) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=33) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 33 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=34) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 34 --state open
 git worktree list
 ```
 
@@ -73,15 +75,16 @@ git worktree list
 - [x] Phase 9 product polish (#465–#470 / PRs #471–#476)
 - [x] Phase 10 product depth (#477–#482 / PRs #483–#488)
 - [x] Phase 11 residual polish (#489–#494 / PRs #495–#500)
-- [ ] Phase 12 product polish continue (#501–#506)
+- [x] Phase 12 product polish continue (#501–#506 / PRs #507–#512)
+- [ ] Phase 13 architecture depth (#513–#518)
 
 ## Current Status
 
-**Active Phase**: Phase 12 — Product polish continue (milestone 33)
-**Active Tasks**: #501 MASTER · #502 WorkbenchShell · #503 TasksPage EmptyState · #504 ContactsPage EmptyState · #505 EdgeCallbackService · #506 workbench residual
+**Active Phase**: Phase 13 — Architecture depth (milestone 34)
+**Active Tasks**: #513 MASTER · #514 outbox helpers · #515 workbench residual · #516 ProjectsPage EmptyState · #517 DocsPage EmptyState · #518 design residual
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: Phase 11 tip on `master` (PR #495–#500 line)
+**Tip**: Phase 12 tip on `master` (PR #507–#512 line)
 
 ## Governance Status
 
@@ -92,9 +95,9 @@ git worktree list
 
 ## Next Steps
 
-1. Land Phase 12 issues under milestone 33 (issue-bound Workflows)
+1. Land Phase 13 issues under milestone 34 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #502 WorkbenchShell cleanup and EmptyState residual before further hub extract
+3. Prefer #514 pure outbox helpers and #515 workbench residual before design residual
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -106,10 +109,12 @@ git worktree list
 | 2026-07-17 | lead | Phase 10 opened #477–#482 |
 | 2026-07-17 | lead | Phase 10 closed via #483–#488; Phase 11 #489–#494 active |
 | 2026-07-17 | lead | Phase 11 closed via #495–#500; Phase 12 #501–#506 active |
+| 2026-07-17 | lead | Phase 12 closed via #507–#512; Phase 13 #513–#518 active |
 
 ## Completion notes
 
 - Phase 9: runtime inventory (#465), design SSOT (#466), workbench extract (#467), hub `agentevent` (#468), hygiene (#469), settings inventory (#470).
 - Phase 10: RunEventService (#478/#484), settings load/error UX (#479/#486), spacing tokens (#480/#485), workbench slice2 (#481/#488), welcome glass (#482), MASTER sync (#477/#487).
 - Phase 11: MASTER sync (#489/#495), delete `useWorkbenchCallbacks` (#490/#498), chatview token inventory (#491/#497), EmptyState consistency (#492/#499), hub boundary map (#493/#496), workbench residual (#494/#500).
-- Phase 12 targets: MASTER sync, WorkbenchShell quarantine/delete, Tasks/Contacts EmptyState, EdgeCallbackService extract, workbench fourth residual.
+- Phase 12: MASTER sync (#501/#507), delete orphan WorkbenchShell (#502/#508), Tasks/Contacts EmptyState (#503/#509, #504/#510), EdgeCallbackService (#505/#511), workbench fourth residual (#506/#512).
+- Phase 13 targets: MASTER sync, pure outbox helpers, workbench fifth residual, Projects/Docs EmptyState, design residual.
