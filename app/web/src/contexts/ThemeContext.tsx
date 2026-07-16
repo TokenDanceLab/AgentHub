@@ -25,27 +25,17 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function getStoredMode(): ThemeMode {
-  return getStoredAgentHubThemeMode();
-}
-
-function getSystemTheme(): Theme {
-  return getSystemAgentHubTheme();
-}
-
-function resolveTheme(mode: ThemeMode): Theme {
-  return resolveAgentHubTheme(mode);
-}
-
-function applyTheme(theme: Theme) {
-  applyAgentHubTheme(theme);
-}
-
+/**
+ * Thin React wrapper over shared theme SSOT (`@shared/theme`).
+ * Web does not expose preset UI yet; CSS presets still load via styles/presets.css.
+ * Preset registry/apply lives in shared for desktop (and future web) consumers.
+ */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredMode);
-  const [resolvedTheme, setResolvedTheme] = useState<Theme>(() => resolveTheme(getStoredMode()));
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredAgentHubThemeMode);
+  const [resolvedTheme, setResolvedTheme] = useState<Theme>(() =>
+    resolveAgentHubTheme(getStoredAgentHubThemeMode()),
+  );
 
-  // Persist to localStorage and resolve
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
     persistAgentHubThemeMode(mode);
@@ -53,8 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Keep resolvedTheme in sync with themeMode + system changes
   useEffect(() => {
-    const resolved = resolveTheme(themeMode);
-    setResolvedTheme(resolved);
+    setResolvedTheme(resolveAgentHubTheme(themeMode));
   }, [themeMode]);
 
   // Listen for system theme changes when in system mode
@@ -62,7 +51,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (themeMode !== 'system') return;
     const mql = window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
-      setResolvedTheme(getSystemTheme());
+      setResolvedTheme(getSystemAgentHubTheme());
     };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
@@ -70,13 +59,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Apply data-theme to <html>
   useEffect(() => {
-    applyTheme(resolvedTheme);
+    applyAgentHubTheme(resolvedTheme);
   }, [resolvedTheme]);
 
   const toggleTheme = useCallback(() => {
     if (themeMode === 'system') {
       // Exiting system mode: pick the opposite of current system preference
-      const next = getSystemTheme() === 'dark' ? 'light' : 'dark';
+      const next = getSystemAgentHubTheme() === 'dark' ? 'light' : 'dark';
       setThemeMode(next);
     } else {
       const next: Theme = themeMode === 'dark' ? 'light' : 'dark';
