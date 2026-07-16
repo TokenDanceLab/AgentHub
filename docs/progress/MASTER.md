@@ -35,12 +35,16 @@ Branch：`chore/cleanup-baseline`（from `master@dbb808f2`）
 
 ## Phases
 
-- [ ] Phase 0: Analysis & strategy 落盘（Workflow: analysis-synthesize）
-- [ ] Phase 1: P0 卫生与叙事对齐（Workflow: p0-hygiene）
-- [ ] Phase 2: 轻量 llmwiki 种子（Workflow: llmwiki-bootstrap）
+- [x] Phase 0: Analysis & strategy 落盘（commit 347642b6）
+- [x] Phase 1: P0 卫生与叙事对齐（commit 347642b6）
+- [x] Phase 2: 轻量 llmwiki 种子（commit 347642b6；index/labels residual 已修）
 - [ ] Phase 3: 前端去重 strangler 计划与首切片（scout → implement）
 - [ ] Phase 4: Edge god-file 提取 + capability/outbox seams
 - [ ] Phase 5: Hub delivery/auth 安全闭环 + 证据等级
+
+## Baseline commit
+
+`347642b6` docs(cleanup): baseline analysis, wiki, and LIVE production narrative
 
 ## Active Workflow Teams
 
