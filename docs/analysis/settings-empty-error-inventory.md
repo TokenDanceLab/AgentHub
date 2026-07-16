@@ -1,7 +1,7 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479 / #492 / #503 / #504 / #517
+> issue: #470 / residual #479 / #492-#504 / #516 / #517
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -85,8 +85,8 @@ but no longer remain silent in the Settings product surface.
 | `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors still ad-hoc `agent-inline-state` |
 | `pages/TasksPage.tsx` | primary empty uses shared `EmptyState` (#503); public `emptyStateLabel` maps to description |
 | `pages/ContactsPage.tsx` | primary empty uses shared `EmptyState` (#504); residual search loading text |
-| `pages/ProjectsPage.tsx` | loading caption / error alert / editor error |
-| `pages/DocsPage.tsx` | primary empty uses shared `EmptyState` (#517); loading/error status not plumbed |
+| `pages/ProjectsPage.tsx` | empty uses shared `EmptyState`; loading/error use `StatusNotice` (#516) |
+| `pages/DocsPage.tsx` | empty uses shared `EmptyState` (#517); residual loading/error TBD |
 | Shell lists (desktop/web AgentList, NotificationBell, WelcomeScreen, DiffViewer, IMContactList) | shared `@shared/ui/EmptyState` |
 
 ## 6. Copy / structure divergences after orphan deletion
@@ -132,6 +132,7 @@ but no longer remain silent in the Settings product surface.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
+## 9.1 Residual after Agents/Tasks/Contacts/Projects EmptyState (#492 / #503 / #504 / #516)
 ## 9.1 Residual after Agents/Tasks/Contacts/Docs EmptyState (#492 / #503 / #504 / #517)
 
 | Surface | After | Next |
@@ -139,5 +140,15 @@ but no longer remain silent in the Settings product surface.
 | Agents installed/market empty | shared `EmptyState` (#492) | load/action errors still ad-hoc |
 | TasksPage primary empty | shared `EmptyState` (#503) | — |
 | ContactsPage primary empty | shared `EmptyState` (#504) | residual search loading text |
-| ProjectsPage | loading/error captions | follow-up |
+| ProjectsPage primary empty | shared `EmptyState` + loading/error `StatusNotice` (#516) | form-inline editor error residual; no `RecoveryPanel` retry plumbing yet; nested runs/artifacts/feed empty optional |
+
+## 9.2 ProjectsPage inventory + fix (#516)
+| Path | Before | After (#516) |
+|---|---|---|
+| Loading caption | ad-hoc `navCaption` repeating `t('nav.projects')` | shared `StatusNotice role="status"` + `projects.loading` |
+| Nav load error | ad-hoc `navCaption role="alert"` | shared `StatusNotice role="alert"` + error text |
+| Primary empty | custom `detailHead` h1 + optional create CTA; empty description conflated with load error | shared `EmptyState` (`titleLevel={1}`) + pure empty copy; load error shown via nav `StatusNotice` |
+| Editor mutation error | local `editorError` box | residual form-inline (acceptable; lower priority) |
+| Nested empties (runs/artifacts/feed) | section headers only | residual / out of scope |
+Blocked without product plumbing: full `RecoveryPanel` for projects load needs `onProjectsRetry` through WorkbenchRoutes/hub load.
 | DocsPage primary empty | shared `EmptyState` (#517) | loading/error status not plumbed; mock fallback can mask real empty/error; tab/search filter empty residual |
