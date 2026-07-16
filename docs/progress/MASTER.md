@@ -116,7 +116,7 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 6: Baseline Hardening (5/5 closed: #441-#445)
 
 ## Current Status
-**Active Phase**: COMPLETE (baseline + hardening)  
+**Active Phase**: COMPLETE (baseline + hardening + residual closeout)  
 **Active Task**: none  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
@@ -131,20 +131,21 @@ gh project item-list 6 --owner @me --format json --limit 50
 **Memory note**: `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
-1. 可选：push `chore/cleanup-baseline` 并开 PR 汇总 #424–#445  
+1. push `chore/cleanup-baseline` 并开 PR 汇总 #424–#445 + residual closeout commits  
 2. 禁止 freestyle multi-workflow 实现 fleets；新工作必须新 Issue  
-3. 长期残留（非阻塞）：AH-SR-049 idempotent ack + reconciliation E2E；AH-SR-046 action/target/workspace 绑定 E2E  
-4. orphan UI 物理删除：desktop/web SettingsPage + TeamRunConsole（已 quarantine + `@ts-nocheck`）
+3. 可选增强（非基线阻塞）：live Hub→Edge capability E2E；cross-service journal offline/replay E2E  
 
 ## Session Log
 | Date | Session | Summary |
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Analysis/wiki/hygiene baseline; stopped ad-hoc fleets; Project #6 + milestones 22–26 + issues #424–#440; MASTER → GITHUB_FULL |
 | 2026-07-16 | lead | Phase 6 #441–#445 closed: SectionId extract, purpose=run-start, SQLite journal, desktop/web tsc clean |
+| 2026-07-16 | lead | residual closeout: orphan UI physical delete; AH-SR-046 bindings; AH-SR-049 reconciliation API |
 
 
 ## Baseline completion
 
-- Program cleanup-baseline + Phase 6 hardening closed on 2026-07-16.
-- Residual non-blocking debt: AH-SR-049 reconciliation/E2E; AH-SR-046 full E2E; orphan UI physical delete.
+- Program cleanup-baseline + Phase 6 hardening + residual closeout closed on 2026-07-16.
+- Orphan Settings/TeamRun UI physically deleted; AH-SR-046 action/target/thread bindings landed; AH-SR-049 durable journal + reconciliation read path landed.
+- Optional future enhancements (not baseline blockers): live Hub→Edge E2E evidence; automatic redelivery worker.
 - Next work must open a **new** SPEC/Issues; do not freestyle on this branch without issues.
