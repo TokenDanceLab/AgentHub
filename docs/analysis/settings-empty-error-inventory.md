@@ -1,8 +1,7 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479 / #492–#504 / #516 / #517
-> issue: #470 / residual #479 / #492–#504 / #516 / #517
+> issue: #470 / residual #479 / #492-#504 / #516 / #517
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -142,7 +141,6 @@ but no longer remain silent in the Settings product surface.
 | TasksPage primary empty | shared `EmptyState` (#503) | — |
 | ContactsPage primary empty | shared `EmptyState` (#504) | residual search loading text |
 | ProjectsPage primary empty | shared `EmptyState` + loading/error `StatusNotice` (#516) | form-inline editor error residual; no `RecoveryPanel` retry plumbing yet; nested runs/artifacts/feed empty optional |
-| DocsPage | verify when touched | follow-up (#517 ownership) |
 
 ## 9.2 ProjectsPage inventory + fix (#516)
 | Path | Before | After (#516) |
@@ -153,5 +151,4 @@ but no longer remain silent in the Settings product surface.
 | Editor mutation error | local `editorError` box | residual form-inline (acceptable; lower priority) |
 | Nested empties (runs/artifacts/feed) | section headers only | residual / out of scope |
 Blocked without product plumbing: full `RecoveryPanel` for projects load needs `onProjectsRetry` through WorkbenchRoutes/hub load.
-| ProjectsPage | loading/error captions | follow-up |
 | DocsPage primary empty | shared `EmptyState` (#517) | loading/error status not plumbed; mock fallback can mask real empty/error; tab/search filter empty residual |
