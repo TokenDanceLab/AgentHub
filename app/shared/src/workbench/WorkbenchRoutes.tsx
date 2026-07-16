@@ -1,51 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  isWorkbenchRealDataMode,
-  normalizeWorkbenchDataMode,
-  readWorkbenchDataModeOverride,
-  workbenchDataModeDisplayLabel,
-  writeWorkbenchDataModeOverride,
-} from '../demo';
-import {
-  composerSubmitBehaviorFromLabel,
-  composerSubmitBehaviorLabel,
-  readComposerSubmitBehavior,
-  writeComposerSubmitBehavior,
-} from './workbenchPreferences';
+import React, { useMemo } from 'react';
 import type { LocalCliDiscoveryManifest, WorkbenchAgent } from '../platform';
 import type {
-  ContactsPane,
-  ContactGroup,
-  ContactMember,
   DocRow,
-  DocsPane,
   ProjectDraft,
   ProjectInfo,
-  SettingsPaneId,
-  ServiceDesk,
 } from './pages';
 import type { AgentConfig, SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { GlobalRailPage } from './GlobalRail';
-import {
-  fileTypeFromPreviewName,
-  previewFilenameFromTitle,
-  type WorkbenchDocumentPreview,
-} from './documentPreview';
-import {
-  WORKBENCH_MOCK_AGENT_AUDIT_ROWS,
-  WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES,
-  WORKBENCH_MOCK_AGENT_MODEL_HEALTH,
-  WORKBENCH_MOCK_AGENT_POLICY_RULES,
-  WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
-  WORKBENCH_MOCK_CONTACT_GROUPS,
-  WORKBENCH_MOCK_CONTACT_MEMBERS,
-  WORKBENCH_MOCK_CONTACT_SHORTCUTS,
-  WORKBENCH_MOCK_DOC_ROWS,
-  WORKBENCH_MOCK_EXTERNAL_CONTACTS,
-  WORKBENCH_MOCK_PENDING_CONTACTS,
-  WORKBENCH_MOCK_SERVICE_DESKS,
-  WORKBENCH_MOCK_SETTINGS_DEFAULTS,
-} from './mockData';
 import type { SettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
@@ -55,11 +16,28 @@ import { AgentsPage } from './pages/AgentsPage';
 import { TasksPage } from './pages/TasksPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import {
+  WORKBENCH_MOCK_AGENT_AUDIT_ROWS,
+  WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES,
+  WORKBENCH_MOCK_AGENT_MODEL_HEALTH,
+  WORKBENCH_MOCK_AGENT_POLICY_RULES,
+  WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
+} from './mockData';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
+import {
+  useWorkbenchContactsRoute,
+  type WorkbenchContactsActions,
+  type WorkbenchContactsData,
+} from './useWorkbenchContactsRoute';
+import {
+  useWorkbenchDocsRoute,
+  type WorkbenchDocumentsActions,
+} from './useWorkbenchDocsRoute';
 import {
   useWorkbenchProjectsRoute,
   type WorkbenchProjectsStatus,
 } from './useWorkbenchProjectsRoute';
+import { useWorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
 import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -134,25 +112,8 @@ export interface WorkbenchRoutesProps {
   userDisplayName?: string | undefined;
 }
 
-/** Contact mutation callbacks wired to Hub API. */
-export interface WorkbenchContactsActions {
-  onSearchUser?: ((query: string) => Promise<unknown> | void) | undefined;
-  onSendFriendRequest?: ((userId: string, message?: string) => Promise<unknown> | void) | undefined;
-  onAcceptRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
-  onRejectRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
-  onRemoveContact?: ((userId: string) => Promise<unknown> | void) | undefined;
-  onBlockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
-  onUnblockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
-  onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
-  onCreateGroup?: ((name: string, memberIds: string[]) => Promise<unknown> | void) | undefined;
-}
-
-/** Document mutation callbacks wired to Hub Documents API. */
-export interface WorkbenchDocumentsActions {
-  onCreateDoc?: (() => Promise<unknown> | void) | undefined;
-  onUpdateDoc?: ((documentId: string, data: Record<string, unknown>) => Promise<unknown> | void) | undefined;
-  onDeleteDoc?: ((documentId: string) => Promise<unknown> | void) | undefined;
-}
+export type { WorkbenchContactsActions, WorkbenchContactsData } from './useWorkbenchContactsRoute';
+export type { WorkbenchDocumentsActions } from './useWorkbenchDocsRoute';
 
 export interface WorkbenchAgentProfilesStatus {
   loading?: boolean | undefined;
@@ -163,71 +124,6 @@ export interface WorkbenchAgentProfilesStatus {
 }
 
 export type { WorkbenchProjectsStatus } from './useWorkbenchProjectsRoute';
-
-export interface WorkbenchContactsData {
-  members: ContactMember[];
-  externalContacts?: ContactMember[] | undefined;
-  pendingContacts?: ContactMember[] | undefined;
-  starredContacts?: ContactMember[] | undefined;
-  groups?: ContactGroup[] | undefined;
-  serviceDesks?: ServiceDesk[] | undefined;
-  recentShortcuts?: string[] | undefined;
-  orgName?: string | undefined;
-  orgInitials?: string | undefined;
-}
-
-function persistDataModeLabel(value: string): void {
-  writeWorkbenchDataModeOverride(normalizeWorkbenchDataMode(value));
-}
-
-function dataModeLabel(): string {
-  return workbenchDataModeDisplayLabel(readWorkbenchDataModeOverride());
-}
-
-function isRouteRealDataMode(value: string | undefined): boolean {
-  return isWorkbenchRealDataMode(value);
-}
-
-function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
-  const filename = previewFilenameFromTitle(doc.title);
-  const tagLine = doc.tag ? `- 标签：${doc.tag}` : '- 标签：未标记';
-  return {
-    id: `doc:${doc.id}`,
-    name: filename,
-    type: fileTypeFromPreviewName(filename),
-    owner: doc.owner,
-    sourceLabel: doc.location,
-    content: [
-      `# ${doc.title}`,
-      '',
-      '## 文档信息',
-      `- 所有者：${doc.owner}`,
-      `- 位置：${doc.location}`,
-      `- 创建时间：${doc.time}`,
-      tagLine,
-      '',
-      '## 摘要',
-      '这是 AgentHub 轻量文档预览。当前内容来自文档索引，后续可由 Hub artifact store、workspace 文件或外部文档 provider 提供正文。',
-      '',
-      '## 下一步',
-      '- 接入全文搜索与项目归档索引。',
-      '- 将外部云文档 provider 映射为同一预览合同。',
-      '- 对 Markdown、Diff、表格和链接产物使用统一只读预览。',
-    ].join('\n'),
-  };
-}
-
-function persistedComposerSubmitBehaviorLabel(): string {
-  return composerSubmitBehaviorLabel(readComposerSubmitBehavior());
-}
-
-function createSettingsDefaults(): typeof WORKBENCH_MOCK_SETTINGS_DEFAULTS {
-  return {
-    ...WORKBENCH_MOCK_SETTINGS_DEFAULTS,
-    dataMode: dataModeLabel(),
-    composerSubmitBehavior: persistedComposerSubmitBehaviorLabel(),
-  };
-}
 
 export function WorkbenchRoutes({
   activePage,
@@ -265,10 +161,11 @@ export function WorkbenchRoutes({
   currentUserId,
   userDisplayName,
 }: WorkbenchRoutesProps): React.ReactElement {
-  const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
-  const [docsNav, setDocsNav] = useState('home');
-  const [docsTab, setDocsTab] = useState<DocsPane>('recent');
-  const realDataMode = isRouteRealDataMode(dataMode);
+  const settingsRoute = useWorkbenchSettingsRoute({
+    settingsService,
+    dataMode,
+  });
+  const { realDataMode } = settingsRoute;
 
   const agentsRoute = useWorkbenchAgentsRoute({
     agents,
@@ -298,157 +195,62 @@ export function WorkbenchRoutes({
     realDataMode,
   });
 
-  const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
-  const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
-  const [settings, setSettings] = useState(createSettingsDefaults);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [settingsErrorKind, setSettingsErrorKind] = useState<'init' | 'write' | null>(null);
+  const contactsRoute = useWorkbenchContactsRoute({
+    contacts,
+    contactsActions,
+    onStartConversation,
+  });
 
-  const syncSettingsServiceState = useCallback(() => {
-    if (!settingsService) {
-      setSettingsLoading(false);
-      setSettingsError(null);
-      setSettingsErrorKind(null);
-      return;
-    }
-    setSettings(settingsService.readAll() as typeof settings);
-    setSettingsLoading(settingsService.loading);
-    setSettingsError(settingsService.error);
-    setSettingsErrorKind(settingsService.errorKind);
-  }, [settingsService]);
+  const docsRoute = useWorkbenchDocsRoute({
+    documents,
+    documentsActions,
+  });
 
-  // When a settingsService is provided, initialize it and subscribe to remote changes.
-  useEffect(() => {
-    if (!settingsService) {
-      setSettingsLoading(false);
-      setSettingsError(null);
-      setSettingsErrorKind(null);
-      return;
-    }
-    const unsub = settingsService.subscribe(syncSettingsServiceState);
-    syncSettingsServiceState();
-    settingsService.init().catch((err) => {
-      console.error('settingsService.init failed in WorkbenchRoutes:', err);
-      /* init failure is surfaced via settingsService.error */
-      syncSettingsServiceState();
-    });
-    return unsub;
-  }, [settingsService, syncSettingsServiceState]);
-
-  const handleRetrySettingsLoad = useCallback(() => {
-    if (!settingsService) return;
-    settingsService.init().catch((err) => {
-      console.error('settingsService.init retry failed in WorkbenchRoutes:', err);
-      syncSettingsServiceState();
-    });
-  }, [settingsService, syncSettingsServiceState]);
-
-  const handleDismissSettingsError = useCallback(() => {
-    if (!settingsService) {
-      setSettingsError(null);
-      setSettingsErrorKind(null);
-      return;
-    }
-    settingsService.clearError();
-    syncSettingsServiceState();
-  }, [settingsService, syncSettingsServiceState]);
-
-  const contactsData = contacts ?? {
-    members: WORKBENCH_MOCK_CONTACT_MEMBERS,
-    externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
-    pendingContacts: WORKBENCH_MOCK_PENDING_CONTACTS,
-    starredContacts: WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2),
-    groups: WORKBENCH_MOCK_CONTACT_GROUPS,
-    serviceDesks: WORKBENCH_MOCK_SERVICE_DESKS,
-    recentShortcuts: WORKBENCH_MOCK_CONTACT_SHORTCUTS,
-    orgName: 'TokenDance',
-    orgInitials: 'TD',
-  };
   const profileSources = useMemo(() => [
     ...agentsRoute.agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
-    ...contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
-  ], [agentsRoute.agentConfigs, contactsData.members]);
-
-  function handleSettingChange(key: string, value: string | boolean): void {
-    if (key === 'dataMode' && typeof value === 'string') {
-      persistDataModeLabel(value);
-    }
-    if (key === 'composerSubmitBehavior' && typeof value === 'string') {
-      writeComposerSubmitBehavior(composerSubmitBehaviorFromLabel(value));
-    }
-    setSettings((current) => {
-      let next: typeof current;
-      if (key.startsWith('perm_')) {
-        next = {
-          ...current,
-          permissions: { ...current.permissions, [key.slice(5)]: String(value) },
-        };
-      } else if (key.startsWith('stateStrategy_')) {
-        const strategy = key.slice('stateStrategy_'.length) as keyof typeof current.stateStrategies;
-        next = {
-          ...current,
-          stateStrategies: { ...current.stateStrategies, [strategy]: Boolean(value) },
-        };
-      } else {
-        next = { ...current, [key]: value };
-      }
-      // Persist to settingsService (fire-and-forget)
-      if (settingsService) {
-        if (key.startsWith('perm_')) {
-          settingsService.write('permissions', next.permissions);
-        } else if (key.startsWith('stateStrategy_')) {
-          settingsService.write('stateStrategies', next.stateStrategies);
-        } else {
-          settingsService.write(key, value);
-        }
-      }
-      return next;
-    });
-  }
+    ...contactsRoute.contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
+  ], [agentsRoute.agentConfigs, contactsRoute.contactsData.members]);
 
   switch (activePage) {
     case 'contacts':
       return (
         <ContactsPage
-          activePane={contactsPane}
-          externalContacts={contactsData.externalContacts ?? []}
-          groups={contactsData.groups ?? []}
-          members={contactsData.members}
-          onMemberClick={onStartConversation ? (member) => {
-            onStartConversation({ name: member.name, id: member.id, kind: 'dm' });
-          } : undefined}
-          onPaneChange={setContactsPane}
-          orgInitials={contactsData.orgInitials ?? 'TD'}
-          orgName={contactsData.orgName ?? 'TokenDance'}
-          pendingContacts={contactsData.pendingContacts ?? []}
-          recentShortcuts={contactsData.recentShortcuts ?? []}
-          serviceDesks={contactsData.serviceDesks ?? []}
-          starredContacts={contactsData.starredContacts ?? []}
-          onSearchUser={contactsActions?.onSearchUser}
-          onSendFriendRequest={contactsActions?.onSendFriendRequest}
-          onAcceptRequest={contactsActions?.onAcceptRequest}
-          onRejectRequest={contactsActions?.onRejectRequest}
-          onRemoveContact={contactsActions?.onRemoveContact}
-          onBlockContact={contactsActions?.onBlockContact}
-          onUpdateRemark={contactsActions?.onUpdateRemark}
+          activePane={contactsRoute.contactsPane}
+          externalContacts={contactsRoute.contactsData.externalContacts ?? []}
+          groups={contactsRoute.contactsData.groups ?? []}
+          members={contactsRoute.contactsData.members}
+          onMemberClick={contactsRoute.handleMemberClick}
+          onPaneChange={contactsRoute.setContactsPane}
+          orgInitials={contactsRoute.contactsData.orgInitials ?? 'TD'}
+          orgName={contactsRoute.contactsData.orgName ?? 'TokenDance'}
+          pendingContacts={contactsRoute.contactsData.pendingContacts ?? []}
+          recentShortcuts={contactsRoute.contactsData.recentShortcuts ?? []}
+          serviceDesks={contactsRoute.contactsData.serviceDesks ?? []}
+          starredContacts={contactsRoute.contactsData.starredContacts ?? []}
+          onSearchUser={contactsRoute.contactsActions?.onSearchUser}
+          onSendFriendRequest={contactsRoute.contactsActions?.onSendFriendRequest}
+          onAcceptRequest={contactsRoute.contactsActions?.onAcceptRequest}
+          onRejectRequest={contactsRoute.contactsActions?.onRejectRequest}
+          onRemoveContact={contactsRoute.contactsActions?.onRemoveContact}
+          onBlockContact={contactsRoute.contactsActions?.onBlockContact}
+          onUpdateRemark={contactsRoute.contactsActions?.onUpdateRemark}
         />
       );
     case 'docs':
       return (
         <DocsPage
-          activeNav={docsNav}
-          activeTab={docsTab}
+          activeNav={docsRoute.docsNav}
+          activeTab={docsRoute.docsTab}
           navItems={[]}
-          onNavChange={setDocsNav}
-          onTabChange={setDocsTab}
+          onNavChange={docsRoute.setDocsNav}
+          onTabChange={docsRoute.setDocsTab}
           profiles={profileSources}
-          activePreview={docsPreview}
-          onClosePreview={() => setDocsPreview(null)}
-          onDocClick={(doc) => setDocsPreview(createDocPreview(doc))}
-          rows={documents ?? WORKBENCH_MOCK_DOC_ROWS}
-          onCreateDoc={documentsActions?.onCreateDoc}
-          onDeleteDoc={documentsActions?.onDeleteDoc}
+          activePreview={docsRoute.docsPreview}
+          onClosePreview={docsRoute.closeDocPreview}
+          onDocClick={docsRoute.openDocPreview}
+          rows={docsRoute.rows}
+          onCreateDoc={docsRoute.documentsActions?.onCreateDoc}
+          onDeleteDoc={docsRoute.documentsActions?.onDeleteDoc}
         />
       );
     case 'agents':
@@ -596,23 +398,23 @@ export function WorkbenchRoutes({
     case 'settings':
       return (
         <SettingsPage
-          {...settings}
-          activePane={settingsPane}
-          onChangeSetting={handleSettingChange}
+          {...settingsRoute.settings}
+          activePane={settingsRoute.settingsPane}
+          onChangeSetting={settingsRoute.handleSettingChange}
           localCliDiscovery={localCliDiscovery}
           onOpenAgentConfig={() => {
             agentsRoute.setAgentsPane('installed');
             onNavigatePage?.('agents');
           }}
-          onSelectPane={setSettingsPane}
+          onSelectPane={settingsRoute.setSettingsPane}
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"
           currentUserDisplayName={userDisplayName}
-          settingsLoading={settingsLoading}
-          settingsError={settingsError}
-          settingsErrorKind={settingsErrorKind}
-          onRetrySettingsLoad={settingsService ? handleRetrySettingsLoad : undefined}
-          onDismissSettingsError={settingsService ? handleDismissSettingsError : undefined}
+          settingsLoading={settingsRoute.settingsLoading}
+          settingsError={settingsRoute.settingsError}
+          settingsErrorKind={settingsRoute.settingsErrorKind}
+          onRetrySettingsLoad={settingsRoute.hasSettingsService ? settingsRoute.handleRetrySettingsLoad : undefined}
+          onDismissSettingsError={settingsRoute.hasSettingsService ? settingsRoute.handleDismissSettingsError : undefined}
         />
       );
     default:
