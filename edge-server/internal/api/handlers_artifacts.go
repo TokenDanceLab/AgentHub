@@ -12,7 +12,14 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
-	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListArtifacts(runID)))
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	// When a specific run is requested under Hub JWT, fail closed if not owned.
+	if runID != "" && userID != "" && !isRunOwnedBy(repo, runID, userID) {
+		writeSuccess(w, http.StatusOK, listResponse([]store.Artifact{}))
+		return
+	}
+	writeSuccess(w, http.StatusOK, listResponse(filterArtifactsByOwner(repo.ListArtifacts(runID), repo, userID)))
 }
 
 func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID string) {
@@ -21,7 +28,13 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
 		return
 	}
-	if artifact, ok := ensureStore(h).GetArtifact(artifactID); ok {
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if artifact, ok := repo.GetArtifact(artifactID); ok {
+		if !isArtifactOwnedBy(repo, artifact.ID, userID) {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+			return
+		}
 		writeSuccess(w, http.StatusOK, artifact)
 		return
 	}
@@ -30,7 +43,13 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID
 
 func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
 	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
-	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if runID != "" && userID != "" && !isRunOwnedBy(repo, runID, userID) {
+		writeSuccess(w, http.StatusOK, listResponse([]store.Preview{}))
+		return
+	}
+	writeSuccess(w, http.StatusOK, listResponse(filterPreviewsByOwner(repo.ListPreviews(runID), repo, userID)))
 }
 
 func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +90,13 @@ func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID s
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 		return
 	}
-	if preview, ok := ensureStore(h).GetPreview(previewID); ok {
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if preview, ok := repo.GetPreview(previewID); ok {
+		if !isPreviewOwnedBy(repo, preview.ID, userID) {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+			return
+		}
 		writeSuccess(w, http.StatusOK, preview)
 		return
 	}

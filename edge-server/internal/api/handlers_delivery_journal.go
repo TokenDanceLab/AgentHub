@@ -10,6 +10,7 @@ import (
 
 // GetDeliveryJournal returns Edge->Hub callback journal entries for reconciliation (AH-SR-049).
 // Query: afterSeq (uint64, default 0). Requires same auth as other Edge state APIs.
+// Under Hub JWT, entries are filtered to runs owned by the caller (AH-SR-045).
 func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
@@ -33,8 +34,16 @@ func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("journal snapshot: %v", err)))
 		return
 	}
+	userID := hubUserFromRequest(r)
+	repo := ensureStore(h)
 	out := make([]map[string]any, 0, len(entries))
 	for _, e := range entries {
+		if userID != "" {
+			// Fail closed: unowned / unscoped journal rows are hidden from Hub JWT callers.
+			if e.RunID == "" || !isRunOwnedBy(repo, e.RunID, userID) {
+				continue
+			}
+		}
 		out = append(out, map[string]any{
 			"seq":         e.Seq,
 			"task_id":     e.TaskID,
