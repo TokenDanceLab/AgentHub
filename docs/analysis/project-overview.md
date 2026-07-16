@@ -1,188 +1,255 @@
-# AgentHub Project Overview
+# AgentHub 项目总览（Cleanup Baseline）
 
 > last-updated: 2026-07-16  
-> scope: cleanup baseline synthesis (Architecture / Hub / Edge / Frontend / Debt / Governance)  
-> authority: synthesis of discovery lanes + verified contradictions; not a replacement for AGENTS.md / architecture.md / server STATE
+> scope: cleanup baseline synthesis（Architecture / Hub / Edge / Frontend / Risks + 主会话卫生债）  
+> authority: 综合 discovery lanes；**不替代** `AGENTS.md` / `docs/architecture.md` / server STATE
 
-## 1. 产品定位
+## Preliminary Direction
 
-AgentHub 是 TokenDance 生态内的 **Hub / Edge 双平面 Agent 工作台**：
+**结论：不做 big-bang rewrite；做 knowledge-first + strangler 增量清理。**
 
-| 平面 | 职责 | 主要目录 |
+AgentHub 已具备正确且大体落地的双平面骨架：
+
+| 平面 | 职责 | 目录 |
 |---|---|---|
-| **Hub** | 身份会话、IM/同步、路由、审计、TeamRun 协作、设备路由 | `hub-server/` |
+| **Hub** | 身份会话、IM/同步、路由、审计、TeamRun、设备路由 | `hub-server/` |
 | **Edge** | 本地执行权威：lifecycle、adapters、EventStore、workspace | `edge-server/` |
 | **Workbench UI** | Desktop / Web / Mobile 共享 transcript + workbench 合同 | `app/shared/` + surface shells |
 
-核心产品事实：
+当前清理对象不是“缺架构”，而是：
 
-1. **Hub 不直接启动 CLI**；本地执行只发生在 Edge（Desktop 可托管 Local Edge）。
-2. **Web / Mobile 不能使用 Local Edge**；仅 Desktop 具备 `capabilities.localEdge: true`。
-3. **主协议是 REST JSON + typed WS events**；Protobuf / Connect-RPC / JSON-RPC 仅历史遗留。
-4. **生产已在 2026-07-15 于 hk3 恢复 LIVE**（container `agenthub-hub`，health `127.0.0.1:8090`，Azure PG role `agenthub`）。  
-   **禁止把生产描述为 offline / permanently decommissioned。**  
-   CI 与部分 policy 文档仍保留 “decommissioned runtime” 节流叙述，这是 **叙事漂移**，不是运行时真相。
+1. **生产叙事漂移**：hk3 已 LIVE，CI / 部分模板仍残留 decommissioned 叙述
+2. **安全半落地**：AH-SR-046 / 049 / 045 / 037 / 043 有代码痕迹但端到端未关
+3. **巨石与分叉**：Edge handlers / ProcessExecutor、Hub flat service、三份 `hubClient`、孤儿 Settings / TeamRun
+4. **卫生债**：`reference/` ~3.7G ignored 克隆、`.worktrees` ~4.6G、scripts ~80 家族（大量 readiness-only）、本地 dirty noise
 
-## 2. 仓库结构与规模（约数）
+权威程序见 `cleanup-strategy.md`：绞杀式切片 + 轻量 `wiki/` 编译知识层（非第二 SSOT）。
 
-| 区域 | 规模线索 | 说明 |
+## Current Architecture
+
+```mermaid
+flowchart TB
+  subgraph clients [Client Surfaces]
+    D[Desktop Tauri<br/>app/desktop]
+    W[Web<br/>app/web]
+    M[Mobile RN boundary<br/>app/mobile-rn]
+    S[Shared Workbench<br/>app/shared]
+  end
+
+  subgraph contracts [Contracts]
+    API[api/openapi.yaml]
+    EV[api/events.md]
+  end
+
+  subgraph hub [Hub Control Plane]
+    HAPI[Hub REST/WS]
+    HSVC[service / agentteam / outbox]
+    HDB[(Azure PG + Redis)]
+  end
+
+  subgraph edge [Edge Execution Plane]
+    EAPI[Edge REST/WS]
+    LIFE[lifecycle.ProcessExecutor]
+    AD[adapters Registry]
+    ESTORE[store + EventStore]
+  end
+
+  subgraph runtimes [Agent Runtimes]
+    CC[Claude Code]
+    CX[Codex]
+    OC[OpenCode]
+    SDK[Anthropic/OpenAI SDK]
+  end
+
+  D --> S
+  W --> S
+  M --> S
+  D -->|Local Edge :3210| EAPI
+  D -->|Hub session| HAPI
+  W -->|Hub only| HAPI
+  M -->|Hub only| HAPI
+  HAPI --> HSVC --> HDB
+  HSVC -->|dispatch / callback partial| EAPI
+  EAPI --> LIFE --> AD --> runtimes
+  LIFE --> ESTORE
+  ESTORE -->|WS| D
+  HAPI -->|WS| W
+  HAPI -->|WS| D
+  API -.-> HAPI
+  API -.-> EAPI
+  EV -.-> HAPI
+  EV -.-> EAPI
+```
+
+### 非协商边界
+
+1. Hub **不**直接启动 CLI；本地执行只在 Edge（Desktop 可托管 Local Edge）。
+2. Web / Mobile **不能** Local Edge；仅 Desktop `capabilities.localEdge: true`。
+3. Desktop renderer **无** raw process execution；危险能力经 typed Tauri host + Local Edge。
+4. TokenDance ID 只证明身份；Hub-local membership/resource/action 做授权。
+5. TokenDance API key 不进浏览器 UI / 公开日志。
+6. Mock / fixture / observed / approved-real / production 必须显式区分。
+7. 主协议 REST JSON + typed WS；Protobuf / Connect-RPC / JSON-RPC 仅历史。
+
+### 前端分层（已基本正确）
+
+```text
+surface shell → platform adapter (AgentHubPlatform)
+  → shared workbench / transcript / chatview
+    → Hub REST/WS  and/or  Local Edge (Desktop only)
+```
+
+shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
+
+## Technology Stack
+
+| 层 | 技术 | 备注 |
 |---|---|---|
-| 全仓 Go | ~473 `.go` 文件 | Go workspace：`edge-server`, `hub-server`, `pkg`（Go 1.25） |
-| 全仓 TS/TSX app | ~815 文件 | Desktop/Web/Mobile + shared |
-| `edge-server` | ~76k LOC-ish | 执行平面最大 |
-| `hub-server` | ~66k LOC-ish | 控制平面 |
-| `app/shared` | ~60k LOC-ish | workbench / transcript / platform 合同 |
-| `app/desktop` | ~51k LOC-ish | Tauri shell + Edge host |
-| `app/web` | ~27k LOC-ish | Hub-only remote workbench |
-| `reference/` | ~3.7G ignored | 仅 `reference/INDEX.md` 入仓；研究克隆非 SSOT |
+| Hub / Edge | Go 1.25 workspace（`hub-server` / `edge-server` / `pkg`） | `go.work` |
+| 数据 | PostgreSQL + Redis | 生产 Azure PG role `agenthub` |
+| 协议 | REST JSON + typed WebSocket | Hub 成功包络 `{code:OK,data}`；Edge 多为 bare JSON |
+| 前端 | React + TypeScript + pnpm workspace | `app/shared` / `desktop` / `web` / `mobile-rn` |
+| Desktop host | Tauri + Rust | Vite renderer ≠ packaged 证据 |
+| Mobile | Expo / React Native | 本轮 boundary-only |
+| 契约 | `api/openapi.yaml` + `events.md` + `conventions.md` | OpenAPI 混编 Hub+Edge 表面 |
+| 验证 | `scripts/{verify,dev,smoke,release,lib}` | ~63 ps1；体感 ~80 家族脚本 |
+| 部署 | `deployments/production/` + server compose | 秘密不在本仓 |
 
-固定本地端口（SSOT：`AGENTS.md`）：
+### 规模线索（约数，worktree 扫描）
 
-| 资源 | 端口 |
-|---|---:|
-| Desktop Vite | 5173 |
-| Web Vite | 5174 |
-| Mobile Expo Web | 5177 |
-| Hub Server | 8080 |
-| Local Edge | 3210 |
-
-## 3. 架构骨架（不可谈判边界）
-
-### 3.1 Hub / Edge 分工
-
-```
-Clients (Desktop / Web / Mobile)
-        │ REST + WS
-        ▼
-   Hub Server  ── identity / IM / routing / audit / outbox ──► PG + Redis
-        │
-        │ dispatch / callback (partial durable contract)
-        ▼
-   Edge Server ── lifecycle + adapters + EventStore ──► local runtime (CLI/SDK)
-```
-
-权威入口：
-
-- `docs/architecture.md`
-- `docs/architecture/01-hub-server.md` … `06-auth-identity.md`
-- `docs/decisions.md`（ADR-001 Hub/Edge；ADR-011 shared platform；ADR-016 delivery；ADR-017 capability 方向）
-- `hub-server/README.md` / `edge-server/README.md`
-
-### 3.2 前端分层（已基本正确）
-
-```
-surface shell (desktop|web|mobile)
-   → platform adapter (AgentHubPlatform)
-      → shared workbench / transcript / chatview
-         → Hub REST/WS  and/or  Local Edge (Desktop only)
-```
-
-- Desktop + Web 产品路径已挂载共享 `AgentHubWorkbench`。
-- Mobile 主线是 `app/mobile-rn`（Expo RN）；旧 `app/mobile` Tauri 残渣不应再被当作第二主线。
-- shared UI **不得**直接调用 Tauri / Hub / Edge 客户端；只经 platform ports。
-
-### 3.3 协议与响应信封
-
-- REST / WS 合同：`api/openapi.yaml`、`api/events.md`、`api/conventions.md`
-- Hub 成功信封仍是 `{code:OK,data}`；Edge 返回 bare JSON —— **有意兼容债**，禁止 big-bang 同时改两边。
-- Event 所有者分裂：Edge envelope vs Hub flat frame；前端 transcript normalizer 负责收敛。
-
-## 4. 生产与运维叙事（必须先对齐）
-
-| 事实层 | 当前权威 | 状态 |
+| 区域 | 规模 | 说明 |
 |---|---|---|
-| Live host / health / DB role | `C:/Users/Ding/server/projects/agenthub/STATE.md` | **LIVE hk3**（2026-07-15） |
-| In-repo production shape | `deployments/production/docker-compose.yml` | 最接近 hk3（Azure PG + redis + 8090） |
-| CI 门禁叙述 | `.github/workflows/checks.yml` | 仍写 S1 decommissioned / throttle |
-| 旧 prod 模板 | `hub-server/deployments/docker-compose.prod.yml` 等 | 本地 PG 形态，**非 live SSOT** |
-| 镜像名 | 分裂 | `agenthub-hub-server` vs `agenthub-hub`（已验证矛盾） |
+| `edge-server` | ~33k prod / ~47k test | 执行面最大；adapters prod~12k/test~16k |
+| `hub-server` | ~29k prod / ~46k test | service prod~12k |
+| `app/shared` | ~62k prod / ~17k test | workbench 巨文件集中 |
+| `app/desktop` | ~54k prod / ~16k test | + Tauri ~4k |
+| `app/web` | ~26k prod / ~8k test | Hub-only |
+| `app/mobile-rn` | ~12k prod / ~7k test | 非 UI 主线 |
+| `api/` | openapi ~7.5k lines | 合同巨石 |
+| `reference/` | ~3.7G ignored | 仅 `INDEX.md` 跟踪 |
+| `.worktrees/` | ~4.6G 本地 | 不进 git |
 
-**生产叙事 SSOT 推荐三件套：**
+## Entry Points
 
-1. server `STATE.md`（live host/facts）
-2. `deployments/production/`（in-repo shape）
-3. `docs/architecture/05-deployment.md` 短指针
-
-CI comments / 旧 compose / 旧 deploy.sh **不得**覆盖 Current Role。
-
-## 5. 模块健康一览（S.U.P.E.R 摘要）
-
-> 详细评分见 `risk-assessment.md`；模块清单见 `module-inventory.md`。
-
-| 模块 | 单目的 | 单向依赖 | 端口化 | 环境无关 | 可替换 | 结论 |
-|---|---|---|---|---|---|---|
-| Hub control plane | 强 | 大多单向 | 强 | 中 | 中 | 边界正确；AgentService / outbox 接线是主压力 |
-| Edge execution | 强意图 | 意图强 | 强 adapter | 中高 | adapter 高 | god-file + 半成品安全路径 |
-| Shared frontend contract | 强 | 强规则 | 强 | 高 | 高 | 清理支点；勿拆 transcript |
-| Desktop shell | 强 | 大多 | 强 | 低（设计如此） | 中 | 保留 Edge host；清 orphan UI |
-| Web shell | 强 | 强 | 强 | 高 | 高 | Hub-only 正确；sessionStorage 风险 |
-| Mobile RN | 中 | 大多 Hub-only | 有 | 中 | 中 | 边界隔离好；非本轮 UI 主线 |
-| Deploy/Ops narrative | 弱 | 叙事断裂 | 多模板 | docs 正确但模板竞争 | 高 | **P0 对齐** |
-| Governance/docs | 强骨架 | 强 | 强 | 好 | 好 | 状态漂移，不缺体系 |
-
-整体判断：**架构已够支撑增量 strangler cleanup；不需要 rewrite。**
-
-## 6. 当前最大清理压力（按类别）
-
-### 6.1 叙事 / 运维漂移（P0）
-
-- LIVE hk3 vs CI “decommissioned” 叙述（verified）
-- 镜像名 `agenthub-hub-server` vs `agenthub-hub`（verified）
-- 生产 DB 模板：Azure PG `agenthub` vs 旧本地 postgres / 默认 `tdadmin`（verified）
-- STATE 验证命令仍残留 hk2/us1 路径
-
-### 6.2 安全半成品（Open High，P0）
-
-| ID | 主题 | 现状 |
+| 入口 | 路径 | 说明 |
 |---|---|---|
-| AH-SR-037 | Web sessionStorage | 仍真实 |
-| AH-SR-045 | Remote Edge 授权粒度 | owner 过滤偏软 |
-| AH-SR-046 | capability 双令牌 | Edge 验但 Hub 未见签发；claims 不完整 |
-| AH-SR-049 | Hub-Edge durable delivery | Hub outbox 有实现但 retry loop 未接线；Edge callback 仍 best-effort |
-| AH-SR-043 | demo/mock 泄漏 | auto/fixture 仍可假成功 |
+| 项目规则 | `AGENTS.md` | 唯一规则 SSOT |
+| 架构 | `docs/architecture.md` + `docs/architecture/*` | 01–06 子文档 |
+| 总进度 | `docs/roadmap.md` | 2026-06-28：无 active SPEC |
+| 专项进度 | `docs/progress/MASTER.md` | cleanup 应重建 |
+| 安全 | `docs/governance/security-risk-register.md` | 发布门禁 |
+| Hub 进程 | `hub-server/cmd/server-hub` | 本地 `:8080` |
+| Edge 进程 | `edge-server/cmd/agenthub-edge` | 本地 `127.0.0.1:3210` |
+| Desktop | `app/desktop` Vite `:5173` | packaged 另证 |
+| Web | `app/web` Vite `:5174` | Hub-only |
+| Mobile Expo Web | `app/mobile-rn` `:5177` | boundary |
+| REST | `api/openapi.yaml` | 运行时路径以 router 为准 |
+| WS | `api/events.md` | Edge envelope vs Hub flat frame |
+| 生产 live | server `projects/agenthub/STATE.md` | **hk3 LIVE** |
+| 本基线 | `docs/analysis/*` | overview / inventory / risk / strategy |
 
-### 6.3 代码浓度 / 分叉（P0–P1）
+## Build & Run
 
-- Hub：`AgentService` 多关注点（dispatch / outbox / run-events / edge-callback）；flat `service` ~12k 行
-- Edge：`handlers.go` ~2374、`process_executor.go` ~2279
-- Frontend：三份 `hubClient`；orphan SettingsPage / TeamRunConsole；ConversationPort 未承载真实会话列表
-- Hygiene：tracked `hub-server/server-hub` ELF；Tauri android gen 脏树；无 active `docs/progress/MASTER.md`
+最短本地路径（细节：`docs/developer-quickstart.md`）：
 
-## 7. 明确不做什么
+```bash
+docker compose up -d postgres redis
 
-1. **不做 big-bang rewrite**（Hub/Edge 合并、协议同时改、前端整页重写）。
-2. **不把 Edge 并入 Hub**，不给 Web Local Edge 权限。
-3. **不把 llm-wiki 做成产品化第二知识平面**；可选的是 *knowledge compiler*（见 `cleanup-strategy.md`）。
-4. **不新增 root script wrappers**；沿用 `scripts/{verify,dev,smoke,release,lib}` 与 `make test` / `go test -short` / `pnpm typecheck|test`。
-5. **不宣称 production offline**。
-6. **不把 residual hub_relay 分支误读为 remote 执行已产品化**。
+cd hub-server && go run ./cmd/server-hub          # :8080/health
+cd edge-server && go run ./cmd/agenthub-edge      # :3210/health
 
-## 8. 证据入口（精选）
+cd app/web && corepack pnpm install && corepack pnpm dev          # :5174
+cd app/desktop && corepack pnpm install && corepack pnpm dev      # :5173
+cd app/desktop && corepack pnpm tauri dev                          # native
+```
 
-| 主题 | 路径 |
+固定端口 SSOT（`AGENTS.md`）：Desktop 5173、Web 5174、Mobile Expo Web 5177、Hub 8080、Local Edge 3210。
+
+生产形状：
+
+- 仓库内最近似：`deployments/production/docker-compose.yml`（Azure PG + redis + 8090）
+- live：hk3 `/opt/agenthub`，容器 `agenthub-hub`，health `http://127.0.0.1:8090/health`
+- 镜像名仍漂移：`agenthub-hub` vs `agenthub-hub-server`（P0 对齐）
+
+## Testing Baseline
+
+| 表面 | 最低命令 / 证据 | 边界 |
+|---|---|---|
+| 任意变更 | `git diff --check` + `git status --short --branch` | 强制 |
+| 文档 / API | `scripts/verify/verify-doc-ssot.ps1` + OpenAPI YAML parse | 强制 |
+| Edge / Hub | `go test ./... -short -count=1`（touched service） | 大量 `*_test.go` |
+| Desktop | `pnpm test` + `pnpm typecheck` | Vite ≠ packaged |
+| Web | `pnpm typecheck` + `vite build` | Hub-only |
+| UI 行为 | shared unit/contract + Playwright + Visual QA | 主视口 `1440x810` |
+| 真实登录 / 模型 / API | `.agents/skills/real-e2e-acceptance/SKILL.md` | 禁止 readiness 冒充 real |
+| 性能 / 泄漏 | `docs/reference/backend-performance-gates.md` | path-level |
+
+观察：Hub/Edge 测试体量常大于生产（保护力高，也有 mega-test / `time.Sleep` 卫生问题）。scripts 中大量 readiness-only，必须与 approved-real 分离。
+
+## Project Governance Baseline
+
+| 主题 | SSOT | 说明 |
+|---|---|---|
+| 规则 | `AGENTS.md` | 无第二套根级规则文件 |
+| 总进度 | `docs/roadmap.md` | Repo Structure Cleanup 已完成 |
+| 专项 | `docs/progress/MASTER.md` | cleanup 大型任务需重建 |
+| 架构 / 决策 | `docs/architecture*`、`docs/decisions.md` | 旧 ADR 外迁 |
+| 安全 | `docs/governance/*` | High Open 阻断公开发布 |
+| Skill 白名单 | `.agents/skills/*` + verify 脚本 | 过期 skill 不得 active |
+| 分支 | `feat/*|docs/*` → `dev/delicious233` → `master` | worktree 在 `.worktrees/` |
+| 历史 | `docs/history.md` → 外部归档 | 源仓不保留 `docs/archive/` |
+| 脚本布局 | `scripts/{verify,dev,smoke,release,lib}` | **禁止**新根级 wrapper |
+
+## External Integrations
+
+| 集成 | 角色 | 边界 |
+|---|---|---|
+| TokenDance ID | OIDC 登录 / 身份 | 不做 AgentHub 业务授权 |
+| TokenDance Gateway | 模型 / API 路由 | API key 不进浏览器 |
+| Feishu / Lark | 协作入口 / 卡片 | 非第二登录；回调 3s 内 |
+| Azure PostgreSQL | Hub 生产库 | role `agenthub`（2026-07-15 切流） |
+| Redis | session / cache / 部分 relay | hk3 本地 redis |
+| Runtime CLI/SDK | Claude Code / Codex / OpenCode / Anthropic / OpenAI | 仅 Edge adapters |
+| GHCR / GitHub Actions | 镜像与 CI | 部分 CD 仍 dry-run / 文档式 |
+
+## Production Reality（hk3 LIVE）
+
+**当前权威状态（2026-07-15 起）：生产在 hk3 LIVE，不是 decommissioned。**
+
+| 项 | 当前事实 |
 |---|---|
-| 项目规则 | `AGENTS.md` |
-| 架构总览 | `docs/architecture.md` |
-| 前端数据流 | `docs/architecture/04-frontend-data-flow.md` |
-| 部署 | `docs/architecture/05-deployment.md` |
-| 认证边界 | `docs/architecture/06-auth-identity.md` |
-| 决策 | `docs/decisions.md` |
-| 风险登记 | `docs/governance/security-risk-register.md` |
-| 威胁模型 | `docs/governance/threat-model.md` |
-| 路线图 | `docs/roadmap.md` |
-| Live 生产 | `C:/Users/Ding/server/projects/agenthub/STATE.md` |
-| In-repo prod compose | `deployments/production/docker-compose.yml` |
-| CI | `.github/workflows/checks.yml` |
-| API 合同 | `api/openapi.yaml`, `api/conventions.md`, `api/events.md` |
+| 角色 | 🟢 hk3 生产运行 |
+| Compose | `/opt/agenthub/docker-compose.yml` |
+| 容器 | `agenthub-hub`（healthy） |
+| 健康检查 | `http://127.0.0.1:8090/health` |
+| 数据库 | Azure PG `agenthub`，用户 / role **`agenthub`** |
+| DNS | service CNAME → `primary.vectorcontrol.tech` → current edge |
 
-## 9. 相关基线文档
+### 必须同时记住的漂移
+
+1. `.github/workflows/checks.yml` 等仍写 **decommissioned** —— 叙事漂移，待修，**不是**生产真相。
+2. server STATE 的 Verification Commands / nginx 段落仍夹杂 hk2/us1 历史 —— 勿覆盖 Current Role。
+3. 镜像名、旧 `hub-server/deployments/docker-compose.prod.yml` 本地 PG 形状、默认 `tdadmin` 可能过时。
+
+**生产叙事 SSOT 三件套：** server STATE + `deployments/production/` + `docs/architecture/05-deployment.md` 短指针。
+
+### 卫生债（主会话补充，lanes 未全覆盖）
+
+| 债面 | 事实 | 原则 |
+|---|---|---|
+| `reference/` | ~3.7G ignored 研究克隆；跟踪 `INDEX.md` | 不提交克隆；非产品 SSOT |
+| `.worktrees/` | ~4.6G | 任务后删除 |
+| scripts | ~80 家族 / ~63 ps1，多 readiness | 分类保留；删重复 |
+| dirty main noise | 本地删 tauri android gen、`hub-server/server-hub` binary 等 | 本机噪声，不写进产品叙事 |
+
+## 相关基线文档
 
 | 文档 | 内容 |
 |---|---|
-| `docs/analysis/module-inventory.md` | 模块清单、复杂度、清理优先级 |
-| `docs/analysis/risk-assessment.md` | 矛盾、Open High、S.U.P.E.R、测试证据等级 |
-| `docs/analysis/cleanup-strategy.md` | knowledge-first strangler 程序 + 可选 llmwiki |
+| `module-inventory.md` | 模块 Files/LOC、复杂度、S.U.P.E.R 灯号 |
+| `risk-assessment.md` | 矛盾、Open High、PARTIAL 046/049、测试与卫生风险 |
+| `cleanup-strategy.md` | 程序决策、Phase 0–5、并行 Workflow 队、非目标 |
 
-## 10. 一句话结论
+## 一句话结论
 
-AgentHub 的 **边界与分层已经正确且大体落地**；清理对象是 **叙事漂移、安全半成品接线、god-file 浓度、前端分叉与仓库卫生**，不是“缺架构”。正确路径是 **knowledge-first + strangler 增量**，把 SSOT 与安全门禁先校正，再机械抽取可替换端口。
+边界与分层已正确；清理对象是 **叙事漂移、安全半成品接线、god-file 浓度、前端分叉与仓库卫生**。路径是 **strangler + 轻量 wiki 编译层**，永不宣称生产 offline。
