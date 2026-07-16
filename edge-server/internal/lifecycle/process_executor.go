@@ -21,7 +21,6 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
-	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -95,7 +94,7 @@ type ProcessExecutor struct {
 	metrics    *metrics.EdgeMetrics  // Prometheus instrumentation; may be nil
 
 	// Hub callback client for Edge→Hub direct reporting
-	hubCallback *hub.CallbackClient
+	hubCallback CallbackReporter
 
 	maxConcurrentRuns         int // maximum concurrent runs; 0 means use default (5)
 	maxRunOutputBytes         int64
@@ -123,16 +122,16 @@ type ProcessExecutor struct {
 
 	mu          sync.Mutex
 	running     map[string]context.CancelFunc
-	stdins      map[string]io.Writer                       // runID to stdin (for adapter-aware interrupt)
-	processes   map[string]*os.Process                     // runID to os.Process (for graceful shutdown)
-	runOutputs  map[string]*runnerctx.RunOutputStore       // runID to temp log for output persistence and replay
-	runToAgent  map[string]string                          // runID to agentInstanceID for result aggregation
-	hubTasks    map[string]string                          // runID to Hub taskID (for Edge→Hub callbacks)
-	hubOutputs  map[string]*hubOutputCollector             // runID to bounded final response collector
-	workDirs    map[string]string                          // runID to workDir (for post-finish surfacing)
-	surfacers     map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
-	cancelDone    map[string]chan struct{}                   // runID to done channel for graceful shutdown goroutines
-	callbackSem   chan struct{}                              // bounds concurrent hub callbacks (max 10); prevents goroutine explosion
+	stdins      map[string]io.Writer                 // runID to stdin (for adapter-aware interrupt)
+	processes   map[string]*os.Process               // runID to os.Process (for graceful shutdown)
+	runOutputs  map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
+	runToAgent  map[string]string                    // runID to agentInstanceID for result aggregation
+	hubTasks    map[string]string                    // runID to Hub taskID (for Edge→Hub callbacks)
+	hubOutputs  map[string]*hubOutputCollector       // runID to bounded final response collector
+	workDirs    map[string]string                    // runID to workDir (for post-finish surfacing)
+	surfacers   map[string]*adapters.WorkdirSnapshot // runID to pre-run snapshot (for auto-surface detection)
+	cancelDone  map[string]chan struct{}             // runID to done channel for graceful shutdown goroutines
+	callbackSem chan struct{}                        // bounds concurrent hub callbacks (max 10); prevents goroutine explosion
 }
 
 // NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.
@@ -191,17 +190,17 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		shutdownForceTimeout:      shutdownFT,
 		evidenceGateCfg:           EvidenceGateConfigFromEnv(),
 		faultEscalationCfg:        faultEscalationCfg,
-		running:     make(map[string]context.CancelFunc),
-		stdins:      make(map[string]io.Writer),
-		processes:   make(map[string]*os.Process),
-		runOutputs:  make(map[string]*runnerctx.RunOutputStore),
-		runToAgent:  make(map[string]string),
-		hubTasks:    make(map[string]string),
-		hubOutputs:  make(map[string]*hubOutputCollector),
-		workDirs:    make(map[string]string),
-		surfacers:     make(map[string]*adapters.WorkdirSnapshot),
-		cancelDone:    make(map[string]chan struct{}),
-		callbackSem:   make(chan struct{}, 10), // max 10 concurrent hub callbacks
+		running:                   make(map[string]context.CancelFunc),
+		stdins:                    make(map[string]io.Writer),
+		processes:                 make(map[string]*os.Process),
+		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
+		runToAgent:                make(map[string]string),
+		hubTasks:                  make(map[string]string),
+		hubOutputs:                make(map[string]*hubOutputCollector),
+		workDirs:                  make(map[string]string),
+		surfacers:                 make(map[string]*adapters.WorkdirSnapshot),
+		cancelDone:                make(map[string]chan struct{}),
+		callbackSem:               make(chan struct{}, 10), // max 10 concurrent hub callbacks
 	}, nil
 }
 
@@ -318,12 +317,12 @@ func (e *ProcessExecutor) WithDecisionLoop(factory *DecisionLoopEmitterFactory) 
 // When set, run lifecycle transitions (started, finished, failed, cancelled)
 // are reported to the Hub server. Callbacks are fire-and-forget: errors are
 // logged but never block the run lifecycle.
-func (e *ProcessExecutor) SetHubCallback(c *hub.CallbackClient) {
+func (e *ProcessExecutor) SetHubCallback(c CallbackReporter) {
 	e.hubCallback = c
 }
 
 // WithHubCallback is a fluent variant of SetHubCallback.
-func (e *ProcessExecutor) WithHubCallback(c *hub.CallbackClient) *ProcessExecutor {
+func (e *ProcessExecutor) WithHubCallback(c CallbackReporter) *ProcessExecutor {
 	e.SetHubCallback(c)
 	return e
 }
@@ -909,7 +908,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 						line = strings.TrimRight(line, "\r")
 						if line != "" {
 							sanitizedLine, _ := recursiveSanitizeString(line)
-						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
+							slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 						}
 					}
 				}
@@ -1939,146 +1938,6 @@ func newRandomSessionID() string {
 // ── Hub callback fire-and-forget helpers ─────────────────────────────────
 
 // hubTaskID returns the Hub task ID for the given run, or empty string if not tracked.
-func (e *ProcessExecutor) hubTaskID(runID string) string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.hubTasks[runID]
-}
-
-// fireHubAck sends a TaskAck callback to Hub. Called when the run starts.
-// Errors are logged but never block the run lifecycle.
-func (e *ProcessExecutor) fireHubAck(runID string) {
-	if e.hubCallback == nil {
-		return
-	}
-	taskID := e.hubTaskID(runID)
-	if taskID == "" {
-		return
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
-		defer cancel()
-		if err := e.hubCallback.TaskAck(ctx, taskID, runID); err != nil {
-			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "error", err)
-		}
-	}()
-}
-
-func (e *ProcessExecutor) recordHubOutput(runID, text string) {
-	if text == "" {
-		return
-	}
-	e.mu.Lock()
-	collector := e.hubOutputs[runID]
-	e.mu.Unlock()
-	if collector == nil {
-		return
-	}
-	collector.Append(text)
-}
-
-func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
-	if text == "" {
-		return
-	}
-	e.mu.Lock()
-	collector := e.hubOutputs[runID]
-	e.mu.Unlock()
-	if collector == nil {
-		return
-	}
-	collector.SetFallback(text)
-}
-
-func (e *ProcessExecutor) hubFinalContent(runID string) string {
-	e.mu.Lock()
-	collector := e.hubOutputs[runID]
-	e.mu.Unlock()
-	if collector == nil {
-		return ""
-	}
-	return collector.Final()
-}
-
-// fireHubStream sends a TaskStream callback to Hub for visible runtime output.
-// Errors are logged but never block the run lifecycle.
-func (e *ProcessExecutor) fireHubStream(runID string, content string) {
-	if e.hubCallback == nil || content == "" {
-		return
-	}
-	taskID := e.hubTaskID(runID)
-	if taskID == "" {
-		return
-	}
-	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
-		chunk := chunk
-		e.callbackSem <- struct{}{}
-		go func() {
-			defer func() { <-e.callbackSem }()
-			ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
-			defer cancel()
-			if err := e.hubCallback.TaskStream(ctx, taskID, runID, chunk); err != nil {
-				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "error", err)
-			}
-		}()
-	}
-}
-
-// fireHubDone sends a TaskDone callback to Hub. Called when the run finishes successfully.
-// Errors are logged but never block the run lifecycle.
-func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
-	if e.hubCallback == nil {
-		return
-	}
-	taskID := e.hubTaskID(runID)
-	if taskID == "" {
-		return
-	}
-	content := e.hubFinalContent(runID)
-	if content == "" {
-		content = "Run finished"
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
-		defer cancel()
-		result := hub.TaskResult{
-			RunID:        runID,
-			FinalContent: content,
-		}
-		if err := e.hubCallback.TaskDone(ctx, taskID, result); err != nil {
-			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "error", err)
-		}
-	}()
-}
-
-type hubCallbackEmitter struct {
-	executor *ProcessExecutor
-	runID    string
-	inner    adapters.EventEmitter
-}
-
-func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
-	if executor == nil || inner == nil {
-		return inner
-	}
-	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
-}
-
-func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.inner.Emit(eventType, scope, payload)
-	switch eventType {
-	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.executor.recordHubOutput(e.runID, text)
-			e.executor.fireHubStream(e.runID, text)
-		}
-	case adapters.BusEventResult:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.executor.recordHubFinalFallback(e.runID, text)
-		}
-	}
-}
-
 type threadTranscriptEmitter struct {
 	writer    store.Writer
 	run       store.Run
@@ -2261,19 +2120,3 @@ func splitHubCallbackText(text string, maxBytes int) []string {
 
 // fireHubFail sends a TaskFail callback to Hub. Called when the run fails or is cancelled.
 // Errors are logged but never block the run lifecycle.
-func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
-	if e.hubCallback == nil {
-		return
-	}
-	taskID := e.hubTaskID(runID)
-	if taskID == "" {
-		return
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
-		defer cancel()
-		if err := e.hubCallback.TaskFail(ctx, taskID, runID, reason); err != nil {
-			slog.Warn("hub callback fail failed", "taskId", taskID, "runId", runID, "error", err)
-		}
-	}()
-}
