@@ -287,7 +287,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const conversations = useMemo(() => {
     // Merge Hub sessions + Edge threads into a unified conversation list.
     const hubConversationList = useHubConversations
-      ? hubSessions.map((session) => hubSessionToConversation(session))
+      ? hubSessions.map((session) => hubSessionToConversation(session as Parameters<typeof hubSessionToConversation>[0]))
       : [];
     const edgeConversationList = threads.map((thread) =>
       threadToConversation(
