@@ -7,7 +7,7 @@ export { FilePreview } from './FilePreview';
 export type { FilePreviewProps } from './FilePreview';
 
 export { FilePreviewRouter } from './FilePreviewRouter';
-export type { FilePreviewRouterProps } from './FilePreviewRouter';
+export type { FilePreviewRouterProps, PreviewFile } from './FilePreviewRouter';
 
 export { BrowserPreview } from './BrowserPreview';
 export type { BrowserPreviewProps } from './BrowserPreview';
