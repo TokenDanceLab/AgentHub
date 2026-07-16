@@ -738,7 +738,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
         {showLoadingNotice ? (
           <div className={styles.statusStack}>
             <StatusNotice
-              className={styles.statusNotice}
+              {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
               icon={<Loader2 size={14} aria-hidden="true" />}
               role="status"
             >
@@ -750,20 +750,22 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
         {showWriteNotice && settingsError ? (
           <div className={styles.statusStack}>
             <StatusNotice
-              className={styles.statusNotice}
+              {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
               icon={<AlertCircle size={14} aria-hidden="true" />}
               role="alert"
-              action={
-                onDismissSettingsError ? (
-                  <button
-                    type="button"
-                    className={styles.statusAction}
-                    onClick={onDismissSettingsError}
-                  >
-                    关闭
-                  </button>
-                ) : undefined
-              }
+              {...(onDismissSettingsError
+                ? {
+                    action: (
+                      <button
+                        type="button"
+                        className={styles.statusAction}
+                        onClick={onDismissSettingsError}
+                      >
+                        关闭
+                      </button>
+                    ),
+                  }
+                : {})}
             >
               设置未能保存：{settingsError}
             </StatusNotice>
@@ -773,7 +775,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
         {showInitRecovery && settingsError ? (
           <div className={styles.statusStack}>
             <RecoveryPanel
-              className={styles.recoveryPanel}
+              {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
               icon={<AlertCircle size={18} aria-hidden="true" />}
               eyebrow="Settings recovery"
               title="设置加载失败"
@@ -789,14 +791,14 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
                 },
                 disabled: !onRetrySettingsLoad,
               }}
-              secondaryAction={
-                onDismissSettingsError
-                  ? {
+              {...(onDismissSettingsError
+                ? {
+                    secondaryAction: {
                       label: '继续使用默认值',
                       onClick: onDismissSettingsError,
-                    }
-                  : undefined
-              }
+                    },
+                  }
+                : {})}
             />
           </div>
         ) : null}
