@@ -32,10 +32,11 @@ import (
 // CallbackClient reports Edge run lifecycle events to the Hub server.
 // It is safe for concurrent use.
 type CallbackClient struct {
-	hubURL    string
-	authToken string
-	client    *http.Client
-	journal   *DeliveryJournal
+	hubURL        string
+	authToken     string
+	client        *http.Client
+	journal       *DeliveryJournal
+	sqliteJournal *SQLiteDeliveryJournal
 }
 
 // TaskResult carries the final result of a completed task.
@@ -83,6 +84,23 @@ func (c *CallbackClient) Journal() *DeliveryJournal {
 		return nil
 	}
 	return c.journal
+}
+
+// EnableSQLiteJournal swaps the in-memory journal for a durable SQLite journal.
+// On failure, keeps the existing in-memory journal and returns the error.
+func (c *CallbackClient) EnableSQLiteJournal(path string) error {
+	if c == nil {
+		return nil
+	}
+	sj, err := OpenSQLiteDeliveryJournal(path)
+	if err != nil {
+		return err
+	}
+	// Bridge: copy is not required; new durable journal starts fresh or reloads via Snapshot.
+	// Replace memory journal with adapter that records into sqlite AND keeps memory optional.
+	c.journal = &DeliveryJournal{max: 1000} // keep memory mirror for fast Snapshot in-process
+	c.sqliteJournal = sj
+	return nil
 }
 
 // TaskAck sends an acknowledgement that the Edge server has received the task
@@ -227,8 +245,16 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 }
 
 func (c *CallbackClient) recordJournal(taskID, runID, action string, ok bool, errMsg string, attempts int) {
-	if c == nil || c.journal == nil {
+	if c == nil {
 		return
 	}
-	c.journal.Record(taskID, runID, action, ok, errMsg, attempts)
+	if c.journal != nil {
+		c.journal.Record(taskID, runID, action, ok, errMsg, attempts)
+	}
+	if c.sqliteJournal != nil {
+		if _, err := c.sqliteJournal.Record(taskID, runID, action, ok, errMsg, attempts); err != nil {
+			// best-effort durability; never block callback path
+			slog.Warn("durable delivery journal write failed", "taskId", taskID, "action", action, "error", err)
+		}
+	}
 }
