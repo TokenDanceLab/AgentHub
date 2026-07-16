@@ -6,12 +6,8 @@ import type {
   WorkbenchConversation,
 } from '../platform';
 import type { TranscriptBlock, ApprovalDecisionAction } from '../transcript';
-import { ConversationHost } from './ConversationHost';
-import { ConversationSidebar } from './ConversationSidebar';
-import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
-import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import { type TranscriptContextMenuEvent } from './transcriptEventTypes';
-import { WorkbenchRoutes } from './WorkbenchRoutes';
+import { type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
+import type { RuntimeEvidenceSnapshot } from './RightInspector';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
@@ -23,17 +19,9 @@ import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import { WorkbenchFrame } from './WorkbenchFrame';
 import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
 import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
-import {
-  INSPECTOR_MAX_WIDTH,
-  INSPECTOR_MIN_WIDTH,
-  SIDEBAR_MAX_WIDTH,
-  SIDEBAR_MIN_WIDTH,
-} from './workbenchLayoutConstants';
-import styles from './AgentHubWorkbench.module.css';
-
-const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
@@ -186,22 +174,7 @@ export function AgentHubWorkbench({
 
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
   const isChatPage = activePage === 'chat';
-  const {
-    inspectorWidth,
-    inspectorCollapsed,
-    inspectorResizing,
-    sidebarWidth,
-    sidebarCollapsed,
-    sidebarResizing,
-    toggleInspector,
-    navigateRail,
-    beginInspectorResize,
-    beginSidebarResize,
-    resizeInspectorBy,
-    resizeSidebarBy,
-    openInspector,
-    shellStyle,
-  } = useWorkbenchPanelLayout({
+  const layout = useWorkbenchPanelLayout({
     activePage,
     isChatPage,
     platformSurface: platform.surface,
@@ -216,34 +189,7 @@ export function AgentHubWorkbench({
     resetSelection: () => {},
   });
 
-  const {
-    settingsService,
-    currentConversationId,
-    selectConversation,
-    activeConversation,
-    selectedExecutionTargetId,
-    setSelectedExecutionTargetId,
-    dismissedPinnedIds,
-    localCliDiscovery,
-    reviewFileRequest,
-    searchOpen,
-    setSearchOpen,
-    workspaceRef,
-    composerInputRef,
-    composer,
-    dispatchComposer,
-    evidence,
-    mainchainSummary,
-    inspectorRouteBlocks,
-    inspectorContextBlocks,
-    inspectorDeployPreviewUrl,
-    inspectorRunResult,
-    mentionableAgents,
-    handleToggleTheme,
-    openReviewFile,
-    handleDeploySubmit,
-    exportMainchainEvidence,
-  } = useWorkbenchSessionChrome({
+  const session = useWorkbenchSessionChrome({
     platform,
     conversations,
     activeConversationId,
@@ -255,281 +201,123 @@ export function AgentHubWorkbench({
     workbenchStatus,
     activePage,
     isChatPage,
-    openInspector,
+    openInspector: layout.openInspector,
     showWorkbenchToast: (message) => transcriptHelpersRef.current.showWorkbenchToast(message),
     copyText: (text) => transcriptHelpersRef.current.copyText(text),
     resetSelection: () => transcriptHelpersRef.current.resetSelection(),
     t: translate,
   });
 
-  const {
-    selectionMode,
-    selectedBlockIds,
-    softHiddenBlockIds,
-    actionedBlockIds,
-    contextMenu,
-    setContextMenu,
-    toastMessage,
-    toastVisible,
-    selectBarRect,
-    multiSelectActions,
-    contextMenuGroups,
-    showWorkbenchToast,
-    openBlockContextMenu,
-    handleBlockSelect,
-    handleTranscriptBlockAction,
-    copyText,
-    resetSelection,
-  } = useWorkbenchTranscriptChrome({
+  const transcriptChrome = useWorkbenchTranscriptChrome({
     transcript,
     t: translate,
     onApprovalDecision,
     onRegenerate,
-    dispatchComposer,
-    composerInputRef,
-    workspaceRef,
-    inspectorCollapsed,
-    inspectorWidth,
+    dispatchComposer: session.dispatchComposer,
+    composerInputRef: session.composerInputRef,
+    workspaceRef: session.workspaceRef,
+    inspectorCollapsed: layout.inspectorCollapsed,
+    inspectorWidth: layout.inspectorWidth,
   });
 
   transcriptHelpersRef.current = {
-    showWorkbenchToast,
-    copyText,
-    resetSelection,
+    showWorkbenchToast: transcriptChrome.showWorkbenchToast,
+    copyText: transcriptChrome.copyText,
+    resetSelection: transcriptChrome.resetSelection,
   };
 
-  const {
-    activeAgentProfile,
-    activeHumanProfile,
-    activeGroupProfile,
-    focusedAgentId,
-    setActiveAgentProfile,
-    setActiveHumanProfile,
-    setActiveGroupProfile,
-    openAgentProfile,
-    openAgentProfileFromConfig,
-    openConversationAvatar,
-    openAgentDirectMessage,
-    openHumanDirectMessage,
-    openAgentConfig,
-    openGroupConversation,
-    copyHumanProfileLink,
-  } = useWorkbenchProfileChrome({
+  const profile = useWorkbenchProfileChrome({
     agents,
     conversations,
     t: translate,
-    selectConversation,
+    selectConversation: session.selectConversation,
     setActivePage,
-    showWorkbenchToast,
-    copyText,
-    composerInputRef,
+    showWorkbenchToast: transcriptChrome.showWorkbenchToast,
+    copyText: transcriptChrome.copyText,
+    composerInputRef: session.composerInputRef,
     onNavigateToConversation,
   });
 
   return (
-    <div
-      className={styles.shell}
-      data-inspector-collapsed={inspectorCollapsed ? 'true' : 'false'}
-      data-inspector-resizing={inspectorResizing ? 'true' : 'false'}
-      data-page={activePage}
-      data-selection-mode={selectionMode ? 'true' : 'false'}
-      data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}
-      data-sidebar-resizing={sidebarResizing ? 'true' : 'false'}
-      data-data-mode={workbenchStatus?.dataMode}
-      data-testid="agenthub-workbench"
-      style={shellStyle}
+    <WorkbenchFrame
+      platform={platform}
+      activePage={activePage}
+      isChatPage={isChatPage}
+      layout={layout}
+      session={session}
+      transcriptChrome={transcriptChrome}
+      profile={profile}
+      conversations={conversations}
+      agents={agents}
+      composerExecutionTargets={composerExecutionTargets}
+      workbenchStatus={workbenchStatus}
+      agentProfilesStatus={agentProfilesStatus}
+      contacts={contacts}
+      projects={projects}
+      activeProjectId={activeProjectId}
+      projectsStatus={projectsStatus}
+      onConversationPin={onConversationPin}
+      onConversationArchive={onConversationArchive}
+      onActiveProjectChange={onActiveProjectChange}
+      onAgentCreate={onAgentCreate}
+      onAgentUpdate={onAgentUpdate}
+      onAgentDelete={onAgentDelete}
+      onAgentsRetry={onAgentsRetry}
+      onLogout={onLogout}
+      onProjectCreate={onProjectCreate}
+      onProjectUpdate={onProjectUpdate}
+      hubClient={hubClient}
+      onNavigateToConversation={onNavigateToConversation}
+      contactsActions={contactsActions}
+      documents={documents}
+      documentsActions={documentsActions}
+      modelCatalog={modelCatalog}
+      ccSwitchStatus={ccSwitchStatus}
+      ccSwitchProviders={ccSwitchProviders}
+      runtimeEvidence={runtimeEvidence}
+      showComposerAgentPicker={showComposerAgentPicker}
+      showComposerStatus={showComposerStatus}
+      showMainchainStatus={showMainchainStatus}
+      transcript={transcript}
+      userDisplayName={userDisplayName}
+      userAvatarUrl={userAvatarUrl}
+      currentUserId={currentUserId}
+      skillMarketItems={skillMarketItems}
+      skillMarketLoading={skillMarketLoading}
+      mcpMarketItems={mcpMarketItems}
+      mcpMarketLoading={mcpMarketLoading}
+      highlightedBlockId={highlightedBlockId}
+      onHighlightEnd={onHighlightEnd}
+      connectionStatus={connectionStatus}
+      setActivePage={setActivePage}
     >
-      <GlobalRail
-        activePage={activePage}
-        onNavigate={navigateRail}
-        onLogout={onLogout}
-        onToggleTheme={handleToggleTheme}
-        userDisplayName={userDisplayName}
-        userAvatarUrl={userAvatarUrl}
-      />
-      {isChatPage && (
-        <div className={styles.sidebarFrame}>
-          <ConversationSidebar
-            activeConversationId={currentConversationId}
-            conversations={conversations}
-            onAvatarClick={openConversationAvatar}
-            onSelectConversation={selectConversation}
-            onPinConversation={onConversationPin}
-            onArchiveConversation={onConversationArchive}
-          />
-          <div
-            aria-label={t('aria.resizeSidebar')}
-            aria-orientation="vertical"
-            aria-valuemax={SIDEBAR_MAX_WIDTH}
-            aria-valuemin={SIDEBAR_MIN_WIDTH}
-            aria-valuenow={sidebarWidth}
-            className={styles.sidebarResizer}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-              event.preventDefault();
-              const step = event.shiftKey ? 40 : 16;
-              resizeSidebarBy(event.key === 'ArrowLeft' ? -step : step);
-            }}
-            onPointerDown={(event) => {
-              if (sidebarCollapsed) return;
-              event.preventDefault();
-              event.currentTarget.setPointerCapture?.(event.pointerId);
-              beginSidebarResize(event.clientX);
-            }}
-            role="separator"
-            tabIndex={sidebarCollapsed ? -1 : 0}
-          />
-        </div>
-      )}
-
-      <main
-        ref={workspaceRef}
-        aria-label={t('aria.workspace')}
-        className={styles.workspace}
-        data-mainchain={showMainchainStatus ? 'true' : 'false'}
-        data-mode={isChatPage ? 'chat' : 'workbench'}
-        data-surface={platform.surface}
-        data-workspace-main
-      >
-        {workbenchStatus?.initialLoading && conversations.length === 0 ? (
-          <div className={styles.workspaceLoading} role="status">
-            <span className={styles.workspaceLoadingSpinner} />
-            <span className={styles.workspaceLoadingLabel}>{t('connection.connecting')}</span>
-          </div>
-        ) : isChatPage ? (
-          <ConversationHost
-            transcript={transcript}
-            activeConversation={activeConversation}
-            connectionStatus={connectionStatus}
-            inspectorCollapsed={inspectorCollapsed}
-            onToggleInspector={toggleInspector}
-            showMainchainStatus={showMainchainStatus}
-            mainchainSummary={mainchainSummary}
-            onExportMainchainEvidence={exportMainchainEvidence}
-            workbenchStatus={workbenchStatus}
-            onAgentClick={openAgentProfile}
-            onBlockContextMenu={(blockId, event) => {
-              const block = transcript.find((b) => b.id === blockId);
-              if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
-            }}
-            onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey: shiftKey ?? false })}
-            onBlockAction={handleTranscriptBlockAction}
-            onReviewFile={openReviewFile}
-            onDeploySubmit={handleDeploySubmit}
-            selectedBlockIds={new Set(selectedBlockIds)}
-            selectionMode={selectionMode}
-            softHiddenBlockIds={new Set(softHiddenBlockIds)}
-            actionedBlockIds={new Set(actionedBlockIds)}
-            highlightedBlockId={highlightedBlockId}
-            onHighlightEnd={onHighlightEnd}
-            dismissedPinnedIds={dismissedPinnedIds}
-            onToast={showWorkbenchToast}
-            composerExecutionTargets={composerExecutionTargets}
-            selectedExecutionTargetId={selectedExecutionTargetId}
-            onExecutionTargetChange={setSelectedExecutionTargetId}
-            mentionableAgents={mentionableAgents}
-            showComposerAgentPicker={showComposerAgentPicker}
-            showComposerStatus={showComposerStatus}
-            composerTargetLabel={activeConversation?.title ?? 'AgentHub'}
-            currentConversationId={currentConversationId}
-            platform={platform}
-            composer={composer}
-            dispatchComposer={dispatchComposer}
-            composerInputRef={composerInputRef}
-            searchOpen={searchOpen}
-            onSearchOpenChange={setSearchOpen}
-          />
-        ) : (
-          <section aria-label={t('aria.workbenchPage')} className={styles.workbenchPageHost}>
-            <WorkbenchRoutes
-              activePage={activePage}
-              agents={agents}
-              agentProfilesStatus={agentProfilesStatus}
-              dataMode={workbenchStatus?.dataMode}
-              contacts={contacts}
-              documents={documents}
-              focusedAgentId={focusedAgentId}
-              projects={projects}
-              activeProjectId={activeProjectId}
-              projectsStatus={projectsStatus}
-              onActiveProjectChange={onActiveProjectChange}
-              onProjectCreate={onProjectCreate}
-              onProjectUpdate={onProjectUpdate}
-              hubClient={hubClient}
-              onAgentCreate={onAgentCreate}
-              onAgentUpdate={onAgentUpdate}
-              onAgentDelete={onAgentDelete}
-              onAgentsRetry={onAgentsRetry}
-              onAgentProfileOpen={openAgentProfileFromConfig}
-              onStartConversation={onNavigateToConversation}
-              contactsActions={contactsActions}
-              documentsActions={documentsActions}
-              localCliDiscovery={localCliDiscovery}
-              modelCatalog={modelCatalog}
-              ccSwitchStatus={ccSwitchStatus}
-              ccSwitchProviders={ccSwitchProviders}
-              settingsService={settingsService}
-              skillMarketItems={skillMarketItems}
-              skillMarketLoading={skillMarketLoading}
-              mcpMarketItems={mcpMarketItems}
-              mcpMarketLoading={mcpMarketLoading}
-              onNavigatePage={setActivePage}
-              currentUserId={currentUserId}
-              userDisplayName={userDisplayName}
-            />
-          </section>
-        )}
-      </main>
-
-      {isChatPage && (
-        <RightInspector
-          browserPreviewEnabled={platform.capabilities.browserPreview}
-          canOpenPreview={platform.preview?.canOpenEvidence}
-          collapsed={inspectorCollapsed}
-          contextBlocks={inspectorContextBlocks}
-          defaultBrowserUrl={DEFAULT_BROWSER_PREVIEW_URL}
-          deployPreviewUrl={inspectorDeployPreviewUrl}
-          evidence={evidence}
-          maxWidth={INSPECTOR_MAX_WIDTH}
-          minWidth={INSPECTOR_MIN_WIDTH}
-          onOpenPreview={platform.preview?.openEvidence}
-          reviewFileRequest={reviewFileRequest}
-          routeBlocks={inspectorRouteBlocks}
-          runtimeEvidence={runtimeEvidence}
-          runResult={inspectorRunResult}
-          workDir={composer.workDir?.trim() || undefined}
-          onResizeBy={resizeInspectorBy}
-          onResizeStart={beginInspectorResize}
-          width={inspectorWidth}
-        />
-      )}
       <WorkbenchTranscriptOverlays
         isChatPage={isChatPage}
-        contextMenu={contextMenu}
-        contextMenuGroups={contextMenuGroups}
-        onCloseContextMenu={() => setContextMenu(null)}
-        selectionMode={selectionMode}
-        multiSelectActions={multiSelectActions}
-        selectedCount={selectedBlockIds.length}
+        contextMenu={transcriptChrome.contextMenu}
+        contextMenuGroups={transcriptChrome.contextMenuGroups}
+        onCloseContextMenu={() => transcriptChrome.setContextMenu(null)}
+        selectionMode={transcriptChrome.selectionMode}
+        multiSelectActions={transcriptChrome.multiSelectActions}
+        selectedCount={transcriptChrome.selectedBlockIds.length}
         totalCount={transcript.length}
-        selectBarRect={selectBarRect}
-        toastMessage={toastMessage}
-        toastVisible={toastVisible}
+        selectBarRect={transcriptChrome.selectBarRect}
+        toastMessage={transcriptChrome.toastMessage}
+        toastVisible={transcriptChrome.toastVisible}
       />
       <WorkbenchProfileOverlays
         t={translate}
-        activeAgentProfile={activeAgentProfile}
-        activeHumanProfile={activeHumanProfile}
-        activeGroupProfile={activeGroupProfile}
-        onCloseAgentProfile={() => setActiveAgentProfile(null)}
-        onCloseHumanProfile={() => setActiveHumanProfile(null)}
-        onCloseGroupProfile={() => setActiveGroupProfile(null)}
-        onAgentDirectMessage={openAgentDirectMessage}
-        onAgentConfig={openAgentConfig}
-        onHumanDirectMessage={openHumanDirectMessage}
-        onCopyHumanProfileLink={copyHumanProfileLink}
-        onGroupSendMessage={openGroupConversation}
+        activeAgentProfile={profile.activeAgentProfile}
+        activeHumanProfile={profile.activeHumanProfile}
+        activeGroupProfile={profile.activeGroupProfile}
+        onCloseAgentProfile={() => profile.setActiveAgentProfile(null)}
+        onCloseHumanProfile={() => profile.setActiveHumanProfile(null)}
+        onCloseGroupProfile={() => profile.setActiveGroupProfile(null)}
+        onAgentDirectMessage={profile.openAgentDirectMessage}
+        onAgentConfig={profile.openAgentConfig}
+        onHumanDirectMessage={profile.openHumanDirectMessage}
+        onCopyHumanProfileLink={profile.copyHumanProfileLink}
+        onGroupSendMessage={profile.openGroupConversation}
       />
-    </div>
+    </WorkbenchFrame>
   );
 }
