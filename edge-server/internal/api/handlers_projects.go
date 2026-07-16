@@ -162,7 +162,8 @@ func (h *Handler) ArchiveThread(w http.ResponseWriter, r *http.Request, threadID
 
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
 	repository := ensureStore(h)
-	if _, ok := repository.GetThread(threadID); !ok {
+	userID := hubUserFromRequest(r)
+	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
 	}
@@ -232,7 +233,8 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 
 func (h *Handler) GetThreadPins(w http.ResponseWriter, r *http.Request, threadID string) {
 	repository := ensureStore(h)
-	if _, ok := repository.GetThread(threadID); !ok {
+	userID := hubUserFromRequest(r)
+	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
 	}
@@ -301,7 +303,13 @@ func (h *Handler) DeleteThreadPin(w http.ResponseWriter, r *http.Request, thread
 
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
-	if item, ok := ensureStore(h).GetItem(itemID); ok {
+	repo := ensureStore(h)
+	userID := hubUserFromRequest(r)
+	if item, ok := repo.GetItem(itemID); ok {
+		if !isItemOwnedBy(repo, item.ID, userID) {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
+			return
+		}
 		writeSuccess(w, http.StatusOK, item)
 		return
 	}
@@ -310,7 +318,8 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
 	repository := ensureStore(h)
-	if _, ok := repository.GetRun(runID); !ok {
+	userID := hubUserFromRequest(r)
+	if _, ok := repository.GetRun(runID); !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
 	}
