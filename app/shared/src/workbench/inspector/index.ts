@@ -21,3 +21,14 @@ export {
   fileDiffToText,
 } from './RuntimeEvidencePanel';
 export type { RuntimeEvidencePanelProps } from './RuntimeEvidencePanel';
+
+export {
+  BrowserPanelFallback,
+  DeployStatusBar,
+  FilesPanel,
+  OverviewContextUsage,
+  canOpenEvidence,
+  evidenceOverviewFiles,
+  evidenceOverviewTasks,
+  fileTypeFromName,
+} from './InspectorModePanels';
