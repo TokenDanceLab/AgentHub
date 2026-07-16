@@ -16,7 +16,7 @@ import {
 } from '../agentCapabilities';
 import { agentConfigToAgentSpecFixture } from '../agentProfileCatalog';
 import { formatAgentHubAgentSpecV1 } from '../../agentSpec';
-import { EmptyState, Select } from '../../ui';
+import { EmptyState, RecoveryPanel, Select, StatusNotice } from '../../ui';
 import styles from './AgentsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -515,14 +515,54 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             <h2>已安装 Agent</h2>
             <span>{agentsLoading ? '同步中' : `${agents.length} active`}</span>
           </div>
-          {agentsError && (
-            <div className={styles['agent-inline-state']} role="alert">
-              <span>{agentsError}</span>
-              <button type="button" onClick={onAgentsRetry}>重试</button>
+          {agentsError && agents.length === 0 ? (
+            <div className={styles.statusStack}>
+              <RecoveryPanel
+                {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
+                icon={<DesignNavIcon name="error404" size={18} />}
+                eyebrow="Agent recovery"
+                title="Agent 加载失败"
+                description="无法从当前 Hub 读取已安装 Agent Profile。列表暂时不可用，重试后可重新同步。"
+                meta={agentsError}
+                primaryAction={{
+                  label: '重试',
+                  busyLabel: '重试中…',
+                  busy: agentsLoading,
+                  icon: <DesignNavIcon name="refresh" size={14} />,
+                  onClick: () => {
+                    onAgentsRetry?.();
+                  },
+                  disabled: !onAgentsRetry,
+                }}
+              />
             </div>
-          )}
+          ) : null}
+          {agentsError && agents.length > 0 ? (
+            <div className={styles.statusStack}>
+              <StatusNotice
+                {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
+                icon={<DesignNavIcon name="error404" size={14} />}
+                role="alert"
+                {...(onAgentsRetry
+                  ? {
+                      action: (
+                        <button
+                          type="button"
+                          className={styles.statusAction}
+                          onClick={onAgentsRetry}
+                        >
+                          重试
+                        </button>
+                      ),
+                    }
+                  : {})}
+              >
+                {agentsError}
+              </StatusNotice>
+            </div>
+          ) : null}
           <div className={styles['agent-config-list']}>
-            {agents.length === 0 && !agentsLoading && (
+            {agents.length === 0 && !agentsLoading && !agentsError ? (
               <EmptyState
                 title="暂无 Agent Profile"
                 description="当前 Hub 账号还没有已安装 Agent。"
@@ -546,7 +586,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                   ? { action: { label: '添加 Agent', onClick: onAgentAdd } }
                   : {})}
               />
-            )}
+            ) : null}
             {agents.map((agent) => (
               <button
                 key={agent.id}
@@ -871,11 +911,21 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         </div>
       ))}
     </section>
-    {actionError && (
-      <div className={`${styles['agent-inline-state']} ${styles.danger}`} role="alert">
-        <span>{actionError}</span>
-      </div>
-    )}
+    {actionError ? (
+      <StatusNotice
+        {...((styles.statusNotice || styles.statusNoticeDanger)
+          ? {
+              className: [styles.statusNotice, styles.statusNoticeDanger]
+                .filter(Boolean)
+                .join(' '),
+            }
+          : {})}
+        icon={<DesignNavIcon name="error404" size={14} />}
+        role="alert"
+      >
+        {actionError}
+      </StatusNotice>
+    ) : null}
 
     {/* Edit actions */}
     <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
