@@ -1349,6 +1349,111 @@ export type CreateHubDocumentRequest = HubCreateDocumentRequest;
 export type UpdateHubDocumentRequest = HubUpdateDocumentRequest;
 export type AgentTaskStreamEventOptions = HubAgentTaskStreamEventOptions;
 
+
+// ── T3.4 web-only task approval/artifact types ──
+export interface HubAgentTaskApproval {
+  approval_id: string;
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status?: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface HubAgentTaskApprovalList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  approvals: HubAgentTaskApproval[];
+  pending?: HubAgentTaskApproval[];
+  decided?: HubAgentTaskApproval[];
+  last_event_seq?: number;
+}
+
+export interface HubAgentTaskArtifact {
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path?: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  artifact_id?: string;
+  name?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  diff?: string;
+  patch?: string;
+  edit_id?: string;
+  review_status?: string;
+  can_apply?: boolean;
+  can_revert?: boolean;
+  type?: string;
+  kind?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface HubAgentTaskArtifactList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  artifacts: HubAgentTaskArtifact[];
+  last_event_seq?: number;
+}
+
+export interface HubTaskApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export type AgentTaskApproval = HubAgentTaskApproval;
+export type AgentTaskApprovalList = HubAgentTaskApprovalList;
+export type AgentTaskArtifact = HubAgentTaskArtifact;
+export type AgentTaskArtifactList = HubAgentTaskArtifactList;
+export type TaskApprovalDecisionRequest = HubTaskApprovalDecisionRequest;
+
+export interface HubAgentInstance {
+  id: string;
+  agent_type: string;
+  custom_agent_id?: string;
+  session_id: string;
+  inviter_user_id: string;
+  workspace_id?: string;
+  display_name: string;
+  created_at?: string;
+}
+
+export interface HubPendingAgentTask {
+  id: string;
+  agent_instance_id: string;
+  triggered_by_user_id: string;
+  trigger_message_id: string;
+  target_id?: string;
+  status: string;
+  edge_run_id?: string;
+  edge_device_id?: string;
+  error_message?: string;
+  created_at?: string;
+  dispatched_at?: string;
+  finished_at?: string;
+  expire_at?: string;
+}
+
+export type AgentInstance = HubAgentInstance;
+export type PendingAgentTask = HubPendingAgentTask;
+
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
   const fetchImpl = opts.fetch;
@@ -2204,6 +2309,23 @@ export function createHubClient(opts: HubClientOptions = {}) {
         }),
       }),
 
+
+    // ── T3.4 web task approvals/artifacts ──
+    listTaskApprovals: (taskId: string) =>
+      request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+
+    decideTaskApproval: (taskId: string, approvalId: string, decision: HubTaskApprovalDecisionRequest) =>
+      request<HubAgentTaskApproval>(
+        `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    listTaskArtifacts: (taskId: string) =>
+      request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
+
   };
 }
 
@@ -2288,7 +2410,9 @@ export const HUBCLIENT_SSOT_GAPS = {
     // create/updateExecutionTarget request-shape differences may remain surface-local
   ],
   /** Web-only relative to desktop. */
-  webOnly: ['decideTaskApproval', 'listTaskApprovals', 'listTaskArtifacts'],
+  webOnly: [
+    // T3.4 landed task approvals/artifacts on shared
+  ],
 } as const;
 
 function isRouteFallbackError(error: unknown): boolean {
