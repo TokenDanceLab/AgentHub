@@ -3432,6 +3432,150 @@ func TestRunStartDualToken_MatchingTargetAndThreadAccepted(t *testing.T) {
 	}
 }
 
+// issueHubShapedCapToken mirrors hub-server IssueCapabilityToken wire claims
+// (issuer/audience/nbf + action/target/thread) for PostRuns dual-token fixture
+// evidence (AH-SR-046 residual / #461). No production network.
+func issueHubShapedCapToken(secret, userID, deviceID, projectID, purpose, action, targetID, threadID string, expiresIn time.Duration) string {
+	if purpose == "" {
+		purpose = "run-start"
+	}
+	if action == "" {
+		action = purpose
+	}
+	now := time.Now()
+	claims := jwtutil.CapabilityClaims{
+		UserID:    userID,
+		DeviceID:  deviceID,
+		ProjectID: projectID,
+		Purpose:   purpose,
+		Action:    action,
+		TargetID:  targetID,
+		ThreadID:  threadID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-edge"},
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now.Add(-5 * time.Second)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiresIn)),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+	return tok
+}
+
+func TestRunStartDualToken_HubIssueShape_AcceptsBoundToken(t *testing.T) {
+	// AH-SR-046 / #461 fixture: Hub-shaped issue → Edge PostRuns validate path.
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_local", time.Hour)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue shape ok"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	req.Header.Set("X-AgentHub-Target-Id", "target-a")
+	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-1")
+	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_HubIssueShape_RejectsWrongThread(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_other", time.Hour)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong thread"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	req.Header.Set("X-AgentHub-Target-Id", "target-a")
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_HubIssueShape_RejectsWrongTarget(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_local", time.Hour)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong target"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	req.Header.Set("X-AgentHub-Target-Id", "target-b")
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_HubIssueShape_RejectsWrongAction(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	// Hand-craft action mismatch (Hub issuer would refuse action!=purpose).
+	claims := jwtutil.CapabilityClaims{
+		UserID: "user-1", DeviceID: "test-edge-001", ProjectID: "proj_local",
+		Purpose: "run-start", Action: "stream", TargetID: "target-a", ThreadID: "thread_local",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: "agenthub-hub", Audience: jwt.ClaimStrings{"agenthub-edge"},
+			IssuedAt: jwt.NewNumericDate(time.Now()), NotBefore: jwt.NewNumericDate(time.Now().Add(-5 * time.Second)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong action"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", tok)
+	req.Header.Set("X-AgentHub-Target-Id", "target-a")
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
 type fakeCallbackJournal struct {
 	entries []hub.DeliveryJournalEntry
 }
