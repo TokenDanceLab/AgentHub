@@ -11,6 +11,7 @@ import {
   resolveWorkbenchProfile,
   type WorkbenchProfileSource,
 } from '../profileRegistry';
+import { EmptyState } from '../../ui';
 import styles from './TasksPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -489,10 +490,30 @@ function TaskTable({
         </React.Fragment>
       ))}
 
-      {totalTasks === 0 && emptyStateLabel && (
-        <div className={styles.emptyState} role="status">
-          {emptyStateLabel}
-        </div>
+      {totalTasks === 0 && (
+        <EmptyState
+          title={t('tasks.empty.title')}
+          titleLevel={3}
+          {...(emptyStateLabel ? { description: emptyStateLabel } : {})}
+          {...(styles['tasks-empty-compact']
+            ? { className: styles['tasks-empty-compact'] }
+            : {})}
+          {...(styles['tasks-empty-compact-content']
+            ? { contentClassName: styles['tasks-empty-compact-content'] }
+            : {})}
+          {...(styles['tasks-empty-compact-title']
+            ? { titleClassName: styles['tasks-empty-compact-title'] }
+            : {})}
+          {...(styles['tasks-empty-compact-description']
+            ? { descriptionClassName: styles['tasks-empty-compact-description'] }
+            : {})}
+          {...(styles['tasks-empty-compact-action']
+            ? { actionClassName: styles['tasks-empty-compact-action'] }
+            : {})}
+          {...(onAddRow
+            ? { action: { label: t('tasks.newTask'), onClick: onAddRow } }
+            : {})}
+        />
       )}
 
       {/* Fallback: if no groups, show single group with all tasks */}
