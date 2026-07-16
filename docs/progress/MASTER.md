@@ -85,9 +85,9 @@
 | T3.3 | #432 | Desktop thin re-export cutover | closed |
 | T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | closed |
 | T4.1 | #434 | Edge handlers 机械拆分 | closed |
-| T4.2 | #435 | ProcessExecutor 接口抽取 | open |
+| T4.2 | #435 | ProcessExecutor 接口抽取 | closed |
 | T4.3 | #436 | AH-SR-046 capability 闭环 | open |
-| T4.4 | #437 | AH-SR-049 outbox retry / journal | open |
+| T4.4 | #437 | AH-SR-049 outbox retry / journal | open (retry loop wired; Edge journal remaining) |
 | T5.1 | #438 | AH-SR-037 决策 | open |
 | T5.2 | #439 | Settings/TeamRun orphan 决策 | open |
 | T5.3 | #440 | 专项收口与归档计划 | open |
@@ -110,7 +110,7 @@ gh project item-list 6 --owner @me --format json --limit 50
 
 ## Current Status
 **Active Phase**: Phase 4 Edge Seams + Security  
-**Active Task**: #435 executor seams / #436 capability / #437 outbox  
+**Active Task**: #436 capability; #437 remaining Edge journal; Phase 5 decisions  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
