@@ -127,6 +127,7 @@ but no longer remain silent in the Settings product surface.
 
 - Rebind or delete dead `useTopMenuConfig` / `useShellShortcuts` / TopMenuBar `openSettings`.
 - Collapse `surfaceMetadata` `desktopSectionId`s + web residual section i18n to current 5-pane SSOT (or mark `interfaceGap`).
+  - Full residual inventory + collapse plan: [`settings-sectionid-residual-inventory.md`](./settings-sectionid-residual-inventory.md) (#530).
 - Migrate `StatesPane` previews onto shared `EmptyState` + variants.
 - Stop hardcoding Desktop demo `spaceTitle` / `spaceMeta` for Web mounts.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
