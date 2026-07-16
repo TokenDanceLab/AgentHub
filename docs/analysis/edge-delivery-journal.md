@@ -12,8 +12,12 @@
   - `CallbackClient.EnableSQLiteJournal(path)` dual-writes memory + sqlite (best-effort)
   - Runtime opt-in: `AGENTHUB_DELIVERY_JOURNAL_DB=/path/to/journal.db` in `httpserver` wiring
   - Open failure keeps memory journal; never blocks callback path
+- **Reconciliation read path**
+  - `CallbackClient.DurableSnapshot(afterSeq)` prefers SQLite
+  - `GET /v1/delivery-journal?afterSeq=` on Edge API
+  - `HasSuccessful(task, run, action)` for idempotent skip of already-acked deliveries
+  - unit tests: HasSuccessful + DurableSnapshot + GetDeliveryJournal
 
-## Remaining for full close
-- Hub idempotent ack/replay contract
-- reconciliation API/worker
-- E2E offline/replay evidence
+## Remaining (optional hardening)
+- Cross-service offline/replay E2E fixture against live Hub outbox
+- Automatic redelivery worker driven by DurableSnapshot cursor
