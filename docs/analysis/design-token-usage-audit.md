@@ -1,7 +1,7 @@
 # Design token usage audit (inventory)
 
-最后更新：2026-07-17  
-Issue: #466  
+最后更新：2026-07-17
+Issue: #466
 Companion SSOT map: [../architecture/07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
 
 > Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
@@ -52,11 +52,11 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 
 ## 4. Deferred (out of smallest #466 slice)
 
-1. Wholesale WelcomeScreen / AuthPage glass rewrite  
-2. Full chatview token merge  
-3. Workbench `px` → `--sp-*` pass  
-4. Mobile RN color SSOT merge  
-5. Shared React `ThemeProvider` with `enablePresets`  
+1. Wholesale WelcomeScreen / AuthPage glass rewrite
+2. Full chatview token merge
+3. Workbench `px` → `--sp-*` pass
+4. Mobile RN color SSOT merge
+5. Shared React `ThemeProvider` with `enablePresets`
 6. Package export for `./designTokens` and/or `./styles/*`
 
 ## 5. How to re-audit

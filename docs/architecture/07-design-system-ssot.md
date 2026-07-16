@@ -1,10 +1,10 @@
 # Design system SSOT map
 
-最后更新：2026-07-17  
+最后更新：2026-07-17
 Issue: #466 (P9.1)
 
-> 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。  
-> 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。  
+> 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
+> 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
 > 主架构索引：[architecture.md](../architecture.md)
 
 ## 1. Ownership map
