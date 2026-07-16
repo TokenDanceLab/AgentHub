@@ -15,6 +15,19 @@ vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),
 }));
 
+
+function getHeader(init: RequestInit | undefined, name: string): string | null {
+  const headers = init?.headers;
+  if (!headers) return null;
+  if (headers instanceof Headers) return headers.get(name);
+  if (Array.isArray(headers)) {
+    const hit = headers.find(([key]) => key.toLowerCase() === name.toLowerCase());
+    return hit?.[1] ?? null;
+  }
+  const record = headers as Record<string, string>;
+  return record[name] ?? record[name.toLowerCase()] ?? null;
+}
+
 describe('web project queries', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -26,7 +39,7 @@ describe('web project queries', () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('http://localhost:8080/web/projects?pageSize=50');
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer hub-access' });
+      expect(getHeader(init, 'Authorization')).toBe('Bearer hub-access');
       return new Response(
         JSON.stringify({
           code: 'ok',
@@ -121,28 +134,17 @@ describe('web project queries', () => {
       description: 'Updated from Web',
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'http://localhost:8080/web/projects/project%2Fid',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
+    expect(getHeader(fetchMock.mock.calls[0]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('http://localhost:8080/web/projects');
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).body).toBe(
+      JSON.stringify({ name: 'Created Project', description: 'Created from Web' }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'http://localhost:8080/web/projects',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ name: 'Created Project', description: 'Created from Web' }),
-      }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      'http://localhost:8080/web/projects/project%2Fid',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'Updated Project', description: 'Updated from Web' }),
-      }),
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
+    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe('PATCH');
+    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).body).toBe(
+      JSON.stringify({ name: 'Updated Project', description: 'Updated from Web' }),
     );
     expect(detail).toMatchObject({ name: 'Existing Project' });
     expect(created).toMatchObject({ id: 'created-project' });
@@ -244,38 +246,30 @@ describe('web project queries', () => {
       content: JSON.stringify(a2aContent),
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(getHeader(fetchMock.mock.calls[0]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ name: '新项目群' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).body).toBe(
+      JSON.stringify({ name: '新项目群' }),
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
-      }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+    expect(getHeader(fetchMock.mock.calls[2]?.[1] as RequestInit, 'Authorization')).toBe('Bearer hub-access');
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
       'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          client_msg_id: 'client-message-2',
-          content_type: 'text',
-          content: JSON.stringify(a2aContent),
-        }),
+    );
+    expect((fetchMock.mock.calls[3]?.[1] as RequestInit).method).toBe('POST');
+    expect((fetchMock.mock.calls[3]?.[1] as RequestInit).body).toBe(
+      JSON.stringify({
+        client_msg_id: 'client-message-2',
+        content_type: 'text',
+        content: JSON.stringify(a2aContent),
       }),
     );
     expect(threads[0]).toMatchObject({ id: 'thread-1', name: '项目群', member_count: 3 });
