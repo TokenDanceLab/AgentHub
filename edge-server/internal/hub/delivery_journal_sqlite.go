@@ -98,6 +98,27 @@ func (j *SQLiteDeliveryJournal) Snapshot(afterSeq uint64) ([]DeliveryJournalEntr
 	return out, rows.Err()
 }
 
+// HasSuccessful reports whether a successful delivery already exists for task+action(+run).
+// Used by reconciliation to skip re-delivery of terminal acks that already landed.
+func (j *SQLiteDeliveryJournal) HasSuccessful(taskID, runID, action string) (bool, error) {
+	if j == nil || j.db == nil {
+		return false, fmt.Errorf("journal closed")
+	}
+	row := j.db.QueryRow(
+		`SELECT 1 FROM delivery_journal WHERE task_id = ? AND action = ? AND ok = 1 AND (? = '' OR run_id = ?) LIMIT 1`,
+		taskID, action, runID, runID,
+	)
+	var one int
+	err := row.Scan(&one)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Close closes the DB.
 func (j *SQLiteDeliveryJournal) Close() error {
 	if j == nil || j.db == nil {
