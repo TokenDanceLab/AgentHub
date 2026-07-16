@@ -81,7 +81,7 @@
 | T2.2 | #428 | 中和 .agenthub/memory 假进度指针 | closed |
 | T2.3 | #429 | 降级旧 prod 模板为非权威 | closed |
 | T3.1 | #430 | hubClient 类型/矩阵 slice1 | closed |
-| T3.2 | #431 | shared hubClient 方法补齐 + contract tests | open |
+| T3.2 | #431 | shared hubClient 方法补齐 + contract tests | closed |
 | T3.3 | #432 | Desktop thin re-export cutover | open |
 | T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | open |
 | T4.1 | #434 | Edge handlers 机械拆分 | open |
@@ -104,13 +104,13 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 0: Analysis baseline（`347642b6` 等）
 - [x] Phase 1: Governance Lock (3/3 closed: #424-#426)
 - [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
-- [ ] Phase 3: Frontend Strangler (0/4)
+- [ ] Phase 3: Frontend Strangler (2/4 closed: #430 #431)
 - [ ] Phase 4: Edge Seams + Security (0/4)
 - [ ] Phase 5: Closure Decisions (0/3)
 
 ## Current Status
 **Active Phase**: Phase 3 Frontend Strangler  
-**Active Task**: T3.2 #431 hubClient method parity  
+**Active Task**: next #432/#433 cutover or #434 edge split  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
