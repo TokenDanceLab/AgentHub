@@ -166,6 +166,40 @@
   font: 400 0.8125rem/1.45 var(--font-sans);
 }
 
+.statusStack {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.statusNotice {
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-high, var(--surface));
+  color: var(--text-2);
+}
+
+.statusAction {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.statusAction:hover {
+  background: var(--surface-high);
+}
+
+.recoveryPanel {
+  margin: 0;
+}
+
 .iconAction {
   width: 36px;
   height: 36px;

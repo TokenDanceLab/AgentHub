@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -9,6 +10,7 @@ import {
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import { getWorkbenchDataModeContract } from '../../demo';
 import type { LocalCliDiscoveryManifest } from '../../platform';
+import { RecoveryPanel, StatusNotice } from '../../ui';
 import styles from './SettingsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -91,6 +93,16 @@ export interface SettingsPageProps {
   onOpenAgentConfig?: () => void;
   /** Current user display name from OIDC. */
   currentUserDisplayName?: string | undefined;
+  /** True while settingsService is loading remote values. */
+  settingsLoading?: boolean | undefined;
+  /** Last settings load/write error message. */
+  settingsError?: string | null | undefined;
+  /** Whether the last error came from init or write. */
+  settingsErrorKind?: 'init' | 'write' | null | undefined;
+  /** Retry loading settings after an init failure. */
+  onRetrySettingsLoad?: (() => void) | undefined;
+  /** Dismiss a transient write-error notice. */
+  onDismissSettingsError?: (() => void) | undefined;
 }
 
 export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states';
@@ -667,10 +679,22 @@ const PANE_RENDERERS: Record<SettingsPaneId, React.FC<SettingsPageProps>> = {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SettingsPage(props: SettingsPageProps): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const { activePane, spaceTitle, spaceMeta, onSelectPane } = props;
+  const {
+    activePane,
+    spaceTitle,
+    spaceMeta,
+    onSelectPane,
+    settingsLoading = false,
+    settingsError = null,
+    settingsErrorKind = null,
+    onRetrySettingsLoad,
+    onDismissSettingsError,
+  } = props;
   const meta = PANE_META[activePane] ?? PANE_META.appearance;
   const PaneContent = PANE_RENDERERS[activePane] ?? PANE_RENDERERS.appearance;
+  const showInitRecovery = Boolean(settingsError) && settingsErrorKind === 'init' && !settingsLoading;
+  const showWriteNotice = Boolean(settingsError) && settingsErrorKind === 'write' && !settingsLoading;
+  const showLoadingNotice = settingsLoading;
 
   return (
     <section className={`${styles.page} workbench settings-page`}>
@@ -710,6 +734,73 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
             <DesignNavIcon name="settings" size={16} />
           </button>
         </div>
+
+        {showLoadingNotice ? (
+          <div className={styles.statusStack}>
+            <StatusNotice
+              className={styles.statusNotice}
+              icon={<Loader2 size={14} aria-hidden="true" />}
+              role="status"
+            >
+              正在加载设置…
+            </StatusNotice>
+          </div>
+        ) : null}
+
+        {showWriteNotice && settingsError ? (
+          <div className={styles.statusStack}>
+            <StatusNotice
+              className={styles.statusNotice}
+              icon={<AlertCircle size={14} aria-hidden="true" />}
+              role="alert"
+              action={
+                onDismissSettingsError ? (
+                  <button
+                    type="button"
+                    className={styles.statusAction}
+                    onClick={onDismissSettingsError}
+                  >
+                    关闭
+                  </button>
+                ) : undefined
+              }
+            >
+              设置未能保存：{settingsError}
+            </StatusNotice>
+          </div>
+        ) : null}
+
+        {showInitRecovery && settingsError ? (
+          <div className={styles.statusStack}>
+            <RecoveryPanel
+              className={styles.recoveryPanel}
+              icon={<AlertCircle size={18} aria-hidden="true" />}
+              eyebrow="Settings recovery"
+              title="设置加载失败"
+              description="无法从当前平台适配器读取已保存的设置。页面会暂时使用默认值，重试后可恢复远端偏好。"
+              meta={settingsError}
+              primaryAction={{
+                label: '重试加载',
+                busyLabel: '重试中…',
+                busy: settingsLoading,
+                icon: <RefreshCw size={14} aria-hidden="true" />,
+                onClick: () => {
+                  onRetrySettingsLoad?.();
+                },
+                disabled: !onRetrySettingsLoad,
+              }}
+              secondaryAction={
+                onDismissSettingsError
+                  ? {
+                      label: '继续使用默认值',
+                      onClick: onDismissSettingsError,
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        ) : null}
+
         <PaneContent {...props} />
       </main>
     </section>
