@@ -1,7 +1,7 @@
 # Design token usage audit (inventory)
 
 最后更新：2026-07-17
-Issue: #466 / #480 / #482 / #491
+Issue: #466 / #480 / #482 / #491 / #518
 Companion SSOT map: [../architecture/07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
 
 > Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
@@ -32,7 +32,7 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 | entry | `app/desktop/src/components/WelcomeScreen.module.css` | was 5 → **0** | **#482**: residual elevation rgba → `--glass-shadow*` |
 | entry | `app/desktop/src/components/AuthPage.module.css` | was 7 → **0** | **#482**: residual identity/logo glass literals tokenized |
 | workbench | `app/shared/src/workbench/AgentHubWorkbench.module.css` | few hex; many raw px | spacing not using `--sp-*` |
-| chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | **#491**: dense scale kept; `--sp-md` now aliases base compat `--space-md` (12px ≠ v4 16px); dark palette still forked |
+| chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | **#491**: dense scale kept; `--sp-md` → base compat `--space-md` (12px ≠ v4 16px). **#518**: radius / type / dark still forked (inventory only; no further alias) |
 
 ## 3. Theme fork evidence (pre-#466 → post)
 
@@ -56,7 +56,7 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 ## 4. Deferred (out of smallest #466 slice)
 
 1. ~~Wholesale WelcomeScreen / AuthPage glass rewrite~~ → landed in **#482** (module CSS only; no theme runtime rewrite)
-2. Full chatview token merge (dark palette / radius / type) — **#491** inventory + `--sp-md`→`--space-md` only
+2. Full chatview token merge (dark palette / radius / type) — **#491** inventory + `--sp-md`→`--space-md`; **#518** residual radius/type/dark inventory (no redesign / no extra alias)
 3. ~~Workbench `px` → `--sp-*` pass~~ → landed in **#480** (exact/compat spacing only; odd steps deferred)
 4. Mobile RN color SSOT merge
 5. Shared React `ThemeProvider` with `enablePresets`
@@ -274,20 +274,84 @@ Highest product risk: chat sits in workbench under host `data-theme` but **does 
 **Align 2b — color blocked with evidence (no value change)**
 Dark palette fork + light `success/warning-bg` opacity drift documented in §6.7–6.8. Full dark → `themes.css` merge deferred (high visual QA; separate issue). Light opacity inherit (2a) skipped for standalone fallback safety.
 
-### 6.12 Residual after #491
+### 6.12 Residual after #491 / #518
 
-| Area | Status |
-|---|---|
-| Spacing semantic | **partially linked**: chatview `--sp-md` → base `--space-md` (12px); `--sp-lg`/`--sp-xl` still dense 20/28 |
-| Radius | still forked (tighter chat scale) |
-| Typography | still dense chat type |
-| Dark colors | still full palette fork (incl. primary `#3399dd` vs `#29ABE2`) |
-| Full merge / package `./styles/*` export | deferred |
+| Area | Status after #491 | #518 residual decision |
+|---|---|---|
+| Spacing semantic | **partially linked**: chatview `--sp-md` → base `--space-md` (12px); `--sp-lg`/`--sp-xl` still dense 20/28 | keep; no further spacing alias (no base 20/28 step) |
+| Radius | still forked (tighter chat scale) | **document only** — see §6.14 |
+| Typography | still dense chat type | **document only** — see §6.14 |
+| Dark colors | still full palette fork (incl. primary `#3399dd` vs `#29ABE2`) | **document only** — see §6.14 |
+| Full merge / package `./styles/*` export | deferred | still deferred |
 
 ### 6.13 Out of scope / later phases
 
 - Full chatview token merge / delete scoped table
-- Dark palette → `themes.css`
-- Radius + type density redesign
-- Package export of shared styles
+- Dark palette → `themes.css` (with visual QA under workbench host theme)
+- Radius + type density redesign (or intentional dual-scale product decision)
+- Package export of shared styles (`./styles/*`) so scoped redeclares can thin out safely
 - Workbench odd-px residual (already #480)
+
+### 6.14 #518 residual inventory — radius / type / dark
+
+Goal: micro inventory of the three forks left after #491. **No intentional visual redesign.** Optional zero-visual alias only if a host token already carries the **same computed value** under a different name (the `--sp-md` → `--space-md` pattern). None found for radius / type / dark.
+
+#### Radius residual
+
+| Token | Base (`tokens-base`) | Chatview | Δ | ~fan-out (chatview CSS) |
+|---|---|---|---:|---:|
+| `--r-xs` | 6px | 3px | −3 | ~9 (chips, code, badges, file acts) |
+| `--r-sm` | 8px | 6px | −2 | ~5 (buttons, code block shell, avatars) |
+| `--r-md` | 12px | 10px | −2 | ~8 (cards, card-stack, bubbles) |
+| `--r-lg` | 16px | 14px | −2 | 1 (user bubble) |
+| `--r-full` | 9999px | 9999px | 0 | 1 (progress / pill) |
+| `--r-xl` / `--r-2xl` | base only | absent | n/a | — |
+| `--radius-*` compat | aliases base `--r-*` | unused in chatview | n/a | — |
+
+Primary sites: `RowItem.css` (cards / chips / actions / code), `Transcript.css` (bubbles / badges / code).
+
+**Why not alias:** base has no 3 / 6 / 10 / 14 radius steps (compat `--radius-*` maps to the **looser** base scale). Pointing chatview `--r-*` at base `--r-*` or `--radius-*` rounds the whole transcript surface (+2–3px per corner) → redesign, not silent.
+
+#### Typography residual
+
+| Token | Base | Chatview | Match? | ~fan-out |
+|---|---|---|---|---:|
+| `--font-sans` / `--font-mono` | same stacks | same stacks | yes (literal redeclare) | many |
+| `--body` | 14px (`0.875rem`) | **13px** (`0.8125rem`) | **NO** | ~5 (+ empty / plan text) |
+| `--label` | 12px medium | same | yes (literal redeclare) | ~12 |
+| `--label-xs` | 10px (`0.625rem`) | **11px** (`0.6875rem`) | **NO** | ~12 |
+| `--bubble-font` | — | chat-only 14px | chat-only | bubble body |
+| raw `0.625/0.6875/0.8125rem` fonts | — | several hard sizes in `Transcript.css` / `RowItem.css` | bypass tokens | residual |
+
+**Why not alias:** no base token equals chat dense 13px body or 11px `--label-xs`. Aligning `--body` / `--label-xs` to base reflows labels + body density. Identical stacks (`--font-sans` / `--font-mono` / matching `--label`) stay as scoped redeclares because standalone import still only loads `chatview/design/tokens.css` (see blocked #491 #5).
+
+#### Dark palette residual (major)
+
+Chat sits under host `data-theme` in workbench but `[data-theme="dark"] .chatview` **re-overrides** the full surface/text/status table. Light mostly matches `themes.css`; dark does not.
+
+| Risk class | Examples (themes dark → chatview dark) | Product impact |
+|---|---|---|
+| Surfaces | `--app-bg` `#1a1a20`→`#121217`; `--surface` `#24242d`→`#1c1c24`; ladder dim/low/high/highest all darker | Chat panel reads as a separate sheet inside workbench |
+| Text | `--text-1/2/3` slight cool shift | readable but not host SSOT |
+| Borders | `--bdr` 0.06→0.07; `--bdr-strong` 0.10→0.12 | minor |
+| Brand / status | **`--primary` `#29ABE2`→`#3399dd`**; success/warning/danger/info all diverge | selection outline, user bubble fill, deploy links, agent avatars |
+| Role / state / diff | follow chatview status hexes | orchestrator + state chips diverge from host |
+
+Light residual only: `--success-bg` / `--warning-bg` opacity 0.08 (themes) vs 0.06 (chatview).
+
+**Why not alias / inherit host:** same custom-property names → no non-circular “different name, same value” link. Deleting the dark table to inherit host changes brand primary + every surface (redesign + standalone path loses colors). Light-only inherit (2a in #491) still skipped for standalone fallback safety.
+
+#### Safe vs blocked under #518
+
+| Candidate | Verdict |
+|---|---|
+| Radius → base / `--radius-*` | **blocked** (value Δ + high fan-out) |
+| `--body` / `--label-xs` → base type | **blocked** (density redesign) |
+| Dark table → `themes.css` inherit | **blocked** (visual redesign + standalone) |
+| Delete identical font/dur/micro-sp redeclares | **blocked** until package exports `./styles/*` and standalone load path includes host SSOT |
+| Extra spacing alias for `--sp-lg`/`--sp-xl` | **blocked** (no base 20/28) |
+| Zero-visual alias like #491 `--sp-md`→`--space-md` | **none remaining** for radius / type / dark |
+
+#### Landed in #518
+
+Docs + SSOT residual inventory only. `app/shared/src/chatview/design/tokens.css` **unchanged** this pass (no redesign; no unsafe alias).
