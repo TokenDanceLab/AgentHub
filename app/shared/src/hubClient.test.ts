@@ -3,9 +3,11 @@ import { HUB_EVENTS } from './hubEvents';
 import { AppError } from './errors';
 import {
   createHubClient,
+  HUBCLIENT_SSOT_GAPS,
   HubError,
   parseHubError,
   unwrapHubResponse,
+  type AuthResponse,
   type HubAgentDoneFrame,
   type HubAgentFailedFrame,
   type HubAgentStreamFrame,
@@ -16,6 +18,7 @@ import {
   type HubFriendRequestFrame,
   type HubNotificationNewFrame,
   type HubSession,
+  type Session,
 } from './hubClient';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -327,5 +330,26 @@ describe('hubClient helpers', () => {
     expect(error.status).toBe(401);
     expect(error.code).toBe('auth_failed');
     expect(error.message).toBe('Unauthorized');
+  });
+
+  it('exports compatibility aliases and SSOT gap inventory for slice1 (#430)', () => {
+    // Type-level aliases must remain assignable (compile-time); runtime checks inventory shape.
+    const session: Session = { session_id: 's-alias', type: 'private' };
+    const hubSession: HubSession = session;
+    expect(hubSession.session_id).toBe('s-alias');
+
+    const auth: AuthResponse = {
+      access_token: 'a',
+      refresh_token: 'r',
+      expires_in: 3600,
+    };
+    expect(auth.access_token).toBe('a');
+
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).toContain('listAgentTeams');
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).toContain('fetchSettings');
+    expect(HUBCLIENT_SSOT_GAPS.desktopOnly).toContain('streamTaskEvent');
+    expect(HUBCLIENT_SSOT_GAPS.webOnly).toContain('listTaskApprovals');
+    // Guard against accidental empty inventory during later edits.
+    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared.length).toBeGreaterThan(10);
   });
 });

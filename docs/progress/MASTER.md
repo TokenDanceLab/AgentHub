@@ -47,6 +47,9 @@
 
 ## References
 
+- [Dirty Tree Policy](../analysis/dirty-tree-policy.md) (#427)
+- [hubClient SSOT Slice1](../analysis/hubclient-ssot-slice1.md) (#430)
+
 - [Project Overview](../analysis/project-overview.md)
 - [Module Inventory](../analysis/module-inventory.md)
 - [Risk Assessment](../analysis/risk-assessment.md)

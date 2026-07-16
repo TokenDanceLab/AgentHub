@@ -3,6 +3,12 @@
 // Covers all routes defined in hub-server/internal/router/router.go.
 //
 // Uses the same error convention as edgeClient.ts: AppError from @shared/errors.
+//
+// CLEANUP FREEZE (issue #430 / T3.1 — hubClient SSOT slice1):
+// - SSOT target is `app/shared/src/hubClient.ts` (see docs/analysis/hubclient-ssot-slice1.md).
+// - Do NOT add new Hub REST methods or DTO types here.
+// - Add shared methods/types first; web may only keep thin host glue until T3.4 cutover.
+// - Demo/dataMode mutations must not gain new silent-success paths (AH-SR-043 / T3.4).
 
 import { HUB_URL } from '@/config';
 import { AppError, reportApiError } from '@shared/errors';
