@@ -1,7 +1,7 @@
 # AgentHub 项目总览（Cleanup Baseline）
 
-> last-updated: 2026-07-16  
-> scope: cleanup baseline synthesis（Architecture / Hub / Edge / Frontend / Risks + 主会话卫生债）  
+> last-updated: 2026-07-16
+> scope: cleanup baseline synthesis（Architecture / Hub / Edge / Frontend / Risks + 主会话卫生债）
 > authority: 综合 discovery lanes；**不替代** `AGENTS.md` / `docs/architecture.md` / server STATE
 
 ## Preliminary Direction

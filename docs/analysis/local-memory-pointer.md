@@ -1,6 +1,6 @@
 # Local agent memory pointer policy
 
-最后更新：2026-07-16  
+最后更新：2026-07-16
 Issue: #428 (T2.2)
 
 ## Decision

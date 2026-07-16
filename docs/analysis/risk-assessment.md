@@ -1,7 +1,7 @@
 # AgentHub 风险评估（Cleanup Baseline）
 
-> last-updated: 2026-07-16  
-> purpose: cleanup baseline risks、verified contradictions、S.U.P.E.R health、debt surfaces  
+> last-updated: 2026-07-16
+> purpose: cleanup baseline risks、verified contradictions、S.U.P.E.R health、debt surfaces
 > sources: 五条 discovery lanes + 主会话卫生债；安全发布 SSOT 仍是 `docs/governance/security-risk-register.md`
 
 ## 1. Executive judgment
@@ -175,15 +175,15 @@ S.U.P.E.R = Single-purpose · Unidirectional · Ports · Environment-agnostic ·
 
 ## 9. Verified contradictions（高置信摘要）
 
-1. **LIVE vs decommissioned** — STATE Current Role vs CI S1 注释  
-2. **镜像名分裂** — production compose / cd-hub-server vs cd-production  
-3. **DB 拓扑模板** — Azure `agenthub` vs 本地 postgres / `tdadmin`  
-4. **Outbox retry 未启用** — 实现在、接线无  
-5. **Capability 完成度被高估** — Edge 验、Hub 签不全  
-6. **Local event durability ≠ Hub-Edge contract**  
-7. **runners vs adapters** — 兼容面 vs 执行中心  
-8. **ConversationPort.list vs 真实会话源**  
-9. **Settings 三套 UI / TeamRun 产品面模糊**  
+1. **LIVE vs decommissioned** — STATE Current Role vs CI S1 注释
+2. **镜像名分裂** — production compose / cd-hub-server vs cd-production
+3. **DB 拓扑模板** — Azure `agenthub` vs 本地 postgres / `tdadmin`
+4. **Outbox retry 未启用** — 实现在、接线无
+5. **Capability 完成度被高估** — Edge 验、Hub 签不全
+6. **Local event durability ≠ Hub-Edge contract**
+7. **runners vs adapters** — 兼容面 vs 执行中心
+8. **ConversationPort.list vs 真实会话源**
+9. **Settings 三套 UI / TeamRun 产品面模糊**
 10. **MASTER 缺失 vs AGENTS 渐进加载假设**
 
 ## 10. Risk-driven cleanup order
