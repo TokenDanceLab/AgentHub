@@ -1,0 +1,410 @@
+package agentevent
+
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/agenthub/hub-server/internal/model"
+)
+
+// SummarizeAgentRunEvents rolls up runtime history for a pending task.
+func SummarizeAgentRunEvents(task *model.PendingAgentTask, events []model.AgentRunEvent) model.AgentRunEventSummary {
+	summary := model.AgentRunEventSummary{
+		TaskID:          task.ID,
+		EdgeRunID:       task.EdgeRunID,
+		Status:          task.Status,
+		TotalEvents:     len(events),
+		EventTypeCounts: make(map[string]int),
+	}
+	startedAt := task.CreatedAt
+	if startedAt.IsZero() && len(events) > 0 {
+		startedAt = events[0].CreatedAt
+	}
+	if !startedAt.IsZero() {
+		summary.StartedAt = &startedAt
+	}
+	if task.FinishedAt != nil {
+		finishedAt := task.FinishedAt.UTC()
+		summary.FinishedAt = &finishedAt
+	}
+
+	approvalStates := map[string]string{}
+	for _, event := range events {
+		if event.EventSeq > summary.LastEventSeq {
+			summary.LastEventSeq = event.EventSeq
+		}
+		if summary.EdgeRunID == "" {
+			summary.EdgeRunID = event.EdgeRunID
+		}
+		summary.EventTypeCounts[event.EventType]++
+		if strings.HasPrefix(event.EventType, "run.agent.") {
+			summary.StepCount++
+		}
+
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(event.Payload), &payload)
+		switch event.EventType {
+		case model.RunEventTypeOutputBatch:
+			summary.OutputBytes += OutputBytesFromPayload(payload)
+		case "run.agent.tool_call":
+			summary.ToolCallCount++
+		case "run.agent.permission_requested":
+			key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
+			if key == "" {
+				key = event.ID
+			}
+			approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "status"), "pending")
+		case "run.agent.permission_decided":
+			key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
+			if key == "" {
+				key = event.ID
+			}
+			approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "decision", "status"), "decided")
+		case "run.agent.file_change":
+			summary.ArtifactCount++
+		case "run.agent.result", "run.agent.context_usage":
+			inputTokens, outputTokens := TokenUsageFromPayload(payload)
+			summary.InputTokens += inputTokens
+			summary.OutputTokens += outputTokens
+		}
+	}
+	for _, status := range approvalStates {
+		summary.ApprovalCount++
+		if PendingApprovalStatus(status) {
+			summary.PendingApprovals++
+		} else {
+			summary.DecidedApprovals++
+		}
+	}
+
+	if summary.StartedAt != nil {
+		end := time.Time{}
+		if summary.FinishedAt != nil {
+			end = *summary.FinishedAt
+		} else if len(events) > 0 {
+			end = events[len(events)-1].CreatedAt
+		}
+		if !end.IsZero() && end.After(*summary.StartedAt) {
+			summary.ElapsedMs = end.Sub(*summary.StartedAt).Milliseconds()
+		}
+	}
+	return summary
+}
+
+// ProjectTaskApprovals builds pending/decided approval projections from run events.
+func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunEvent) *model.AgentTaskApprovalList {
+	result := &model.AgentTaskApprovalList{
+		TaskID:    task.ID,
+		EdgeRunID: task.EdgeRunID,
+		Approvals: []model.AgentTaskApproval{},
+		Pending:   []model.AgentTaskApproval{},
+		Decided:   []model.AgentTaskApproval{},
+	}
+	approvalIndex := map[string]int{}
+	for _, event := range events {
+		if event.EventSeq > result.LastEventSeq {
+			result.LastEventSeq = event.EventSeq
+		}
+		if result.EdgeRunID == "" {
+			result.EdgeRunID = event.EdgeRunID
+		}
+		if result.SessionID == "" {
+			result.SessionID = event.SessionID
+		}
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+			continue
+		}
+		switch event.EventType {
+		case "run.agent.permission_requested":
+			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
+			requestID := FirstJSONString(payload, "requestId", "request_id")
+			toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
+			key := FirstNonEmptyString(requestID, toolUseID)
+			if key == "" {
+				continue
+			}
+			approvalIndex[key] = len(result.Approvals)
+			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
+				ApprovalID:    ApprovalIDFor(requestID, toolUseID),
+				TaskID:        event.TaskID,
+				TargetID:      strings.TrimSpace(task.TargetID),
+				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
+				CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
+				EdgeRunID:     edgeRunID,
+				SessionID:     event.SessionID,
+				SourceEventID: event.ID,
+				EventSeq:      event.EventSeq,
+				RequestID:     requestID,
+				ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:     toolUseID,
+				Status:        FirstNonEmptyString(FirstJSONString(payload, "status"), "pending"),
+				CreatedAt:     event.CreatedAt,
+			})
+		case "run.agent.permission_decided":
+			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
+			requestID := FirstJSONString(payload, "requestId", "request_id")
+			toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
+			key := FirstNonEmptyString(requestID, toolUseID)
+			if key == "" {
+				continue
+			}
+			decision := FirstNonEmptyString(FirstJSONString(payload, "decision", "status"), "decided")
+			decidedAt := event.CreatedAt
+			edgeControl := TaskApprovalEdgeControl(payload)
+			if idx, ok := approvalIndex[key]; ok {
+				result.Approvals[idx].Status = decision
+				result.Approvals[idx].Reason = FirstJSONString(payload, "reason")
+				result.Approvals[idx].DecidedBy = FirstJSONString(payload, "decided_by", "decidedBy")
+				result.Approvals[idx].DecidedAt = &decidedAt
+				if result.Approvals[idx].RequestID == "" {
+					result.Approvals[idx].RequestID = requestID
+				}
+				if result.Approvals[idx].ToolUseID == "" {
+					result.Approvals[idx].ToolUseID = toolUseID
+				}
+				if result.Approvals[idx].ToolName == "" {
+					result.Approvals[idx].ToolName = FirstJSONString(payload, "toolName", "tool_name")
+				}
+				if edgeControl != nil {
+					result.Approvals[idx].EdgeControl = edgeControl
+				}
+				if result.Approvals[idx].TargetID == "" {
+					result.Approvals[idx].TargetID = strings.TrimSpace(task.TargetID)
+				}
+				if result.Approvals[idx].EdgeDeviceID == "" {
+					result.Approvals[idx].EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
+				}
+				if result.Approvals[idx].CorrelationID == "" {
+					result.Approvals[idx].CorrelationID = FirstJSONString(payload, "correlation_id", "correlationId")
+				}
+				continue
+			}
+			approvalIndex[key] = len(result.Approvals)
+			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
+				ApprovalID:    ApprovalIDFor(requestID, toolUseID),
+				TaskID:        event.TaskID,
+				TargetID:      strings.TrimSpace(task.TargetID),
+				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
+				CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
+				EdgeRunID:     edgeRunID,
+				SessionID:     event.SessionID,
+				SourceEventID: event.ID,
+				EventSeq:      event.EventSeq,
+				RequestID:     requestID,
+				ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:     toolUseID,
+				Status:        decision,
+				Reason:        FirstJSONString(payload, "reason"),
+				DecidedBy:     FirstJSONString(payload, "decided_by", "decidedBy"),
+				CreatedAt:     event.CreatedAt,
+				DecidedAt:     &decidedAt,
+				EdgeControl:   edgeControl,
+			})
+		}
+	}
+	for _, approval := range result.Approvals {
+		if PendingApprovalStatus(approval.Status) {
+			result.Pending = append(result.Pending, approval)
+		} else {
+			result.Decided = append(result.Decided, approval)
+		}
+	}
+	return result
+}
+
+// TaskApprovalEdgeControl extracts optional edge_control payload fields.
+func TaskApprovalEdgeControl(payload map[string]any) *model.TeamApprovalEdgeControl {
+	raw, ok := payload["edge_control"]
+	if !ok {
+		raw = payload["edgeControl"]
+	}
+	controlMap, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	control := &model.TeamApprovalEdgeControl{
+		RunID:     FirstJSONString(controlMap, "runId", "run_id"),
+		RequestID: FirstJSONString(controlMap, "requestId", "request_id"),
+		Decision:  FirstJSONString(controlMap, "decision"),
+		Reason:    FirstJSONString(controlMap, "reason"),
+	}
+	if control.RunID == "" && control.RequestID == "" && control.Decision == "" {
+		return nil
+	}
+	return control
+}
+
+// FindTaskApproval locates an approval by approval/request/tool-use id.
+func FindTaskApproval(approvals []model.AgentTaskApproval, approvalID string) *model.AgentTaskApproval {
+	approvalID = strings.TrimSpace(approvalID)
+	for i := range approvals {
+		if approvalID != "" && (approvals[i].ApprovalID == approvalID || approvals[i].RequestID == approvalID || approvals[i].ToolUseID == approvalID) {
+			return &approvals[i]
+		}
+	}
+	return nil
+}
+
+// ProjectTaskArtifacts builds artifact projections from file_change / artifact.created events.
+func ProjectTaskArtifacts(task *model.PendingAgentTask, events []model.AgentRunEvent) *model.AgentTaskArtifactList {
+	result := &model.AgentTaskArtifactList{
+		TaskID:    task.ID,
+		EdgeRunID: task.EdgeRunID,
+		Artifacts: []model.AgentTaskArtifact{},
+	}
+	for _, event := range events {
+		if event.EventSeq > result.LastEventSeq {
+			result.LastEventSeq = event.EventSeq
+		}
+		if result.EdgeRunID == "" {
+			result.EdgeRunID = event.EdgeRunID
+		}
+		if result.SessionID == "" {
+			result.SessionID = event.SessionID
+		}
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+			continue
+		}
+		switch event.EventType {
+		case "run.agent.file_change":
+			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
+			paths := TaskArtifactPaths(payload)
+			for _, path := range paths {
+				result.Artifacts = append(result.Artifacts, model.AgentTaskArtifact{
+					TaskID:        event.TaskID,
+					SessionID:     event.SessionID,
+					SourceEventID: event.ID,
+					EventSeq:      event.EventSeq,
+					EdgeRunID:     edgeRunID,
+					Path:          path,
+					Action:        FirstJSONString(payload, "action", "kind"),
+					ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+					Status:        FirstJSONString(payload, "status"),
+					Diff:          FirstJSONString(payload, "diff", "unified_diff", "unifiedDiff", "patch"),
+					EditID:        FirstJSONString(payload, "edit_id", "editId"),
+					Hash:          FirstJSONString(payload, "hash", "diff_hash", "diffHash", "sha256"),
+					ReviewStatus:  FirstJSONString(payload, "review_status", "reviewStatus", "status"),
+					CanApply:      SafeTaskArtifactCapability(payload, "can_apply", "canApply"),
+					CanRevert:     SafeTaskArtifactCapability(payload, "can_revert", "canRevert"),
+					CreatedAt:     event.CreatedAt,
+				})
+			}
+		case "artifact.created":
+			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
+			path := FirstJSONString(payload, "path", "filePath", "file_path", "uri")
+			if path == "" {
+				continue
+			}
+			result.Artifacts = append(result.Artifacts, model.AgentTaskArtifact{
+				TaskID:        event.TaskID,
+				EdgeRunID:     edgeRunID,
+				SessionID:     event.SessionID,
+				SourceEventID: event.ID,
+				EventSeq:      event.EventSeq,
+				Path:          path,
+				Action:        FirstJSONString(payload, "action"),
+				ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+				Status:        FirstJSONString(payload, "status"),
+				ArtifactID:    FirstJSONString(payload, "artifact_id", "artifactId", "id"),
+				Hash:          FirstJSONString(payload, "hash", "sha256"),
+				Name:          FirstJSONString(payload, "name", "filename", "file_name"),
+				MimeType:      FirstJSONString(payload, "mime_type", "mimeType", "content_type", "contentType"),
+				SizeBytes:     int64(FirstRuntimeInt(payload, "size_bytes", "sizeBytes", "size")),
+				CreatedAt:     event.CreatedAt,
+			})
+		}
+	}
+	return result
+}
+
+// TaskArtifactPaths extracts path/files fields from a file_change payload.
+func TaskArtifactPaths(payload map[string]any) []string {
+	paths := []string{}
+	if path := FirstJSONString(payload, "path", "filePath", "file_path"); path != "" {
+		paths = append(paths, path)
+	}
+	if files, ok := payload["files"].([]any); ok {
+		for _, file := range files {
+			if value, ok := file.(string); ok && strings.TrimSpace(value) != "" {
+				paths = append(paths, strings.TrimSpace(value))
+			}
+		}
+	}
+	return paths
+}
+
+// SafeTaskArtifactCapability always reports false for apply/revert capabilities.
+// Hub exposes artifact/file-change projection for review and evidence export only.
+func SafeTaskArtifactCapability(payload map[string]any, keys ...string) *bool {
+	requested := FirstJSONBoolPtr(payload, keys...)
+	if requested == nil {
+		return nil
+	}
+	disabled := false
+	return &disabled
+}
+
+// FirstJSONBoolPtr returns a pointer to the first bool value for any key.
+func FirstJSONBoolPtr(payload map[string]any, keys ...string) *bool {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok {
+			continue
+		}
+		if typed, ok := value.(bool); ok {
+			return &typed
+		}
+	}
+	return nil
+}
+
+// OutputBytesFromPayload estimates streamed output size from content/text chunks.
+func OutputBytesFromPayload(payload map[string]any) int {
+	total := len(RuntimeString(payload, "content", "text"))
+	if chunks, ok := payload["chunks"].([]any); ok {
+		for _, chunk := range chunks {
+			chunkMap, ok := chunk.(map[string]any)
+			if !ok {
+				continue
+			}
+			total += len(RuntimeString(chunkMap, "content", "text"))
+		}
+	}
+	return total
+}
+
+// TokenUsageFromPayload extracts input/output token counts from a payload or nested usage object.
+func TokenUsageFromPayload(payload map[string]any) (int, int) {
+	source := payload
+	if usage, ok := payload["usage"].(map[string]any); ok {
+		source = usage
+	}
+	inputTokens := FirstRuntimeInt(source, "input_tokens", "inputTokens", "prompt_tokens", "promptTokens")
+	outputTokens := FirstRuntimeInt(source, "output_tokens", "outputTokens", "completion_tokens", "completionTokens")
+	return inputTokens, outputTokens
+}
+
+// FirstRuntimeInt returns the first numeric value for any key.
+func FirstRuntimeInt(payload map[string]any, keys ...string) int {
+	for _, key := range keys {
+		switch value := payload[key].(type) {
+		case int:
+			return value
+		case int64:
+			return int(value)
+		case float64:
+			return int(value)
+		case json.Number:
+			n, _ := value.Int64()
+			return int(n)
+		case string:
+			n, _ := strconv.Atoi(strings.TrimSpace(value))
+			return n
+		}
+	}
+	return 0
+}
