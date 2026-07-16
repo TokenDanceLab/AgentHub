@@ -16,7 +16,6 @@ import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock, ApprovalDecisionAction } from '../transcript';
 import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
-import { ProfilePopover } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { buildMainchainSummary } from './mainchain';
@@ -27,14 +26,15 @@ import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchCont
 import type { HubClient } from '../hubClient';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
-import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
+import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
-import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { createSettingsService, type SettingsService } from './settingsService';
 import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
+import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
 import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
 import {
   INSPECTOR_MAX_WIDTH,
@@ -57,29 +57,6 @@ const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
     { id: 'opencode', name: 'OpenCode', installed: false, version: null, path: 'opencode', noSpend: true },
   ],
 };
-
-interface AgentProfileState {
-  id: string;
-  name: string;
-  role: string;
-  engine: string;
-  model: string;
-  state: string;
-  skills: string[];
-  anchor: HTMLElement;
-}
-
-interface HumanProfileState {
-  id: string;
-  name: string;
-  initials: string;
-  org: string;
-  status: string;
-  tag: string;
-  subtitle: string;
-  avatarColor?: string | undefined;
-  anchor: HTMLElement;
-}
 
 export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
@@ -270,15 +247,6 @@ export function AgentHubWorkbench({
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
   const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
-  const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
-  const [activeHumanProfile, setActiveHumanProfile] = useState<HumanProfileState | null>(null);
-  const [activeGroupProfile, setActiveGroupProfile] = useState<{
-    id: string;
-    name: string;
-    memberNames: string[];
-    anchor: HTMLElement;
-  } | null>(null);
-  const [focusedAgentId, setFocusedAgentId] = useState<string | undefined>(undefined);
   const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
@@ -317,6 +285,40 @@ export function AgentHubWorkbench({
     workspaceRef,
     inspectorCollapsed,
     inspectorWidth,
+  });
+
+  function selectConversation(conversationId: string): void {
+    setLocalConversationId(conversationId);
+    resetSelection();
+    onActiveConversationChange?.(conversationId);
+  }
+
+  const {
+    activeAgentProfile,
+    activeHumanProfile,
+    activeGroupProfile,
+    focusedAgentId,
+    setActiveAgentProfile,
+    setActiveHumanProfile,
+    setActiveGroupProfile,
+    openAgentProfile,
+    openAgentProfileFromConfig,
+    openConversationAvatar,
+    openAgentDirectMessage,
+    openHumanDirectMessage,
+    openAgentConfig,
+    openGroupConversation,
+    copyHumanProfileLink,
+  } = useWorkbenchProfileChrome({
+    agents,
+    conversations,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
+    selectConversation,
+    setActivePage,
+    showWorkbenchToast,
+    copyText,
+    composerInputRef,
+    onNavigateToConversation,
   });
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
@@ -424,153 +426,6 @@ export function AgentHubWorkbench({
     toggleAppliedAgentHubTheme();
   }
 
-  function openAgentProfile(agentName: string, anchor: HTMLElement): void {
-    const profile = agentProfileByName(agentName);
-    if (!profile) {
-      setActiveAgentProfile(null);
-      setActiveGroupProfile(null);
-      setActiveHumanProfile(humanProfileByName(agentName, anchor));
-      return;
-    }
-    setActiveHumanProfile(null);
-    setActiveGroupProfile(null);
-    setActiveAgentProfile({ ...profile, anchor });
-  }
-
-  function openAgentProfileFromConfig(
-    agent: {
-      id: string;
-      name: string;
-      role: string;
-      engine: string;
-      model: string;
-      state: string;
-      skills: string[];
-    },
-    anchor: HTMLElement,
-  ): void {
-    setActiveHumanProfile(null);
-    setActiveGroupProfile(null);
-    setActiveAgentProfile({ ...agent, anchor });
-  }
-
-  function openConversationAvatar(conversation: WorkbenchConversation, anchor: HTMLElement): void {
-    setActiveAgentProfile(null);
-    setActiveHumanProfile(null);
-    setActiveGroupProfile(null);
-
-    if (conversation.kind === 'group') {
-      setActiveGroupProfile({
-        id: conversation.id,
-        name: conversation.title,
-        memberNames: conversation.members ?? [],
-        anchor,
-      });
-      return;
-    }
-
-    const profile = agentProfileByName(conversation.title);
-    if (profile) {
-      setActiveAgentProfile({ ...profile, anchor });
-    } else {
-      setActiveHumanProfile(humanProfileByName(conversation.title, anchor));
-    }
-  }
-
-  function agentProfileByName(agentName: string): Omit<AgentProfileState, 'anchor'> | null {
-    const normalized = agentName.toLowerCase();
-    const runtimeAgent = (agents ?? []).find((agent) => agent.name.toLowerCase() === normalized);
-    const configured = configuredAgentProfiles().find((agent) => (
-      agent.name.toLowerCase() === normalized || agent.id.toLowerCase() === normalized
-    ));
-
-    if (configured) return configured;
-    if (!runtimeAgent) return null;
-
-    return {
-      id: runtimeAgent.id,
-      name: runtimeAgent.name,
-      role: runtimeAgent.description ?? t('label.agent'),
-      engine: t('label.agentHub'),
-      model: runtimeAgent.model ?? t('status.unconfigured'),
-      state: runtimeAgent.status ?? 'available',
-      skills: [],
-    };
-  }
-
-  function humanProfileByName(name: string, anchor: HTMLElement): HumanProfileState {
-    const normalized = name.toLowerCase();
-    const contact = WORKBENCH_MOCK_CONTACT_MEMBERS.find((item) => (
-      item.name.toLowerCase() === normalized || item.id.toLowerCase() === normalized
-    ));
-    const conversation = conversations.find((item) => (
-      item.title.toLowerCase() === normalized || item.id.toLowerCase() === normalized
-    ));
-    const resolvedName = contact?.name ?? conversation?.title ?? name;
-
-    return {
-      id: contact?.id ?? conversation?.id ?? resolvedName.toLowerCase(),
-      name: resolvedName,
-      initials: contact?.initials ?? conversation?.avatarLabel ?? resolvedName.slice(0, 1).toUpperCase(),
-      org: contact?.org ?? t('label.contact'),
-      status: contact?.status ?? conversation?.updatedLabel ?? t('status.online'),
-      tag: contact?.tag ?? (conversation?.kind === 'group' ? t('chat.kind.group') : t('chat.kind.friend')),
-      subtitle: conversation?.subtitle ?? contact?.org ?? t('chat.kind.friend'),
-      avatarColor: conversation?.avatarColor,
-      anchor,
-    };
-  }
-
-  function openAgentDirectMessage(): void {
-    if (!activeAgentProfile) return;
-    const conversation = conversations.find((item) => (
-      item.title.toLowerCase() === activeAgentProfile.name.toLowerCase()
-      || item.id.toLowerCase() === activeAgentProfile.id.toLowerCase()
-    ));
-    if (conversation) {
-      selectConversation(conversation.id);
-    } else if (onNavigateToConversation) {
-      onNavigateToConversation({ name: activeAgentProfile.name, id: activeAgentProfile.id, kind: 'dm' });
-    } else {
-      showWorkbenchToast(t('toast.noDmSession', { name: activeAgentProfile.name }));
-      return;
-    }
-    setActivePage('chat');
-    setActiveAgentProfile(null);
-    setActiveHumanProfile(null);
-    setActiveGroupProfile(null);
-    window.setTimeout(() => composerInputRef.current?.focus(), 0);
-  }
-
-  function openHumanDirectMessage(): void {
-    if (!activeHumanProfile) return;
-    const conversation = conversations.find((item) => (
-      item.title.toLowerCase() === activeHumanProfile.name.toLowerCase()
-      || item.id.toLowerCase() === activeHumanProfile.id.toLowerCase()
-    ));
-    if (conversation) {
-      selectConversation(conversation.id);
-    } else if (onNavigateToConversation) {
-      onNavigateToConversation({ name: activeHumanProfile.name, id: activeHumanProfile.id, kind: 'dm' });
-    } else {
-      showWorkbenchToast(t('toast.noDmSession', { name: activeHumanProfile.name }));
-      return;
-    }
-    setActivePage('chat');
-    setActiveHumanProfile(null);
-    setActiveAgentProfile(null);
-    setActiveGroupProfile(null);
-    window.setTimeout(() => composerInputRef.current?.focus(), 0);
-  }
-
-  function openAgentConfig(): void {
-    if (!activeAgentProfile) return;
-    setFocusedAgentId(activeAgentProfile.id);
-    setActivePage('agents');
-    setActiveAgentProfile(null);
-    showWorkbenchToast(t('toast.agentConfigOpened', { name: activeAgentProfile.name }));
-  }
-
   function openReviewFile(file: FileItem): void {
     openInspector();
     setReviewFileRequest({ ...file });
@@ -579,12 +434,6 @@ export function AgentHubWorkbench({
   function handleDeploySubmit(_id: string): void {
     openInspector();
     showWorkbenchToast(t('toast.deployPreviewOpened'));
-  }
-
-  function selectConversation(conversationId: string): void {
-    setLocalConversationId(conversationId);
-    resetSelection();
-    onActiveConversationChange?.(conversationId);
   }
 
   function exportMainchainEvidence(): void {
@@ -793,122 +642,20 @@ export function AgentHubWorkbench({
         toastMessage={toastMessage}
         toastVisible={toastVisible}
       />
-      {activeAgentProfile && (
-        <ProfilePopover
-          actions={[
-            { label: t('profile.sendMessage') },
-            { label: t('profile.agentConfig') },
-          ]}
-          anchorElement={activeAgentProfile.anchor}
-          avatar={workbenchProfileInitials(activeAgentProfile.name)}
-          avatarColor={workbenchAgentColor(activeAgentProfile)}
-          badge={agentStateLabel(t, activeAgentProfile.state)}
-          isOpen
-          meta={[
-            { label: t('profile.role'), value: activeAgentProfile.role },
-            { label: t('profile.engine'), value: activeAgentProfile.engine },
-            { label: t('profile.model'), value: activeAgentProfile.model },
-            { label: t('profile.skills'), value: activeAgentProfile.skills.join(' · ') || t('status.unconfigured') },
-          ]}
-          name={activeAgentProfile.name}
-          onAction={(action) => {
-            if (action === t('profile.sendMessage')) openAgentDirectMessage();
-            if (action === t('profile.agentConfig')) openAgentConfig();
-          }}
-          onClose={() => setActiveAgentProfile(null)}
-          subtitle={`${activeAgentProfile.role} · ${activeAgentProfile.engine}`}
-          variant="agent"
-        />
-      )}
-      {activeHumanProfile && (
-        <ProfilePopover
-          actions={[
-            { label: t('profile.sendMessage') },
-            { label: t('profile.copyLink') },
-          ]}
-          anchorElement={activeHumanProfile.anchor}
-          avatar={activeHumanProfile.initials}
-          avatarColor={activeHumanProfile.avatarColor ?? 'var(--surface-highest)'}
-          badge={activeHumanProfile.tag}
-          isOpen
-          meta={[
-            { label: t('profile.identity'), value: activeHumanProfile.tag },
-            { label: t('profile.org'), value: activeHumanProfile.org },
-            { label: t('profile.state'), value: activeHumanProfile.status },
-            { label: t('profile.recentMessage'), value: activeHumanProfile.subtitle },
-          ]}
-          name={activeHumanProfile.name}
-          onAction={(action) => {
-            if (action === t('profile.sendMessage')) openHumanDirectMessage();
-            if (action === t('profile.copyLink')) {
-              copyText(`agenthub://user/${activeHumanProfile.id}`);
-              showWorkbenchToast(t('toast.contactLinkCopied'));
-            }
-          }}
-          onClose={() => setActiveHumanProfile(null)}
-          subtitle={`${activeHumanProfile.tag} · ${activeHumanProfile.org}`}
-        />
-      )}
-      {activeGroupProfile && (
-        <ProfilePopover
-          actions={[
-            { label: t('profile.sendMessage') },
-          ]}
-          anchorElement={activeGroupProfile.anchor}
-          avatar={workbenchProfileInitials(activeGroupProfile.name)}
-          avatarColor="var(--primary)"
-          badge={t('profile.groupChat')}
-          isOpen
-          meta={[
-            { label: t('profile.type'), value: t('profile.groupType') },
-            ...(activeGroupProfile.memberNames.length > 0
-              ? [{ label: t('profile.members'), value: activeGroupProfile.memberNames.join(' · ') }]
-              : []),
-          ]}
-          name={activeGroupProfile.name}
-          onAction={(action) => {
-            if (action === t('profile.sendMessage')) {
-              selectConversation(activeGroupProfile.id);
-              setActiveGroupProfile(null);
-            }
-          }}
-          onClose={() => setActiveGroupProfile(null)}
-          subtitle={activeGroupProfile.memberNames.length > 0
-            ? `${activeGroupProfile.memberNames.length} ${t('profile.members').toLowerCase()}`
-            : t('profile.groupSession')}
-          variant="group"
-        />
-      )}
+      <WorkbenchProfileOverlays
+        t={t as (key: string, options?: Record<string, unknown>) => string}
+        activeAgentProfile={activeAgentProfile}
+        activeHumanProfile={activeHumanProfile}
+        activeGroupProfile={activeGroupProfile}
+        onCloseAgentProfile={() => setActiveAgentProfile(null)}
+        onCloseHumanProfile={() => setActiveHumanProfile(null)}
+        onCloseGroupProfile={() => setActiveGroupProfile(null)}
+        onAgentDirectMessage={openAgentDirectMessage}
+        onAgentConfig={openAgentConfig}
+        onHumanDirectMessage={openHumanDirectMessage}
+        onCopyHumanProfileLink={copyHumanProfileLink}
+        onGroupSendMessage={openGroupConversation}
+      />
     </div>
   );
-}
-
-function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {
-  return WORKBENCH_MOCK_AGENT_CONFIGS.map((agent) => ({
-    id: agent.id,
-    name: agent.name,
-    role: agent.role,
-    engine: agent.engine,
-    model: agent.model,
-    state: agent.state,
-    skills: agent.skills,
-  }));
-}
-
-function agentStateLabel(t: (key: string) => string, state: string): string {
-  switch (state) {
-    case 'running':
-      return t('agent.state.running');
-    case 'ready':
-    case 'available':
-      return t('agent.state.ready');
-    case 'waiting':
-      return t('agent.state.waiting');
-    case 'configuring':
-      return t('agent.state.configuring');
-    case 'unavailable':
-      return t('agent.state.unavailable');
-    default:
-      return state || t('label.agent');
-  }
 }
