@@ -3287,3 +3287,28 @@ func TestRunStartDualToken_WrongDeviceInCapabilityTokenReturns403(t *testing.T) 
 	}
 	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
 }
+
+func TestRunStartDualToken_WrongPurposeReturns403(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "not-run-start", 1*time.Hour)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"purpose test"}`))
+	req.Header.Set("X-AgentHub-Capability-Token", capToken)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
