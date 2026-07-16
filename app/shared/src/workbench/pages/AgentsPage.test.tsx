@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '../../__tests__/setup';
+import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import {
   WORKBENCH_AGENT_MARKET_FIXTURES,
   WORKBENCH_AGENT_PROFILE_FIXTURES,
@@ -138,5 +138,82 @@ describe('AgentsPage profile catalog rendering', () => {
     expect(screen.getAllByText('写文件和 Shell 默认进入确认队列').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Target').length).toBeGreaterThan(0);
     expect(screen.getAllByText('local-edge · remote-edge').length).toBeGreaterThan(0);
+  });
+});
+
+describe('AgentsPage empty states', () => {
+  it('uses shared EmptyState for the installed empty path and wires the add CTA', () => {
+    const onAgentAdd = vi.fn();
+
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        agentsLoading={false}
+        onAgentAdd={onAgentAdd}
+      />,
+    );
+
+    const emptyState = screen.getByRole('region', { name: '暂无 Agent Profile' });
+    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装 Agent。')).toBeInTheDocument();
+    fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
+    expect(onAgentAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the installed empty path while agents are loading', () => {
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        agentsLoading
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
+    expect(screen.getByText('同步中')).toBeInTheDocument();
+  });
+
+  it('uses shared EmptyState for skill and MCP market empty paths', () => {
+    const { rerender } = render(
+      <AgentsPage
+        activePane="skillMarket"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        skillMarketItems={[]}
+        skillMarketLoading={false}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: '暂无公共 Skill' })).toBeInTheDocument();
+
+    rerender(
+      <AgentsPage
+        activePane="mcpMarket"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        mcpMarketItems={[]}
+        mcpMarketLoading={false}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: '暂无公共 MCP Server' })).toBeInTheDocument();
   });
 });

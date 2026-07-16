@@ -16,7 +16,7 @@ import {
 } from '../agentCapabilities';
 import { agentConfigToAgentSpecFixture } from '../agentProfileCatalog';
 import { formatAgentHubAgentSpecV1 } from '../../agentSpec';
-import { Select } from '../../ui';
+import { EmptyState, Select } from '../../ui';
 import styles from './AgentsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -523,11 +523,29 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
           )}
           <div className={styles['agent-config-list']}>
             {agents.length === 0 && !agentsLoading && (
-              <div className={styles['agent-empty-state']} role="status">
-                <strong>暂无 Agent Profile</strong>
-                <span>当前 Hub 账号还没有已安装 Agent。</span>
-                <button type="button" onClick={onAgentAdd}>添加 Agent</button>
-              </div>
+              <EmptyState
+                title="暂无 Agent Profile"
+                description="当前 Hub 账号还没有已安装 Agent。"
+                titleLevel={3}
+                {...(styles['agent-empty-compact']
+                  ? { className: styles['agent-empty-compact'] }
+                  : {})}
+                {...(styles['agent-empty-compact-content']
+                  ? { contentClassName: styles['agent-empty-compact-content'] }
+                  : {})}
+                {...(styles['agent-empty-compact-title']
+                  ? { titleClassName: styles['agent-empty-compact-title'] }
+                  : {})}
+                {...(styles['agent-empty-compact-description']
+                  ? { descriptionClassName: styles['agent-empty-compact-description'] }
+                  : {})}
+                {...(styles['agent-empty-compact-action']
+                  ? { actionClassName: styles['agent-empty-compact-action'] }
+                  : {})}
+                {...(onAgentAdd
+                  ? { action: { label: '添加 Agent', onClick: onAgentAdd } }
+                  : {})}
+              />
             )}
             {agents.map((agent) => (
               <button
@@ -1546,10 +1564,23 @@ const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
           <span>{skillMarketLoading ? '加载中' : `${skillMarketItems.length} skills`}</span>
         </div>
         {skillMarketItems.length === 0 && !skillMarketLoading && (
-          <div className={styles['agent-empty-state']} role="status">
-            <strong>暂无公共 Skill</strong>
-            <span>Hub 上暂无已发布的 Skill，发布后在此浏览安装。</span>
-          </div>
+          <EmptyState
+            title="暂无公共 Skill"
+            description="Hub 上暂无已发布的 Skill，发布后在此浏览安装。"
+            titleLevel={3}
+            {...(styles['agent-empty-compact']
+              ? { className: styles['agent-empty-compact'] }
+              : {})}
+            {...(styles['agent-empty-compact-content']
+              ? { contentClassName: styles['agent-empty-compact-content'] }
+              : {})}
+            {...(styles['agent-empty-compact-title']
+              ? { titleClassName: styles['agent-empty-compact-title'] }
+              : {})}
+            {...(styles['agent-empty-compact-description']
+              ? { descriptionClassName: styles['agent-empty-compact-description'] }
+              : {})}
+          />
         )}
         <div className={styles['market-list']}>
           {skillMarketItems.map((skill) => {
@@ -1658,10 +1689,23 @@ const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
           <span>{mcpMarketLoading ? '加载中' : `${mcpMarketItems.length} servers`}</span>
         </div>
         {mcpMarketItems.length === 0 && !mcpMarketLoading && (
-          <div className={styles['agent-empty-state']} role="status">
-            <strong>暂无公共 MCP Server</strong>
-            <span>Hub 上暂无已发布的 MCP Server，发布后在此浏览安装。</span>
-          </div>
+          <EmptyState
+            title="暂无公共 MCP Server"
+            description="Hub 上暂无已发布的 MCP Server，发布后在此浏览安装。"
+            titleLevel={3}
+            {...(styles['agent-empty-compact']
+              ? { className: styles['agent-empty-compact'] }
+              : {})}
+            {...(styles['agent-empty-compact-content']
+              ? { contentClassName: styles['agent-empty-compact-content'] }
+              : {})}
+            {...(styles['agent-empty-compact-title']
+              ? { titleClassName: styles['agent-empty-compact-title'] }
+              : {})}
+            {...(styles['agent-empty-compact-description']
+              ? { descriptionClassName: styles['agent-empty-compact-description'] }
+              : {})}
+          />
         )}
         <div className={styles['market-list']}>
           {mcpMarketItems.map((mcp) => {
