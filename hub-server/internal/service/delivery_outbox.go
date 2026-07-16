@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
@@ -27,31 +27,31 @@ const (
 	DeliveryStatusDead      = "dead"
 )
 
-// ── Delivery outbox TTL constants ───────────────────────────────────────────
+// ── Delivery outbox TTL constants (aliases to pure deliveryoutbox package) ──
 
 const (
 	// DefaultMaxDeliveryAttempts is the default retry budget before dead-letter.
-	DefaultMaxDeliveryAttempts = 3
+	DefaultMaxDeliveryAttempts = deliveryoutbox.DefaultMaxAttempts
 
 	// DeliveryRetryBaseInterval is the base backoff interval (multiplied by 2^attempt).
-	DeliveryRetryBaseInterval = 2 * time.Second
+	DeliveryRetryBaseInterval = deliveryoutbox.RetryBaseInterval
 
 	// DeliveryRetryMaxInterval caps the exponential backoff ceiling.
-	DeliveryRetryMaxInterval = 30 * time.Second
+	DeliveryRetryMaxInterval = deliveryoutbox.RetryMaxInterval
 
 	// DeliveryRetryScanInterval controls how often retryable deliveries are scanned.
-	DeliveryRetryScanInterval = 15 * time.Second
+	DeliveryRetryScanInterval = deliveryoutbox.RetryScanInterval
 
 	// DeliveryPendingTimeout is the time after which a pending (never sent) delivery
 	// is eligible for retry.
-	DeliveryPendingTimeout = 30 * time.Second
+	DeliveryPendingTimeout = deliveryoutbox.PendingTimeout
 
 	// DeliverySentTimeout is the time after which a sent (unacked) delivery
 	// is eligible for retry.
-	DeliverySentTimeout = 60 * time.Second
+	DeliverySentTimeout = deliveryoutbox.SentTimeout
 
 	// DeliveryOutboxMaxBatch caps the number of deliveries scanned per retry cycle.
-	DeliveryOutboxMaxBatch = 100
+	DeliveryOutboxMaxBatch = deliveryoutbox.MaxBatch
 )
 
 // ── Model ──────────────────────────────────────────────────────────────────
@@ -214,13 +214,9 @@ func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]deliveryO
 }
 
 // computeNextRetryAt calculates the next retry time using exponential backoff.
-// Formula: baseInterval * 2^attempt, capped at maxInterval.
+// Thin wrapper around pure deliveryoutbox helpers (clock fixed at call time).
 func computeNextRetryAt(attempt int) time.Time {
-	delay := DeliveryRetryBaseInterval * time.Duration(int64(math.Pow(2, float64(attempt))))
-	if delay > DeliveryRetryMaxInterval {
-		delay = DeliveryRetryMaxInterval
-	}
-	return time.Now().Add(delay)
+	return deliveryoutbox.NextRetryAt(attempt, time.Now())
 }
 
 // MarkDeliveryRetrying transitions a delivery to retrying status and increments
@@ -242,7 +238,7 @@ func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID stri
 			Updates(map[string]interface{}{
 				"status":        DeliveryStatusDead,
 				"attempt_count": newAttempt,
-				"last_error":    truncateString(lastError, 1024),
+				"last_error":    deliveryoutbox.TruncateString(lastError, 1024),
 				"next_retry_at": nil,
 			}).Error
 		if updateErr != nil {
@@ -265,7 +261,7 @@ func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID stri
 		Updates(map[string]interface{}{
 			"status":        DeliveryStatusRetrying,
 			"attempt_count": newAttempt,
-			"last_error":    truncateString(lastError, 1024),
+			"last_error":    deliveryoutbox.TruncateString(lastError, 1024),
 			"next_retry_at": &nextRetry,
 		})
 	if result.Error != nil {
@@ -290,7 +286,7 @@ func (s *AgentService) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID 
 		Where("delivery_id = ? AND status IN ?", deliveryID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
 		Updates(map[string]interface{}{
 			"status":     DeliveryStatusDead,
-			"last_error": truncateString(lastError, 1024),
+			"last_error": deliveryoutbox.TruncateString(lastError, 1024),
 		})
 	if result.Error != nil {
 		return fmt.Errorf("move to dead-letter: %w", result.Error)
@@ -546,12 +542,9 @@ func (s *AgentService) retryDispatchToTarget(ctx context.Context, task *pendingT
 	}
 }
 
-// truncateString truncates s to maxLen characters, appending "..." if truncated.
+// truncateString is a thin alias kept for same-package tests.
 func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	return deliveryoutbox.TruncateString(s, maxLen)
 }
 
 // ── Outbox maintenance ─────────────────────────────────────────────────────
