@@ -1915,7 +1915,9 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '任务' }));
     const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
-    expect(within(tasksPage).getByRole('status')).toHaveTextContent('Hub tasks are not loaded in this replay.');
+    const tasksEmpty = within(tasksPage).getByRole('region', { name: /tasks\.empty\.title|暂无任务|No tasks/i });
+    expect(tasksEmpty).toBeInTheDocument();
+    expect(within(tasksPage).getByText('Hub tasks are not loaded in this replay.')).toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
   });
