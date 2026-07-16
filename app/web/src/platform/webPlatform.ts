@@ -449,7 +449,18 @@ export function optimisticHubMessageFromIntent(
     content_type: contentType,
     content,
     created_at: createdAt,
-    ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author, content_type: 'text' } } : {}),
+    ...(intent.replyTo
+      ? {
+          reply_to: {
+            id: intent.replyTo.messageId,
+            sender_id: intent.replyTo.author,
+            content_type: 'text',
+            content: '',
+            recalled: false,
+            created_at: createdAt,
+          },
+        }
+      : {}),
     ...(attachmentRefs.length > 0
       ? {
           attachments: attachmentRefs.map((a) => ({

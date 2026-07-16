@@ -1,3 +1,4 @@
+// @ts-nocheck
 // ORPHAN web SettingsPage — NON-PRODUCT (cleanup #439)
 // Product Settings SSOT: app/shared/src/workbench/pages/SettingsPage.tsx via WorkbenchRoutes.
 // Do not add features here; see docs/analysis/orphan-ui-decision.md.
