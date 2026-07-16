@@ -48,7 +48,38 @@ graph TD
     T51 --> T53
   end
 
+  subgraph P6 [Phase 6 Baseline Hardening]
+    T61[T6.1 desktop tsc residual]
+    T62[T6.2 web hubClient align]
+    T63[T6.3 extract SectionId]
+    T64[T6.4 purpose=run-start]
+    T65[T6.5 SQLite DeliveryJournal]
+    T33 --> T61
+    T34 --> T62
+    T52 --> T63
+    T43 --> T64
+    T44 --> T65
+  end
+
+  subgraph P7 [Phase 7 CI Green + SDD Closeout]
+    T71[T7.1 hubClient envelope + contracts]
+    T72[T7.2 trailing whitespace]
+    T73[T7.3 plan docs sync]
+    T74[T7.4 SDD archive]
+    T75[T7.5 re-verify PR CI]
+    T62 --> T71
+    T65 --> T73
+    T73 --> T74
+    T71 --> T75
+    T72 --> T75
+    T74 --> T75
+  end
+
   P1 --> P2
   P1 --> P3
   P1 --> P4
+  P3 --> P5
+  P4 --> P5
+  P5 --> P6
+  P6 --> P7
 ```
