@@ -89,7 +89,7 @@ describe('execution target queries', () => {
     });
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
+    expect(url).toBe('http://test.local/web/execution-targets/target-relay-1:ping');
     expect(init.method).toBe('POST');
   });
 
