@@ -275,6 +275,15 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		// Wire Hub callback client for Edge-to-Hub direct bridge
 		if cfg.HubURL != "" {
 			hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+			// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
+			// Falls back to in-memory journal on open failure so callback path never blocks startup.
+			if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
+				if err := hubClient.EnableSQLiteJournal(journalPath); err != nil {
+					slog.Warn("durable delivery journal unavailable; using memory journal", "path", journalPath, "error", err)
+				} else {
+					slog.Info("durable delivery journal enabled", "path", journalPath)
+				}
+			}
 			processExecutor.WithHubCallback(hubClient)
 			slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
 		}
