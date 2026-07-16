@@ -1,6 +1,6 @@
-# Edge DeliveryJournal (#437 / #445)
+# Edge DeliveryJournal (#437 / #445 / #462)
 
-最后更新：2026-07-16
+最后更新：2026-07-17
 
 ## Landed
 - `edge-server/internal/hub/delivery_journal.go` — seq + Snapshot + bounded memory
@@ -17,7 +17,11 @@
   - `GET /v1/delivery-journal?afterSeq=` on Edge API
   - `HasSuccessful(task, run, action)` for idempotent skip of already-acked deliveries
   - unit tests: HasSuccessful + DurableSnapshot + GetDeliveryJournal
+- **#462 offline/replay reconciliation fixture (AH-SR-049 residual)**
+  - `TestCallbackClient_OfflineReplayReconciliation`: enable SQLite → record success/fail → close/reopen → `HasSuccessful` true → `DurableSnapshot(afterSeq)` cursor window
+  - `RedeliveryCandidates(entries, afterSeq)` pure helper (+ unit test) selects failed entries without a later success; **not** a production worker
+  - Automatic redelivery worker **explicitly deferred** (no background loop in this residual)
 
-## Remaining (optional hardening)
-- Cross-service offline/replay E2E fixture against live Hub outbox
-- Automatic redelivery worker driven by DurableSnapshot cursor
+## Deferred / optional
+- Automatic redelivery worker driven by DurableSnapshot cursor (deferred; helper only)
+- Live Hub outbox cross-service offline/replay probe (optional; in-repo reopen fixture covers Edge journal reconciliation path)
