@@ -13,7 +13,7 @@
   box-shadow: var(--e-3);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   flex-wrap: nowrap;
   overflow: auto hidden;
   scrollbar-width: none;
@@ -46,14 +46,14 @@
 .action {
   flex: 0 0 auto;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   font: 600 0.75rem var(--font-sans);
   cursor: pointer;
   white-space: nowrap;

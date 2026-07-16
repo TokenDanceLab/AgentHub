@@ -58,8 +58,8 @@
 .workbench-search {
   width: 100%;
   height: 40px;
-  margin: 0 0 10px;
-  padding: 0 14px;
+  margin: 0 0 var(--sp-10);
+  padding: 0 var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -86,15 +86,15 @@
 .nav-row {
   width: 100%;
   min-height: 42px;
-  padding: 0 12px;
-  margin: 2px 0;
+  padding: 0 var(--space-md);
+  margin: var(--sp-2) 0;
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   text-align: left;
   font: 500 0.9375rem var(--font-sans);
   cursor: pointer;
@@ -156,8 +156,8 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: nowrap;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
   overflow: hidden;
 }
 
@@ -177,7 +177,7 @@
   min-width: 0;
   max-width: 176px;
   height: 36px;
-  padding: 0 14px;
+  padding: 0 var(--sp-14);
   border: 1px solid var(--primary);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -221,15 +221,15 @@
   width: 100%;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: var(--sp-10);
+  margin-bottom: var(--sp-14);
 }
 
 /* ── Agent stat ── */
 
 .agent-stat {
   min-height: 72px;
-  padding: 12px 14px;
+  padding: var(--space-md) var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -276,7 +276,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: minmax(420px, 1fr) minmax(320px, 1fr);
-  gap: 14px;
+  gap: var(--sp-14);
   align-items: start;
 }
 
@@ -285,7 +285,7 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
-  padding: 14px;
+  padding: var(--sp-14);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -302,8 +302,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: var(--space-md);
+  margin-bottom: var(--sp-10);
 }
 
 .section-title-row h2 {
@@ -326,7 +326,7 @@
 .agent-config-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .agent-inline-state,
@@ -339,17 +339,17 @@
 
 .agent-inline-state {
   min-height: 36px;
-  margin-bottom: 8px;
-  padding: 8px 10px;
+  margin-bottom: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-10);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-10);
   font: 500 0.75rem/1.35 var(--font-sans);
 }
 
 .agent-inline-state.danger {
-  margin: 10px 0 0;
+  margin: var(--sp-10) 0 0;
   border-color: var(--danger);
   background: var(--danger-bg);
   color: var(--danger);
@@ -358,7 +358,7 @@
 .agent-inline-state button,
 .agent-empty-state button {
   height: 28px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr-strong);
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -378,7 +378,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .agent-empty-state strong {
@@ -394,7 +394,7 @@
 .agent-config-row {
   width: 100%;
   min-height: 66px;
-  padding: 8px 10px;
+  padding: var(--sp-sm) var(--sp-10);
   border: 1px solid transparent;
   border-radius: var(--r-md);
   background: transparent;
@@ -402,7 +402,7 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) minmax(116px, 148px) 14px;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   text-align: left;
   cursor: pointer;
   transition:
@@ -435,14 +435,14 @@
   display: block;
   color: var(--text-2);
   font: 400 0.75rem var(--font-sans);
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 
 .agent-config-row small {
   display: block;
   color: var(--text-3);
   font: 400 0.6875rem var(--font-sans);
-  margin-top: 4px;
+  margin-top: var(--sp-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -571,7 +571,7 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
-  padding: 16px;
+  padding: var(--sp-md);
   min-width: 0;
   overflow: hidden;
   display: flex;
@@ -594,8 +594,8 @@
 .detail-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 0 14px;
+  gap: var(--sp-10);
+  padding: 0 0 var(--sp-14);
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -636,8 +636,8 @@
 
 .agent-runtime-line {
   min-height: 36px;
-  margin: 12px 0 4px;
-  padding: 0 10px;
+  margin: var(--space-md) 0 var(--sp-xs);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
@@ -669,22 +669,22 @@
 .agent-capability-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0 4px;
+  gap: var(--sp-xxs);
+  margin: var(--sp-sm) 0 var(--sp-xs);
 }
 
 .capability-badge,
 .capability-readiness {
   min-height: 26px;
   max-width: 100%;
-  padding: 4px 8px;
+  padding: var(--sp-xs) var(--sp-sm);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   font: 600 0.6875rem/1.25 var(--font-sans);
 }
 
@@ -729,7 +729,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  margin: 8px 0 2px;
+  margin: var(--sp-sm) 0 var(--sp-2);
   border-top: 1px solid var(--bdr);
   border-bottom: 1px solid var(--bdr);
 }
@@ -739,7 +739,7 @@
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   border-top: 1px solid var(--bdr);
 }
 
@@ -762,8 +762,8 @@
 }
 
 .agent-spec-fixture {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
   border-top: 1px solid var(--bdr);
 }
 
@@ -775,8 +775,8 @@
 
 .agent-spec-preview {
   max-height: 152px;
-  margin: 10px 0 0;
-  padding: 10px;
+  margin: var(--sp-10) 0 0;
+  padding: var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
@@ -798,13 +798,13 @@
 .agent-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 14px 0;
+  gap: var(--sp-sm);
+  margin: var(--sp-14) 0;
 }
 
 .agent-edit-grid label {
   min-height: 58px;
-  padding: 8px 10px;
+  padding: var(--sp-sm) var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
@@ -847,11 +847,11 @@
 /* ── Skill editor ── */
 
 .agent-skill-editor {
-  padding-top: 2px;
+  padding-top: var(--sp-2);
   border: 0;
   border-radius: 0;
   background: transparent;
-  margin-bottom: 14px;
+  margin-bottom: var(--sp-14);
 }
 
 .skill-chip-grid {
@@ -862,7 +862,7 @@
 
 .skill-chip {
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-full);
   background: var(--surface);
@@ -871,7 +871,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -904,14 +904,14 @@
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   font: 600 0.6875rem var(--font-sans);
 }
 
 /* ── Tool scope / permissions ── */
 
 .editable-tools {
-  margin-top: 4px;
+  margin-top: var(--sp-xs);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -923,7 +923,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-10);
   border-top: 1px solid var(--bdr);
   color: var(--text-2);
   font: 400 0.75rem var(--font-sans);
@@ -944,18 +944,18 @@
 
 .permission-segment {
   height: 30px;
-  padding: 2px;
+  padding: var(--sp-2);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface-low);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-2);
 }
 
 .permission-segment button {
   height: 24px;
-  padding: 0 8px;
+  padding: 0 var(--sp-sm);
   border: 0;
   border-radius: var(--r-xs);
   background: transparent;
@@ -983,22 +983,22 @@
 .agent-edit-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-14);
+  padding-top: var(--sp-14);
   border-top: 1px solid var(--bdr);
 }
 
 .agent-edit-actions .btn {
   flex: 1 1 0;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
 }
 
 /* ── Mini log ── */
 
 .agent-mini-log {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: var(--sp-14);
+  padding-top: var(--space-md);
   border-top: 1px solid var(--bdr);
   border-radius: 0;
   background: transparent;
@@ -1090,14 +1090,14 @@
 .agent-market-main {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-14);
 }
 
 .market-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: var(--space-md);
   margin-top: -6px;
   min-width: 0;
   overflow: hidden;
@@ -1127,7 +1127,7 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: var(--sp-xxs);
   min-width: 0;
   overflow: auto hidden;
   scrollbar-width: none;
@@ -1141,7 +1141,7 @@
   flex: 0 0 auto;
   max-width: 112px;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid transparent;
   border-radius: var(--r-full);
   background: transparent;
@@ -1165,7 +1165,7 @@
 }
 
 .market-featured {
-  margin-top: 4px;
+  margin-top: var(--sp-xs);
 }
 
 .market-list-section {
@@ -1175,12 +1175,12 @@
 .market-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .market-card {
   min-height: 190px;
-  padding: 16px;
+  padding: var(--sp-md);
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface-low);
@@ -1202,7 +1202,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 
 .market-icon {
@@ -1250,7 +1250,7 @@
 .market-card div:last-child {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   margin-top: auto;
 }
 
@@ -1261,7 +1261,7 @@
 
 .market-card button {
   height: 28px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -1281,7 +1281,7 @@
 .market-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .market-list-row {
@@ -1295,7 +1295,7 @@
   display: grid;
   grid-template-columns: 34px minmax(180px, 1fr) 72px minmax(220px, 0.9fr) 58px;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   text-align: left;
   cursor: pointer;
   transition:
@@ -1315,7 +1315,7 @@
 
 .market-list-row span {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
   color: var(--text-2);
   font: 400 0.75rem var(--font-sans);
   white-space: nowrap;
@@ -1350,20 +1350,20 @@
 .agent-policy-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 14px;
+  gap: var(--sp-14);
   align-items: start;
 }
 
 .agent-rule-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-xxs);
 }
 
 .agent-rule-row {
   width: 100%;
   min-height: 62px;
-  padding: 10px;
+  padding: var(--sp-10);
   border: 1px solid transparent;
   border-radius: var(--r-md);
   background: transparent;
@@ -1371,7 +1371,7 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) 68px 82px;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   text-align: left;
   cursor: pointer;
   transition:
@@ -1412,7 +1412,7 @@
 
 .agent-rule-row small {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
   color: var(--text-3);
   font: 400 0.6875rem var(--font-sans);
   overflow: hidden;
@@ -1479,7 +1479,7 @@
 }
 
 .policy-note {
-  margin-top: 14px;
+  margin-top: var(--sp-14);
   padding: 11px 12px;
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
@@ -1512,7 +1512,7 @@
   display: grid;
   grid-template-columns: minmax(160px, 1.1fr) repeat(5, minmax(96px, 0.8fr));
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   min-height: 48px;
   border-bottom: 1px solid var(--bdr);
 }
@@ -1525,7 +1525,7 @@
 .tool-head-cell {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   min-width: 0;
 }
 
@@ -1593,8 +1593,8 @@
 .permission-legend {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 10px;
+  gap: var(--sp-14);
+  margin-top: var(--sp-10);
   color: var(--text-2);
   font: 500 0.75rem var(--font-sans);
 }
@@ -1602,7 +1602,7 @@
 .permission-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   white-space: nowrap;
 }
 
@@ -1635,8 +1635,8 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
-  padding: 14px;
-  margin-bottom: 14px;
+  padding: var(--sp-14);
+  margin-bottom: var(--sp-14);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -1678,7 +1678,7 @@
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   border-top: 1px solid var(--bdr);
 }
 
@@ -1701,15 +1701,15 @@
 }
 
 .ccswitch-provider {
-  margin-top: 10px;
+  margin-top: var(--sp-10);
   border-top: 1px solid var(--bdr);
-  padding-top: 10px;
+  padding-top: var(--sp-10);
 }
 
 .ccswitch-alias-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-xs);
 }
 
 .ccswitch-alias-row {
@@ -1717,7 +1717,7 @@
   display: grid;
   grid-template-columns: minmax(80px, 1fr) 24px minmax(0, 2fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-sm);
   border-top: 1px solid var(--bdr);
   color: var(--text-2);
   font: 500 0.75rem var(--font-sans);
@@ -1748,7 +1748,7 @@
 }
 
 .ccswitch-no-aliases {
-  margin-top: 6px;
+  margin-top: var(--sp-xxs);
   color: var(--text-3);
   font: 400 0.75rem var(--font-sans);
 }
@@ -1756,19 +1756,19 @@
 .model-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: var(--space-md);
+  margin-bottom: var(--sp-14);
 }
 
 .model-card {
   min-height: 126px;
-  padding: 14px;
+  padding: var(--sp-14);
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--space-md);
   align-items: flex-start;
   transition:
     box-shadow var(--dur-medium) var(--ease);
@@ -1791,7 +1791,7 @@
 
 .model-card small {
   display: block;
-  margin-top: 10px;
+  margin-top: var(--sp-10);
   color: var(--text-3);
   font: 500 0.6875rem var(--font-sans);
 }
@@ -1807,13 +1807,13 @@
 /* ── Model routing ── */
 
 .model-routing {
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 
 .model-route-row {
   width: 100%;
   min-height: 54px;
-  padding: 8px 10px;
+  padding: var(--sp-sm) var(--sp-10);
   border: 1px solid transparent;
   border-radius: var(--r-md);
   background: transparent;
@@ -1821,7 +1821,7 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) 18px 150px;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   text-align: left;
   cursor: pointer;
   transition:
@@ -1858,7 +1858,7 @@
 /* ── Model health ── */
 
 .model-health {
-  margin-top: 14px;
+  margin-top: var(--sp-14);
 }
 
 .model-health-row {
@@ -1866,7 +1866,7 @@
   display: grid;
   grid-template-columns: 18px minmax(180px, 1fr) 72px minmax(120px, 0.7fr);
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   border-top: 1px solid var(--bdr);
 }
 
@@ -1908,7 +1908,7 @@
 
 .audit-filter-bar button {
   height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-full);
   background: var(--surface);
@@ -1933,7 +1933,7 @@
   display: grid;
   grid-template-columns: 72px 120px 150px 100px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   min-height: 48px;
   border-bottom: 1px solid var(--bdr);
 }
@@ -2041,7 +2041,7 @@
 
 .market-item-card .market-action-btn {
   height: 28px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   font: 600 0.75rem var(--font-sans);
