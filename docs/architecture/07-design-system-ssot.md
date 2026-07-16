@@ -1,7 +1,7 @@
 # Design system SSOT map
 
 最后更新：2026-07-17
-Issue: #466 (P9.1)
+Issue: #466 (P9.1) / #491 (chatview drift inventory)
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
 > 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
@@ -52,7 +52,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 |---|---|---|
 | ThemeContext dual providers | **Mitigated in #466** — preset constants + apply moved to shared; providers are thin wrappers | Optional: one shared React provider with `enablePresets` |
 | Stale CSS status fallbacks | **Partial fix in #466** — `ApprovalCard.module.css` uses bare status tokens; **#482** Welcome/Auth glass hardcodes → `--glass-*` | Continue on EntryGate / FileExplorer / IM panels |
-| Chatview parallel spacing (`--sp-md: 12px` vs base `16px`) | Open | Dedicated chatview token merge |
+| Chatview parallel spacing / density | **Partial in #491** — chatview `--sp-md` aliases base compat `--space-md` (12px); lg/xl stay dense 20/28; radius/type/dark colors still forked (see audit §6) | Full merge + dark palette → `themes.css` needs deliberate visual redesign |
 | Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing decls → `--sp-*` / compat `--space-md|3xl`; odd steps (3/5/7/9/18…) + sizes left raw | Optional: scale extension or redesign normalize |
 | `designTokens.ts` not package-exported | Open | Export when mobile/web path aliases stabilize |
 | Mobile RN color SSOT | Open | Align RN values to themes.css via registry |

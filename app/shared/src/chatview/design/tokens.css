@@ -12,7 +12,13 @@
   --label-xs: 600 0.6875rem/1.5 var(--font-sans);  /* larger than base --label-xs (0.625rem) */
   --bubble-font: 400 0.875rem/1.5 var(--font-sans);  /* bubble message font, distinct from --body at 0.8125rem */
 
-  --sp-xs: 4px; --sp-sm: 8px; --sp-md: 12px; --sp-lg: 20px; --sp-xl: 28px;
+  /* Chat density scale (intentional): md/lg/xl = 12/20/28
+     Base v4 scale: md/lg/xl = 16/24/32
+     Matching micro steps inherit names only: 2/4/6/8/10/14/16
+     --sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px) */
+  --sp-xs: 4px; --sp-sm: 8px;
+  --sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
+  --sp-lg: 20px; --sp-xl: 28px;
   --sp-xxs: 6px; --sp-2: 2px; --sp-10: 10px; --sp-14: 14px; --sp-16: 16px;
   --r-xs: 3px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 9999px;
   --dur: 160ms; --dur-slow: 400ms; --dur-pulse: 1.2s; --dur-route: 1.5s; --dur-bar: 0.5s;
