@@ -1,6 +1,8 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
+> issue: #470 / residual #479 / #492 / #503
+> status: inventory + settings load/error UX + Agents EmptyState (#492) + Tasks EmptyState (#503)
 > issue: #470 / residual #479 / #492 / #504
 > status: inventory + settings load/error UX + Agents EmptyState (#492) + Contacts EmptyState (#504)
 > scope: shared workbench Settings SSOT + residual desktop/web shell
@@ -84,6 +86,7 @@ but no longer remain silent in the Settings product surface.
 | Path | Pattern |
 |---|---|
 | `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors still ad-hoc `agent-inline-state` |
+| `pages/TasksPage.tsx` | primary empty uses shared `EmptyState` (#503); public `emptyStateLabel` maps to description |
 | `pages/TasksPage.tsx` | ad-hoc `emptyState` + optional `emptyStateLabel` |
 | `pages/ContactsPage.tsx` | primary `new` empty uses shared `EmptyState` (#504); residual search loading text + blank list panes |
 | `pages/ProjectsPage.tsx` | loading caption / error alert / editor error |
@@ -133,13 +136,16 @@ but no longer remain silent in the Settings product surface.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
 
-## 9.1 Residual after Agents EmptyState (#492) / Contacts EmptyState (#504)
+## 9.1 Residual after Agents/Tasks/Contacts EmptyState (#492 / #503 / #504)
 
+| Surface | After #492 / #503 / #504 | Next |
+## 9.1 Residual after Agents EmptyState (#492) / Contacts EmptyState (#504)
 | Surface | After #492 / #504 | Next |
 |---|---|---|
 | Agents installed empty | shared `EmptyState` + compact overrides | — |
 | Agents skill/MCP market empty | shared `EmptyState` + compact overrides | — |
 | Agents load/action error | still `agent-inline-state` | later `StatusNotice` / `RecoveryPanel` |
+| TasksPage | shared `EmptyState` + compact table overrides; `emptyStateLabel` → description (#503) | — |
 | TasksPage | ad-hoc `emptyState` + `emptyStateLabel` | follow-up (#503 ownership) |
 | ContactsPage | primary `new` empty → shared `EmptyState` + compact overrides (#504) | residual: blank internal/external/starred/groups/service lists; search loading / no-result still ad-hoc/absent |
 | ProjectsPage | loading/error captions | follow-up (not pure empty) |
