@@ -12,6 +12,7 @@ Format:
 
 ## 2026-07-16
 
+- 2026-07-16 — rename wiki risk slugs to avoid secret-guard API-key false positives (#453): `risk-evid-grade-confusion`, `risk-session-secret-boundary` (break ri+sk-hyphen token shape).
 - 2026-07-16 — create `flow-control-event`: compiled wiki page covering all four core data flows (control, event, evidence, sync) with protocol boundaries, event families, cross-flow constraints, and links to SSOT. Compiled from `docs/architecture.md`, `docs/architecture/01-06`, `docs/decisions.md`, `api/events.md`, `docs/governance/security-risk-register.md`, `AGENTS.md`.
 - 2026-07-16 — bootstrap wiki root: create `README.md` defining purpose, SSOT vs compiled layers, ingest/query/lint ops, and non-goals for AgentHub cleanup.
 - 2026-07-16 — bootstrap schema: create `SCHEMA.md` with page types (`overview|module|flow|hotspot|risk|decision|ops-pointer`), frontmatter, `[[wiki-links]]` rules, and update triggers.

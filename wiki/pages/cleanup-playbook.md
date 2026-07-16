@@ -24,8 +24,8 @@ related:
   - production-live-hk3
   - ci-decommission-drift
   - risk-ah-sr-register
-  - risk-evidence-grade-confusion
-  - risk-secret-and-session-boundary
+  - risk-evid-grade-confusion
+  - risk-session-secret-boundary
   - decision-wiki-is-compiled
   - decision-incremental-cleanup
   - decision-production-live-narrative
@@ -194,7 +194,7 @@ pwsh ./scripts/release/verify-release-gate.ps1
 - Vite renderer 冒充 Tauri packaged + sidecar + installer
 - mock 模式静默降级为 real mode 无提示
 
-参见 [[risk-evidence-grade-confusion]]。
+参见 [[risk-evid-grade-confusion]]。
 
 ### 架构红线
 
@@ -213,7 +213,7 @@ pwsh ./scripts/release/verify-release-gate.ps1
 - 禁止提交生产数据库 dump、用户数据、聊天记录
 - TokenDance API key 不得暴露给浏览器 UI 或公开日志
 
-参见 [[risk-secret-and-session-boundary]]。
+参见 [[risk-session-secret-boundary]]。
 
 ### 文档规则
 
