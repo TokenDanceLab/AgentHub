@@ -83,7 +83,7 @@
 | T3.1 | #430 | hubClient 类型/矩阵 slice1 | closed |
 | T3.2 | #431 | shared hubClient 方法补齐 + contract tests | closed |
 | T3.3 | #432 | Desktop thin re-export cutover | closed |
-| T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | open |
+| T3.4 | #433 | Web cutover + AH-SR-043 fail-closed | closed |
 | T4.1 | #434 | Edge handlers 机械拆分 | open |
 | T4.2 | #435 | ProcessExecutor 接口抽取 | open |
 | T4.3 | #436 | AH-SR-046 capability 闭环 | open |
@@ -104,13 +104,13 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 0: Analysis baseline（`347642b6` 等）
 - [x] Phase 1: Governance Lock (3/3 closed: #424-#426)
 - [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
-- [ ] Phase 3: Frontend Strangler (3/4 closed: #430 #431 #432; open #433)
+- [x] Phase 3: Frontend Strangler (4/4 closed: #430-#433)
 - [ ] Phase 4: Edge Seams + Security (0/4)
 - [ ] Phase 5: Closure Decisions (0/3)
 
 ## Current Status
-**Active Phase**: Phase 3 Frontend Strangler  
-**Active Task**: #433 web cutover + AH-SR-043, then Phase 4 edge/security  
+**Active Phase**: Phase 4 Edge Seams + Security (or Phase 5 decisions)  
+**Active Task**: Phase 4 Edge/Security (#434-#437) or Phase 5 decisions  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
