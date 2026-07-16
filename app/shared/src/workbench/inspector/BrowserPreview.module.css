@@ -22,11 +22,11 @@
 /* ── Toolbar (back / forward / refresh / address / close) ── */
 .toolbar {
   min-height: 46px;
-  padding: 8px 10px;
+  padding: var(--sp-sm) var(--sp-10);
   border-bottom: 1px solid var(--bdr);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-xxs);
   background: var(--surface);
 }
 
@@ -65,7 +65,7 @@
   flex: 1;
   min-width: 0;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--bdr);
   border-radius: var(--r-full);
   background: var(--surface-low);
@@ -119,11 +119,11 @@
 /* ── Status bar ── */
 .status {
   min-height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   border-top: 1px solid var(--bdr);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   color: var(--text-3);
   background: var(--surface-low);
   font: 500 0.6875rem var(--font-sans);
