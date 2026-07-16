@@ -1252,6 +1252,103 @@ func setupRemoteReadFixture(t *testing.T) (*api.Handler, *http.ServeMux, store.R
 	s.CreateRun("run_default", "proj_default", "thread_default")
 	s.CreateRun("run_1", "proj_user1", "thread_1")
 	s.CreateRun("run_2", "proj_user2", "thread_2")
+	if _, err := s.CreateItem(store.Item{
+		ID:        "item_default",
+		ProjectID: "proj_default",
+		ThreadID:  "thread_default",
+		Type:      "user_message",
+		Role:      "user",
+		Status:    "created",
+		Content:   "unowned item",
+	}); err != nil {
+		t.Fatalf("CreateItem item_default: %v", err)
+	}
+	if _, err := s.CreateItem(store.Item{
+		ID:        "item_1",
+		ProjectID: "proj_user1",
+		ThreadID:  "thread_1",
+		Type:      "user_message",
+		Role:      "user",
+		Status:    "created",
+		Content:   "user-1 item",
+	}); err != nil {
+		t.Fatalf("CreateItem item_1: %v", err)
+	}
+	if _, err := s.CreateItem(store.Item{
+		ID:        "item_2",
+		ProjectID: "proj_user2",
+		ThreadID:  "thread_2",
+		Type:      "user_message",
+		Role:      "user",
+		Status:    "created",
+		Content:   "user-2 item",
+	}); err != nil {
+		t.Fatalf("CreateItem item_2: %v", err)
+	}
+	if _, err := s.UpsertArtifact(store.Artifact{
+		ID:    "artifact_1",
+		RunID: "run_1",
+		Kind:  "file",
+		Path:  "out/user1.txt",
+	}); err != nil {
+		t.Fatalf("UpsertArtifact artifact_1: %v", err)
+	}
+	if _, err := s.UpsertArtifact(store.Artifact{
+		ID:    "artifact_2",
+		RunID: "run_2",
+		Kind:  "file",
+		Path:  "out/user2.txt",
+	}); err != nil {
+		t.Fatalf("UpsertArtifact artifact_2: %v", err)
+	}
+	if _, err := s.UpsertArtifact(store.Artifact{
+		ID:    "artifact_default",
+		RunID: "run_default",
+		Kind:  "file",
+		Path:  "out/default.txt",
+	}); err != nil {
+		t.Fatalf("UpsertArtifact artifact_default: %v", err)
+	}
+	if _, err := s.UpsertPreview(store.Preview{
+		ID:     "preview_1",
+		RunID:  "run_1",
+		URL:    "http://127.0.0.1:4173/user1",
+		Status: "ready",
+	}); err != nil {
+		t.Fatalf("UpsertPreview preview_1: %v", err)
+	}
+	if _, err := s.UpsertPreview(store.Preview{
+		ID:     "preview_2",
+		RunID:  "run_2",
+		URL:    "http://127.0.0.1:4173/user2",
+		Status: "ready",
+	}); err != nil {
+		t.Fatalf("UpsertPreview preview_2: %v", err)
+	}
+	if _, err := s.UpsertRunDiffFile(store.RunDiffFile{
+		RunID:  "run_1",
+		Path:   "src/a.go",
+		Diff:   "+owned",
+		Status: "pending",
+	}); err != nil {
+		t.Fatalf("UpsertRunDiffFile run_1: %v", err)
+	}
+	if _, err := s.UpsertRunDiffFile(store.RunDiffFile{
+		RunID:  "run_2",
+		Path:   "src/b.go",
+		Diff:   "+other",
+		Status: "pending",
+	}); err != nil {
+		t.Fatalf("UpsertRunDiffFile run_2: %v", err)
+	}
+	if _, err := s.CreateAgentProfile(store.AgentProfile{
+		ID:        "profile_shared",
+		Name:      "Shared Profile",
+		AdapterID: "mock-runner",
+	}); err != nil {
+		t.Fatalf("CreateAgentProfile: %v", err)
+	}
+	s.UpsertSettings(map[string]string{"theme": "dark"})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	return h, mux, s
@@ -1283,8 +1380,9 @@ func TestRemoteRead_ValidHubJWT_SeesOwnProjects(t *testing.T) {
 	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	ids := projectIDs(items)
-	if !contains(ids, "proj_default") {
-		t.Error("missing proj_default")
+	// AH-SR-045: unowned projects are fail-closed under Hub JWT.
+	if contains(ids, "proj_default") {
+		t.Error("should not see unowned proj_default under Hub JWT")
 	}
 	if !contains(ids, "proj_user1") {
 		t.Error("missing proj_user1")
@@ -1310,8 +1408,8 @@ func TestRemoteRead_ValidHubJWT_SeesOwnThreads(t *testing.T) {
 	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	ids := threadIDs(items)
-	if !contains(ids, "thread_default") {
-		t.Error("missing thread_default")
+	if contains(ids, "thread_default") {
+		t.Error("should not see unowned thread_default under Hub JWT")
 	}
 	if !contains(ids, "thread_1") {
 		t.Error("missing thread_1")
@@ -1337,8 +1435,8 @@ func TestRemoteRead_ValidHubJWT_SeesOwnRuns(t *testing.T) {
 	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	ids := runIDs(items)
-	if !contains(ids, "run_default") {
-		t.Error("missing run_default")
+	if contains(ids, "run_default") {
+		t.Error("should not see unowned run_default under Hub JWT")
 	}
 	if !contains(ids, "run_1") {
 		t.Error("missing run_1")
@@ -1356,13 +1454,30 @@ func TestRemoteRead_CrossUserAccess_Returns404(t *testing.T) {
 		{http.MethodGet, "/v1/projects/proj_user2"},
 		{http.MethodGet, "/v1/threads/thread_2"},
 		{http.MethodGet, "/v1/runs/run_2"},
+		// Unowned resources fail closed under Hub JWT (AH-SR-045).
+		{http.MethodGet, "/v1/projects/proj_default"},
+		{http.MethodGet, "/v1/threads/thread_default"},
+		{http.MethodGet, "/v1/runs/run_default"},
+		// Sensitive read routes that previously lacked ownership checks.
+		{http.MethodGet, "/v1/items/item_2"},
+		{http.MethodGet, "/v1/items/item_default"},
+		{http.MethodGet, "/v1/threads/thread_2/items"},
+		{http.MethodGet, "/v1/threads/thread_2/pins"},
+		{http.MethodGet, "/v1/artifacts/artifact_2"},
+		{http.MethodGet, "/v1/artifacts/artifact_default"},
+		{http.MethodGet, "/v1/previews/preview_2"},
+		{http.MethodGet, "/v1/runs/run_2/diff"},
+		{http.MethodGet, "/v1/runs/run_default/diff"},
+		{http.MethodGet, "/v1/settings"},
+		{http.MethodGet, "/v1/agent-profiles"},
+		{http.MethodGet, "/v1/agent-profiles/profile_shared"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusNotFound {
-			t.Fatalf("%s %s status = %d, want 404", tc.method, tc.path, rec.Code)
+			t.Fatalf("%s %s status = %d, want 404 body=%s", tc.method, tc.path, rec.Code, rec.Body.String())
 		}
 	}
 }
@@ -1451,6 +1566,69 @@ func TestRemoteRead_User2_SeesTheirOwnData(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("own run: %d", rec.Code)
+	}
+}
+
+func TestRemoteRead_OwnItemArtifactSettings_AllowedOrDenied(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithHubJWT(t, mux)
+	token := newHubJWTForDevice(testRemoteReadJWTSecret, "user-1", testRemoteReadEdgeDevice, 1*time.Hour)
+
+	// Own item / artifact / preview / diff should succeed.
+	for _, path := range []string{
+		"/v1/items/item_1",
+		"/v1/threads/thread_1/items",
+		"/v1/artifacts/artifact_1",
+		"/v1/artifacts?runId=run_1",
+		"/v1/previews/preview_1",
+		"/v1/runs/run_1/diff",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200 body=%s", path, rec.Code, rec.Body.String())
+		}
+	}
+
+	// Artifact list for another user's run is empty (not 404) to avoid enumeration noise.
+	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?runId=run_2", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cross-user artifact list status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode artifact list: %v", err)
+	}
+	body = unwrapSuccess(body)
+	items, _ := body["items"].([]any)
+	if len(items) != 0 {
+		t.Fatalf("cross-user artifact list items = %#v, want empty", items)
+	}
+}
+
+func TestRemoteRead_LocalAuth_SeesUnownedAndSharedConfig(t *testing.T) {
+	_, mux, _ := setupRemoteReadFixture(t)
+	handler := wrapWithLocalAuth(t, mux, "local-secret-token")
+	for _, path := range []string{
+		"/v1/projects/proj_default",
+		"/v1/items/item_default",
+		"/v1/artifacts/artifact_default",
+		"/v1/settings",
+		"/v1/agent-profiles",
+		"/v1/agent-profiles/profile_shared",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer local-secret-token")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("local auth %s status = %d, want 200 body=%s", path, rec.Code, rec.Body.String())
+		}
 	}
 }
 
