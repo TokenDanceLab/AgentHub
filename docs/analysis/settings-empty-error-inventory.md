@@ -1,8 +1,8 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470
-> status: inventory + trivial consistency fixes landed
+> issue: #470 / residual #479
+> status: inventory + trivial consistency fixes + settings load/error UX landed
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -11,19 +11,19 @@ Product Settings SSOT is already the shared workbench page. Desktop orphan
 `SettingsPage` is gone; residual shell files are mostly dead typing, dead menu
 hooks, leftover i18n, and surface metadata still describing ~20 old sections.
 
-Settings form UI has design-system **empty/invalid/missing previews**, but **no
-real loading/error UX** for settings persistence. Failures stay in
-`console.error` with silent defaults/rollback.
+Settings form UI now surfaces real **loading / init error / write error** UX via
+shared `StatusNotice` + `RecoveryPanel`. Failures still log to `console.error`,
+but no longer remain silent in the Settings product surface.
 
 ## 1. SSOT product surface
 
 | Path | Role |
 |---|---|
-| `app/shared/src/workbench/pages/SettingsPage.tsx` | Product Settings UI SSOT (panes: `appearance \| notify \| agent \| local \| states`) |
-| `app/shared/src/workbench/pages/SettingsPage.module.css` | Settings layout + local `StatePanel` styles |
-| `app/shared/src/workbench/WorkbenchRoutes.tsx` | Mounts SettingsPage; hardcodes `spaceTitle="AgentHub Desktop"`, `spaceMeta="桌面设计 demo"` |
+| `app/shared/src/workbench/pages/SettingsPage.tsx` | Product Settings UI SSOT (panes: `appearance \| notify \| agent \| local \| states`) + load/error chrome |
+| `app/shared/src/workbench/pages/SettingsPage.module.css` | Settings layout + local `StatePanel` styles + status stack |
+| `app/shared/src/workbench/WorkbenchRoutes.tsx` | Mounts SettingsPage; hardcodes `spaceTitle="AgentHub Desktop"`, `spaceMeta="桌面设计 demo"`; plumbs settings service loading/error |
 | `app/shared/src/workbench/AgentHubWorkbench.tsx` | Creates `settingsService`; rail nav to `settings` |
-| `app/shared/src/workbench/settingsService.ts` | External store; init/write fail → defaults + `console.error` only |
+| `app/shared/src/workbench/settingsService.ts` | External store; init/write fail → defaults/rollback + `error` / `errorKind` / `loading` |
 | `app/shared/src/workbench/settingsTypes.ts` | Persist keys (incl. `stateStrategies`) |
 | `app/shared/src/workbench/GlobalRail.tsx` | Real settings entry (rail gear → `handleNavigate('settings')`) |
 | `app/shared/src/workbench/mockData.ts` | Default settings incl. `stateStrategies` |
@@ -55,8 +55,8 @@ real loading/error UX** for settings persistence. Failures stay in
 | Path | Role vs Settings |
 |---|---|
 | `app/shared/src/ui/EmptyState.tsx` | Shared empty SSOT (shell lists); **not** used by SettingsPage |
-| `app/shared/src/ui/StatusNotice.tsx` | Inline status; **not** wired to settings load/write |
-| `app/shared/src/ui/RecoveryPanel.tsx` | Error recovery; **not** used by Settings |
+| `app/shared/src/ui/StatusNotice.tsx` | Inline status; **wired** for settings loading + write failure |
+| `app/shared/src/ui/RecoveryPanel.tsx` | Error recovery; **wired** for settings init failure |
 | `app/shared/src/ui/Skeleton.tsx` / `SkeletonBar.tsx` | Loading; **not** used by Settings |
 
 ## 5. Empty / error / loading inventory (Settings-related)
@@ -65,8 +65,8 @@ real loading/error UX** for settings persistence. Failures stay in
 
 | State | Present? | Notes |
 |---|---|---|
-| Loading | **No** | `settingsService.initialized` never rendered; page always paints defaults |
-| Error | **No** | init/write failures logged only; silent rollback/defaults |
+| Loading | **Yes** | `settingsLoading` → shared `StatusNotice` (“正在加载设置…”) |
+| Error | **Yes** | init → `RecoveryPanel` + retry/dismiss; write → `StatusNotice` + dismiss |
 | Empty | **N/A as page** | Settings is form UI, not a list |
 | Empty/invalid/missing **preview** | Yes | `StatesPane` + local `StatePanel` (design-system preview only) |
 | Search empty | Non-functional | Search input has no state/filter |
@@ -75,7 +75,7 @@ real loading/error UX** for settings persistence. Failures stay in
 
 | Path | Loading | Error | Empty |
 |---|---|---|---|
-| `settingsService.ts` | `initialized` flag only | `console.error`; keep defaults / roll back write | N/A |
+| `settingsService.ts` | `loading` + `initialized` | `error` / `errorKind` (`init`\|`write`); keep defaults / roll back write | N/A |
 | `desktopSettingsAdapter.ts` | none | silent tier fallback | empty `{}` from LS |
 | `webSettingsAdapter.ts` | none | silent tier fallback | empty `{}` from LS |
 
@@ -94,7 +94,7 @@ real loading/error UX** for settings persistence. Failures stay in
 1. **Pane model mismatch**: SSOT panes = 5 (`appearance/notify/agent/local/states`); residual `SectionId` / `surfaceMetadata` still describe ~20 orphan sections.
 2. **Dead menu wiring**: `useTopMenuConfig` / `useShellShortcuts` target `general` / `tasks` / `agentScheduling` — none map to `SettingsPaneId`; hooks currently unmounted.
 3. **Hardcoded scope**: `WorkbenchRoutes` always passes Desktop demo scope even for Web.
-4. **EN/CN mix in Settings UI**: section counters previously rendered `{count} items` while surrounding copy is Chinese (same on Projects detail settings panel).
+4. **EN/CN mix in Settings UI**: recovery eyebrow still English (`Settings recovery`) while surrounding chrome is Chinese; product copy can be unified later.
 5. **State system dual track**: Settings previews custom `StatePanel`; product lists use `EmptyState`; other workbench pages still use ad-hoc divs.
 6. **Locale drift**: large desktop/web `settings.*` residual strings no longer backed by a Settings UI.
 
@@ -106,16 +106,34 @@ real loading/error UX** for settings persistence. Failures stay in
 2. **Residual menu section mapping note** —
    - `app/desktop/src/components/settings/sectionIds.ts`: document that only `SettingsPaneId` is navigable; map dead `openSettings('general')` intent → `'appearance'` when rewired later.
 
-## 8. Larger follow-ups (do not land as “trivial”)
+## 8. Landed load/error UX (#479)
 
-- Surface `settingsService` loading/error via `StatusNotice` / `RecoveryPanel` on SettingsPage (needs service error state + WorkbenchRoutes prop; avoid #467 ownership collision on god workbench file).
+1. **`settingsService` state surface**
+   - `loading`, `error`, `errorKind`, `clearError()`
+   - init failure keeps defaults and marks initialized so UI can recover
+   - write failure rolls back snapshot and keeps a dismissible write error
+2. **`WorkbenchRoutes` plumbing**
+   - subscribes to service state and passes `settingsLoading` / `settingsError` / `settingsErrorKind`
+   - retry = re-run `settingsService.init()`; dismiss = `clearError()`
+3. **`SettingsPage` shared primitives**
+   - loading → `StatusNotice`
+   - init error → `RecoveryPanel` (retry + continue with defaults)
+   - write error → `StatusNotice` (dismiss)
+4. **Tests**
+   - `settingsService.test.ts`
+   - `pages/SettingsPage.test.tsx`
+
+## 9. Residual follow-ups (do not land as “trivial”)
+
 - Rebind or delete dead `useTopMenuConfig` / `useShellShortcuts` / TopMenuBar `openSettings`.
 - Collapse `surfaceMetadata` `desktopSectionId`s + web residual section i18n to current 5-pane SSOT (or mark `interfaceGap`).
 - Migrate `StatesPane` previews onto shared `EmptyState` + variants.
 - Stop hardcoding Desktop demo `spaceTitle` / `spaceMeta` for Web mounts.
+- Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
+- Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
-## 9. Evidence
+## 10. Evidence
 
 - Real entry path: GlobalRail → workbench `settings` page.
 - Residual desktop/web settings affordances are mostly **dead code + leftover i18n/surface metadata**, not alternate Settings UIs.
-- Settings page has design-system empty/invalid/missing **previews**, but **no real loading/error UX** for settings persistence.
+- Settings page has design-system empty/invalid/missing **previews**, plus real load/error UX for settings persistence via shared StatusNotice/RecoveryPanel (#479).
