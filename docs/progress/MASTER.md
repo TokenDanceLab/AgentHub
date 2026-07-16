@@ -87,10 +87,10 @@
 | T4.1 | #434 | Edge handlers 机械拆分 | closed |
 | T4.2 | #435 | ProcessExecutor 接口抽取 | closed |
 | T4.3 | #436 | AH-SR-046 capability 闭环 | closed (issuer landed) |
-| T4.4 | #437 | AH-SR-049 outbox retry / journal | open (retry loop wired; Edge journal remaining) |
+| T4.4 | #437 | AH-SR-049 outbox retry / journal | closed (journal minimal; durable residual) |
 | T5.1 | #438 | AH-SR-037 决策 | closed accepted |
 | T5.2 | #439 | Settings/TeamRun orphan 决策 | closed |
-| T5.3 | #440 | 专项收口与归档计划 | open |
+| T5.3 | #440 | 专项收口与归档计划 | closed |
 
 ## Quick Status Commands
 
@@ -105,12 +105,12 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 1: Governance Lock (3/3 closed: #424-#426)
 - [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
 - [x] Phase 3: Frontend Strangler (4/4 closed: #430-#433)
-- [ ] Phase 4: Edge Seams + Security (0/4)
-- [ ] Phase 5: Closure Decisions (2/3 closed: #438 #439; open #440)
+- [x] Phase 4: Edge Seams + Security (0/4)
+- [x] Phase 5: Closure Decisions (3/3)
 
 ## Current Status
-**Active Phase**: Phase 4 residual + Phase 5 closeout  
-**Active Task**: #437 Edge journal residual; #440 program closeout  
+**Active Phase**: COMPLETE (baseline program)  
+**Active Task**: none — residual AH-SR-049 durable journal tracked in risk register  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
@@ -133,3 +133,10 @@ gh project item-list 6 --owner @me --format json --limit 50
 | Date | Session | Summary |
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Analysis/wiki/hygiene baseline; stopped ad-hoc fleets; Project #6 + milestones 22–26 + issues #424–#440; MASTER → GITHUB_FULL |
+
+
+## Baseline completion
+
+- Program cleanup-baseline closed on 2026-07-16 for clear engineering baseline.
+- Residual non-blocking debt: AH-SR-049 durable Edge journal / full reconciliation E2E (documented Partial).
+- Next work must open a **new** SPEC/Issues; do not freestyle on this branch without issues.
