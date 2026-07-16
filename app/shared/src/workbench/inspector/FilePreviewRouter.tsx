@@ -1,33 +1,42 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { FilePreview } from './FilePreview';
-import type { FileItem } from './OverviewPanel';
+import React, { useCallback, useMemo } from 'react';
+import { applyAllRunDiffs, applyRunDiff } from '../../apiClient';
+import type { FileDiff } from '../../types/chat';
+import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../../ui/DiffReviewPanel';
+import { DocxPreview } from '../../ui/DocxPreview';
 import { SlideshowPreview } from '../../ui/SlideshowPreview';
 import { TablePreview } from '../../ui/TablePreview';
-import { DocxPreview } from '../../ui/DocxPreview';
-import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
-import styles from './FilePreview.module.css';
+import { DesignFileIcon } from '../designIcons';
+import styles from '../AgentHubWorkbench.module.css';
+import { FilePreview } from './FilePreview';
+import type { FileItem } from './OverviewPanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
    FilePreviewRouter — Routes a PreviewFile to the right native or
    code viewer based on the filename extension.
 
    Routing table:
-     .pptx / .ppt      -> SlideshowPreview (JSZip + XML parsing)
-     .xlsx / .xls / .csv -> TablePreview (SheetJS xlsx)
-     .docx              -> DocxPreview (mammoth.js)
-     .pdf               -> browser-native PDF iframe
-     .html / .htm       -> sandboxed HTML iframe (srcDoc)
-     .png/.jpg/...      -> full-res image with lightbox
-     .txt / .log        -> plain <pre>
-     .md / .markdown    -> FilePreview (markdown mode)
-     everything else    -> FilePreview (code / diff mode)
+     interactiveDiff       -> InteractiveDiffPreview (accept/reject write-back)
+     .pptx                 -> SlideshowPreview
+     .ppt                  -> SlideshowPreview (legacy kind)
+     .xlsx / .xls / .csv   -> TablePreview
+     .docx                 -> DocxPreview
+     .pdf                  -> browser-native PDF iframe
+     .html / .htm          -> sandboxed HTML iframe (srcDoc)
+     .png/.jpg/...         -> image placeholder (URL-loaded later)
+     .txt / .log           -> plain <pre>
+     everything else       -> FilePreview (code / diff / markdown)
    ═══════════════════════════════════════════════════════════════════════ */
 
-type PreviewFile = FileItem & {
+export type PreviewFile = FileItem & {
   content?: string | undefined;
   diffContent?: string | undefined;
   owner?: string | undefined;
+  /** When present, this is an interactive diff from a run — enables accept/reject with Edge apply. */
+  interactiveDiff?: {
+    runId: string;
+    fileDiff: FileDiff;
+    workDir: string;
+  } | undefined;
 };
 
 export interface FilePreviewRouterProps {
@@ -35,138 +44,260 @@ export interface FilePreviewRouterProps {
   onClose: () => void;
 }
 
-type PreviewKind = 'pptx' | 'xlsx' | 'docx' | 'pdf' | 'html' | 'image' | 'text' | null;
+type FilePreviewKind =
+  | 'code'
+  | 'pptx'
+  | 'pptx-legacy'
+  | 'xlsx'
+  | 'xls'
+  | 'csv'
+  | 'docx'
+  | 'pdf'
+  | 'html'
+  | 'image'
+  | 'text';
 
-function detectPreviewKind(filename: string): PreviewKind {
-  const lower = filename.toLowerCase();
-  if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) return 'pptx';
-  if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')) return 'xlsx';
+function detectFilePreviewKind(fileName: string): FilePreviewKind {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pptx')) return 'pptx';
+  if (lower.endsWith('.ppt')) return 'pptx-legacy';
+  if (lower.endsWith('.xlsx')) return 'xlsx';
+  if (lower.endsWith('.xls')) return 'xls';
+  if (lower.endsWith('.csv')) return 'csv';
   if (lower.endsWith('.docx')) return 'docx';
   if (lower.endsWith('.pdf')) return 'pdf';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
-  if (/^(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(lower.split('.').pop() ?? '')) return 'image';
-  if (lower.endsWith('.txt') || lower.endsWith('.log')) return 'text';
-  return null;
+  if (/\.(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(lower)) return 'image';
+  if (/\.(txt|log)$/.test(lower)) return 'text';
+  return 'code';
 }
 
-export const FilePreviewRouter: React.FC<FilePreviewRouterProps> = ({
+/** Extract a fetchable URL from a PreviewFile's content field.
+ *  runtimeEvidenceOverviewFiles puts real Edge API paths (e.g. /v1/runs/…/content)
+ *  or full preview URLs into `content`; fallback text starts with `#` or prose. */
+function extractFileUrl(content: string | undefined): string {
+  if (!content) return '';
+  // Real URLs start with '/' (relative API path) or 'http'
+  if (content.startsWith('/') || content.startsWith('http://') || content.startsWith('https://')) {
+    return content;
+  }
+  return '';
+}
+
+/** Interactive diff preview with hunk accept/reject that writes back to the workdir via Edge API. */
+function InteractiveDiffPreview({
   file,
   onClose,
-}) => {
-  const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
-  const kind = detectPreviewKind(file.name);
+}: {
+  file: PreviewFile;
+  onClose: () => void;
+}): React.ReactElement {
+  if (!file.interactiveDiff) return (<></>);
+  const { runId, fileDiff, workDir } = file.interactiveDiff;
 
-  // ── Document format previews (PPTX, XLSX, DOCX) ──
-  if (kind === 'pptx') {
-    return (
-      <SlideshowPreview
-        fileName={file.name}
-        fileUrl={file.content ?? ''}
-        onClose={onClose}
-      />
-    );
-  }
+  const reviewFiles: DiffReviewFile[] = useMemo(() => [{
+    filePath: fileDiff.filePath,
+    status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
+    additions: fileDiff.additions,
+    deletions: fileDiff.deletions,
+    hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
+  }], [fileDiff]);
 
-  if (kind === 'xlsx') {
-    return (
-      <TablePreview
-        fileName={file.name}
-        fileUrl={file.content ?? ''}
-        onClose={onClose}
-      />
-    );
-  }
+  const handleApplyHunk = useCallback(
+    async (decision: DiffHunkDecision) => {
+      try {
+        await applyRunDiff(runId, {
+          file_path: decision.filePath,
+          hunk_index: decision.hunkIndex,
+          accepted: decision.accepted,
+          workDir,
+        });
+      } catch (err) {
+        console.error('RightInspector: applyRunDiff failed for hunk:', decision.filePath, decision.hunkIndex, err);
+      }
+    },
+    [runId, workDir],
+  );
 
-  if (kind === 'docx') {
-    return (
-      <DocxPreview
-        fileName={file.name}
-        fileUrl={file.content ?? ''}
-        onClose={onClose}
-      />
-    );
-  }
+  const handleApplyAllHunks = useCallback(
+    async (decisions: DiffHunkDecision[]) => {
+      try {
+        await applyAllRunDiffs(runId, {
+          decisions: decisions.map((d) => ({
+            file_path: d.filePath,
+            hunk_index: d.hunkIndex,
+            accepted: d.accepted,
+          })),
+          workDir,
+        });
+      } catch (err) {
+        console.error('RightInspector: applyAllRunDiffs failed:', decisions.length, 'hunks,', err);
+      }
+    },
+    [runId, workDir],
+  );
 
-  // ── Native format: render directly ──
-  if (kind === 'pdf') {
-    return <PdfPreview filename={file.name} />;
-  }
-
-  if (kind === 'html') {
-    return <HtmlPreview content={content} />;
-  }
-
-  if (kind === 'image') {
-    return <ImagePreview filename={file.name} />;
-  }
-
-  if (kind === 'text') {
-    return <TextPreview content={content} />;
-  }
-
-  // ── Fallback to existing FilePreview with code/diff/markdown modes ──
   return (
-    <FilePreview
-      filename={file.name}
-      owner={file.owner}
-      language={file.type}
-      content={content}
-      diffContent={file.diffContent}
-      onClose={onClose}
+    <div className={styles.filePreview}>
+      <div className={styles.filePreviewHeader}>
+        <button className={styles.filePreviewClose} onClick={onClose} type="button">
+          {'<'} 返回
+        </button>
+        <span className={styles.filePreviewTitle}>{fileDiff.filePath}</span>
+      </div>
+      <DiffReviewPanel
+        files={reviewFiles}
+        runId={runId}
+        onApplyHunk={handleApplyHunk}
+        onApplyAllHunks={handleApplyAllHunks}
+      />
+    </div>
+  );
+}
+
+export function FilePreviewRouter({
+  file,
+  onClose,
+}: FilePreviewRouterProps): React.ReactElement {
+  // Interactive diff review with accept/reject write-back
+  if (file.interactiveDiff) {
+    return (
+      <InteractiveDiffPreview
+        file={file}
+        onClose={onClose}
+      />
+    );
+  }
+
+  const kind = detectFilePreviewKind(file.name);
+  const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
+  const fileUrl = extractFileUrl(file.content);
+
+  switch (kind) {
+    case 'pptx':
+    case 'pptx-legacy':
+      return (
+        <SlideshowPreview
+          fileName={file.name}
+          fileUrl={fileUrl}
+          onClose={onClose}
+        />
+      );
+
+    case 'xlsx':
+    case 'xls':
+    case 'csv':
+      return (
+        <TablePreview
+          fileName={file.name}
+          fileUrl={fileUrl}
+          onClose={onClose}
+        />
+      );
+
+    case 'docx':
+      return (
+        <DocxPreview
+          fileName={file.name}
+          fileUrl={fileUrl}
+          onClose={onClose}
+        />
+      );
+
+    case 'pdf':
+      return <NativePdfPreview filename={file.name} />;
+
+    case 'html':
+      return <NativeHtmlPreview content={content} />;
+
+    case 'image':
+      return <NativeImagePreview filename={file.name} />;
+
+    case 'text':
+      return <NativeTextPreview content={content} />;
+
+    default:
+      return (
+        <FilePreview
+          filename={file.name}
+          owner={file.owner}
+          language={file.type}
+          content={file.content ?? `${file.name}\n\n暂无文件内容。`}
+          diffContent={file.diffContent}
+          onClose={onClose}
+        />
+      );
+  }
+}
+
+/* ═══ Native File Previews (zero extra libraries) ═══ */
+
+function NativePdfPreview({ filename }: { filename: string }): React.ReactElement {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <iframe
+        title={`PDF 预览 ${filename}`}
+        style={{ flex: 1, border: 0, minHeight: 0 }}
+        role="document"
+      />
+    </div>
+  );
+}
+
+function NativeHtmlPreview({ content }: { content: string }): React.ReactElement {
+  return (
+    <iframe
+      title="HTML 预览"
+      style={{ flex: 1, border: 0, minHeight: 0, width: '100%' }}
+      srcDoc={content}
+      sandbox="allow-scripts"
+      role="document"
     />
   );
-};
-
-// ── Native previews ─────────────────────────────────────────────────────
-
-function PdfPreview({ filename }: { filename: string }): React.ReactElement {
-  return (
-    <section className={styles.pane} aria-label={`PDF 预览 ${filename}`}>
-      <iframe
-        title={filename}
-        className={styles.nativeFrame}
-        src={''}
-        role="document"
-      />
-    </section>
-  );
 }
 
-function HtmlPreview({ content }: { content: string }): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+function NativeImagePreview({ filename }: { filename: string }): React.ReactElement {
   return (
-    <section className={styles.pane} aria-label={t('aria.htmlPreview')}>
-      <iframe
-        title="HTML 预览"
-        className={styles.nativeFrame}
-        srcDoc={content}
-        sandbox="allow-scripts"
-        role="document"
-      />
-    </section>
-  );
-}
-
-function ImagePreview({ filename }: { filename: string }): React.ReactElement {
-  return (
-    <section className={styles.pane} aria-label={`图片预览 ${filename}`}>
-      <div className={styles.nativeImageWrap}>
-        <div className={styles.nativeImageText}>
-          <span>图片预览: {filename}</span>
-          <span>通过文件 URL 或 base64 内容加载</span>
-        </div>
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      overflow: 'auto',
+      minHeight: 0,
+    }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        color: 'var(--text-3)',
+        font: '400 0.75rem var(--font-sans)',
+      }}>
+        <DesignFileIcon className={styles.fileIcon} name={filename} />
+        <span>图片预览: {filename}</span>
+        <span style={{ fontSize: '0.6875rem' }}>图片内容将通过文件 URL 加载</span>
       </div>
-    </section>
+    </div>
   );
 }
 
-function TextPreview({ content }: { content: string }): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+function NativeTextPreview({ content }: { content: string }): React.ReactElement {
   return (
-    <section className={styles.pane} aria-label={t('aria.textPreview')}>
-      <pre className={styles.code} tabIndex={0}>
-        <code className={styles.codeInner}>{content}</code>
-      </pre>
-    </section>
+    <pre style={{
+      flex: 1,
+      margin: 0,
+      padding: 16,
+      overflow: 'auto',
+      font: '400 0.8125rem/1.6 var(--font-mono)',
+      color: 'var(--text-2)',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      background: 'var(--surface)',
+      minHeight: 0,
+    }}>
+      {content}
+    </pre>
   );
 }
