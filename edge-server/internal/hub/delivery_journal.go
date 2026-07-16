@@ -85,3 +85,39 @@ func (j *DeliveryJournal) Len() int {
 	defer j.mu.RUnlock()
 	return len(j.entries)
 }
+
+// redeliveryKey uniquely identifies a delivery attempt group for candidate selection.
+type redeliveryKey struct {
+	taskID string
+	runID  string
+	action string
+}
+
+// RedeliveryCandidates selects failed journal entries with seq > afterSeq that still
+// need redelivery. Entries are skipped when a successful delivery already exists for
+// the same task_id + run_id + action anywhere in the provided set (idempotent skip).
+//
+// This is a pure selection helper for offline reconciliation / future workers
+// (AH-SR-049 residual #462). It is intentionally not a production redelivery loop.
+func RedeliveryCandidates(entries []DeliveryJournalEntry, afterSeq uint64) []DeliveryJournalEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+	success := make(map[redeliveryKey]struct{}, len(entries))
+	for _, e := range entries {
+		if e.OK {
+			success[redeliveryKey{e.TaskID, e.RunID, e.Action}] = struct{}{}
+		}
+	}
+	out := make([]DeliveryJournalEntry, 0)
+	for _, e := range entries {
+		if e.Seq <= afterSeq || e.OK {
+			continue
+		}
+		if _, ok := success[redeliveryKey{e.TaskID, e.RunID, e.Action}]; ok {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
