@@ -22,7 +22,7 @@
 | AH-SR-045 | High | Open | Remote Edge read API 认证后缺少 route/target/workspace/user-action 级授权。 | 增加远程 read API scoped authorization 和代表性 negative tests。 |
 | AH-SR-046 | High | Partial mitigated in repo | Edge `PostRuns` 已有 dual-token capability 校验（`jwtutil.ValidateCapabilityToken` + `X-AgentHub-Capability-Token`，绑定 user/device/project）；仍缺完整 action/target/workspace 绑定与全套 wrong-target/project/action/stale negative tests，以及 Hub 发 token 的端到端闭环证据。 | 补齐 route-scoped purpose/action 绑定、代表性 negative tests，并完成 Hub→Edge 签发/校验 E2E 证据。 |
 | AH-SR-048 | High | Mitigated in repo; runtime/log verification required | Edge 启动日志已脱敏，但真实 adapter debug 日志仍需验证不泄露 prompt、MCP、config、image path 或 session。 | 用真实 adapter smoke 审查 runtime/debug logs，私有记录无密证据。 |
-| AH-SR-049 | High | Partial mitigated in repo | Hub 已有 `delivery_outbox` 表/迁移、service outbox retry/ack（`delivery_outbox.go` + task-ack 自动 ack）；仍缺完整 Edge-side journal、event sequence、idempotent replay/cursor 与跨端 reconciliation 合同。 | 补齐 Edge outbox/journal、sequence/idempotent ack、replay/cursor 与 reconciliation，并附 fixture/runtime 证据。 |
+| AH-SR-049 | High | Partial mitigated in repo | Hub 已有 `delivery_outbox` 表/迁移、service outbox retry/ack（`delivery_outbox.go` + task-ack 自动 ack），且 app wiring 已启动 `StartDeliveryRetryLoop`；仍缺完整 Edge-side journal、event sequence、idempotent replay/cursor 与跨端 reconciliation 合同。 | 补齐 Edge outbox/journal、sequence/idempotent ack、replay/cursor 与 reconciliation，并附 fixture/runtime 证据。 |
 
 ## High Deploy/Client Verification Queue
 

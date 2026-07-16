@@ -443,8 +443,9 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	payload, _ := json.Marshal(dp)
 	deliveryID, err := s.RecordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
 	if err != nil {
-		slog.Error("failed to record delivery outbox entry, continuing dispatch without tracking",
-			"task_id", task.ID, "error", err)
+		// Still dispatch for availability, but durability is degraded until outbox is healthy.
+		slog.Error("AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking",
+			"task_id", task.ID, "edge_device_id", task.EdgeDeviceID, "error", err)
 	} else {
 		dp.DeliveryID = deliveryID
 		// Re-serialize with delivery_id included.
