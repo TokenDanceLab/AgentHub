@@ -6,8 +6,11 @@ import en from './locales/en.json';
 import zh from './locales/zh.json';
 
 const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Product Settings SSOT is shared workbench SettingsPage (own i18n surface).
+// Desktop orphan SettingsPage was deleted; residual desktop settings helpers only
+// keep sectionIds typing. Locale completeness for desktop settings remains the
+// runtime category keys that desktop still owns.
 const settingsRoots = [
-  join(srcRoot, 'components', 'SettingsPage.tsx'),
   join(srcRoot, 'components', 'settings'),
 ];
 
