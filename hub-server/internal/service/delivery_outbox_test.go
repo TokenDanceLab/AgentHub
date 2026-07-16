@@ -690,3 +690,86 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 	assert.Equal(t, DeliveryStatusSent, rec.Status,
 		"outbox record should be in 'sent' status after dispatch")
 }
+
+// ==================== TestOutbox_RetryLoopInvokesRedispatcher ====================
+
+// fakeRedispatcher records RedispatchDelivery calls without HTTP/WS.
+type fakeRedispatcher struct {
+	calls []redispatchCall
+}
+
+type redispatchCall struct {
+	taskID       string
+	deliveryID   string
+	payloadJSON  string
+	edgeDeviceID string
+}
+
+func (f *fakeRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	f.calls = append(f.calls, redispatchCall{
+		taskID:       taskID,
+		deliveryID:   deliveryID,
+		payloadJSON:  payloadJSON,
+		edgeDeviceID: edgeDeviceID,
+	})
+	return nil
+}
+
+func TestOutbox_RetryLoopInvokesRedispatcher(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	fake := &fakeRedispatcher{}
+	outbox := NewDeliveryOutbox(db, fake)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+
+	// Seed a sent delivery past DeliverySentTimeout so scan finds it.
+	oldSentTime := now.Add(-DeliverySentTimeout - time.Second)
+	payload := `{"task_id":"task-port","opaque":true}`
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, edge_device_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"port-sent", "task-port", "del-port", payload, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, "dev-port", oldSentTime, oldSentTime,
+	)
+	require.NoError(t, err)
+
+	// Drive one retry cycle (no ticker / no HTTP/WS).
+	outbox.retryDeliveries(ctx)
+
+	// Journal transitioned to retrying.
+	status, err := outbox.GetDeliveryStatus(ctx, "del-port")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusRetrying, status)
+
+	// Opaque redispatch port invoked with stored payload bytes.
+	require.Len(t, fake.calls, 1)
+	assert.Equal(t, "task-port", fake.calls[0].taskID)
+	assert.Equal(t, "del-port", fake.calls[0].deliveryID)
+	assert.Equal(t, payload, fake.calls[0].payloadJSON)
+	assert.Equal(t, "dev-port", fake.calls[0].edgeDeviceID)
+}
+
+func TestOutbox_RetryLoopNoRedispatcherSkipsDispatch(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	// nil redispatcher: journal still advances; redispatch is a no-op.
+	outbox := NewDeliveryOutbox(db, nil)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+
+	oldSentTime := now.Add(-DeliverySentTimeout - time.Second)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"nil-port", "task-nil", "del-nil", `{}`, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, oldSentTime, oldSentTime,
+	)
+	require.NoError(t, err)
+
+	outbox.retryDeliveries(ctx)
+
+	status, err := outbox.GetDeliveryStatus(ctx, "del-nil")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusRetrying, status)
+}

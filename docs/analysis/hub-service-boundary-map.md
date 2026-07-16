@@ -1,8 +1,8 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-17
-> issue: #528 (DeliveryOutbox + Redispatcher boundary sketch; prior #514 / #505 / #493 / #478 / #468)
-> status: map current — pure helpers closed; **#528 docs-only** DeliveryOutbox/Redispatcher sketch + thin-type feasibility (no code extract this PR)
+> issue: #540 (DeliveryOutbox thin type + Redispatcher port; prior #528 / #514 / #505 / #493 / #478 / #468)
+> status: map current — pure helpers closed; **#540 landed** same-package `DeliveryOutbox` + opaque `Redispatcher`; model/repository move + `DispatchService` still deferred
 > companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014)
 
 This document is the authoritative **read-only boundary map** for
@@ -20,21 +20,22 @@ an acceptance sketch.
 | Same-package type extract `RunEventService` | ~200 methods + facade | existing `agent_run_event_test.go` | still in flat `service` | injected `runEventControl` (#478) |
 | Same-package type extract `EdgeCallbackService` | ~500 methods + facade | existing HandleTask*/outbox auto-ack tests | still in flat `service` | injected bus/seq/outbox (#505) |
 | Pure extract `service/deliveryoutbox` | ~30–40 | unit tests | pure helpers | backoff/truncate + retry constants; no DB/WS/cache/`*AgentService` (#514) |
-| Same-package type extract `DeliveryOutbox` | **not landed** | existing `TestOutbox_*` | still on `*AgentService` | blocked by `dispatchPayload` redispatch glue; sketch in §6a (#528) |
+| Same-package type extract `DeliveryOutbox` | **landed #540** | existing `TestOutbox_*` + fake Redispatcher tests | still in flat `service` | injected opaque `Redispatcher`; redispatch impl stays on `*AgentService` |
 
 **Shape note:** not one god struct — **25+ `*Service` types** already exist
-(including `RunEventService`, `EdgeCallbackService`). Concentration remains
-**package flatness + `AgentService` method sprawl** (~3.2k LOC across
-agent/dispatch/outbox/run-event facade/callback facade). Outbox journal +
-retry redispatch remain methods on `*AgentService` in `delivery_outbox.go`
-(~592 LOC), not a composed type yet.
+(including `RunEventService`, `EdgeCallbackService`, `DeliveryOutbox`).
+Concentration remains **package flatness + `AgentService` method sprawl**
+(~3.2k LOC across agent/dispatch/outbox facade/run-event facade/callback
+facade). Outbox journal + retry-loop orchestration are now on
+`DeliveryOutbox`; redispatch (`redispatchDelivery` / `retryDispatchToTarget`)
+stays on `*AgentService` behind `Redispatcher`.
 
 Precedent: `service/agentteam` uses **local interfaces**
 (`agentTeamAgentSvc`, `agentTeamCache`, `agentTeamControlSvc`) + `*service.Bus`.
 `RunEventService` follows the same port pattern with `runEventControl`.
 `EdgeCallbackService` injects `edgeCallbackBus` / `edgeCallbackSeq` /
-`edgeCallbackOutbox`. DeliveryOutbox (when extracted) should inject a
-`Redispatcher` port rather than importing dispatch HTTP/WS guts.
+`edgeCallbackOutbox`. `DeliveryOutbox` injects opaque `Redispatcher`
+(no `dispatchPayload` export).
 
 ## 1. File inventory by domain
 
@@ -55,10 +56,10 @@ Precedent: `service/agentteam` uses **local interfaces**
 | File | LOC | Owns | Couples to |
 |------|----:|------|------------|
 | `agent_dispatch.go` | 819 | `TriggerAgentTask`, `dispatchTask`, edge HTTP, capability, history/pins | outbox `RecordDelivery`/`MarkDeliverySent`; private `dispatchPayload`; cache/ws/relay |
-| `delivery_outbox.go` | ~592 | `deliveryOutboxRecord` model + journal + retry loop | pure helpers → `deliveryoutbox` (#514); still **same-package** `dispatchPayload` + `dispatchToEdgeHTTP` + cache/ws in redispatch; `deliveryOutboxAcker` used by EdgeCallback; app wires `StartDeliveryRetryLoop` |
+| `delivery_outbox.go` | ~750 | `DeliveryOutbox` + facades + redispatch on `AgentService` | pure helpers → `deliveryoutbox` (#514); thin type + `Redispatcher` (**#540 done**); model still in service; redispatch stays on `AgentService` |
 | `message.go` | 860 | send/edit/pin/forward/search | `Bus`, cache seq, attachments |
 | `session.go` | 728 | private/group lifecycle | cache, bus, agent cleanup helpers |
-| `agent_edge_callback.go` | ~513 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**) |
+| `agent_edge_callback.go` | ~520 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**); outbox rebind via `DeliveryOutbox` (**#540**) |
 | `agent_run_event.go` | 237 | `RunEventService` + `AgentService` facade | repo; `agentevent` project; injected `runEventControl` (**#478 done**) |
 
 ### Consumers outside package
@@ -68,16 +69,16 @@ Precedent: `service/agentteam` uses **local interfaces**
 - **Subpkg:** `agentteam` → `service.Bus` + agent/control interfaces
 - **Subpkg:** `agentevent` → pure helpers used by `RunEventService` + `EdgeCallbackService`
 - **Subpkg:** `deliveryoutbox` → pure backoff/truncate helpers used by `delivery_outbox.go`
-- **Composition:** `AgentService` holds `runEvents *RunEventService` and
-  `edgeCallbacks *EdgeCallbackService` (set in `NewAgentService`); facade
-  methods keep handler signatures stable. No `deliveryOutbox` field yet —
-  outbox methods still live directly on `*AgentService` (#528 sketch for next)
+- **Composition:** `AgentService` holds `runEvents *RunEventService`,
+  `edgeCallbacks *EdgeCallbackService`, and `deliveryOutbox *DeliveryOutbox`
+  (set in `NewAgentService`); facade methods keep handler signatures stable.
+  Redispatch stays on `*AgentService` via `agentRedispatcher` (**#540**).
 
 ## 2. Coupling risks
 
-1. **`*AgentService` is still the real god receiver** — dispatch + outbox + custom agents share one struct (`db`, `bus`, `mgr`, `cacheClient`, `relay`). Run-event and edge-callback orchestration are composed out but facaded.
-2. **`dispatchPayload` is package-private glue** between `agent_dispatch.go` and `delivery_outbox.go` (retry re-unmarshals payload and calls `dispatchToEdgeHTTP`). **Cannot extract either alone without exporting a DTO + redispatch port.**
-3. **Outbox row type lives in service** (`deliveryOutboxRecord`) by design comment — schema coupled to service package; cleanup-strategy wants model/repository later. `#505` only injects a narrow auto-ack port (`deliveryOutboxAcker`), not a full outbox move.
+1. **`*AgentService` is still the real god receiver** — dispatch + custom agents share one struct (`db`, `bus`, `mgr`, `cacheClient`, `relay`). Run-event, edge-callback, and outbox journal orchestration are composed out but facaded; redispatch still lives on `AgentService`.
+2. **`dispatchPayload` remains package-private glue** for redispatch only — thin extract (#540) avoided export via opaque `Redispatcher`. Full `DispatchService` extract still needs care around this DTO.
+3. **Outbox row type lives in service** (`deliveryOutboxRecord`) by design — schema coupled to service package; cleanup-strategy wants model/repository later. `#540` keeps model in place; `#505` auto-ack port now satisfied by `DeliveryOutbox.autoAckDeliveriesForTask` (acker type retained as fallback).
 4. **Run-event pure helpers** — normalize/validate used by edge callback; project/summarize used by list/decide APIs. **Moved to `agentevent` in #468.**
 5. **`DecideTaskApproval` control coupling** — **resolved in #478**: `RunEventService` injects `runEventControl` (implemented by `*AgentControlService`). Facade still type-asserts cache for tests that construct `AgentService` without `NewAgentService`.
 6. **`agent_team_helpers.go` overlaps agentteam** — approval ID/decision predicates still duplicated in subpkg (drift risk). Flat package wraps `agentevent`; agentteam still has local copies. Edge callback now prefers `agentevent.*` on touched paths.
@@ -224,31 +225,35 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] Existing `TestOutbox_*` + `go test ./internal/service/ -short` green after pure extract
 - [x] DeliveryOutbox + Redispatcher boundary sketch + thin-type feasibility (#528 docs-only)
 - [x] Pure residual closed — no further pure helpers before orchestration type work
+- [x] Same-package thin type extract `DeliveryOutbox` + opaque `Redispatcher` (#540)
+- [x] Redispatch stays on `*AgentService` via `agentRedispatcher`; no `dispatchPayload` export
+- [x] Facades preserve call sites; `edgeCallbackOutbox` rebound to `DeliveryOutbox`
+- [x] Fake-`Redispatcher` unit test for retry loop; `TestOutbox_*` + short suite green
 
 ## 6. Suggested follow-up extract order
 
 1. ~~**`RunEventService`**~~ — **DONE #478**
 2. ~~**`EdgeCallbackService`**~~ — **DONE #505**
 3. ~~**Optional pure outbox helpers**~~ — **DONE #514** (`service/deliveryoutbox`)
-4. ~~**Boundary sketch DeliveryOutbox + Redispatcher**~~ — **DONE #528** (docs-only; this section)
-5. **Same-package thin type extract `DeliveryOutbox` + `Redispatcher` port** — next code PR (optional if sized small enough; see §6a feasibility)
-6. **Outbox model/repository move** — `deliveryOutboxRecord` → `model`/`repository` after ports stabilize
+4. ~~**Boundary sketch DeliveryOutbox + Redispatcher**~~ — **DONE #528** (docs-only)
+5. ~~**Same-package thin type extract `DeliveryOutbox` + `Redispatcher` port**~~ — **DONE #540**
+6. **Outbox model/repository move** — `deliveryOutboxRecord` → `model`/`repository` after ports stabilize (**next**)
 7. **`DispatchService`** — **last** among runtime; owns `dispatchPayload` + capability. **No big-bang.**
 8. **IM subpackages** (`service/im` or message/session/contact) — agentteam-style, lower urgency than runtime.
 9. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
 
-### 6a. #528 feasibility: DeliveryOutbox + Redispatcher (docs sketch vs thin type extract)
+### 6a. DeliveryOutbox + Redispatcher (#528 sketch → #540 thin type landed)
 
-#### File ownership (current)
+#### File ownership (current, post-#540)
 
 | Path | Owns | Notes |
 |------|------|-------|
-| `service/delivery_outbox.go` (~592) | status consts, `deliveryOutboxRecord`, journal methods on `*AgentService`, retry loop, redispatch glue | **single ownership file** for outbox orchestration |
+| `service/delivery_outbox.go` | status consts, `deliveryOutboxRecord`, `DeliveryOutbox` journal + retry loop, `Redispatcher`, redispatch on `*AgentService`, facades | **thin type landed #540** |
 | `service/deliveryoutbox/` (~30–40) | pure backoff/TTL/truncate | **DONE #514** — no pure residual left to extract |
 | `service/agent_dispatch.go` (~819) | `dispatchPayload`, `dispatchToEdgeHTTP`, `dispatchTask`, `RecordDelivery`/`MarkDeliverySent` call sites | package-private DTO + HTTP path; **not moved** |
-| `service/agent_edge_callback.go` | `edgeCallbackOutbox` + `deliveryOutboxAcker` | narrow auto-ack port over same outbox table |
-| `service/agent.go` | `AgentService` composition (`runEvents`, `edgeCallbacks`) | no `deliveryOutbox` field yet |
-| `app/wiring.go` | `AgentService.StartDeliveryRetryLoop(coreCtx)` | retry loop **is** wired (AH-SR-049) |
+| `service/agent_edge_callback.go` | `edgeCallbackOutbox` + `deliveryOutboxAcker` fallback | auto-ack rebinds to `DeliveryOutbox` in `NewAgentService` / lazy facade |
+| `service/agent.go` | `AgentService` composition (`runEvents`, `edgeCallbacks`, `deliveryOutbox`) | `SetRedispatcher(agentRedispatcher{s})` after construct |
+| `app/wiring.go` | `AgentService.StartDeliveryRetryLoop(coreCtx)` | retry loop **is** wired (AH-SR-049); facade unchanged |
 
 #### Coupling map (`dispatchPayload` ↔ outbox)
 
@@ -259,18 +264,17 @@ dispatchTask (agent_dispatch.go)
   ├─► dispatchToEdgeHTTP / WS / offline queue
   └─► MarkDeliverySent(deliveryID)
 
-StartDeliveryRetryLoop → retryDeliveries (delivery_outbox.go)
+StartDeliveryRetryLoop → DeliveryOutbox.retryDeliveries
   │  ScanRetryableDeliveries / MarkDeliveryRetrying
-  └─► redispatchDelivery
-        │  json.Unmarshal → dispatchPayload   // PRIVATE type in agent_dispatch.go
-        │  getPendingTaskForRedelivery (pending_agent_tasks snapshot)
-        └─► retryDispatchToTarget
-              ├─► dispatchToEdgeHTTP(ctx, minimalTask, &dp)  // AgentService method
-              ├─► cache GetRouteForDevice / PushPendingTask
-              └─► ws.Manager PushToConn (TypeAgentDispatch)
+  └─► Redispatcher.RedispatchDelivery(opaque payload JSON)  // port
+        └─► agentRedispatcher → AgentService.redispatchDelivery
+              │  json.Unmarshal → dispatchPayload   // stays PRIVATE
+              │  getPendingTaskForRedelivery
+              └─► retryDispatchToTarget
+                    ├─► dispatchToEdgeHTTP / cache / ws.Manager
 
 EdgeCallbackService.autoAck
-  └─► deliveryOutboxAcker.autoAckDeliveriesForTask  // writes delivery_outbox rows
+  └─► DeliveryOutbox.autoAckDeliveriesForTask  // (or deliveryOutboxAcker fallback)
 ```
 
 **Coupling split (`dispatchPayload` ↔ outbox):**
@@ -290,27 +294,19 @@ EdgeCallbackService.autoAck
 5. `StartDeliveryRetryLoop` **is** wired in `app/wiring.go` (AH-SR-049). Any wiki/note that says the retry loop is “never started” is **stale**.
 6. Tests: broad `TestOutbox_*` coverage for journal/scan/dead-letter/auto-ack; **no direct unit test of `redispatchDelivery` / `retryDispatchToTarget`** (integration stops at scan + MarkRetrying + Ack). A type extract that only moves journal is safer than one that also relocates redispatch without a port mock.
 
-#### Feasibility decision (this PR / #528)
+#### Decision trail
 
-| Option | Size | Risk | Verdict for #528 |
-|--------|-----:|------|------------------|
-| **A. Docs-only sketch** (this section) | S | Lowest | **Chosen** — precise acceptance + ownership; no runtime churn |
-| **B. Thin same-package type extract** (`DeliveryOutbox` + ports; model stays) | M–L | Medium | **Feasible as follow-up code PR**, not free in one small PR if redispatch stays attached |
-| **C. Full model/repository move + type** | L | High | **Defer** until B ports land |
-| **D. DispatchService big-bang** | XL | Highest | **Out of scope** |
+| Option | Size | Risk | Verdict |
+|--------|-----:|------|---------|
+| **A. Docs-only sketch** (#528) | S | Lowest | **Landed #528** |
+| **B. Thin same-package type extract** (`DeliveryOutbox` + ports; model stays) | M–L | Medium | **Landed #540** |
+| **C. Full model/repository move + type** | L | High | **Next** after B ports stabilize |
+| **D. DispatchService big-bang** | XL | Highest | **Out of scope / last** |
 
-**Why not B in the same PR as this sketch:**
-
-- Mirror of `#478`/`#505` would be: `type DeliveryOutbox struct { db; redispatcher Redispatcher }` + `AgentService` facade + lazy constructor.
-- Journal-only move is mechanical (~260 LOC methods + model stay in same package file or split file). Safe.
-- Retry loop **must** either (1) keep redispatch methods on `*AgentService` and call them via a port, or (2) move redispatch into `DeliveryOutbox` with injected deps (`agentCache`, `*ws.Manager`, HTTP dispatcher). Option (2) is a **de facto mini-Dispatch extract** and exceeds “thin type extract only with ports (no model move)” unless the port is deliberately opaque.
-- Recommended thin shape for a later PR (still same package, no model move):
+**Landed thin shape (#540):**
 
 ```go
-// Opaque redispatch: outbox never imports dispatchPayload.
 type Redispatcher interface {
-    // RedispatchDelivery re-sends a stored outbox payload for taskID/deliveryID.
-    // Implementer owns unmarshal + route (HTTP/WS/offline).
     RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error
 }
 
@@ -319,54 +315,41 @@ type DeliveryOutbox struct {
     redispatcher Redispatcher // nil → scan/mark only; loop no-ops redispatch
 }
 
-// AgentService implements Redispatcher by wrapping redispatchDelivery/retryDispatchToTarget.
-// OR a small adapter type holds *AgentService / dispatch deps.
+// agentRedispatcher adapts *AgentService; owns dispatchPayload unmarshal + route.
+// NewAgentService: NewDeliveryOutbox(db, nil) then SetRedispatcher(agentRedispatcher{s})
 ```
 
-- Keep `deliveryOutboxRecord` **unexported in service** until model move (same as today).
-- Rebind `edgeCallbackOutbox` implementer: either keep `deliveryOutboxAcker{db}` or add `DeliveryOutbox.autoAckDeliveriesForTask` and inject that.
-- `NewAgentService` gains `s.deliveryOutbox = NewDeliveryOutbox(db, agentRedispatcher{s})` (or set redispatcher after construct to avoid init cycles).
-- Facade: `RecordDelivery` / `MarkDeliverySent` / `AckDelivery` / `StartDeliveryRetryLoop` / … remain on `*AgentService` for dispatch call sites and `app/wiring.go`.
+- `deliveryOutboxRecord` remains **unexported in service** (model move deferred).
+- `edgeCallbackOutbox` rebinds to `DeliveryOutbox.autoAckDeliveriesForTask`; `deliveryOutboxAcker` retained as type for reference/fallback.
+- Facades: `RecordDelivery` / `MarkDeliverySent` / `AckDelivery` / `StartDeliveryRetryLoop` / scan/retry/cleanup/stats remain on `*AgentService`.
+- Fake-`Redispatcher` unit tests prove retry loop invokes port without HTTP/WS.
 
-**Sizing estimate for follow-up code PR (option B):**
-
-| Slice | LOC | Port needed? |
-|-------|----:|--------------|
-| Model + status consts (stay same package) | ~70 | no |
-| Journal methods → `DeliveryOutbox` | ~250–260 | no |
-| Retry loop orchestration (`Start`/`retryDeliveries`) | ~40 | calls `Redispatcher` |
-| `redispatchDelivery` + task snapshot + `retryDispatchToTarget` | ~230 | **stay on AgentService as Redispatcher impl** (preferred) or inject cache/ws/http |
-| Facade + `NewAgentService` wiring | ~40–60 | — |
-| Test updates (`*AgentService` → facade still works) | mostly zero if facades kept | add fake `Redispatcher` tests optional |
-
-**Pure residual close:** closed in #514; #528 confirms **no further pure extract** before orchestration type work.
-
-#### Acceptance checklist — docs-only (#528 this PR)
+#### Acceptance checklist — docs-only (#528)
 
 - [x] Boundary map next step precise with acceptance sketch (this §6a)
 - [x] File ownership table for DeliveryOutbox / dispatch / edge-callback / wiring
 - [x] Coupling map for `dispatchPayload` + redispatch
-- [x] Thin type extract feasibility documented; **code extract deferred**
+- [x] Thin type extract feasibility documented
 - [x] Pure residual: none remaining after #514
 - [x] No DispatchService big-bang; no frontend / OpenAPI
 
-#### Acceptance checklist — follow-up code PR (thin type extract only)
+#### Acceptance checklist — thin type extract (#540 this PR)
 
-- [ ] `type DeliveryOutbox struct` + `NewDeliveryOutbox` in same package (likely still `delivery_outbox.go` or split file)
-- [ ] Injected `Redispatcher` port; redispatch implementation remains on dispatch/`AgentService` side
-- [ ] **No** `deliveryOutboxRecord` move to `model`/`repository` in that PR
-- [ ] **No** export of `dispatchPayload` required (opaque JSON on port)
-- [ ] `AgentService` facades keep `RecordDelivery` / `MarkDeliverySent` / `AckDelivery` / `StartDeliveryRetryLoop` / scan/retry/cleanup/stats signatures
-- [ ] `edgeCallbackOutbox` still satisfied (`deliveryOutboxAcker` or `DeliveryOutbox` method)
-- [ ] Existing `TestOutbox_*` green; `go test ./internal/service/ -short` green
-- [ ] Optional: unit test with fake `Redispatcher` proving retry loop invokes port without HTTP/WS
-- [ ] Boundary map status → thin type landed; next = model move **or** DispatchService last
+- [x] `type DeliveryOutbox struct` + `NewDeliveryOutbox` in same package (`delivery_outbox.go`)
+- [x] Injected `Redispatcher` port; redispatch implementation remains on `AgentService` side
+- [x] **No** `deliveryOutboxRecord` move to `model`/`repository`
+- [x] **No** export of `dispatchPayload` (opaque JSON on port)
+- [x] `AgentService` facades keep `RecordDelivery` / `MarkDeliverySent` / `AckDelivery` / `StartDeliveryRetryLoop` / scan/retry/cleanup/stats signatures
+- [x] `edgeCallbackOutbox` still satisfied (`DeliveryOutbox` method; acker retained)
+- [x] Existing `TestOutbox_*` green; `go test ./internal/service/ -short` green
+- [x] Fake-`Redispatcher` unit test for retry loop
+- [x] Boundary map status → thin type landed; next = model move **or** DispatchService last
 
 #### Acceptance checklist — later full outbox (model move)
 
 - [ ] `deliveryOutboxRecord` → `model` + repository accessors
 - [ ] `DeliveryOutbox` uses repository; pure `deliveryoutbox` helpers unchanged
-- [ ] Reuse `#505` outbox auto-ack port shape
+- [ ] Reuse `#505`/`#540` outbox auto-ack port shape
 - [ ] Existing `TestOutbox_*` green after model move
 - [ ] Next extract pointer: **`DispatchService` last** among runtime (or IM)
 
@@ -374,21 +357,21 @@ type DeliveryOutbox struct {
 
 | Field | Value |
 |-------|-------|
-| Suggested title | `[P14.x] Hub DeliveryOutbox same-package type + Redispatcher port` |
-| Depends on | #528 sketch (this), #514 pure helpers |
-| Scope | Option B only: type + port + facades; no model move; no DispatchService |
-| Non-goals | model/repository move; exporting `dispatchPayload`; OpenAPI/frontend; starting new background semantics beyond existing wiring |
-| Primary files | `delivery_outbox.go`, `agent.go`, `agent_edge_callback.go` (rebind only if needed), `delivery_outbox_test.go` |
-| Risk note | Keep redispatch implementation on `AgentService` behind `Redispatcher`; do not drag `dispatchToEdgeHTTP` into outbox type |
+| Suggested title | `[P15.x] Hub delivery outbox model/repository move` |
+| Depends on | #540 thin type + Redispatcher |
+| Scope | Move `deliveryOutboxRecord` → model/repository; keep `DeliveryOutbox` + ports |
+| Non-goals | DispatchService extract; OpenAPI/frontend; redispatch relocation |
+| Primary files | `delivery_outbox.go`, `model/`, `repository/`, tests |
+| Risk note | Ports already stabilize auto-ack + redispatch; model move should be mechanical |
 
 ## 7. Bottom line
 
-- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** are pure seams; **`RunEventService`** and **`EdgeCallbackService`** are the first orchestration type extracts.
-- **Highest remaining coupling:** `AgentService` × (`dispatch` ↔ `outbox` via `dispatchPayload` + `retryDispatchToTarget`).
-- **Landed:** pure **`agentevent`** (#468) + **`RunEventService` + injected control** (#478) + **`EdgeCallbackService` + injected bus/seq/outbox** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** (DeliveryOutbox/Redispatcher feasibility).
-- **Pure residual:** **closed** — no more pure helpers to lift before orchestration work.
-- **#528 decision:** **docs-only deliverable**. Thin same-package `DeliveryOutbox` + opaque `Redispatcher` is **feasible as the next code PR** if redispatch stays on the dispatch/`AgentService` side; full model move and DispatchService remain later. **Not** DispatchService big-bang.
-- **Next code step:** thin `DeliveryOutbox` type extract + `Redispatcher` port (follow-up issue table above) — or, if capacity prefers lower risk still, model-move-only after that port exists.
+- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** are pure seams; **`RunEventService`**, **`EdgeCallbackService`**, and **`DeliveryOutbox`** are orchestration type extracts.
+- **Highest remaining coupling:** `AgentService` × redispatch (`dispatchPayload` + `retryDispatchToTarget` + cache/ws) — journal/outbox loop no longer owns that path directly.
+- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`**.
+- **Pure residual:** **closed**.
+- **#540 decision:** thin same-package extract **landed**. Redispatch stays on `AgentService` behind port; no model move; no DispatchService big-bang.
+- **Next code step:** outbox **model/repository move**, then **`DispatchService` last** among runtime (or IM).
 
 ## Key paths
 
