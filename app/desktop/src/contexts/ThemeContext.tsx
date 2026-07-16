@@ -1,35 +1,24 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import {
-  AGENTHUB_THEME_STORAGE_KEY,
+  THEME_PRESETS,
+  THEME_PRESET_META,
   applyAgentHubTheme,
+  applyAgentHubThemePreset,
   getStoredAgentHubThemeMode,
+  getStoredAgentHubThemePreset,
   getSystemAgentHubTheme,
   persistAgentHubThemeMode,
+  persistAgentHubThemePreset,
   type AgentHubTheme,
   type AgentHubThemeMode,
+  type ThemePreset,
 } from '@shared/theme';
 
 type Theme = AgentHubTheme;
 type ThemeMode = AgentHubThemeMode;
 
-export const THEME_PRESETS = [
-  'classic-blue',
-  'claude-warm',
-  'chatgpt-minimal',
-  'deepseek-tech',
-  'one-dark-pro',
-  'dracula',
-] as const;
-export type ThemePreset = (typeof THEME_PRESETS)[number];
-
-export const THEME_PRESET_META: Record<ThemePreset, { label: string; lightPreview: string[]; darkPreview: string[] }> = {
-  'classic-blue':    { label: 'Classic Blue',    lightPreview: ['#2563EB', '#F1F5F9', '#E2E8F0'], darkPreview: ['#1E1E2E', '#252536', '#3B82F6'] },
-  'claude-warm':     { label: 'Claude Warm',     lightPreview: ['#D97706', '#FEF3C7', '#FDE68A'], darkPreview: ['#2D2420', '#3D3028', '#F59E0B'] },
-  'chatgpt-minimal': { label: 'ChatGPT Minimal', lightPreview: ['#10A37F', '#F7F7F8', '#E5E5E5'], darkPreview: ['#212121', '#2D2D2D', '#10A37F'] },
-  'deepseek-tech':   { label: 'DeepSeek Tech',   lightPreview: ['#6366F1', '#F1F5F9', '#E2E8F0'], darkPreview: ['#0F172A', '#1E293B', '#818CF8'] },
-  'one-dark-pro':    { label: 'One Dark Pro',    lightPreview: ['#61AFEF', '#F0F0F0', '#E0E0E0'], darkPreview: ['#282C34', '#2C313C', '#61AFEF'] },
-  'dracula':         { label: 'Dracula',         lightPreview: ['#BD93F9', '#F0F0E8', '#E0E0D8'], darkPreview: ['#282A36', '#2C2E3A', '#BD93F9'] },
-};
+// Re-export shared preset SSOT so existing desktop imports keep working.
+export { THEME_PRESETS, THEME_PRESET_META, type ThemePreset };
 
 interface ThemeContextValue {
   /** The resolved theme currently applied (dark or light). */
@@ -48,45 +37,14 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const PRESET_STORAGE_KEY = 'agenthub-v4-theme-preset';
-
-function getStoredMode(): ThemeMode {
-  return getStoredAgentHubThemeMode();
-}
-
-function getStoredPreset(): ThemePreset | undefined {
-  try {
-    const stored = localStorage.getItem(PRESET_STORAGE_KEY);
-    if (stored && (THEME_PRESETS as readonly string[]).includes(stored)) return stored as ThemePreset;
-  } catch {
-    /* localStorage unavailable */
-  }
-  return undefined;
-}
-
-function getSystemTheme(): Theme {
-  return getSystemAgentHubTheme();
-}
-
-function applyTheme(theme: Theme) {
-  applyAgentHubTheme(theme);
-}
-
-function applyThemePreset(preset: ThemePreset | undefined) {
-  if (preset) {
-    document.documentElement.setAttribute('data-theme-preset', preset);
-  } else {
-    document.documentElement.removeAttribute('data-theme-preset');
-  }
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredMode);
-  const [systemTheme, setSystemTheme] = useState<Theme>(getSystemTheme);
-  const [themePreset, setThemePresetState] = useState<ThemePreset | undefined>(getStoredPreset);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredAgentHubThemeMode);
+  const [systemTheme, setSystemTheme] = useState<Theme>(getSystemAgentHubTheme);
+  const [themePreset, setThemePresetState] = useState<ThemePreset | undefined>(
+    getStoredAgentHubThemePreset,
+  );
   const resolvedTheme = themeMode === 'system' ? systemTheme : themeMode;
 
-  // Persist to localStorage and resolve
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
     persistAgentHubThemeMode(mode);
@@ -94,15 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setThemePreset = useCallback((preset: ThemePreset | undefined) => {
     setThemePresetState(preset);
-    try {
-      if (preset) {
-        localStorage.setItem(PRESET_STORAGE_KEY, preset);
-      } else {
-        localStorage.removeItem(PRESET_STORAGE_KEY);
-      }
-    } catch {
-      /* localStorage unavailable */
-    }
+    persistAgentHubThemePreset(preset);
   }, []);
 
   // Listen for system theme changes when in system mode
@@ -110,7 +60,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (themeMode !== 'system') return;
     const mql = window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
-      setSystemTheme(getSystemTheme());
+      setSystemTheme(getSystemAgentHubTheme());
     };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
@@ -118,18 +68,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Apply data-theme to <html>
   useEffect(() => {
-    applyTheme(resolvedTheme);
+    applyAgentHubTheme(resolvedTheme);
   }, [resolvedTheme]);
 
   // Apply data-theme-preset to <html>
   useEffect(() => {
-    applyThemePreset(themePreset);
+    applyAgentHubThemePreset(themePreset);
   }, [themePreset]);
 
   const toggleTheme = useCallback(() => {
     if (themeMode === 'system') {
       // Exiting system mode: pick the opposite of current system preference
-      const next = getSystemTheme() === 'dark' ? 'light' : 'dark';
+      const next = getSystemAgentHubTheme() === 'dark' ? 'light' : 'dark';
       setThemeMode(next);
     } else {
       const next: Theme = themeMode === 'dark' ? 'light' : 'dark';
@@ -138,7 +88,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [themeMode, setThemeMode]);
 
   return (
-    <ThemeContext.Provider value={{ theme: resolvedTheme, themeMode, setThemeMode, toggleTheme, themePreset, setThemePreset }}>
+    <ThemeContext.Provider
+      value={{
+        theme: resolvedTheme,
+        themeMode,
+        setThemeMode,
+        toggleTheme,
+        themePreset,
+        setThemePreset,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

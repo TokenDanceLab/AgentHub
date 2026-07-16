@@ -3,33 +3,33 @@
 
 .card {
   padding: 14px 16px;
-  border-radius: var(--r-lg, 12px);
+  border-radius: var(--r-lg);
   background: var(--surface);
   border: 1px solid var(--bdr);
-  transition: border-color var(--dur-normal, 140ms) var(--ease, cubic-bezier(0.2, 0, 0, 1));
+  transition: border-color var(--dur-normal) var(--ease));
 }
 
 /* Status border tints — subtle left accent */
 .statusPending {
-  border-color: var(--warning, #c0883a);
-  border-left: 3px solid var(--warning, #c0883a);
+  border-color: var(--warning);
+  border-left: 3px solid var(--warning);
 }
 
 .statusApproved {
-  border-color: var(--success, #409467);
-  border-left: 3px solid var(--success, #409467);
+  border-color: var(--success);
+  border-left: 3px solid var(--success);
   opacity: 0.88;
 }
 
 .statusDenied {
-  border-color: var(--danger, #d15252);
-  border-left: 3px solid var(--danger, #d15252);
+  border-color: var(--danger);
+  border-left: 3px solid var(--danger);
   opacity: 0.78;
 }
 
 .statusTimeout {
-  border-color: var(--text-3, #9595ac);
-  border-left: 3px solid var(--text-3, #9595ac);
+  border-color: var(--text-3);
+  border-left: 3px solid var(--text-3);
   opacity: 0.65;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .icon {
-  color: var(--primary, #0071BC);
+  color: var(--primary);
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -52,7 +52,7 @@
 .title {
   font-weight: 500;
   font-size: 0.875rem;
-  color: var(--text-1, #1a1a2e);
+  color: var(--text-1);
 }
 
 .riskBadge {
@@ -60,7 +60,7 @@
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: var(--r-full, 9999px);
+  border-radius: var(--r-full);
   font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   white-space: nowrap;
   margin-left: auto;
@@ -74,24 +74,24 @@
 }
 
 .riskLow {
-  background: var(--success-bg, rgba(64,148,103,0.08));
-  color: var(--success, #409467);
+  background: var(--success-bg));
+  color: var(--success);
 }
 
 .riskMedium {
-  background: var(--warning-bg, rgba(192,136,58,0.08));
-  color: var(--warning, #c0883a);
+  background: var(--warning-bg));
+  color: var(--warning);
 }
 
 .riskHigh {
-  background: var(--danger-bg, rgba(209,82,82,0.06));
-  color: var(--danger, #d15252);
+  background: var(--danger-bg));
+  color: var(--danger);
 }
 
 .riskCritical {
-  background: var(--danger-bg, rgba(209,82,82,0.06));
-  color: var(--danger, #d15252);
-  border: 1px solid var(--danger, #d15252);
+  background: var(--danger-bg));
+  color: var(--danger);
+  border: 1px solid var(--danger);
 }
 
 .statusBadge {
@@ -99,7 +99,7 @@
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: var(--r-full, 9999px);
+  border-radius: var(--r-full);
   font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   white-space: nowrap;
 }
@@ -112,28 +112,28 @@
 }
 
 .statusBadge.statusPending {
-  background: var(--warning-bg, rgba(192,136,58,0.08));
-  color: var(--warning, #c0883a);
+  background: var(--warning-bg));
+  color: var(--warning);
 }
 
 .statusBadge.statusApproved {
-  background: var(--success-bg, rgba(64,148,103,0.08));
-  color: var(--success, #409467);
+  background: var(--success-bg));
+  color: var(--success);
 }
 
 .statusBadge.statusDenied {
-  background: var(--danger-bg, rgba(209,82,82,0.06));
-  color: var(--danger, #d15252);
+  background: var(--danger-bg));
+  color: var(--danger);
 }
 
 .statusBadge.statusTimeout {
-  background: var(--surface-high, #efedf5);
-  color: var(--text-3, #9595ac);
+  background: var(--surface-high);
+  color: var(--text-3);
 }
 
 /* Info rows — agent name + tool name */
 .info {
-  color: var(--text-2, #585870);
+  color: var(--text-2);
   font: 400 0.8125rem/1.5 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   margin-bottom: 12px;
   display: flex;
@@ -153,12 +153,12 @@
   gap: 4px;
   min-width: 72px;
   font-size: 0.75rem;
-  color: var(--text-3, #9595ac);
+  color: var(--text-3);
 }
 
 .infoValue {
   font-size: 0.8125rem;
-  color: var(--text-1, #1a1a2e);
+  color: var(--text-1);
   font-weight: 500;
 }
 
@@ -173,11 +173,11 @@
 .reasonText {
   margin: 0;
   padding: 8px 10px;
-  background: var(--surface-low, #faf9fc);
-  border-radius: var(--r-sm, 8px);
-  border: 1px solid var(--bdr, rgba(0,0,0,0.055));
+  background: var(--surface-low);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bdr));
   font-size: 0.75rem;
-  color: var(--text-2, #585870);
+  color: var(--text-2);
   line-height: 1.55;
   max-height: 120px;
   overflow-y: auto;
@@ -190,15 +190,15 @@
   justify-content: space-between;
   padding: 6px 0;
   font-size: 0.75rem;
-  color: var(--text-3, #9595ac);
+  color: var(--text-3);
 }
 
 .decisionLabel {
-  color: var(--text-2, #585870);
+  color: var(--text-2);
 }
 
 .decisionTime {
-  color: var(--text-3, #9595ac);
+  color: var(--text-3);
 }
 
 /* Action buttons — matching .btn.btn-p and .btn.btn-d from demo */
@@ -215,22 +215,22 @@
   gap: 6px;
   height: 36px;
   padding: 0 18px;
-  border-radius: var(--r-md, 12px);
+  border-radius: var(--r-md);
   font: 500 0.875rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   border: none;
   cursor: pointer;
-  transition: background var(--dur-normal, 140ms), color var(--dur-normal, 140ms), transform var(--dur-normal, 140ms), box-shadow var(--dur-normal, 140ms);
+  transition: background var(--dur-normal), color var(--dur-normal), transform var(--dur-normal), box-shadow var(--dur-normal);
   white-space: nowrap;
 }
 
 .approveBtn {
-  background: var(--primary, #0071BC);
-  color: var(--text-inv, #ffffff);
+  background: var(--primary);
+  color: var(--text-inv);
 }
 
 .approveBtn:hover {
-  background: var(--primary-hover, #005F9F);
-  box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.05));
+  background: var(--primary-hover);
+  box-shadow: var(--e-1));
 }
 
 .approveBtn:active {
@@ -245,8 +245,8 @@
 }
 
 .denyBtn {
-  background: var(--danger, #d15252);
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--text-inv);
 }
 
 .denyBtn:hover {
@@ -270,16 +270,16 @@
   justify-content: space-between;
   margin-top: 10px;
   font-size: 0.6875rem;
-  color: var(--text-3, #9595ac);
+  color: var(--text-3);
 }
 
 .footerTime {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--text-3, #9595ac);
+  color: var(--text-3);
 }
 
 .pendingIcon {
-  color: var(--warning, #c0883a);
+  color: var(--warning);
 }
