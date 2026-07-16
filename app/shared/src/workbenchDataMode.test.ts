@@ -81,7 +81,7 @@ describe('workbenchDataMode', () => {
     const catalogState = getWorkbenchCatalogState(
       state({
         connection: { status: 'error', error: 'network down' },
-        runners: [{ id: 'runner-1', name: 'Local Runner', status: 'online' }],
+        projects: [{ id: 'project-1', name: 'AgentHub', createdAt: '2026-05-24T10:00:00.000Z' }],
       }),
     );
 
@@ -91,6 +91,17 @@ describe('workbenchDataMode', () => {
       tone: 'purple',
       hasLiveCatalog: true,
     });
+  });
+
+  it('does not treat Edge runner diagnostics alone as product live-catalog evidence', () => {
+    expect(
+      getWorkbenchDataMode(
+        state({
+          connection: { status: 'connected' },
+          runners: [{ id: 'runner-1', name: 'Local Runner', status: 'online' }],
+        }),
+      ),
+    ).toBe('unavailable');
   });
 
   it.each([

@@ -2,10 +2,21 @@ import type { WorkbenchAgent } from '@shared/platform';
 import type { AgentInfo } from '@shared/types';
 import type { ModelCatalogResponse } from '@/api/edgeClient';
 
+/**
+ * Product runtime inventory for Local Edge.
+ *
+ * Product SSOT is Runtime inventory (agents/models/adapters) + Execution Target health.
+ * Edge `/v1/runners` may still appear as optional diagnostic metadata only — never as the
+ * healthy-signal source for Desktop dispatch readiness.
+ */
 export interface EdgeRuntimeInventorySnapshot {
   edgeOnline: boolean;
   healthStatus?: string;
-  runners: Array<{
+  /**
+   * Optional Edge diagnostics residual from health.checks.runners / `/v1/runners`.
+   * Not used for product healthy status.
+   */
+  diagnosticRunners?: Array<{
     id: string;
     name?: string;
     status: string;
@@ -21,8 +32,6 @@ export interface DesktopExecutionTarget {
   name: 'Local Edge';
   status: 'healthy' | 'degraded' | 'offline' | 'unknown';
   route: 'local-edge-api';
-  runnerCount: number;
-  onlineRunnerCount: number;
   agentCount: number;
   modelCount: number;
   capabilityIds: string[];
@@ -141,22 +150,23 @@ export function mapEdgeAgentsToWorkbenchAgents(
 export function mapLocalEdgeExecutionTarget(
   snapshot: EdgeRuntimeInventorySnapshot,
 ): DesktopExecutionTarget {
-  const onlineRunnerCount = snapshot.runners.filter((runner) => runner.status === 'online').length;
+  const agentCount = snapshot.agents.length;
+  const modelCount = snapshot.modelCatalog?.items.length ?? 0;
   return {
     id: 'local-edge',
     type: 'local_edge',
     name: 'Local Edge',
-    status: normalizeLocalEdgeStatus(snapshot.edgeOnline, snapshot.healthStatus, onlineRunnerCount),
+    status: normalizeLocalEdgeStatus(
+      snapshot.edgeOnline,
+      snapshot.healthStatus,
+      agentCount,
+      modelCount,
+    ),
     route: 'local-edge-api',
-    runnerCount: snapshot.runners.length,
-    onlineRunnerCount,
-    agentCount: snapshot.agents.length,
-    modelCount: snapshot.modelCatalog?.items.length ?? 0,
+    agentCount,
+    modelCount,
     capabilityIds: Array.from(
-      new Set([
-        ...snapshot.runners.flatMap((runner) => runner.capabilities ?? []),
-        ...snapshot.agents.flatMap((agent) => capabilityLabels(agent.capabilities)),
-      ]),
+      new Set(snapshot.agents.flatMap((agent) => capabilityLabels(agent.capabilities))),
     ).sort(),
   };
 }
@@ -265,15 +275,24 @@ function capabilityLabels(capabilities: AgentInfo['capabilities']): string[] {
   return labels;
 }
 
+/**
+ * Product local-edge status from connectivity + Edge health + runtime inventory.
+ * Never infers healthy solely from Edge runner diagnostics.
+ */
 function normalizeLocalEdgeStatus(
   edgeOnline: boolean,
   healthStatus: string | undefined,
-  onlineRunnerCount: number,
+  agentCount: number,
+  modelCount: number,
 ): DesktopExecutionTarget['status'] {
   if (!edgeOnline) return 'offline';
-  if (healthStatus === 'healthy' || healthStatus === 'ok') return 'healthy';
-  if (healthStatus === 'degraded') return 'degraded';
-  if (onlineRunnerCount > 0) return 'healthy';
+  const normalized = (healthStatus ?? '').trim().toLowerCase();
+  if (normalized === 'healthy' || normalized === 'ok') return 'healthy';
+  if (normalized === 'degraded') return 'degraded';
+  if (normalized === 'offline') return 'offline';
+  // Online without explicit healthy status: runtime inventory is evidence of
+  // partial readiness, not a healthy product signal.
+  if (agentCount > 0 || modelCount > 0) return 'degraded';
   return 'unknown';
 }
 

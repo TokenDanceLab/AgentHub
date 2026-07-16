@@ -28,15 +28,16 @@ function DesktopHubTaskBridgeActive() {
   const hubTargets = useHubExecutionTargets({ enabled: deviceReady });
   const syncLocalEdgeTarget = useSyncLocalEdgeExecutionTarget();
   const lastAutoSyncKey = useRef<string | null>(null);
+  // Product runtime inventory: agents + models + Edge health.
+  // health.checks.runners stays Edge diagnostics and is intentionally not mapped.
   const localEdgeTarget = useMemo(
     () => mapLocalEdgeExecutionTarget({
       edgeOnline,
       healthStatus: edgeOnline ? (health?.status ?? 'unknown') : 'offline',
-      runners: health?.checks?.runners?.items ?? [],
       agents: agentData?.items ?? [],
       modelCatalog,
     }),
-    [agentData?.items, edgeOnline, health?.checks?.runners?.items, health?.status, modelCatalog],
+    [agentData?.items, edgeOnline, health?.status, modelCatalog],
   );
   const registeredLocalEdgeTarget = useMemo(
     () => findRegisteredLocalEdgeTarget(hubTargets.data?.items ?? [], deviceRegistration.deviceId),
