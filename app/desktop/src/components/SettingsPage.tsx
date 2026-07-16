@@ -1,3 +1,6 @@
+// ORPHAN desktop SettingsPage — NON-PRODUCT (cleanup #439)
+// Product Settings SSOT: app/shared/src/workbench/pages/SettingsPage.tsx via WorkbenchRoutes.
+// Do not add features here; see docs/analysis/orphan-ui-decision.md.
 import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
