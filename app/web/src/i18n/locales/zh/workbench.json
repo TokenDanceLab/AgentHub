@@ -26,11 +26,11 @@
     "connectEdge": "连接 Edge 以加载项目",
     "threads": "线程",
     "noThreads": "Edge 未返回任何线程。",
-    "runners": "Runner 状态",
-    "noRunners": "没有已注册的 Runner。"
+    "runners": "Runtime 清单",
+    "noRunners": "暂无 Runtime 清单。"
   },
   "runner": {
-    "adapterReady": "适配器就绪"
+    "adapterReady": "Runtime 适配器就绪"
   },
   "header": {
     "thread": "线程",
@@ -68,7 +68,7 @@
     "title": "AgentRun 时间线",
     "queuedDone": "线程已接受 Owner 请求。",
     "queuedWaiting": "等待 Run。",
-    "startedWaiting": "Runner 尚未启动。",
+    "startedWaiting": "Runtime 尚未启动。",
     "logsAvailable": "日志可在工作区面板中查看。",
     "noLogs": "暂无日志。",
     "artifactsAvailable": "产物可供审查。",

@@ -99,10 +99,10 @@ export function getWorkbenchSectionSource({
 }
 
 function hasWorkbenchSnapshotData(state: WorkbenchState): boolean {
+  // Product live-catalog evidence excludes Edge runners (diagnostics residual only).
   return (
     state.projects.length > 0 ||
     state.threads.length > 0 ||
-    state.runners.length > 0 ||
     state.runs.length > 0 ||
     state.artifacts.length > 0 ||
     state.approvals.length > 0 ||

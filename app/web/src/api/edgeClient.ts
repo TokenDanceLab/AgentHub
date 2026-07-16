@@ -1,5 +1,7 @@
 import type { AgentInfo, HealthResponse, ListResponse } from '@shared/types';
 
+// Web never talks to Local Edge. Product health is Hub Execution Target inventory.
+// Keep this stub free of runner-shaped product inventory.
 export const webHubOnlyHealth: HealthResponse = {
   status: 'hub-only',
   version: 'web-preview',
@@ -8,11 +10,8 @@ export const webHubOnlyHealth: HealthResponse = {
     executor: {
       status: 'stubbed',
     },
-    runners: {
-      status: 'stubbed',
-      total: 0,
-      available: 0,
-      items: [],
+    adapters: {
+      status: 'hub-execution-target',
     },
   },
 };
