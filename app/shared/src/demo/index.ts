@@ -31,6 +31,16 @@ export type {
 } from './dataMode';
 
 export {
+  WEB_DEMO_MUTATION_PATH_INVENTORY,
+  allowsWorkbenchDemoRuntimeMutation,
+  demoRuntimeMutationDeniedReason,
+} from './demoMutationGate';
+export type {
+  DemoRuntimeMutationGateInput,
+  WebDemoMutationPathId,
+} from './demoMutationGate';
+
+export {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   createWorkbenchDemoStore,
   createWorkbenchDemoRuntimeStore,
