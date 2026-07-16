@@ -1902,8 +1902,9 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
     const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
-    expect(within(agentsPage).getByRole('alert')).toHaveTextContent('Hub AgentProfiles unavailable');
-    expect(within(agentsPage).getByRole('region', { name: '暂无 Agent Profile' })).toBeInTheDocument();
+    const agentsAlert = within(agentsPage).getByRole('alert', { name: 'Agent 加载失败' });
+    expect(agentsAlert).toHaveTextContent('Hub AgentProfiles unavailable');
+    expect(within(agentsPage).queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
 
