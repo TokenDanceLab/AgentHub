@@ -35,6 +35,7 @@ type CallbackClient struct {
 	hubURL    string
 	authToken string
 	client    *http.Client
+	journal   *DeliveryJournal
 }
 
 // TaskResult carries the final result of a completed task.
@@ -64,7 +65,24 @@ func NewCallbackClient(hubURL, authToken string) *CallbackClient {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		journal: NewDeliveryJournal(1000),
 	}
+}
+
+// WithJournal replaces the delivery journal (tests / durable impl later).
+func (c *CallbackClient) WithJournal(j *DeliveryJournal) *CallbackClient {
+	if c != nil {
+		c.journal = j
+	}
+	return c
+}
+
+// Journal exposes the Edge→Hub delivery journal for reconciliation.
+func (c *CallbackClient) Journal() *DeliveryJournal {
+	if c == nil {
+		return nil
+	}
+	return c.journal
 }
 
 // TaskAck sends an acknowledgement that the Edge server has received the task
@@ -126,9 +144,14 @@ func (c *CallbackClient) TaskFail(ctx context.Context, taskID string, runID stri
 // It retries on transient errors up to 3 times with exponential backoff.
 func (c *CallbackClient) callback(ctx context.Context, taskID string, action string, body map[string]string) error {
 	url := fmt.Sprintf("%s/edge/agent-tasks/%s/%s", c.hubURL, taskID, action)
+	runID := ""
+	if body != nil {
+		runID = body["run_id"]
+	}
 
 	payload, err := json.Marshal(body)
 	if err != nil {
+		c.recordJournal(taskID, runID, action, false, err.Error(), 0)
 		return fmt.Errorf("hub callback marshal: %w", err)
 	}
 
@@ -170,24 +193,42 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 				Message string `json:"message"`
 			}
 			if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
+				c.recordJournal(taskID, runID, action, true, "", attempt+1)
 				return nil
 			}
 			// Non-OK code from Hub is an application-level failure; do not retry
 			if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
-				return fmt.Errorf("hub callback rejected: %s", summarizeHubResponse(resp.StatusCode, respBody, "app_rejected"))
+				errMsg := summarizeHubResponse(resp.StatusCode, respBody, "app_rejected")
+				c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
+				return fmt.Errorf("hub callback rejected: %s", errMsg)
 			}
 			// 2xx without JSON body — accept as success
+			c.recordJournal(taskID, runID, action, true, "", attempt+1)
 			return nil
 		}
 
 		// 4xx errors are not retryable (bad request, auth failure, etc.)
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			return fmt.Errorf("hub callback client error: %s", summarizeHubResponse(resp.StatusCode, respBody, "client_error"))
+			errMsg := summarizeHubResponse(resp.StatusCode, respBody, "client_error")
+			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
+			return fmt.Errorf("hub callback client error: %s", errMsg)
 		}
 
 		// 5xx errors are retryable
 		lastErr = fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, "server_error"))
 	}
 
+	errMsg := ""
+	if lastErr != nil {
+		errMsg = lastErr.Error()
+	}
+	c.recordJournal(taskID, runID, action, false, errMsg, 3)
 	return fmt.Errorf("hub callback failed after 3 attempts: %w", lastErr)
+}
+
+func (c *CallbackClient) recordJournal(taskID, runID, action string, ok bool, errMsg string, attempts int) {
+	if c == nil || c.journal == nil {
+		return
+	}
+	c.journal.Record(taskID, runID, action, ok, errMsg, attempts)
 }
