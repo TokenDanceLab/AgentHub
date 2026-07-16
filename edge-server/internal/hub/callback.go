@@ -86,6 +86,21 @@ func (c *CallbackClient) Journal() *DeliveryJournal {
 	return c.journal
 }
 
+// DurableSnapshot returns journal entries with seq > afterSeq, preferring SQLite
+// when enabled so reconciliation survives process restarts.
+func (c *CallbackClient) DurableSnapshot(afterSeq uint64) ([]DeliveryJournalEntry, error) {
+	if c == nil {
+		return nil, nil
+	}
+	if c.sqliteJournal != nil {
+		return c.sqliteJournal.Snapshot(afterSeq)
+	}
+	if c.journal == nil {
+		return nil, nil
+	}
+	return c.journal.Snapshot(afterSeq), nil
+}
+
 // EnableSQLiteJournal swaps the in-memory journal for a durable SQLite journal.
 // On failure, keeps the existing in-memory journal and returns the error.
 func (c *CallbackClient) EnableSQLiteJournal(path string) error {
