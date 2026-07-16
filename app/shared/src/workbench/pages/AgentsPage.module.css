@@ -329,31 +329,31 @@
   gap: var(--sp-xxs);
 }
 
-.agent-inline-state {
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-md);
-  background: var(--surface-low);
-  color: var(--text-2);
-  min-height: 36px;
-  margin-bottom: var(--sp-sm);
-  padding: var(--sp-sm) var(--sp-10);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-10);
-  font: 500 0.75rem/1.35 var(--font-sans);
+.statusStack {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 var(--sp-sm);
 }
 
-.agent-inline-state.danger {
+.statusNotice {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-high, var(--surface));
+  color: var(--text-2);
+}
+
+.statusNoticeDanger {
   margin: var(--sp-10) 0 0;
   border-color: var(--danger);
   background: var(--danger-bg);
   color: var(--danger);
 }
 
-.agent-inline-state button {
-  height: 28px;
-  padding: 0 var(--sp-10);
+.statusAction {
+  min-height: 28px;
+  padding: 0 10px;
   border: 1px solid var(--bdr-strong);
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -362,8 +362,12 @@
   cursor: pointer;
 }
 
-.agent-inline-state button:hover {
+.statusAction:hover {
   background: var(--surface-high);
+}
+
+.recoveryPanel {
+  margin: 0;
 }
 
 /* Compact EmptyState overrides for in-list / market section density */

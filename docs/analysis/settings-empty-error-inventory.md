@@ -1,7 +1,7 @@
 # Settings Empty / Error / Loading Inventory
 
 > last-updated: 2026-07-17
-> issue: #470 / residual #479 / #492-#504 / #516 / #517
+> issue: #470 / residual #479 / #492-#504 / #516 / #517 / #529
 > scope: shared workbench Settings SSOT + residual desktop/web shell
 
 ## 0. Summary
@@ -82,7 +82,7 @@ but no longer remain silent in the Settings product surface.
 
 | Path | Pattern |
 |---|---|
-| `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors still ad-hoc `agent-inline-state` |
+| `pages/AgentsPage.tsx` | installed + skill/MCP market empties use shared `EmptyState` (#492); load/action errors use `StatusNotice` / `RecoveryPanel` (#529) |
 | `pages/TasksPage.tsx` | primary empty uses shared `EmptyState` (#503); public `emptyStateLabel` maps to description |
 | `pages/ContactsPage.tsx` | primary empty uses shared `EmptyState` (#504); residual search loading text |
 | `pages/ProjectsPage.tsx` | empty uses shared `EmptyState`; loading/error use `StatusNotice` (#516) |
@@ -132,15 +132,16 @@ but no longer remain silent in the Settings product surface.
 - Optionally surface adapter-tier fallback detail (Edge/Hub/localStorage) in recovery meta.
 - Optionally replace loading StatusNotice with Skeleton rows for denser form chrome.
 
-## 9.1 Residual after Agents/Tasks/Contacts/Projects EmptyState (#492 / #503 / #504 / #516)
-## 9.1 Residual after Agents/Tasks/Contacts/Docs EmptyState (#492 / #503 / #504 / #517)
+## 9.1 Residual after Agents/Tasks/Contacts/Projects/Docs EmptyState + Agents load/action (#492 / #503 / #504 / #516 / #517 / #529)
 
 | Surface | After | Next |
 |---|---|---|
-| Agents installed/market empty | shared `EmptyState` (#492) | load/action errors still ad-hoc |
+| Agents installed/market empty | shared `EmptyState` (#492) | market loading captions residual |
+| Agents load/action errors | hard empty+error → `RecoveryPanel`; soft list+error / mutation → `StatusNotice` (#529) | desktop `error`/`actionError` conflation + `onAgentsRetry` no-op refetch residual; no action-error dismiss callback |
 | TasksPage primary empty | shared `EmptyState` (#503) | — |
 | ContactsPage primary empty | shared `EmptyState` (#504) | residual search loading text |
 | ProjectsPage primary empty | shared `EmptyState` + loading/error `StatusNotice` (#516) | form-inline editor error residual; no `RecoveryPanel` retry plumbing yet; nested runs/artifacts/feed empty optional |
+| DocsPage primary empty | shared `EmptyState` (#517) | loading/error status not plumbed; mock fallback can mask real empty/error; tab/search filter empty residual |
 
 ## 9.2 ProjectsPage inventory + fix (#516)
 | Path | Before | After (#516) |
@@ -151,4 +152,14 @@ but no longer remain silent in the Settings product surface.
 | Editor mutation error | local `editorError` box | residual form-inline (acceptable; lower priority) |
 | Nested empties (runs/artifacts/feed) | section headers only | residual / out of scope |
 Blocked without product plumbing: full `RecoveryPanel` for projects load needs `onProjectsRetry` through WorkbenchRoutes/hub load.
-| DocsPage primary empty | shared `EmptyState` (#517) | loading/error status not plumbed; mock fallback can mask real empty/error; tab/search filter empty residual |
+
+## 9.3 AgentsPage load/action inventory + fix (#529)
+| Path | Before | After (#529) |
+|---|---|---|
+| Installed empty | shared `EmptyState` (#492) | unchanged; suppressed while `agentsError` is active |
+| Hard load error (`agentsError` + empty list) | ad-hoc `agent-inline-state` + raw retry | shared `RecoveryPanel` (`error404` / `refresh`, busy on `agentsLoading`) |
+| Soft load error (`agentsError` + partial list) | same ad-hoc banner | compact `StatusNotice role="alert"` + optional retry action |
+| Mutation/action error (`agentActionError`) | ad-hoc danger `agent-inline-state` | `StatusNotice role="alert"` danger styling; display-only |
+| Loading residual | section caption `"同步中"` | kept; market loading captions residual |
+| CSS residual | `.agent-inline-state*` | removed; replaced by `.statusStack` / `.statusNotice*` / `.statusAction` / `.recoveryPanel` |
+Known residual: Desktop host still conflates `error`/`actionError` and `onAgentsRetry` may only clear local state without refetch.
