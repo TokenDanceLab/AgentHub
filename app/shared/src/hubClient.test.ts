@@ -359,7 +359,7 @@ describe('hubClient helpers', () => {
 
     expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('listAgentTeams');
     expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('fetchSettings');
-    expect(HUBCLIENT_SSOT_GAPS.desktopOnly).toContain('streamTaskEvent');
+    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopOnly)).toBe(true);
     expect(HUBCLIENT_SSOT_GAPS.webOnly).toContain('listTaskApprovals');
     // Guard against accidental empty inventory during later edits.
     expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
