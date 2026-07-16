@@ -142,6 +142,10 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token validation failed: %v", err)))
 			return
 		}
+		if strings.TrimSpace(capClaims.Purpose) != "run-start" {
+			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token purpose %q must be run-start", capClaims.Purpose)))
+			return
+		}
 		// Cross-check capability claims against the request.
 		if capClaims.ProjectID != req.ProjectID {
 			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token project_id %q does not match request project %q", capClaims.ProjectID, req.ProjectID)))
