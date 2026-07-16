@@ -10,7 +10,7 @@ Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维�
 
 | Priority | Source |
 |---|---|
-| 1 Live ops | server `projects/agenthub/STATE.md` — **hk3 LIVE** |
+| 1 Live ops | server `projects/agenthub` external ops SSOT — **hk3 LIVE** |
 | 2 In-repo production shape | `../../deployments/production/docker-compose.yml` |
 | 3 This directory | Dockerfile + **historical** compose/nginx templates |
 

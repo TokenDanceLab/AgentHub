@@ -22,8 +22,6 @@
 3. Claude TaskList 可以丢弃、重建，不影响程序进度。
 4. 看进度：`gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline` 或 Project board。
 
-
-
 现代软件工程 + SDD 收口，**不再用 ad-hoc multi-workflow 当 backlog**：
 
 1. **SPEC in-repo**：`docs/analysis/*` + `docs/plan/*` + 本文件
@@ -119,7 +117,7 @@ gh project item-list 6 --owner @me --format json --limit 50
 **Active Phase**: COMPLETE (baseline + hardening + residual closeout)
 **Active Task**: none
 **Blockers**: None
-**Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）
+**Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
 **Baseline commits**:
 - `347642b6` docs(cleanup): baseline analysis, wiki, LIVE narrative
 - Phase 6: `8fd3625f` #443 · `e41ed1ed` #444 · `342cc711` #445 · `83f5e1ea` #441/#442
