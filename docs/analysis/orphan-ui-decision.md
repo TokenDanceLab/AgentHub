@@ -7,16 +7,17 @@
 | Surface | Status | Action |
 |---|---|---|
 | `app/shared/.../SettingsPage.tsx` | **Product SSOT** (WorkbenchRoutes) | Keep |
-| `app/desktop/src/components/SettingsPage.tsx` | Orphan / residual (type import only via menus) | Quarantine; do not feature-expand; extract `SectionId` then delete in follow-up |
-| `app/web/src/components/SettingsPage.tsx` | Orphan giant | Quarantine; prefer delete after import-graph CI check |
-| `app/*/views/TeamRunConsole.tsx` | No product App/workbench mount | Quarantine; productize only if TeamRun owner reopens SPEC |
+| `app/desktop/src/components/SettingsPage.tsx` | **Deleted** | Physically removed with orphan settings tree (kept only `sectionIds.ts` for menu typing) |
+| `app/web/src/components/SettingsPage.tsx` | **Deleted** | Physically removed |
+| `app/*/views/TeamRunConsole.tsx` | **Deleted** | Physically removed (+ web tests/css; desktop TeamRunDock removed as unused mount) |
 
 ## Non-goals
 
 - No merge of dead UI into shared workbench in this slice
 - No UX redesign
 
-## Follow-ups
+## Landed follow-ups
 
-- Extract desktop `SectionId` type away from orphan SettingsPage
-- Add import-graph guard preventing new imports of orphan paths
+- Extract desktop `SectionId` type away from orphan SettingsPage (`sectionIds.ts`)
+- Physical delete of orphan Settings/TeamRun UI surfaces
+- Product Settings continues via shared workbench `pages/SettingsPage.tsx`
