@@ -19,11 +19,8 @@ import type {
   ContactMember,
   DocRow,
   DocsPane,
-  ProjectArtifact,
   ProjectDraft,
-  ProjectFilter,
   ProjectInfo,
-  ProjectTab,
   SettingsPaneId,
   ServiceDesk,
 } from './pages';
@@ -46,14 +43,12 @@ import {
   WORKBENCH_MOCK_DOC_ROWS,
   WORKBENCH_MOCK_EXTERNAL_CONTACTS,
   WORKBENCH_MOCK_PENDING_CONTACTS,
-  WORKBENCH_MOCK_PROJECTS,
   WORKBENCH_MOCK_SERVICE_DESKS,
   WORKBENCH_MOCK_SETTINGS_DEFAULTS,
 } from './mockData';
 import type { SettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
-import { workspaceProjectToProjectInfo } from './hubDataMapping';
 import { ContactsPage } from './pages/ContactsPage';
 import { DocsPage } from './pages/DocsPage';
 import { AgentsPage } from './pages/AgentsPage';
@@ -61,6 +56,10 @@ import { TasksPage } from './pages/TasksPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
+import {
+  useWorkbenchProjectsRoute,
+  type WorkbenchProjectsStatus,
+} from './useWorkbenchProjectsRoute';
 import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -163,12 +162,7 @@ export interface WorkbenchAgentProfilesStatus {
   deletingAgentId?: string | undefined;
 }
 
-export interface WorkbenchProjectsStatus {
-  loading?: boolean | undefined;
-  error?: string | undefined;
-  actionError?: string | undefined;
-  saving?: boolean | undefined;
-}
+export type { WorkbenchProjectsStatus } from './useWorkbenchProjectsRoute';
 
 export interface WorkbenchContactsData {
   members: ContactMember[];
@@ -221,72 +215,6 @@ function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
       '- 对 Markdown、Diff、表格和链接产物使用统一只读预览。',
     ].join('\n'),
   };
-}
-
-function createProjectArtifactPreview(projectId: string, artifact: ProjectArtifact): WorkbenchDocumentPreview {
-  const name = artifact.name ?? 'artifact.txt';
-  const type = fileTypeFromPreviewName(name);
-  return {
-    id: `project:${projectId}:${artifact.id}`,
-    name,
-    type,
-    owner: 'AgentHub',
-    sourceLabel: `项目产物 / ${projectId}`,
-    content: projectArtifactContent(projectId, name, type),
-    diffContent: projectArtifactDiff(name, type),
-  };
-}
-
-function projectArtifactContent(projectId: string, name: string, type: string): string {
-  if (type === 'xlsx') {
-    return [
-      `# ${name}`,
-      '',
-      '| 维度 | 状态 | 备注 |',
-      '|---|---|---|',
-      '| 项目 | 已索引 | ' + projectId + ' |',
-      '| 类型 | 表格产物 | 轻量预览先以 Markdown 表格呈现 |',
-      '| 后续 | 待接入 | Sheet viewer / 导出 / provider sync |',
-    ].join('\n');
-  }
-
-  if (type === 'md') {
-    return [
-      `# ${name}`,
-      '',
-      '## 项目产物',
-      `- 项目：${projectId}`,
-      '- 来源：Agent run / 项目归档',
-      '- 浏览：当前使用 AgentHub 轻量预览，后续可接 Hub artifact store 正文。',
-      '',
-      '## 内容摘要',
-      '这个文件已进入项目产物索引。项目页负责展示上下文，预览区负责阅读正文、源码和 Diff。',
-    ].join('\n');
-  }
-
-  return [
-    `// ${name}`,
-    `// project: ${projectId}`,
-    '// readonly artifact preview',
-    '',
-    'export const artifact = {',
-    `  name: ${JSON.stringify(name)},`,
-    `  projectId: ${JSON.stringify(projectId)},`,
-    '  source: "AgentHub project artifact index",',
-    '};',
-  ].join('\n');
-}
-
-function projectArtifactDiff(name: string, type: string): string | undefined {
-  if (type === 'xlsx') return undefined;
-  return [
-    `diff --git a/${name} b/${name}`,
-    `--- a/${name}`,
-    `+++ b/${name}`,
-    '@@ project artifact preview @@',
-    `+${name}`,
-    '+已接入 AgentHub 轻量项目产物预览。',
-  ].join('\n');
 }
 
 function persistedComposerSubmitBehaviorLabel(): string {
@@ -359,86 +287,18 @@ export function WorkbenchRoutes({
     userDisplayName,
   });
 
-  // ── Internal Hub project state (used when hubClient is provided and parent doesn't manage projects) ──
-  const [hubProjects, setHubProjects] = useState<ProjectInfo[]>([]);
-  const [hubProjectsStatus, setHubProjectsStatus] = useState<WorkbenchProjectsStatus>({});
-  const hubProjectsEnabled = Boolean(hubClient) && !projects;
+  const projectsRoute = useWorkbenchProjectsRoute({
+    projects,
+    activeProjectId,
+    projectsStatus,
+    onActiveProjectChange,
+    onProjectCreate,
+    onProjectUpdate,
+    hubClient,
+    realDataMode,
+  });
 
-  const loadHubProjects = useCallback(async () => {
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, loading: true, error: undefined }));
-    try {
-      const response = await hubClient.listWorkspaceProjects({ pageSize: 50 });
-      setHubProjects((response.items ?? []).map(workspaceProjectToProjectInfo));
-      setHubProjectsStatus((prev) => ({ ...prev, loading: false }));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load projects';
-      setHubProjectsStatus((prev) => ({ ...prev, loading: false, error: message }));
-    }
-  }, [hubClient]);
-
-  useEffect(() => {
-    if (!hubProjectsEnabled) return;
-    loadHubProjects();
-  }, [hubProjectsEnabled, loadHubProjects]);
-
-  const handleProjectCreate = useCallback(async (draft: ProjectDraft): Promise<ProjectInfo | void> => {
-    if (onProjectCreate) return onProjectCreate(draft);
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
-    try {
-      const created = await hubClient.createWorkspaceProject({
-        name: draft.name.trim() || 'Untitled Project',
-        description: draft.description.trim(),
-      });
-      const info = workspaceProjectToProjectInfo(created);
-      await loadHubProjects();
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
-      return info;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create project';
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
-      throw err;
-    }
-  }, [onProjectCreate, hubClient, loadHubProjects]);
-
-  const handleProjectUpdate = useCallback(async (
-    projectId: string,
-    draft: ProjectDraft,
-  ): Promise<ProjectInfo | void> => {
-    if (onProjectUpdate) return onProjectUpdate(projectId, draft);
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
-    try {
-      const updated = await hubClient.updateWorkspaceProject(projectId, {
-        ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
-        ...(draft.description.trim() ? { description: draft.description.trim() } : {}),
-      });
-      const info = workspaceProjectToProjectInfo(updated);
-      await loadHubProjects();
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
-      return info;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update project';
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
-      throw err;
-    }
-  }, [onProjectUpdate, hubClient, loadHubProjects]);
-
-  const sourceProjects = projects
-    ?? (hubProjectsEnabled ? hubProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
-  const effectiveProjectsStatus = projectsStatus
-    ?? (hubProjectsEnabled ? hubProjectsStatus : undefined);
-  const canMutateProject = Boolean(onProjectCreate ?? onProjectUpdate ?? hubClient);
-  const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
-  const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
-    ? activeProjectId
-    : null;
-  const projectId = controlledProjectId ?? localProjectId;
-  const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
-  const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
-  const [projectPreview, setProjectPreview] = useState<WorkbenchDocumentPreview | null>(null);
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
   const [settings, setSettings] = useState(createSettingsDefaults);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -509,21 +369,6 @@ export function WorkbenchRoutes({
     ...agentsRoute.agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
     ...contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
   ], [agentsRoute.agentConfigs, contactsData.members]);
-
-  React.useEffect(() => {
-    if (sourceProjects.length === 0) {
-      setLocalProjectId(null);
-      return;
-    }
-    if (!projectId || !sourceProjects.some((project) => project.id === projectId)) {
-      setLocalProjectId(sourceProjects[0]?.id ?? null);
-    }
-  }, [projectId, sourceProjects]);
-
-  function selectProject(nextProjectId: string): void {
-    setLocalProjectId(nextProjectId);
-    onActiveProjectChange?.(nextProjectId);
-  }
 
   function handleSettingChange(key: string, value: string | boolean): void {
     if (key === 'dataMode' && typeof value === 'string') {
@@ -729,26 +574,23 @@ export function WorkbenchRoutes({
     case 'projects':
       return (
         <ProjectsPage
-          activeFilter={projectFilter}
-          activeProjectId={projectId}
-          activeTab={projectTab}
-          activePreview={projectPreview}
-          onFilterChange={setProjectFilter}
+          activeFilter={projectsRoute.projectFilter}
+          activeProjectId={projectsRoute.projectId}
+          activeTab={projectsRoute.projectTab}
+          activePreview={projectsRoute.projectPreview}
+          onFilterChange={projectsRoute.setProjectFilter}
           profiles={profileSources}
-          onArtifactClick={(id, artifact) => {
-            selectProject(id);
-            setProjectPreview(createProjectArtifactPreview(id, artifact));
-          }}
-          onClosePreview={() => setProjectPreview(null)}
-          onProjectCreate={canMutateProject ? handleProjectCreate : undefined}
-          onProjectSelect={selectProject}
-          onProjectUpdate={canMutateProject ? handleProjectUpdate : undefined}
-          onTabChange={setProjectTab}
-          projectActionError={effectiveProjectsStatus?.actionError}
-          projectSaving={effectiveProjectsStatus?.saving}
-          projects={sourceProjects}
-          projectsError={effectiveProjectsStatus?.error}
-          projectsLoading={effectiveProjectsStatus?.loading}
+          onArtifactClick={projectsRoute.openArtifactPreview}
+          onClosePreview={() => projectsRoute.setProjectPreview(null)}
+          onProjectCreate={projectsRoute.canMutateProject ? projectsRoute.handleProjectCreate : undefined}
+          onProjectSelect={projectsRoute.selectProject}
+          onProjectUpdate={projectsRoute.canMutateProject ? projectsRoute.handleProjectUpdate : undefined}
+          onTabChange={projectsRoute.setProjectTab}
+          projectActionError={projectsRoute.effectiveProjectsStatus?.actionError}
+          projectSaving={projectsRoute.effectiveProjectsStatus?.saving}
+          projects={projectsRoute.sourceProjects}
+          projectsError={projectsRoute.effectiveProjectsStatus?.error}
+          projectsLoading={projectsRoute.effectiveProjectsStatus?.loading}
         />
       );
     case 'settings':
