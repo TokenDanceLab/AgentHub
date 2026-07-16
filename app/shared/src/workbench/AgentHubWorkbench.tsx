@@ -1,38 +1,27 @@
-import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  type ComposerMention,
-  composerReducer,
-  createInitialComposerState,
-} from '../composer';
 import type {
   AgentHubPlatform,
-  LocalCliDiscoveryManifest,
   WorkbenchAgent,
   WorkbenchConversation,
 } from '../platform';
-import { toggleAppliedAgentHubTheme } from '../theme';
-import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock, ApprovalDecisionAction } from '../transcript';
+import type { TranscriptBlock, ApprovalDecisionAction } from '../transcript';
 import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import { buildMainchainSummary } from './mainchain';
 import { type TranscriptContextMenuEvent } from './transcriptEventTypes';
-import type { FileItem } from './inspector';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
-import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
-import { createSettingsService, type SettingsService } from './settingsService';
 import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
+import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
 import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
@@ -45,18 +34,6 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
-
-const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
-  mode: 'no-spend-discovery',
-  readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
-  readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
-  generatedAt: null,
-  items: [
-    { id: 'codex', name: 'Codex CLI', installed: false, version: null, path: 'codex', noSpend: true },
-    { id: 'claude-code', name: 'Claude Code', installed: false, version: null, path: 'claude', noSpend: true },
-    { id: 'opencode', name: 'OpenCode', installed: false, version: null, path: 'opencode', noSpend: true },
-  ],
-};
 
 export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
@@ -205,22 +182,8 @@ export function AgentHubWorkbench({
   connectionStatus,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const translate = t as (key: string, options?: Record<string, unknown>) => string;
 
-  // Create settings service if platform provides a settings port
-  const settingsService = useMemo<SettingsService | null>(
-    () => platform.settings ? createSettingsService(platform.settings, WORKBENCH_MOCK_SETTINGS_DEFAULTS) : null,
-    [platform.settings],
-  );
-
-  const fallbackConversationId = conversations[0]?.id ?? 'default';
-  const [localConversationId, setLocalConversationId] = useState(fallbackConversationId);
-  const controlledConversationExists = conversations.some((conversation) => conversation.id === activeConversationId);
-  const localConversationExists = conversations.some((conversation) => conversation.id === localConversationId);
-  const currentConversationId = controlledConversationExists
-    ? activeConversationId!
-    : localConversationExists
-      ? localConversationId
-      : fallbackConversationId;
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
   const isChatPage = activePage === 'chat';
   const {
@@ -244,19 +207,61 @@ export function AgentHubWorkbench({
     platformSurface: platform.surface,
     setActivePage,
   });
-  const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
-  const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
-  const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
-  const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
-  const workspaceRef = useRef<HTMLElement>(null);
-  const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const [composer, dispatchComposer] = useReducer(
-    composerReducer,
+
+  // Session owns composer/workspace refs and may run before transcript chrome is composed.
+  // Bridge transcript helpers through a ref so user-driven handlers always see the latest impl.
+  const transcriptHelpersRef = useRef({
+    showWorkbenchToast: (_message: string) => {},
+    copyText: (_text: string) => {},
+    resetSelection: () => {},
+  });
+
+  const {
+    settingsService,
     currentConversationId,
-    createInitialComposerState,
-  );
+    selectConversation,
+    activeConversation,
+    selectedExecutionTargetId,
+    setSelectedExecutionTargetId,
+    dismissedPinnedIds,
+    localCliDiscovery,
+    reviewFileRequest,
+    searchOpen,
+    setSearchOpen,
+    workspaceRef,
+    composerInputRef,
+    composer,
+    dispatchComposer,
+    evidence,
+    mainchainSummary,
+    inspectorRouteBlocks,
+    inspectorContextBlocks,
+    inspectorDeployPreviewUrl,
+    inspectorRunResult,
+    mentionableAgents,
+    handleToggleTheme,
+    openReviewFile,
+    handleDeploySubmit,
+    exportMainchainEvidence,
+  } = useWorkbenchSessionChrome({
+    platform,
+    conversations,
+    activeConversationId,
+    onActiveConversationChange,
+    agents,
+    composerExecutionTargets,
+    transcript,
+    runtimeEvidence,
+    workbenchStatus,
+    activePage,
+    isChatPage,
+    openInspector,
+    showWorkbenchToast: (message) => transcriptHelpersRef.current.showWorkbenchToast(message),
+    copyText: (text) => transcriptHelpersRef.current.copyText(text),
+    resetSelection: () => transcriptHelpersRef.current.resetSelection(),
+    t: translate,
+  });
+
   const {
     selectionMode,
     selectedBlockIds,
@@ -277,7 +282,7 @@ export function AgentHubWorkbench({
     resetSelection,
   } = useWorkbenchTranscriptChrome({
     transcript,
-    t: t as (key: string, options?: Record<string, unknown>) => string,
+    t: translate,
     onApprovalDecision,
     onRegenerate,
     dispatchComposer,
@@ -287,11 +292,11 @@ export function AgentHubWorkbench({
     inspectorWidth,
   });
 
-  function selectConversation(conversationId: string): void {
-    setLocalConversationId(conversationId);
-    resetSelection();
-    onActiveConversationChange?.(conversationId);
-  }
+  transcriptHelpersRef.current = {
+    showWorkbenchToast,
+    copyText,
+    resetSelection,
+  };
 
   const {
     activeAgentProfile,
@@ -312,7 +317,7 @@ export function AgentHubWorkbench({
   } = useWorkbenchProfileChrome({
     agents,
     conversations,
-    t: t as (key: string, options?: Record<string, unknown>) => string,
+    t: translate,
     selectConversation,
     setActivePage,
     showWorkbenchToast,
@@ -320,137 +325,6 @@ export function AgentHubWorkbench({
     composerInputRef,
     onNavigateToConversation,
   });
-  const evidence = collectTranscriptEvidence(transcript);
-  const mainchainSummary = buildMainchainSummary({
-    composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
-    evidence,
-    platformSurface: platform.surface,
-    runtimeEvidence,
-    selectedExecutionTargetId,
-    targetRequired: Boolean(composerExecutionTargets),
-    transcript,
-    workbenchStatus,
-    t: t as (key: string, options?: Record<string, unknown>) => string,
-  });
-
-  // ── Inspector data: route decisions, context usage, deploy preview ──
-  const inspectorRouteBlocks = useMemo(
-    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock =>
-      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent',
-    ),
-    [transcript],
-  );
-  const inspectorContextBlocks = useMemo(
-    () => transcript.filter((block): block is ContextUsageTranscriptBlock => block.kind === 'context_usage'),
-    [transcript],
-  );
-  const inspectorDeployPreviewUrl = useMemo(() => {
-    // Look for the latest preview block with a URL (deploy preview)
-    for (let i = transcript.length - 1; i >= 0; i--) {
-      const block = transcript[i]!;
-      if (block.kind === 'preview' && block.url) return block.url;
-    }
-    return undefined;
-  }, [transcript]);
-
-  const inspectorRunResult = useMemo(() => {
-    for (let i = transcript.length - 1; i >= 0; i--) {
-      const block = transcript[i]!;
-      if (block.kind === 'result') return { success: block.success, summary: block.summary, duration: block.duration };
-      if (block.kind === 'finished') return { success: true, summary: block.title, duration: block.duration };
-      if (block.kind === 'failure') return { success: false, summary: block.reason ?? block.title };
-    }
-    return undefined;
-  }, [transcript]);
-
-  const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
-  const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
-    id: agent.id,
-    label: agent.name,
-    ...(agent.description ? { description: agent.description } : {}),
-    ...(agent.status ? { status: agent.status } : {}),
-    ...(agent.model ? { model: agent.model } : {}),
-    ...(agent.provider ? { provider: agent.provider } : {}),
-    ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
-  }));
-
-  useEffect(() => {
-    dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
-  }, [currentConversationId]);
-
-  useEffect(() => {
-    if (!composerExecutionTargets || !selectedExecutionTargetId) return;
-    if (!composerExecutionTargets.some((target) => target.id === selectedExecutionTargetId)) {
-      setSelectedExecutionTargetId('');
-    }
-  }, [composerExecutionTargets, selectedExecutionTargetId]);
-
-  useEffect(() => {
-    if (activePage !== 'settings' || platform.surface !== 'desktop' || !platform.host?.localCliDiscovery) {
-      setLocalCliDiscovery(null);
-      return undefined;
-    }
-
-    let cancelled = false;
-    setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
-    platform.host.localCliDiscovery()
-      .then((discovery) => {
-        if (!cancelled) setLocalCliDiscovery(discovery);
-      })
-      .catch((err) => {
-        console.error('localCliDiscovery failed:', err);
-        if (!cancelled) setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activePage, platform]);
-
-  // Ctrl/Cmd+F opens search when on chat page
-  useEffect(() => {
-    if (!isChatPage) return;
-
-    function handleSearchShortcut(event: KeyboardEvent): void {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        setSearchOpen(true);
-      }
-    }
-
-    document.addEventListener('keydown', handleSearchShortcut);
-    return () => document.removeEventListener('keydown', handleSearchShortcut);
-  }, [isChatPage]);
-
-  function handleToggleTheme(): void {
-    toggleAppliedAgentHubTheme();
-  }
-
-  function openReviewFile(file: FileItem): void {
-    openInspector();
-    setReviewFileRequest({ ...file });
-  }
-
-  function handleDeploySubmit(_id: string): void {
-    openInspector();
-    showWorkbenchToast(t('toast.deployPreviewOpened'));
-  }
-
-  function exportMainchainEvidence(): void {
-    if (!mainchainSummary.exportEnabled) {
-      showWorkbenchToast(t('toast.noEvidence'));
-      return;
-    }
-    copyText(JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      surface: platform.surface,
-      status: workbenchStatus,
-      nodes: mainchainSummary.nodes,
-      evidence,
-      runtimeEvidence,
-    }, null, 2));
-    showWorkbenchToast(t('toast.evidenceCopied'));
-  }
 
   return (
     <div
@@ -643,7 +517,7 @@ export function AgentHubWorkbench({
         toastVisible={toastVisible}
       />
       <WorkbenchProfileOverlays
-        t={t as (key: string, options?: Record<string, unknown>) => string}
+        t={translate}
         activeAgentProfile={activeAgentProfile}
         activeHumanProfile={activeHumanProfile}
         activeGroupProfile={activeGroupProfile}
