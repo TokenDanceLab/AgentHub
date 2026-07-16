@@ -1,6 +1,6 @@
 # AgentHub 安全风险登记表
 
-最后审查：2026-07-16
+最后审查：2026-07-17
 
 本文件只记录当前安全风险队列、发布门禁和验证入口。2026-06-27 前的完整历史登记表见 [../history.md](../history.md)。
 
@@ -20,7 +20,7 @@
 | AH-SR-036 | High | Mitigated in repo; deploy/client verification required | Desktop system-browser PKCE、Hub session、WS auth、logout/reconnect 有代码，但缺少真实 Desktop 登录闭环证据。 | Desktop 对 live Hub 完成 login/logout/reconnect，私有记录无密证据。 |
 | AH-SR-037 | High | Accepted (cleanup-baseline #438) | Web 仍用 tab-scoped `sessionStorage` 保存 Hub session（非 localStorage）。本阶段正式 **Accepted** 补偿控制：仅 HTTPS 生产、短 TTL access + refresh 轮换、CSP、不在公开 Web 静默 demo 成功（AH-SR-043）、token 不进 URL/日志。后续可选 BFF/HttpOnly 作为增强而非发布阻塞关闭条件。 | Owner: Web; Accepted 2026-07-16; revisit if public Web attack surface expands or XSS incident. |
 | AH-SR-045 | High | Open | Remote Edge read API 认证后缺少 route/target/workspace/user-action 级授权。 | 增加远程 read API scoped authorization 和代表性 negative tests。 |
-| AH-SR-046 | High | Mitigated in repo (purpose + action/target/thread bindings) | Edge `PostRuns` dual-token 校验：`purpose=run-start` 强制；可选 `action`/`thread_id`/`target_id` 绑定（负例 + 正例测试）；Hub `IssueCapabilityToken` 支持 `CapabilityIssueOptions` 并在 HTTP dispatch 附带 action/target/thread。仍建议补 Hub→Edge 真链路 E2E 证据与 CORS 全覆盖。 | 可选：live Hub→Edge 签发/校验 E2E 证据。 |
+| AH-SR-046 | High | Mitigated in repo (purpose + action/target/thread + Hub→Edge fixture E2E) | Edge `PostRuns` dual-token：`purpose=run-start` 强制；可选 `action`/`thread_id`/`target_id` 绑定；Hub `IssueCapabilityToken` + dispatch 附带 bindings。**In-repo fixture E2E**（#461，无生产网络/无真实 secret）：Hub issue→Edge-shaped validate（`hub-server/internal/jwtutil/capability_test.go`）；Hub-shaped issue→Edge `ValidateCapabilityToken`（`edge-server/internal/jwtutil/capability_test.go`）；Hub-shaped token→`PostRuns` accept/reject（`edge-server/internal/api/handlers_test.go` DualToken suite）。分析指针：`docs/analysis/capability-issuer.md`。可选 residual：staging live probe、CORS allow-header 全覆盖。 | Optional only: non-prod live Hub→Edge probe if desired; code-path residual closed by fixture suite. |
 | AH-SR-048 | High | Mitigated in repo; runtime/log verification required | Edge 启动日志已脱敏，但真实 adapter debug 日志仍需验证不泄露 prompt、MCP、config、image path 或 session。 | 用真实 adapter smoke 审查 runtime/debug logs，私有记录无密证据。 |
 | AH-SR-049 | High | Mitigated in repo (durable journal + reconciliation read path) | Hub outbox + retry loop 已接线；Edge 内存 journal + **SQLite durable journal**（`AGENTHUB_DELIVERY_JOURNAL_DB`）；`DurableSnapshot` + `GET /v1/delivery-journal?afterSeq=` 对账读取；`HasSuccessful` 支持幂等跳过已成功交付。完整跨服务 offline/replay E2E 仍可增强。 | 可选：跨进程 offline/replay E2E fixture。 |
 
