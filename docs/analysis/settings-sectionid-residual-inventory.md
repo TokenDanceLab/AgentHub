@@ -1,8 +1,8 @@
 # Settings SectionId / surfaceMetadata Residual Inventory
 
-> last-updated: 2026-07-17  
-> issue: #530 (Phase 14 residual of #470 / #443)  
-> scope: residual section model vs 5-pane Settings SSOT — inventory + collapse plan only  
+> last-updated: 2026-07-17
+> issue: #530 (Phase 14 residual of #470 / #443)
+> scope: residual section model vs 5-pane Settings SSOT — inventory + collapse plan only
 > non-goals: UX redesign, MASTER edits, product Settings UI changes
 
 ## 0. Summary
@@ -18,10 +18,10 @@ Product Settings navigation SSOT is already the shared workbench 5-pane model:
 
 Residual layers still describe the **deleted orphan multi-section Settings shell** (~20–32 ids):
 
-1. Desktop `SectionId` type (32 members) — menu typing only  
-2. Unmounted menu/shortcut hooks that call `openSettings('general'|'tasks'|'agentScheduling')`  
-3. Shared `surfaceMetadata` `desktopSectionId` map (20 members) + tests  
-4. Web/desktop leftover `settings.*` i18n for old sections / orphan form copy  
+1. Desktop `SectionId` type (32 members) — menu typing only
+2. Unmounted menu/shortcut hooks that call `openSettings('general'|'tasks'|'agentScheduling')`
+3. Shared `surfaceMetadata` `desktopSectionId` map (20 members) + tests
+4. Web/desktop leftover `settings.*` i18n for old sections / orphan form copy
 
 This issue documents the residual graph and a collapse plan. No product UX redesign in this PR.
 
@@ -169,7 +169,7 @@ Label keys used by surfaceMetadata (`settings.general`, `settings.tasks`, …) l
 
 ### 4.2 Desktop locales `settings.*` (1064 keys)
 
-Paths: `app/desktop/src/i18n/locales/{en,zh}.json`  
+Paths: `app/desktop/src/i18n/locales/{en,zh}.json`
 EN/ZH key sets match (0 missing each side).
 
 Classification against `app/{desktop,shared,web}/src` TS/TSX string refs:
@@ -210,10 +210,10 @@ No runtime UI currently resolves surfaceMetadata keys (registry unused outside t
 
 ### Phase A — Document + fence (this PR / #530)
 
-1. Keep `SettingsPaneId` as the only navigable SSOT.  
-2. Leave `SectionId` annotated as residual typing (already).  
-3. Publish this inventory + map.  
-4. Optional: delete **zero-ref** residual shell i18n that is **not** surface-bound (see §6).  
+1. Keep `SettingsPaneId` as the only navigable SSOT.
+2. Leave `SectionId` annotated as residual typing (already).
+3. Publish this inventory + map.
+4. Optional: delete **zero-ref** residual shell i18n that is **not** surface-bound (see §6).
 5. Hold bulk desktop 1012-key deletion until surfaceMetadata collapse lands (keys are cheap; wrong deletes are noisy).
 
 ### Phase B — Dead menu/shortcut rebind or delete
@@ -241,10 +241,10 @@ Recommended target shape:
    | `desktop.settings.local` | `local` | `localSource` |
    | `desktop.settings.states` | `states` | `localSource` |
 
-2. Or drop `desktopSectionId` entirely and key surfaces by `SettingsPaneId`.  
-3. Keep non-settings surfaces (`desktop.commandCenter`, `mobile.*`) unless a separate mobile IA task owns them.  
-4. Update `surfaceMetadata.test.ts` expectations (`tasks` / `remoteControl` / `agentMarket` lookups).  
-5. Align i18n keys to `settings.pane.<id>.*` or `surface.desktop.settings.<pane>.*` (one owner: shared or web).  
+2. Or drop `desktopSectionId` entirely and key surfaces by `SettingsPaneId`.
+3. Keep non-settings surfaces (`desktop.commandCenter`, `mobile.*`) unless a separate mobile IA task owns them.
+4. Update `surfaceMetadata.test.ts` expectations (`tasks` / `remoteControl` / `agentMarket` lookups).
+5. Align i18n keys to `settings.pane.<id>.*` or `surface.desktop.settings.<pane>.*` (one owner: shared or web).
 6. Mark truly missing product capabilities as `interfaceGap` rows **without** fake section bodies.
 
 ### Phase D — Locale cleanup after C
@@ -258,8 +258,8 @@ Recommended target shape:
 
 ### Phase E — Optional product follow-ups (out of #530)
 
-- Stop hardcoding Desktop demo `spaceTitle` / `spaceMeta` for Web (noted in settings empty/error inventory).  
-- Wire SettingsPage copy to i18n (currently hardcoded CN) — separate product pass.  
+- Stop hardcoding Desktop demo `spaceTitle` / `spaceMeta` for Web (noted in settings empty/error inventory).
+- Wire SettingsPage copy to i18n (currently hardcoded CN) — separate product pass.
 - If menus return, map only the three dead intents: `general→appearance`, `tasks→agent`, `agentScheduling→agent`.
 
 ## 6. Optional dead-key cleanup in this PR
@@ -268,29 +268,29 @@ Recommended target shape:
 
 Delete only when **all** are true:
 
-1. Key is residual settings chrome / orphan shell copy  
-2. Zero references in `app/**/*.{ts,tsx,js,jsx}` outside locale JSON  
-3. Not required by `surfaceMetadata` labelKey/descriptionKey  
-4. Not required by `locales.test.ts` runtime list / dynamic prefixes  
+1. Key is residual settings chrome / orphan shell copy
+2. Zero references in `app/**/*.{ts,tsx,js,jsx}` outside locale JSON
+3. Not required by `surfaceMetadata` labelKey/descriptionKey
+4. Not required by `locales.test.ts` runtime list / dynamic prefixes
 
 ### 6.2 Applied (zero-ref shell chrome)
 
 Removed from web `common.json` (en + zh) when present with zero non-locale refs:
 
-- `settings.open`  
-- `settings.language`  
-- `settings.theme`  
-- `settings.sharedDesktopSection`  
-- `settings.webLocal.section`  
-- `settings.webLocal.status`  
-- `settings.webLocal.description`  
+- `settings.open`
+- `settings.language`
+- `settings.theme`
+- `settings.sharedDesktopSection`
+- `settings.webLocal.section`
+- `settings.webLocal.status`
+- `settings.webLocal.description`
 
 Matching desktop dead twins removed when present and zero-ref:
 
-- `settings.sharedDesktopSection`  
-- `settings.webLocal.section`  
-- `settings.webLocal.status`  
-- `settings.webLocal.description`  
+- `settings.sharedDesktopSection`
+- `settings.webLocal.section`
+- `settings.webLocal.status`
+- `settings.webLocal.description`
 
 ### 6.3 Explicit hold
 
@@ -322,10 +322,10 @@ Matching desktop dead twins removed when present and zero-ref:
 
 ## 8. Acceptance for #530
 
-- [x] Residual inventory committed (`docs/analysis/settings-sectionid-residual-inventory.md`)  
-- [x] Optional dead-key cleanup with evidence (§6 applied) **or** explicit hold (bulk desktop held)  
-- [x] No UX redesign  
-- [x] MASTER not modified  
+- [x] Residual inventory committed (`docs/analysis/settings-sectionid-residual-inventory.md`)
+- [x] Optional dead-key cleanup with evidence (§6 applied) **or** explicit hold (bulk desktop held)
+- [x] No UX redesign
+- [x] MASTER not modified
 
 ## 9. Scan method (reproducible)
 
@@ -342,8 +342,8 @@ Manual greps used for call-graph confirmation:
 
 Snapshot counts (2026-07-17 / branch `chore/530-settings-sectionid`):
 
-- `SectionId` members: **32**  
-- `surfaceMetadata` desktop sections: **20**  
-- `SettingsPaneId` members: **5**  
-- Desktop `settings.*` keys: **1064 → 1060** after §6 twin removal  
+- `SectionId` members: **32**
+- `surfaceMetadata` desktop sections: **20**
+- `SettingsPaneId` members: **5**
+- Desktop `settings.*` keys: **1064 → 1060** after §6 twin removal
 - Web `settings.*` keys: **28 → 21** after §6 shell chrome removal
