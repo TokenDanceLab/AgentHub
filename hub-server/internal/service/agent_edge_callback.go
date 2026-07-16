@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
@@ -22,7 +23,7 @@ import (
 // that is executing it. It also auto-acks any pending delivery outbox entries
 // for this task (AH-SR-049: outbox delivery journal).
 func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
-	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+	if err := agentevent.ValidateAgentCallbackEdgeRunID(edgeRunID); err != nil {
 		return err
 	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -99,7 +100,7 @@ func (s *AgentService) autoAckDeliveriesForTask(ctx context.Context, taskID stri
 // HandleTaskStream records a typed runtime event and keeps the existing
 // message.new projection for current Web/Desktop chat consumers.
 func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
-	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+	if err := agentevent.ValidateAgentCallbackEdgeRunID(edgeRunID); err != nil {
 		return err
 	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -118,7 +119,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		return err
 	}
 
-	eventType, eventPayload, messageContent, err := normalizeRunEventInput(stream)
+	eventType, eventPayload, messageContent, err := agentevent.NormalizeRunEventInput(stream)
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 
 	runEvent := &model.AgentRunEvent{
 		TaskID:          taskID,
-		EdgeRunID:       firstNonEmpty(edgeRunID, task.EdgeRunID),
+		EdgeRunID:       agentevent.FirstNonEmpty(edgeRunID, task.EdgeRunID),
 		SessionID:       ai.SessionID,
 		AgentInstanceID: task.AgentInstanceID,
 		EventType:       eventType,
