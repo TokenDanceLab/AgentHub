@@ -36,3 +36,7 @@ git status --short
 - Does not delete Mobile RN (`app/mobile-rn`)
 - Does not rewrite Tauri packaging pipeline
 - Does not force-remove `gen/schemas` while capabilities still point at them
+
+## Local agent memory
+
+`.agenthub/memory/**` is gitignored. If present, it must be a **pointer only** to AGENTS/MASTER/GitHub Issues/server STATE. SUPER-phase claims are invalid. See issue #428.
