@@ -16,6 +16,7 @@ import (
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -49,6 +50,10 @@ type Handler struct {
 	// EdgeDeviceID is the local Edge device ID used to validate Hub-issued
 	// identity JWTs and capability tokens are scoped to this device.
 	EdgeDeviceID string
+	// CallbackClient is the optional Edge→Hub callback client (AH-SR-049 journal).
+	CallbackClient interface {
+		DurableSnapshot(afterSeq uint64) ([]hub.DeliveryJournalEntry, error)
+	}
 
 	PermissionRegistry *PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
@@ -347,6 +352,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	ensureStore(h)
 	h.ensurePermissionRegistry()
 	mux.HandleFunc("/v1/health", h.GetHealth)
+	mux.HandleFunc("/v1/delivery-journal", h.GetDeliveryJournal)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
 	mux.HandleFunc("/v1/agents", h.GetAgents)
 	mux.HandleFunc("/v1/model-catalog", h.GetModelCatalog)
