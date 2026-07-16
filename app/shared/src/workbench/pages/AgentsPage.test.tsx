@@ -217,3 +217,91 @@ describe('AgentsPage empty states', () => {
     expect(screen.getByRole('region', { name: '暂无公共 MCP Server' })).toBeInTheDocument();
   });
 });
+
+describe('AgentsPage load/action status', () => {
+  it('uses RecoveryPanel for hard load failure and wires retry', () => {
+    const onAgentsRetry = vi.fn();
+
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        agentsError="Hub AgentProfiles unavailable"
+        onAgentsRetry={onAgentsRetry}
+      />,
+    );
+
+    const recovery = screen.getByRole('alert', { name: 'Agent 加载失败' });
+    expect(within(recovery).getByText('Hub AgentProfiles unavailable')).toBeInTheDocument();
+    expect(within(recovery).getByText(/无法从当前 Hub 读取已安装 Agent Profile/)).toBeInTheDocument();
+    fireEvent.click(within(recovery).getByRole('button', { name: '重试' }));
+    expect(onAgentsRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses installed EmptyState while load error is active', () => {
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[]}
+        agentsError="Hub AgentProfiles unavailable"
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert', { name: 'Agent 加载失败' })).toBeInTheDocument();
+  });
+
+  it('uses StatusNotice for soft load failure when agents remain visible', () => {
+    const onAgentsRetry = vi.fn();
+
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={1}
+        runnableCount={1}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={WORKBENCH_AGENT_PROFILE_FIXTURES.slice(0, 1)}
+        selectedAgentId={WORKBENCH_AGENT_PROFILE_FIXTURES[0]?.id}
+        agentsError="Hub AgentProfiles refresh failed"
+        onAgentsRetry={onAgentsRetry}
+      />,
+    );
+
+    const notice = screen.getByRole('alert');
+    expect(within(notice).getByText('Hub AgentProfiles refresh failed')).toBeInTheDocument();
+    fireEvent.click(within(notice).getByRole('button', { name: '重试' }));
+    expect(onAgentsRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText(WORKBENCH_AGENT_PROFILE_FIXTURES[0]!.name).length).toBeGreaterThan(0);
+  });
+
+  it('uses StatusNotice for editor action errors', () => {
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={1}
+        runnableCount={1}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={WORKBENCH_AGENT_PROFILE_FIXTURES.slice(0, 1)}
+        selectedAgentId={WORKBENCH_AGENT_PROFILE_FIXTURES[0]?.id}
+        agentActionError="保存失败"
+      />,
+    );
+
+    const notice = screen.getByRole('alert');
+    expect(within(notice).getByText('保存失败')).toBeInTheDocument();
+  });
+});
