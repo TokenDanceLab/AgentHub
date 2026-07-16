@@ -34,10 +34,16 @@ type AgentService struct {
 	mgr         *ws.Manager
 	cacheClient agentCache
 	relay       relayDispatcher
+	// runEvents owns list/summary/approvals/artifacts orchestration.
+	// Constructed in NewAgentService; tests using struct literals fall back to
+	// a lazy facade via runEventService().
+	runEvents *RunEventService
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
-	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
+	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
+	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
+	return s
 }
 
 // AddAgentToSession adds an agent instance to a session (invite agent into group).
