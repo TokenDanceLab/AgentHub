@@ -1,8 +1,8 @@
 # Settings SectionId / surfaceMetadata Residual Inventory
 
 > last-updated: 2026-07-17
-> issue: #530 (Phase 14 residual of #470 / #443)
-> scope: residual section model vs 5-pane Settings SSOT — inventory + collapse plan only
+> issue: #530 inventory (Phase 14) · #541 Phase B collapse (Phase 15)
+> scope: residual section model vs 5-pane Settings SSOT — inventory + ordered collapse
 > non-goals: UX redesign, MASTER edits, product Settings UI changes
 
 ## 0. Summary
@@ -16,14 +16,14 @@ Product Settings navigation SSOT is already the shared workbench 5-pane model:
 | Mount | `WorkbenchRoutes` state `settingsPane` / `setSettingsPane` |
 | Entry | `GlobalRail` gear → `handleNavigate('settings')` (default pane `appearance`) |
 
-Residual layers still describe the **deleted orphan multi-section Settings shell** (~20–32 ids):
+Residual layers that still (or previously) described the **deleted orphan multi-section Settings shell**:
 
-1. Desktop `SectionId` type (32 members) — menu typing only
-2. Unmounted menu/shortcut hooks that call `openSettings('general'|'tasks'|'agentScheduling')`
-3. Shared `surfaceMetadata` `desktopSectionId` map (20 members) + tests
-4. Web/desktop leftover `settings.*` i18n for old sections / orphan form copy
+1. ~~Desktop `SectionId` type (32 members) — menu typing only~~ **removed in #541 (Phase B1)**
+2. ~~Unmounted menu/shortcut hooks that call `openSettings('general'|'tasks'|'agentScheduling')`~~ **removed in #541 (Phase B1)**
+3. Shared `surfaceMetadata` `desktopSectionId` map (20 members) + tests — **hold Phase C**
+4. Web/desktop leftover `settings.*` i18n for old sections / orphan form copy — **hold Phase C/D**
 
-This issue documents the residual graph and a collapse plan. No product UX redesign in this PR.
+#541 deleted the closed dead menu cluster (B1). No product UX redesign.
 
 ## 1. SSOT vs residual models
 
@@ -39,11 +39,11 @@ This issue documents the residual graph and a collapse plan. No product UX redes
 
 Source: `app/shared/src/workbench/pages/SettingsPage.tsx` (`NAV_ITEMS`, `PANE_META`, `PANE_RENDERERS`).
 
-### 1.2 Residual `SectionId` (desktop typing only)
+### 1.2 Residual `SectionId` (desktop typing only) — **removed (#541 / Phase B1)**
 
-Path: `app/desktop/src/components/settings/sectionIds.ts`
+Former path: `app/desktop/src/components/settings/sectionIds.ts` (**deleted**)
 
-32 members (orphan shell IA):
+Former 32 members (orphan shell IA) lived only inside the dead menu cluster and are gone with B1:
 
 ```text
 general | appearance | configuration | personalization | permissions |
@@ -54,7 +54,7 @@ git | environment | worktree | browser | computerUse | platforms |
 account | securityAudit | archived | data | about
 ```
 
-Comments already state: **not navigable**; full collapse was noted as follow-up (#470 residual / this #530).
+Acceptance met: **no `SectionId` imports**; `sectionIds.ts` deleted (not re-exported as `SettingsPaneId` — product SSOT remains shared `SettingsPage`).
 
 ### 1.3 Residual `surfaceMetadata` desktop settings surfaces
 
@@ -87,25 +87,38 @@ Helpers still exported from `@agenthub/shared`:
 
 Scan root: `app/desktop/src`, `app/shared/src`, `app/web/src` (excluding `node_modules` / build).
 
+### 2.1 After #541 Phase B1
+
 | Symbol | Hits | Notes |
 |---|---:|---|
 | `SettingsPaneId` | live | SettingsPage + WorkbenchRoutes + package exports |
+| `SectionId` | **0** | type + sole consumers deleted in B1 |
+| `useTopMenuConfig` | **0** | deleted (closed island) |
+| `useShellShortcuts` | **0** | deleted (closed island) |
+| `TopMenuBar` | **0** | deleted (unmounted chrome) |
+| `topMenuState` / test | **0** | deleted with TopMenuBar cluster |
+| `getSurfaceByDesktopSectionId` | 3 | `surfaceMetadata.ts`, test, `shared/index.ts` re-export — **Phase C** |
+| `SURFACE_METADATA` / `getSurfaceMetadata` | 3 | same (definition / test / export) — **Phase C** |
+| `openSettings('…')` literals | **0** | lived only in deleted hooks |
+
+### 2.2 Pre-B1 snapshot (historical)
+
+| Symbol | Hits | Notes |
+|---|---:|---|
 | `SectionId` | 2 | `sectionIds.ts` definition; `useTopMenuConfig.ts` type import |
 | `useTopMenuConfig` | 2 | self + comment in `sectionIds.ts` — **no mount caller** |
 | `useShellShortcuts` | 2 | self + comment in `sectionIds.ts` — **no mount caller** |
 | `TopMenuBar` | chrome only | imported by `useTopMenuConfig` only; not mounted by workbench |
-| `getSurfaceByDesktopSectionId` | 3 | `surfaceMetadata.ts`, test, `shared/index.ts` re-export |
-| `SURFACE_METADATA` / `getSurfaceMetadata` | 3 | same (definition / test / export) |
 | `openSettings('…')` literals | 3 ids | `general`, `tasks`, `agentScheduling` only |
 
-Dead open-settings intents (unmounted):
+Former dead open-settings intents (deleted with B1; map kept for optional remount):
 
-| Caller | Intent | Residual SectionId |
-|---|---|---|
-| `useTopMenuConfig` File/Help | settings / about / desktop-settings | `general` |
-| `useTopMenuConfig` View | tasks | `tasks` |
-| `useTopMenuConfig` View | team runs | `agentScheduling` |
-| `useShellShortcuts` Ctrl+, | open settings | `general` |
+| Former caller | Intent | Residual SectionId | Collapse if remounted |
+|---|---|---|---|
+| `useTopMenuConfig` File/Help | settings / about / desktop-settings | `general` | → `appearance` |
+| `useTopMenuConfig` View | tasks | `tasks` | → `agent` |
+| `useTopMenuConfig` View | team runs | `agentScheduling` | → `agent` |
+| `useShellShortcuts` Ctrl+, | open settings | `general` | → `appearance` |
 
 Product path that **is** live: rail → `settings` route → default `SettingsPaneId = 'appearance'`.
 
@@ -208,24 +221,35 @@ No runtime UI currently resolves surfaceMetadata keys (registry unused outside t
 
 ## 5. Collapse plan (ordered, no UX redesign)
 
-### Phase A — Document + fence (this PR / #530)
+### Phase A — Document + fence (#530) — **done**
 
 1. Keep `SettingsPaneId` as the only navigable SSOT.
-2. Leave `SectionId` annotated as residual typing (already).
+2. ~~Leave `SectionId` annotated as residual typing~~ → superseded by Phase B1 delete.
 3. Publish this inventory + map.
 4. Optional: delete **zero-ref** residual shell i18n that is **not** surface-bound (see §6).
 5. Hold bulk desktop 1012-key deletion until surfaceMetadata collapse lands (keys are cheap; wrong deletes are noisy).
 
-### Phase B — Dead menu/shortcut rebind or delete
+### Phase B — Dead menu/shortcut rebind or delete — **done (#541 / B1)**
 
-| Option | Work | Risk |
-|---|---|---|
-| **B1 delete** unmounted `useTopMenuConfig` / `useShellShortcuts` / optional `TopMenuBar` if still unused | Removes `SectionId` sole import | Low if import-graph stays empty |
-| **B2 rebind** hooks to `navigate('settings')` + `SettingsPaneId` using §3 map | Restores Ctrl+, / menu | Needs workbench mount decision |
+| Option | Work | Risk | Status |
+|---|---|---|---|
+| **B1 delete** unmounted `useTopMenuConfig` / `useShellShortcuts` / `TopMenuBar` / `sectionIds` / `topMenuState` (+ test) | Removes `SectionId` sole import island | Low — closed zero-importer cluster | **Done in #541** |
+| **B2 rebind** hooks to `navigate('settings')` + `SettingsPaneId` using §3 map | Restores Ctrl+, / menu | Needs workbench mount decision | **Not chosen** (rail remains sole entry) |
 
-Prefer B1 if product entry remains GlobalRail only; B2 if native menu bar returns.
+Deleted together (closed island; nothing outside imported them):
 
-Acceptance for B: no `SectionId` imports; `sectionIds.ts` deleted or reduced to re-export of `SettingsPaneId`.
+| Path | Role |
+|---|---|
+| `app/desktop/src/hooks/useTopMenuConfig.ts` | Dead menu config; sole `SectionId` consumer |
+| `app/desktop/src/hooks/useShellShortcuts.ts` | Dead Ctrl+, → `openSettings('general')` |
+| `app/desktop/src/components/TopMenuBar.tsx` | Unmounted chrome |
+| `app/desktop/src/components/settings/sectionIds.ts` | Residual `SectionId` (32) — dir removed |
+| `app/desktop/src/utils/topMenuState.ts` | Menu open/hover helper |
+| `app/desktop/src/__tests__/topMenuState.test.ts` | Cascade test |
+
+Also updated: `app/desktop/src/i18n/locales.test.ts` — dropped `components/settings` scan root (directory gone); keeps `settings.dataCategory.*` runtime keys only.
+
+Acceptance for B: **met** — no `SectionId` imports; `sectionIds.ts` deleted.
 
 ### Phase C — `surfaceMetadata` collapse
 
@@ -300,7 +324,7 @@ Matching desktop dead twins removed when present and zero-ref:
 | `settings.title` | Referenced by workbench test mock map |
 | Desktop ~1000 orphan form keys | Zero-ref today, but mass delete is a separate hygiene PR; keep until Phase C/D |
 | Live §4.2 keys | Still rendered |
-| `SectionId` / hooks / surface rows | Code collapse is Phase B/C, not silent locale-only |
+| Surface rows / helpers | Code collapse is Phase C, not silent locale-only |
 
 ## 7. File checklist
 
@@ -308,24 +332,35 @@ Matching desktop dead twins removed when present and zero-ref:
 |---|---|---|
 | `app/shared/src/workbench/pages/SettingsPage.tsx` | **SSOT** panes | keep |
 | `app/shared/src/workbench/WorkbenchRoutes.tsx` | mounts pane state | keep |
-| `app/desktop/src/components/settings/sectionIds.ts` | residual `SectionId` | B |
-| `app/desktop/src/hooks/useTopMenuConfig.ts` | dead openSettings | B |
-| `app/desktop/src/hooks/useShellShortcuts.ts` | dead Ctrl+, | B |
-| `app/desktop/src/components/TopMenuBar.tsx` | unmounted chrome | B |
+| ~~`app/desktop/src/components/settings/sectionIds.ts`~~ | residual `SectionId` | **deleted #541** |
+| ~~`app/desktop/src/hooks/useTopMenuConfig.ts`~~ | dead openSettings | **deleted #541** |
+| ~~`app/desktop/src/hooks/useShellShortcuts.ts`~~ | dead Ctrl+, | **deleted #541** |
+| ~~`app/desktop/src/components/TopMenuBar.tsx`~~ | unmounted chrome | **deleted #541** |
+| ~~`app/desktop/src/utils/topMenuState.ts`~~ | menu state helper | **deleted #541** |
+| ~~`app/desktop/src/__tests__/topMenuState.test.ts`~~ | cascade test | **deleted #541** |
 | `app/shared/src/surfaceMetadata.ts` | 20 orphan desktop sections | C |
 | `app/shared/src/surfaceMetadata.test.ts` | locks orphan ids | C |
 | `app/shared/src/index.ts` | re-exports surface helpers | C |
 | `app/web/src/i18n/locales/{en,zh}/common.json` | surface descs + residual shell | C/D; shell subset cleaned in §6 |
 | `app/desktop/src/i18n/locales/{en,zh}.json` | 1000+ orphan settings strings | D |
-| `app/desktop/src/i18n/locales.test.ts` | residual settings root scan + dataCategory | B/D |
+| `app/desktop/src/i18n/locales.test.ts` | dataCategory runtime keys only (settings root scan removed) | D |
 | `docs/analysis/settings-empty-error-inventory.md` | prior Settings empty/error inventory | companion; points residual mismatch |
 
-## 8. Acceptance for #530
+## 8. Acceptance
+
+### 8.1 #530 (Phase A inventory)
 
 - [x] Residual inventory committed (`docs/analysis/settings-sectionid-residual-inventory.md`)
 - [x] Optional dead-key cleanup with evidence (§6 applied) **or** explicit hold (bulk desktop held)
 - [x] No UX redesign
 - [x] MASTER not modified
+
+### 8.2 #541 (Phase B1 collapse)
+
+- [x] Dead menu cluster deleted (`useTopMenuConfig` / `useShellShortcuts` / `TopMenuBar` / `sectionIds` / `topMenuState` + test)
+- [x] No `SectionId` imports remain in app TS/TSX
+- [x] Inventory §1.2 / §2 / §5 / §7 updated; surfaceMetadata held for Phase C
+- [x] No product pane UX redesign; no B2 rebind (rail remains sole settings entry)
 
 ## 9. Scan method (reproducible)
 
@@ -347,3 +382,11 @@ Snapshot counts (2026-07-17 / branch `chore/530-settings-sectionid`):
 - `SettingsPaneId` members: **5**
 - Desktop `settings.*` keys: **1064 → 1060** after §6 twin removal
 - Web `settings.*` keys: **28 → 21** after §6 shell chrome removal
+
+Snapshot after #541 B1 (`chore/541-sectionid-collapse-a`):
+
+- `SectionId` members / imports: **0** (type deleted)
+- Dead menu hooks / TopMenuBar / topMenuState: **deleted**
+- `surfaceMetadata` desktop sections: **20** (unchanged; Phase C)
+- `SettingsPaneId` members: **5**
+- Product settings entry: GlobalRail → `SettingsPaneId='appearance'`
