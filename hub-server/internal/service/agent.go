@@ -38,11 +38,21 @@ type AgentService struct {
 	// Constructed in NewAgentService; tests using struct literals fall back to
 	// a lazy facade via runEventService().
 	runEvents *RunEventService
+	// edgeCallbacks owns Edge ack/stream/done/fail orchestration.
+	// Constructed in NewAgentService; tests using struct literals fall back to
+	// a lazy facade via edgeCallbackService().
+	edgeCallbacks *EdgeCallbackService
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
 	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
+	s.edgeCallbacks = NewEdgeCallbackService(
+		db,
+		bus,
+		seqAllocatorFunc(s.allocateSeq),
+		&deliveryOutboxAcker{db: db},
+	)
 	return s
 }
 
