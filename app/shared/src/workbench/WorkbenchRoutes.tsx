@@ -61,7 +61,6 @@ import {
   WORKBENCH_MOCK_TASK_GROUPS,
 } from './mockData';
 import type { SettingsService } from './settingsService';
-import { createSettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
 import { workspaceProjectToProjectInfo } from './hubDataMapping';
@@ -672,19 +671,58 @@ export function WorkbenchRoutes({
   const [projectPreview, setProjectPreview] = useState<WorkbenchDocumentPreview | null>(null);
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
   const [settings, setSettings] = useState(createSettingsDefaults);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsErrorKind, setSettingsErrorKind] = useState<'init' | 'write' | null>(null);
+
+  const syncSettingsServiceState = useCallback(() => {
+    if (!settingsService) {
+      setSettingsLoading(false);
+      setSettingsError(null);
+      setSettingsErrorKind(null);
+      return;
+    }
+    setSettings(settingsService.readAll() as typeof settings);
+    setSettingsLoading(settingsService.loading);
+    setSettingsError(settingsService.error);
+    setSettingsErrorKind(settingsService.errorKind);
+  }, [settingsService]);
 
   // When a settingsService is provided, initialize it and subscribe to remote changes.
   useEffect(() => {
-    if (!settingsService) return;
-    const unsub = settingsService.subscribe(() => {
-      setSettings(settingsService.readAll() as typeof settings);
-    });
+    if (!settingsService) {
+      setSettingsLoading(false);
+      setSettingsError(null);
+      setSettingsErrorKind(null);
+      return;
+    }
+    const unsub = settingsService.subscribe(syncSettingsServiceState);
+    syncSettingsServiceState();
     settingsService.init().catch((err) => {
       console.error('settingsService.init failed in WorkbenchRoutes:', err);
-      /* init failure: keep defaults */
+      /* init failure is surfaced via settingsService.error */
+      syncSettingsServiceState();
     });
     return unsub;
-  }, [settingsService]);
+  }, [settingsService, syncSettingsServiceState]);
+
+  const handleRetrySettingsLoad = useCallback(() => {
+    if (!settingsService) return;
+    settingsService.init().catch((err) => {
+      console.error('settingsService.init retry failed in WorkbenchRoutes:', err);
+      syncSettingsServiceState();
+    });
+  }, [settingsService, syncSettingsServiceState]);
+
+  const handleDismissSettingsError = useCallback(() => {
+    if (!settingsService) {
+      setSettingsError(null);
+      setSettingsErrorKind(null);
+      return;
+    }
+    settingsService.clearError();
+    syncSettingsServiceState();
+  }, [settingsService, syncSettingsServiceState]);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
   const [agentDrafts, setAgentDrafts] = useState<Record<string, AgentConfig>>({});
@@ -1392,6 +1430,11 @@ export function WorkbenchRoutes({
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"
           currentUserDisplayName={userDisplayName}
+          settingsLoading={settingsLoading}
+          settingsError={settingsError}
+          settingsErrorKind={settingsErrorKind}
+          onRetrySettingsLoad={settingsService ? handleRetrySettingsLoad : undefined}
+          onDismissSettingsError={settingsService ? handleDismissSettingsError : undefined}
         />
       );
     default:
