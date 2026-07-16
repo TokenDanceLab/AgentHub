@@ -64,11 +64,12 @@
 
 | Phase | Name | Milestone | Open | Closed | Total |
 |:------|:-----|:----------|-----:|-------:|------:|
-| 1 | Governance Lock | [#22](https://github.com/TokenDanceLab/AgentHub/milestone/22) | 3 | 0 | 3 |
-| 2 | Hygiene Residual | [#23](https://github.com/TokenDanceLab/AgentHub/milestone/23) | 3 | 0 | 3 |
-| 3 | Frontend Strangler | [#24](https://github.com/TokenDanceLab/AgentHub/milestone/24) | 4 | 0 | 4 |
-| 4 | Edge Seams + Security | [#25](https://github.com/TokenDanceLab/AgentHub/milestone/25) | 4 | 0 | 4 |
-| 5 | Closure Decisions | [#26](https://github.com/TokenDanceLab/AgentHub/milestone/26) | 3 | 0 | 3 |
+| 1 | Governance Lock | [#22](https://github.com/TokenDanceLab/AgentHub/milestone/22) | 0 | 3 | 3 |
+| 2 | Hygiene Residual | [#23](https://github.com/TokenDanceLab/AgentHub/milestone/23) | 0 | 3 | 3 |
+| 3 | Frontend Strangler | [#24](https://github.com/TokenDanceLab/AgentHub/milestone/24) | 0 | 4 | 4 |
+| 4 | Edge Seams + Security | [#25](https://github.com/TokenDanceLab/AgentHub/milestone/25) | 0 | 4 | 4 |
+| 5 | Closure Decisions | [#26](https://github.com/TokenDanceLab/AgentHub/milestone/26) | 0 | 3 | 3 |
+| 6 | Baseline Hardening | [#27](https://github.com/TokenDanceLab/AgentHub/milestone/27) | 0 | 5 | 5 |
 
 ## Issue Mapping
 
@@ -91,11 +92,16 @@
 | T5.1 | #438 | AH-SR-037 决策 | closed accepted |
 | T5.2 | #439 | Settings/TeamRun orphan 决策 | closed |
 | T5.3 | #440 | 专项收口与归档计划 | closed |
+| T6.1 | #441 | desktop hubClient cutover tsc | closed (`83f5e1ea`) |
+| T6.2 | #442 | web hubClient 类型/测试对齐 | closed (`83f5e1ea`) |
+| T6.3 | #443 | 抽取 SectionId | closed (`8fd3625f`) |
+| T6.4 | #444 | purpose=run-start 强制 | closed (`e41ed1ed`) |
+| T6.5 | #445 | SQLite durable DeliveryJournal | closed (`342cc711`) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=22 and .number<=26) | "\(.title): \(.open_issues) open / \(.closed_issues) closed"'
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=22 and .number<=27) | "\(.title): \(.open_issues) open / \(.closed_issues) closed"'
 gh issue list -R TokenDanceLab/AgentHub --label cleanup-baseline --state open
 gh project item-list 6 --owner @me --format json --limit 50
 ```
@@ -105,17 +111,18 @@ gh project item-list 6 --owner @me --format json --limit 50
 - [x] Phase 1: Governance Lock (3/3 closed: #424-#426)
 - [x] Phase 2: Hygiene Residual (3/3 closed: #427-#429)
 - [x] Phase 3: Frontend Strangler (4/4 closed: #430-#433)
-- [x] Phase 4: Edge Seams + Security (0/4)
-- [x] Phase 5: Closure Decisions (3/3)
+- [x] Phase 4: Edge Seams + Security (4/4 closed: #434-#437)
+- [x] Phase 5: Closure Decisions (3/3 closed: #438-#440)
+- [x] Phase 6: Baseline Hardening (5/5 closed: #441-#445)
 
 ## Current Status
-**Active Phase**: COMPLETE (baseline program)  
-**Active Task**: none — residual AH-SR-049 durable journal tracked in risk register  
+**Active Phase**: COMPLETE (baseline + hardening)  
+**Active Task**: none  
 **Blockers**: None  
 **Production fact**: hk3 LIVE（server `projects/agenthub/STATE.md`）  
 **Baseline commits**:
 - `347642b6` docs(cleanup): baseline analysis, wiki, LIVE narrative
-- `843c64d4` docs(progress): phase ticks (pre-GITHUB_FULL)
+- Phase 6: `8fd3625f` #443 · `e41ed1ed` #444 · `342cc711` #445 · `83f5e1ea` #441/#442
 
 ## Governance Status
 **Shared instruction surface**: `AGENTS.md`  
@@ -124,19 +131,20 @@ gh project item-list 6 --owner @me --format json --limit 50
 **Memory note**: `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
-1. Close #424 / #425 after this MASTER commit lands  
-2. 仅 issue-bound 执行：下一步推荐 **#430 (T3.1)** 与 **#427 (T2.1)** 分 PR  
-3. 禁止 freestyle multi-workflow 实现 fleets  
-4. 安全切片 #436/#437 必须 issue-bound + 测试
+1. 可选：push `chore/cleanup-baseline` 并开 PR 汇总 #424–#445  
+2. 禁止 freestyle multi-workflow 实现 fleets；新工作必须新 Issue  
+3. 长期残留（非阻塞）：AH-SR-049 idempotent ack + reconciliation E2E；AH-SR-046 action/target/workspace 绑定 E2E  
+4. orphan UI 物理删除：desktop/web SettingsPage + TeamRunConsole（已 quarantine + `@ts-nocheck`）
 
 ## Session Log
 | Date | Session | Summary |
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Analysis/wiki/hygiene baseline; stopped ad-hoc fleets; Project #6 + milestones 22–26 + issues #424–#440; MASTER → GITHUB_FULL |
+| 2026-07-16 | lead | Phase 6 #441–#445 closed: SectionId extract, purpose=run-start, SQLite journal, desktop/web tsc clean |
 
 
 ## Baseline completion
 
-- Program cleanup-baseline closed on 2026-07-16 for clear engineering baseline.
-- Residual non-blocking debt: AH-SR-049 durable Edge journal / full reconciliation E2E (documented Partial).
+- Program cleanup-baseline + Phase 6 hardening closed on 2026-07-16.
+- Residual non-blocking debt: AH-SR-049 reconciliation/E2E; AH-SR-046 full E2E; orphan UI physical delete.
 - Next work must open a **new** SPEC/Issues; do not freestyle on this branch without issues.
