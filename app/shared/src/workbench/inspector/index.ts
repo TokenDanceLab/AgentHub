@@ -11,3 +11,13 @@ export type { FilePreviewRouterProps, PreviewFile } from './FilePreviewRouter';
 
 export { BrowserPreview } from './BrowserPreview';
 export type { BrowserPreviewProps } from './BrowserPreview';
+
+export {
+  RuntimeEvidencePanel,
+  runtimeDiffPreviewFile,
+  runtimeEvidenceOverviewFiles,
+  runtimeEvidenceOverviewKicker,
+  runtimeEvidenceOverviewTasks,
+  fileDiffToText,
+} from './RuntimeEvidencePanel';
+export type { RuntimeEvidencePanelProps } from './RuntimeEvidencePanel';
