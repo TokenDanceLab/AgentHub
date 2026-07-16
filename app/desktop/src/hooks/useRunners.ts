@@ -1,10 +1,13 @@
-// Runners polling hook. Only fetches when Edge is online.
+// Edge `/v1/runners` diagnostics poller.
+// Product health/catalog SSOT is Runtime inventory + Hub Execution Targets.
+// Keep this hook for local diagnostics/tests only — do not wire into product status UI.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchRunners } from '@/api/edgeClient';
 import type { Runner } from '@shared/types';
 import { RUNNERS_POLL_MS } from '@/config';
 
+/** Local Edge runner diagnostics only. Not product inventory SSOT. */
 export function useRunners(online: boolean): Runner[] {
   const [runners, setRunners] = useState<Runner[]>([]);
   const mountedRef = useRef(true);
