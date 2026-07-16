@@ -8,7 +8,7 @@ import {
   type DesignNavIconName,
 } from '../designIcons';
 import { ProfilePopover } from '../floating';
-import { Select } from '../../ui';
+import { EmptyState, Select } from '../../ui';
 import styles from './ContactsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -961,7 +961,19 @@ export function ContactsPage({
             )}
 
             {(!friendRequests || friendRequests.length === 0) && resolvedPending.length === 0 && (
-              <div className={styles.emptyState}>{t('contacts.empty', '暂无待处理的好友请求')}</div>
+              <EmptyState
+                title={t('contacts.empty', '暂无待处理的好友请求')}
+                titleLevel={3}
+                {...(styles['contacts-empty-compact']
+                  ? { className: styles['contacts-empty-compact'] }
+                  : {})}
+                {...(styles['contacts-empty-compact-content']
+                  ? { contentClassName: styles['contacts-empty-compact-content'] }
+                  : {})}
+                {...(styles['contacts-empty-compact-title']
+                  ? { titleClassName: styles['contacts-empty-compact-title'] }
+                  : {})}
+              />
             )}
           </main>
         );
