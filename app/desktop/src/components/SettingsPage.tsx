@@ -106,39 +106,8 @@ const ArchivedSection = lazy(() => import('./settings/sections/ArchivedSection')
 const DataSection = lazy(() => import('./settings/sections/DataSection'));
 const AboutSection = lazy(() => import('./settings/sections/AboutSection'));
 
-export type SectionId =
-  | 'general'
-  | 'appearance'
-  | 'configuration'
-  | 'personalization'
-  | 'permissions'
-  | 'agentProfiles'
-  | 'executionTargets'
-  | 'tasks'
-  | 'onlineIm'
-  | 'groupChat'
-  | 'agentScheduling'
-  | 'agentMarket'
-  | 'keyboard'
-  | 'mcp'
-  | 'skills'
-  | 'hooks'
-  | 'models'
-  | 'modelMapping'
-  | 'ccSwitch'
-  | 'connections'
-  | 'remoteControl'
-  | 'git'
-  | 'environment'
-  | 'worktree'
-  | 'browser'
-  | 'computerUse'
-  | 'platforms'
-  | 'account'
-  | 'securityAudit'
-  | 'archived'
-  | 'data'
-  | 'about';
+export type { SectionId } from './settings/sectionIds';
+import type { SectionId } from './settings/sectionIds';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
 
@@ -367,7 +336,7 @@ export default function SettingsPage({
     void syncLocalEdgeTarget.mutateAsync({
       deviceId,
       localEdgeTarget,
-      ...(registeredLocalEdgeTarget ? { registeredTargetId: registeredLocalEdgeTarget.id } : {}),
+      ...(registeredLocalEdgeTarget?.id ? { registeredTargetId: String(registeredLocalEdgeTarget.id) } : {}),
     });
   }, [deviceId, localEdgeTarget, registeredLocalEdgeTarget, syncLocalEdgeTarget]);
   const handleSignOut = () => {
