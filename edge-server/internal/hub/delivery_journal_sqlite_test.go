@@ -82,3 +82,87 @@ func TestCallbackClient_DurableSnapshotPrefersSQLite(t *testing.T) {
 		t.Fatalf("entries=%+v", entries)
 	}
 }
+
+// TestCallbackClient_OfflineReplayReconciliation proves AH-SR-049 residual (#462):
+// DurableSnapshot + HasSuccessful drive reconciliation after process reopen.
+// Automatic redelivery worker is intentionally deferred (see risk register / analysis).
+func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "journal.db")
+
+	// 1. Enable SQLite journal and record a mixed offline window.
+	c1 := NewCallbackClient("http://example.invalid", "")
+	if err := c1.EnableSQLiteJournal(path); err != nil {
+		t.Fatalf("enable: %v", err)
+	}
+	c1.recordJournal("task-ack", "run-1", "ack", true, "", 1)                    // seq 1 success
+	c1.recordJournal("task-fail", "run-2", "done", false, "hub unreachable", 3)   // seq 2 failure
+	c1.recordJournal("task-later", "run-3", "stream", true, "", 1)                // seq 3 success
+	c1.recordJournal("task-fail", "run-2", "done", false, "still unreachable", 3) // seq 4 failure again
+	if c1.sqliteJournal == nil {
+		t.Fatal("sqlite journal not enabled")
+	}
+	if err := c1.sqliteJournal.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	// 2. Reopen as a fresh CallbackClient (simulates Edge restart).
+	c2 := NewCallbackClient("http://example.invalid", "")
+	if err := c2.EnableSQLiteJournal(path); err != nil {
+		t.Fatalf("reopen enable: %v", err)
+	}
+	t.Cleanup(func() {
+		if c2.sqliteJournal != nil {
+			_ = c2.sqliteJournal.Close()
+		}
+	})
+
+	// 3. HasSuccessful remains true for the terminal ack after reopen.
+	ok, err := c2.sqliteJournal.HasSuccessful("task-ack", "run-1", "ack")
+	if err != nil || !ok {
+		t.Fatalf("HasSuccessful after reopen: ok=%v err=%v", ok, err)
+	}
+	// Failed-only task must not look successful.
+	ok, err = c2.sqliteJournal.HasSuccessful("task-fail", "run-2", "done")
+	if err != nil || ok {
+		t.Fatalf("failed task should not be successful: ok=%v err=%v", ok, err)
+	}
+
+	// 4. DurableSnapshot(afterSeq) returns the expected cursor window.
+	all, err := c2.DurableSnapshot(0)
+	if err != nil {
+		t.Fatalf("snapshot all: %v", err)
+	}
+	if len(all) != 4 {
+		t.Fatalf("expected 4 durable entries, got %d: %+v", len(all), all)
+	}
+	afterAck, err := c2.DurableSnapshot(1)
+	if err != nil {
+		t.Fatalf("snapshot afterSeq=1: %v", err)
+	}
+	if len(afterAck) != 3 {
+		t.Fatalf("afterSeq=1 want 3 entries, got %d: %+v", len(afterAck), afterAck)
+	}
+	if afterAck[0].TaskID != "task-fail" || afterAck[0].OK {
+		t.Fatalf("first after-ack entry want failed task-fail: %+v", afterAck[0])
+	}
+	if afterAck[1].TaskID != "task-later" || !afterAck[1].OK {
+		t.Fatalf("second after-ack entry want successful task-later: %+v", afterAck[1])
+	}
+
+	// 5. Candidate selection (helper only — no automatic worker) surfaces failed entries.
+	cands := RedeliveryCandidates(all, 0)
+	if len(cands) != 2 {
+		t.Fatalf("redelivery candidates want 2 failed done entries, got %d: %+v", len(cands), cands)
+	}
+	for _, c := range cands {
+		if c.OK || c.TaskID != "task-fail" || c.Action != "done" {
+			t.Fatalf("unexpected candidate: %+v", c)
+		}
+	}
+	// Cursor after first failure still yields the later failure.
+	candsAfter := RedeliveryCandidates(all, 2)
+	if len(candsAfter) != 1 || candsAfter[0].Seq != 4 {
+		t.Fatalf("afterSeq=2 candidates=%+v", candsAfter)
+	}
+}
