@@ -8,6 +8,7 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/runnerctx"
+	"github.com/agenthub/edge-server/internal/store"
 )
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
@@ -33,6 +34,19 @@ func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 		instances = h.AgentRegistry.List()
 	}
 
+	// Under Hub JWT, only expose instances bound to an owned run/thread.
+	userID := hubUserFromRequest(r)
+	if userID != "" {
+		repo := ensureStore(h)
+		filtered := make([]agents.AgentInstance, 0, len(instances))
+		for _, inst := range instances {
+			if agentInstanceVisibleToUser(repo, inst, userID) {
+				filtered = append(filtered, inst)
+			}
+		}
+		instances = filtered
+	}
+
 	writeSuccess(w, http.StatusOK, listResponse(instances))
 }
 
@@ -51,7 +65,27 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
 		return
 	}
+	userID := hubUserFromRequest(r)
+	if userID != "" && !agentInstanceVisibleToUser(ensureStore(h), *inst, userID) {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
+		return
+	}
 	writeSuccess(w, http.StatusOK, inst)
+}
+
+// agentInstanceVisibleToUser reports whether a runtime instance is owned by userID.
+// Instances without run/thread anchors are fail-closed under Hub JWT.
+func agentInstanceVisibleToUser(repo store.Reader, inst agents.AgentInstance, userID string) bool {
+	if userID == "" {
+		return true
+	}
+	if inst.RunID != "" {
+		return isRunOwnedBy(repo, inst.RunID, userID)
+	}
+	if inst.ThreadID != "" {
+		return isThreadOwnedBy(repo, inst.ThreadID, userID)
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------

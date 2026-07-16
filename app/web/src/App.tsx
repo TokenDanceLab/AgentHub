@@ -5,6 +5,7 @@ import { AgentHubWorkbench } from '@shared/workbench';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import {
+  allowsWorkbenchDemoRuntimeMutation,
   getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
   resolveWorkbenchDataMode,
@@ -61,13 +62,15 @@ function WebWorkbenchRoot() {
   const webPlatform = useMemo(
     () => createWebPlatform({
       ensureAuth,
+      dataMode: dataModeContract.mode,
       // AH-SR-043: only explicit mock/fixture modes may use demo runtime fallback.
       // Never silent-fallback from auto/real/observed/approved-real.
-      demoRuntimeFallback:
-        (dataModeContract.mode === 'mock' || dataModeContract.mode === 'fixture') &&
-        dataModeContract.allowsDemoRuntimeFallback,
+      demoRuntimeFallback: allowsWorkbenchDemoRuntimeMutation({
+        demoRuntimeFallback: true,
+        dataMode: dataModeContract.mode,
+      }),
     }),
-    [dataModeContract.allowsDemoRuntimeFallback, dataModeContract.mode, ensureAuth],
+    [dataModeContract.mode, ensureAuth],
   );
   const agentList = useAgentList(true);
   const createAgentProfile = useCreateAgentProfile();

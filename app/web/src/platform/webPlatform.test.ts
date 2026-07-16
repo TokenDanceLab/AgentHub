@@ -156,6 +156,7 @@ describe('webPlatform workbench agent mapping', () => {
     const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
     const platform = createWebPlatform({
       demoRuntimeStore,
+      dataMode: 'auto',
     });
 
     await expect(platform.runs.submitComposerIntent({
@@ -175,10 +176,35 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
-  it('routes unauthenticated auto submits into the demo runtime only when explicitly allowed', async () => {
+  it('rejects auto-mode demoRuntimeFallback instead of silent fake success (AH-SR-043)', async () => {
     const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
     const platform = createWebPlatform({
       demoRuntimeFallback: true,
+      dataMode: 'auto',
+      demoRuntimeStore,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: 'auto 不能假成功',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: 'auto 不能假成功',
+      }),
+    ]));
+  });
+
+  it('routes mock/fixture submits into the demo runtime when explicitly allowed', async () => {
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const platform = createWebPlatform({
+      demoRuntimeFallback: true,
+      dataMode: 'fixture',
       demoRuntimeStore,
     });
 
@@ -203,6 +229,33 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
+  it('allows intentional fixture demo mutations even when ensureAuth is mounted', async () => {
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const ensureAuth = vi.fn(() => false);
+    const platform = createWebPlatform({
+      demoRuntimeFallback: true,
+      dataMode: 'mock',
+      demoRuntimeStore,
+      ensureAuth,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: 'fixture 模式可本地演示',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).resolves.toEqual({ intentId: expect.stringMatching(/^demo-agent-/) });
+
+    expect(ensureAuth).not.toHaveBeenCalled();
+    expect(demoRuntimeStore.resolveTranscript('builder')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: 'fixture 模式可本地演示',
+      }),
+    ]));
+  });
+
   it('opens the auth guard instead of silently using demo fallback when the Web root mounts auth', async () => {
     localStorage.clear();
     sessionStorage.clear();
@@ -215,6 +268,7 @@ describe('webPlatform workbench agent mapping', () => {
     };
     const platform = createWebPlatform({
       demoRuntimeStore,
+      dataMode: 'auto',
       ensureAuth,
       hubClient,
     });
@@ -234,6 +288,41 @@ describe('webPlatform workbench agent mapping', () => {
       expect.objectContaining({
         author: expect.objectContaining({ role: 'human' }),
         text: '需要登录后才能进入真实 Hub 路径',
+      }),
+    ]));
+  });
+
+  it('does not use demo fallback when a Hub client is injected even in fixture mode', async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const ensureAuth = vi.fn(() => false);
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+    };
+    const platform = createWebPlatform({
+      demoRuntimeFallback: true,
+      dataMode: 'fixture',
+      demoRuntimeStore,
+      ensureAuth,
+      hubClient,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: '注入 Hub client 必须走真实路径',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: '注入 Hub client 必须走真实路径',
       }),
     ]));
   });
