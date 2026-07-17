@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -120,7 +121,7 @@ func TestMain(m *testing.M) {
 	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
-	attachmentService := service.NewAttachmentService(db, cfg.Upload, service.NewLocalStorage(cfg.Upload.Dir))
+	attachmentService := attachment.NewService(db, cfg.Upload, attachment.NewLocalStorage(cfg.Upload.Dir))
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
 	notificationService := service.NewNotificationService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
