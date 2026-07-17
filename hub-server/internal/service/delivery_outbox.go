@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,9 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
-	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
@@ -133,7 +130,7 @@ func (r deliveryOutboxRecord) toEntry() DeliveryOutboxEntry {
 	}
 }
 
-// redispatchTarget carries only the opaque fields Redispatcher / AgentService
+// redispatchTarget carries only the opaque fields Redispatcher / DispatchService
 // need to re-send a stored payload. It is not a GORM model and must not grow
 // journal columns — that keeps redispatch free of deliveryOutboxRecord.
 type redispatchTarget struct {
@@ -176,7 +173,7 @@ type Redispatcher interface {
 }
 
 // DeliveryOutbox owns delivery journal operations and retry-loop orchestration.
-// Redispatch implementation stays on AgentService (or an adapter) behind Redispatcher.
+// Redispatch implementation lives on DispatchService behind the Redispatcher port.
 type DeliveryOutbox struct {
 	db           *gorm.DB
 	redispatcher Redispatcher // nil → journal only; retry loop skips redispatch
@@ -534,19 +531,20 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 	}
 }
 
-// ── Redispatch implementation (stays on AgentService) ──────────────────────
+// ── Redispatcher adapter (implementation on DispatchService) ────────────────
 
-// agentRedispatcher adapts *AgentService to the Redispatcher port without
+// dispatchRedispatcher adapts *DispatchService to the Redispatcher port without
 // exporting dispatchPayload or deliveryOutboxRecord to DeliveryOutbox.
-type agentRedispatcher struct {
-	s *AgentService
+// Redispatch residual ownership moved in #573.
+type dispatchRedispatcher struct {
+	d *DispatchService
 }
 
-func (a agentRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
-	if a.s == nil {
-		return fmt.Errorf("redispatch: nil agent service")
+func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	if a.d == nil {
+		return fmt.Errorf("redispatch: nil dispatch service")
 	}
-	a.s.redispatchDelivery(ctx, redispatchTarget{
+	a.d.redispatchDelivery(ctx, redispatchTarget{
 		TaskID:       taskID,
 		DeliveryID:   deliveryID,
 		Payload:      payloadJSON,
@@ -555,197 +553,19 @@ func (a agentRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliv
 	return nil
 }
 
-// redispatchDelivery re-dispatches a delivery by parsing the stored payload
-// and routing it to the target Edge device. Owns dispatchPayload unmarshal.
-// Accepts redispatchTarget only — never the private GORM row type.
-func (s *AgentService) redispatchDelivery(ctx context.Context, rec redispatchTarget) {
-	// Parse the payload to get dispatch info.
-	var dp dispatchPayload
-	if err := json.Unmarshal([]byte(rec.Payload), &dp); err != nil {
-		slog.Error("failed to unmarshal delivery payload for redispatch",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
-		_ = s.MoveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload unmarshal: %v", err))
-		return
-	}
-
-	// Update the delivery_id in the payload so the Edge can ack the new attempt.
-	dp.DeliveryID = rec.DeliveryID
-
-	newPayload, err := json.Marshal(dp)
-	if err != nil {
-		slog.Error("failed to marshal redispatch payload",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
-		_ = s.MoveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload marshal: %v", err))
-		return
-	}
-
-	// Look up the task for dispatch routing.
-	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
-	if err != nil {
-		slog.Warn("redispatch: task lookup failed, marking dead-letter",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
-		_ = s.MoveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task lookup: %v", err))
-		return
-	}
-
-	// Only retry if task is still in a retryable state.
-	if task.Status != "queued" && task.Status != "dispatched" && task.Status != "running" {
-		slog.Info("redispatch: task in terminal state, moving delivery to dead-letter",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"task_status", task.Status,
-		)
-		_ = s.MoveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task status is %s", task.Status))
-		return
-	}
-
-	// Re-dispatch via HTTP (if local Edge) or WebSocket.
-	s.retryDispatchToTarget(ctx, task, dp, newPayload, rec)
+// lazyDispatchRedispatcher resolves DispatchService only when a retry fires.
+// Used by deliveryOutboxService() lazy construction so it does not call
+// dispatchService() during outbox construction (avoids init recursion with
+// dispatchService → deliveryOutboxService).
+type lazyDispatchRedispatcher struct {
+	s *AgentService
 }
 
-// getPendingTaskForRedelivery looks up a task for redelivery purposes.
-func (s *AgentService) getPendingTaskForRedelivery(ctx context.Context, taskID string) (*pendingTaskSnapshot, error) {
-	var task struct {
-		ID                string
-		AgentInstanceID   string
-		TriggeredByUserID string
-		Status            string
-		EdgeDeviceID      string
-		EdgeRunID         string
-		TargetID          string
+func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	if a.s == nil {
+		return fmt.Errorf("redispatch: nil agent service")
 	}
-	err := s.db.WithContext(ctx).
-		Table("pending_agent_tasks").
-		Select("id, agent_instance_id, triggered_by_user_id, status, edge_device_id, edge_run_id, target_id").
-		Where("id = ?", taskID).
-		First(&task).Error
-	if err != nil {
-		return nil, err
-	}
-	return &pendingTaskSnapshot{
-		ID:                task.ID,
-		AgentInstanceID:   task.AgentInstanceID,
-		TriggeredByUserID: task.TriggeredByUserID,
-		Status:            task.Status,
-		EdgeDeviceID:      task.EdgeDeviceID,
-		EdgeRunID:         task.EdgeRunID,
-		TargetID:          task.TargetID,
-	}, nil
-}
-
-type pendingTaskSnapshot struct {
-	ID                string
-	AgentInstanceID   string
-	TriggeredByUserID string
-	Status            string
-	EdgeDeviceID      string
-	EdgeRunID         string
-	TargetID          string
-}
-
-// retryDispatchToTarget re-dispatches a delivery to the target Edge device.
-// rec is a redispatchTarget (opaque payload fields only), not the GORM model.
-func (s *AgentService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) {
-	// Build a minimal PendingAgentTask for dispatchToEdgeHTTP which needs task.ID.
-	minimalTask := &model.PendingAgentTask{
-		ID:           task.ID,
-		TargetID:     task.TargetID,
-		EdgeDeviceID: task.EdgeDeviceID,
-	}
-
-	// Try HTTP dispatch first for unbound tasks.
-	// HTTP path lives on DispatchService (same-package thin extract #563).
-	if task.TargetID == "" && task.EdgeDeviceID == "" {
-		if edgeRunID := s.dispatchService().dispatchToEdgeHTTP(ctx, minimalTask, &dp); edgeRunID != "" {
-			slog.Info("redispatch: HTTP dispatch succeeded",
-				"delivery_id", rec.DeliveryID,
-				"task_id", rec.TaskID,
-				"edge_run_id", edgeRunID,
-			)
-			return
-		}
-	}
-
-	// Route by device: push to WebSocket or offline queue.
-	cacheClient := resolveAgentCache(s.cacheClient)
-	if task.EdgeDeviceID != "" {
-		connID, err := cacheClient.GetRouteForDevice(ctx, task.TriggeredByUserID, "desktop", task.EdgeDeviceID)
-		if err == nil && connID != "" && s.mgr != nil {
-			conn := s.mgr.FindByConnID(connID)
-			if conn != nil && conn.UserID == task.TriggeredByUserID {
-				frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload))
-				result := s.mgr.PushToConn(connID, frame)
-				if result.Queued {
-					slog.Info("redispatch: WS dispatch succeeded",
-						"delivery_id", rec.DeliveryID,
-						"task_id", rec.TaskID,
-						"device_id", task.EdgeDeviceID,
-					)
-					return
-				}
-				slog.Warn("redispatch: WS push not queued",
-					"delivery_id", rec.DeliveryID,
-					"task_id", rec.TaskID,
-					"delivery_status", result.Status,
-					"error", result.Err,
-				)
-			}
-		}
-		// Offline: push to Redis queue.
-		if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
-			slog.Error("redispatch: failed to push to offline queue",
-				"delivery_id", rec.DeliveryID,
-				"task_id", rec.TaskID,
-				"error", err,
-			)
-		} else {
-			slog.Info("redispatch: queued to offline queue",
-				"delivery_id", rec.DeliveryID,
-				"task_id", rec.TaskID,
-				"user_id", task.TriggeredByUserID,
-			)
-		}
-		return
-	}
-
-	// Fallback: push to inviter's desktop queue.
-	connID, err := cacheClient.GetRoute(ctx, task.TriggeredByUserID, "desktop")
-	if err == nil && connID != "" && s.mgr != nil {
-		conn := s.mgr.FindByConnID(connID)
-		if conn != nil {
-			frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload))
-			result := s.mgr.PushToConn(connID, frame)
-			if result.Queued {
-				slog.Info("redispatch: WS fallback dispatch succeeded",
-					"delivery_id", rec.DeliveryID,
-					"task_id", rec.TaskID,
-				)
-				return
-			}
-		}
-	}
-
-	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
-		slog.Error("redispatch: failed to push to fallback queue",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
-	} else {
-		slog.Info("redispatch: queued to fallback queue",
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-		)
-	}
+	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
 }
 
 // truncateString is a thin alias kept for same-package tests.
@@ -757,11 +577,13 @@ func truncateString(s string, maxLen int) string {
 
 // deliveryOutboxService returns the composed DeliveryOutbox, lazily constructing
 // one from AgentService deps when tests use struct literals without NewAgentService.
+// Lazy path uses lazyDispatchRedispatcher so construction does not recurse into
+// dispatchService(); redispatch still lands on DispatchService at call time.
 func (s *AgentService) deliveryOutboxService() *DeliveryOutbox {
 	if s.deliveryOutbox != nil {
 		return s.deliveryOutbox
 	}
-	return NewDeliveryOutbox(s.db, agentRedispatcher{s})
+	return NewDeliveryOutbox(s.db, lazyDispatchRedispatcher{s})
 }
 
 // RecordDelivery inserts a delivery_outbox entry in status=pending before
