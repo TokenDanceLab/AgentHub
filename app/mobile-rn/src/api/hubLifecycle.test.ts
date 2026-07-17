@@ -67,7 +67,7 @@ describe('Mobile Hub lifecycle bridge', () => {
       onResyncRequired: (resync) => resyncs.push(resync),
     });
 
-    expect(createWebSocket).toHaveBeenCalledWith('wss://hub.example.test/client/ws');
+    expect(createWebSocket).toHaveBeenCalledWith('wss://hub.example.test/client/ws', undefined);
 
     // Server frame: { type, payload, seq_id }
     sockets[0]?.emitMessage(
@@ -88,6 +88,7 @@ describe('Mobile Hub lifecycle bridge', () => {
     expect(resyncs).toEqual([{ reason: 'foreground', since: '10' }]);
     expect(createWebSocket).toHaveBeenLastCalledWith(
       'wss://hub.example.test/client/ws?since=10',
+      undefined,
     );
     expect(bridge.getCursor()).toBe('10');
   });
@@ -110,7 +111,10 @@ describe('Mobile Hub lifecycle bridge', () => {
 
     appState.transition('active');
 
-    expect(createWebSocket).toHaveBeenCalledWith('ws://127.0.0.1:8080/client/ws?since=5');
+    expect(createWebSocket).toHaveBeenCalledWith(
+      'ws://127.0.0.1:8080/client/ws?since=5',
+      undefined,
+    );
     expect(statuses).toContain('resync_required');
   });
 
@@ -144,14 +148,17 @@ describe('Mobile Hub lifecycle bridge', () => {
     expect(resyncs).toEqual([{ reason: 'stream_closed', since: '7' }]);
     expect(createWebSocket).toHaveBeenLastCalledWith(
       'wss://hub.example.test/client/ws?since=7',
+      undefined,
     );
     expect(sockets).toHaveLength(2);
   });
 
-  it('passes access_token to WS URL when provided', () => {
+  it('passes JWT via Sec-WebSocket-Protocol when provided (no query access_token)', () => {
     const appState = new FakeAppState('active');
-    const createWebSocket = vi.fn((url: string) => {
-      expect(new URL(url).searchParams.get('access_token')).toBe('test-jwt');
+    const createWebSocket = vi.fn((url: string, protocols?: string[]) => {
+      expect(new URL(url).searchParams.has('access_token')).toBe(false);
+      expect(url).toBe('wss://hub.example.test/client/ws');
+      expect(protocols).toEqual(['agenthub.bearer.v1', 'test-jwt']);
       return new FakeSocket();
     });
 

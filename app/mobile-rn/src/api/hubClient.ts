@@ -221,6 +221,27 @@ export interface HubWsEvent<TPayload = unknown> {
 export interface HubWsUrlOptions {
   since?: string;
   token?: string;
+  /**
+   * When true, append JWT as query `access_token` (legacy fallback).
+   * Default false — prefer Sec-WebSocket-Protocol via `buildWSAuthProtocols`.
+   */
+  useQueryTokenFallback?: boolean;
+}
+
+/**
+ * Fixed Sec-WebSocket-Protocol marker negotiated with Hub WS upgrades.
+ * Paired with the raw Hub JWT as a second subprotocol value.
+ * Must match hub-server middleware.WSBearerSubprotocol.
+ */
+export const WS_BEARER_SUBPROTOCOL = 'agenthub.bearer.v1';
+
+/**
+ * Build WebSocket subprotocols that carry a Hub JWT without putting it in the URL.
+ * Returns undefined when token is missing so the socket opens without auth protocols.
+ */
+export function buildWSAuthProtocols(token: string | null | undefined): string[] | undefined {
+  if (!token) return undefined;
+  return [WS_BEARER_SUBPROTOCOL, token];
 }
 
 // ── Mobile Hub client ──
@@ -651,6 +672,10 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
 }
 
 // ── WebSocket URL builder (aligned with hub-server /client/ws) ──
+//
+// Preferred auth carriage (matching hub-server middleware.WSBearerSubprotocol):
+//   Sec-WebSocket-Protocol: agenthub.bearer.v1, <hub-jwt>
+// Query ?access_token= is a legacy fallback only (useQueryTokenFallback).
 
 export function createHubWsUrl(baseUrl: string, options: HubWsUrlOptions = {}): string {
   const url = new URL(baseUrl);
@@ -662,9 +687,10 @@ export function createHubWsUrl(baseUrl: string, options: HubWsUrlOptions = {}): 
     url.searchParams.set('since', options.since);
   }
 
-  // Token goes in query for WS auth. Hub WSAuthMiddleware accepts
-  // Authorization Bearer or the "access_token" query parameter (not "token").
-  if (options.token) {
+  // Default path does not put JWT in the URL. Prefer buildWSAuthProtocols +
+  // Sec-WebSocket-Protocol. Query access_token remains available only when
+  // useQueryTokenFallback is explicitly enabled (legacy mobile / older hubs).
+  if (options.token && options.useQueryTokenFallback === true) {
     url.searchParams.set('access_token', options.token);
   }
 
