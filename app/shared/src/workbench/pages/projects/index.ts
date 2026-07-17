@@ -4,9 +4,10 @@ export {
   ProjectNavRow,
   FilterList,
   ProjectTabs,
-  ProjectDetail,
   ProjectEditor,
-} from './ProjectDetailViews';
+} from './ProjectChromeViews';
+
+export { ProjectDetail } from './ProjectPanelViews';
 
 export { ProjectNav } from './ProjectNav';
 export type { ProjectNavProps } from './ProjectNav';
