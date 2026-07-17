@@ -478,3 +478,180 @@ func TestNeedsAdapterStdinAndMetricsLabel(t *testing.T) {
 	_ = needsAdapterStdin(ad)
 	_ = fmt.Sprintf("%v", ad != nil)
 }
+
+func TestCanStartRun(t *testing.T) {
+	t.Parallel()
+	if err := canStartRun(0, 0, false); err != nil {
+		t.Fatalf("empty map should start: %v", err)
+	}
+	if err := canStartRun(defaultMaxConcurrentRuns, 0, false); !errors.Is(err, ErrTooManyConcurrentRuns) {
+		t.Fatalf("at default max -> %v", err)
+	}
+	if err := canStartRun(0, 3, true); !errors.Is(err, ErrRunAlreadyStarted) {
+		t.Fatalf("already running -> %v", err)
+	}
+	if err := canStartRun(2, 3, false); err != nil {
+		t.Fatalf("under custom max -> %v", err)
+	}
+}
+
+func TestShouldResolveAdapter(t *testing.T) {
+	t.Parallel()
+	if shouldResolveAdapter(false, "a", true) {
+		t.Fatal("no registry")
+	}
+	if !shouldResolveAdapter(true, "a", false) {
+		t.Fatal("agent id should resolve")
+	}
+	if !shouldResolveAdapter(true, "", true) {
+		t.Fatal("default adapter should resolve")
+	}
+	if shouldResolveAdapter(true, "", false) {
+		t.Fatal("no agent and no default")
+	}
+}
+
+func TestSanitizePermissionMode(t *testing.T) {
+	t.Parallel()
+	mode, forbidden := sanitizePermissionMode("bypassPermissions")
+	if !forbidden || mode != "default" {
+		t.Fatalf("forbidden -> %q %v", mode, forbidden)
+	}
+	mode, forbidden = sanitizePermissionMode("acceptEdits")
+	if forbidden || mode != "acceptEdits" {
+		t.Fatalf("allowed -> %q %v", mode, forbidden)
+	}
+}
+
+func TestEnvForAdapterOrProfile(t *testing.T) {
+	t.Parallel()
+	run := store.Run{ID: "run_1", ProjectID: "p", ThreadID: "th"}
+	adapterEnv := envForAdapterOrProfile(run, true, []string{"ANTHROPIC_API_KEY=x"}, []string{"EXTRA=1"})
+	joined := strings.Join(adapterEnv, "\n")
+	if !strings.Contains(joined, "AGENTHUB_RUN_ID=run_1") {
+		t.Fatalf("adapter mode missing runtime vars: %#v", adapterEnv)
+	}
+	if !strings.Contains(joined, "EXTRA=1") || !strings.Contains(joined, "ANTHROPIC_API_KEY=x") {
+		t.Fatalf("adapter mode missing overlay: %#v", adapterEnv)
+	}
+	profileEnv := envForAdapterOrProfile(run, false, []string{"CUSTOM=1"}, []string{"EXTRA=2"})
+	joined = strings.Join(profileEnv, "\n")
+	if !strings.Contains(joined, "CUSTOM=1") || !strings.Contains(joined, "EXTRA=2") {
+		t.Fatalf("profile mode %#v", profileEnv)
+	}
+	if !strings.Contains(joined, "AGENTHUB_THREAD_ID=th") {
+		t.Fatalf("profile mode missing runtime: %#v", profileEnv)
+	}
+}
+
+func TestWithFreshSessionAndCancelPredicates(t *testing.T) {
+	t.Parallel()
+	runCtx := RunProcessContext{SessionID: "old", ContinueLast: true}
+	got := withFreshSession(runCtx, "new")
+	if got.SessionID != "new" || got.ContinueLast {
+		t.Fatalf("%#v", got)
+	}
+	if !shouldTreatAsCancelled(context.Canceled, "started") {
+		t.Fatal("ctx cancel")
+	}
+	if !shouldTreatAsCancelled(nil, "cancelling") {
+		t.Fatal("status cancelling")
+	}
+	if shouldTreatAsCancelled(nil, "started") {
+		t.Fatal("running should not cancel")
+	}
+	if !shouldSurfaceRunArtifacts(true, "finished") {
+		t.Fatal("finished should surface")
+	}
+	if shouldSurfaceRunArtifacts(false, "finished") || shouldSurfaceRunArtifacts(true, "failed") {
+		t.Fatal("non-finished should not surface")
+	}
+}
+
+func TestAgentFailurePersistenceHelpers(t *testing.T) {
+	t.Parallel()
+	if _, ok := trimAgentFailureContent("  \n"); ok {
+		t.Fatal("blank content")
+	}
+	got, ok := trimAgentFailureContent("  boom  ")
+	if !ok || got != "boom" {
+		t.Fatalf("%q %v", got, ok)
+	}
+	items := []store.Item{
+		{RunID: "run_1", Type: "user_message"},
+		{RunID: "run_2", Type: "agent_message"},
+	}
+	if hasAgentMessageForRun(items, "run_1") {
+		t.Fatal("user message is not agent_message")
+	}
+	if !hasAgentMessageForRun(items, "run_2") {
+		t.Fatal("expected existing agent_message")
+	}
+}
+
+func TestApplyParentWorkDirMemory(t *testing.T) {
+	t.Parallel()
+	base := RunProcessContext{Prompt: "hi"}
+	if got := applyParentWorkDirMemory(base, "", "th", "agent"); got.WorkDir != "" {
+		t.Fatalf("empty parent %#v", got)
+	}
+	// Empty workDir yields empty memory; still copies workdir when provided.
+	got := applyParentWorkDirMemory(base, "D:/tmp/ws", "th", "agent")
+	if got.WorkDir != "D:/tmp/ws" {
+		t.Fatalf("workdir %#v", got)
+	}
+}
+
+func TestSubAgentDeliveryPredicates(t *testing.T) {
+	t.Parallel()
+	if shouldDeliverSubAgentResult(false, true) || shouldDeliverSubAgentResult(true, false) {
+		t.Fatal("both registry and queue required")
+	}
+	if !shouldDeliverSubAgentResult(true, true) {
+		t.Fatal("expected delivery ready")
+	}
+	if shouldRouteSubAgentToParent(false, "p") || shouldRouteSubAgentToParent(true, "") {
+		t.Fatal("parent required")
+	}
+	if !shouldRouteSubAgentToParent(true, "parent") {
+		t.Fatal("expected route")
+	}
+	if !shouldRecordHubTask("task_1") || shouldRecordHubTask("") {
+		t.Fatal("hub task predicate")
+	}
+}
+
+func TestParserContextAndSecurityHooks(t *testing.T) {
+	t.Parallel()
+	if _, ok := budgetFromParserContext(context.Background()); ok {
+		t.Fatal("empty ctx")
+	}
+	budget := runnerctx.NewContextBudget(100)
+	ctx := context.WithValue(context.Background(), adapters.CtxBudgetKey, budget)
+	got, ok := budgetFromParserContext(ctx)
+	if !ok || got != budget {
+		t.Fatalf("budget %v %v", got, ok)
+	}
+	if _, ok := allowedToolsFromParserContext(context.Background()); ok {
+		t.Fatal("no tools")
+	}
+	rcCtx := adapters.SDKAdapterContext(context.Background(), adapters.RunProcessContext{
+		AllowedTools: []string{"Read", "Edit"},
+	})
+	tools, ok := allowedToolsFromParserContext(rcCtx)
+	if !ok || len(tools) != 2 {
+		t.Fatalf("tools %#v %v", tools, ok)
+	}
+	hooks := buildProcessSecurityHooks(nil, adapters.NewBusEventEmitter(nil), map[string]any{"runId": "r"})
+	if len(hooks) != 1 {
+		t.Fatalf("security-only hooks %d", len(hooks))
+	}
+	hooks = buildProcessSecurityHooks([]string{"Read"}, adapters.NewBusEventEmitter(nil), map[string]any{"runId": "r"})
+	if len(hooks) != 2 {
+		t.Fatalf("allowlist+security hooks %d", len(hooks))
+	}
+	msg := recoverableParseWarningMessage(errors.New("malformed"))
+	if !strings.Contains(msg, "malformed") || !strings.HasPrefix(msg, "Recoverable stream parse error:") {
+		t.Fatalf("msg %q", msg)
+	}
+}
