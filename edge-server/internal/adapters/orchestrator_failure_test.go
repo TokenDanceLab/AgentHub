@@ -782,8 +782,6 @@ func TestBuildReflexionCritique_FormatStructure(t *testing.T) {
 // ── Rule Engine: isFinishDispatch Tests (T2-A08) ─────────────────────────────
 
 func TestIsFinishDispatch(t *testing.T) {
-	d := &dispatchInterceptor{} // minimal interceptor; isFinishDispatch is pure
-
 	tests := []struct {
 		name string
 		evt  dispatchEvent
@@ -901,7 +899,7 @@ func TestIsFinishDispatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := d.isFinishDispatch(tt.evt)
+			got := isFinishDispatch(tt.evt)
 			if got != tt.want {
 				t.Errorf("isFinishDispatch(%+v) = %v, want %v", tt.evt, got, tt.want)
 			}
@@ -912,8 +910,6 @@ func TestIsFinishDispatch(t *testing.T) {
 // ── Rule Engine: matchCompletion Tests (T2-A08) ──────────────────────────────
 
 func TestMatchCompletion(t *testing.T) {
-	d := &dispatchInterceptor{} // minimal interceptor; matchCompletion is pure
-
 	tests := []struct {
 		name string
 		text string
@@ -1008,7 +1004,7 @@ func TestMatchCompletion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			textLower := strings.ToLower(tt.text)
-			got := d.matchCompletion(textLower)
+			got := matchCompletion(textLower)
 			if got != tt.want {
 				t.Errorf("matchCompletion(%q) = %v, want %v", tt.text, got, tt.want)
 			}
