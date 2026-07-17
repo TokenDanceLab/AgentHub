@@ -7,19 +7,19 @@
 /* ── Status messages ─────────────────────────────────── */
 .loading {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
 .error {
   padding: var(--space-lg);
-  color: var(--td-danger);
+  color: var(--danger);
   font-size: var(--font-size-xs);
 }
 
 .empty {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
@@ -33,20 +33,20 @@
 .reasonInput {
   flex: 1;
   padding: 6px 10px;
-  border-radius: var(--td-radius-control);
-  border: 1px solid var(--td-line);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bdr);
   font-size: var(--font-size-xs);
-  background: var(--td-surface);
-  color: var(--td-ink);
+  background: var(--surface);
+  color: var(--text-1);
   outline: none;
 }
 
 /* ── Card shared by approval & conflict ──────────────── */
 .card {
   padding: 10px 12px;
-  border-radius: var(--td-radius-panel);
-  border: 1px solid var(--td-line);
-  background: var(--surface-raised);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--bdr);
+  background: var(--surface-high);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -75,12 +75,12 @@
 
 .cardMeta {
   font-size: var(--font-size-2xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 .cardMetaItalic {
   font-size: var(--font-size-xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-style: italic;
 }
 
@@ -112,18 +112,18 @@
 }
 
 .badgeApproved {
-  color: var(--td-moss);
+  color: var(--success);
   background: var(--glass-tint-moss);
 }
 
 .badgeDenied {
-  color: var(--td-danger);
+  color: var(--danger);
   background: var(--glass-tint-danger);
 }
 
 .badgeDefault {
-  color: var(--td-ink-muted);
-  background: var(--td-tint);
+  color: var(--text-2);
+  background: var(--muted);
 }
 
 /* ── Action buttons ──────────────────────────────────── */
@@ -132,7 +132,7 @@
   align-items: center;
   gap: 4px;
   padding: 5px 12px;
-  border-radius: var(--td-radius-control);
+  border-radius: var(--r-sm);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
@@ -145,21 +145,21 @@
 }
 
 .actionBtnDeny {
-  border-color: var(--td-danger);
+  border-color: var(--danger);
   background: var(--glass-tint-danger);
-  color: var(--td-danger);
+  color: var(--danger);
 }
 
 .actionBtnApprove {
-  border-color: var(--td-moss);
+  border-color: var(--success);
   background: var(--glass-tint-moss);
-  color: var(--td-moss);
+  color: var(--success);
 }
 
 .actionBtnResolve {
-  border: 1px solid var(--td-moss);
+  border: 1px solid var(--success);
   background: var(--glass-tint-moss);
-  color: var(--td-moss);
+  color: var(--success);
   cursor: pointer;
 }
 
@@ -175,9 +175,9 @@
 }
 
 .dialog {
-  background: var(--td-surface);
-  border: 1px solid var(--td-line);
-  border-radius: var(--td-radius-panel);
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
   padding: 20px;
   min-width: 320px;
   max-width: 420px;
@@ -188,19 +188,19 @@
   margin: 0 0 8px;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--td-ink);
+  color: var(--text-1);
 }
 
 .dialogBody {
   margin: 0 0 var(--space-lg);
   font-size: var(--font-size-xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 .dialogReason {
   margin: 0 0 var(--space-lg);
   font-size: var(--font-size-xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 .dialogActions {
@@ -211,10 +211,10 @@
 
 .dialogCancel {
   padding: 6px 14px;
-  border-radius: var(--td-radius-control);
-  border: 1px solid var(--td-line);
-  background: var(--surface-raised);
-  color: var(--td-ink);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bdr);
+  background: var(--surface-high);
+  color: var(--text-1);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
@@ -222,7 +222,7 @@
 
 .dialogConfirm {
   padding: 6px 14px;
-  border-radius: var(--td-radius-control);
+  border-radius: var(--r-sm);
   border: none;
   color: var(--primary-foreground);
   font-size: var(--font-size-xs);
@@ -231,9 +231,9 @@
 }
 
 .dialogConfirmApprove {
-  background: var(--td-moss);
+  background: var(--success);
 }
 
 .dialogConfirmDeny {
-  background: var(--td-danger);
+  background: var(--danger);
 }
