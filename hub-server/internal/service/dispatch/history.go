@@ -37,3 +37,30 @@ func ShouldResolveTeamContext(customAgentID *string) bool {
 func TeamContextFromRun(teamRunID string) bool {
 	return teamRunID != ""
 }
+
+// TeamContextResolutionReady is true when resolveDispatchTeamContext has enough
+// service/db/agent identity to attempt team-run attribution.
+func TeamContextResolutionReady(serviceOK, dbOK, agentOK bool, customAgentID *string) bool {
+	return serviceOK && dbOK && agentOK && ShouldResolveTeamContext(customAgentID)
+}
+
+// TeamRunLoadable is true when a team-run row may drive attribution.
+func TeamRunLoadable(err error, runPresent bool, teamRunID string) bool {
+	return err == nil && runPresent && TeamContextFromRun(teamRunID)
+}
+
+// TeamMembersPresent is true when ListTeamMembers returned a usable set (no error).
+// Empty member lists still proceed to MatchTeamContext (team+run only attribution).
+func TeamMembersPresent(err error) bool {
+	return err == nil
+}
+
+// EmptyTeamContext is the zero TeamContext returned on short-circuit paths.
+func EmptyTeamContext() TeamContext {
+	return TeamContext{}
+}
+
+// PinMessagesLoadable is true when GetMessagesByIDs for pins succeeded.
+func PinMessagesLoadable(err error) bool {
+	return err == nil
+}
