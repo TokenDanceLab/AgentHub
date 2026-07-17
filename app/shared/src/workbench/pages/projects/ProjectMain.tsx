@@ -13,7 +13,8 @@ import { EmptyState } from '../../../ui';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 import styles from '../ProjectsPage.module.css';
-import { ProjectDetail, ProjectEditor, ProjectTabs } from './ProjectDetailViews';
+import { ProjectEditor, ProjectTabs } from './ProjectChromeViews';
+import { ProjectDetail } from './ProjectPanelViews';
 import type {
   ProjectArtifact,
   ProjectDraft,
