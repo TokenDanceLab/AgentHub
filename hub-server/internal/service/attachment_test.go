@@ -171,6 +171,67 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 	}
 }
 
+func TestAttachmentService_NilStorageBlobPathsAreSafe(t *testing.T) {
+	// Metadata-only construction (storage port unset) must not panic on blob paths.
+	svc := service.NewAttachmentService(nil, config.UploadConfig{}, nil)
+	hash := strings.Repeat("e", 64)
+
+	if path := svc.BlobLocalPath(hash); path != "" {
+		t.Fatalf("BlobLocalPath with nil storage = %q, want empty", path)
+	}
+	if err := svc.DeleteBlob(context.Background(), hash); err != nil {
+		t.Fatalf("DeleteBlob with nil storage error = %v, want nil", err)
+	}
+	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="x.txt"`)
+	if err != nil {
+		t.Fatalf("PresignBlobURL with nil storage error = %v, want nil", err)
+	}
+	if url != "" {
+		t.Fatalf("PresignBlobURL with nil storage = %q, want empty", url)
+	}
+
+	if _, err := svc.StoreBlob(context.Background(), hash, strings.NewReader("x"), "text/plain"); err == nil {
+		t.Fatal("StoreBlob with nil storage error = nil, want configured error")
+	}
+	if _, err := svc.GetBlob(context.Background(), hash); err == nil {
+		t.Fatal("GetBlob with nil storage error = nil, want configured error")
+	}
+}
+
+func TestAttachmentService_SetStoragePort(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	hash := strings.Repeat("f", 64)
+	store := &recordingPresignStorage{url: "https://s3.example.test/set-storage"}
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, nil)
+
+	// Before SetStorage: presign is a no-op.
+	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
+	if err != nil {
+		t.Fatalf("PresignBlobURL before SetStorage error = %v", err)
+	}
+	if url != "" {
+		t.Fatalf("PresignBlobURL before SetStorage = %q, want empty", url)
+	}
+	if store.called {
+		t.Fatal("storage should not be called before SetStorage")
+	}
+
+	svc.SetStorage(store)
+	url, err = svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
+	if err != nil {
+		t.Fatalf("PresignBlobURL after SetStorage error = %v", err)
+	}
+	if url != store.url {
+		t.Fatalf("PresignBlobURL after SetStorage = %q, want %q", url, store.url)
+	}
+	if !store.called {
+		t.Fatal("storage PresignURL should be called after SetStorage")
+	}
+	if store.key != service.PathFromHash(hash) {
+		t.Fatalf("presign key = %q, want %q", store.key, service.PathFromHash(hash))
+	}
+}
+
 func TestSaveAttachmentWithMetadata_NormalizesJSONObject(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
 	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
