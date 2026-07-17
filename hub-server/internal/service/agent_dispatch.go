@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -24,33 +23,9 @@ import (
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
-// dispatchPayload is the payload sent to the edge for agent.dispatch
-type dispatchPayload struct {
-	TaskID           string `json:"task_id"`
-	DeliveryID       string `json:"delivery_id,omitempty"`
-	AgentInstanceID  string `json:"agent_instance_id"`
-	AgentType        string `json:"agent_type"`
-	CustomAgentID    string `json:"custom_agent_id,omitempty"`
-	TargetID         string `json:"target_id,omitempty"`
-	EdgeDeviceID     string `json:"edge_device_id,omitempty"`
-	SessionID        string `json:"session_id"`
-	TriggerMessageID string `json:"trigger_message_id"`
-	TriggerUserID    string `json:"trigger_user_id"`
-	Prompt           string `json:"prompt"`
-	DisplayName      string `json:"display_name"`
-	SystemPrompt     string `json:"system_prompt,omitempty"`
-	ModelParams      string `json:"model_params,omitempty"`
-	ToolWhitelist    string `json:"tool_whitelist,omitempty"`
-	TeamID           string `json:"team_id,omitempty"`
-	TeamRunID        string `json:"team_run_id,omitempty"`
-	TeamMemberID     string `json:"team_member_id,omitempty"`
-	TeamMemberRole   string `json:"team_member_role,omitempty"`
-	// Context continuity: thread history and pinned messages for all agent runtimes.
-	Messages       []dispatchMessage `json:"messages,omitempty"`
-	PinnedMessages []dispatchMessage `json:"pinned_messages,omitempty"`
-	// OutputSchema is the JSON Schema for structured output (--json-schema).
-	OutputSchema *json.RawMessage `json:"structured_output_schema,omitempty"`
-}
+// dispatchPayload is a same-package alias for the pure dispatch.Payload DTO so
+// edge JSON tags and redispatch unmarshaling stay stable (#789).
+type dispatchPayload = dispatch.Payload
 
 // dispatchMessage is a same-package alias for the pure dispatch.Message DTO so
 // payload JSON tags and redispatch unmarshaling stay stable (#756).
@@ -64,14 +39,15 @@ type edgeRunResponse = dispatch.EdgeRunResponse
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Residual pure surface (#779) after #768/#756/#732 pure helpers, thin first
-// seam (#563), redispatch residual (#573), and residual ports (#617). Pure
-// surface lives in service/dispatch (loopback / runtime type / select / merge /
-// prompt+history text / task-status / edge constants / Message DTO / Edge run
-// request builder / team+target+capability+redelivery / routing / task-access /
-// payload assembly / event payloads) with thin same-package aliases below.
-// Orchestration + ports stay flat; dispatchPayload stays package-private; no
-// OpenAPI/handler/frontend; no typed DispatchService package move.
+// Residual pure surface (#789) after #779/#768/#756/#732 pure helpers, thin
+// first seam (#563), redispatch residual (#573), and residual ports (#617).
+// Pure surface lives in service/dispatch (loopback / runtime type / select /
+// merge / prompt+history text / task-status / edge constants / Message DTO /
+// Edge run request builder / team+target+capability+redelivery / routing /
+// task-access / payload assembly / event payloads / Payload DTO + builders /
+// capability mint resolve / trigger target mapping) with thin same-package
+// aliases below. Orchestration + ports stay flat; no OpenAPI/handler/frontend;
+// no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -109,9 +85,10 @@ type dispatchWS interface {
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
-// retries call in through Redispatcher; dispatchPayload stays package-private.
-// Same-package extract (#563/#573/#617) + pure helpers in service/dispatch
-// (#732/#756/#768/#779) — typed package move still deferred.
+// retries call in through Redispatcher; Payload DTO lives in service/dispatch
+// with a thin same-package alias. Same-package extract (#563/#573/#617) + pure
+// helpers in service/dispatch (#732/#756/#768/#779/#789) — typed package move
+// still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -348,24 +325,16 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 	if err != nil {
 		return nil, err
 	}
-	targetType := ""
-	if dispatchTarget != nil {
-		targetID = dispatchTarget.ID
-		targetType = dispatchTarget.TargetType
-	} else {
-		targetID = ""
-	}
+	targetID, targetType, edgeDeviceID := dispatch.ApplyValidatedTarget(dispatchTarget)
 
 	task := &model.PendingAgentTask{
 		AgentInstanceID:   ai.ID,
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
 		TargetID:          targetID,
+		EdgeDeviceID:      edgeDeviceID,
 		Status:            model.TaskStatusQueued,
 		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
-	}
-	if dispatchTarget != nil {
-		task.EdgeDeviceID = dispatchTarget.DeviceID
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
@@ -373,8 +342,8 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 
 	// Pre-query the CustomAgent to avoid a DB query inside the dispatch goroutine.
 	var customAgent *model.CustomAgent
-	if ai.CustomAgentID != nil && *ai.CustomAgentID != "" {
-		ca, err := repository.GetCustomAgentByID(s.db, *ai.CustomAgentID)
+	if dispatch.NeedsCustomAgentPreload(ai.CustomAgentID) {
+		ca, err := repository.GetCustomAgentByID(s.db, dispatch.CustomAgentIDValue(ai.CustomAgentID))
 		if err == nil {
 			customAgent = ca
 		}
@@ -433,21 +402,12 @@ func promptFromMessage(msg *model.Message) string {
 }
 
 func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
-	dp := dispatchPayload{
-		TaskID:           task.ID,
-		AgentInstanceID:  ai.ID,
-		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
-		TargetID:         task.TargetID,
-		EdgeDeviceID:     task.EdgeDeviceID,
-		SessionID:        ai.SessionID,
-		TriggerMessageID: task.TriggerMessageID,
-		TriggerUserID:    task.TriggeredByUserID,
-		Prompt:           prompt,
-		DisplayName:      ai.DisplayName,
-	}
+	dp := dispatch.NewPayload(
+		task.ID, ai.ID, ai.AgentType, task.TargetID, task.EdgeDeviceID, ai.SessionID,
+		task.TriggerMessageID, task.TriggeredByUserID, prompt, ai.DisplayName,
+	)
 
-	if ai.CustomAgentID != nil && *ai.CustomAgentID != "" {
-		dp.CustomAgentID = *ai.CustomAgentID
+	if dispatch.HasCustomAgentBinding(ai.CustomAgentID) {
 		var fields *dispatch.CustomAgentFields
 		if customAgent != nil {
 			fields = &dispatch.CustomAgentFields{
@@ -457,12 +417,10 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				OutputSchema:  customAgent.OutputSchema,
 			}
 		}
-		dp.SystemPrompt, dp.ModelParams, dp.ToolWhitelist, dp.OutputSchema =
-			dispatch.ApplyCustomAgentToPayload(dp.CustomAgentID, fields)
+		dispatch.ApplyCustomAgentProfile(&dp, dispatch.CustomAgentIDValue(ai.CustomAgentID), fields)
 	}
-	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
-	dp.TeamID, dp.TeamRunID, dp.TeamMemberID, dp.TeamMemberRole =
-		dispatch.ApplyTeamContextToPayload(s.resolveDispatchTeamContext(ai))
+	dispatch.MergePayloadModelParams(&dp, modelParams)
+	dispatch.ApplyTeamContext(&dp, s.resolveDispatchTeamContext(ai))
 
 	// Load thread history for context continuity (all agent runtimes).
 	dp.Messages = s.loadThreadHistory(ai.SessionID, task.TriggerMessageID)
@@ -476,9 +434,13 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		slog.Error("AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking",
 			"task_id", task.ID, "edge_device_id", task.EdgeDeviceID, "error", err)
 	} else {
-		dp.DeliveryID = deliveryID
 		// Re-serialize with delivery_id included.
-		payload, _ = json.Marshal(dp)
+		dispatch.AttachDeliveryID(&dp, deliveryID)
+		if withDelivery, mErr := dispatch.MarshalWithDeliveryID(dp, deliveryID); mErr == nil {
+			payload = withDelivery
+		} else {
+			payload, _ = json.Marshal(dp)
+		}
 	}
 
 	// Try HTTP direct dispatch to local Edge server first.
@@ -572,7 +534,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 }
 
 func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
-	if s == nil || s.db == nil || ai == nil || ai.CustomAgentID == nil || strings.TrimSpace(*ai.CustomAgentID) == "" {
+	if s == nil || s.db == nil || ai == nil || !dispatch.HasCustomAgentBinding(ai.CustomAgentID) {
 		return dispatchTeamContext{}
 	}
 	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
@@ -592,7 +554,7 @@ func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) di
 		profileIDs[i] = members[i].AgentProfileID
 	}
 	refs := dispatch.TeamMemberRefsFromProfiles(ids, roles, profileIDs)
-	return dispatch.MatchTeamContext(run.TeamID, run.ID, *ai.CustomAgentID, refs)
+	return dispatch.MatchTeamContext(run.TeamID, run.ID, dispatch.CustomAgentIDValue(ai.CustomAgentID), refs)
 }
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
@@ -752,24 +714,35 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 // issueRunStartCapability mints a short-lived capability token for Edge dual-token auth.
 // Returns empty string when secret/device are unavailable so local/dev dispatch still works.
 func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
-	secret := strings.TrimSpace(os.Getenv("AGENTHUB_JWT_SECRET"))
-	if secret == "" {
+	if dp == nil {
 		return ""
 	}
-	deviceID := dispatch.ResolveCapabilityDeviceID(dp.EdgeDeviceID, os.Getenv("AGENTHUB_EDGE_DEVICE_ID"))
-	if deviceID == "" {
-		return ""
-	}
-	userID := dispatch.ResolveCapabilityUserID(dp.TriggerUserID)
-	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
-	projectID := dispatch.LocalProjectID
-	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, dispatch.DefaultCapabilityAction, 5*time.Minute, jwtutil.CapabilityIssueOptions{
-		Action:   dispatch.DefaultCapabilityAction,
-		TargetID: strings.TrimSpace(dp.TargetID),
-		ThreadID: dispatch.LocalThreadID,
+	resolved := dispatch.ResolveCapabilityMint(dispatch.CapabilityMintInput{
+		JWTSecret:       os.Getenv("AGENTHUB_JWT_SECRET"),
+		PayloadDeviceID: dp.EdgeDeviceID,
+		EnvDeviceID:     os.Getenv("AGENTHUB_EDGE_DEVICE_ID"),
+		TriggerUserID:   dp.TriggerUserID,
+		TargetID:        dp.TargetID,
 	})
+	if !resolved.Ok {
+		return ""
+	}
+	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
+	token, err := jwtutil.IssueCapabilityToken(
+		[]byte(resolved.Secret),
+		resolved.UserID,
+		resolved.DeviceID,
+		resolved.ProjectID,
+		resolved.Action,
+		resolved.TTL,
+		jwtutil.CapabilityIssueOptions{
+			Action:   resolved.Action,
+			TargetID: resolved.TargetID,
+			ThreadID: resolved.ThreadID,
+		},
+	)
 	if err != nil {
-		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", deviceID)
+		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", resolved.DeviceID)
 		return ""
 	}
 	return token
@@ -789,23 +762,22 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"task_id", rec.TaskID,
 			"error", err,
 		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload unmarshal: %v", err))
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(dispatch.DeadLetterKindPayloadUnmarshal, err))
 		return
 	}
 
 	// Update the delivery_id in the payload so the Edge can ack the new attempt.
-	dp.DeliveryID = rec.DeliveryID
-
-	newPayload, err := json.Marshal(dp)
+	newPayload, err := dispatch.MarshalWithDeliveryID(dp, rec.DeliveryID)
 	if err != nil {
 		slog.Error("failed to marshal redispatch payload",
 			"delivery_id", rec.DeliveryID,
 			"task_id", rec.TaskID,
 			"error", err,
 		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload marshal: %v", err))
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(dispatch.DeadLetterKindPayloadMarshal, err))
 		return
 	}
+	dispatch.AttachDeliveryID(&dp, rec.DeliveryID)
 
 	// Look up the task for dispatch routing.
 	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
@@ -815,7 +787,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"task_id", rec.TaskID,
 			"error", err,
 		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task lookup: %v", err))
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(dispatch.DeadLetterKindTaskLookup, err))
 		return
 	}
 
@@ -826,7 +798,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"task_id", rec.TaskID,
 			"task_status", task.Status,
 		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task status is %s", task.Status))
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterTaskStatus(task.Status))
 		return
 	}
 
@@ -847,7 +819,7 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 	}
 	err := s.db.WithContext(ctx).
 		Table("pending_agent_tasks").
-		Select("id, agent_instance_id, triggered_by_user_id, status, edge_device_id, edge_run_id, target_id").
+		Select(dispatch.PendingTaskRedeliverySelect).
 		Where("id = ?", taskID).
 		First(&task).Error
 	if err != nil {
