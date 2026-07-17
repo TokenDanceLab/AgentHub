@@ -2,6 +2,12 @@
 
 export { TaskSelectionStrip, TaskTable } from './TaskTableViews';
 
+export { TaskNav } from './TaskNav';
+export type { TaskNavProps } from './TaskNav';
+
+export { TaskMain } from './TaskMainViews';
+export type { TaskMainProps } from './TaskMainViews';
+
 export {
   NavGlyph,
   NAV_PRIMARY,
