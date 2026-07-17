@@ -42,6 +42,7 @@ import {
   validateDispatchTarget,
 } from './hubIntegrationMappers';
 import { getFirstString, getString, parseRecord } from './hubIntegrationParseHelpers';
+import { catchHubReport } from './hubReportUtils';
 
 export type { AgentTask };
 export { useTaskBridgeStore };
@@ -112,7 +113,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       if (postedRouteDecisionsRef.current.has(key)) return;
       postedRouteDecisionsRef.current.add(key);
 
-      hubClient.postTeamRouteDecision(context.teamId, context.teamRunId, decision).catch(() => {});
+      void catchHubReport(
+        `postTeamRouteDecision:${context.teamId}:${context.teamRunId}`,
+        hubClient.postTeamRouteDecision(context.teamId, context.teamRunId, decision),
+      );
     },
     [hubClient],
   );
@@ -142,7 +146,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
           break;
         }
@@ -151,7 +158,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
           break;
         }
@@ -160,7 +170,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = extractRunOutputBatch(payload);
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
           break;
         }
@@ -168,7 +181,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
           break;
         }
@@ -179,7 +195,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         case 'run.agent.permission_requested':
         case 'run.agent.permission_decided':
           // Forward the canonical typed runtime event so Hub can persist and replay it.
-          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+          void catchHubReport(
+            `streamTaskEvent:${taskId}:${event.type}`,
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+          );
           break;
 
         case 'run.agent.route_decision': {
@@ -187,7 +206,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           if (decision) {
             postRouteDecision(task, decision);
           }
-          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+          void catchHubReport(
+            `streamTaskEvent:${taskId}:${event.type}`,
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+          );
           break;
         }
 
@@ -196,14 +218,20 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           if (decision) {
             postRouteDecision(task, decision);
           }
-          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+          void catchHubReport(
+            `streamTaskEvent:${taskId}:${event.type}`,
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+          );
           const success = payload.success !== false;
           if (success) {
             const output =
               typeof payload.content === 'string'
                 ? payload.content
                 : outputByRunRef.current.get(runId) || JSON.stringify(payload);
-            hubClient.doneTask(taskId, output, runId).catch(() => {});
+            void catchHubReport(
+              `doneTask:${taskId}`,
+              hubClient.doneTask(taskId, output, runId),
+            );
             store.getState().updateTask(taskId, {
               status: 'done',
             });
@@ -211,7 +239,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           } else {
             const error =
               typeof payload.error === 'string' ? payload.error : 'Agent reported failure';
-            hubClient.failTask(taskId, error, runId).catch(() => {});
+            void catchHubReport(
+              `failTask:${taskId}`,
+              hubClient.failTask(taskId, error, runId),
+            );
             store.getState().updateTask(taskId, {
               status: 'failed',
               error,
@@ -224,7 +255,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         case 'run.finished': {
           const output = outputByRunRef.current.get(runId) || 'Run finished';
-          hubClient.doneTask(taskId, output, runId).catch(() => {});
+          void catchHubReport(
+            `doneTask:${taskId}`,
+            hubClient.doneTask(taskId, output, runId),
+          );
           store.getState().updateTask(taskId, {
             status: 'done',
           });
@@ -234,7 +268,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         case 'run.failed': {
           const error = typeof payload.error === 'string' ? payload.error : 'Run lifecycle failure';
-          hubClient.failTask(taskId, error, runId).catch(() => {});
+          void catchHubReport(
+            `failTask:${taskId}`,
+            hubClient.failTask(taskId, error, runId),
+          );
           store.getState().updateTask(taskId, {
             status: 'failed',
             error,
@@ -244,7 +281,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.cancelled': {
-          hubClient.failTask(taskId, 'Run cancelled', runId).catch(() => {});
+          void catchHubReport(
+            `failTask:${taskId}`,
+            hubClient.failTask(taskId, 'Run cancelled', runId),
+          );
           store.getState().updateTask(taskId, {
             status: 'failed',
             error: 'Run cancelled',
@@ -297,7 +337,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           error: targetError,
           createdAt: new Date().toISOString(),
         });
-        hubClient.failTask(taskId, targetError).catch(() => {});
+        void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, targetError));
         return;
       }
 
@@ -350,8 +390,8 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         // Map taskId ↔ runId and mark running
         store.getState().updateTask(taskId, { runId, status: 'running' });
 
-        // Acknowledge task to Hub
-        hubClient.ackTask(taskId, runId).catch(() => {});
+        // Acknowledge task to Hub (log failures — do not throw into dispatch handler)
+        void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
 
         // Notify consumer
         const updatedTask = store.getState().tasks.find((t) => t.taskId === taskId);
@@ -364,7 +404,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           status: 'failed',
           error: errorMsg,
         });
-        hubClient.failTask(taskId, errorMsg).catch(() => {});
+        void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, errorMsg));
       }
     });
 
