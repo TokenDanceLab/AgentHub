@@ -27,8 +27,8 @@ export function taskStatusIconModifier(
   status: TaskStatus,
   css: TaskTableCss = styles,
 ): string {
-  if (status === '已完成') return css.nameIconDone;
-  if (status === '进行中') return css.nameIconRunning;
+  if (status === '已完成') return css.nameIconDone ?? '';
+  if (status === '进行中') return css.nameIconRunning ?? '';
   return '';
 }
 
@@ -37,7 +37,7 @@ export function taskStatusIconClassName(
   status: TaskStatus,
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.nameIcon, taskStatusIconModifier(status, css));
+  return joinClassNames(css.nameIcon ?? '', taskStatusIconModifier(status, css));
 }
 
 /** Table surface class: five-column layout when creator is hidden. */
@@ -45,7 +45,7 @@ export function taskTableClassName(
   showCreatorColumn: boolean,
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.table, !showCreatorColumn && css.tableFiveColumns, 'task-table');
+  return joinClassNames(css.table ?? '', !showCreatorColumn && (css.tableFiveColumns ?? ''), 'task-table');
 }
 
 /** Display-row className including selected state. */
@@ -53,28 +53,28 @@ export function taskDisplayRowClassName(
   selected: boolean,
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.row, selected && css.rowSelected, 'task-row');
+  return joinClassNames(css.row ?? '', selected && (css.rowSelected ?? ''), 'task-row');
 }
 
 /** Edit-row className (always selected + edit surface). */
 export function taskEditRowClassName(
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.row, css.rowSelected, css.editRow, 'task-row');
+  return joinClassNames(css.row ?? '', css.rowSelected ?? '', css.editRow ?? '', 'task-row');
 }
 
 /** Group title className. */
 export function taskGroupTitleClassName(
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.groupTitle, 'task-group-title');
+  return joinClassNames(css.groupTitle ?? '', 'task-group-title');
 }
 
 /** Add-row button className. */
 export function taskAddRowClassName(
   css: TaskTableCss = styles,
 ): string {
-  return joinClassNames(css.addRow, 'task-add-row');
+  return joinClassNames(css.addRow ?? '', 'task-add-row');
 }
 
 /** Aria label for the selection strip region. */
