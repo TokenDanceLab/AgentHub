@@ -1,21 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   appendHubRuntimeEvent,
-  decideWebApprovalWithHubClient,
-  mergeHubTaskContractEvents,
   mergeHubRuntimeEvents,
+  mergeHubTaskContractEvents,
+} from './webWorkbenchRuntimeEvents';
+import { decideWebApprovalWithHubClient } from './webWorkbenchApprovals';
+import {
+  resolveWebRuntimeEvidence,
+  resolveWebWorkbenchTranscript,
+} from './webWorkbenchTranscript';
+import { resolveWebExecutionTargetStatus } from './webWorkbenchExecutionTargets';
+import {
+  mergeWorkspaceProjectDetail,
   parseWorkspaceProjectThreadMessageContent,
   projectDraftToHubRequest,
-  mergeWorkspaceProjectDetail,
-  resolveWebRuntimeEvidence,
-  resolveWebWorkbenchContacts,
-  resolveWebExecutionTargetStatus,
-  resolveWebWorkbenchProjects,
-  resolveWebWorkbenchTranscript,
   resolveWebProjectsStatus,
+  resolveWebWorkbenchProjects,
   workspaceProjectToProjectInfo,
-} from './useWebWorkbenchModel';
+} from './webWorkbenchProjects';
+import { resolveWebWorkbenchContacts } from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
+import { errorMessage } from './webWorkbenchError';
+
+describe('webWorkbenchError', () => {
+  it('prefers Error.message, then string, then fallback', () => {
+    expect(errorMessage(new Error('boom'), 'fallback')).toBe('boom');
+    expect(errorMessage('  string-error  ', 'fallback')).toBe('  string-error  ');
+    expect(errorMessage(null, 'fallback')).toBe('fallback');
+    expect(errorMessage(new Error('   '), 'fallback')).toBe('fallback');
+  });
+});
 
 describe('useWebWorkbenchModel helpers', () => {
   it('maps Hub contacts into shared workbench contacts', () => {
