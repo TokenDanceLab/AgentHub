@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-18
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43 · [#882](https://github.com/TokenDanceLab/AgentHub/pull/882)–[#886](https://github.com/TokenDanceLab/AgentHub/pull/886) Phase 44 · [#893](https://github.com/TokenDanceLab/AgentHub/pull/893)–[#897](https://github.com/TokenDanceLab/AgentHub/pull/897) Phase 45 · [#904](https://github.com/TokenDanceLab/AgentHub/pull/904)–[#908](https://github.com/TokenDanceLab/AgentHub/pull/908) Phase 46 · [#915](https://github.com/TokenDanceLab/AgentHub/pull/915)–[#919](https://github.com/TokenDanceLab/AgentHub/pull/919) Phase 47 · [#926](https://github.com/TokenDanceLab/AgentHub/pull/926)–[#930](https://github.com/TokenDanceLab/AgentHub/pull/930) Phase 48
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43 · [#882](https://github.com/TokenDanceLab/AgentHub/pull/882)–[#886](https://github.com/TokenDanceLab/AgentHub/pull/886) Phase 44 · [#893](https://github.com/TokenDanceLab/AgentHub/pull/893)–[#897](https://github.com/TokenDanceLab/AgentHub/pull/897) Phase 45 · [#904](https://github.com/TokenDanceLab/AgentHub/pull/904)–[#908](https://github.com/TokenDanceLab/AgentHub/pull/908) Phase 46 · [#915](https://github.com/TokenDanceLab/AgentHub/pull/915)–[#919](https://github.com/TokenDanceLab/AgentHub/pull/919) Phase 47 · [#926](https://github.com/TokenDanceLab/AgentHub/pull/926)–[#930](https://github.com/TokenDanceLab/AgentHub/pull/930) Phase 48 · [#937](https://github.com/TokenDanceLab/AgentHub/pull/937)–[#941](https://github.com/TokenDanceLab/AgentHub/pull/941) Phase 49
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 49 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 70 --state open`
-- **Labels**: `spec-driven` · `phase:49`
+- **Phase 50 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 71 --state open`
+- **Labels**: `spec-driven` · `phase:50`
 
 ## References
 
@@ -53,7 +53,8 @@
 | 46 | Dual-token hard gate + design/shared residual | #67 | closed (PRs #904–#908) |
 | 47 | Design token residual + godfile peels | #68 | closed (PRs #915–#919) |
 | 48 | WS protocol auth + design residual + peels | #69 | closed (PRs #926–#930) |
-| 49 | Mobile WS protocol auth + residual peels | #70 | active (#931–#936) |
+| 49 | Mobile WS protocol auth + residual peels | #70 | closed (PRs #937–#941) |
+| 50 | Desktop WS protocol auth + residual peels | #71 | active (#942–#947) |
 
 ## Issue Mapping (summary)
 
@@ -73,13 +74,14 @@
 | #898–#903 Phase 46 dual-token hard gate + design/shared residual | closed (PRs #904–#908; #903 hygiene ops-only) |
 | #909–#914 Phase 47 design token residual + godfile peels | closed (PRs #915–#919; #914 hygiene ops-only) |
 | #920–#925 Phase 48 WS protocol auth + design residual + peels | closed (PRs #926–#930; #925 hygiene ops-only) |
-| #931–#936 Phase 49 mobile WS protocol auth + residual peels | open (milestone 70) |
+| #931–#936 Phase 49 mobile WS protocol auth + residual peels | closed (PRs #937–#941; #936 hygiene ops-only) |
+| #942–#947 Phase 50 desktop WS protocol auth + residual peels | open (milestone 71) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=70) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 70 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=71) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 71 --state open
 git worktree list
 ```
 
@@ -99,25 +101,26 @@ git worktree list
 - [x] Phase 46 dual-token hard gate + design/shared residual (#898–#903 / PRs #904–#908)
 - [x] Phase 47 design token residual + godfile peels (#909–#914 / PRs #915–#919)
 - [x] Phase 48 WS protocol auth + design residual + peels (#920–#925 / PRs #926–#930)
-- [ ] Phase 49 mobile WS protocol auth + residual peels (#931–#936)
+- [x] Phase 49 mobile WS protocol auth + residual peels (#931–#936 / PRs #937–#941)
+- [ ] Phase 50 desktop WS protocol auth + residual peels (#942–#947)
 
 ## Current Status
 
-**Active Phase**: Phase 49 — Mobile WS protocol auth + residual peels (milestone 70)
-**Active Tasks**: #931 MASTER · #932 mobile Hub WS Sec-WebSocket-Protocol auth P1 · #933 process_executor residual · #934 store residual · #935 hubClient residual · #936 hygiene
+**Active Phase**: Phase 50 — Desktop WS protocol auth + residual peels (milestone 71)
+**Active Tasks**: #942 MASTER · #943 desktop Hub WS Sec-WebSocket-Protocol auth P1 · #944 process_executor residual · #945 store residual · #946 agent_dispatch residual · #947 hygiene
 **Blockers**: None
-**Stability note**: Post-P48 residual — mobile RN Hub WS prefer Sec-WebSocket-Protocol over query access_token (#932, keep query fallback); continue pure peels process_executor (#933) · store (#934) · hubClient (#935)
+**Stability note**: Post-P49 residual — desktop Hub WS prefer Sec-WebSocket-Protocol over query access_token (#943, align web #921 / mobile #932; keep server query fallback); continue pure peels process_executor (#944) · store (#945) · agent_dispatch (#946)
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: cf5c50e4 on `master` (Phase 48 PR #926–#930 line)
-**Residual after P48**: process_executor ~1182 · store ~900 · hubClient ~825 · agent_dispatch ~843
-**Boundary map next residual**: mobile WS protocol auth / PE pure peel / store pure helpers / hubClient pure peel
+**Tip**: 1ea93dcc on `master` (Phase 49 PR #937–#941 line)
+**Residual after P49**: process_executor ~1169 · store ~834 · hubClient ~817 · agent_dispatch ~843
+**Boundary map next residual**: desktop WS protocol auth / PE pure peel / store pure helpers / agent_dispatch pure peel
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
 
-1. Land Phase 49 issues under milestone 70 (issue-bound Workflows)
+1. Land Phase 50 issues under milestone 71 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #932 mobile WS protocol auth P1 · #933 PE residual · #934 store residual · #935 hubClient residual
+3. Prefer #943 desktop WS protocol auth P1 · #944 PE residual · #945 store residual · #946 agent_dispatch residual
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -126,9 +129,9 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | Phase 42–48 closed; Phase 49 mobile WS protocol auth + residual peels active |
+| 2026-07-18 | lead | Phase 42–49 closed; Phase 50 desktop WS protocol auth + residual peels active |
 
 ## Completion notes
 
-- Phase 48 closed via #926–#930 (MASTER / Hub WS Sec-WebSocket-Protocol auth P1 / IM desktop CSS design-token SSOT P1 / process_executor residual / store residual; #925 hygiene ops-only). Tip ~cf5c50e4.
-- Phase 49 targets: MASTER sync, mobile Hub WS Sec-WebSocket-Protocol auth P1, process_executor residual, store residual, hubClient residual, hygiene.
+- Phase 49 closed via #937–#941 (MASTER / mobile Hub WS Sec-WebSocket-Protocol auth P1 / hubClient residual / store residual / process_executor residual; #936 hygiene ops-only). Tip ~1ea93dcc.
+- Phase 50 targets: MASTER sync, desktop Hub WS Sec-WebSocket-Protocol auth P1, process_executor residual, store residual, agent_dispatch residual, hygiene.
