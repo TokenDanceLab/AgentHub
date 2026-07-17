@@ -43,7 +43,7 @@ export function inspectorDataPreviewAttr(activeMode: InspectorMode): ShellBoolea
 }
 
 export function resolveDagNodesFromRouteBlocks(
-  routeBlocks: readonly InspectorRouteBlock[] | undefined,
+  routeBlocks: Array<InspectorRouteBlock> | undefined,
 ): DagNode[] {
   if (!routeBlocks || routeBlocks.length === 0) return [];
   return buildDagNodesFromTranscript(routeBlocks);
