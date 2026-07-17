@@ -1,40 +1,59 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAcceptFriendRequestPath,
   buildAttachmentDownloadUrl,
   buildAttachmentFormData,
+  buildBlockContactPath,
   buildCancelAgentTaskPaths,
+  buildContactRemarkPath,
+  buildDecideTaskApprovalPath,
   buildDecideTeamApprovalPath,
   buildForwardMessageBody,
   buildFriendRequestBody,
+  buildGetMessagesPath,
+  buildGetTeamRunPath,
+  buildGetTeamRunStatePath,
   buildListMessageReactionsPath,
   buildListTaskRunEventsAfterPath,
+  buildListTeamEventsPath,
+  buildListTeamTasksPath,
+  buildListWorkspaceProjectThreadMessagesPath,
   buildMarkNotificationReadPaths,
   buildMarkReadBody,
   buildMemberIdsBody,
   buildOidcAuthorizeBody,
+  buildOptionalJsonBody,
   buildPatchSettingsBody,
   buildPostTeamRouteDecisionPath,
   buildProbeAttachmentBody,
   buildReactionBody,
   buildReadAllNotificationsPaths,
   buildRefreshBody,
+  buildRegisterDevicePaths,
+  buildRejectFriendRequestPath,
   buildRemarkBody,
+  buildRemoveAgentTeamMemberPath,
+  buildRemoveSessionMemberPath,
   buildResolveTeamConflictPath,
+  buildSearchSessionMessagesPath,
   buildSearchSessionsPath,
   buildSearchUserPath,
+  buildSendWorkspaceProjectThreadMessagePath,
   buildSessionIdBody,
   buildStreamTaskEventBody,
+  buildSyncMessagesPath,
   buildTaskAckBody,
   buildTaskDoneBody,
   buildTaskFailBody,
   buildTaskStreamBody,
   buildTransferOwnerBody,
   buildTriggerAgentTaskBody,
+  buildUnblockContactPath,
   normalizeExecutionTargetsResponse,
   withPublicCatalogParams,
 } from './hubClientPayloadUtils';
 
-describe('hubClientPayloadUtils (#810 / #822)', () => {
+describe('hubClientPayloadUtils (#810 / #822 / #833)', () => {
   it('normalizes execution-target array vs {items,page} responses', () => {
     expect(
       normalizeExecutionTargetsResponse([
@@ -147,7 +166,6 @@ describe('hubClientPayloadUtils (#810 / #822)', () => {
     });
     expect(buildFriendRequestBody('u-3')).toEqual({
       friend_id: 'u-3',
-      message: undefined,
     });
     expect(buildRemarkBody('buddy')).toEqual({ remark: 'buddy' });
     expect(buildMemberIdsBody(['a', 'b'])).toEqual({ member_ids: ['a', 'b'] });
@@ -191,6 +209,73 @@ describe('hubClientPayloadUtils (#810 / #822)', () => {
     expect(buildPostTeamRouteDecisionPath('t/1', 'r/2')).toBe(
       '/web/agent-teams/t%2F1/runs/r%2F2/route-decisions',
     );
+  });
+
+  it('builds multi-segment path residual helpers (#833)', () => {
+    expect(buildRegisterDevicePaths()).toEqual([
+      '/edge/devices:register',
+      '/edge/devices/register',
+    ]);
+
+    expect(buildAcceptFriendRequestPath('req/1')).toBe(
+      '/client/contacts/friend-requests/req%2F1/accept',
+    );
+    expect(buildRejectFriendRequestPath('req/2')).toBe(
+      '/client/contacts/friend-requests/req%2F2/reject',
+    );
+    expect(buildBlockContactPath('user/a')).toBe('/client/contacts/user%2Fa/block');
+    expect(buildUnblockContactPath('user/b')).toBe('/client/contacts/user%2Fb/unblock');
+    expect(buildContactRemarkPath('user/c')).toBe('/client/contacts/user%2Fc/remark');
+
+    expect(buildRemoveSessionMemberPath('sess/1', 'user/2')).toBe(
+      '/client/sessions/sess%2F1/members/user%2F2',
+    );
+
+    expect(buildGetMessagesPath('sess/1', { before_seq: 9, limit: 50 })).toBe(
+      '/client/sessions/sess%2F1/messages?before_seq=9&limit=50',
+    );
+    expect(buildGetMessagesPath('sess/1')).toBe('/client/sessions/sess%2F1/messages');
+    expect(buildSyncMessagesPath('sess/2', { after_seq: 3 })).toBe(
+      '/client/sessions/sess%2F2/messages/sync?after_seq=3',
+    );
+    expect(buildSearchSessionMessagesPath('sess/3', { q: 'a b', content_type: 'text' })).toBe(
+      '/client/sessions/sess%2F3/messages/search?q=a+b&content_type=text',
+    );
+
+    expect(buildListWorkspaceProjectThreadMessagesPath('p/1', 'th/2', { limit: 20 })).toBe(
+      '/web/projects/p%2F1/threads/th%2F2/messages?limit=20',
+    );
+    expect(buildSendWorkspaceProjectThreadMessagePath('p/1', 'th/2')).toBe(
+      '/web/projects/p%2F1/threads/th%2F2/messages',
+    );
+
+    expect(buildGetTeamRunPath('t/1', 'r/2')).toBe('/web/agent-teams/t%2F1/runs/r%2F2');
+    expect(buildGetTeamRunStatePath('t/1', 'r/2')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/state',
+    );
+    expect(buildListTeamEventsPath('t/1', 'r/2')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/events',
+    );
+    expect(buildListTeamTasksPath('t/1', 'r/2')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/tasks',
+    );
+    expect(buildRemoveAgentTeamMemberPath('t/1', 'm/9')).toBe(
+      '/web/agent-teams/t%2F1/members/m%2F9',
+    );
+    expect(buildDecideTaskApprovalPath('task/1', 'appr/2')).toBe(
+      '/web/agent-tasks/task%2F1/approvals/appr%2F2/decide',
+    );
+  });
+
+  it('omits optional JSON body key when payload is absent (#833 exactOptional)', () => {
+    expect(buildOptionalJsonBody(undefined)).toEqual({});
+    expect(Object.prototype.hasOwnProperty.call(buildOptionalJsonBody(undefined), 'body')).toBe(
+      false,
+    );
+    expect(buildOptionalJsonBody(buildTaskAckBody())).toEqual({});
+    expect(buildOptionalJsonBody(buildTaskAckBody('run-9'))).toEqual({
+      body: JSON.stringify({ run_id: 'run-9' }),
+    });
   });
 
   it('merges public catalog params and builds attachment helpers', () => {

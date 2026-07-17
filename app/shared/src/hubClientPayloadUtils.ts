@@ -219,3 +219,101 @@ export function buildResolveTeamConflictPath(
 export function buildPostTeamRouteDecisionPath(teamId: string, runId: string): string {
   return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`;
 }
+
+// ── Pure path residual (#833) ────────────────────────────────────────────────
+
+/** Colon-route first, slash fallback for requestWithFallback. */
+export function buildRegisterDevicePaths(): [string, string] {
+  return ['/edge/devices:register', '/edge/devices/register'];
+}
+
+/** RequestInit fragment: include JSON body only when payload is defined (exactOptional-safe). */
+export function buildOptionalJsonBody(
+  payload: unknown | undefined,
+): { body: string } | Record<string, never> {
+  return payload === undefined ? {} : { body: JSON.stringify(payload) };
+}
+
+export function buildAcceptFriendRequestPath(requestId: string): string {
+  return `/client/contacts/friend-requests/${encodeURIComponent(requestId)}/accept`;
+}
+
+export function buildRejectFriendRequestPath(requestId: string): string {
+  return `/client/contacts/friend-requests/${encodeURIComponent(requestId)}/reject`;
+}
+
+export function buildBlockContactPath(targetUserId: string): string {
+  return `/client/contacts/${encodeURIComponent(targetUserId)}/block`;
+}
+
+export function buildUnblockContactPath(targetUserId: string): string {
+  return `/client/contacts/${encodeURIComponent(targetUserId)}/unblock`;
+}
+
+export function buildContactRemarkPath(friendUserId: string): string {
+  return `/client/contacts/${encodeURIComponent(friendUserId)}/remark`;
+}
+
+export function buildRemoveSessionMemberPath(sessionId: string, userId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/members/${encodeURIComponent(userId)}`;
+}
+
+export function buildGetMessagesPath(
+  sessionId: string,
+  params?: { before_seq?: number; limit?: number },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages${qs(params ?? {})}`;
+}
+
+export function buildSyncMessagesPath(
+  sessionId: string,
+  params?: { after_seq?: number; limit?: number },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/sync${qs(params ?? {})}`;
+}
+
+export function buildSearchSessionMessagesPath(
+  sessionId: string,
+  params: { q: string; content_type?: string; from?: string; to?: string },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/search${qs(params)}`;
+}
+
+export function buildListWorkspaceProjectThreadMessagesPath(
+  projectId: string,
+  threadId: string,
+  params?: { limit?: number },
+): string {
+  return `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`;
+}
+
+export function buildSendWorkspaceProjectThreadMessagePath(
+  projectId: string,
+  threadId: string,
+): string {
+  return `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`;
+}
+
+export function buildGetTeamRunPath(teamId: string, runId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`;
+}
+
+export function buildGetTeamRunStatePath(teamId: string, runId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`;
+}
+
+export function buildListTeamEventsPath(teamId: string, runId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`;
+}
+
+export function buildListTeamTasksPath(teamId: string, runId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`;
+}
+
+export function buildRemoveAgentTeamMemberPath(teamId: string, memberId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`;
+}
+
+export function buildDecideTaskApprovalPath(taskId: string, approvalId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`;
+}
