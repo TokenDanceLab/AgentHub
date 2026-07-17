@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 )
@@ -465,14 +464,11 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 	key := runDiffFileKey(file.RunID, file.Path)
 	now := nowString()
 	if existing, ok := s.diffs[key]; ok {
-		existing.Diff = file.Diff
-		existing.Status = file.Status
-		existing.UpdatedAt = now
+		existing = mergeRunDiffFileUpdate(existing, file, now)
 		s.diffs[key] = existing
 		return existing, nil
 	}
-	file.CreatedAt = now
-	file.UpdatedAt = now
+	file = stampRunDiffFileCreate(file, now)
 	s.diffs[key] = file
 	s.diffOrder = append(s.diffOrder, key)
 	return file, nil
@@ -499,14 +495,13 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 		return Artifact{}, ErrNotFound
 	}
 	now := nowString()
-	if existing, ok := s.artifacts[artifact.ID]; ok {
-		artifact.CreatedAt = existing.CreatedAt
-		artifact.UpdatedAt = now
+	existing, exists := s.artifacts[artifact.ID]
+	if exists {
+		artifact = stampArtifactUpsert(artifact, existing.CreatedAt, true, now)
 		s.artifacts[artifact.ID] = cloneArtifact(artifact)
 		return cloneArtifact(artifact), nil
 	}
-	artifact.CreatedAt = now
-	artifact.UpdatedAt = now
+	artifact = stampArtifactUpsert(artifact, "", false, now)
 	s.artifacts[artifact.ID] = cloneArtifact(artifact)
 	s.artifactOrder = append(s.artifactOrder, artifact.ID)
 	return cloneArtifact(artifact), nil
@@ -539,14 +534,13 @@ func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 		return Preview{}, ErrNotFound
 	}
 	now := nowString()
-	if existing, ok := s.previews[preview.ID]; ok {
-		preview.CreatedAt = existing.CreatedAt
-		preview.UpdatedAt = now
+	existing, exists := s.previews[preview.ID]
+	if exists {
+		preview = stampPreviewUpsert(preview, existing.CreatedAt, true, now)
 		s.previews[preview.ID] = preview
 		return preview, nil
 	}
-	preview.CreatedAt = now
-	preview.UpdatedAt = now
+	preview = stampPreviewUpsert(preview, "", false, now)
 	s.previews[preview.ID] = preview
 	s.previewOrder = append(s.previewOrder, preview.ID)
 	return preview, nil
@@ -592,15 +586,11 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 		return !remove
 	})
 
-	removedItems := 0
-	removedItemIDs := make(map[string]struct{})
-	for id, item := range s.items {
-		if _, remove := removeRuns[item.RunID]; remove {
-			delete(s.items, id)
-			removedItemIDs[id] = struct{}{}
-			removedItems++
-		}
+	removedItemIDs := collectItemIDsForRemovedRuns(s.items, removeRuns)
+	for id := range removedItemIDs {
+		delete(s.items, id)
 	}
+	removedItems := len(removedItemIDs)
 	if removedItems > 0 {
 		s.itemOrder = filterIDs(s.itemOrder, func(id string) bool {
 			_, ok := s.items[id]
@@ -657,7 +647,7 @@ func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
 	if !ok {
 		return Run{}, false
 	}
-	run.EvidenceGateResult = result
+	run = applyRunEvidenceGate(run, result)
 	s.runs[id] = run
 	return run, true
 }
@@ -672,7 +662,7 @@ func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
 	if !ok {
 		return Run{}, false
 	}
-	run.RetryCount = count
+	run = applyRunRetryCount(run, count)
 	s.runs[id] = run
 	return run, true
 }
@@ -746,21 +736,12 @@ func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, err
 	now := nowString()
 	key := threadPinKey(threadID, itemID)
 	if existing, ok := s.pins[key]; ok {
-		existing.PinnedBy = strings.TrimSpace(pinnedBy)
-		existing.PinnedAt = now
-		existing.UpdatedAt = now
+		existing = touchThreadPin(existing, pinnedBy, now)
 		s.pins[key] = existing
 		return existing, nil
 	}
 
-	pin := ThreadPin{
-		ThreadID:  threadID,
-		ItemID:    itemID,
-		PinnedBy:  strings.TrimSpace(pinnedBy),
-		PinnedAt:  now,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
+	pin := buildThreadPin(threadID, itemID, pinnedBy, now)
 	s.pins[key] = pin
 	s.pinOrder = append(s.pinOrder, key)
 	return pin, nil
@@ -806,28 +787,22 @@ func (s *Store) removePins(match func(ThreadPin) bool) {
 }
 
 func (s *Store) removeRunEvidence(runID string) {
-	for id, file := range s.diffs {
-		if file.RunID == runID {
-			delete(s.diffs, id)
-		}
+	for id := range collectKeysByRunID(s.diffs, runID, func(file RunDiffFile) string { return file.RunID }) {
+		delete(s.diffs, id)
 	}
 	s.diffOrder = filterIDs(s.diffOrder, func(id string) bool {
 		_, ok := s.diffs[id]
 		return ok
 	})
-	for id, artifact := range s.artifacts {
-		if artifact.RunID == runID {
-			delete(s.artifacts, id)
-		}
+	for id := range collectKeysByRunID(s.artifacts, runID, func(artifact Artifact) string { return artifact.RunID }) {
+		delete(s.artifacts, id)
 	}
 	s.artifactOrder = filterIDs(s.artifactOrder, func(id string) bool {
 		_, ok := s.artifacts[id]
 		return ok
 	})
-	for id, preview := range s.previews {
-		if preview.RunID == runID {
-			delete(s.previews, id)
-		}
+	for id := range collectKeysByRunID(s.previews, runID, func(preview Preview) string { return preview.RunID }) {
+		delete(s.previews, id)
 	}
 	s.previewOrder = filterIDs(s.previewOrder, func(id string) bool {
 		_, ok := s.previews[id]
@@ -844,9 +819,7 @@ func (s *Store) CreateUserProfile(profile UserProfile) (UserProfile, error) {
 	if existing, ok := s.userProfiles[profile.ID]; ok {
 		return existing, nil
 	}
-	now := nowString()
-	profile.CreatedAt = now
-	profile.UpdatedAt = now
+	profile = prepareUserProfileCreate(profile, nowString())
 	s.userProfiles[profile.ID] = profile
 	s.userProfileOrder = append(s.userProfileOrder, profile.ID)
 	return profile, nil
@@ -882,15 +855,10 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 	if err := validateAgentProfileCreate(profile); err != nil {
 		return AgentProfile{}, err
 	}
-	profile.Name = defaultAgentProfileName(profile.Name)
 	if _, exists := s.agentProfiles[profile.ID]; exists {
 		return AgentProfile{}, fmt.Errorf("agent profile %q already exists", profile.ID)
 	}
-	now := nowString()
-	if profile.CreatedAt == "" {
-		profile.CreatedAt = now
-	}
-	profile.UpdatedAt = now
+	profile = prepareAgentProfileCreate(profile, nowString())
 	s.agentProfiles[profile.ID] = profile
 	s.agentProfileOrder = append(s.agentProfileOrder, profile.ID)
 	return profile, nil
@@ -942,15 +910,7 @@ func (s *Store) DeleteAgentProfile(id string) error {
 func (s *Store) GetSettings() UserSettings {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	values := make(map[string]string, len(s.settings))
-	for k, v := range s.settings {
-		values[k] = v
-	}
-	return UserSettings{
-		Values:    values,
-		UpdatedAt: s.settingsMtime,
-	}
+	return cloneUserSettings(s.settings, s.settingsMtime)
 }
 
 func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
@@ -962,8 +922,5 @@ func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
 	}
 	applySettingsPatch(s.settings, patch)
 	s.settingsMtime = nowString()
-	return UserSettings{
-		Values:    copyMap(s.settings),
-		UpdatedAt: s.settingsMtime,
-	}
+	return cloneUserSettings(s.settings, s.settingsMtime)
 }
