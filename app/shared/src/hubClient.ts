@@ -1,4 +1,4 @@
-import { AppError, isErrorResponse, reportApiError } from './errors';
+import { AppError, reportApiError } from './errors';
 import type {
   HubAgentRunEventSummary,
   HubAgentRunEvent,
@@ -158,7 +158,25 @@ import type {
   HubRelayCommand,
 } from './hubClientDomainTypes';
 
+import {
+  parseHubError,
+  readJson,
+  unwrapHubResponse,
+} from './hubClientEnvelope';
+import {
+  isRouteFallbackError,
+  normalizeRegisterDeviceRequest,
+  qs,
+} from './hubClientRequestUtils';
 
+// ── Envelope / error runtime (extracted #799) ──
+export {
+  HubError,
+  isHubResponseEnvelope,
+  isHubSuccessCode,
+  parseHubError,
+  unwrapHubResponse,
+} from './hubClientEnvelope';
 
 // ── WS frame payload / typed frame DTOs (extracted #788) ──
 export type {
@@ -207,91 +225,6 @@ export type {
   HubSessionMemberLeftFrame,
   HubKnownFrame,
 } from './hubClientFrameTypes';
-
-export class HubError extends AppError {
-  constructor(status: number, message: string, code = 'hub_error') {
-    super({ error: { code, message } }, status);
-    this.name = 'HubError';
-  }
-}
-
-export function isHubResponseEnvelope(
-  body: unknown,
-): body is HubResponseEnvelope {
-  return isRecord(body) && typeof body.code === 'string';
-}
-
-export function isHubSuccessCode(code: string): boolean {
-  return String(code).toUpperCase() === 'OK';
-}
-
-export function unwrapHubResponse<T>(body: unknown, status = 200): T {
-  if (!isHubResponseEnvelope(body)) {
-    return body as T;
-  }
-
-  // Accept case-insensitive OK/ok so fixtures and legacy mocks stay compatible.
-  if (!isHubSuccessCode(body.code)) {
-    throw new AppError(
-      {
-        error: {
-          code: body.code,
-          message: body.message || 'Hub request failed',
-        },
-      },
-      status,
-      body,
-    );
-  }
-
-  return body.data as T;
-}
-
-export async function parseHubError(response: Response): Promise<AppError> {
-  const body = await readJson(response);
-  if (isErrorResponse(body)) {
-    return new AppError(body, response.status, body);
-  }
-  if (isHubResponseEnvelope(body)) {
-    return new AppError(
-      {
-        error: {
-          code: body.code || 'HUB_ERROR',
-          message:
-            body.message ||
-            response.statusText ||
-            `HTTP ${response.status}`,
-        },
-      },
-      response.status,
-      body,
-    );
-  }
-  if (isRecord(body) && typeof body.message === 'string') {
-    return new AppError(
-      {
-        error: {
-          code: text(body.code) ?? 'HUB_ERROR',
-          message: body.message,
-        },
-      },
-      response.status,
-      body,
-    );
-  }
-
-  return new AppError(
-    {
-      error: {
-        code: response.status >= 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST',
-        message: response.statusText || `HTTP ${response.status}`,
-      },
-    },
-    response.status,
-    body,
-  );
-}
-
 
 // ── Team / profile / document / task-approval DTOs (extracted #767) ──
 export type {
@@ -1336,147 +1269,55 @@ export function createHubClient(opts: HubClientOptions = {}) {
 }
 
 export type HubClient = ReturnType<typeof createHubClient>;
-export type EmptyHubResponse = undefined;
 
-// ---------------------------------------------------------------------------
-// Compatibility aliases (desktop/web historical names → shared Hub* types)
-// Slice1 (#430): align names without moving method implementations yet.
-// Prefer Hub* names in new shared code; aliases exist so surface forks can
-// re-export shared types without a big-bang rename.
-// ---------------------------------------------------------------------------
-export type RegisterRequest = HubRegisterRequest;
-export type LoginRequest = HubLoginRequest;
-export type AuthResponse = HubAuthResponse;
-export type UserProfile = HubUserProfile;
-export type UpdateProfileRequest = HubUpdateProfileRequest;
-export type ChangePasswordRequest = HubChangePasswordRequest;
-export type SearchResult = HubSearchResult;
-export type FriendRequestInfo = HubFriendRequest;
-export type ContactInfo = HubContactInfo;
-/** @deprecated Prefer HubContactInfo / relationship fields; kept for desktop/web parity. */
-export interface Contact {
-  id: string;
-  user_id: string;
-  friend_id: string;
-  status: string;
-  remark?: string;
-  friend?: UserProfile;
-  created_at?: string;
-}
-/** Alias: desktop/web historically used Session; shared canonical type is HubSession. */
-export type Session = HubSession;
-export type HubSessionAlias = HubSession;
-export type SessionMember = HubSessionMember;
-export type CreatePrivateSessionRequest = HubCreatePrivateSessionRequest;
-export type CreateGroupSessionRequest = HubCreateGroupSessionRequest;
-export type SendMessageRequest = HubSendMessageRequest;
-export type SendMessageResponse = HubSendMessageResponse;
-export type ReplyToInfo = HubReplyToInfo;
-export type MessageResponse = HubMessage;
-export type MessageAttachment = HubMessageAttachment;
-export type RegisterDeviceRequest = HubRegisterDeviceRequest;
-export type Device = HubDevice;
-export type AddAgentToSessionRequest = HubAddAgentToSessionRequest;
-export type CustomAgentRequest = HubCustomAgentRequest;
-export type CustomAgent = HubCustomAgent;
-export type Notification = HubNotification;
-export type ExecutionTarget = HubExecutionTarget;
-export type ExecutionTargetType = HubExecutionTargetType;
-export type ExecutionTargetRequest = HubExecutionTargetRequest;
-export type ExecutionTargetListResponse = HubExecutionTargetListResponse;
-export type WorkspaceProject = HubWorkspaceProject;
-export type WorkspaceProjectListResponse = HubWorkspaceProjectListResponse;
-export type CreateWorkspaceProjectRequest = HubCreateWorkspaceProjectRequest;
-export type UpdateWorkspaceProjectRequest = HubUpdateWorkspaceProjectRequest;
-export type WorkspaceProjectThread = HubWorkspaceProjectThread;
-export type CreateWorkspaceProjectThreadRequest = HubCreateWorkspaceProjectThreadRequest;
-export type SendWorkspaceProjectThreadMessageRequest = HubSendWorkspaceProjectThreadMessageRequest;
-export type WorkspaceProjectThreadMessage = HubWorkspaceProjectThreadMessage;
-export type AgentTask = HubAgentTask;
-export type TriggerAgentTaskOptions = HubTriggerAgentTaskOptions;
-export type OIDCAuthorizeRequest = HubOidcAuthorizeRequest;
-export type OIDCAuthorizeResponse = HubOidcAuthorizeResponse;
-export type OIDCCallbackRequest = HubOidcCallbackRequest;
-export type OIDCCallbackResponse = HubOidcCallbackResponse;
-export type Skill = HubSkill;
-export type MCPServer = HubMCPServer;
-
-/**
- * Method groups still owned by desktop/web forks (not yet on shared createHubClient).
- * Tracked for T3.2 method parity — do not implement ad-hoc only on one surface.
- * @see docs/analysis/hubclient-ssot-slice1.md
- */
-export const HUBCLIENT_SSOT_GAPS = {
-  /** Present on both desktop and web, missing from shared createHubClient return. */
-  desktopAndWebNotShared: [
-    // T3.2 landed these on shared createHubClient
-  ],
-  /** Desktop-only relative to web (keep desktop-local until product decision). */
-  desktopOnly: [
-    // create/updateExecutionTarget request-shape differences may remain surface-local
-  ],
-  /** Web-only relative to desktop. */
-  webOnly: [
-    // T3.4 landed task approvals/artifacts on shared
-  ],
-} as const;
-
-function isRouteFallbackError(error: unknown): boolean {
-  return error instanceof AppError && (error.status === 404 || error.status === 405);
-}
-
-function normalizeRegisterDeviceRequest(
-  body: HubRegisterDeviceRequest,
-): HubRegisterDeviceRequest & {
-  device_name: string;
-  device_type: string;
-  capabilities?: Record<string, unknown>;
-} {
-  const normalized = {
-    ...body,
-    device_name: body.device_name ?? body.device_id,
-    device_type: body.device_type ?? 'desktop',
-  };
-
-  if (Array.isArray(body.capabilities)) {
-    return {
-      ...normalized,
-      capabilities: Object.fromEntries(body.capabilities.map((capability) => [capability, true])),
-    };
-  }
-
-  return normalized as HubRegisterDeviceRequest & {
-    device_name: string;
-    device_type: string;
-    capabilities?: Record<string, unknown>;
-  };
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
-}
-
-function qs(
-  params: Record<string, string | number | boolean | undefined | null>,
-): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      search.set(key, String(value));
-    }
-  }
-  const value = search.toString();
-  return value ? `?${value}` : '';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function text(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
+// ── Compat aliases + SSOT gaps (extracted #799) ──
+export type {
+  EmptyHubResponse,
+  RegisterRequest,
+  LoginRequest,
+  AuthResponse,
+  UserProfile,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  SearchResult,
+  FriendRequestInfo,
+  ContactInfo,
+  Contact,
+  Session,
+  HubSessionAlias,
+  SessionMember,
+  CreatePrivateSessionRequest,
+  CreateGroupSessionRequest,
+  SendMessageRequest,
+  SendMessageResponse,
+  ReplyToInfo,
+  MessageResponse,
+  MessageAttachment,
+  RegisterDeviceRequest,
+  Device,
+  AddAgentToSessionRequest,
+  CustomAgentRequest,
+  CustomAgent,
+  Notification,
+  ExecutionTarget,
+  ExecutionTargetType,
+  ExecutionTargetRequest,
+  ExecutionTargetListResponse,
+  WorkspaceProject,
+  WorkspaceProjectListResponse,
+  CreateWorkspaceProjectRequest,
+  UpdateWorkspaceProjectRequest,
+  WorkspaceProjectThread,
+  CreateWorkspaceProjectThreadRequest,
+  SendWorkspaceProjectThreadMessageRequest,
+  WorkspaceProjectThreadMessage,
+  AgentTask,
+  TriggerAgentTaskOptions,
+  OIDCAuthorizeRequest,
+  OIDCAuthorizeResponse,
+  OIDCCallbackRequest,
+  OIDCCallbackResponse,
+  Skill,
+  MCPServer,
+} from './hubClientCompatTypes';
+export { HUBCLIENT_SSOT_GAPS } from './hubClientCompatTypes';
