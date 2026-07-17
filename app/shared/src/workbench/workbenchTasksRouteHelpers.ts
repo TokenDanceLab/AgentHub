@@ -1,23 +1,103 @@
-import type { TaskGroup, TaskItem, TaskStatus, TasksPane, ViewMode } from './pages';
+import type { TaskGroup, TaskItem, TasksPane, ViewMode } from './pages';
 import type { TaskEditDraft } from './pages/TasksPage';
-import { WORKBENCH_MOCK_TASK_GROUPS } from './mockData';
 import {
-  TASK_STATUS_SEQUENCE,
   type TaskGroupMode,
   type TaskSortMode,
-  createLocalTask,
 } from './workbenchTaskGroups';
+import {
+  appendCustomTaskGroup,
+  nextTaskGroupMode,
+  patchTaskEditDraft,
+  patchTaskInGroups,
+  prependTaskToGroups,
+  removeTaskFromGroups,
+} from './workbenchTasksRouteGroupHelpers';
+import {
+  planAssignSelectedTaskToMe,
+  planCancelTaskEdit,
+  planCreateTask,
+  planCycleSelectedTaskStatus,
+  planDeleteSelectedTask,
+  planEditSelectedTask,
+  planFilterBySelectedTaskAssignee,
+  planGroupBySelectedTaskProject,
+  planNewTaskGroup,
+  planSaveTaskEdit,
+  planTaskClick,
+  planTaskListReset,
+  planTaskPaneChange,
+  planTaskSortToggle,
+  planToolbarFieldConfig,
+  planToolbarFilter,
+} from './workbenchTasksRoutePlanners';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTasksRouteHelpers — pure residual slices from
-   useWorkbenchTasksRoute (#719).
+   workbenchTasksRouteHelpers — residual handler factory + public re-export
+   barrel for tasks-route pure slices (#719, #769).
 
-   Public option/return types, source-group resolution, edit drafts,
-   task-group mutations, status/assignee/pane/sort/group planners, and
-   action-label builders. No React hooks / no intentional UX change.
+   Group/draft/mode helpers live in workbenchTasksRouteGroupHelpers;
+   action-plan / label builders live in workbenchTasksRoutePlanners.
+   This module keeps the handler factory and stable public exports.
+   No React hooks / no intentional UX change.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
+
+export {
+  resolveSourceTaskGroups,
+  buildTaskEditDraft,
+  nextTaskSortMode,
+  nextTaskGroupMode,
+  patchTaskInGroups,
+  removeTaskFromGroups,
+  nextTaskStatus,
+  resolveTaskAssignee,
+  resolveTaskAssigneeLabel,
+  prependTaskToGroups,
+  appendCustomTaskGroup,
+  prepareTaskEditSave,
+  patchTaskEditDraft,
+  resolveFilterPaneForAssignee,
+} from './workbenchTasksRouteGroupHelpers';
+
+export {
+  buildTaskPaneChangeLabel,
+  planTaskPaneChange,
+  buildTaskSortActionLabel,
+  planTaskSortToggle,
+  planTaskListReset,
+  planNewTaskGroup,
+  planCreateTask,
+  planStartTaskEdit,
+  planEditSelectedTask,
+  planSaveTaskEdit,
+  planCancelTaskEdit,
+  planDeleteSelectedTask,
+  planCycleSelectedTaskStatus,
+  planAssignSelectedTaskToMe,
+  planGroupBySelectedTaskProject,
+  planFilterBySelectedTaskAssignee,
+  planTaskClick,
+  planToolbarFieldConfig,
+  planToolbarFilter,
+  type TaskSelectionReset,
+  type TaskPaneChangePlan,
+  type CreateTaskPlan,
+  type NewTaskGroupPlan,
+  type TaskListResetPlan,
+  type TaskSortTogglePlan,
+  type StartTaskEditPlan,
+  type SaveTaskEditPlan,
+  type TaskActionFeedbackPlan,
+  type SelectedTaskGuardPlan,
+  type DeleteSelectedTaskPlan,
+  type CycleSelectedTaskStatusPlan,
+  type AssignSelectedTaskPlan,
+  type GroupBySelectedProjectPlan,
+  type FilterBySelectedAssigneePlan,
+  type TaskClickPlan,
+  type ToggleFlagPlan,
+} from './workbenchTasksRoutePlanners';
 
 export interface UseWorkbenchTasksRouteOptions {
   realDataMode: boolean;
@@ -61,427 +141,6 @@ export interface WorkbenchTasksRoute {
   handleNavMore: () => void;
   handleToolbarFieldConfig: () => void;
   handleToolbarFilter: () => void;
-}
-
-const TASK_PANE_LABELS: Record<TasksPane, string> = {
-  owned: '我负责的',
-  watching: '我关注的',
-  activity: '动态',
-  done: '已完成',
-  all: '任务视图',
-  created: '任务视图',
-  assigned: '任务视图',
-};
-
-export interface TaskSelectionReset {
-  selectedTaskId: null;
-  editingTaskId: null;
-  editingTaskDraft: null;
-}
-
-export interface TaskPaneChangePlan extends TaskSelectionReset {
-  tasksPane: TasksPane;
-  taskNavMenuOpen: false;
-  taskActionLabel: string;
-}
-
-export interface CreateTaskPlan {
-  nextTask: TaskItem;
-  tasksPane: 'owned';
-  taskViewMode: 'list';
-  selectedTaskId: string;
-  editingTaskId: string;
-  editingTaskDraft: TaskEditDraft;
-  taskActionLabel: string;
-}
-
-export interface NewTaskGroupPlan {
-  nextIndex: number;
-  taskGroupMode: 'custom';
-  taskViewMode: 'list';
-  taskActionLabel: string;
-}
-
-export interface TaskListResetPlan {
-  taskViewMode: 'list';
-  taskGroupMode: 'custom';
-  taskNavMenuOpen: false;
-  taskActionLabel: '已回到任务清单';
-}
-
-export interface TaskSortTogglePlan {
-  next: TaskSortMode;
-  taskActionLabel: string;
-}
-
-export interface StartTaskEditPlan {
-  selectedTaskId: string;
-  editingTaskId: string;
-  editingTaskDraft: TaskEditDraft;
-  taskViewMode: 'list';
-  taskActionLabel: string;
-}
-
-export interface SaveTaskEditPlan {
-  kind: 'save';
-  taskId: string;
-  patch: TaskEditDraft;
-  taskActionLabel: string;
-}
-
-export interface TaskActionFeedbackPlan {
-  kind: 'feedback';
-  taskActionLabel: string;
-}
-
-export type SelectedTaskGuardPlan = TaskActionFeedbackPlan;
-
-export interface DeleteSelectedTaskPlan extends TaskSelectionReset {
-  kind: 'delete';
-  taskId: string;
-  taskActionLabel: string;
-}
-
-export interface CycleSelectedTaskStatusPlan {
-  kind: 'cycle';
-  taskId: string;
-  status: TaskStatus;
-  taskActionLabel: string;
-}
-
-export interface AssignSelectedTaskPlan {
-  kind: 'assign';
-  taskId: string;
-  assignee: string;
-  taskActionLabel: string;
-}
-
-export interface GroupBySelectedProjectPlan {
-  kind: 'group-project';
-  taskGroupMode: 'project';
-  taskViewMode: 'list';
-  taskActionLabel: string;
-}
-
-export interface FilterBySelectedAssigneePlan {
-  kind: 'filter-assignee';
-  tasksPane: TasksPane;
-  taskFilterActive: false;
-  taskActionLabel: string;
-}
-
-export interface TaskClickPlan {
-  selectedTaskId: string;
-  clearEdit: boolean;
-  taskActionLabel: string;
-}
-
-export interface ToggleFlagPlan {
-  next: boolean;
-  taskActionLabel: string;
-}
-
-/** Resolve mock-backed or local task groups for the active data mode. */
-export function resolveSourceTaskGroups(
-  realDataMode: boolean,
-  taskGroups: TaskGroup[],
-  mockGroups: TaskGroup[] = WORKBENCH_MOCK_TASK_GROUPS,
-): TaskGroup[] {
-  return realDataMode ? taskGroups : (taskGroups.length > 0 ? taskGroups : mockGroups);
-}
-
-/** Build a row-edit draft from a task item. */
-export function buildTaskEditDraft(task: TaskItem): TaskEditDraft {
-  return {
-    title: task.title,
-    project: task.project,
-    assignee: task.assignee,
-    startTime: task.startTime,
-    dueDate: task.dueDate,
-    creator: task.creator,
-  };
-}
-
-export function buildTaskPaneChangeLabel(pane: TasksPane): string {
-  return `已切换到${TASK_PANE_LABELS[pane]}`;
-}
-
-export function planTaskPaneChange(pane: TasksPane): TaskPaneChangePlan {
-  return {
-    tasksPane: pane,
-    selectedTaskId: null,
-    editingTaskId: null,
-    editingTaskDraft: null,
-    taskNavMenuOpen: false,
-    taskActionLabel: buildTaskPaneChangeLabel(pane),
-  };
-}
-
-export function nextTaskSortMode(current: TaskSortMode): TaskSortMode {
-  return current === 'custom' ? 'due' : 'custom';
-}
-
-export function buildTaskSortActionLabel(mode: TaskSortMode): string {
-  return mode === 'due' ? '已按截止时间排序' : '已恢复拖拽自定义排序';
-}
-
-export function planTaskSortToggle(current: TaskSortMode): TaskSortTogglePlan {
-  const next = nextTaskSortMode(current);
-  return {
-    next,
-    taskActionLabel: buildTaskSortActionLabel(next),
-  };
-}
-
-export function nextTaskGroupMode(current: TaskGroupMode): TaskGroupMode {
-  return current === 'custom' ? 'project' : current === 'project' ? 'status' : 'custom';
-}
-
-export function planTaskListReset(): TaskListResetPlan {
-  return {
-    taskViewMode: 'list',
-    taskGroupMode: 'custom',
-    taskNavMenuOpen: false,
-    taskActionLabel: '已回到任务清单',
-  };
-}
-
-export function planNewTaskGroup(groupCount: number): NewTaskGroupPlan {
-  const nextIndex = groupCount + 1;
-  return {
-    nextIndex,
-    taskGroupMode: 'custom',
-    taskViewMode: 'list',
-    taskActionLabel: `已创建自定义分组 ${nextIndex}`,
-  };
-}
-
-/** Patch one task inside every group (immutable). */
-export function patchTaskInGroups(
-  groups: TaskGroup[],
-  taskId: string,
-  patch: Partial<TaskItem>,
-): TaskGroup[] {
-  return groups.map((group) => ({
-    ...group,
-    tasks: group.tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
-  }));
-}
-
-/** Remove a task; keep empty custom groups. */
-export function removeTaskFromGroups(groups: TaskGroup[], taskId: string): TaskGroup[] {
-  return groups
-    .map((group) => ({
-      ...group,
-      tasks: group.tasks.filter((task) => task.id !== taskId),
-    }))
-    .filter((group) => group.tasks.length > 0 || group.label.startsWith('自定义分组'));
-}
-
-export function nextTaskStatus(status: TaskStatus | undefined): TaskStatus {
-  const currentIndex = TASK_STATUS_SEQUENCE.indexOf(status ?? TASK_STATUS_SEQUENCE[0]!);
-  return TASK_STATUS_SEQUENCE[(currentIndex + 1) % TASK_STATUS_SEQUENCE.length]
-    ?? TASK_STATUS_SEQUENCE[0]!;
-}
-
-export function resolveTaskAssignee(
-  userDisplayName?: string | undefined,
-  currentUserId?: string | undefined,
-): string {
-  return userDisplayName ?? currentUserId ?? '当前用户';
-}
-
-export function resolveTaskAssigneeLabel(
-  userDisplayName?: string | undefined,
-): string {
-  return userDisplayName ?? '当前用户';
-}
-
-export function prependTaskToGroups(groups: TaskGroup[], task: TaskItem): TaskGroup[] {
-  const [first, ...rest] = groups;
-  if (!first) return [{ label: '默认分组', tasks: [task] }];
-  return [{ ...first, tasks: [task, ...first.tasks] }, ...rest];
-}
-
-export function appendCustomTaskGroup(groups: TaskGroup[], nextIndex: number): TaskGroup[] {
-  return [...groups, { label: `自定义分组 ${nextIndex}`, tasks: [] }];
-}
-
-export function prepareTaskEditSave(draft: TaskEditDraft): {
-  title: string;
-  patch: TaskEditDraft;
-  taskActionLabel: string;
-} {
-  const title = draft.title.trim() || '未命名任务';
-  const patch = { ...draft, title };
-  return {
-    title,
-    patch,
-    taskActionLabel: `${title} 已保存`,
-  };
-}
-
-export function patchTaskEditDraft(
-  current: TaskEditDraft | null,
-  field: keyof TaskEditDraft,
-  value: string,
-): TaskEditDraft | null {
-  return current ? { ...current, [field]: value } : current;
-}
-
-export function planCreateTask(localTaskCounter: number): CreateTaskPlan {
-  const nextTask = createLocalTask(localTaskCounter);
-  return {
-    nextTask,
-    tasksPane: 'owned',
-    taskViewMode: 'list',
-    selectedTaskId: nextTask.id,
-    editingTaskId: nextTask.id,
-    editingTaskDraft: buildTaskEditDraft(nextTask),
-    taskActionLabel: `已创建 ${nextTask.title}`,
-  };
-}
-
-export function planStartTaskEdit(task: TaskItem): StartTaskEditPlan {
-  return {
-    selectedTaskId: task.id,
-    editingTaskId: task.id,
-    editingTaskDraft: buildTaskEditDraft(task),
-    taskViewMode: 'list',
-    taskActionLabel: `正在编辑 ${task.title}`,
-  };
-}
-
-export function planEditSelectedTask(selectedTask: TaskItem | null): StartTaskEditPlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  return planStartTaskEdit(selectedTask);
-}
-
-export function planSaveTaskEdit(
-  editingTaskId: string | null,
-  editingTaskDraft: TaskEditDraft | null,
-): SaveTaskEditPlan | TaskActionFeedbackPlan {
-  if (!editingTaskId || !editingTaskDraft) {
-    return { kind: 'feedback', taskActionLabel: '没有正在编辑的任务' };
-  }
-  const saved = prepareTaskEditSave(editingTaskDraft);
-  return {
-    kind: 'save',
-    taskId: editingTaskId,
-    patch: saved.patch,
-    taskActionLabel: saved.taskActionLabel,
-  };
-}
-
-export function planCancelTaskEdit(editingTaskDraft: TaskEditDraft | null): TaskActionFeedbackPlan | null {
-  if (!editingTaskDraft) return null;
-  return { kind: 'feedback', taskActionLabel: '已取消编辑' };
-}
-
-export function planDeleteSelectedTask(selectedTask: TaskItem | null): DeleteSelectedTaskPlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  return {
-    kind: 'delete',
-    taskId: selectedTask.id,
-    selectedTaskId: null,
-    editingTaskId: null,
-    editingTaskDraft: null,
-    taskActionLabel: `${selectedTask.title} 已删除`,
-  };
-}
-
-export function planCycleSelectedTaskStatus(
-  selectedTask: TaskItem | null,
-): CycleSelectedTaskStatusPlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  const status = nextTaskStatus(selectedTask.status);
-  return {
-    kind: 'cycle',
-    taskId: selectedTask.id,
-    status,
-    taskActionLabel: `${selectedTask.title} 已推进到 ${status}`,
-  };
-}
-
-export function planAssignSelectedTaskToMe(
-  selectedTask: TaskItem | null,
-  userDisplayName?: string | undefined,
-  currentUserId?: string | undefined,
-): AssignSelectedTaskPlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  const assignee = resolveTaskAssignee(userDisplayName, currentUserId);
-  return {
-    kind: 'assign',
-    taskId: selectedTask.id,
-    assignee,
-    taskActionLabel: `${selectedTask.title} 已指派给 ${resolveTaskAssigneeLabel(userDisplayName)}`,
-  };
-}
-
-export function planGroupBySelectedTaskProject(
-  selectedTask: TaskItem | null,
-): GroupBySelectedProjectPlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  return {
-    kind: 'group-project',
-    taskGroupMode: 'project',
-    taskViewMode: 'list',
-    taskActionLabel: `已按项目查看：${selectedTask.project}`,
-  };
-}
-
-export function resolveFilterPaneForAssignee(
-  assignee: string,
-  currentUserId?: string | undefined,
-): TasksPane {
-  return assignee === currentUserId ? 'owned' : 'all';
-}
-
-export function planFilterBySelectedTaskAssignee(
-  selectedTask: TaskItem | null,
-  currentUserId?: string | undefined,
-): FilterBySelectedAssigneePlan | SelectedTaskGuardPlan {
-  if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
-  }
-  return {
-    kind: 'filter-assignee',
-    tasksPane: resolveFilterPaneForAssignee(selectedTask.assignee, currentUserId),
-    taskFilterActive: false,
-    taskActionLabel: `当前负责人：${selectedTask.assignee}`,
-  };
-}
-
-export function planTaskClick(task: TaskItem, editingTaskId: string | null): TaskClickPlan {
-  return {
-    selectedTaskId: task.id,
-    clearEdit: Boolean(editingTaskId && editingTaskId !== task.id),
-    taskActionLabel: `已选中 ${task.title}`,
-  };
-}
-
-export function planToolbarFieldConfig(currentlyShown: boolean): ToggleFlagPlan {
-  return {
-    next: !currentlyShown,
-    taskActionLabel: currentlyShown ? '已隐藏创建人字段' : '已显示创建人字段',
-  };
-}
-
-export function planToolbarFilter(currentlyActive: boolean): ToggleFlagPlan {
-  return {
-    next: !currentlyActive,
-    taskActionLabel: currentlyActive ? '已关闭筛选' : '筛选已启用',
-  };
 }
 
 /** Minimal setState signature so handlers stay React-hook free. */
