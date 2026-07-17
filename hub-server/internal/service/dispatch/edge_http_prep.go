@@ -59,3 +59,14 @@ func EdgeHTTPDispatchResult(statusCode int, respBody []byte) (runID string, nonS
 	}
 	return runID, false, nil
 }
+
+// Historical edge HTTP dispatch slog messages (AH-SR-053 + client side-effects).
+const (
+	EdgeHTTPLogInsecureCleartext = "edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext"
+	EdgeHTTPLogMarshalFailed     = "edge http dispatch: failed to marshal request"
+	EdgeHTTPLogCreateReqFailed   = "edge http dispatch: failed to create request"
+	EdgeHTTPLogUnreachable       = "edge http dispatch: edge server unreachable"
+	EdgeHTTPLogNonSuccess        = "edge http dispatch: edge returned non-success"
+	EdgeHTTPLogDecodeFailed      = "edge http dispatch: failed to decode response"
+	EdgeHTTPLogDispatched        = "edge http dispatch: task dispatched to local Edge"
+)

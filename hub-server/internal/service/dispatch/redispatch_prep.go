@@ -75,3 +75,19 @@ func RedispatchOfflineSuccessIncludesUserID(preferDevice bool) bool {
 func RedeliveryWSPushSucceeded(queued bool) bool {
 	return queued
 }
+
+// Historical redispatchDelivery / retryDispatchToTarget slog messages.
+const (
+	RedispatchLogTaskLookupFailed    = "redispatch: task lookup failed, marking dead-letter"
+	RedispatchLogTaskTerminal        = "redispatch: task in terminal state, moving delivery to dead-letter"
+	RedispatchLogHTTPSucceeded       = "redispatch: HTTP dispatch succeeded"
+	RedispatchLogWSSucceeded         = "redispatch: WS dispatch succeeded"
+	RedispatchLogWSNotQueued         = "redispatch: WS push not queued"
+	RedispatchLogWSFallbackSucceeded = "redispatch: WS fallback dispatch succeeded"
+)
+
+// RedispatchOfflinePushFailedLogMessage returns the historical offline-queue push
+// failure slog message for preferDevice-bound vs inviter fallback.
+func RedispatchOfflinePushFailedLogMessage(preferDevice bool) string {
+	return "redispatch: failed to push to " + RedeliveryOfflineLogKind(preferDevice) + " queue"
+}
