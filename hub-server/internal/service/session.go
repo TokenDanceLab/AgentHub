@@ -9,31 +9,69 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
+// ── SessionService ports + type ──────────────────────────────────────────────
+//
+// Same-package thin first seam (#593): SessionService already owns private/group
+// session lifecycle (create/list/members/leave/transfer/dissolve/settings/search).
+// This seam hardens replaceable ports (bus + cache) without a package move —
+// same pattern as MessageService (#585). ContactService and full service/im
+// subpackage extract remain deferred.
+
+// sessionBus publishes domain events from session lifecycle paths.
+// Implemented by *Bus.
+type sessionBus interface {
+	Publish(ctx context.Context, event Event)
+}
+
 // sessionCache is the subset of *cache.Client methods used by SessionService.
+// Implemented by *cache.Client and cache.NoOpCache.
 type sessionCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error
 }
 
+// SessionService owns IM session lifecycle orchestration in the flat service
+// package: private/group create, list/search, member join/leave/remove,
+// ownership transfer, dissolve, group info, per-member settings, delete-for-me,
+// and invited-agent cleanup. Member/meta cache invalidation uses injected
+// sessionCache; domain events go through sessionBus. Not a package move (#593).
 type SessionService struct {
 	db          *gorm.DB
 	cacheClient sessionCache
-	bus         *Bus
+	bus         sessionBus
 }
 
-func NewSessionService(db *gorm.DB, cacheClient *cache.Client, bus ...*Bus) *SessionService {
-	var eventBus *Bus
+// NewSessionService constructs a SessionService.
+// cacheClient may be nil and falls back to cache.NoOpCache.
+// bus may be omitted/nil for read-only/partial tests; write paths that publish no-op.
+func NewSessionService(db *gorm.DB, cacheClient sessionCache, bus ...sessionBus) *SessionService {
+	var eventBus sessionBus
 	if len(bus) > 0 {
 		eventBus = bus[0]
 	}
 	return &SessionService{db: db, cacheClient: resolveSessionCache(cacheClient), bus: eventBus}
+}
+
+// SetBus injects (or replaces) the event bus port.
+func (s *SessionService) SetBus(bus sessionBus) {
+	if s == nil {
+		return
+	}
+	s.bus = bus
+}
+
+// SetCache injects (or replaces) the session cache port.
+func (s *SessionService) SetCache(cacheClient sessionCache) {
+	if s == nil {
+		return
+	}
+	s.cacheClient = resolveSessionCache(cacheClient)
 }
 
 type CreateSessionResponse struct {
@@ -720,8 +758,9 @@ func (s *SessionService) cleanupInvitedAgents(sessionID, inviterUserID string) e
 	return errors.Join(allErrors...)
 }
 
+// publishEvent is a nil-safe wrapper over the bus port.
 func (s *SessionService) publishEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
-	if s.bus == nil {
+	if s == nil || s.bus == nil {
 		return
 	}
 	s.bus.Publish(ctx, Event{Type: eventType, Payload: payload})

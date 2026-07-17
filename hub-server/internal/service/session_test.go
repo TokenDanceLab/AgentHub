@@ -17,6 +17,58 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 )
 
+// mockSessionCache implements sessionCache for testing.
+type mockSessionCache struct {
+	invalidated []string
+	initSeq     map[string]int64
+}
+
+func (m *mockSessionCache) Invalidate(ctx context.Context, keys ...string) error {
+	m.invalidated = append(m.invalidated, keys...)
+	return nil
+}
+
+func (m *mockSessionCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error {
+	if m.initSeq == nil {
+		m.initSeq = make(map[string]int64)
+	}
+	m.initSeq[sessionID] = seq
+	return nil
+}
+
+// recordingSessionBus is a sessionBus test double that records Publish calls.
+type recordingSessionBus struct {
+	events []Event
+}
+
+func (b *recordingSessionBus) Publish(ctx context.Context, event Event) {
+	b.events = append(b.events, event)
+}
+
+func TestSessionService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &SessionService{db: nil, bus: nil, cacheClient: &mockSessionCache{}}
+	// Must not panic when bus port is unset (read-only/partial construction).
+	svc.publishEvent(context.Background(), "session.created", map[string]interface{}{"k": "v"})
+}
+
+func TestSessionService_SetBusAndSetCachePorts(t *testing.T) {
+	bus := &recordingSessionBus{}
+	cachePort := &mockSessionCache{}
+	svc := NewSessionService(nil, nil)
+	require.NotNil(t, svc)
+
+	svc.SetBus(bus)
+	svc.SetCache(cachePort)
+	svc.publishEvent(context.Background(), "session.dissolved", map[string]interface{}{"session_id": "s1"})
+	require.NoError(t, resolveSessionCache(svc.cacheClient).Invalidate(context.Background(), "session:members:s1"))
+	require.NoError(t, resolveSessionCache(svc.cacheClient).InitSeqIfAbsent(context.Background(), "s1", 0))
+
+	require.Len(t, bus.events, 1)
+	assert.Equal(t, "session.dissolved", bus.events[0].Type)
+	assert.Contains(t, cachePort.invalidated, "session:members:s1")
+	assert.Equal(t, int64(0), cachePort.initSeq["s1"])
+}
+
 func newMockDBSession(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
 	t.Helper()
 	sqlDB, mock, err := sqlmock.New()
