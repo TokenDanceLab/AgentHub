@@ -11,6 +11,18 @@ export function isRouteFallbackError(error: unknown): boolean {
   return error instanceof AppError && (error.status === 404 || error.status === 405);
 }
 
+/**
+ * Whether requestWithFallback should try the next path after this error.
+ * Pure residual of the multi-route 404/405 peel.
+ */
+export function shouldContinueRouteFallback(
+  index: number,
+  pathCount: number,
+  error: unknown,
+): boolean {
+  return index < pathCount - 1 && isRouteFallbackError(error);
+}
+
 export function normalizeRegisterDeviceRequest(
   body: HubRegisterDeviceRequest,
 ): HubRegisterDeviceRequest & {
