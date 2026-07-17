@@ -36,6 +36,35 @@ func TestGenerateAccessToken_RoundTrip(t *testing.T) {
 	if claims.IssuedAt == nil {
 		t.Fatal("expected IssuedAt to be set")
 	}
+	if claims.ID == "" {
+		t.Fatal("expected access token jti (RegisteredClaims.ID) to be set")
+	}
+}
+
+func TestGenerateAccessToken_MintsUniqueJTI(t *testing.T) {
+	secret := "test-secret"
+	t1, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken failed: %v", err)
+	}
+	t2, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken failed: %v", err)
+	}
+	c1, err := ParseToken(t1, secret)
+	if err != nil {
+		t.Fatalf("ParseToken t1: %v", err)
+	}
+	c2, err := ParseToken(t2, secret)
+	if err != nil {
+		t.Fatalf("ParseToken t2: %v", err)
+	}
+	if c1.ID == "" || c2.ID == "" {
+		t.Fatal("expected non-empty jti on both tokens")
+	}
+	if c1.ID == c2.ID {
+		t.Fatal("expected unique jti per access token mint")
+	}
 }
 
 func TestParseToken_Expired(t *testing.T) {
@@ -220,7 +249,6 @@ func claimStringsContain(values jwt.ClaimStrings, want string) bool {
 	}
 	return false
 }
-
 
 func TestParseToken_RejectsEdgeToken(t *testing.T) {
 	secret := "hub-secret-at-least-32-bytes-long!!"

@@ -23,6 +23,8 @@ type authCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error
 	IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error)
+	BlacklistAccessToken(ctx context.Context, jti string, ttl time.Duration) error
+	IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error)
 }
 
 // LoginResponse is returned to clients after successful authentication.
@@ -121,7 +123,9 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 // Logout revokes all refresh tokens for the given user and device,
 // both in the database and in the Redis blacklist (#66).
 // If deviceType is non-empty, the Redis blacklist is scoped by device_type (#149).
-func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType string) error {
+// When accessJTI is non-empty, the access token jti is also blacklisted until
+// AccessTTL elapses so middleware rejects the token immediately (#888).
+func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
 	// Write to Redis blacklist so token validation can check without hitting DB (#66).
 	// BlacklistRefreshToken prepends "rt_blacklist:" internally, so we only pass the
 	// logical key suffix here.
@@ -131,6 +135,14 @@ func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType s
 	}
 	if err := resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL); err != nil {
 		slog.Warn("logout: failed to blacklist in Redis, fallback to DB-only revocation", "key", blacklistKey, "error", err)
+	}
+
+	// Blacklist the current access token jti for the remaining access TTL (#888).
+	// Without this, a stolen access JWT remains valid until natural expiry.
+	if accessJTI != "" {
+		if err := resolveAuthCache(s.cacheClient).BlacklistAccessToken(ctx, accessJTI, s.jwtCfg.AccessTTL); err != nil {
+			slog.Warn("logout: failed to blacklist access jti in Redis", "jti", accessJTI, "error", err)
+		}
 	}
 
 	// Also revoke in the database (source of truth).

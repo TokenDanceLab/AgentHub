@@ -154,6 +154,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Wire audit into middleware for permission decision logging.
 	middleware.AuditPermissionFn = auditSvc.RecordPermissionDecision
+	// Wire access-token jti blacklist for logout revocation (#888).
+	middleware.SetAccessTokenBlacklist(a.CacheClient)
 
 	// AgentTeam service
 	a.AgentTeamService = agentteam.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, agentteam.AgentTeamGuardrails{
@@ -190,8 +192,8 @@ func (a *App) Run(ctx context.Context) error {
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{
-		Service: a.MessageService,
-		reactions:      a.MessageReactionService,
+		Service:   a.MessageService,
+		reactions: a.MessageReactionService,
 	})
 	a.AgentHandler = handler.NewAgentHandler(a.AgentService)
 	a.CustomAgentHandler = handler.NewCustomAgentHandler(a.AgentService)
