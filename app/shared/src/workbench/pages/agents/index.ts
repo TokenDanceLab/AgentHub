@@ -11,6 +11,19 @@ export {
 } from './AgentInstalledViews';
 
 export {
+  AgentEditPanel,
+} from './AgentEditPanel';
+export type { AgentEditPanelProps } from './AgentEditPanel';
+
+export {
+  AgentAvatar,
+  AgentStat,
+  CapabilityBadge,
+  deriveCapabilityTags,
+  stateClass,
+} from './AgentInstalledParts';
+
+export {
   AgentPolicyView,
   AgentToolsView,
   AgentModelsView,
