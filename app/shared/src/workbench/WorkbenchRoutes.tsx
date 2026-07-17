@@ -8,21 +8,13 @@ import type {
 import type { AgentConfig, SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { GlobalRailPage } from './GlobalRail';
 import type { SettingsService } from './settingsService';
-import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
 import { ContactsPage } from './pages/ContactsPage';
 import { DocsPage } from './pages/DocsPage';
-import { AgentsPage } from './pages/AgentsPage';
-import { TasksPage } from './pages/TasksPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
-import {
-  WORKBENCH_MOCK_AGENT_AUDIT_ROWS,
-  WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES,
-  WORKBENCH_MOCK_AGENT_MODEL_HEALTH,
-  WORKBENCH_MOCK_AGENT_POLICY_RULES,
-  WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
-} from './mockData';
+import { WorkbenchAgentsRouteView } from './WorkbenchAgentsRouteView';
+import { WorkbenchTasksRouteView } from './WorkbenchTasksRouteView';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
 import {
   useWorkbenchContactsRoute,
@@ -39,6 +31,7 @@ import {
 } from './useWorkbenchProjectsRoute';
 import { useWorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
 import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
+import { buildWorkbenchProfileSources } from './workbenchProfileSources';
 import styles from './AgentHubWorkbench.module.css';
 
 // ── Static page imports (no React.lazy — lazy 在 jsdom 测试中无法同步解析) ──
@@ -206,10 +199,13 @@ export function WorkbenchRoutes({
     documentsActions,
   });
 
-  const profileSources = useMemo(() => [
-    ...agentsRoute.agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
-    ...contactsRoute.contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
-  ], [agentsRoute.agentConfigs, contactsRoute.contactsData.members]);
+  const profileSources = useMemo(
+    () => buildWorkbenchProfileSources(
+      agentsRoute.agentConfigs,
+      contactsRoute.contactsData.members,
+    ),
+    [agentsRoute.agentConfigs, contactsRoute.contactsData.members],
+  );
 
   switch (activePage) {
     case 'contacts':
@@ -255,122 +251,26 @@ export function WorkbenchRoutes({
       );
     case 'agents':
       return (
-        <AgentsPage
-          activePane={agentsRoute.agentsPane}
-          agents={agentsRoute.agentConfigs}
-          agentActionError={agentProfilesStatus?.actionError}
-          agentsError={agentProfilesStatus?.error}
-          agentsLoading={agentProfilesStatus?.loading}
-          allSkills={agentsRoute.resolvedSkills}
-          allTools={agentsRoute.resolvedTools}
-          auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
-          confirmCount={agentsRoute.agentConfigs.reduce((total, agent) => total + agentsRoute.resolvedTools.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
-          defaultModelLabel={agentsRoute.agentConfigs[0]?.model ?? '未配置模型'}
-          installedCount={agentsRoute.agentConfigs.length}
-          marketFeatured={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(0, 3)}
-          marketTemplates={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(3)}
-          modelHealthRows={WORKBENCH_MOCK_AGENT_MODEL_HEALTH}
-          modelRoutes={agentsRoute.agentConfigs.map((agent) => ({
-            agentId: agent.id,
-            agentName: agent.name,
-            agentInitials: workbenchProfileInitials(agent.name),
-            agentColor: workbenchAgentColor(agent),
-            role: agent.role,
-            mode: agent.mode,
-            model: agent.model,
-          }))}
-          models={agentsRoute.resolvedModels}
-          onPaneChange={agentsRoute.setAgentsPane}
-          onAgentAdd={agentsRoute.handleAgentAdd}
-          onAgentDelete={agentsRoute.handleAgentDelete}
-          onAgentFieldChange={agentsRoute.handleAgentFieldChange}
+        <WorkbenchAgentsRouteView
+          agents={agents}
+          agentsRoute={agentsRoute}
+          agentProfilesStatus={agentProfilesStatus}
           onAgentProfileOpen={onAgentProfileOpen}
-          onAgentSave={agentsRoute.handleAgentSave}
-          onAgentSelect={agentsRoute.setSelectedAgentId}
-          onAgentSkillToggle={agentsRoute.handleAgentSkillToggle}
-          onMarketInstall={agentsRoute.handleMarketInstall}
           onAgentsRetry={onAgentsRetry}
-          onToolPermissionSet={agentsRoute.handleToolPermissionSet}
-          policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
-          recentShortcuts={agents === undefined ? ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'] : agentsRoute.agentConfigs.slice(0, 3).map((agent) => `${agent.name} 已同步`)}
-          runnableCount={agentsRoute.agentConfigs.filter((agent) => agent.state === 'running' || agent.state === 'ready').length}
-          saveStateLabel={agentsRoute.agentSaveStateLabel()}
-          isDirty={agentsRoute.selectedAgentIsDirty}
-          savingAgentId={agentProfilesStatus?.savingAgentId}
-          deletingAgentId={agentProfilesStatus?.deletingAgentId}
-          toolMatrixAgents={agentsRoute.agentConfigs.map((agent) => ({
-            id: agent.id,
-            name: agent.name,
-            initials: workbenchProfileInitials(agent.name),
-            color: workbenchAgentColor(agent),
-            permissions: agent.tools,
-          }))}
-          toolMatrixTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
-          {...(agentsRoute.effectiveSelectedAgentId ? { selectedAgentId: agentsRoute.effectiveSelectedAgentId } : {})}
-          skillMarketItems={skillMarketItems ?? []}
-          skillMarketLoading={skillMarketLoading ?? false}
-          mcpMarketItems={mcpMarketItems ?? []}
-          mcpMarketLoading={mcpMarketLoading ?? false}
+          skillMarketItems={skillMarketItems}
+          skillMarketLoading={skillMarketLoading}
+          mcpMarketItems={mcpMarketItems}
+          mcpMarketLoading={mcpMarketLoading}
           ccSwitchStatus={ccSwitchStatus}
           ccSwitchProviders={ccSwitchProviders}
         />
       );
     case 'runs':
       return (
-        <TasksPage
-          activePane={tasksRoute.tasksPane}
-          activeFilterCount={tasksRoute.taskFilterActive ? 1 : 0}
-          crossProjectCount={new Set(tasksRoute.visibleTasks.map((task) => task.project)).size}
-          dueTodayCount={tasksRoute.visibleTasks.filter((task) => task.dueDate.includes('今天')).length}
-          fieldConfigActive={!tasksRoute.taskShowCreator}
-          fieldConfigLabel={tasksRoute.taskShowCreator ? '字段配置' : '字段配置 5/6'}
-          emptyStateLabel={realDataMode ? 'Hub tasks are not loaded in this replay.' : undefined}
-          groupActive={tasksRoute.taskGroupMode !== 'custom' || tasksRoute.taskViewMode !== 'list'}
-          groupLabel={
-            tasksRoute.taskViewMode === 'board'
-              ? '分组：状态看板'
-              : tasksRoute.taskViewMode === 'dashboard'
-                ? '分组：项目仪表盘'
-                : tasksRoute.taskGroupMode === 'project'
-                  ? '分组：所属项目'
-                  : tasksRoute.taskGroupMode === 'status'
-                    ? '分组：任务状态'
-                    : '分组：自定义分组'
-          }
-          groups={tasksRoute.visibleTaskGroups}
+        <WorkbenchTasksRouteView
+          tasksRoute={tasksRoute}
+          realDataMode={realDataMode}
           profiles={profileSources}
-          editingDraft={tasksRoute.editingTaskDraft}
-          editingTaskId={tasksRoute.editingTaskId}
-          navMenuOpen={tasksRoute.taskNavMenuOpen}
-          incompleteCount={tasksRoute.visibleTasks.filter((task) => task.status !== '已完成').length}
-          onAddTaskRow={realDataMode ? undefined : tasksRoute.handleCreateTask}
-          onAssignSelectedTaskToMe={tasksRoute.handleAssignSelectedTaskToMe}
-          onCycleSelectedTaskStatus={tasksRoute.handleCycleSelectedTaskStatus}
-          onCreateTask={realDataMode ? undefined : tasksRoute.handleCreateTask}
-          onCancelTaskEdit={tasksRoute.handleCancelTaskEdit}
-          onDeleteSelectedTask={tasksRoute.handleDeleteSelectedTask}
-          onEditDraftChange={tasksRoute.handleEditTaskDraftChange}
-          onEditSelectedTask={tasksRoute.handleEditSelectedTask}
-          onFilterBySelectedTaskAssignee={tasksRoute.handleFilterBySelectedTaskAssignee}
-          onGroupBySelectedTaskProject={tasksRoute.handleGroupBySelectedTaskProject}
-          onNewGroup={realDataMode ? undefined : tasksRoute.handleNewTaskGroup}
-          onNavMore={tasksRoute.handleNavMore}
-          onPaneChange={tasksRoute.handleTaskPaneChange}
-          onTaskClick={tasksRoute.handleTaskClick}
-          onSaveTaskEdit={tasksRoute.handleSaveTaskEdit}
-          onTaskList={tasksRoute.handleTaskList}
-          onToolbarFieldConfig={tasksRoute.handleToolbarFieldConfig}
-          onToolbarFilter={tasksRoute.handleToolbarFilter}
-          onToolbarGroup={tasksRoute.handleTaskGroup}
-          onToolbarSort={tasksRoute.handleTaskSort}
-          onViewModeChange={tasksRoute.setTaskViewMode}
-          selectedTaskId={tasksRoute.selectedTaskId}
-          selectedTask={tasksRoute.selectedTask}
-          showCreatorColumn={tasksRoute.taskShowCreator}
-          sortActive={tasksRoute.taskSortMode !== 'custom'}
-          sortLabel={tasksRoute.taskSortMode === 'custom' ? '排序：拖拽自定义' : '排序：截止时间'}
-          taskActionLabel={tasksRoute.taskActionLabel}
-          viewMode={tasksRoute.taskViewMode}
         />
       );
     case 'projects':
