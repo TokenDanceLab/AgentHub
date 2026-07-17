@@ -111,7 +111,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		return nil, err
 	}
 	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
-	if err != nil {
+	if shouldFailNewRunnerProfile(err) {
 		return nil, err
 	}
 	if shouldStatConfiguredWorkDir(cfg.WorkDir) {
@@ -290,11 +290,11 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	cancel()
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
-	if !ok {
-		current, found := e.store.GetRun(runID)
-		return lookupCancelResult(current, found)
+	if result, needLookup := cancelTransitionResult(run, ok); !needLookup {
+		return result
 	}
-	return cancelResultWithRun(run)
+	current, found := e.store.GetRun(runID)
+	return lookupCancelResult(current, found)
 }
 
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
@@ -320,7 +320,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	adapter := e.adapter
 	if shouldResolveAdapter(e.adapterReg != nil, runCtx.AgentID, adapter != nil) {
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
-		if err != nil {
+		if shouldPublishAdapterResolveFailure(err) {
 			e.publishFailed(run, err)
 			return
 		}
@@ -331,7 +331,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// it is properly configured (e.g. API keys, credentials) before launching
 	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
 	if preflight, ok := asPreflightAdapter(adapter); ok {
-		if err := preflight.PreflightCheck(); err != nil {
+		if err := preflight.PreflightCheck(); shouldPublishPreflightFailure(err) {
 			slog.Warn("process: adapter preflight check failed",
 				"runId", run.ID,
 				"agentId", runCtx.AgentID,
@@ -349,12 +349,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// before launching the agent process. If the API validation is somehow
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
-	if mode, forbidden := sanitizePermissionMode(runCtx.PermissionMode); forbidden {
+	if sanitized, forbidden := applyPermissionModeSanitization(runCtx); shouldLogForbiddenPermissionMode(forbidden) {
 		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
 			"runId", run.ID,
 			"agentId", runCtx.AgentID,
 		)
-		runCtx.PermissionMode = mode
+		runCtx = sanitized
 	}
 
 	var runStartTime time.Time
@@ -390,7 +390,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// Profile mode: use configured command template
 			var err error
 			args, env, err = e.profile.Template.Expand(runCtx)
-			if err != nil {
+			if shouldPublishCommandBuildFailure(err) {
 				e.publishFailed(run, err)
 				return
 			}
@@ -413,7 +413,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-		if err != nil {
+		if shouldPublishCommandBuildFailure(err) {
 			e.publishFailed(run, err)
 			return
 		}
@@ -423,19 +423,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// uses the administrator-configured env base. See envForAdapterOrProfile.
 		cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
 		stdout, err := cmd.StdoutPipe()
-		if err != nil {
+		if shouldPublishPipeFailure(err) {
 			e.publishFailed(run, pipeOpenError("stdout", err))
 			return
 		}
 		stderr, err := cmd.StderrPipe()
-		if err != nil {
+		if shouldPublishPipeFailure(err) {
 			e.publishFailed(run, pipeOpenError("stderr", err))
 			return
 		}
 		var stdin io.WriteCloser
 		if needsAdapterStdin(adapter) {
 			stdin, err = cmd.StdinPipe()
-			if err != nil {
+			if shouldPublishPipeFailure(err) {
 				e.publishFailed(run, pipeOpenError("stdin", err))
 				return
 			}
@@ -764,8 +764,7 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	slog.Debug("executor.run.failed", "runId", run.ID, "error", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
 	if shouldPublishStatusTransition(ok) {
-		exitCode := ExitCodeFromErr(err)
-		classified := ClassifyError(err, exitCode)
+		classified := classifyPublishedFailure(err)
 		if shouldPersistClassifiedFailure(classified) {
 			e.persistAgentFailureMessage(failed, classified.Message)
 		}
@@ -779,14 +778,14 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 
 func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
 	content, ok := trimAgentFailureContent(content)
-	if !ok {
+	if !shouldPersistAgentFailureContent(ok) {
 		return
 	}
 	repository, ok := asAgentFailureRepository(e.store)
-	if !ok {
+	if !shouldUseAgentFailureRepository(ok) {
 		return
 	}
-	if hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID) {
+	if shouldSkipExistingAgentFailureMessage(hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)) {
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
@@ -813,7 +812,7 @@ func (e *ProcessExecutor) publishCancelled(run store.Run) {
 // has a pending persistence failure after a status transition.
 func (e *ProcessExecutor) checkPersistError(runID string) {
 	pc, ok := asPersistErrorSource(e.store)
-	if !ok {
+	if !shouldCheckPersistErrorSource(ok) {
 		return
 	}
 	if persistErr := pc.LastPersistError(); shouldEmitPersistenceError(persistErr) {
@@ -882,7 +881,7 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 
 	// Resolve a store.Writer for direct persistence.
 	writer, ok := asStoreWriter(e.store)
-	if !ok {
+	if !shouldSurfaceWithWriter(ok) {
 		slog.Debug("surfacing: store does not implement Writer, skipping", "runId", runID)
 		return
 	}
@@ -999,7 +998,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	hooks := buildProcessSecurityHooks(allowedTools, emitter, scope)
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
-	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
+	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); shouldRecordStructuredParseError(err) {
 		slog.Error("structured output parse error", "runId", run.ID, "error", err)
 		*parseErr = err
 	}
@@ -1080,7 +1079,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 				"agentInstanceId", agentInstanceID,
 				"error", regErr,
 			)
-		} else {
+		} else if shouldMarkSubAgentRegistered(regErr) {
 			registered = true
 		}
 	}
