@@ -368,3 +368,224 @@ func TestDecodeSQLiteRowPayloadRejectsTrailingTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestIsBlankSQLiteSnapshotPayload(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		payload string
+		want    bool
+	}{
+		{"", true},
+		{"   \n\t", true},
+		{"{}", false},
+		{"  {\"x\":1} ", false},
+	}
+	for _, tt := range tests {
+		if got := isBlankSQLiteSnapshotPayload(tt.payload); got != tt.want {
+			t.Fatalf("isBlankSQLiteSnapshotPayload(%q) = %v, want %v", tt.payload, got, tt.want)
+		}
+	}
+}
+
+func TestDecodeAndEncodeSQLiteSnapshotPayload(t *testing.T) {
+	t.Parallel()
+
+	if _, err := decodeSQLiteSnapshotPayload(`{"projects":{}} extra`); err == nil {
+		t.Fatal("expected trailing data error")
+	}
+	if _, err := decodeSQLiteSnapshotPayload(`{not-json`); err == nil {
+		t.Fatal("expected invalid json error")
+	}
+
+	original := fileSnapshot{
+		Projects: map[string]Project{
+			"p1": {ID: "p1", Name: "Local", Status: "active", OwnerID: "o1", CreatedAt: "c", UpdatedAt: "u"},
+		},
+		ProjectOrder: []string{"p1"},
+		Settings:     map[string]string{"theme": "dark"},
+	}
+	payload, err := encodeSQLiteSnapshotPayload(original)
+	if err != nil {
+		t.Fatalf("encodeSQLiteSnapshotPayload: %v", err)
+	}
+	decoded, err := decodeSQLiteSnapshotPayload(string(payload))
+	if err != nil {
+		t.Fatalf("decodeSQLiteSnapshotPayload: %v", err)
+	}
+	if !reflect.DeepEqual(decoded.Projects["p1"], original.Projects["p1"]) {
+		t.Fatalf("decoded project = %#v, want %#v", decoded.Projects["p1"], original.Projects["p1"])
+	}
+	if !reflect.DeepEqual(decoded.ProjectOrder, original.ProjectOrder) {
+		t.Fatalf("decoded order = %#v", decoded.ProjectOrder)
+	}
+	if decoded.Settings["theme"] != "dark" {
+		t.Fatalf("decoded settings = %#v", decoded.Settings)
+	}
+}
+
+func TestBuildJSONPayloadMap(t *testing.T) {
+	t.Parallel()
+
+	items := map[string]Project{
+		"p1": {ID: "p1", Name: "One"},
+		"p2": {ID: "p2", Name: "Two"},
+	}
+	got := buildJSONPayloadMap(items)
+	if len(got) != 2 {
+		t.Fatalf("size = %d, want 2", len(got))
+	}
+	var p1 Project
+	if err := json.Unmarshal([]byte(got["p1"]), &p1); err != nil {
+		t.Fatalf("unmarshal p1: %v", err)
+	}
+	if p1.Name != "One" {
+		t.Fatalf("p1 = %#v", p1)
+	}
+}
+
+func TestPrepareWorkspaceProjectionWrite(t *testing.T) {
+	t.Parallel()
+
+	now := "2026-07-18T00:00:00Z"
+	write, skip, err := prepareWorkspaceProjectionWrite(`{"projectId":"p1","name":"Local","status":"active","createdAt":"c1"}`, now)
+	if err != nil || skip {
+		t.Fatalf("prepare workspace: skip=%v err=%v", skip, err)
+	}
+	if write.WorkspaceID != "p1" || write.LocalPath != "p1" || write.Name != "Local" || write.Status != "active" {
+		t.Fatalf("workspace write = %#v", write)
+	}
+	if write.CreatedAt != "c1" || write.UpdatedAt != "c1" {
+		t.Fatalf("workspace timestamps = %#v", write)
+	}
+
+	// Missing name/status/createdAt fall back.
+	write, skip, err = prepareWorkspaceProjectionWrite(`{"projectId":"p2"}`, now)
+	if err != nil || skip {
+		t.Fatalf("prepare workspace defaults: skip=%v err=%v", skip, err)
+	}
+	if write.Name != "p2" || write.Status != "active" || write.CreatedAt != now || write.UpdatedAt != now {
+		t.Fatalf("workspace defaults = %#v", write)
+	}
+
+	_, skip, err = prepareWorkspaceProjectionWrite(`{"name":"no-id"}`, now)
+	if err != nil || !skip {
+		t.Fatalf("empty id skip=%v err=%v, want skip", skip, err)
+	}
+	if _, _, err := prepareWorkspaceProjectionWrite(`{bad`, now); err == nil {
+		t.Fatal("expected invalid json error")
+	}
+}
+
+func TestPrepareRunProjectionWrite(t *testing.T) {
+	t.Parallel()
+
+	now := "2026-07-18T00:00:00Z"
+	projects := map[string]Project{"p1": {ID: "p1"}}
+
+	write, skip, err := prepareRunProjectionWrite(
+		`{"runId":"r1","projectId":"p1","threadId":"t1","status":"started","createdAt":"c1","startedAt":"s1"}`,
+		projects, now,
+	)
+	if err != nil || skip {
+		t.Fatalf("prepare run: skip=%v err=%v", skip, err)
+	}
+	if write.RunID != "r1" || write.WorkspaceID != "p1" || write.ThreadID != "t1" || write.Status != "started" {
+		t.Fatalf("run write = %#v", write)
+	}
+	if write.CreatedAt != "c1" || write.StartedAt != "s1" || write.FinishedAt != nil {
+		t.Fatalf("run times = %#v", write)
+	}
+
+	// Empty thread/status/createdAt defaults.
+	write, skip, err = prepareRunProjectionWrite(`{"runId":"r2","projectId":"p1"}`, projects, now)
+	if err != nil || skip {
+		t.Fatalf("prepare run defaults: skip=%v err=%v", skip, err)
+	}
+	if write.ThreadID != nil || write.Status != "queued" || write.CreatedAt != now {
+		t.Fatalf("run defaults = %#v", write)
+	}
+
+	_, skip, err = prepareRunProjectionWrite(`{"runId":"r3","projectId":"missing"}`, projects, now)
+	if err != nil || !skip {
+		t.Fatalf("missing project skip=%v err=%v, want skip", skip, err)
+	}
+	_, skip, err = prepareRunProjectionWrite(`{"runId":"","projectId":"p1"}`, projects, now)
+	if err != nil || !skip {
+		t.Fatalf("empty run id skip=%v err=%v, want skip", skip, err)
+	}
+	if _, _, err := prepareRunProjectionWrite(`{bad`, projects, now); err == nil {
+		t.Fatal("expected invalid json error")
+	}
+}
+
+func TestPrepareArtifactDiffPreviewProjectionWrite(t *testing.T) {
+	t.Parallel()
+
+	now := "2026-07-18T00:00:00Z"
+
+	artifact, skip, err := prepareArtifactProjectionWrite(
+		`{"artifactId":"a1","runId":"r1","workspaceId":"p1","kind":"log","path":"out.txt","createdAt":"c1","metadataJson":"{\"sizeBytes\":1}","contentSourceKind":"path","contentSourcePath":"/tmp/out","contentSourceReadable":1}`,
+		now,
+	)
+	if err != nil || skip {
+		t.Fatalf("artifact: skip=%v err=%v", skip, err)
+	}
+	if artifact.ArtifactID != "a1" || artifact.Kind != "log" || artifact.ContentSourceReadable != 1 {
+		t.Fatalf("artifact write = %#v", artifact)
+	}
+	artifact, skip, err = prepareArtifactProjectionWrite(`{"artifactId":"a2","runId":"r1","workspaceId":"p1"}`, now)
+	if err != nil || skip {
+		t.Fatalf("artifact defaults: skip=%v err=%v", skip, err)
+	}
+	if artifact.Kind != "file" || artifact.CreatedAt != now || artifact.UpdatedAt != now {
+		t.Fatalf("artifact defaults = %#v", artifact)
+	}
+	_, skip, err = prepareArtifactProjectionWrite(`{"artifactId":"","runId":"r1","workspaceId":"p1"}`, now)
+	if err != nil || !skip {
+		t.Fatalf("artifact empty id skip=%v err=%v", skip, err)
+	}
+
+	diff, skip, err := prepareDiffProjectionWrite(
+		`{"diffId":"d1","runId":"r1","workspaceId":"p1","summaryJson":"{}","patchPath":"a.go","status":"added","createdAt":"c2"}`,
+		now,
+	)
+	if err != nil || skip {
+		t.Fatalf("diff: skip=%v err=%v", skip, err)
+	}
+	if diff.DiffID != "d1" || diff.PatchPath != "a.go" || diff.Status != "added" || diff.UpdatedAt != "c2" {
+		t.Fatalf("diff write = %#v", diff)
+	}
+	diff, skip, err = prepareDiffProjectionWrite(`{"diffId":"d2","runId":"r1","workspaceId":"p1","patchPath":"b.go"}`, now)
+	if err != nil || skip {
+		t.Fatalf("diff defaults: skip=%v err=%v", skip, err)
+	}
+	if diff.Status != "modified" || diff.CreatedAt != now {
+		t.Fatalf("diff defaults = %#v", diff)
+	}
+	_, skip, err = prepareDiffProjectionWrite(`{"diffId":"d3","runId":"","workspaceId":"p1"}`, now)
+	if err != nil || !skip {
+		t.Fatalf("diff empty run skip=%v err=%v", skip, err)
+	}
+
+	preview, skip, err := preparePreviewProjectionWrite(
+		`{"previewId":"v1","runId":"r1","workspaceId":"p1","url":"http://localhost","status":"ready","createdAt":"c3"}`,
+		now,
+	)
+	if err != nil || skip {
+		t.Fatalf("preview: skip=%v err=%v", skip, err)
+	}
+	if preview.PreviewID != "v1" || preview.URL != "http://localhost" || preview.Status != "ready" {
+		t.Fatalf("preview write = %#v", preview)
+	}
+	preview, skip, err = preparePreviewProjectionWrite(`{"previewId":"v2","runId":"r1","workspaceId":"p1","url":"http://x"}`, now)
+	if err != nil || skip {
+		t.Fatalf("preview defaults: skip=%v err=%v", skip, err)
+	}
+	if preview.Status != "created" || preview.CreatedAt != now || preview.UpdatedAt != now {
+		t.Fatalf("preview defaults = %#v", preview)
+	}
+	_, skip, err = preparePreviewProjectionWrite(`{"previewId":"v3","runId":"r1","workspaceId":""}`, now)
+	if err != nil || !skip {
+		t.Fatalf("preview empty workspace skip=%v err=%v", skip, err)
+	}
+}
