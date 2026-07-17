@@ -16,13 +16,6 @@ func resolveAuthCache(c authCache) authCache {
 	return c
 }
 
-func resolveContactCache(c contactCache) contactCache {
-	if isNilCache(c) {
-		return cache.NoOpCache{}
-	}
-	return c
-}
-
 func resolveSessionCache(c sessionCache) sessionCache {
 	if isNilCache(c) {
 		return cache.NoOpCache{}
