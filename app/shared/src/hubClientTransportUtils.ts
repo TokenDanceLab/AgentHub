@@ -63,6 +63,13 @@ export function buildHubUrl(baseUrl: string, path: string): string {
   return `${baseUrl}${path}`;
 }
 
+/** Resolve fetch implementation (injected or global). */
+export function resolveHubFetch(
+  fetchImpl?: typeof globalThis.fetch,
+): typeof globalThis.fetch {
+  return fetchImpl ?? globalThis.fetch;
+}
+
 /** Set JSON content-type only when the caller did not supply one. */
 export function applyDefaultJsonContentType(headers: Headers): void {
   if (!headers.has('Content-Type')) {
@@ -75,4 +82,94 @@ export function applyBearerAuth(headers: Headers, token?: string | null): void {
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
+}
+
+/** Force-set Authorization for a one-shot retry after token refresh. */
+export function applyRefreshedBearerAuth(headers: Headers, token: string): void {
+  headers.set('Authorization', `Bearer ${token}`);
+}
+
+/**
+ * JSON request headers: preserve caller headers, default Content-Type, optional Bearer.
+ */
+export function createJsonAuthHeaders(
+  initHeaders?: HeadersInit,
+  token?: string | null,
+): Headers {
+  const headers = new Headers(initHeaders);
+  applyDefaultJsonContentType(headers);
+  applyBearerAuth(headers, token);
+  return headers;
+}
+
+/**
+ * Multipart/upload headers: Bearer only — runtime must set multipart boundary.
+ */
+export function createAuthOnlyHeaders(token?: string | null): Headers {
+  const headers = new Headers();
+  applyBearerAuth(headers, token);
+  return headers;
+}
+
+/** Compose RequestInit for JSON/auth Hub fetches (caller options + headers + signal). */
+export function buildHubFetchInit(
+  options: RequestInit,
+  headers: Headers,
+  signal: AbortSignal,
+): RequestInit {
+  return {
+    ...options,
+    headers,
+    signal,
+  };
+}
+
+/** Compose RequestInit for multipart POST uploads. */
+export function buildMultipartFetchInit(
+  headers: Headers,
+  formData: FormData,
+  signal: AbortSignal,
+): RequestInit {
+  return {
+    method: 'POST',
+    headers,
+    body: formData,
+    signal,
+  };
+}
+
+/** 401 + refresh handler present → attempt single token-refresh recovery. */
+export function shouldAttemptTokenRefresh(
+  status: number,
+  hasRefreshHandler: boolean,
+): boolean {
+  return status === 401 && hasRefreshHandler;
+}
+
+/** Normalize unknown catch values for reportApiError / console paths. */
+export function toReportableError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
+ * Classify request catch values for timeout / network remapping.
+ * Pure decision only — side effects stay in createHubClient.
+ */
+export function classifyHubRequestCatch(
+  error: unknown,
+):
+  | { kind: 'timeout' }
+  | { kind: 'app'; error: AppError }
+  | { kind: 'network'; message: string }
+  | { kind: 'other'; error: unknown } {
+  if (isAbortError(error)) {
+    return { kind: 'timeout' };
+  }
+  if (error instanceof AppError) {
+    return { kind: 'app', error };
+  }
+  if (isNetworkFetchTypeError(error)) {
+    return { kind: 'network', message: (error as TypeError).message };
+  }
+  return { kind: 'other', error };
 }
