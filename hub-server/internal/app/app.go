@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -38,7 +39,7 @@ type App struct {
 	// Service layer
 	AuthService            *service.AuthService
 	ContactService         *contact.Service
-	SessionService         *service.SessionService
+	SessionService         *session.Service
 	MessageService         *service.MessageService
 	MessageReactionService *messagereaction.Service
 	AgentService           *service.AgentService
@@ -46,7 +47,7 @@ type App struct {
 	AttachmentService      *attachment.Service
 	NotificationService    *service.NotificationService
 	DeviceService          *service.DeviceService
-		DocumentService        *service.DocumentService
+	DocumentService        *service.DocumentService
 
 	// OIDC (optional — only when TokenDance ID is configured)
 	OIDCService *service.OIDCService
@@ -74,7 +75,7 @@ type App struct {
 	WorkspaceHandler       *handler.WorkspaceHandler
 	AuditHandler           *handler.AuditHandler
 	AgentTeamHandler       *handler.AgentTeamHandler
-		DocumentHandler        *handler.DocumentHandler
+	DocumentHandler        *handler.DocumentHandler
 
 	// AgentTeam
 	AgentTeamService *agentteam.AgentTeamService
