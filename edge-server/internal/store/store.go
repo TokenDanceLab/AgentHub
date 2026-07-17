@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -322,19 +321,7 @@ func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
 	if existing, ok := s.projects[id]; ok {
 		return existing, ErrProjectExists
 	}
-	if name == "" {
-		name = "Local Project"
-	}
-	ownerID = strings.TrimSpace(ownerID)
-	now := nowString()
-	project := Project{
-		ID:        id,
-		Name:      name,
-		Status:    "active",
-		OwnerID:   ownerID,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
+	project := buildProject(id, name, ownerID, nowString())
 	s.projects[id] = project
 	s.projectOrder = append(s.projectOrder, id)
 	return project, nil
@@ -350,12 +337,7 @@ func (s *Store) GetProject(id string) (Project, bool) {
 func (s *Store) ListProjects() []Project {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	projects := make([]Project, 0, len(s.projectOrder))
-	for _, id := range s.projectOrder {
-		projects = append(projects, s.projects[id])
-	}
-	return projects
+	return collectOrdered(s.projectOrder, s.projects)
 }
 
 func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error) {
@@ -371,21 +353,7 @@ func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabe
 		}
 		return existing, nil
 	}
-	if title == "" {
-		title = "New Thread"
-	}
-	now := nowString()
-	thread := Thread{
-		ID:          id,
-		ProjectID:   projectID,
-		Title:       title,
-		Kind:        kind,
-		AvatarColor: avatarColor,
-		AvatarLabel: avatarLabel,
-		Status:      "active",
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
+	thread := buildThread(id, projectID, title, kind, avatarColor, avatarLabel, nowString())
 	s.threads[id] = thread
 	s.threadOrder = append(s.threadOrder, id)
 	return thread, nil
@@ -406,13 +374,7 @@ func (s *Store) UpdateThread(id string, title *string, status *string) (Thread, 
 	if !ok {
 		return Thread{}, false
 	}
-	if title != nil {
-		thread.Title = *title
-	}
-	if status != nil {
-		thread.Status = *status
-	}
-	thread.UpdatedAt = nowString()
+	thread = applyThreadUpdate(thread, title, status, nowString())
 	s.threads[id] = thread
 	return thread, true
 }
@@ -449,15 +411,9 @@ func (s *Store) DeleteThread(id string) bool {
 func (s *Store) ListThreads(projectID string) []Thread {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	threads := make([]Thread, 0, len(s.threadOrder))
-	for _, id := range s.threadOrder {
-		thread := s.threads[id]
-		if projectID == "" || thread.ProjectID == projectID {
-			threads = append(threads, thread)
-		}
-	}
-	return threads
+	return filterOrdered(s.threadOrder, s.threads, func(thread Thread) bool {
+		return scopeEquals(projectID, thread.ProjectID)
+	})
 }
 
 func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
@@ -474,13 +430,7 @@ func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
 	if existing, ok := s.runs[id]; ok {
 		return existing, nil
 	}
-	run := Run{
-		ID:        id,
-		ProjectID: projectID,
-		ThreadID:  threadID,
-		Status:    "queued",
-		CreatedAt: nowString(),
-	}
+	run := buildQueuedRun(id, projectID, threadID, nowString())
 	s.runs[id] = run
 	s.runOrder = append(s.runOrder, id)
 	return run, nil
@@ -496,15 +446,9 @@ func (s *Store) GetRun(id string) (Run, bool) {
 func (s *Store) ListRuns(threadID string) []Run {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	runs := make([]Run, 0, len(s.runOrder))
-	for _, id := range s.runOrder {
-		run := s.runs[id]
-		if threadID == "" || run.ThreadID == threadID {
-			runs = append(runs, run)
-		}
-	}
-	return runs
+	return filterOrdered(s.runOrder, s.runs, func(run Run) bool {
+		return scopeEquals(threadID, run.ThreadID)
+	})
 }
 
 func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
@@ -514,11 +458,10 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 	if _, ok := s.runs[file.RunID]; !ok {
 		return RunDiffFile{}, ErrNotFound
 	}
-	file.Path = strings.TrimSpace(file.Path)
+	file = normalizeRunDiffFileInput(file)
 	if file.Path == "" {
 		return RunDiffFile{}, ErrNotFound
 	}
-	file.Status = normalizeEvidenceStatus(file.Status)
 	key := runDiffFileKey(file.RunID, file.Path)
 	now := nowString()
 	if existing, ok := s.diffs[key]; ok {
@@ -538,15 +481,9 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 func (s *Store) ListRunDiffFiles(runID string) []RunDiffFile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	files := make([]RunDiffFile, 0, len(s.diffOrder))
-	for _, id := range s.diffOrder {
-		file := s.diffs[id]
-		if runID == "" || file.RunID == runID {
-			files = append(files, file)
-		}
-	}
-	return files
+	return filterOrdered(s.diffOrder, s.diffs, func(file RunDiffFile) bool {
+		return scopeEquals(runID, file.RunID)
+	})
 }
 
 func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
@@ -557,21 +494,10 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	if !ok {
 		return Artifact{}, ErrNotFound
 	}
-	if artifact.ThreadID == "" {
-		artifact.ThreadID = run.ThreadID
-	}
-	if artifact.ThreadID != run.ThreadID {
+	artifact, ok = prepareArtifactInput(artifact, run.ThreadID)
+	if !ok {
 		return Artifact{}, ErrNotFound
 	}
-	artifact.ID = strings.TrimSpace(artifact.ID)
-	if artifact.ID == "" {
-		return Artifact{}, ErrNotFound
-	}
-	if artifact.Kind == "" {
-		artifact.Kind = "file"
-	}
-	artifact.Path = sanitizeArtifactDisplayPath(artifact.Path)
-	artifact.ContentSource = normalizeArtifactContentSource(artifact.ContentSource)
 	now := nowString()
 	if existing, ok := s.artifacts[artifact.ID]; ok {
 		artifact.CreatedAt = existing.CreatedAt
@@ -589,15 +515,7 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 func (s *Store) ListArtifacts(runID string) []Artifact {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	artifacts := make([]Artifact, 0, len(s.artifactOrder))
-	for _, id := range s.artifactOrder {
-		artifact := cloneArtifact(s.artifacts[id])
-		if runID == "" || artifact.RunID == runID {
-			artifacts = append(artifacts, artifact)
-		}
-	}
-	return artifacts
+	return listClonedArtifacts(s.artifactOrder, s.artifacts, runID)
 }
 
 func (s *Store) GetArtifact(id string) (Artifact, bool) {
@@ -616,18 +534,9 @@ func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 	if !ok {
 		return Preview{}, ErrNotFound
 	}
-	if preview.ThreadID == "" {
-		preview.ThreadID = run.ThreadID
-	}
-	if preview.ThreadID != run.ThreadID {
+	preview, ok = preparePreviewInput(preview, run.ThreadID)
+	if !ok {
 		return Preview{}, ErrNotFound
-	}
-	preview.ID = strings.TrimSpace(preview.ID)
-	if preview.ID == "" {
-		return Preview{}, ErrNotFound
-	}
-	if preview.Status == "" {
-		preview.Status = "ready"
 	}
 	now := nowString()
 	if existing, ok := s.previews[preview.ID]; ok {
@@ -646,15 +555,9 @@ func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 func (s *Store) ListPreviews(runID string) []Preview {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	previews := make([]Preview, 0, len(s.previewOrder))
-	for _, id := range s.previewOrder {
-		preview := s.previews[id]
-		if runID == "" || preview.RunID == runID {
-			previews = append(previews, preview)
-		}
-	}
-	return previews
+	return filterOrdered(s.previewOrder, s.previews, func(preview Preview) bool {
+		return scopeEquals(runID, preview.RunID)
+	})
 }
 
 func (s *Store) GetPreview(id string) (Preview, bool) {
@@ -673,63 +576,8 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 		opts.Now = time.Now().UTC()
 	}
 
-	type cleanupCandidate struct {
-		id         string
-		threadID   string
-		terminalAt time.Time
-		hasTime    bool
-		order      int
-	}
-
-	candidates := make([]cleanupCandidate, 0, len(s.runOrder))
-	removeRuns := map[string]struct{}{}
-	for idx, id := range s.runOrder {
-		run, ok := s.runs[id]
-		if !ok || !isTerminalRunStatus(run.Status) {
-			continue
-		}
-
-		terminalAt, hasTime := runTerminalTime(run)
-		candidates = append(candidates, cleanupCandidate{
-			id:         id,
-			threadID:   run.ThreadID,
-			terminalAt: terminalAt,
-			hasTime:    hasTime,
-			order:      idx,
-		})
-		if opts.TerminalTTL > 0 && hasTime && !terminalAt.After(opts.Now.Add(-opts.TerminalTTL)) {
-			removeRuns[id] = struct{}{}
-		}
-	}
-
-	if opts.MaxTerminalRunsPerThread > 0 {
-		byThread := make(map[string][]cleanupCandidate)
-		for _, candidate := range candidates {
-			if _, deleting := removeRuns[candidate.id]; deleting {
-				continue
-			}
-			byThread[candidate.threadID] = append(byThread[candidate.threadID], candidate)
-		}
-		for _, threadRuns := range byThread {
-			sort.SliceStable(threadRuns, func(i, j int) bool {
-				left := threadRuns[i]
-				right := threadRuns[j]
-				if left.hasTime && right.hasTime && !left.terminalAt.Equal(right.terminalAt) {
-					return left.terminalAt.After(right.terminalAt)
-				}
-				if left.hasTime != right.hasTime {
-					return left.hasTime
-				}
-				return left.order > right.order
-			})
-			if len(threadRuns) <= opts.MaxTerminalRunsPerThread {
-				continue
-			}
-			for _, candidate := range threadRuns[opts.MaxTerminalRunsPerThread:] {
-				removeRuns[candidate.id] = struct{}{}
-			}
-		}
-	}
+	candidates := buildTerminalCleanupCandidates(s.runOrder, s.runs)
+	removeRuns := selectRunsForCleanup(candidates, opts.Now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
 
 	if len(removeRuns) == 0 {
 		return RunCleanupResult{}
@@ -778,13 +626,7 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	if !ok {
 		return Run{}, false
 	}
-	switch status {
-	case "started":
-		run.StartedAt = nowString()
-	case "cancelled", "finished", "failed", "completed_with_issues":
-		run.FinishedAt = nowString()
-	}
-	run.Status = status
+	run = applyRunStatus(run, status, nowString())
 	s.runs[id] = run
 	return run, true
 }
@@ -797,23 +639,10 @@ func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run
 	if !ok {
 		return Run{}, false
 	}
-	allowed := len(allowedCurrent) == 0
-	for _, current := range allowedCurrent {
-		if run.Status == current {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
+	if !isAllowedCurrentStatus(run.Status, allowedCurrent) {
 		return run, false
 	}
-	switch status {
-	case "started":
-		run.StartedAt = nowString()
-	case "finished", "failed", "cancelled", "completed_with_issues":
-		run.FinishedAt = nowString()
-	}
-	run.Status = status
+	run = applyRunStatus(run, status, nowString())
 	s.runs[id] = run
 	return run, true
 }
@@ -868,15 +697,7 @@ func (s *Store) CreateItem(item Item) (Item, error) {
 	if existing, ok := s.items[item.ID]; ok {
 		return existing, nil
 	}
-	if item.Type == "" {
-		item.Type = "event"
-	}
-	if item.Status == "" {
-		item.Status = "created"
-	}
-	now := nowString()
-	item.CreatedAt = now
-	item.UpdatedAt = now
+	item = prepareItemDefaults(item, nowString())
 	s.items[item.ID] = item
 	s.itemOrder = append(s.itemOrder, item.ID)
 	return item, nil
@@ -889,19 +710,7 @@ func (s *Store) CreateThreadMessage(itemID, threadID, role, content string) (Ite
 	if !ok {
 		return Item{}, ErrNotFound
 	}
-	role = strings.TrimSpace(role)
-	if role == "" {
-		role = "user"
-	}
-	return s.CreateItem(Item{
-		ID:        itemID,
-		ProjectID: thread.ProjectID,
-		ThreadID:  thread.ID,
-		Type:      "user_message",
-		Role:      role,
-		Status:    "created",
-		Content:   content,
-	})
+	return s.CreateItem(buildUserMessageItem(itemID, thread.ProjectID, thread.ID, role, content))
 }
 
 func (s *Store) GetItem(id string) (Item, bool) {
@@ -915,16 +724,10 @@ func (s *Store) ListThreadItems(threadID string) []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	items := make([]Item, 0, len(s.itemOrder))
-	for _, id := range s.itemOrder {
-		item := s.items[id]
-		if item.ThreadID == threadID {
-			items = append(items, item)
-		}
-	}
-	sort.SliceStable(items, func(i, j int) bool {
-		return items[i].CreatedAt < items[j].CreatedAt
+	items := filterOrdered(s.itemOrder, s.items, func(item Item) bool {
+		return item.ThreadID == threadID
 	})
+	sortItemsByCreatedAtAsc(items)
 	return items
 }
 
@@ -980,16 +783,10 @@ func (s *Store) ListThreadPins(threadID string) []ThreadPin {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	pins := make([]ThreadPin, 0, len(s.pinOrder))
-	for _, id := range s.pinOrder {
-		pin := s.pins[id]
-		if pin.ThreadID == threadID {
-			pins = append(pins, pin)
-		}
-	}
-	sort.SliceStable(pins, func(i, j int) bool {
-		return pins[i].PinnedAt > pins[j].PinnedAt
+	pins := filterOrdered(s.pinOrder, s.pins, func(pin ThreadPin) bool {
+		return pin.ThreadID == threadID
 	})
+	sortPinsByPinnedAtDesc(pins)
 	return pins
 }
 
@@ -1065,12 +862,7 @@ func (s *Store) GetUserProfile(id string) (UserProfile, bool) {
 func (s *Store) ListUserProfiles() []UserProfile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	profiles := make([]UserProfile, 0, len(s.userProfileOrder))
-	for _, id := range s.userProfileOrder {
-		profiles = append(profiles, s.userProfiles[id])
-	}
-	return profiles
+	return collectOrdered(s.userProfileOrder, s.userProfiles)
 }
 
 // GetCurrentUser returns the first profile marked as status="owner",
@@ -1078,16 +870,7 @@ func (s *Store) ListUserProfiles() []UserProfile {
 func (s *Store) GetCurrentUser() (UserProfile, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	for _, id := range s.userProfileOrder {
-		if p := s.userProfiles[id]; p.Status == "owner" {
-			return p, true
-		}
-	}
-	if len(s.userProfileOrder) > 0 {
-		return s.userProfiles[s.userProfileOrder[0]], true
-	}
-	return UserProfile{}, false
+	return selectCurrentUserProfile(s.userProfileOrder, s.userProfiles)
 }
 
 // ── AgentProfile CRUD ──
@@ -1099,9 +882,7 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 	if err := validateAgentProfileCreate(profile); err != nil {
 		return AgentProfile{}, err
 	}
-	if profile.Name == "" {
-		profile.Name = "Unnamed Agent"
-	}
+	profile.Name = defaultAgentProfileName(profile.Name)
 	if _, exists := s.agentProfiles[profile.ID]; exists {
 		return AgentProfile{}, fmt.Errorf("agent profile %q already exists", profile.ID)
 	}
@@ -1125,15 +906,9 @@ func (s *Store) GetAgentProfile(id string) (AgentProfile, bool) {
 func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	profiles := make([]AgentProfile, 0, len(s.agentProfileOrder))
-	for _, id := range s.agentProfileOrder {
-		profile := s.agentProfiles[id]
-		if adapterID == "" || profile.AdapterID == adapterID {
-			profiles = append(profiles, profile)
-		}
-	}
-	return profiles
+	return filterOrdered(s.agentProfileOrder, s.agentProfiles, func(profile AgentProfile) bool {
+		return scopeEquals(adapterID, profile.AdapterID)
+	})
 }
 
 func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
@@ -1185,13 +960,7 @@ func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
 	if s.settings == nil {
 		s.settings = make(map[string]string)
 	}
-	for k, v := range patch {
-		key := strings.TrimSpace(k)
-		if key == "" {
-			continue
-		}
-		s.settings[key] = v
-	}
+	applySettingsPatch(s.settings, patch)
 	s.settingsMtime = nowString()
 	return UserSettings{
 		Values:    copyMap(s.settings),
