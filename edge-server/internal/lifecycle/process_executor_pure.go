@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -599,4 +600,288 @@ func hubCallbackTextForEvent(eventType string, payload any) (string, hubCallback
 // can be constructed around the inner emitter.
 func shouldWrapHubCallbackEmitter(hasExecutor, hasInner bool) bool {
 	return hasExecutor && hasInner
+}
+
+// resolveProcessExecutorTimeouts applies package defaults for run and shutdown
+// timeouts when the caller leaves them non-positive.
+func resolveProcessExecutorTimeouts(cfg ProcessExecutorConfig) (runTimeout, shutdownGrace, shutdownForce time.Duration) {
+	return resolvePositiveDuration(cfg.RunTimeout, defaultRunTimeout),
+		resolvePositiveDuration(cfg.ShutdownGracePeriod, defaultShutdownGracePeriod),
+		resolvePositiveDuration(cfg.ShutdownForceTimeout, defaultShutdownForceTimeout)
+}
+
+// shouldStatConfiguredWorkDir reports whether the constructor must validate a
+// configured process workdir via os.Stat.
+func shouldStatConfiguredWorkDir(workDir string) bool {
+	return workDir != ""
+}
+
+// buildProcessExecutor constructs the default ProcessExecutor maps/state. Pure
+// relative to I/O: callers supply already-resolved deps and timeouts.
+func buildProcessExecutor(
+	bus *events.Bus,
+	runStore store.RunLifecycleStore,
+	profile RunnerProfile,
+	adapter adapters.AgentAdapter,
+	adapterReg *adapters.Registry,
+	runTimeout, shutdownGrace, shutdownForce time.Duration,
+	evidenceGateCfg EvidenceGateConfig,
+	faultEscalationCfg FaultEscalationConfig,
+) *ProcessExecutor {
+	return &ProcessExecutor{
+		bus:                       bus,
+		store:                     runStore,
+		profile:                   profile,
+		adapter:                   adapter,
+		adapterReg:                adapterReg,
+		maxConcurrentRuns:         defaultMaxConcurrentRuns,
+		maxRunOutputBytes:         defaultRunOutputMaxBytes,
+		maxStructuredPayloadBytes: adapters.DefaultStructuredPayloadMaxBytes,
+		runTimeout:                runTimeout,
+		shutdownGracePeriod:       shutdownGrace,
+		shutdownForceTimeout:      shutdownForce,
+		evidenceGateCfg:           evidenceGateCfg,
+		faultEscalationCfg:        faultEscalationCfg,
+		running:                   make(map[string]context.CancelFunc),
+		stdins:                    make(map[string]io.Writer),
+		processes:                 make(map[string]*os.Process),
+		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
+		runToAgent:                make(map[string]string),
+		hubTasks:                  make(map[string]string),
+		hubOutputs:                make(map[string]*hubOutputCollector),
+		workDirs:                  make(map[string]string),
+		surfacers:                 make(map[string]*adapters.WorkdirSnapshot),
+		cancelDone:                make(map[string]chan struct{}),
+		callbackSem:               make(chan struct{}, 10), // max 10 concurrent hub callbacks
+	}
+}
+
+// shouldWriteInterruptStdin reports whether Cancel should write an adapter
+// interrupt frame before cancelling the run context.
+func shouldWriteInterruptStdin(hasStdin bool) bool {
+	return hasStdin
+}
+
+// shouldStartGracefulProcessShutdown reports whether Cancel should schedule the
+// interrupt→kill escalation goroutine for a tracked process.
+func shouldStartGracefulProcessShutdown(proc *os.Process) bool {
+	return proc != nil
+}
+
+// shouldPerformTerminalFinish reports whether the deferred finish path owns
+// concurrency-slot teardown for this attempt (see #867 handoff).
+func shouldPerformTerminalFinish(terminalFinish bool) bool {
+	return terminalFinish
+}
+
+// shouldAttachFinishMetricsDefer reports whether run-finish latency metrics
+// should be deferred for this attempt.
+func shouldAttachFinishMetricsDefer(hasMetrics bool) bool {
+	return hasMetrics
+}
+
+// shouldRecordRunStartMetrics reports whether a successful cmd.Start should
+// record Prometheus start counters.
+func shouldRecordRunStartMetrics(hasMetrics bool) bool {
+	return hasMetrics
+}
+
+// shouldUseAdapterCommand reports whether BuildCommand should drive the child
+// process instead of the profile template.
+func shouldUseAdapterCommand(hasAdapter bool) bool {
+	return hasAdapter
+}
+
+// shouldPublishCLIInvocationPlan reports whether a CLI invocation plan event
+// should be published for the resolved adapter.
+func shouldPublishCLIInvocationPlan(hasAdapter bool) bool {
+	return hasAdapter
+}
+
+// shouldUseStructuredOutputParser reports whether stdout should be parsed by
+// the adapter instead of raw batch capture.
+func shouldUseStructuredOutputParser(hasAdapter bool) bool {
+	return hasAdapter
+}
+
+// shouldReadOutputStoreCapture reports whether stderr/stdout capture text is
+// available from a run output store (e.g. for session-conflict detection).
+func shouldReadOutputStoreCapture(hasOutStore bool) bool {
+	return hasOutStore
+}
+
+// shouldBreakSessionRetryOnWaitError reports whether a non-retryable wait error
+// should leave the session-retry loop for terminal handling/escalation.
+func shouldBreakSessionRetryOnWaitError(waitErr error) bool {
+	return waitErr != nil
+}
+
+// shouldHandleStructuredParseError reports whether ParseStream produced an error
+// that needs recoverability classification.
+func shouldHandleStructuredParseError(parseErr error) bool {
+	return parseErr != nil
+}
+
+// shouldLogEvidenceGateFailure reports whether a completed evidence-gate result
+// should be logged as a verification failure.
+func shouldLogEvidenceGateFailure(passed bool) bool {
+	return !passed
+}
+
+// shouldPublishStatusTransition reports whether a conditional store status
+// transition succeeded and may publish bus/Hub side effects.
+func shouldPublishStatusTransition(ok bool) bool {
+	return ok
+}
+
+// shouldProcessOutputRead reports whether a pipe read produced bytes to process.
+func shouldProcessOutputRead(n int) bool {
+	return n > 0
+}
+
+// shouldLogRunOutputTruncation reports whether a truncation marker should be
+// mirrored to the structured logger.
+func shouldLogRunOutputTruncation(truncatedNow bool) bool {
+	return truncatedNow
+}
+
+// shouldStopOutputRead reports whether publishOutput should exit the read loop.
+func shouldStopOutputRead(err error) bool {
+	return err != nil
+}
+
+// runStatusFromLookup maps a store.GetRun result to the status string used by
+// cancel/finish predicates (empty when the run is missing).
+func runStatusFromLookup(run store.Run, found bool) string {
+	if !found {
+		return ""
+	}
+	return run.Status
+}
+
+// agentFailureRepository is the dual Reader+Writer surface needed to persist a
+// failed agent_message without inventing a new store API.
+type agentFailureRepository interface {
+	store.Reader
+	store.Writer
+}
+
+// asAgentFailureRepository returns the store when it can both list thread items
+// and create failure messages.
+func asAgentFailureRepository(runStore store.RunLifecycleStore) (agentFailureRepository, bool) {
+	repository, ok := runStore.(interface {
+		store.Reader
+		store.Writer
+	})
+	return repository, ok
+}
+
+// persistErrorSource exposes the last FileStore persistence failure.
+type persistErrorSource interface {
+	LastPersistError() error
+}
+
+// asPersistErrorSource returns the store when it tracks persistence errors.
+func asPersistErrorSource(runStore store.RunLifecycleStore) (persistErrorSource, bool) {
+	source, ok := runStore.(persistErrorSource)
+	return source, ok
+}
+
+// shouldEmitPersistenceError reports whether a pending persist failure should
+// be logged and published on the bus.
+func shouldEmitPersistenceError(err error) bool {
+	return err != nil
+}
+
+// shouldCloseCancelDoneChannel reports whether finish should close the graceful
+// shutdown abort channel for a run.
+func shouldCloseCancelDoneChannel(found bool) bool {
+	return found
+}
+
+// shouldCloseTrackedRunOutput reports whether finish should close a tracked
+// run output store.
+func shouldCloseTrackedRunOutput(found bool) bool {
+	return found
+}
+
+// shouldSurfaceWithSnapshot reports whether auto-surface has a pre-run workdir
+// snapshot to compare against.
+func shouldSurfaceWithSnapshot(snapshot *adapters.WorkdirSnapshot) bool {
+	return snapshot != nil
+}
+
+// shouldApplyBudgetAwareEmitter reports whether the structured-output emitter
+// should be wrapped with budget monitoring.
+func shouldApplyBudgetAwareEmitter(hasBudget bool) bool {
+	return hasBudget
+}
+
+// shouldClearRunAgentMappingOnStartFailure reports whether SpawnSubAgent should
+// drop the run→agent map entry after Start fails.
+func shouldClearRunAgentMappingOnStartFailure(startErr error) bool {
+	return startErr != nil
+}
+
+// nextFaultEscalationRetryCount returns the retry counter after one escalation
+// attempt is accepted. Control flow / #867 handoff stays in the executor.
+func nextFaultEscalationRetryCount(retryCount int) int {
+	return retryCount + 1
+}
+
+// contextCompactionSnapshot reads compaction diagnostics from a budget. Pure
+// relative to I/O (atomic load only).
+func contextCompactionSnapshot(budget *runnerctx.ContextBudget) (usagePct float64, tokensUsed, remaining int64) {
+	if budget == nil {
+		return 0, 0, 0
+	}
+	return budget.UsagePercent(), budget.UsedTokens.Load(), budget.Remaining()
+}
+
+// shouldResetSessionRetryStatus reports whether a session-conflict retry should
+// attempt to re-queue the run before relaunching.
+func shouldResetSessionRetryStatus(retrying bool) bool {
+	return retrying
+}
+
+// shouldKillProcessAfterCancel reports whether a non-nil process handle should
+// be killed when the start path observes a cancelled context.
+func shouldKillProcessAfterCancel(proc *os.Process) bool {
+	return proc != nil
+}
+
+// shouldWaitProcessAfterCancel reports whether Wait should be called after a
+// cancelled start/kill path observes a non-nil process.
+func shouldWaitProcessAfterCancel(proc *os.Process) bool {
+	return proc != nil
+}
+
+// shouldLogInterruptWriteFailure reports whether a stdin interrupt write error
+// should be debug-logged (errors are non-fatal).
+func shouldLogInterruptWriteFailure(err error) bool {
+	return err != nil
+}
+
+// shouldLogProcessWaitAfterKill reports whether a post-kill Wait error should
+// be warned.
+func shouldLogProcessWaitAfterKill(err error) bool {
+	return err != nil
+}
+
+// shouldLogRunOutputStoreCreateFailure reports whether NewRunOutputStore failure
+// should be warned (run continues without persistence/replay).
+func shouldLogRunOutputStoreCreateFailure(err error) bool {
+	return err != nil
+}
+
+// shouldTrackRunOutputStore reports whether a successfully created output store
+// should be retained on the executor.
+func shouldTrackRunOutputStore(err error) bool {
+	return err == nil
+}
+
+// shouldCloseStdinPipe reports whether an open stdin WriteCloser should be
+// closed (distinct from the eager-close decision).
+func shouldCloseStdinPipe(stdinOpen bool) bool {
+	return stdinOpen
 }
