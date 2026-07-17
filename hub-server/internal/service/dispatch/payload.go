@@ -1,6 +1,10 @@
 package dispatch
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/agenthub/hub-server/internal/model"
+)
 
 // CustomAgentFields is the pure subset of a custom-agent profile used when
 // assembling a dispatch payload (no GORM / repository dependency).
@@ -9,6 +13,20 @@ type CustomAgentFields struct {
 	ModelParams   string
 	ToolWhitelist string
 	OutputSchema  *json.RawMessage
+}
+
+// CustomAgentFieldsFromModel projects a CustomAgent row into pure payload fields.
+// Nil model yields nil (no custom-agent profile applied).
+func CustomAgentFieldsFromModel(ca *model.CustomAgent) *CustomAgentFields {
+	if ca == nil {
+		return nil
+	}
+	return &CustomAgentFields{
+		SystemPrompt:  ca.SystemPrompt,
+		ModelParams:   ca.ModelParams,
+		ToolWhitelist: ca.ToolWhitelist,
+		OutputSchema:  ca.OutputSchema,
+	}
 }
 
 // ApplyCustomAgentToPayload returns system prompt, model params, tool whitelist,
@@ -50,6 +68,23 @@ func TeamMemberRefsFromProfiles(ids, roles []string, profileIDs []*string) []Tea
 			ID:             ids[i],
 			Role:           roles[i],
 			AgentProfileID: profileIDs[i],
+		}
+	}
+	return refs
+}
+
+// TeamMemberRefsFromMembers maps team-member rows into pure refs without building
+// intermediate id/role/profile triple slices.
+func TeamMemberRefsFromMembers(members []model.AgentTeamMember) []TeamMemberRef {
+	if len(members) == 0 {
+		return nil
+	}
+	refs := make([]TeamMemberRef, len(members))
+	for i := range members {
+		refs[i] = TeamMemberRef{
+			ID:             members[i].ID,
+			Role:           members[i].Role,
+			AgentProfileID: members[i].AgentProfileID,
 		}
 	}
 	return refs

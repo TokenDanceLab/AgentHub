@@ -24,6 +24,21 @@ func IsEdgeHTTPSuccessStatus(statusCode int) bool {
 	return statusCode == http.StatusAccepted || statusCode == http.StatusOK
 }
 
+// EdgeHTTPHeaders builds Content-Type / Authorization / capability headers for
+// Hub→Edge HTTP run creation. Empty authBearer or capabilityToken omits that header.
+// http.Client and request construction stay orchestration-side.
+func EdgeHTTPHeaders(authBearer, capabilityToken string) http.Header {
+	h := make(http.Header)
+	h.Set("Content-Type", "application/json")
+	if authBearer != "" {
+		h.Set("Authorization", "Bearer "+authBearer)
+	}
+	if capabilityToken != "" {
+		h.Set(CapabilityTokenHeader, capabilityToken)
+	}
+	return h
+}
+
 // DeviceNotRoutableErrorMessage is the TargetNotRoutable message when the bound
 // device row is missing or not routable (historical validateDispatchTarget text).
 const DeviceNotRoutableErrorMessage = "execution target device is not routable"

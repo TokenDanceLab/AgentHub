@@ -1,6 +1,11 @@
 package dispatch
 
-import "strings"
+import (
+	"strings"
+	"time"
+
+	"github.com/agenthub/hub-server/internal/model"
+)
 
 // ApplyValidatedTarget maps a validated TargetSnapshot onto trigger task fields.
 // When target is nil (no target requested / validation no-op), all returns are empty.
@@ -28,4 +33,21 @@ func NeedsCustomAgentPreload(customAgentID *string) bool {
 // HasCustomAgentBinding is true when an agent instance is bound to a custom agent.
 func HasCustomAgentBinding(customAgentID *string) bool {
 	return CustomAgentIDValue(customAgentID) != ""
+}
+
+// NewQueuedPendingTask builds a pending task row in queued status. expireAt is
+// injected by the caller (TTL / clock stay orchestration-side).
+func NewQueuedPendingTask(
+	agentInstanceID, triggeredByUserID, triggerMessageID, targetID, edgeDeviceID string,
+	expireAt time.Time,
+) *model.PendingAgentTask {
+	return &model.PendingAgentTask{
+		AgentInstanceID:   agentInstanceID,
+		TriggeredByUserID: triggeredByUserID,
+		TriggerMessageID:  triggerMessageID,
+		TargetID:          targetID,
+		EdgeDeviceID:      edgeDeviceID,
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          expireAt,
+	}
 }
