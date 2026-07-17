@@ -1,7 +1,7 @@
 # Design token usage audit (inventory)
 
 最后更新：2026-07-17
-Issue: #466 / #480 / #482 / #491 / #518
+Issue: #466 / #480 / #482 / #491 / #518 / #607
 Companion SSOT map: [../architecture/07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
 
 > Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
@@ -18,21 +18,28 @@ app/desktop|web/src/main.tsx
 ## 2. Top hardcode offenders (sample counts)
 
 Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview meta). Snapshot for prioritization, not a CI gate.
+Re-audited 2026-07-17 (#607).
 
 | Rank | File | ~matches | Notes |
 |---:|---|---:|---|
 | 1 | `app/web/src/components/WelcomeScreen.module.css` | was 53 → **0** | **#482**: glass/status hardcodes → `--glass-*` / semantic tokens |
-| 2 | `app/desktop/src/components/ApprovalCard.module.css` | was 45 | **#466**: semantic status fallbacks removed; residual font-stack fallbacks may remain |
+| 2 | `app/desktop/src/components/ApprovalCard.module.css` | was 45 → residual font-stack only | **#466**: semantic status fallbacks removed; font-stack fallbacks remain |
 | 3 | `app/web/src/components/AuthPage.module.css` | was 42 → **0** | **#482**: auth glass hardcodes → `--glass-*` / elevated-card tokens |
 | 4 | `app/desktop/src/contexts/ThemeContext.tsx` | was 36 | **#466**: preview hex moved to shared `themePresets.ts` meta only |
-| 5 | `app/desktop/src/components/FileExplorer.module.css` | 31 | explorer chrome |
-| 6 | `app/web/src/components/IM/TeamApprovalPanel.module.css` | 28 | IM status colors |
-| 7 | `app/desktop/src/components/DesktopEntryGate.module.css` | 26 | entry chrome |
+| 5 | `app/desktop/src/components/FileExplorer.module.css` | **31** | explorer chrome — deferred hardcode pass |
+| 6 | `app/web/src/components/IM/TeamApprovalPanel.module.css` | **28** | IM status colors — deferred |
+| 7 | `app/desktop/src/components/DesktopEntryGate.module.css` | **26** | entry chrome — deferred |
+| 8 | `app/web/src/components/ModelDropdown.module.css` | **22** | dropdown chrome — deferred |
+| 9 | `app/desktop/src/components/IM/IMContactList.module.css` | **22** | IM list chrome — deferred |
+| 10 | `app/web/src/components/IM/TeamEventTimeline.module.css` | **19** | IM timeline — deferred |
+| shared UI | `app/shared/src/ui/DeployCard.module.css` | was 17 → **0** | **#607**: semantic / surface fallbacks stripped to bare theme tokens |
+| shared UI | `app/shared/src/ui/EmptyState.module.css` | **13** | mostly glass-token fallbacks (`--glass-*` rgba); not semantic drift |
+| shared UI | `app/shared/src/ui/PermissionModePicker.module.css` | **12** | deferred (non-semantic literals) |
 | workbench | `app/shared/src/workbench/**/*.module.css` | few hex; spacing largely tokenized | **#480**: exact/compat spacing → `--sp-*` / `--space-md|3xl`; odd micro-steps + sizes remain raw |
 | entry | `app/desktop/src/components/WelcomeScreen.module.css` | was 5 → **0** | **#482**: residual elevation rgba → `--glass-shadow*` |
 | entry | `app/desktop/src/components/AuthPage.module.css` | was 7 → **0** | **#482**: residual identity/logo glass literals tokenized |
-| workbench | `app/shared/src/workbench/AgentHubWorkbench.module.css` | few hex; many raw px | spacing not using `--sp-*` |
-| chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | **#491**: dense scale kept; `--sp-md` → base compat `--space-md` (12px ≠ v4 16px). **#518**: radius / type / dark still forked (inventory only; no further alias) |
+| workbench | `app/shared/src/workbench/AgentHubWorkbench.module.css` | few hex; many raw px | spacing residual odd steps |
+| chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | **#491**: dense scale kept; `--sp-md` → base compat `--space-md`. **#518**: radius / type / dark still forked (inventory only). **#607**: no further chatview alias (still blocked) |
 
 ## 3. Theme fork evidence (pre-#466 → post)
 
@@ -56,12 +63,13 @@ Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS / preset preview
 ## 4. Deferred (out of smallest #466 slice)
 
 1. ~~Wholesale WelcomeScreen / AuthPage glass rewrite~~ → landed in **#482** (module CSS only; no theme runtime rewrite)
-2. Full chatview token merge (dark palette / radius / type) — **#491** inventory + `--sp-md`→`--space-md`; **#518** residual radius/type/dark inventory (no redesign / no extra alias)
+2. Full chatview token merge (dark palette / radius / type) — **#491** inventory + `--sp-md`→`--space-md`; **#518** residual radius/type/dark inventory (no redesign / no extra alias); **#607** reconfirmed blocked
 3. ~~Workbench `px` → `--sp-*` pass~~ → landed in **#480** (exact/compat spacing only; odd steps deferred)
 4. Mobile RN color SSOT merge
 5. Shared React `ThemeProvider` with `enablePresets`
 6. Package export for `./designTokens` and/or `./styles/*`
-7. DesktopEntryGate / FileExplorer / IM panel hardcode passes
+7. DesktopEntryGate / FileExplorer / IM panel / ModelDropdown hardcode passes (still top residual offenders)
+8. ~~Stale semantic `var(--token, #hex|oklch)` fallbacks in shared UI~~ → **#607** safe cluster landed (see §7)
 
 ## 4b. #482 Welcome/Auth glass migration notes
 
@@ -355,3 +363,61 @@ Light residual only: `--success-bg` / `--warning-bg` opacity 0.08 (themes) vs 0.
 #### Landed in #518
 
 Docs + SSOT residual inventory only. `app/shared/src/chatview/design/tokens.css` **unchanged** this pass (no redesign; no unsafe alias).
+
+## 7. #607 residual inventory + safe fix cluster
+
+Goal: product-polish residual inventory update + one safe fix cluster (**no visual redesign**, no freestyle page rewrites of Agents/Contacts/Projects/Routes/Inspector).
+
+### 7.1 Residual status matrix (2026-07-17)
+
+| Area | Status | Action under #607 |
+|---|---|---|
+| Chatview spacing `--sp-md` | linked to base `--space-md` (12px) since #491 | **hold** — no further spacing alias |
+| Chatview `--sp-lg` / `--sp-xl` | dense 20/28 vs base 24/32 | **hold** (no base 20/28 step) |
+| Chatview radius / type / dark | intentional dense fork; documented §6.14 | **hold** — redesign / dual-scale decision needed |
+| Workbench odd-px residual | #480 left 3/5/7/9/18… raw | **hold** (snap would redesign) |
+| Stale semantic CSS fallbacks | residual after #466 ApprovalCard fix | **fixed** — §7.2 cluster |
+| EntryGate / FileExplorer / IM panels / ModelDropdown hardcodes | still top hex offenders | **deferred** (separate hardcode pass; out of safe silent cluster) |
+| EmptyState glass-token rgba fallbacks | glass SSOT present; fallbacks are defensive | **hold** (not semantic dark-mode drift) |
+| Package `./styles/*` export | still deferred | **hold** |
+
+### 7.2 Safe fix cluster landed — bare semantic tokens
+
+Same rule as #466 Fix B / SSOT §2.6: `var(--danger, #…)` and friends freeze **light** (or wrong-space oklch) values when the custom property is missing or when authors rely on the fallback path, which breaks dark/presets. Prefer bare `var(--token)`.
+
+| File | Before | After |
+|---|---|---|
+| `app/shared/src/ui/DeployCard.module.css` | `--success/--primary/--danger/--text-* /--surface-* /--bdr /--primary-hover` with light hex/rgba fallbacks (~17 literals) | bare theme tokens; hex/rgba count → **0** |
+| `app/shared/src/ui/CollapsibleBlock.module.css` | scheme borders used `var(--brand|success|warning|skill|destructive, oklch(...))` | bare semantic tokens |
+| `app/shared/src/ui/ProgressBar.module.css` | `--brand` / `--warning` oklch fallbacks | bare |
+| `app/shared/src/ui/Avatar.module.css` | `--brand` oklch fallback | bare |
+| `app/shared/src/ui/Button.module.css` | `--brand` oklch fallback on `.gradient` | bare (decorative oklch shadow left as non-token recipe) |
+| `app/shared/src/workbench/pages/DocsPage.module.css` | delete hover/confirm used `var(--danger, #e5484d)` (stale vs theme `#d15252` / dark `#e87070`) | bare `--danger` |
+| `app/desktop/src/components/FileSearchDialog.module.css` | `var(--primary, #5b9bd5)` (off-brand vs theme primary) | bare `--primary` |
+
+Evidence re-audit:
+
+```bash
+# semantic status/brand fallbacks — should be empty after #607
+rg 'var\(--(danger|success|warning|primary|info|brand|destructive|skill)\s*,' app --glob '*.css'
+
+# DeployCard hardcode density
+rg -c '#[0-9a-fA-F]{3,8}|rgba?\(' app/shared/src/ui/DeployCard.module.css
+```
+
+### 7.3 Explicit holds (with evidence)
+
+1. **Chatview dark / radius / type** — still blocked (see §6.14). No same-value host alias remains; full merge is redesign + standalone load-path work.
+2. **Top hex offenders** (FileExplorer 31, TeamApprovalPanel 28, DesktopEntryGate 26, ModelDropdown 22, IMContactList 22, TeamEventTimeline 19) — not silent; need dedicated visual QA hardcode passes, not a residual hygiene cluster.
+3. **Glass rgba fallbacks** in EmptyState etc. — defensive when `--glass-*` is absent; glass tokens are already SSOT; stripping changes standalone/story isolation, not dark-mode correctness.
+4. **Workbench page freestyle rewrites** — out of scope for #607 (Agents/Contacts/Projects/Routes/Inspector ownership lanes).
+
+### 7.4 Residual after #607
+
+| Residual class | Open? | Next owner |
+|---|---|---|
+| Chatview full merge | yes | deliberate redesign issue |
+| Entry/IM/explorer hardcode passes | yes | future polish issues |
+| Workbench odd-px normalize | yes | optional scale extension |
+| Shared UI semantic fallbacks | **closed** | — |
+| Package styles export | yes | packaging issue |

@@ -36,18 +36,18 @@
 }
 
 .badgeSuccess {
-  background: var(--success-bg, rgba(64,148,103,0.08));
-  color: var(--success, #409467);
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .badgePrimary {
-  background: var(--primary-soft, rgba(0,113,188,0.11));
-  color: var(--primary, #0071BC);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .badgeDanger {
-  background: var(--danger-bg, rgba(209,82,82,0.06));
-  color: var(--danger, #d15252);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .spin {
@@ -61,7 +61,7 @@
 
 .title {
   font: 500 0.8125rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
-  color: var(--text-1, #1a1a2e);
+  color: var(--text-1);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,13 +76,13 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: var(--r-md, 12px);
-  background: var(--surface-low, #faf9fc);
-  border: 1px solid var(--bdr, rgba(0,0,0,0.055));
+  background: var(--surface-low);
+  border: 1px solid var(--bdr);
 }
 
 .url {
   font: 400 0.6875rem var(--font-mono, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace);
-  color: var(--primary, #0071BC);
+  color: var(--primary);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -117,13 +117,13 @@
 }
 
 .previewBtn {
-  background: var(--primary, #0071BC);
-  color: var(--text-inv, #ffffff);
+  background: var(--primary);
+  color: var(--text-inv);
 }
 
 .previewBtn:hover {
-  background: var(--primary-hover, #005F9F);
-  box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.05));
+  background: var(--primary-hover);
+  box-shadow: var(--e-1);
 }
 
 .previewBtn:focus-visible {
@@ -137,12 +137,12 @@
 
 .openBtn {
   background: transparent;
-  color: var(--text-2, #585870);
+  color: var(--text-2);
 }
 
 .openBtn:hover {
-  background: var(--surface-high, #efedf5);
-  color: var(--text-1, #1a1a2e);
+  background: var(--surface-high);
+  color: var(--text-1);
 }
 
 .openBtn:focus-visible {
