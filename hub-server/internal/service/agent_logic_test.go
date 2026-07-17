@@ -400,4 +400,3 @@ func TestIsLoopback(t *testing.T) {
 	assert.False(t, isLoopback("http://edge.example.com"))
 	assert.False(t, isLoopback("not a url"))
 }
-
