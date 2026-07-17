@@ -56,36 +56,22 @@ type dispatchPayload struct {
 // payload JSON tags and redispatch unmarshaling stay stable (#756).
 type dispatchMessage = dispatch.Message
 
-type dispatchTeamContext struct {
-	TeamID         string
-	TeamRunID      string
-	TeamMemberID   string
-	TeamMemberRole string
-}
-
-type dispatchTargetSnapshot struct {
-	ID         string
-	TargetType string
-	DeviceID   string
-}
-
-// edgeRunResponse captures the relevant fields from Edge's /v1/runs response.
-type edgeRunResponse struct {
-	Success bool `json:"success"`
-	Data    struct {
-		RunID string `json:"runId"`
-	} `json:"data"`
-}
+// Same-package aliases for pure dispatch DTOs (#768 residual).
+type dispatchTeamContext = dispatch.TeamContext
+type dispatchTargetSnapshot = dispatch.TargetSnapshot
+type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
+type edgeRunResponse = dispatch.EdgeRunResponse
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Residual pure-helper extract (#756) after pure helpers (#732), thin first
-// seam (#563), redispatch residual (#573), and residual ports (#617). Pure
-// surface lives in service/dispatch (loopback / runtime type / select / merge /
+// Residual pure surface (#768) after #756/#732 pure helpers, thin first seam
+// (#563), redispatch residual (#573), and residual ports (#617). Pure surface
+// lives in service/dispatch (loopback / runtime type / select / merge /
 // prompt+history text / task-status / edge constants / Message DTO / Edge run
-// request builder) with thin same-package aliases below. Orchestration + ports
-// stay flat; dispatchPayload stays package-private; no OpenAPI/handler/frontend;
-// no typed DispatchService package move.
+// request builder / team+target+capability+redelivery pure helpers) with thin
+// same-package aliases below. Orchestration + ports stay flat; dispatchPayload
+// stays package-private; no OpenAPI/handler/frontend; no typed DispatchService
+// package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -272,7 +258,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	// Bearer token so the Edge server's localAuthMiddleware can verify it.
 	// This is the shared-secret trust chain between Hub and Edge for HTTP
 	// dispatch. In dev mode (AGENTHUB_DEV=1) the Edge skips auth entirely.
-	if edgeAuthToken := strings.TrimSpace(os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN")); edgeAuthToken != "" {
+	if edgeAuthToken := dispatch.EdgeAuthBearerToken(os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN")); edgeAuthToken != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+edgeAuthToken)
 	}
 	// AH-SR-046: attach per-run capability when Hub JWT secret and Edge device are known.
@@ -295,13 +281,11 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 		return ""
 	}
 
-	var edgeResp edgeRunResponse
-	if err := json.Unmarshal(respBody, &edgeResp); err != nil {
+	runID, err := dispatch.ParseEdgeRunID(respBody)
+	if err != nil {
 		slog.Warn("edge http dispatch: failed to decode response", "task_id", task.ID, "error", err)
 		return ""
 	}
-
-	runID := edgeResp.Data.RunID
 	slog.Info("edge http dispatch: task dispatched to local Edge", "task_id", task.ID, "edge_run_id", runID, "url", url)
 	return runID
 }
@@ -423,20 +407,22 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		}
 		return nil, err
 	}
-	if target.OwnerID != userID {
-		return nil, errcode.TargetNotFound
+	// Pure ownership / type / health / binding checks (#768) — order matches prior
+	// behavior so error precedence stays stable.
+	if err := dispatch.ValidateTargetOwner(target.OwnerID, userID); err != nil {
+		return nil, err
 	}
-	if target.TargetType != "local_edge" {
-		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
+	if err := dispatch.ValidateTargetType(target.TargetType); err != nil {
+		return nil, err
 	}
 	healthState := resolveExecutionTargetHealthState(target, time.Now())
-	if healthState != "online" && healthState != "healthy" {
-		return nil, errcode.TargetNotRoutable.WithMessage("execution target health is " + healthState)
+	if err := dispatch.ValidateTargetHealth(healthState); err != nil {
+		return nil, err
 	}
-	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
-		return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
+	deviceID, err := dispatch.BoundDeviceID(target.DeviceID)
+	if err != nil {
+		return nil, err
 	}
-	deviceID := strings.TrimSpace(*target.DeviceID)
 	device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -444,14 +430,10 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		}
 		return nil, err
 	}
-	if device.UserID != userID || device.DeviceType != "desktop" {
-		return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+	if err := dispatch.ValidateTargetDevice(userID, device.UserID, device.DeviceType); err != nil {
+		return nil, err
 	}
-	return &dispatchTargetSnapshot{
-		ID:         target.ID,
-		TargetType: target.TargetType,
-		DeviceID:   deviceID,
-	}, nil
+	return dispatch.NewTargetSnapshot(target.ID, target.TargetType, deviceID), nil
 }
 
 func promptFromMessage(msg *model.Message) string {
@@ -608,22 +590,15 @@ func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) di
 	if err != nil {
 		return dispatchTeamContext{}
 	}
-	customAgentID := strings.TrimSpace(*ai.CustomAgentID)
-	for _, member := range members {
-		if member.AgentProfileID == nil || strings.TrimSpace(*member.AgentProfileID) != customAgentID {
-			continue
-		}
-		return dispatchTeamContext{
-			TeamID:         run.TeamID,
-			TeamRunID:      run.ID,
-			TeamMemberID:   member.ID,
-			TeamMemberRole: member.Role,
+	refs := make([]dispatch.TeamMemberRef, len(members))
+	for i := range members {
+		refs[i] = dispatch.TeamMemberRef{
+			ID:             members[i].ID,
+			Role:           members[i].Role,
+			AgentProfileID: members[i].AgentProfileID,
 		}
 	}
-	return dispatchTeamContext{
-		TeamID:    run.TeamID,
-		TeamRunID: run.ID,
-	}
+	return dispatch.MatchTeamContext(run.TeamID, run.ID, *ai.CustomAgentID, refs)
 }
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
@@ -796,17 +771,11 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	if secret == "" {
 		return ""
 	}
-	deviceID := strings.TrimSpace(dp.EdgeDeviceID)
-	if deviceID == "" {
-		deviceID = strings.TrimSpace(os.Getenv("AGENTHUB_EDGE_DEVICE_ID"))
-	}
+	deviceID := dispatch.ResolveCapabilityDeviceID(dp.EdgeDeviceID, os.Getenv("AGENTHUB_EDGE_DEVICE_ID"))
 	if deviceID == "" {
 		return ""
 	}
-	userID := strings.TrimSpace(dp.TriggerUserID)
-	if userID == "" {
-		userID = dispatch.FallbackCapabilityUserID
-	}
+	userID := dispatch.ResolveCapabilityUserID(dp.TriggerUserID)
 	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
 	projectID := dispatch.LocalProjectID
 	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, dispatch.DefaultCapabilityAction, 5*time.Minute, jwtutil.CapabilityIssueOptions{
@@ -822,17 +791,6 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 }
 
 // ── Redispatch residual (moved from AgentService in #573) ────────────────────
-
-// pendingTaskSnapshot is the minimal task row used for redelivery routing.
-type pendingTaskSnapshot struct {
-	ID                string
-	AgentInstanceID   string
-	TriggeredByUserID string
-	Status            string
-	EdgeDeviceID      string
-	EdgeRunID         string
-	TargetID          string
-}
 
 // redispatchDelivery re-dispatches a delivery by parsing the stored payload
 // and routing it to the target Edge device. Owns dispatchPayload unmarshal.
@@ -925,14 +883,10 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 // rec is a redispatchTarget (opaque payload fields only), not the GORM model.
 func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) {
 	// Build a minimal PendingAgentTask for dispatchToEdgeHTTP which needs task.ID.
-	minimalTask := &model.PendingAgentTask{
-		ID:           task.ID,
-		TargetID:     task.TargetID,
-		EdgeDeviceID: task.EdgeDeviceID,
-	}
+	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
 
 	// Try HTTP dispatch first for unbound tasks.
-	if task.TargetID == "" && task.EdgeDeviceID == "" {
+	if dispatch.ShouldTryHTTPRedelivery(task.TargetID, task.EdgeDeviceID) {
 		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); edgeRunID != "" {
 			slog.Info("redispatch: HTTP dispatch succeeded",
 				"delivery_id", rec.DeliveryID,
