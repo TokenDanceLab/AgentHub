@@ -214,10 +214,10 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	args = append(args, prompt)
 
-	workDir := ctx.WorkDir
-	if workDir == "" {
-		workDir = DefaultWorkDir()
-	}
+	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
+	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
+	// if a bypass path reaches BuildCommand.
+	workDir := strings.TrimSpace(ctx.WorkDir)
 
 	var env []string // runtime vars set by process executor
 

@@ -357,8 +357,8 @@ func TestDeprecatedToolAliasesWork(t *testing.T) {
 	srv, _ := newTestServer(t)
 
 	deprecatedNames := []struct {
-		name     string
-		args     map[string]any
+		name string
+		args map[string]any
 	}{
 		{"list_projects", map[string]any{}},
 		{"list_threads", map[string]any{"projectId": "proj_test"}},
@@ -904,6 +904,61 @@ func TestToolStartRunCreatesRunMessageAndStartsExecutor(t *testing.T) {
 	}
 }
 
+func TestToolStartRunRejectsEmptyWorkDir(t *testing.T) {
+	srv, s := newTestServer(t)
+	srv.executor = &recordingRunExecutor{}
+
+	cases := []struct {
+		name string
+		args map[string]any
+	}{
+		{
+			name: "omitted",
+			args: map[string]any{
+				"projectId": "proj_test",
+				"threadId":  "thread_test",
+				"prompt":    "no workdir",
+			},
+		},
+		{
+			name: "empty",
+			args: map[string]any{
+				"projectId": "proj_test",
+				"threadId":  "thread_test",
+				"prompt":    "empty workdir",
+				"workDir":   "",
+			},
+		},
+		{
+			name: "whitespace",
+			args: map[string]any{
+				"projectId": "proj_test",
+				"threadId":  "thread_test",
+				"prompt":    "ws workdir",
+				"workDir":   "   ",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+				"name":      "agenthub_start_run",
+				"arguments": tc.args,
+			})
+			result := assertToolError(t, rec)
+			content := result["content"].([]any)[0].(map[string]any)
+			text := content["text"].(string)
+			if !strings.Contains(text, "workdir_required") && !strings.Contains(text, "workDir is required") {
+				t.Fatalf("error text = %q, want workdir_required", text)
+			}
+			if runs := s.ListRuns("thread_test"); len(runs) != 0 {
+				t.Fatalf("stored runs = %d, want 0", len(runs))
+			}
+		})
+	}
+}
+
 func TestToolStartRunRejectsActiveRun(t *testing.T) {
 	srv, s := newTestServer(t)
 	srv.executor = &recordingRunExecutor{}
@@ -917,6 +972,7 @@ func TestToolStartRunRejectsActiveRun(t *testing.T) {
 			"projectId": "proj_test",
 			"threadId":  "thread_test",
 			"prompt":    "Should wait",
+			"workDir":   "/tmp",
 		},
 	})
 
@@ -938,6 +994,7 @@ func TestToolStartRunMarksRunFailedWhenExecutorFails(t *testing.T) {
 			"projectId": "proj_test",
 			"threadId":  "thread_test",
 			"prompt":    "Start and fail",
+			"workDir":   "/tmp",
 		},
 	})
 

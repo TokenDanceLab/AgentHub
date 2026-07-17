@@ -87,6 +87,7 @@ func TestDomainErrorCodes(t *testing.T) {
 	}{
 		// Workspace security
 		{ErrWorkspaceNotAllowed, "workspace_not_allowed", "workDir is outside the workspace allowlist", http.StatusForbidden},
+		{ErrWorkDirRequired, "workdir_required", "workDir is required for adapter runs", http.StatusBadRequest},
 
 		// Permission mode / decision
 		{ErrInvalidPermissionMode, "invalid_permission_mode", "invalid permission mode", http.StatusBadRequest},
@@ -162,6 +163,7 @@ func TestDomainErrorCodes(t *testing.T) {
 func TestDomainErrorCodesAreDistinct(t *testing.T) {
 	errs := []*Error{
 		ErrWorkspaceNotAllowed,
+		ErrWorkDirRequired,
 		ErrInvalidPermissionMode,
 		ErrInvalidDecision,
 		ErrExecutorUnavailable,

@@ -83,6 +83,13 @@ func (f *fakeRunExecutor) Cancel(runID string) lifecycle.CancelResult {
 	return f.cancel
 }
 
+func allowTestWorkspace(t *testing.T, h *Handler) string {
+	t.Helper()
+	workDir := t.TempDir()
+	h.WorkspaceAllowlist = []string{workDir}
+	return workDir
+}
+
 func fallbackHomeDir(t *testing.T) string {
 	t.Helper()
 	home, err := os.UserHomeDir()
@@ -691,8 +698,9 @@ func TestHandlerAcceptsInjectedRepository(t *testing.T) {
 
 func TestPostRuns(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -724,16 +732,19 @@ func TestPostRuns(t *testing.T) {
 
 func TestPostRunsAcceptsDesktopModelRoutingMetadata(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{
+
 		"prompt":"route with model metadata",
 		"model":"newapi/deepseek-v4-pro",
 		"provider":"tokendance-gateway",
 		"modelAlias":"sonnet",
 		"modelMappingEnabled":true,
 		"providerFallbackEnabled":true,
-		"reasoningEffort":"high"
-	}`))
+		"reasoningEffort":"high",
+			"workDir":%q
+		}`, workDir)))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -746,6 +757,7 @@ func TestPostRunsAcceptsDesktopModelRoutingMetadata(t *testing.T) {
 
 func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
@@ -754,7 +766,7 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_bound"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_bound","workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -790,6 +802,7 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 
 func TestPostRunsPersistsUserPromptAndUsesThreadSession(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
@@ -797,11 +810,13 @@ func TestPostRunsPersistsUserPromptAndUsesThreadSession(t *testing.T) {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{
+
 		"projectId":"proj_local",
 		"threadId":"thread_context",
-		"prompt":"remember green-842"
-	}`))
+		"prompt":"remember green-842",
+			"workDir":%q
+		}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -845,6 +860,7 @@ func TestPostRunsPersistsUserPromptAndUsesThreadSession(t *testing.T) {
 
 func TestPostRunsResumesThreadRuntimeSessionAfterAssistantHistory(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
@@ -868,12 +884,14 @@ func TestPostRunsResumesThreadRuntimeSessionAfterAssistantHistory(t *testing.T) 
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{
+
 		"projectId":"proj_local",
 		"threadId":"thread_resume",
 		"sessionId":"thread_resume",
-		"prompt":"resume this thread"
-	}`))
+		"prompt":"resume this thread",
+			"workDir":%q
+		}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -1186,13 +1204,60 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 	}
 }
 
+func TestPostRunsRejectsEmptyWorkDir(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+	// Allowlist configured so only emptiness is under test.
+	h.WorkspaceAllowlist = []string{t.TempDir()}
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"omitted", `{"projectId":"proj_local","threadId":"thread_local","prompt":"x"}`},
+		{"empty", `{"projectId":"proj_local","threadId":"thread_local","prompt":"x","workDir":""}`},
+		{"whitespace", `{"projectId":"proj_local","threadId":"thread_local","prompt":"x","workDir":"   "}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
+			h.PostRuns(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d: %s", rec.Code, rec.Body.String())
+			}
+			var resp map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			errObj, ok := resp["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("error body = %#v", resp)
+			}
+			if errObj["code"] != errcode.ErrWorkDirRequired.Code {
+				t.Fatalf("error code = %#v, want %s", errObj["code"], errcode.ErrWorkDirRequired.Code)
+			}
+			if len(executor.started) != 0 {
+				t.Fatalf("executor starts = %d, want 0", len(executor.started))
+			}
+			if runs := h.Store.ListRuns("thread_local"); len(runs) != 0 {
+				t.Fatalf("stored runs = %d, want 0", len(runs))
+			}
+		})
+	}
+}
+
 func TestPostRunsStartsExecutorAfterQueueingRun(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	_, ch, _ := h.Bus.Subscribe(0)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -1231,9 +1296,10 @@ func TestPostRunsStartsExecutorAfterQueueingRun(t *testing.T) {
 
 func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	h.Executor = &fakeRunExecutor{err: errors.New("start failed")}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -1271,10 +1337,11 @@ func TestPostRunsRejectsUnknownThreadBinding(t *testing.T) {
 
 func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusAccepted {
@@ -1285,7 +1352,7 @@ func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 	}
 	firstRunID := executor.started[0].ID
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec = httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusConflict {
@@ -1317,10 +1384,11 @@ func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 
 func TestPostRunsAllowsNewRunAfterActiveRunTerminal(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusAccepted {
@@ -1331,7 +1399,7 @@ func TestPostRunsAllowsNewRunAfterActiveRunTerminal(t *testing.T) {
 		t.Fatal("SetRunStatus returned ok=false")
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec = httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusAccepted {
@@ -1347,10 +1415,11 @@ func TestPostRunsAllowsNewRunAfterActiveRunTerminal(t *testing.T) {
 
 func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	failingExecutor := &fakeRunExecutor{err: errors.New("start failed")}
 	h.Executor = failingExecutor
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusInternalServerError {
@@ -1370,7 +1439,7 @@ func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
 
 	retryExecutor := &fakeRunExecutor{}
 	h.Executor = retryExecutor
-	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec = httptest.NewRecorder()
 	h.PostRuns(rec, req)
 	if rec.Code != http.StatusAccepted {
@@ -1383,6 +1452,7 @@ func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
 
 func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
@@ -1409,7 +1479,7 @@ func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
 
@@ -1432,14 +1502,15 @@ func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
 
 func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusAccepted {
-		t.Fatalf("POST /v1/runs status = %d, want 202", rec.Code)
+		t.Fatalf("POST /v1/runs status = %d, want 202; body=%s", rec.Code, rec.Body.String())
 	}
 	var runBody map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&runBody); err != nil {
@@ -2237,15 +2308,16 @@ func TestMuxRunnersRoute(t *testing.T) {
 
 func TestMuxPostRunsRoute(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", rec.Code)
+		t.Fatalf("expected 202, got %d; body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -2523,9 +2595,10 @@ func TestPostCancelRunWrongMethod(t *testing.T) {
 
 func TestPostRunsGeneratesEvents(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	_, ch, _ := h.Bus.Subscribe(0)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"workDir":%q}`, workDir)))
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
 
@@ -3074,6 +3147,7 @@ func newCapToken(secret, userID, deviceID, projectID, purpose string, expiresIn 
 
 func TestRunStartDualToken(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3082,7 +3156,7 @@ func TestRunStartDualToken(t *testing.T) {
 
 	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"dual-token test"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"dual-token test","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3098,13 +3172,14 @@ func TestRunStartDualToken(t *testing.T) {
 
 func TestRunStartDualToken_MissingCapabilityTokenReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
 	h.EdgeDeviceID = "test-edge-001"
 	h.ensureDefaults()
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	// Do NOT set X-AgentHub-Capability-Token
 	rec := httptest.NewRecorder()
 
@@ -3121,6 +3196,7 @@ func TestRunStartDualToken_MissingCapabilityTokenReturns403(t *testing.T) {
 
 func TestRunStartDualToken_WrongCapabilityTokenReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3130,7 +3206,7 @@ func TestRunStartDualToken_WrongCapabilityTokenReturns403(t *testing.T) {
 	// Use wrong secret for capability token
 	capToken := newCapToken("wrong-secret-that-is-also-32-bytes!!", "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3144,6 +3220,7 @@ func TestRunStartDualToken_WrongCapabilityTokenReturns403(t *testing.T) {
 
 func TestRunStartDualToken_ExpiredCapabilityTokenReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3152,7 +3229,7 @@ func TestRunStartDualToken_ExpiredCapabilityTokenReturns403(t *testing.T) {
 
 	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", -1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3166,6 +3243,7 @@ func TestRunStartDualToken_ExpiredCapabilityTokenReturns403(t *testing.T) {
 
 func TestRunStartDualToken_MismatchedProjectReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3175,7 +3253,7 @@ func TestRunStartDualToken_MismatchedProjectReturns403(t *testing.T) {
 	// Capability token is for proj_other, but request uses proj_local
 	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_other", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3189,6 +3267,7 @@ func TestRunStartDualToken_MismatchedProjectReturns403(t *testing.T) {
 
 func TestRunStartDualToken_MismatchedUserIdentityReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3198,7 +3277,7 @@ func TestRunStartDualToken_MismatchedUserIdentityReturns403(t *testing.T) {
 	// Capability token is for user-1, but the context identity will be user-2
 	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	// Inject a different user identity into context (simulating middleware)
 	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-2")
@@ -3216,6 +3295,7 @@ func TestRunStartDualToken_MismatchedUserIdentityReturns403(t *testing.T) {
 
 func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	// HubJWTSecret is empty — dual-token check is skipped entirely
@@ -3223,7 +3303,7 @@ func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) 
 	h.EdgeDeviceID = ""
 	h.ensureDefaults()
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"no dual token"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"no dual token","workDir":%q}`, workDir)))
 	// No capability token header
 	rec := httptest.NewRecorder()
 
@@ -3240,6 +3320,7 @@ func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) 
 
 func TestRunStartDualToken_WithMatchingIdentityContext(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3248,7 +3329,7 @@ func TestRunStartDualToken_WithMatchingIdentityContext(t *testing.T) {
 
 	capToken := newCapToken(testCapSecret, "user-alice", "test-edge-001", "proj_local", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"matched identity"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"matched identity","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	// Inject matching identity into context
 	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-alice")
@@ -3268,6 +3349,7 @@ func TestRunStartDualToken_WithMatchingIdentityContext(t *testing.T) {
 
 func TestRunStartDualToken_WrongDeviceInCapabilityTokenReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3277,7 +3359,7 @@ func TestRunStartDualToken_WrongDeviceInCapabilityTokenReturns403(t *testing.T) 
 	// Capability token is for device "other-device" but Edge expects "test-edge-001"
 	capToken := newCapToken(testCapSecret, "user-1", "other-device", "proj_local", "run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3291,6 +3373,7 @@ func TestRunStartDualToken_WrongDeviceInCapabilityTokenReturns403(t *testing.T) 
 
 func TestRunStartDualToken_WrongPurposeReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3299,7 +3382,7 @@ func TestRunStartDualToken_WrongPurposeReturns403(t *testing.T) {
 
 	capToken := newCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "not-run-start", 1*time.Hour)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"purpose test"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"purpose test","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	rec := httptest.NewRecorder()
 
@@ -3316,6 +3399,7 @@ func TestRunStartDualToken_WrongPurposeReturns403(t *testing.T) {
 
 func TestRunStartDualToken_WrongActionReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3331,7 +3415,7 @@ func TestRunStartDualToken_WrongActionReturns403(t *testing.T) {
 		},
 	}
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"action test"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"action test","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", tok)
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
@@ -3345,6 +3429,7 @@ func TestRunStartDualToken_WrongActionReturns403(t *testing.T) {
 
 func TestRunStartDualToken_WrongThreadReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3360,7 +3445,7 @@ func TestRunStartDualToken_WrongThreadReturns403(t *testing.T) {
 		},
 	}
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"thread test"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"thread test","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", tok)
 	rec := httptest.NewRecorder()
 	h.PostRuns(rec, req)
@@ -3374,6 +3459,7 @@ func TestRunStartDualToken_WrongThreadReturns403(t *testing.T) {
 
 func TestRunStartDualToken_WrongTargetReturns403(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3389,7 +3475,7 @@ func TestRunStartDualToken_WrongTargetReturns403(t *testing.T) {
 		},
 	}
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"target test"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"target test","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", tok)
 	req.Header.Set("X-AgentHub-Target-Id", "target-b")
 	rec := httptest.NewRecorder()
@@ -3404,6 +3490,7 @@ func TestRunStartDualToken_WrongTargetReturns403(t *testing.T) {
 
 func TestRunStartDualToken_MatchingTargetAndThreadAccepted(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3419,7 +3506,7 @@ func TestRunStartDualToken_MatchingTargetAndThreadAccepted(t *testing.T) {
 		},
 	}
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"bound ok"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"bound ok","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", tok)
 	req.Header.Set("X-AgentHub-Target-Id", "target-a")
 	rec := httptest.NewRecorder()
@@ -3466,6 +3553,7 @@ func issueHubShapedCapToken(secret, userID, deviceID, projectID, purpose, action
 func TestRunStartDualToken_HubIssueShape_AcceptsBoundToken(t *testing.T) {
 	// AH-SR-046 / #461 fixture: Hub-shaped issue → Edge PostRuns validate path.
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3473,7 +3561,7 @@ func TestRunStartDualToken_HubIssueShape_AcceptsBoundToken(t *testing.T) {
 	h.ensureDefaults()
 
 	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_local", time.Hour)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue shape ok"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue shape ok","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	req.Header.Set("X-AgentHub-Target-Id", "target-a")
 	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-1")
@@ -3493,6 +3581,7 @@ func TestRunStartDualToken_HubIssueShape_AcceptsBoundToken(t *testing.T) {
 
 func TestRunStartDualToken_HubIssueShape_RejectsWrongThread(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3500,7 +3589,7 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongThread(t *testing.T) {
 	h.ensureDefaults()
 
 	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_other", time.Hour)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong thread"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong thread","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	req.Header.Set("X-AgentHub-Target-Id", "target-a")
 	rec := httptest.NewRecorder()
@@ -3518,6 +3607,7 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongThread(t *testing.T) {
 
 func TestRunStartDualToken_HubIssueShape_RejectsWrongTarget(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3525,7 +3615,7 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongTarget(t *testing.T) {
 	h.ensureDefaults()
 
 	capToken := issueHubShapedCapToken(testCapSecret, "user-1", "test-edge-001", "proj_local", "run-start", "run-start", "target-a", "thread_local", time.Hour)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong target"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong target","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", capToken)
 	req.Header.Set("X-AgentHub-Target-Id", "target-b")
 	rec := httptest.NewRecorder()
@@ -3543,6 +3633,7 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongTarget(t *testing.T) {
 
 func TestRunStartDualToken_HubIssueShape_RejectsWrongAction(t *testing.T) {
 	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.HubJWTSecret = testCapSecret
@@ -3560,7 +3651,7 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongAction(t *testing.T) {
 		},
 	}
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testCapSecret))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong action"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub-issue wrong action","workDir":%q}`, workDir)))
 	req.Header.Set("X-AgentHub-Capability-Token", tok)
 	req.Header.Set("X-AgentHub-Target-Id", "target-a")
 	rec := httptest.NewRecorder()
