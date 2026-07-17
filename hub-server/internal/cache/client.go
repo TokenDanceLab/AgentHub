@@ -562,6 +562,32 @@ func (c *Client) IsRefreshTokenBlacklisted(ctx context.Context, key string) (boo
 	return n > 0, nil
 }
 
+// BlacklistAccessToken stores an access-token jti in the Redis blacklist until
+// the remaining access TTL elapses. Used on logout so stolen access JWTs are
+// rejected immediately rather than remaining valid for AccessExpire (#888).
+func (c *Client) BlacklistAccessToken(ctx context.Context, jti string, ttl time.Duration) error {
+	if jti == "" || ttl <= 0 {
+		return nil
+	}
+	return c.rdb.Set(ctx, "at_blacklist:"+jti, "1", ttl).Err()
+}
+
+// IsAccessTokenBlacklisted reports whether an access-token jti is blacklisted.
+// Redis errors fail open (return false) so a transient outage does not deny
+// all authenticated traffic; logout still revokes refresh tokens in DB.
+func (c *Client) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
+	if jti == "" {
+		return false, nil
+	}
+	n, err := c.rdb.Exists(ctx, "at_blacklist:"+jti).Result()
+	if err != nil {
+		slog.Warn("redis IsAccessTokenBlacklisted failed, fail-open",
+			"jti", jti, "error", err)
+		return false, nil
+	}
+	return n > 0, nil
+}
+
 // PoolStats exposes the underlying Redis connection pool statistics.
 func (c *Client) PoolStats() *redis.PoolStats {
 	return c.rdb.PoolStats()
@@ -642,6 +668,12 @@ func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, tt
 	return nil
 }
 func (NoOpCache) IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error) {
+	return false, nil
+}
+func (NoOpCache) BlacklistAccessToken(ctx context.Context, jti string, ttl time.Duration) error {
+	return nil
+}
+func (NoOpCache) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
 	return false, nil
 }
 
