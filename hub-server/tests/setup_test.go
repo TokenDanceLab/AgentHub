@@ -31,6 +31,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -110,7 +111,7 @@ func TestMain(m *testing.M) {
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := contact.NewService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
-	sessionService := service.NewSessionService(db, cacheClient)
+	sessionService := session.NewService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	messageService := service.NewMessageService(db, bus, cacheClient)
 	messageReactionService := messagereaction.NewService(db, bus)
