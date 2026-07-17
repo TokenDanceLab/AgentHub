@@ -84,19 +84,22 @@ func (o *DeliveryOutbox) RecordDelivery(ctx context.Context, taskID, payload, ed
 	return deliveryID, nil
 }
 
-// MarkDeliverySent transitions an outbox record from pending to sent after
-// the Hub has dispatched the task to the Edge.
+// MarkDeliverySent transitions an outbox record from pending or retrying to
+// sent after the Hub has dispatched (or successfully redispatched) the task
+// to the Edge. Clears next_retry_at so the SentRetryCutoff ack-window governs
+// the next scan rather than the retry cadence (avoids duplicate Edge runs).
+// Already-sent/acked rows are a no-op (RowsAffected==0 tolerated).
 func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string) error {
-	result := o.db.WithContext(ctx).
-		Model(outboxModel()).
-		Where("delivery_id = ? AND status = ?", deliveryID, DeliveryStatusPending).
-		Updates(map[string]interface{}{
-			"status": DeliveryStatusSent,
+	rows, err := o.updateOutboxByDeliveryID(ctx, deliveryID,
+		[]string{DeliveryStatusPending, DeliveryStatusRetrying},
+		map[string]interface{}{
+			"status":        DeliveryStatusSent,
+			"next_retry_at": nil,
 		})
-	if result.Error != nil {
-		return fmt.Errorf("mark delivery sent: %w", result.Error)
+	if err != nil {
+		return fmt.Errorf("mark delivery sent: %w", err)
 	}
-	if result.RowsAffected == 0 {
+	if rows == 0 {
 		// Already sent or already acked — idempotent.
 		return nil
 	}
@@ -378,7 +381,18 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 		}
 
 		if err := o.redispatcher.RedispatchDelivery(ctx, rec.TaskID, rec.DeliveryID, rec.Payload, rec.EdgeDeviceID); err != nil {
+			// Failure: leave status=retrying with next_retry_at for backoff.
 			slog.Warn("redispatch failed",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+				"error", err,
+			)
+			continue
+		}
+		// Success: retrying→sent so the ack-timeout window (not retry
+		// cadence) governs re-scan and prevents duplicate Edge runs.
+		if err := o.MarkDeliverySent(ctx, rec.DeliveryID); err != nil {
+			slog.Warn("failed to mark redispatched delivery sent",
 				"delivery_id", rec.DeliveryID,
 				"task_id", rec.TaskID,
 				"error", err,
