@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -694,8 +695,10 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 // ==================== TestOutbox_RetryLoopInvokesRedispatcher ====================
 
 // fakeRedispatcher records RedispatchDelivery calls without HTTP/WS.
+// When fail is true, RedispatchDelivery returns an error (failure branch).
 type fakeRedispatcher struct {
 	calls []redispatchCall
+	fail  bool
 }
 
 type redispatchCall struct {
@@ -712,6 +715,9 @@ func (f *fakeRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliv
 		payloadJSON:  payloadJSON,
 		edgeDeviceID: edgeDeviceID,
 	})
+	if f.fail {
+		return errors.New("redispatch failed")
+	}
 	return nil
 }
 
@@ -737,10 +743,17 @@ func TestOutbox_RetryLoopInvokesRedispatcher(t *testing.T) {
 	// Drive one retry cycle (no ticker / no HTTP/WS).
 	outbox.retryDeliveries(ctx)
 
-	// Journal transitioned to retrying.
+	// Successful redispatch transitions retrying→sent and clears next_retry_at
+	// so the ack-timeout window governs re-scan (not retry cadence).
 	status, err := outbox.GetDeliveryStatus(ctx, "del-port")
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusRetrying, status)
+	assert.Equal(t, DeliveryStatusSent, status)
+
+	var rec deliveryOutboxRecord
+	err = db.WithContext(ctx).Where("delivery_id = ?", "del-port").First(&rec).Error
+	require.NoError(t, err)
+	assert.Nil(t, rec.NextRetryAt)
+	assert.Equal(t, 1, rec.AttemptCount)
 
 	// Opaque redispatch port invoked with stored payload bytes.
 	require.Len(t, fake.calls, 1)
@@ -748,6 +761,77 @@ func TestOutbox_RetryLoopInvokesRedispatcher(t *testing.T) {
 	assert.Equal(t, "del-port", fake.calls[0].deliveryID)
 	assert.Equal(t, payload, fake.calls[0].payloadJSON)
 	assert.Equal(t, "dev-port", fake.calls[0].edgeDeviceID)
+}
+
+func TestOutbox_RetryLoopRedispatchFailureStaysRetrying(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	fake := &fakeRedispatcher{fail: true}
+	outbox := NewDeliveryOutbox(db, fake)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+
+	// Seed a retrying delivery past next_retry_at so scan finds it.
+	pastRetry := now.Add(-time.Second)
+	payload := `{"task_id":"task-fail","opaque":true}`
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, edge_device_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"fail-retry", "task-fail", "del-fail", payload, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, pastRetry, "dev-fail", "prior", now, now,
+	)
+	require.NoError(t, err)
+
+	outbox.retryDeliveries(ctx)
+
+	// Failure branch: stays retrying with next_retry_at set for backoff.
+	status, err := outbox.GetDeliveryStatus(ctx, "del-fail")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusRetrying, status)
+
+	var rec deliveryOutboxRecord
+	err = db.WithContext(ctx).Where("delivery_id = ?", "del-fail").First(&rec).Error
+	require.NoError(t, err)
+	assert.NotNil(t, rec.NextRetryAt)
+	assert.True(t, rec.NextRetryAt.After(now))
+	assert.Equal(t, 2, rec.AttemptCount)
+
+	require.Len(t, fake.calls, 1)
+	assert.Equal(t, "del-fail", fake.calls[0].deliveryID)
+}
+
+func TestOutbox_MarkDeliverySentFromRetrying(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	outbox := NewDeliveryOutbox(db, nil)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+
+	nextRetry := now.Add(5 * time.Second)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"mark-retry", "task-mark", "del-mark", `{}`, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, nextRetry, now, now,
+	)
+	require.NoError(t, err)
+
+	// retrying→sent clears next_retry_at (idempotent RowsAffected==0 OK).
+	require.NoError(t, outbox.MarkDeliverySent(ctx, "del-mark"))
+	status, err := outbox.GetDeliveryStatus(ctx, "del-mark")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusSent, status)
+
+	var rec deliveryOutboxRecord
+	err = db.WithContext(ctx).Where("delivery_id = ?", "del-mark").First(&rec).Error
+	require.NoError(t, err)
+	assert.Nil(t, rec.NextRetryAt)
+
+	// Already sent: no-op.
+	require.NoError(t, outbox.MarkDeliverySent(ctx, "del-mark"))
+	status, err = outbox.GetDeliveryStatus(ctx, "del-mark")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusSent, status)
 }
 
 func TestOutbox_RetryLoopNoRedispatcherSkipsDispatch(t *testing.T) {
