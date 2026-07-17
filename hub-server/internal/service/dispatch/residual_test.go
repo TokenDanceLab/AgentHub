@@ -266,3 +266,50 @@ func TestEdgeHTTPHeaders(t *testing.T) {
 	assert.Equal(t, "Bearer secret", h.Get("Authorization"))
 	assert.Equal(t, "cap-token", h.Get(CapabilityTokenHeader))
 }
+
+func TestClassifyRedeliveryRoutes(t *testing.T) {
+	assert.Equal(t, RouteHTTP, ClassifyRedeliveryPrimaryRoute("", ""))
+	assert.Equal(t, RouteTargetBound, ClassifyRedeliveryPrimaryRoute("t1", "d1"))
+	assert.Equal(t, RouteTargetBound, ClassifyRedeliveryPrimaryRoute("", "d1"))
+	assert.Equal(t, RouteInviterDesktop, ClassifyRedeliveryPrimaryRoute("t1", ""))
+
+	// Device-bound: available + user match → target_bound.
+	assert.Equal(t, RouteTargetBound, ClassifyRedeliveryRoute(true, "c1", true, nil, true, true))
+	// Device-bound: available but user mismatch / missing conn → offline.
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(true, "c1", true, nil, true, false))
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(true, "c1", true, nil, false, false))
+	// Inviter path: found conn → inviter_desktop; missing → offline.
+	assert.Equal(t, RouteInviterDesktop, ClassifyRedeliveryRoute(false, "c1", true, nil, true, false))
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(false, "c1", true, nil, false, false))
+	// Route unavailable (err / empty / no mgr).
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(true, "", true, nil, false, false))
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(false, "c1", false, nil, true, true))
+	assert.Equal(t, RouteOffline, ClassifyRedeliveryRoute(false, "c1", true, assert.AnError, true, true))
+}
+
+func TestTargetBoundRouteUnavailable(t *testing.T) {
+	assert.True(t, TargetBoundRouteUnavailable(assert.AnError, "c1", true))
+	assert.True(t, TargetBoundRouteUnavailable(nil, "", true))
+	assert.True(t, TargetBoundRouteUnavailable(nil, "c1", false))
+	assert.False(t, TargetBoundRouteUnavailable(nil, "c1", true))
+}
+
+func TestFinalizePayloadWithDelivery(t *testing.T) {
+	p := NewPayload("task", "ai", "claude-code", "", "", "s", "m", "u", "prompt", "n")
+	got, body, err := FinalizePayloadWithDelivery(p, "del-1")
+	require.NoError(t, err)
+	assert.Equal(t, "del-1", got.DeliveryID)
+	assert.Equal(t, "", p.DeliveryID) // input not mutated
+	want, err := MarshalWithDeliveryID(p, "del-1")
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(body))
+}
+
+func TestMarshalEdgeRunRequest(t *testing.T) {
+	schema := json.RawMessage(`{"type":"object"}`)
+	body, err := MarshalEdgeRunRequest("hi", "claude-code", "sys", "task-1", "del-1", nil, nil, &schema)
+	require.NoError(t, err)
+	want, err := json.Marshal(BuildEdgeRunRequest("hi", "claude-code", "sys", "task-1", "del-1", nil, nil, &schema))
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(body))
+}
