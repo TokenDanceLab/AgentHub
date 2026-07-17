@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { createHubWS, type HubWSHandle } from "@/api/hubWS";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import {
+  buildWSAuthProtocols,
+  createHubWS,
+  withAccessToken,
+  WS_BEARER_SUBPROTOCOL,
+  type HubWSHandle,
+} from "@/api/hubWS";
 import type { Transport, TransportStatus } from "@/api/transport";
 import { HUB_EVENTS } from "@shared/hubEvents";
 
@@ -76,27 +82,67 @@ function token(valid = true): () => string | null {
   return valid ? () => "test-token" : () => null;
 }
 
+describe("WS auth protocol helpers", () => {
+  it("buildWSAuthProtocols returns marker + jwt", () => {
+    expect(buildWSAuthProtocols("jwt.token.here")).toEqual([
+      WS_BEARER_SUBPROTOCOL,
+      "jwt.token.here",
+    ]);
+  });
+
+  it("buildWSAuthProtocols returns undefined without token", () => {
+    expect(buildWSAuthProtocols(null)).toBeUndefined();
+    expect(buildWSAuthProtocols(undefined)).toBeUndefined();
+    expect(buildWSAuthProtocols("")).toBeUndefined();
+  });
+
+  it("withAccessToken remains available as legacy fallback", () => {
+    expect(withAccessToken("ws://hub.example/client/ws", "tok")).toContain(
+      "access_token=tok",
+    );
+    expect(withAccessToken("ws://hub.example/client/ws", null)).toBe(
+      "ws://hub.example/client/ws",
+    );
+  });
+});
+
 describe("createHubWS", () => {
   let t: MockTransport;
   let h: HubWSHandle;
 
-  function init(validToken = true) {
+  function init(validToken = true, useQueryTokenFallback = false) {
     t = mockTransport();
-    h = createHubWS({ transport: t as unknown as Transport, getToken: token(validToken) });
+    h = createHubWS({
+      transport: t as unknown as Transport,
+      getToken: token(validToken),
+      url: "ws://hub.example/client/ws",
+      useQueryTokenFallback,
+    });
     h.connect();
   }
 
-  it("connects with the Hub access token in the WebSocket URL", () => {
+  it("connects without access_token in URL by default (protocol path)", () => {
     init();
-    expect(String(t._urls[0])).toContain("access_token=test-token");
+    expect(String(t._urls[0])).toBe("ws://hub.example/client/ws");
+    expect(String(t._urls[0])).not.toContain("access_token=");
     const authFrames = t._sent.filter(
       (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
     );
     expect(authFrames.length).toBe(0);
   });
 
+  it("can still append query access_token when fallback is enabled", () => {
+    init(true, true);
+    expect(String(t._urls[0])).toContain("access_token=test-token");
+  });
+
   it("connects without an access_token query param when token is null", () => {
     init(false);
+    expect(String(t._urls[0])).not.toContain("access_token=");
+  });
+
+  it("connects without query token when token is null even with fallback", () => {
+    init(false, true);
     expect(String(t._urls[0])).not.toContain("access_token=");
   });
 
@@ -191,12 +237,30 @@ describe("createHubWS", () => {
     expect(t._closed).toBe(true);
   });
 
-  it("reconnect refreshes the WebSocket URL with the latest token", () => {
+  it("reconnect keeps protocol path URL (no query token by default)", () => {
     let currentToken = "first-token";
     t = mockTransport();
     h = createHubWS({
       transport: t as unknown as Transport,
       getToken: () => currentToken,
+      url: "ws://hub.example/client/ws",
+    });
+    h.connect();
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
+    currentToken = "second-token";
+    h.reconnect();
+    expect(String(t._urls[t._urls.length - 1])).toBe("ws://hub.example/client/ws");
+    expect(String(t._urls[t._urls.length - 1])).not.toContain("access_token=");
+  });
+
+  it("reconnect refreshes query token when fallback is enabled", () => {
+    let currentToken = "first-token";
+    t = mockTransport();
+    h = createHubWS({
+      transport: t as unknown as Transport,
+      getToken: () => currentToken,
+      url: "ws://hub.example/client/ws",
+      useQueryTokenFallback: true,
     });
     h.connect();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
@@ -239,12 +303,12 @@ describe("createHubWS", () => {
     expect(called).toBe(false);
   });
 
-  it("connect URL still contains the token on transport reconnect", () => {
+  it("connect URL still has no query token on transport reconnect", () => {
     init();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
     t._setStatus("disconnected");
     t._setStatus("connected");
-    expect(String(t._urls[0])).toContain("access_token=test-token");
+    expect(String(t._urls[0])).not.toContain("access_token=");
   });
 
   it("onStatus forwards transport status", () => {
@@ -270,5 +334,59 @@ describe("createHubWS", () => {
     init();
     t._setStatus("connecting");
     expect(h.getStatus()).toBe("connecting");
+  });
+});
+
+describe("WebSocketTransport protocol carriage", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("passes Sec-WebSocket-Protocol subprotocols to WebSocket constructor", async () => {
+    const constructed: Array<{ url: string; protocols?: string | string[] }> = [];
+
+    class FakeWebSocket {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSING = 2;
+      static CLOSED = 3;
+      readyState = FakeWebSocket.CONNECTING;
+      onopen: ((ev: Event) => void) | null = null;
+      onmessage: ((ev: MessageEvent) => void) | null = null;
+      onclose: ((ev: CloseEvent) => void) | null = null;
+      onerror: ((ev: Event) => void) | null = null;
+      constructor(url: string, protocols?: string | string[]) {
+        constructed.push({ url, protocols });
+        queueMicrotask(() => {
+          this.readyState = FakeWebSocket.OPEN;
+          this.onopen?.(new Event("open"));
+        });
+      }
+      send(): void {}
+      close(): void {
+        this.readyState = FakeWebSocket.CLOSED;
+        this.onclose?.(new CloseEvent("close"));
+      }
+    }
+
+    vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
+
+    const { WebSocketTransport } = await import("@/api/transport");
+    const transport = new WebSocketTransport({
+      url: "ws://hub.example/client/ws",
+      protocols: () => buildWSAuthProtocols("hub-jwt-token"),
+      offlineQueue: false,
+      maxRetries: 0,
+    });
+    transport.connect();
+
+    expect(constructed).toHaveLength(1);
+    expect(constructed[0]?.url).toBe("ws://hub.example/client/ws");
+    expect(constructed[0]?.protocols).toEqual([
+      WS_BEARER_SUBPROTOCOL,
+      "hub-jwt-token",
+    ]);
+    transport.close();
   });
 });
