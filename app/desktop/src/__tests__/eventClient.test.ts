@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createEventStream } from '../api/eventClient';
-import { setEdgeAuthToken } from '../api/edgeAuth';
+import {
+  EDGE_WS_BEARER_SUBPROTOCOL,
+  buildEdgeWSAuthProtocols,
+  setEdgeAuthToken,
+} from '../api/edgeAuth';
 
 // Track WebSocket instances created by the stream
 const instances: MockWebSocket[] = [];
 
 class MockWebSocket {
   url: string;
+  protocols: string | string[] | undefined;
   onopen: (() => void) | null = null;
   onclose: ((ev?: CloseEvent) => void) | null = null;
   onmessage: ((ev: MessageEvent) => void) | null = null;
@@ -14,8 +19,9 @@ class MockWebSocket {
   readyState = 0;
   CLOSED = 3;
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols;
     instances.push(this);
   }
 
@@ -127,25 +133,50 @@ describe('eventClient', () => {
     expect(instances).toHaveLength(1); // only the original
   });
 
-  it('adds Edge auth token to WebSocket URL when stored locally', () => {
+  it('passes Edge auth token via Sec-WebSocket-Protocol, not query', () => {
     localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
 
     const stream = createEventStream('ws://127.0.0.1:3210/v1/events?cursor=7');
 
     const ws = lastWs();
     expect(ws.url).toContain('cursor=7');
-    expect(ws.url).toContain('access_token=local-edge-token');
+    expect(ws.url).not.toContain('access_token=');
+    expect(ws.protocols).toEqual([EDGE_WS_BEARER_SUBPROTOCOL, 'local-edge-token']);
     stream.close();
   });
 
-  it('adds runtime Edge auth token to WebSocket URL', () => {
+  it('passes runtime Edge auth token via Sec-WebSocket-Protocol', () => {
     setEdgeAuthToken('runtime-edge-token');
 
     const stream = createEventStream('ws://127.0.0.1:3210/v1/events?cursor=8');
 
     const ws = lastWs();
     expect(ws.url).toContain('cursor=8');
-    expect(ws.url).toContain('access_token=runtime-edge-token');
+    expect(ws.url).not.toContain('access_token=');
+    expect(ws.protocols).toEqual([EDGE_WS_BEARER_SUBPROTOCOL, 'runtime-edge-token']);
     stream.close();
+  });
+
+  it('optionally injects query token only when useQueryTokenFallback is true', () => {
+    setEdgeAuthToken('legacy-edge-token');
+
+    const stream = createEventStream('ws://127.0.0.1:3210/v1/events?cursor=9', {
+      useQueryTokenFallback: true,
+    });
+
+    const ws = lastWs();
+    expect(ws.url).toContain('cursor=9');
+    expect(ws.url).toContain('access_token=legacy-edge-token');
+    expect(ws.protocols).toEqual([EDGE_WS_BEARER_SUBPROTOCOL, 'legacy-edge-token']);
+    stream.close();
+  });
+
+  it('buildEdgeWSAuthProtocols returns marker + token', () => {
+    expect(buildEdgeWSAuthProtocols('edge-tok')).toEqual([
+      EDGE_WS_BEARER_SUBPROTOCOL,
+      'edge-tok',
+    ]);
+    expect(buildEdgeWSAuthProtocols('')).toBeUndefined();
+    expect(buildEdgeWSAuthProtocols(null)).toBeUndefined();
   });
 });
