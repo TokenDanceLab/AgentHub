@@ -577,3 +577,122 @@ export function buildDeleteInit(): { method: 'DELETE' } {
 export function buildPutInit(): { method: 'PUT' } {
   return { method: 'PUT' };
 }
+
+/**
+ * POST RequestInit with optional JSON body key (exactOptional-safe).
+ * Omits `body` entirely when payload is undefined.
+ */
+export function buildPostWithOptionalJsonBody(
+  payload: unknown | undefined,
+): { method: 'POST' } | { method: 'POST'; body: string } {
+  return {
+    ...buildPostInit(),
+    ...buildOptionalJsonBody(payload),
+  };
+}
+
+// ── Static path residual (#913) ───────────────────────────────────────────────
+
+export function buildRegisterPath(): string {
+  return '/client/auth/register';
+}
+
+export function buildLoginPath(): string {
+  return '/client/auth/login';
+}
+
+export function buildRefreshPath(): string {
+  return '/client/auth/refresh';
+}
+
+export function buildLogoutPath(): string {
+  return '/client/auth/logout';
+}
+
+export function buildMePath(): string {
+  return '/client/auth/me';
+}
+
+export function buildUpdateProfilePath(): string {
+  return '/client/auth/profile';
+}
+
+export function buildChangePasswordPath(): string {
+  return '/client/auth/change-password';
+}
+
+export function buildChangePasswordFallbackPath(): string {
+  return '/client/auth/password';
+}
+
+export function buildOidcAuthorizePath(): string {
+  return '/client/auth/oidc/authorize';
+}
+
+export function buildOidcCallbackPath(): string {
+  return '/client/auth/oidc/callback';
+}
+
+export function buildListContactsPath(): string {
+  return '/client/contacts';
+}
+
+export function buildFriendRequestsPath(): string {
+  return '/client/contacts/friend-requests';
+}
+
+export function buildListSessionsPath(): string {
+  return '/client/sessions';
+}
+
+export function buildCreatePrivateSessionPath(): string {
+  return '/client/sessions/private';
+}
+
+export function buildCreateGroupSessionPath(): string {
+  return '/client/sessions/group';
+}
+
+export function buildAgentTasksPath(): string {
+  return '/web/agent-tasks';
+}
+
+export function buildExecutionTargetsPath(): string {
+  return '/web/execution-targets';
+}
+
+export function buildRelayCommandsPath(): string {
+  return '/web/relay/commands';
+}
+
+export function buildCustomAgentsPath(): string {
+  return '/web/custom-agents';
+}
+
+export function buildAgentTeamsPath(): string {
+  return '/web/agent-teams';
+}
+
+export function buildAgentProfilesPath(): string {
+  return '/web/agent-profiles';
+}
+
+export function buildDocumentsPath(): string {
+  return '/web/documents';
+}
+
+export function buildWorkspaceProjectsPath(): string {
+  return '/web/projects';
+}
+
+export function buildSettingsPath(): string {
+  return '/client/settings';
+}
+
+export function buildProbeAttachmentPath(): string {
+  return '/client/attachments/probe';
+}
+
+export function buildAttachmentsPath(): string {
+  return '/client/attachments';
+}

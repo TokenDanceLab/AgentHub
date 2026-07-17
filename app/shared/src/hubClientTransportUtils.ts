@@ -43,6 +43,26 @@ export function createNetworkAppError(message: string): AppError {
   );
 }
 
+/** Strip trailing slashes from an optional Hub base URL. */
+export function normalizeHubBaseUrl(baseUrl?: string): string {
+  return (baseUrl ?? '').replace(/\/+$/, '');
+}
+
+/** Resolve request timeout with the shared Hub default. */
+export function resolveHubTimeoutMs(timeoutMs?: number): number {
+  return timeoutMs ?? DEFAULT_HUB_TIMEOUT_MS;
+}
+
+/** Request method used for logging / error reporting (defaults to GET). */
+export function requestMethodOf(options: RequestInit): string {
+  return options.method ?? 'GET';
+}
+
+/** Join a normalized base URL with a Hub path (path includes leading `/`). */
+export function buildHubUrl(baseUrl: string, path: string): string {
+  return `${baseUrl}${path}`;
+}
+
 /** Set JSON content-type only when the caller did not supply one. */
 export function applyDefaultJsonContentType(headers: Headers): void {
   if (!headers.has('Content-Type')) {
