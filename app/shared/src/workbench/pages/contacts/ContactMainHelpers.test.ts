@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   contactEmptyStateClassProps,
   contactProfileActions,
   contactProfileAvatarColor,
   contactProfileVariant,
+  friendRequestCardOptionalProps,
   searchQueryFromKeyDown,
   shouldShowNewContactsEmpty,
+  wrapFriendRequestHandler,
 } from './ContactMainHelpers';
 import type { ContactProfile } from './types';
 
@@ -86,5 +88,45 @@ describe('ContactMainHelpers', () => {
     input.value = '   ';
     expect(searchQueryFromKeyDown({ key: 'Enter', target: input })).toBeNull();
     expect(searchQueryFromKeyDown({ key: 'Enter', target: null })).toBeNull();
+  });
+
+  it('wraps async friend-request handlers to void-return callbacks', async () => {
+    expect(wrapFriendRequestHandler(undefined)).toBeUndefined();
+
+    const asyncHandler = vi.fn(async (_id: string) => 'ok');
+    const wrapped = wrapFriendRequestHandler(asyncHandler);
+    expect(wrapped).toBeTypeOf('function');
+    expect(wrapped?.('req-1')).toBeUndefined();
+    await Promise.resolve();
+    expect(asyncHandler).toHaveBeenCalledWith('req-1');
+
+    const syncHandler = vi.fn((_id: string) => undefined);
+    wrapFriendRequestHandler(syncHandler)?.('req-2');
+    expect(syncHandler).toHaveBeenCalledWith('req-2');
+  });
+
+  it('builds exactOptionalPropertyTypes-safe FriendRequestCard optional props', () => {
+    const empty = friendRequestCardOptionalProps({});
+    expect(empty).toEqual({});
+    expect(Object.prototype.hasOwnProperty.call(empty, 'loading')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(empty, 'onAccept')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(empty, 'onReject')).toBe(false);
+
+    const loadingOnly = friendRequestCardOptionalProps({ actionLoading: false });
+    expect(loadingOnly).toEqual({ loading: false });
+    expect(Object.prototype.hasOwnProperty.call(loadingOnly, 'loading')).toBe(true);
+
+    const accept = vi.fn(async () => undefined);
+    const reject = vi.fn();
+    const full = friendRequestCardOptionalProps({
+      onAcceptRequest: accept,
+      onRejectRequest: reject,
+      actionLoading: true,
+    });
+    expect(Object.keys(full).sort()).toEqual(['loading', 'onAccept', 'onReject']);
+    expect(full.loading).toBe(true);
+    expect(full.onAccept?.('a')).toBeUndefined();
+    expect(full.onReject?.('b')).toBeUndefined();
+    expect(reject).toHaveBeenCalledWith('b');
   });
 });

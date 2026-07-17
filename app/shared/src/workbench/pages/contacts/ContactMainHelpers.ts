@@ -2,10 +2,12 @@ import styles from '../ContactsPage.module.css';
 import type { ContactProfile } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ContactMainHelpers — pure residual slices from ContactMainParts (#672).
+   ContactMainHelpers — pure residual slices from ContactMainParts (#672)
+   and ContactMainSections (#707).
 
-   Profile popover planners, empty-state class props, and search keydown
-   parsing. No React hooks / no intentional UX change.
+   Profile popover planners, empty-state class props, search keydown
+   parsing, and exactOptionalPropertyTypes-safe FriendRequestCard prop
+   builders. No React hooks / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type ContactProfileAction = { label: string };
@@ -16,6 +18,16 @@ export type ContactEmptyStateClassProps = {
   className?: string;
   contentClassName?: string;
   titleClassName?: string;
+};
+
+export type FriendRequestAsyncHandler = (
+  requestId: string,
+) => Promise<unknown> | void;
+
+export type FriendRequestCardOptionalProps = {
+  onAccept?: (requestId: string) => void;
+  onReject?: (requestId: string) => void;
+  loading?: boolean;
 };
 
 /** Primary + secondary action labels for the avatar ProfilePopover. */
@@ -78,4 +90,36 @@ export function searchQueryFromKeyDown(event: {
   if (event.key !== 'Enter') return null;
   const value = (event.target as HTMLInputElement | null)?.value?.trim() ?? '';
   return value || null;
+}
+
+/**
+ * Wrap a Promise-returning friend-request handler to a void-return callback
+ * so FriendRequestCard props stay exactOptionalPropertyTypes-safe (#672).
+ */
+export function wrapFriendRequestHandler(
+  handler: FriendRequestAsyncHandler | undefined,
+): ((requestId: string) => void) | undefined {
+  if (handler === undefined) return undefined;
+  return (requestId: string) => {
+    void handler(requestId);
+  };
+}
+
+/**
+ * Build optional FriendRequestCard props without spreading
+ * `loading?: boolean | undefined` (or undefined handlers). Only defined
+ * keys are present (#672 / #707).
+ */
+export function friendRequestCardOptionalProps(options: {
+  onAcceptRequest?: FriendRequestAsyncHandler | undefined;
+  onRejectRequest?: FriendRequestAsyncHandler | undefined;
+  actionLoading?: boolean | undefined;
+}): FriendRequestCardOptionalProps {
+  const props: FriendRequestCardOptionalProps = {};
+  const accept = wrapFriendRequestHandler(options.onAcceptRequest);
+  const reject = wrapFriendRequestHandler(options.onRejectRequest);
+  if (accept) props.onAccept = accept;
+  if (reject) props.onReject = reject;
+  if (options.actionLoading !== undefined) props.loading = options.actionLoading;
+  return props;
 }
