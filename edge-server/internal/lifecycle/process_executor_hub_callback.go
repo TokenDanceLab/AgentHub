@@ -129,7 +129,7 @@ type hubCallbackEmitter struct {
 }
 
 func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
-	if executor == nil || inner == nil {
+	if !shouldWrapHubCallbackEmitter(executor != nil, inner != nil) {
 		return inner
 	}
 	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
@@ -137,16 +137,16 @@ func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapte
 
 func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	e.inner.Emit(eventType, scope, payload)
-	switch eventType {
-	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.executor.recordHubOutput(e.runID, text)
-			e.executor.fireHubStream(e.runID, text)
-		}
-	case adapters.BusEventResult:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.executor.recordHubFinalFallback(e.runID, text)
-		}
+	text, effect := hubCallbackTextForEvent(eventType, payload)
+	if text == "" {
+		return
+	}
+	switch effect {
+	case hubCallbackStream:
+		e.executor.recordHubOutput(e.runID, text)
+		e.executor.fireHubStream(e.runID, text)
+	case hubCallbackFallback:
+		e.executor.recordHubFinalFallback(e.runID, text)
 	}
 }
 

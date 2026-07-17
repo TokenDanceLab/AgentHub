@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -368,4 +371,232 @@ func resolveEvidenceFinalStatus(gateEnabled, passed bool) string {
 		return "finished"
 	}
 	return evidenceGateFinalStatus(passed)
+}
+
+// requireProcessExecutorDeps validates the non-optional constructor dependencies.
+func requireProcessExecutorDeps(bus *events.Bus, runStore store.RunLifecycleStore) error {
+	if bus == nil {
+		return ErrProcessBusRequired
+	}
+	if runStore == nil {
+		return ErrProcessStoreRequired
+	}
+	return nil
+}
+
+// validateConfiguredWorkDir checks an optional configured process workdir after
+// the caller has performed os.Stat. Empty workDir is always valid.
+func validateConfiguredWorkDir(workDir string, info os.FileInfo, statErr error) error {
+	if workDir == "" {
+		return nil
+	}
+	if statErr != nil {
+		return fmt.Errorf("process workdir %q is not accessible: %w", workDir, statErr)
+	}
+	if info == nil || !info.IsDir() {
+		return fmt.Errorf("process workdir %q is not a directory", workDir)
+	}
+	return nil
+}
+
+// resolveMetricsAdapterLabel returns the Prometheus adapter label only when
+// metrics instrumentation is attached.
+func resolveMetricsAdapterLabel(hasMetrics bool, adapter adapters.AgentAdapter) string {
+	if !hasMetrics {
+		return ""
+	}
+	return resolveAdapterMetricsLabel(adapter)
+}
+
+// shouldRecordRunFinishMetrics reports whether a run actually started far enough
+// to record finish latency (start timestamp is non-zero).
+func shouldRecordRunFinishMetrics(runStartTime time.Time) bool {
+	return !runStartTime.IsZero()
+}
+
+// shouldCloseStdinAfterStart reports whether a successfully opened stdin pipe
+// should be closed eagerly after process start.
+func shouldCloseStdinAfterStart(stdinOpen, needsStdin, hasDecisionLoop bool) bool {
+	return stdinOpen && shouldCloseStdinEagerly(needsStdin, hasDecisionLoop)
+}
+
+// shouldTreatStartFailureAsCancelled reports whether a cmd.Start failure should
+// be published as cancelled because the run context is already done.
+func shouldTreatStartFailureAsCancelled(ctxErr error) bool {
+	return ctxErr != nil
+}
+
+// shouldKillStartedProcessOnCancel reports whether a just-started process must
+// be killed because the run context cancelled between Start and tracking.
+func shouldKillStartedProcessOnCancel(ctxErr error) bool {
+	return ctxErr != nil
+}
+
+// shouldAttemptFaultEscalation reports whether a non-nil wait error may enter
+// the fault-escalation path. Retry/handoff control flow stays in the executor.
+func shouldAttemptFaultEscalation(lastWaitErr error, cfg FaultEscalationConfig) bool {
+	return lastWaitErr != nil && faultEscalationActive(cfg)
+}
+
+// shouldPublishTerminalWaitFailure reports whether the terminal wait-error path
+// should publish a failed run after session retries / escalation settle.
+func shouldPublishTerminalWaitFailure(lastWaitErr error) bool {
+	return lastWaitErr != nil
+}
+
+// shouldPublishOutputChunk reports whether a read produced bytes and/or a
+// truncation marker that must be published on the bus.
+func shouldPublishOutputChunk(allowedLen int, truncatedNow bool) bool {
+	return allowedLen > 0 || truncatedNow
+}
+
+// shouldLogStderrLines reports whether stderr text should be mirrored to slog.
+func shouldLogStderrLines(stream, text string) bool {
+	return stream == "stderr" && text != ""
+}
+
+// shouldForwardStdoutToHub reports whether stdout text should feed Hub stream
+// collectors/callbacks.
+func shouldForwardStdoutToHub(stream, text string) bool {
+	return stream == "stdout" && text != ""
+}
+
+// shouldWriteRunOutputStore reports whether accepted output should be persisted
+// to the run output temp store.
+func shouldWriteRunOutputStore(hasStore bool, allowedLen int) bool {
+	return hasStore && allowedLen > 0
+}
+
+// shouldPersistClassifiedFailure reports whether a classified failure message
+// should be persisted as an agent_message item.
+func shouldPersistClassifiedFailure(classified *RunError) bool {
+	return classified != nil
+}
+
+// asStoreWriter returns the store when it implements store.Writer.
+func asStoreWriter(runStore store.RunLifecycleStore) (store.Writer, bool) {
+	writer, ok := runStore.(store.Writer)
+	return writer, ok
+}
+
+// shouldCascadeAgentShutdown reports whether finish should cascade-terminate
+// descendant sub-agents via the registry.
+func shouldCascadeAgentShutdown(hasRegistry bool) bool {
+	return hasRegistry
+}
+
+// shouldStoreSubAgentAggregatorResult reports whether a completed child result
+// should be written into the result aggregator.
+func shouldStoreSubAgentAggregatorResult(hasAggregator bool) bool {
+	return hasAggregator
+}
+
+// shouldWrapDecisionLoopEmitter reports whether the decision-loop factory should
+// wrap the structured-output emitter.
+func shouldWrapDecisionLoopEmitter(hasFactory bool) bool {
+	return hasFactory
+}
+
+// shouldFlushTranscriptEmitter reports whether a transcript emitter should flush
+// after ParseStream returns.
+func shouldFlushTranscriptEmitter(hasTranscript bool) bool {
+	return hasTranscript
+}
+
+// shouldReserveSpawnSlot reports whether SpawnSubAgent should consult the
+// registry for a TOCTOU-safe child slot reservation.
+func shouldReserveSpawnSlot(hasRegistry bool) bool {
+	return hasRegistry
+}
+
+// shouldRegisterSubAgentInstance reports whether a child agent instance should
+// be registered in the agent registry.
+func shouldRegisterSubAgentInstance(hasRegistry bool) bool {
+	return hasRegistry
+}
+
+// lookupCancelResult maps a post-cancel store lookup into a CancelResult.
+func lookupCancelResult(run store.Run, found bool) CancelResult {
+	if found {
+		return cancelResultWithRun(run)
+	}
+	return cancelResultNotFound()
+}
+
+// pipeOpenError formats stdout/stderr/stdin pipe open failures.
+func pipeOpenError(pipe string, err error) error {
+	return fmt.Errorf("open %s pipe: %w", pipe, err)
+}
+
+// adapterPreflightFailed wraps a PreflightAdapter failure for publishFailed.
+func adapterPreflightFailed(err error) error {
+	return fmt.Errorf("adapter preflight failed: %w", err)
+}
+
+// structuredOutputParseFailed wraps a non-recoverable ParseStream failure.
+func structuredOutputParseFailed(err error) error {
+	return fmt.Errorf("structured output parse error: %w", err)
+}
+
+// cancelledFailReason is the Hub TaskFail reason used for cancelled runs.
+func cancelledFailReason() string {
+	return "run cancelled"
+}
+
+// buildSubAgentResultMessage builds the inter-agent result/error message for a
+// completed child run. timestamp is injected so the helper stays pure.
+func buildSubAgentResultMessage(
+	runID, agentID, agentName, parentID, status string,
+	sanitizedResult any,
+	sanitizeReason string,
+	timestamp time.Time,
+) agents.Message {
+	return agents.Message{
+		ID:          subAgentMessageID(runID),
+		FromAgentID: agentID,
+		ToAgentID:   parentID,
+		Type:        subAgentResultMsgType(status),
+		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
+		Payload: subAgentResultQueuePayload(
+			runID, status, agentID, agentName, sanitizedResult, sanitizeReason,
+		),
+		Timestamp: timestamp,
+	}
+}
+
+// hubCallbackSideEffect classifies how a structured bus event should feed Hub
+// callback collectors (stream vs final fallback).
+type hubCallbackSideEffect int
+
+const (
+	hubCallbackNone hubCallbackSideEffect = iota
+	hubCallbackStream
+	hubCallbackFallback
+)
+
+// classifyHubCallbackEvent maps adapter bus event types to hub side effects.
+func classifyHubCallbackEvent(eventType string) hubCallbackSideEffect {
+	switch eventType {
+	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
+		return hubCallbackStream
+	case adapters.BusEventResult:
+		return hubCallbackFallback
+	default:
+		return hubCallbackNone
+	}
+}
+
+// hubCallbackTextForEvent extracts text and the hub side-effect for an event.
+func hubCallbackTextForEvent(eventType string, payload any) (string, hubCallbackSideEffect) {
+	effect := classifyHubCallbackEvent(eventType)
+	if effect == hubCallbackNone {
+		return "", hubCallbackNone
+	}
+	return extractHubCallbackText(payload), effect
+}
+
+// shouldWrapHubCallbackEmitter reports whether a hub callback emitter wrapper
+// can be constructed around the inner emitter.
+func shouldWrapHubCallbackEmitter(hasExecutor, hasInner bool) bool {
+	return hasExecutor && hasInner
 }

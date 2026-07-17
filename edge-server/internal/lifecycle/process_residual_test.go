@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -772,5 +774,212 @@ func TestSpawnAndEvidenceHelpers(t *testing.T) {
 	}
 	if got := resolveEvidenceFinalStatus(true, false); got != "completed_with_issues" {
 		t.Fatalf("fail -> %q", got)
+	}
+}
+
+func TestRequireProcessExecutorDepsAndWorkDir(t *testing.T) {
+	t.Parallel()
+	if err := requireProcessExecutorDeps(nil, store.New()); !errors.Is(err, ErrProcessBusRequired) {
+		t.Fatalf("nil bus -> %v", err)
+	}
+	bus := events.NewBus(10)
+	if err := requireProcessExecutorDeps(bus, nil); !errors.Is(err, ErrProcessStoreRequired) {
+		t.Fatalf("nil store -> %v", err)
+	}
+	if err := requireProcessExecutorDeps(bus, store.New()); err != nil {
+		t.Fatalf("valid deps -> %v", err)
+	}
+
+	if err := validateConfiguredWorkDir("", nil, errors.New("unused")); err != nil {
+		t.Fatalf("empty workdir -> %v", err)
+	}
+	if err := validateConfiguredWorkDir("D:/missing", nil, os.ErrNotExist); err == nil {
+		t.Fatal("missing workdir should error")
+	}
+	info, err := os.Stat(".")
+	if err != nil {
+		t.Fatalf("stat cwd: %v", err)
+	}
+	if err := validateConfiguredWorkDir(".", info, nil); err != nil {
+		t.Fatalf("cwd dir -> %v", err)
+	}
+	self := "process_residual_test.go"
+	if fi, err := os.Stat(self); err == nil {
+		if err := validateConfiguredWorkDir(self, fi, nil); err == nil {
+			t.Fatal("file path should not be a directory")
+		}
+	}
+}
+
+func TestMetricsAndStartCancelPredicates(t *testing.T) {
+	t.Parallel()
+	if got := resolveMetricsAdapterLabel(false, nil); got != "" {
+		t.Fatalf("no metrics -> %q", got)
+	}
+	if got := resolveMetricsAdapterLabel(true, nil); got != "none" {
+		t.Fatalf("metrics nil adapter -> %q", got)
+	}
+	if shouldRecordRunFinishMetrics(time.Time{}) {
+		t.Fatal("zero start should not record")
+	}
+	if !shouldRecordRunFinishMetrics(time.Now()) {
+		t.Fatal("non-zero start should record")
+	}
+	if !shouldCloseStdinAfterStart(true, false, false) {
+		t.Fatal("open stdin without needs/decision should close")
+	}
+	if shouldCloseStdinAfterStart(false, false, false) {
+		t.Fatal("no stdin should not close")
+	}
+	if shouldCloseStdinAfterStart(true, true, false) {
+		t.Fatal("adapter needs stdin")
+	}
+	if !shouldTreatStartFailureAsCancelled(context.Canceled) || shouldTreatStartFailureAsCancelled(nil) {
+		t.Fatal("start failure cancel predicate")
+	}
+	if !shouldKillStartedProcessOnCancel(context.Canceled) || shouldKillStartedProcessOnCancel(nil) {
+		t.Fatal("kill started cancel predicate")
+	}
+}
+
+func TestWaitFailureAndOutputPredicates(t *testing.T) {
+	t.Parallel()
+	cfg := FaultEscalationConfig{Enabled: true, MaxRetries: 2}
+	if !shouldAttemptFaultEscalation(errors.New("x"), cfg) {
+		t.Fatal("wait err + active cfg")
+	}
+	if shouldAttemptFaultEscalation(nil, cfg) {
+		t.Fatal("nil wait err")
+	}
+	if shouldAttemptFaultEscalation(errors.New("x"), FaultEscalationConfig{}) {
+		t.Fatal("inactive cfg")
+	}
+	if !shouldPublishTerminalWaitFailure(errors.New("x")) || shouldPublishTerminalWaitFailure(nil) {
+		t.Fatal("terminal wait failure")
+	}
+	if !shouldPublishOutputChunk(1, false) || !shouldPublishOutputChunk(0, true) || shouldPublishOutputChunk(0, false) {
+		t.Fatal("output chunk predicate")
+	}
+	if !shouldLogStderrLines("stderr", "x") || shouldLogStderrLines("stdout", "x") || shouldLogStderrLines("stderr", "") {
+		t.Fatal("stderr log predicate")
+	}
+	if !shouldForwardStdoutToHub("stdout", "x") || shouldForwardStdoutToHub("stderr", "x") || shouldForwardStdoutToHub("stdout", "") {
+		t.Fatal("stdout hub predicate")
+	}
+	if !shouldWriteRunOutputStore(true, 1) || shouldWriteRunOutputStore(false, 1) || shouldWriteRunOutputStore(true, 0) {
+		t.Fatal("write store predicate")
+	}
+}
+
+func TestPublishAndSpawnPredicates(t *testing.T) {
+	t.Parallel()
+	if !shouldPersistClassifiedFailure(&RunError{Message: "x"}) || shouldPersistClassifiedFailure(nil) {
+		t.Fatal("classified failure")
+	}
+	if !shouldCascadeAgentShutdown(true) || shouldCascadeAgentShutdown(false) {
+		t.Fatal("cascade")
+	}
+	if !shouldStoreSubAgentAggregatorResult(true) || shouldStoreSubAgentAggregatorResult(false) {
+		t.Fatal("aggregator")
+	}
+	if !shouldWrapDecisionLoopEmitter(true) || shouldWrapDecisionLoopEmitter(false) {
+		t.Fatal("decision loop")
+	}
+	if !shouldFlushTranscriptEmitter(true) || shouldFlushTranscriptEmitter(false) {
+		t.Fatal("flush transcript")
+	}
+	if !shouldReserveSpawnSlot(true) || shouldReserveSpawnSlot(false) {
+		t.Fatal("reserve")
+	}
+	if !shouldRegisterSubAgentInstance(true) || shouldRegisterSubAgentInstance(false) {
+		t.Fatal("register")
+	}
+	if !shouldWrapHubCallbackEmitter(true, true) || shouldWrapHubCallbackEmitter(false, true) || shouldWrapHubCallbackEmitter(true, false) {
+		t.Fatal("hub wrap")
+	}
+}
+
+func TestLookupCancelAndErrorBuilders(t *testing.T) {
+	t.Parallel()
+	run := store.Run{ID: "run_1", Status: "cancelling"}
+	got := lookupCancelResult(run, true)
+	if !got.Found || got.Status != "cancelling" {
+		t.Fatalf("found %#v", got)
+	}
+	got = lookupCancelResult(store.Run{}, false)
+	if got.Found || got.Status != "not_found" {
+		t.Fatalf("missing %#v", got)
+	}
+	if err := pipeOpenError("stdout", errors.New("boom")); err == nil || !strings.Contains(err.Error(), "open stdout pipe") {
+		t.Fatalf("pipe %v", err)
+	}
+	if err := adapterPreflightFailed(errors.New("no key")); err == nil || !strings.Contains(err.Error(), "adapter preflight failed") {
+		t.Fatalf("preflight %v", err)
+	}
+	if err := structuredOutputParseFailed(errors.New("bad json")); err == nil || !strings.Contains(err.Error(), "structured output parse error") {
+		t.Fatalf("parse %v", err)
+	}
+	if cancelledFailReason() != "run cancelled" {
+		t.Fatalf("cancel reason %q", cancelledFailReason())
+	}
+}
+
+func TestBuildSubAgentResultMessage(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 18, 5, 6, 7, 0, time.UTC)
+	msg := buildSubAgentResultMessage("run_1", "a1", "worker", "parent", "finished", "ok", "", now)
+	if msg.ID != "msg_run_1" || msg.FromAgentID != "a1" || msg.ToAgentID != "parent" {
+		t.Fatalf("ids %#v", msg)
+	}
+	if msg.Type != agents.MsgTypeResult || !msg.TriggerTurn || !msg.Timestamp.Equal(now) {
+		t.Fatalf("fields %#v", msg)
+	}
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok || payload["status"] != "finished" || payload["agentName"] != "worker" {
+		t.Fatalf("payload %#v", msg.Payload)
+	}
+	errMsg := buildSubAgentResultMessage("run_2", "a2", "worker", "parent", "failed", "boom", "api-keys-redacted", now)
+	if errMsg.Type != agents.MsgTypeError {
+		t.Fatalf("failed type %q", errMsg.Type)
+	}
+}
+
+func TestHubCallbackEventClassification(t *testing.T) {
+	t.Parallel()
+	if classifyHubCallbackEvent(adapters.BusEventTextDelta) != hubCallbackStream {
+		t.Fatal("delta stream")
+	}
+	if classifyHubCallbackEvent(adapters.BusEventTextBlock) != hubCallbackStream {
+		t.Fatal("block stream")
+	}
+	if classifyHubCallbackEvent(adapters.BusEventResult) != hubCallbackFallback {
+		t.Fatal("result fallback")
+	}
+	if classifyHubCallbackEvent(adapters.BusEventToolCall) != hubCallbackNone {
+		t.Fatal("tool none")
+	}
+	text, effect := hubCallbackTextForEvent(adapters.BusEventTextDelta, map[string]any{"text": "hi"})
+	if effect != hubCallbackStream || text != "hi" {
+		t.Fatalf("text event %q %v", text, effect)
+	}
+	text, effect = hubCallbackTextForEvent(adapters.BusEventResult, map[string]any{"content": "done"})
+	if effect != hubCallbackFallback || text != "done" {
+		t.Fatalf("result event %q %v", text, effect)
+	}
+	text, effect = hubCallbackTextForEvent(adapters.BusEventToolCall, map[string]any{"text": "x"})
+	if effect != hubCallbackNone || text != "" {
+		t.Fatalf("none event %q %v", text, effect)
+	}
+}
+
+func TestAsStoreWriter(t *testing.T) {
+	t.Parallel()
+	s := store.New()
+	if _, ok := asStoreWriter(s); !ok {
+		t.Fatal("in-memory store should implement Writer")
+	}
+	var runStore store.RunLifecycleStore
+	if _, ok := asStoreWriter(runStore); ok {
+		t.Fatal("nil store should not implement Writer")
 	}
 }
