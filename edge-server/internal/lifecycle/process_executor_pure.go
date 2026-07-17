@@ -268,3 +268,104 @@ func buildProcessSecurityHooks(allowedTools []string, emitter adapters.EventEmit
 func recoverableParseWarningMessage(err error) string {
 	return fmt.Sprintf("Recoverable stream parse error: %v", err)
 }
+
+// cancelResultNotFound is returned when Cancel cannot find the run in the store.
+func cancelResultNotFound() CancelResult {
+	return CancelResult{Found: false, Status: "not_found"}
+}
+
+// cancelResultNotRunning is returned when Cancel finds no live cancel func for the run.
+func cancelResultNotRunning() CancelResult {
+	return CancelResult{Found: false, Status: "not_running"}
+}
+
+// cancelResultWithRun reports a found run at its current (possibly terminal) status.
+func cancelResultWithRun(run store.Run) CancelResult {
+	return CancelResult{Run: run, Found: true, Status: run.Status}
+}
+
+// interruptRequestID builds the adapter stdin interrupt request id for a run.
+func interruptRequestID(runID string) string {
+	return "interrupt-" + runID
+}
+
+// shouldTrackWorkDir reports whether a workdir snapshot should be retained for
+// post-finish auto-surface detection.
+func shouldTrackWorkDir(workDir string) bool {
+	return workDir != ""
+}
+
+// shouldEmitContextCompaction reports whether the run budget crossed the
+// auto-compaction threshold and should publish a compaction event.
+func shouldEmitContextCompaction(budget *runnerctx.ContextBudget) bool {
+	return budget != nil && budget.ShouldCompact()
+}
+
+// shouldFireHubCallback reports whether a Hub callback may be sent for the task.
+func shouldFireHubCallback(hasCallback bool, taskID string) bool {
+	return hasCallback && taskID != ""
+}
+
+// prepareHubStreamContent sanitizes outbound Hub stream text. The bool is false
+// when the content is empty before or after sanitization.
+func prepareHubStreamContent(content string) (string, bool) {
+	if content == "" {
+		return "", false
+	}
+	content = sanitizeHubStreamText(content)
+	if content == "" {
+		return "", false
+	}
+	return content, true
+}
+
+// asPreflightAdapter returns the adapter when it implements PreflightAdapter.
+func asPreflightAdapter(adapter adapters.AgentAdapter) (adapters.PreflightAdapter, bool) {
+	if adapter == nil {
+		return nil, false
+	}
+	preflight, ok := adapter.(adapters.PreflightAdapter)
+	return preflight, ok && preflight != nil
+}
+
+// coalesceEmitter prefers next when non-nil; otherwise keeps current.
+func coalesceEmitter(current, next adapters.EventEmitter) adapters.EventEmitter {
+	if next != nil {
+		return next
+	}
+	return current
+}
+
+// shouldReleaseReservedSpawnSlot reports whether a deferred spawn-slot release
+// should run (error path while the slot is still reserved).
+func shouldReleaseReservedSpawnSlot(err error, slotReserved bool) bool {
+	return err != nil && slotReserved
+}
+
+// shouldUnregisterOnStartFailure reports whether a successfully registered
+// sub-agent instance should be unregistered after Start fails.
+func shouldUnregisterOnStartFailure(registered bool) bool {
+	return registered
+}
+
+// buildSubAgentResult packages a completed child run for the result aggregator.
+// completedAt is injected so the helper stays pure.
+func buildSubAgentResult(agentID, agentName, runID, status string, output any, completedAt time.Time) SubAgentResult {
+	return SubAgentResult{
+		AgentID:     agentID,
+		AgentName:   agentName,
+		RunID:       runID,
+		Status:      status,
+		Output:      output,
+		CompletedAt: completedAt,
+	}
+}
+
+// resolveEvidenceFinalStatus returns the terminal status for a successful wait
+// path. When the evidence gate is disabled, the run finishes cleanly.
+func resolveEvidenceFinalStatus(gateEnabled, passed bool) string {
+	if !gateEnabled {
+		return "finished"
+	}
+	return evidenceGateFinalStatus(passed)
+}

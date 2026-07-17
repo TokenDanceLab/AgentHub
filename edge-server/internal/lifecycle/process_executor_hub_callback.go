@@ -26,11 +26,8 @@ func (e *ProcessExecutor) hubTaskID(runID string) string {
 // fireHubAck sends a TaskAck callback to Hub. Called when the run starts.
 // Errors are logged but never block the run lifecycle.
 func (e *ProcessExecutor) fireHubAck(runID string) {
-	if e.hubCallback == nil {
-		return
-	}
 	taskID := e.hubTaskID(runID)
-	if taskID == "" {
+	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
 		return
 	}
 	go func() {
@@ -43,8 +40,8 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 }
 
 func (e *ProcessExecutor) recordHubOutput(runID, text string) {
-	text = sanitizeHubStreamText(text)
-	if text == "" {
+	text, ok := prepareHubStreamContent(text)
+	if !ok {
 		return
 	}
 	e.mu.Lock()
@@ -57,8 +54,8 @@ func (e *ProcessExecutor) recordHubOutput(runID, text string) {
 }
 
 func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
-	text = sanitizeHubStreamText(text)
-	if text == "" {
+	text, ok := prepareHubStreamContent(text)
+	if !ok {
 		return
 	}
 	e.mu.Lock()
@@ -85,15 +82,12 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 // Content is API-key-sanitized at this chokepoint so both raw stdout and
 // structured hub emitter paths share one sink without control-flow rewrites.
 func (e *ProcessExecutor) fireHubStream(runID string, content string) {
-	if e.hubCallback == nil || content == "" {
-		return
-	}
-	content = sanitizeHubStreamText(content)
-	if content == "" {
+	content, ok := prepareHubStreamContent(content)
+	if !ok {
 		return
 	}
 	taskID := e.hubTaskID(runID)
-	if taskID == "" {
+	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
 		return
 	}
 	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
@@ -113,11 +107,8 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 // fireHubDone sends a TaskDone callback to Hub. Called when the run finishes successfully.
 // Errors are logged but never block the run lifecycle.
 func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
-	if e.hubCallback == nil {
-		return
-	}
 	taskID := e.hubTaskID(runID)
-	if taskID == "" {
+	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
 		return
 	}
 	content := e.hubFinalContent(runID)
@@ -160,11 +151,8 @@ func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payloa
 }
 
 func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
-	if e.hubCallback == nil {
-		return
-	}
 	taskID := e.hubTaskID(runID)
-	if taskID == "" {
+	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
 		return
 	}
 	go func() {
