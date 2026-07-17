@@ -7,6 +7,17 @@ export {
 } from './AgentMarketViews';
 
 export {
+  AgentInstalledView,
+} from './AgentInstalledViews';
+
+export {
+  AgentPolicyView,
+  AgentToolsView,
+  AgentModelsView,
+  AgentAuditView,
+} from './AgentOpsViews';
+
+export {
   ConfigSummaryRow,
   formatList,
   permissionClass,
