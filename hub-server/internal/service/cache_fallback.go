@@ -44,6 +44,16 @@ func resolveAgentCache(c agentCache) agentCache {
 	return c
 }
 
+// resolveDispatchCache validates the dispatch route/offline-queue cache port and
+// falls back to cache.NoOpCache when nil (partial unit tests). Production wiring
+// injects *cache.Client via NewDispatchService / NewAgentService.
+func resolveDispatchCache(c dispatchCache) dispatchCache {
+	if isNilCache(c) {
+		return cache.NoOpCache{}
+	}
+	return c
+}
+
 func isNilCache(c any) bool {
 	if c == nil {
 		return true
