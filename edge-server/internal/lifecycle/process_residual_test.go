@@ -1276,3 +1276,72 @@ func TestFaultEscalationAndSpawnPureHelpers(t *testing.T) {
 		t.Fatal("hub callback log")
 	}
 }
+
+func TestCancelTransitionAndPublishPureHelpers(t *testing.T) {
+	t.Parallel()
+	run := store.Run{ID: "r1", Status: "cancelling"}
+	res, needLookup := cancelTransitionResult(run, true)
+	if needLookup || !res.Found || res.Status != "cancelling" {
+		t.Fatalf("transitioned %#v needLookup=%v", res, needLookup)
+	}
+	res, needLookup = cancelTransitionResult(run, false)
+	if !needLookup || res.Found {
+		t.Fatalf("need lookup %#v needLookup=%v", res, needLookup)
+	}
+
+	ctx := RunProcessContext{PermissionMode: "bypassPermissions"}
+	sanitized, forbidden := applyPermissionModeSanitization(ctx)
+	if !forbidden || sanitized.PermissionMode != "default" {
+		t.Fatalf("forbidden sanitize %#v forbidden=%v", sanitized, forbidden)
+	}
+	ctx.PermissionMode = "acceptEdits"
+	sanitized, forbidden = applyPermissionModeSanitization(ctx)
+	if forbidden || sanitized.PermissionMode != "acceptEdits" {
+		t.Fatalf("allowed sanitize %#v forbidden=%v", sanitized, forbidden)
+	}
+	if !shouldLogForbiddenPermissionMode(true) || shouldLogForbiddenPermissionMode(false) {
+		t.Fatal("forbidden mode log")
+	}
+
+	if !shouldFailNewRunnerProfile(errors.New("x")) || shouldFailNewRunnerProfile(nil) {
+		t.Fatal("profile fail")
+	}
+	if !shouldPublishAdapterResolveFailure(errors.New("x")) || shouldPublishAdapterResolveFailure(nil) {
+		t.Fatal("adapter resolve fail")
+	}
+	if !shouldPublishPreflightFailure(errors.New("x")) || shouldPublishPreflightFailure(nil) {
+		t.Fatal("preflight fail")
+	}
+	if !shouldPublishCommandBuildFailure(errors.New("x")) || shouldPublishCommandBuildFailure(nil) {
+		t.Fatal("command build fail")
+	}
+	if !shouldPublishPipeFailure(errors.New("x")) || shouldPublishPipeFailure(nil) {
+		t.Fatal("pipe fail")
+	}
+	if !shouldPersistAgentFailureContent(true) || shouldPersistAgentFailureContent(false) {
+		t.Fatal("persist content")
+	}
+	if !shouldUseAgentFailureRepository(true) || shouldUseAgentFailureRepository(false) {
+		t.Fatal("failure repository")
+	}
+	if !shouldSkipExistingAgentFailureMessage(true) || shouldSkipExistingAgentFailureMessage(false) {
+		t.Fatal("skip existing message")
+	}
+	if !shouldCheckPersistErrorSource(true) || shouldCheckPersistErrorSource(false) {
+		t.Fatal("persist error source")
+	}
+	if !shouldSurfaceWithWriter(true) || shouldSurfaceWithWriter(false) {
+		t.Fatal("surface writer")
+	}
+	if !shouldRecordStructuredParseError(errors.New("x")) || shouldRecordStructuredParseError(nil) {
+		t.Fatal("structured parse record")
+	}
+	if !shouldMarkSubAgentRegistered(nil) || shouldMarkSubAgentRegistered(errors.New("x")) {
+		t.Fatal("mark registered")
+	}
+
+	classified := classifyPublishedFailure(errors.New("boom"))
+	if classified == nil || classified.Message == "" {
+		t.Fatalf("classified %#v", classified)
+	}
+}
