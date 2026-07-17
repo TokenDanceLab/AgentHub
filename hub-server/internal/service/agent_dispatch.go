@@ -96,10 +96,84 @@ type edgeRunResponse struct {
 	} `json:"data"`
 }
 
+// ── DispatchService ports + type ─────────────────────────────────────────────
+
+// dispatchOutbox records and marks delivery journal rows during dispatch.
+// Implemented by *DeliveryOutbox (facades on AgentService also satisfy it).
+type dispatchOutbox interface {
+	RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error)
+	MarkDeliverySent(ctx context.Context, deliveryID string) error
+}
+
+// dispatchBus publishes cancel/regenerate domain events from dispatch lifecycle.
+// Implemented by *Bus.
+type dispatchBus interface {
+	Publish(ctx context.Context, event Event)
+}
+
+// DispatchService owns agent task dispatch orchestration: trigger, payload build,
+// edge HTTP / WS / offline routing, capability minting, and history/pins loading.
+// Redispatch remains on AgentService behind Redispatcher and reuses
+// DispatchService.dispatchToEdgeHTTP for the HTTP path. Same-package thin type
+// extract (#563) — not a package move.
+type DispatchService struct {
+	db          *gorm.DB
+	bus         dispatchBus
+	mgr         *ws.Manager
+	cacheClient agentCache
+	relay       relayDispatcher
+	outbox      dispatchOutbox
+}
+
+// NewDispatchService constructs a DispatchService. bus/outbox/relay may be nil for
+// partial tests; write paths that need them will fail or degrade accordingly.
+func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr *ws.Manager, cacheClient agentCache, relay relayDispatcher, outbox dispatchOutbox) *DispatchService {
+	return &DispatchService{
+		db:          db,
+		bus:         bus,
+		mgr:         mgr,
+		cacheClient: resolveAgentCache(cacheClient),
+		relay:       relay,
+		outbox:      outbox,
+	}
+}
+
+// SetOutbox injects (or replaces) the delivery outbox port.
+func (s *DispatchService) SetOutbox(outbox dispatchOutbox) {
+	if s == nil {
+		return
+	}
+	s.outbox = outbox
+}
+
+// SetBus injects (or replaces) the event bus port.
+func (s *DispatchService) SetBus(bus dispatchBus) {
+	if s == nil {
+		return
+	}
+	s.bus = bus
+}
+
+// recordDelivery is a nil-safe wrapper over the outbox port.
+func (s *DispatchService) recordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
+	if s == nil || s.outbox == nil {
+		return "", errors.New("dispatch outbox unavailable")
+	}
+	return s.outbox.RecordDelivery(ctx, taskID, payload, edgeDeviceID)
+}
+
+// markDeliverySent is a nil-safe wrapper over the outbox port.
+func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID string) error {
+	if s == nil || s.outbox == nil {
+		return errors.New("dispatch outbox unavailable")
+	}
+	return s.outbox.MarkDeliverySent(ctx, deliveryID)
+}
+
 // dispatchToEdgeHTTP attempts to dispatch a task directly via HTTP POST to a
 // local Edge server. Returns the Edge run ID on success, or empty string if
 // the Edge server is unreachable or returns an error.
-func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
+func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
 	edgeURL := os.Getenv("AGENTHUB_EDGE_URL")
 	if edgeURL == "" {
 		edgeURL = "http://127.0.0.1:3210"
@@ -276,7 +350,7 @@ func mergeModelParams(base, override string) string {
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
-func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
 	if err != nil {
 		return nil, errcode.MsgNotFound
@@ -350,7 +424,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	return task, nil
 }
 
-func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targetID string) (*dispatchTargetSnapshot, error) {
+func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, targetID string) (*dispatchTargetSnapshot, error) {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
 		return nil, nil
@@ -409,7 +483,7 @@ func promptFromMessage(msg *model.Message) string {
 	return msg.Content
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
+func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
@@ -446,7 +520,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 
 	// Record delivery in outbox before dispatching (AH-SR-049).
 	payload, _ := json.Marshal(dp)
-	deliveryID, err := s.RecordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
+	deliveryID, err := s.recordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
 	if err != nil {
 		// Still dispatch for availability, but durability is degraded until outbox is healthy.
 		slog.Error("AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking",
@@ -468,7 +542,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			}
 			// Mark delivery as sent.
 			if deliveryID != "" {
-				_ = s.MarkDeliverySent(ctx, deliveryID)
+				_ = s.markDeliverySent(ctx, deliveryID)
 			}
 			return
 		}
@@ -496,13 +570,13 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 				slog.Error("failed to mark hub_relay task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			}
 			if deliveryID != "" {
-				_ = s.MarkDeliverySent(ctx, deliveryID)
+				_ = s.markDeliverySent(ctx, deliveryID)
 			}
 			return
 		}
 		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
 		if deliveryID != "" {
-			_ = s.MarkDeliverySent(ctx, deliveryID)
+			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
 	}
@@ -516,7 +590,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 				slog.Error("failed to push agent task to offline queue (conn nil)", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			}
 			if deliveryID != "" {
-				_ = s.MarkDeliverySent(ctx, deliveryID)
+				_ = s.markDeliverySent(ctx, deliveryID)
 			}
 			return
 		}
@@ -533,7 +607,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			}
 		}
 		if deliveryID != "" {
-			_ = s.MarkDeliverySent(ctx, deliveryID)
+			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
 	}
@@ -543,11 +617,11 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 	}
 	if deliveryID != "" {
-		_ = s.MarkDeliverySent(ctx, deliveryID)
+		_ = s.markDeliverySent(ctx, deliveryID)
 	}
 }
 
-func (s *AgentService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
+func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
 	if s == nil || s.db == nil || ai == nil || ai.CustomAgentID == nil || strings.TrimSpace(*ai.CustomAgentID) == "" {
 		return dispatchTeamContext{}
 	}
@@ -579,7 +653,7 @@ func (s *AgentService) resolveDispatchTeamContext(ai *model.AgentInstance) dispa
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
 // Limits to a maximum of 50 messages to avoid oversized dispatch payloads.
-func (s *AgentService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
+func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
 	if sessionID == "" || triggerMessageID == "" {
 		return nil
 	}
@@ -605,7 +679,7 @@ func (s *AgentService) loadThreadHistory(sessionID, triggerMessageID string) []d
 }
 
 // loadPinnedMessages loads pinned messages for a session for context continuity.
-func (s *AgentService) loadPinnedMessages(sessionID string) []dispatchMessage {
+func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage {
 	if sessionID == "" {
 		return nil
 	}
@@ -666,7 +740,7 @@ func mapSenderType(t string) string {
 	}
 }
 
-func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient agentCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
+func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient agentCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
 	queueTargetTask := func(reason string, err error) {
 		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
 			slog.Error("failed to push target-bound agent task to offline queue", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
@@ -700,7 +774,7 @@ func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient 
 }
 
 // CancelTask cancels a pending task by its ID.
-func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) error {
+func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -745,7 +819,7 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 // RegenerateAgentTask creates a new task using the same prompt as an existing task.
 // It looks up the original task, verifies ownership, and triggers a new task with
 // the same trigger message, agent instance, and target.
-func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
 	original, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -788,7 +862,7 @@ func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID s
 
 // issueRunStartCapability mints a short-lived capability token for Edge dual-token auth.
 // Returns empty string when secret/device are unavailable so local/dev dispatch still works.
-func (s *AgentService) issueRunStartCapability(dp *dispatchPayload) string {
+func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	secret := strings.TrimSpace(os.Getenv("AGENTHUB_JWT_SECRET"))
 	if secret == "" {
 		return ""
@@ -816,4 +890,30 @@ func (s *AgentService) issueRunStartCapability(dp *dispatchPayload) string {
 		return ""
 	}
 	return token
+}
+
+// ── AgentService facade (wiring/handler stability) ───────────────────────────
+
+// dispatchService returns the composed DispatchService, lazily constructing one
+// from AgentService deps when tests use struct literals without NewAgentService.
+func (s *AgentService) dispatchService() *DispatchService {
+	if s.dispatch != nil {
+		return s.dispatch
+	}
+	return NewDispatchService(s.db, s.bus, s.mgr, s.cacheClient, s.relay, s.deliveryOutboxService())
+}
+
+// TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
+func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+	return s.dispatchService().TriggerAgentTask(ctx, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID)
+}
+
+// CancelTask cancels a pending task by its ID.
+func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) error {
+	return s.dispatchService().CancelTask(ctx, userID, taskID)
+}
+
+// RegenerateAgentTask creates a new task using the same prompt as an existing task.
+func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+	return s.dispatchService().RegenerateAgentTask(ctx, userID, taskID)
 }

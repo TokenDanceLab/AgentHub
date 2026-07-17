@@ -183,7 +183,7 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	// Point Edge dispatch at a dead port so it always falls back to Redis.
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -217,7 +217,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run the selected target", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -305,7 +305,7 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 		DisplayName:   "Supervisor",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Route this team run", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -381,7 +381,7 @@ func TestDispatchTaskIncludesOutputSchema(t *testing.T) {
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	// Dispatch WITH the CustomAgent (non-TeamRun scenario).
-	svc.dispatchTask(context.Background(), task, agent, "Give me a summary", "", "", customAgent)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Give me a summary", "", "", customAgent)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -501,7 +501,7 @@ func TestDispatchTaskIncludesOutputSchemaWithTeamRunContext(t *testing.T) {
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	// Dispatch WITH the CustomAgent (TeamRun scenario — backward compatibility).
-	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "", customAgent)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Route this team run", "", "", customAgent)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -544,7 +544,7 @@ func TestDispatchTaskWithoutCustomAgentOmitsOutputSchema(t *testing.T) {
 	}
 
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
-	svc.dispatchTask(context.Background(), task, agent, "Run without custom agent", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run without custom agent", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -579,7 +579,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run invalid target", "", "", nil)
 
 	select {
 	case <-connA.Send:
@@ -613,7 +613,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run missing task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -647,7 +647,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -687,7 +687,7 @@ func TestDispatchTaskPreservesNonTargetTaskWhenDeliveryBufferFull(t *testing.T) 
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on online desktop", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on online desktop", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -732,7 +732,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
 
 	select {
 	case data := <-connB.Send:
@@ -794,7 +794,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenDeliveryBufferFull(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushedTarget, 1)
@@ -830,7 +830,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run missing target task", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -870,7 +870,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -906,7 +906,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on offline B", "", "", nil)
 
 	select {
 	case <-connA.Send:
