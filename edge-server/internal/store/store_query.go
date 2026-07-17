@@ -749,6 +749,164 @@ func pinMatchesRemovedItems(removedItemIDs map[string]struct{}) func(ThreadPin) 
 	}
 }
 
+// storeIf writes value into items when ok is true.
+func storeIf[T any](items map[string]T, id string, value T, ok bool) {
+	if ok {
+		items[id] = value
+	}
+}
+
+// resolveUpdateThread applies optional title/status when the thread exists.
+func resolveUpdateThread(thread Thread, exists bool, title, status *string, now string) (Thread, bool) {
+	if !exists {
+		return Thread{}, false
+	}
+	return applyThreadUpdate(thread, title, status, now), true
+}
+
+// resolveSetRunStatus applies status when the run exists.
+func resolveSetRunStatus(run Run, exists bool, status, now string) (Run, bool) {
+	if !exists {
+		return Run{}, false
+	}
+	return applyRunStatus(run, status, now), true
+}
+
+// resolveSetRunStatusIf applies status when the run exists and current is allowed.
+// When exists but not allowed, returns the unchanged run with applied=false.
+func resolveSetRunStatusIf(run Run, exists bool, status string, allowed []string, now string) (Run, bool) {
+	if !exists {
+		return Run{}, false
+	}
+	if !isAllowedCurrentStatus(run.Status, allowed) {
+		return run, false
+	}
+	return applyRunStatus(run, status, now), true
+}
+
+// resolveSetRunEvidenceGate stores gate result when the run exists.
+func resolveSetRunEvidenceGate(run Run, exists bool, result string) (Run, bool) {
+	if !exists {
+		return Run{}, false
+	}
+	return applyRunEvidenceGate(run, result), true
+}
+
+// resolveSetRunRetryCount updates retry count when the run exists.
+func resolveSetRunRetryCount(run Run, exists bool, count int) (Run, bool) {
+	if !exists {
+		return Run{}, false
+	}
+	return applyRunRetryCount(run, count), true
+}
+
+// prepareRunDiffFileUpsert validates run existence and normalizes path/status.
+// ok is false when the run is missing or the normalized path is empty.
+func prepareRunDiffFileUpsert(runExists bool, file RunDiffFile) (key string, prepared RunDiffFile, ok bool) {
+	if !runExists {
+		return "", RunDiffFile{}, false
+	}
+	file = normalizeRunDiffFileInput(file)
+	if file.Path == "" {
+		return "", RunDiffFile{}, false
+	}
+	return runDiffFileKey(file.RunID, file.Path), file, true
+}
+
+// prepareArtifactForUpsert validates the run and prepares artifact input for upsert.
+func prepareArtifactForUpsert(run Run, runExists bool, artifact Artifact) (Artifact, bool) {
+	if !runExists {
+		return Artifact{}, false
+	}
+	return prepareArtifactInput(artifact, run.ThreadID)
+}
+
+// preparePreviewForUpsert validates the run and prepares preview input for upsert.
+func preparePreviewForUpsert(run Run, runExists bool, preview Preview) (Preview, bool) {
+	if !runExists {
+		return Preview{}, false
+	}
+	return preparePreviewInput(preview, run.ThreadID)
+}
+
+// validatePinThreadItemRefs checks that thread exists and item belongs to it.
+func validatePinThreadItemRefs(threads map[string]Thread, items map[string]Item, threadID, itemID string) bool {
+	if _, ok := threads[threadID]; !ok {
+		return false
+	}
+	if _, ok := lookupItemInThread(items, itemID, threadID); !ok {
+		return false
+	}
+	return true
+}
+
+// resolveUpdateAgentProfile applies a patch when the profile exists.
+func resolveUpdateAgentProfile(profile AgentProfile, exists bool, patch map[string]any, now string) (AgentProfile, error) {
+	if !exists {
+		return AgentProfile{}, ErrNotFound
+	}
+	return touchAgentProfile(applyAgentProfilePatch(profile, patch), now), nil
+}
+
+// errIfMissing maps a missing delete/lookup result to ErrNotFound.
+func errIfMissing(ok bool) error {
+	if !ok {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// applyDeleteThreadOwnedMaps deletes runs/items identified by runIDs/itemIDs and returns orders.
+func applyDeleteThreadOwnedMaps(
+	runs map[string]Run,
+	items map[string]Item,
+	runOrder, itemOrder []string,
+	runIDs, itemIDs map[string]struct{},
+) (newRunOrder, newItemOrder []string) {
+	deleteMapKeys(runs, runIDs)
+	newRunOrder = orderWithoutRemoved(runOrder, runIDs)
+	deleteMapKeys(items, itemIDs)
+	newItemOrder = orderWithoutRemoved(itemOrder, itemIDs)
+	return newRunOrder, newItemOrder
+}
+
+// planRunsForCleanup builds terminal candidates and selects runs for deletion.
+func planRunsForCleanup(order []string, runs map[string]Run, now time.Time, terminalTTL time.Duration, maxPerThread int) map[string]struct{} {
+	candidates := buildTerminalCleanupCandidates(order, runs)
+	return selectRunsForCleanup(candidates, now, terminalTTL, maxPerThread)
+}
+
+// lookupClonedArtifact returns a deep-cloned artifact when present.
+func lookupClonedArtifact(artifacts map[string]Artifact, id string) (Artifact, bool) {
+	artifact, ok := artifacts[id]
+	return cloneArtifact(artifact), ok
+}
+
+// buildThreadMessageFromThread builds a user message item when the thread exists.
+func buildThreadMessageFromThread(thread Thread, exists bool, itemID, role, content string) (Item, error) {
+	if !exists {
+		return Item{}, ErrNotFound
+	}
+	return buildUserMessageItem(itemID, thread.ProjectID, thread.ID, role, content), nil
+}
+
+// newEmptyStore constructs a Store with empty maps and nil orders.
+func newEmptyStore() *Store {
+	return &Store{
+		projects:      make(map[string]Project),
+		threads:       make(map[string]Thread),
+		runs:          make(map[string]Run),
+		items:         make(map[string]Item),
+		pins:          make(map[string]ThreadPin),
+		diffs:         make(map[string]RunDiffFile),
+		artifacts:     make(map[string]Artifact),
+		previews:      make(map[string]Preview),
+		userProfiles:  make(map[string]UserProfile),
+		agentProfiles: make(map[string]AgentProfile),
+		settings:      make(map[string]string),
+	}
+}
+
 // errThreadExistsInProject is returned when CreateThread collides across projects.
 func errThreadExistsInProject(threadID, projectID string) error {
 	return fmt.Errorf("thread %q already exists in project %q", threadID, projectID)
