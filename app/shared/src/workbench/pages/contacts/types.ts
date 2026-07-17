@@ -65,6 +65,39 @@ export type ContactsPane =
 
 export type ContactModalTab = 'qr' | 'link' | 'code' | 'phone';
 
+/** Avatar popover payload for member / group / service rows. */
+export type ContactProfile =
+  | {
+      id: string;
+      kind: 'member';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    }
+  | {
+      id: string;
+      kind: 'group';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    }
+  | {
+      id: string;
+      kind: 'service';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    };
+
 export interface ContactsPageProps {
   /** Currently active nav pane */
   activePane: ContactsPane;
