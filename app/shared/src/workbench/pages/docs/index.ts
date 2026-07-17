@@ -2,6 +2,8 @@
 
 export { DocTable, DocPreviewPanel } from './DocTableViews';
 export { DocsNav } from './DocsNav';
+export { DocMain } from './DocMain';
+export type { DocMainProps } from './DocMain';
 
 export {
   NavGlyph,
