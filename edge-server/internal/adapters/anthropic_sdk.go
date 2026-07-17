@@ -134,10 +134,10 @@ func (a *AnthropicSDKAdapter) CapabilityHealthMetadata() map[string]any {
 // executor will start this command but ParseStream ignores the stdout/stdin
 // pipes and performs the real work via HTTP.
 func (a *AnthropicSDKAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
-	workDir := ctx.WorkDir
-	if workDir == "" {
-		workDir = DefaultWorkDir()
-	}
+	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
+	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
+	// if a bypass path reaches BuildCommand.
+	workDir := strings.TrimSpace(ctx.WorkDir)
 	// Return a harmless no-op command that exits immediately.
 	// The real work happens in ParseStream via HTTP.
 	cmd, args := sdkNoopCommand()
@@ -303,9 +303,9 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 				"lastErr", lastErr,
 			)
 			emitter.Emit(BusEventAPIRetry, scope, map[string]any{
-				"attempt": attempt,
-				"delay":   delay.String(),
-				"error":   fmt.Sprintf("%v", lastErr),
+				"attempt":  attempt,
+				"delay":    delay.String(),
+				"error":    fmt.Sprintf("%v", lastErr),
 				"provider": "anthropic",
 			})
 			select {
@@ -623,22 +623,22 @@ type anthropicTool struct {
 }
 
 type anthropicSSEEvent struct {
-	Type         string                   `json:"type"`
-	Index        int                      `json:"index,omitempty"`
-	Message      *anthropicSSEMessage     `json:"message,omitempty"`
+	Type         string                    `json:"type"`
+	Index        int                       `json:"index,omitempty"`
+	Message      *anthropicSSEMessage      `json:"message,omitempty"`
 	ContentBlock *anthropicSSEContentBlock `json:"content_block,omitempty"`
-	Delta        *anthropicSSEDelta       `json:"delta,omitempty"`
-	Usage        anthropicSSEUsage        `json:"usage,omitempty"`
-	Error        *anthropicSSEError       `json:"error,omitempty"`
+	Delta        *anthropicSSEDelta        `json:"delta,omitempty"`
+	Usage        anthropicSSEUsage         `json:"usage,omitempty"`
+	Error        *anthropicSSEError        `json:"error,omitempty"`
 }
 
 type anthropicSSEMessage struct {
-	ID      string              `json:"id"`
-	Type    string              `json:"type"`
-	Role    string              `json:"role"`
-	Content []any               `json:"content"`
-	Model   string              `json:"model"`
-	Usage   anthropicSSEUsage   `json:"usage"`
+	ID      string            `json:"id"`
+	Type    string            `json:"type"`
+	Role    string            `json:"role"`
+	Content []any             `json:"content"`
+	Model   string            `json:"model"`
+	Usage   anthropicSSEUsage `json:"usage"`
 }
 
 type anthropicSSEUsage struct {

@@ -40,23 +40,27 @@ var (
 var (
 	// Workspace security
 	ErrWorkspaceNotAllowed = New("workspace_not_allowed", "workDir is outside the workspace allowlist", http.StatusForbidden)
+	// ErrWorkDirRequired rejects adapter runs that omit workDir. Empty workDir
+	// previously fell through to DefaultWorkDir()/UserHomeDir and bypassed the
+	// workspace allowlist (AH-SR-006 / #854).
+	ErrWorkDirRequired = New("workdir_required", "workDir is required for adapter runs", http.StatusBadRequest)
 
 	// Permission mode / decision
 	ErrInvalidPermissionMode = New("invalid_permission_mode", "invalid permission mode", http.StatusBadRequest)
 	ErrInvalidDecision       = New("invalid_decision", "decision must be allow or deny", http.StatusBadRequest)
 
 	// Executor lifecycle
-	ErrExecutorUnavailable    = New("executor_unavailable", "no executor configured", http.StatusServiceUnavailable)
-	ErrExecutorStartFailed    = New("executor_start_failed", "executor failed to start", http.StatusInternalServerError)
-	ErrTooManyConcurrentRuns  = New("too_many_concurrent_runs", "too many concurrent runs", http.StatusTooManyRequests)
+	ErrExecutorUnavailable   = New("executor_unavailable", "no executor configured", http.StatusServiceUnavailable)
+	ErrExecutorStartFailed   = New("executor_start_failed", "executor failed to start", http.StatusInternalServerError)
+	ErrTooManyConcurrentRuns = New("too_many_concurrent_runs", "too many concurrent runs", http.StatusTooManyRequests)
 
 	// Run
 	ErrActiveRunExists = New("active_run_exists", "thread already has an active run", http.StatusConflict)
 
 	// Agent discovery
-	ErrInvalidAgentID            = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)
+	ErrInvalidAgentID             = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)
 	ErrAgentRegistryNotConfigured = New("agent_registry_not_configured", "agent registry not configured", http.StatusNotFound)
-	ErrAgentInstanceNotFound     = New("agent_instance_not_found", "agent instance not found", http.StatusNotFound)
+	ErrAgentInstanceNotFound      = New("agent_instance_not_found", "agent instance not found", http.StatusNotFound)
 
 	// Permissions
 	ErrPermissionRequestNotFound = New("permission_request_not_found", "permission request not found", http.StatusNotFound)
@@ -66,7 +70,7 @@ var (
 	ErrRequestIDRequired = New("request_id_required", "requestId is required", http.StatusBadRequest)
 
 	// Plan approval
-	ErrPlanNotFound      = New("plan_not_found", "no pending plan found for this run", http.StatusNotFound)
+	ErrPlanNotFound        = New("plan_not_found", "no pending plan found for this run", http.StatusNotFound)
 	ErrInvalidPlanDecision = New("invalid_plan_decision", "decision must be approve or reject", http.StatusBadRequest)
 
 	// Deploy

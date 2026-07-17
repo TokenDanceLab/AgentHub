@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -172,11 +173,13 @@ func TestNewHandlerFromConfigLeavesDefaultExecutorLazy(t *testing.T) {
 }
 
 func TestNewHandlerFromConfigWiresProcessExecutor(t *testing.T) {
+	workDir := t.TempDir()
 	handler, err := newHandlerFromConfig(Config{
 		ProcessExecutor: lifecycle.ProcessExecutorConfig{
 			Command: os.Args[0],
 			Args:    []string{"-test.run=TestProcessExecutorWiringHelper", "--"},
 		},
+		WorkspaceAllowlist: []string{workDir},
 	})
 	if err != nil {
 		t.Fatalf("newHandlerFromConfig returned error: %v", err)
@@ -188,7 +191,8 @@ func TestNewHandlerFromConfigWiresProcessExecutor(t *testing.T) {
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewBufferString("{}"))
+	body := fmt.Sprintf(`{"workDir":%q}`, workDir)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1226,7 +1230,6 @@ func TestHubUserIDFromContext(t *testing.T) {
 		t.Fatalf("expected test-user, got %q", id)
 	}
 }
-
 
 // ── Remote Read Auth Tests (AH-SR-045) ──
 
