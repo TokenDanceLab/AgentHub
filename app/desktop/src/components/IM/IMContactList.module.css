@@ -107,7 +107,7 @@
 }
 
 .itemAvatarGroup {
-  background: var(--color-success, #22c55e);
+  background: var(--success);
   color: var(--success-foreground);
 }
 
@@ -139,7 +139,7 @@
 }
 
 .onlineDotOn {
-  background: var(--color-success, #22c55e);
+  background: var(--success);
 }
 
 .onlineDotOff {

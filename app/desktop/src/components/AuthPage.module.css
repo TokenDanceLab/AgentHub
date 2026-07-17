@@ -408,8 +408,8 @@
   flex-shrink: 0;
 }
 
-.hubStatusDotConnected { background: var(--color-success); }
-.hubStatusDotDisconnected { background: var(--color-danger); }
+.hubStatusDotConnected { background: var(--success); }
+.hubStatusDotDisconnected { background: var(--danger); }
 .hubStatusDotChecking {
   background: var(--warning);
   animation: pulse 1.5s infinite;

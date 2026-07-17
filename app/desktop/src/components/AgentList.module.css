@@ -156,7 +156,7 @@
   height: 6px;
   border: 1.5px solid var(--sidebar-bg);
   border-radius: 50%;
-  background: var(--color-danger);
+  background: var(--danger);
 }
 
 .status_available {
@@ -169,7 +169,7 @@
 }
 
 .status_unavailable {
-  background: var(--color-danger);
+  background: var(--danger);
 }
 
 /* ── Info ──────────────────────────────────── */
