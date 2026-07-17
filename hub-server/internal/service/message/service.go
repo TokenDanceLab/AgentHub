@@ -3,6 +3,7 @@
 // It is the sixth IM typed-service package (agentteam-style; #720), extracting
 // the message domain from the flat service package. Bus+Cache ports were
 // hardened in #585; package move only. Pure helpers remain in service/im.
+// Residual pure projection/builders live in same-package files (#813).
 package message
 
 import (
@@ -10,14 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -45,7 +44,8 @@ type Cache interface {
 // is the sixth IM typed-service extract (#720) after messagereaction (#662),
 // workspace (#673), contact (#685), attachment (#697), and session (#708).
 // Ports were hardened in #585; package move only. Pure content helpers remain
-// in service/im and are not re-embedded.
+// in service/im and are not re-embedded. Pure residual projection/builders
+// were split package-locally in #813.
 type Service struct {
 	db          *gorm.DB
 	bus         Bus
@@ -101,89 +101,6 @@ func (s *Service) allocateSeq(ctx context.Context, sessionID string) (int64, err
 		return txErr
 	})
 	return fallbackSeq, err
-}
-
-func resolveCache(c Cache) Cache {
-	if isNilCache(c) {
-		return cache.NoOpCache{}
-	}
-	return c
-}
-
-func isNilCache(c any) bool {
-	if c == nil {
-		return true
-	}
-	v := reflect.ValueOf(c)
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return v.IsNil()
-	default:
-		return false
-	}
-}
-
-type SendMessageRequest struct {
-	ClientMsgID  string  `json:"client_msg_id"`
-	ContentType  string  `json:"content_type"`
-	Content      string  `json:"content"`
-	ReplyToMsgID *string `json:"reply_to_message_id,omitempty"`
-}
-
-type ReplyToInfo struct {
-	ID          string `json:"id"`
-	SenderID    string `json:"sender_id"`
-	ContentType string `json:"content_type"`
-	Content     string `json:"content"`
-	Recalled    bool   `json:"recalled"`
-	CreatedAt   string `json:"created_at"`
-}
-
-type MessageResponse struct {
-	ID           string             `json:"id"`
-	SessionID    string             `json:"session_id"`
-	SeqID        int64              `json:"seq_id"`
-	ClientMsgID  string             `json:"client_msg_id"`
-	SenderType   string             `json:"sender_type"`
-	SenderID     string             `json:"sender_id"`
-	ContentType  string             `json:"content_type"`
-	Content      string             `json:"content"`
-	ReplyToMsgID *string            `json:"reply_to_message_id,omitempty"`
-	ReplyTo      *ReplyToInfo       `json:"reply_to,omitempty"`
-	Attachments  []model.Attachment `json:"attachments,omitempty"`
-	Recalled     bool               `json:"recalled"`
-	Edited       bool               `json:"edited"`
-	EditedAt     string             `json:"edited_at,omitempty"`
-	CreatedAt    string             `json:"created_at"`
-}
-
-type SendMessageResponse struct {
-	MessageID string `json:"message_id"`
-	SeqID     int64  `json:"seq_id"`
-	CreatedAt string `json:"created_at"`
-}
-
-type EditMessageRequest struct {
-	ContentType string `json:"content_type"`
-	Content     string `json:"content"`
-}
-
-type EditMessageResponse struct {
-	MessageID string `json:"message_id"`
-	EditedAt  string `json:"edited_at"`
-}
-
-// ── Pure IM helpers (aliases to service/im; #628/#639) ───────────────────────
-// Content-type allowlist source of truth is im.IsValidContentType.
-
-// normalizeMessageContent is a thin alias to im.NormalizeMessageContent.
-func normalizeMessageContent(contentType, content string) (string, error) {
-	return im.NormalizeMessageContent(contentType, content)
-}
-
-// attachmentIDsFromContent is a thin alias to im.AttachmentIDsFromContent.
-func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
-	return im.AttachmentIDsFromContent(contentType, content)
 }
 
 func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
@@ -244,11 +161,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		return nil, err
 	}
 	if existing != nil {
-		return &SendMessageResponse{
-			MessageID: existing.ID,
-			SeqID:     existing.SeqID,
-			CreatedAt: existing.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}, nil
+		return sendMessageResponseFromModel(existing), nil
 	}
 
 	for _, attachmentID := range attachmentIDs {
@@ -277,15 +190,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		if err := repository.InsertMessage(tx, msg); err != nil {
 			return err
 		}
-		if len(attachmentIDs) > 0 {
-			refs := make([]model.MessageAttachment, 0, len(attachmentIDs))
-			for _, attachmentID := range attachmentIDs {
-				refs = append(refs, model.MessageAttachment{
-					SessionID:    sessionID,
-					MessageID:    msg.ID,
-					AttachmentID: attachmentID,
-				})
-			}
+		if refs := messageAttachmentRefs(sessionID, msg.ID, attachmentIDs); len(refs) > 0 {
 			if err := repository.CreateMessageAttachmentReferences(tx, refs); err != nil {
 				return err
 			}
@@ -293,14 +198,10 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		return repository.TouchSessionLastMessage(tx, sessionID)
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
+		if isDuplicateKeyError(err) {
 			existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, req.ClientMsgID)
 			if lookupErr == nil && existing != nil {
-				return &SendMessageResponse{
-					MessageID: existing.ID,
-					SeqID:     existing.SeqID,
-					CreatedAt: existing.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-				}, nil
+				return sendMessageResponseFromModel(existing), nil
 			}
 		}
 		return nil, err
@@ -308,11 +209,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 
 	s.publish(ctx, service.Event{Type: "message.new", Payload: msg})
 
-	return &SendMessageResponse{
-		MessageID: msg.ID,
-		SeqID:     msg.SeqID,
-		CreatedAt: msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	}, nil
+	return sendMessageResponseFromModel(msg), nil
 }
 
 func (s *Service) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
@@ -372,23 +269,12 @@ func (s *Service) GetMessagesIncremental(ctx context.Context, sessionID, userID 
 }
 
 func (s *Service) toMessageResponses(msgs []model.Message) []MessageResponse {
-	result := make([]MessageResponse, len(msgs))
 	attachmentsByMessage := s.attachmentsByMessageID(msgs)
 
-	replyToIDs := make(map[string]bool)
-	for _, m := range msgs {
-		if m.ReplyToMsgID != nil && *m.ReplyToMsgID != "" {
-			replyToIDs[*m.ReplyToMsgID] = true
-		}
-	}
-
+	replyToIDs := collectReplyToIDs(msgs)
 	var replyMessages map[string]*model.Message
 	if len(replyToIDs) > 0 {
-		ids := make([]string, 0, len(replyToIDs))
-		for id := range replyToIDs {
-			ids = append(ids, id)
-		}
-		fetched, err := repository.GetMessagesByIDs(s.db, ids)
+		fetched, err := repository.GetMessagesByIDs(s.db, replyToIDs)
 		if err == nil {
 			replyMessages = make(map[string]*model.Message, len(fetched))
 			for i := range fetched {
@@ -397,66 +283,11 @@ func (s *Service) toMessageResponses(msgs []model.Message) []MessageResponse {
 		}
 	}
 
-	for i, m := range msgs {
-		resp := MessageResponse{
-			ID:           m.ID,
-			SessionID:    m.SessionID,
-			SeqID:        m.SeqID,
-			ClientMsgID:  m.ClientMsgID,
-			SenderType:   m.SenderType,
-			SenderID:     m.SenderID,
-			ContentType:  m.ContentType,
-			Content:      m.Content,
-			ReplyToMsgID: m.ReplyToMsgID,
-			Recalled:     m.Recalled,
-			Edited:       m.Edited,
-			CreatedAt:    m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
-		if m.EditedAt != nil {
-			resp.EditedAt = m.EditedAt.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		if len(attachmentsByMessage[m.ID]) > 0 {
-			resp.Attachments = attachmentsByMessage[m.ID]
-		}
-
-		if m.ReplyToMsgID != nil && replyMessages != nil {
-			if replyMsg, ok := replyMessages[*m.ReplyToMsgID]; ok {
-				replyContent := replyMsg.Content
-				replyContentType := replyMsg.ContentType
-				if replyMsg.Recalled {
-					replyContent = ""
-					replyContentType = "text"
-				}
-				resp.ReplyTo = &ReplyToInfo{
-					ID:          replyMsg.ID,
-					SenderID:    replyMsg.SenderID,
-					ContentType: replyContentType,
-					Content:     replyContent,
-					Recalled:    replyMsg.Recalled,
-					CreatedAt:   replyMsg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-				}
-			}
-		}
-
-		result[i] = resp
-	}
-	return result
+	return projectMessageResponses(msgs, attachmentsByMessage, replyMessages)
 }
 
 func (s *Service) attachmentsByMessageID(msgs []model.Message) map[string][]model.Attachment {
-	messageIDs := make([]string, 0)
-	seen := make(map[string]struct{})
-	for _, msg := range msgs {
-		if (msg.ContentType != model.ContentTypeFile && msg.ContentType != model.ContentTypeImage) || msg.ID == "" {
-			continue
-		}
-		if _, exists := seen[msg.ID]; exists {
-			continue
-		}
-		seen[msg.ID] = struct{}{}
-		messageIDs = append(messageIDs, msg.ID)
-	}
+	messageIDs := fileImageMessageIDs(msgs)
 	if len(messageIDs) == 0 {
 		return nil
 	}
@@ -553,11 +384,7 @@ func (s *Service) EditMessage(ctx context.Context, msgID, userID string, req Edi
 	}
 	s.publish(ctx, service.Event{Type: "message.edited", Payload: updated})
 
-	editedAt := ""
-	if updated.EditedAt != nil {
-		editedAt = updated.EditedAt.Format("2006-01-02T15:04:05Z07:00")
-	}
-	return &EditMessageResponse{MessageID: msgID, EditedAt: editedAt}, nil
+	return &EditMessageResponse{MessageID: msgID, EditedAt: formatMessageTimePtr(updated.EditedAt)}, nil
 }
 
 func (s *Service) PinMessage(ctx context.Context, userID, sessionID, msgID string) error {
@@ -647,13 +474,7 @@ func (s *Service) ListPinnedMessages(ctx context.Context, userID, sessionID stri
 		msgMap[m.ID] = m
 	}
 
-	ordered := make([]model.Message, 0, len(pins))
-	for _, p := range pins {
-		if m, ok := msgMap[p.MessageID]; ok {
-			ordered = append(ordered, m)
-		}
-	}
-
+	ordered := orderMessagesByIDs(msgMap, msgIDs)
 	return s.toMessageResponses(ordered), nil
 }
 
@@ -727,16 +548,8 @@ func (s *Service) forwardOne(ctx context.Context, userID string, msg *model.Mess
 		return fmt.Errorf("allocate seq for session %s: %w", sessionID, err)
 	}
 
-	// Construct forwarded message
-	forwarded := &model.Message{
-		SessionID:   sessionID,
-		ClientMsgID: uuidv7.Must(),
-		SenderType:  msg.SenderType,
-		SenderID:    msg.SenderID,
-		ContentType: msg.ContentType,
-		Content:     msg.Content,
-		SeqID:       seq,
-	}
+	// Construct forwarded message (UUID allocated at orchestration edge)
+	forwarded := newForwardedMessage(sessionID, seq, uuidv7.Must(), msg)
 
 	// Insert + touch session
 	err = s.db.Transaction(func(tx *gorm.DB) error {
