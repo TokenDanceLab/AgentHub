@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { WS_BEARER_SUBPROTOCOL } from './hubClient';
 import { createHubEventStream, type HubWebSocketLike } from './hubEvents';
 
 class FakeSocket implements HubWebSocketLike {
@@ -50,8 +51,8 @@ describe('Mobile Hub event stream', () => {
     expect(statuses).toEqual(['connecting', 'open']);
   });
 
-  it('includes access_token in WS URL query parameter', () => {
-    const createWebSocket = vi.fn((_url: string) => new FakeSocket());
+  it('passes JWT via Sec-WebSocket-Protocol and keeps access_token out of URL', () => {
+    const createWebSocket = vi.fn((_url: string, _protocols?: string[]) => new FakeSocket());
 
     createHubEventStream({
       baseUrl: 'https://hub.example.test',
@@ -60,7 +61,27 @@ describe('Mobile Hub event stream', () => {
     });
 
     const url = createWebSocket.mock.calls[0]?.[0] as string;
+    const protocols = createWebSocket.mock.calls[0]?.[1] as string[] | undefined;
+    expect(new URL(url).searchParams.has('access_token')).toBe(false);
+    expect(url).toBe('wss://hub.example.test/client/ws');
+    expect(protocols).toEqual([WS_BEARER_SUBPROTOCOL, 'test-jwt']);
+  });
+
+  it('supports legacy access_token query fallback when opted in', () => {
+    const createWebSocket = vi.fn((_url: string, _protocols?: string[]) => new FakeSocket());
+
+    createHubEventStream({
+      baseUrl: 'https://hub.example.test',
+      token: 'test-jwt',
+      useQueryTokenFallback: true,
+      createWebSocket,
+    });
+
+    const url = createWebSocket.mock.calls[0]?.[0] as string;
+    const protocols = createWebSocket.mock.calls[0]?.[1] as string[] | undefined;
     expect(new URL(url).searchParams.get('access_token')).toBe('test-jwt');
+    // Protocol auth still preferred alongside legacy query fallback.
+    expect(protocols).toEqual([WS_BEARER_SUBPROTOCOL, 'test-jwt']);
   });
 
   it('parses known Hub server event types (message.new, session.created, etc.)', () => {

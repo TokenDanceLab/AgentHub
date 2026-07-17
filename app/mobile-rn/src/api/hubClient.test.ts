@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   HubApiError,
   HubNetworkError,
+  WS_BEARER_SUBPROTOCOL,
+  buildWSAuthProtocols,
   createHubClient,
   createHubWsUrl,
   createMockHubClient,
@@ -18,8 +20,29 @@ describe('Mobile Hub client facade', () => {
     );
   });
 
-  it('supports token-based WS auth via access_token query parameter', () => {
+  it('buildWSAuthProtocols returns agenthub.bearer.v1 + jwt', () => {
+    expect(buildWSAuthProtocols('jwt.token.here')).toEqual([
+      WS_BEARER_SUBPROTOCOL,
+      'jwt.token.here',
+    ]);
+    expect(buildWSAuthProtocols(null)).toBeUndefined();
+    expect(buildWSAuthProtocols(undefined)).toBeUndefined();
+    expect(buildWSAuthProtocols('')).toBeUndefined();
+  });
+
+  it('does not put token in query by default (prefer Sec-WebSocket-Protocol)', () => {
     const url = createHubWsUrl('https://hub.example.test', { token: 'test-jwt-token' });
+    const parsed = new URL(url);
+    expect(parsed.searchParams.has('access_token')).toBe(false);
+    expect(parsed.searchParams.has('token')).toBe(false);
+    expect(url).toBe('wss://hub.example.test/client/ws');
+  });
+
+  it('supports legacy token-based WS auth via access_token query when opted in', () => {
+    const url = createHubWsUrl('https://hub.example.test', {
+      token: 'test-jwt-token',
+      useQueryTokenFallback: true,
+    });
     const parsed = new URL(url);
     // Hub WSAuthMiddleware accepts access_token (or Authorization Bearer), not "token".
     expect(parsed.searchParams.get('access_token')).toBe('test-jwt-token');
