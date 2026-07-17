@@ -876,10 +876,260 @@ func planRunsForCleanup(order []string, runs map[string]Run, now time.Time, term
 	return selectRunsForCleanup(candidates, now, terminalTTL, maxPerThread)
 }
 
+// planRunCleanup normalizes opts.Now then selects terminal runs for cleanup.
+func planRunCleanup(order []string, runs map[string]Run, opts RunCleanupOptions, fallbackNow time.Time) map[string]struct{} {
+	now := resolveCleanupNow(opts.Now, fallbackNow)
+	return planRunsForCleanup(order, runs, now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
+}
+
+// applyPlannedRunCleanup deletes planned runs/items and builds pin match + result.
+// pinMatch is nil when no items were removed.
+func applyPlannedRunCleanup(
+	runs map[string]Run,
+	items map[string]Item,
+	runOrder, itemOrder []string,
+	removeRuns map[string]struct{},
+) (newRunOrder, newItemOrder []string, pinMatch func(ThreadPin) bool, result RunCleanupResult) {
+	var removedItemIDs map[string]struct{}
+	var removedItems int
+	newRunOrder, newItemOrder, removedItemIDs, removedItems = applyRunCleanupMaps(
+		runs, items, runOrder, itemOrder, removeRuns,
+	)
+	if removedItems > 0 {
+		pinMatch = pinMatchesRemovedItems(removedItemIDs)
+	}
+	result = buildRunCleanupResult(len(removeRuns), removedItems)
+	return newRunOrder, newItemOrder, pinMatch, result
+}
+
+// lookupByID returns the value for id when present.
+func lookupByID[T any](items map[string]T, id string) (T, bool) {
+	value, ok := items[id]
+	return value, ok
+}
+
 // lookupClonedArtifact returns a deep-cloned artifact when present.
 func lookupClonedArtifact(artifacts map[string]Artifact, id string) (Artifact, bool) {
 	artifact, ok := artifacts[id]
 	return cloneArtifact(artifact), ok
+}
+
+// createProjectInMaps resolves and optionally stores a new project.
+func createProjectInMaps(
+	projects map[string]Project,
+	order []string,
+	id, name, ownerID, now string,
+) (Project, []string, error) {
+	existing, exists := projects[id]
+	project, err, created := resolveCreateProject(existing, exists, id, name, ownerID, now)
+	return project, putTracked(projects, order, id, project, created), err
+}
+
+// createThreadInMaps resolves and optionally stores a new thread.
+func createThreadInMaps(
+	projects map[string]Project,
+	threads map[string]Thread,
+	order []string,
+	id, projectID, title, kind, avatarColor, avatarLabel, now string,
+) (Thread, []string, error) {
+	_, projectExists := projects[projectID]
+	existing, exists := threads[id]
+	thread, err, created := resolveCreateThread(existing, exists, projectExists, id, projectID, title, kind, avatarColor, avatarLabel, now)
+	return thread, putTracked(threads, order, id, thread, created), err
+}
+
+// createRunInMaps validates refs and optionally stores a queued run.
+func createRunInMaps(
+	projects map[string]Project,
+	threads map[string]Thread,
+	runs map[string]Run,
+	order []string,
+	id, projectID, threadID, now string,
+) (Run, []string, error) {
+	existing, exists := runs[id]
+	refsOK := validateCreateRunRefs(projects, threads, projectID, threadID)
+	run, err, created := resolveCreateRun(existing, exists, refsOK, id, projectID, threadID, now)
+	return run, putTracked(runs, order, id, run, created), err
+}
+
+// createItemInMaps validates refs and optionally stores a prepared item.
+func createItemInMaps(
+	projects map[string]Project,
+	threads map[string]Thread,
+	runs map[string]Run,
+	items map[string]Item,
+	order []string,
+	item Item,
+	now string,
+) (Item, []string, error) {
+	existing, exists := items[item.ID]
+	refsOK := validateCreateItemRefs(projects, threads, runs, item)
+	item, err, created := resolveCreateItem(existing, exists, refsOK, item, now)
+	return item, putTracked(items, order, item.ID, item, created), err
+}
+
+// createUserProfileInMaps reuses or stores a prepared user profile.
+func createUserProfileInMaps(
+	profiles map[string]UserProfile,
+	order []string,
+	profile UserProfile,
+	now string,
+) (UserProfile, []string) {
+	existing, exists := profiles[profile.ID]
+	profile, created := resolveCreateUserProfile(existing, exists, profile, now)
+	return profile, putTracked(profiles, order, profile.ID, profile, created)
+}
+
+// createAgentProfileInMaps validates and optionally stores an agent profile.
+func createAgentProfileInMaps(
+	profiles map[string]AgentProfile,
+	order []string,
+	profile AgentProfile,
+	now string,
+) (AgentProfile, []string, error) {
+	existing, exists := profiles[profile.ID]
+	profile, err, created := resolveCreateAgentProfile(existing, exists, profile, now)
+	return profile, putTracked(profiles, order, profile.ID, profile, created), err
+}
+
+// updateThreadInMaps applies optional title/status when the thread exists.
+func updateThreadInMaps(threads map[string]Thread, id string, title, status *string, now string) (Thread, bool) {
+	thread, exists := threads[id]
+	thread, ok := resolveUpdateThread(thread, exists, title, status, now)
+	storeIf(threads, id, thread, ok)
+	return thread, ok
+}
+
+// setRunStatusInMaps applies status when the run exists.
+func setRunStatusInMaps(runs map[string]Run, id, status, now string) (Run, bool) {
+	run, exists := runs[id]
+	run, ok := resolveSetRunStatus(run, exists, status, now)
+	storeIf(runs, id, run, ok)
+	return run, ok
+}
+
+// setRunStatusIfInMaps applies status when the run exists and current is allowed.
+func setRunStatusIfInMaps(runs map[string]Run, id, status string, allowed []string, now string) (Run, bool) {
+	run, exists := runs[id]
+	run, ok := resolveSetRunStatusIf(run, exists, status, allowed, now)
+	storeIf(runs, id, run, ok)
+	return run, ok
+}
+
+// setRunEvidenceGateInMaps stores gate result when the run exists.
+func setRunEvidenceGateInMaps(runs map[string]Run, id, result string) (Run, bool) {
+	run, exists := runs[id]
+	run, ok := resolveSetRunEvidenceGate(run, exists, result)
+	storeIf(runs, id, run, ok)
+	return run, ok
+}
+
+// setRunRetryCountInMaps updates retry count when the run exists.
+func setRunRetryCountInMaps(runs map[string]Run, id string, count int) (Run, bool) {
+	run, exists := runs[id]
+	run, ok := resolveSetRunRetryCount(run, exists, count)
+	storeIf(runs, id, run, ok)
+	return run, ok
+}
+
+// updateAgentProfileInMaps applies a patch when the profile exists.
+func updateAgentProfileInMaps(
+	profiles map[string]AgentProfile,
+	id string,
+	patch map[string]any,
+	now string,
+) (AgentProfile, error) {
+	profile, exists := profiles[id]
+	profile, err := resolveUpdateAgentProfile(profile, exists, patch, now)
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	profiles[id] = profile
+	return profile, nil
+}
+
+// upsertRunDiffFileInMaps validates, merges, and stores a run diff file.
+func upsertRunDiffFileInMaps(
+	runs map[string]Run,
+	diffs map[string]RunDiffFile,
+	order []string,
+	file RunDiffFile,
+	now string,
+) (RunDiffFile, []string, error) {
+	_, runExists := runs[file.RunID]
+	key, file, ok := prepareRunDiffFileUpsert(runExists, file)
+	if !ok {
+		return RunDiffFile{}, order, ErrNotFound
+	}
+	existing, exists := diffs[key]
+	file, created := resolveRunDiffFileUpsert(existing, exists, file, now)
+	return file, putUpsert(diffs, order, key, file, created), nil
+}
+
+// upsertArtifactInMaps validates, stamps, and stores a cloned artifact.
+func upsertArtifactInMaps(
+	runs map[string]Run,
+	artifacts map[string]Artifact,
+	order []string,
+	artifact Artifact,
+	now string,
+) (Artifact, []string, error) {
+	run, runExists := runs[artifact.RunID]
+	var ok bool
+	artifact, ok = prepareArtifactForUpsert(run, runExists, artifact)
+	if !ok {
+		return Artifact{}, order, ErrNotFound
+	}
+	existing, exists := artifacts[artifact.ID]
+	artifact = resolveArtifactUpsert(artifact, existing, exists, now)
+	order = putUpsert(artifacts, order, artifact.ID, cloneArtifact(artifact), !exists)
+	return cloneArtifact(artifact), order, nil
+}
+
+// upsertPreviewInMaps validates, stamps, and stores a preview.
+func upsertPreviewInMaps(
+	runs map[string]Run,
+	previews map[string]Preview,
+	order []string,
+	preview Preview,
+	now string,
+) (Preview, []string, error) {
+	run, runExists := runs[preview.RunID]
+	var ok bool
+	preview, ok = preparePreviewForUpsert(run, runExists, preview)
+	if !ok {
+		return Preview{}, order, ErrNotFound
+	}
+	existing, exists := previews[preview.ID]
+	preview = resolvePreviewUpsert(preview, existing, exists, now)
+	return preview, putUpsert(previews, order, preview.ID, preview, !exists), nil
+}
+
+// upsertThreadPinInMaps validates refs and upserts a thread pin.
+func upsertThreadPinInMaps(
+	threads map[string]Thread,
+	items map[string]Item,
+	pins map[string]ThreadPin,
+	order []string,
+	threadID, itemID, pinnedBy, now string,
+) (ThreadPin, []string, error) {
+	if !validatePinThreadItemRefs(threads, items, threadID, itemID) {
+		return ThreadPin{}, order, ErrNotFound
+	}
+	key := threadPinKey(threadID, itemID)
+	existing, exists := pins[key]
+	pin, created := resolveThreadPinUpsert(existing, exists, threadID, itemID, pinnedBy, now)
+	return pin, putUpsert(pins, order, key, pin, created), nil
+}
+
+// upsertSettingsInMaps patches settings and returns map, mtime, and cloned view.
+func upsertSettingsInMaps(
+	settings map[string]string,
+	patch map[string]string,
+	now string,
+) (map[string]string, string, UserSettings) {
+	settings, view := applySettingsUpsert(settings, patch, now)
+	return settings, now, view
 }
 
 // buildThreadMessageFromThread builds a user message item when the thread exists.
