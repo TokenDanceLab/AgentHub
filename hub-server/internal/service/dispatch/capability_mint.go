@@ -21,15 +21,15 @@ type CapabilityMintInput struct {
 // CapabilityMintResolved holds pure bindings for jwtutil.IssueCapabilityToken.
 // Ok is false when secret or device are unavailable (local/dev skip path).
 type CapabilityMintResolved struct {
-	Ok         bool
-	Secret     string
-	UserID     string
-	DeviceID   string
-	ProjectID  string
-	Action     string
-	TargetID   string
-	ThreadID   string
-	TTL        time.Duration
+	Ok        bool
+	Secret    string
+	UserID    string
+	DeviceID  string
+	ProjectID string
+	Action    string
+	TargetID  string
+	ThreadID  string
+	TTL       time.Duration
 }
 
 // ResolveCapabilityMint returns capability mint bindings or Ok=false when minting
