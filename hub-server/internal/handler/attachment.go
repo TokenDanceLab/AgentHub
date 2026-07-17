@@ -19,7 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-// AttachmentService is the subset of *service.AttachmentService used by AttachmentHandler.
+// AttachmentService is the subset of *attachment.Service used by AttachmentHandler.
 type AttachmentService interface {
 	ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error)
 	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)

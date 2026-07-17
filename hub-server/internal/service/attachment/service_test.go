@@ -1,4 +1,4 @@
-package service_test
+package attachment_test
 
 import (
 	"context"
@@ -10,17 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
+	"github.com/agenthub/hub-server/internal/service/attachment"
 )
 
 func TestLocalStorage_PutAndGet(t *testing.T) {
 	t.Chdir(t.TempDir())
-	store := service.NewLocalStorage(".")
+	store := attachment.NewLocalStorage(".")
 
 	key := "uploads/ab/cd/testhash1234"
 	body := strings.NewReader("hello world")
@@ -89,7 +91,7 @@ func TestLocalStorage_PutAndGet(t *testing.T) {
 func TestLocalStorage_AvoidsDoubleUploadsPrefixWhenBaseDirIsUploads(t *testing.T) {
 	root := t.TempDir()
 	uploadDir := filepath.Join(root, "uploads")
-	store := service.NewLocalStorage(uploadDir)
+	store := attachment.NewLocalStorage(uploadDir)
 
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	key := service.PathFromHash(hash)
@@ -132,7 +134,7 @@ func TestLocalStorage_AvoidsDoubleUploadsPrefixWhenBaseDirIsUploads(t *testing.T
 }
 
 func TestS3Storage_LocalPathReturnsEmpty(t *testing.T) {
-	s3 := service.NewS3Storage(
+	s3 := attachment.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
 			return true, nil
 		},
@@ -156,8 +158,8 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 	// writes to disk.
 	t.Chdir(t.TempDir())
 
-	store := service.NewLocalStorage(".")
-	// Verify that the local store works through the AttachmentService
+	store := attachment.NewLocalStorage(".")
+	// Verify that the local store works through the Service
 	// public API contract (the methods exist and don't panic).
 	_ = store
 
@@ -173,7 +175,7 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 
 func TestAttachmentService_NilStorageBlobPathsAreSafe(t *testing.T) {
 	// Metadata-only construction (storage port unset) must not panic on blob paths.
-	svc := service.NewAttachmentService(nil, config.UploadConfig{}, nil)
+	svc := attachment.NewService(nil, config.UploadConfig{}, nil)
 	hash := strings.Repeat("e", 64)
 
 	if path := svc.BlobLocalPath(hash); path != "" {
@@ -202,7 +204,7 @@ func TestAttachmentService_SetStoragePort(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
 	hash := strings.Repeat("f", 64)
 	store := &recordingPresignStorage{url: "https://s3.example.test/set-storage"}
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, nil)
+	svc := attachment.NewService(db, config.UploadConfig{}, nil)
 
 	// Before SetStorage: presign is a no-op.
 	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
@@ -234,10 +236,10 @@ func TestAttachmentService_SetStoragePort(t *testing.T) {
 
 func TestSaveAttachmentWithMetadata_NormalizesJSONObject(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+	svc := attachment.NewService(db, config.UploadConfig{}, attachment.NewLocalStorage(t.TempDir()))
 
 	hash := strings.Repeat("a", 64)
-	attachment, err := svc.SaveAttachmentWithMetadata(context.Background(), "user-1", hash, "text/plain", "notes.txt", 12, `{
+	att, err := svc.SaveAttachmentWithMetadata(context.Background(), "user-1", hash, "text/plain", "notes.txt", 12, `{
 		"source": "chat",
 		"labels": ["draft", "review"]
 	}`)
@@ -245,22 +247,22 @@ func TestSaveAttachmentWithMetadata_NormalizesJSONObject(t *testing.T) {
 		t.Fatalf("SaveAttachmentWithMetadata() error = %v", err)
 	}
 
-	if attachment.Metadata != `{"labels":["draft","review"],"source":"chat"}` {
-		t.Fatalf("Metadata = %q, want normalized object JSON", attachment.Metadata)
+	if att.Metadata != `{"labels":["draft","review"],"source":"chat"}` {
+		t.Fatalf("Metadata = %q, want normalized object JSON", att.Metadata)
 	}
 
 	var fetched model.Attachment
-	if err := db.First(&fetched, "id = ?", attachment.ID).Error; err != nil {
+	if err := db.First(&fetched, "id = ?", att.ID).Error; err != nil {
 		t.Fatalf("fetch attachment: %v", err)
 	}
-	if fetched.Metadata != attachment.Metadata {
-		t.Fatalf("persisted Metadata = %q, want %q", fetched.Metadata, attachment.Metadata)
+	if fetched.Metadata != att.Metadata {
+		t.Fatalf("persisted Metadata = %q, want %q", fetched.Metadata, att.Metadata)
 	}
 }
 
 func TestSaveAttachmentWithMetadata_RejectsInvalidMetadata(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+	svc := attachment.NewService(db, config.UploadConfig{}, attachment.NewLocalStorage(t.TempDir()))
 
 	hash := strings.Repeat("b", 64)
 	_, err := svc.SaveAttachmentWithMetadata(context.Background(), "user-1", hash, "text/plain", "notes.txt", 12, `["not", "object"]`)
@@ -283,20 +285,20 @@ func TestSaveAttachmentWithMetadata_RejectsInvalidMetadata(t *testing.T) {
 
 func TestSaveAttachment_DefaultsMetadataToEmptyObject(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+	svc := attachment.NewService(db, config.UploadConfig{}, attachment.NewLocalStorage(t.TempDir()))
 
-	attachment, err := svc.SaveAttachment(context.Background(), "user-1", strings.Repeat("c", 64), "text/plain", "notes.txt", 12)
+	att, err := svc.SaveAttachment(context.Background(), "user-1", strings.Repeat("c", 64), "text/plain", "notes.txt", 12)
 	if err != nil {
 		t.Fatalf("SaveAttachment() error = %v", err)
 	}
-	if attachment.Metadata != "{}" {
-		t.Fatalf("Metadata = %q, want {}", attachment.Metadata)
+	if att.Metadata != "{}" {
+		t.Fatalf("Metadata = %q, want {}", att.Metadata)
 	}
 }
 
 func TestAttachmentServiceMimeAllowlistUsesDefaultWithoutOctetStream(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+	svc := attachment.NewService(db, config.UploadConfig{}, attachment.NewLocalStorage(t.TempDir()))
 
 	if !svc.IsAttachmentMimeTypeAllowed("text/plain; charset=utf-8") {
 		t.Fatal("text/plain with parameters should be allowed by default")
@@ -308,10 +310,10 @@ func TestAttachmentServiceMimeAllowlistUsesDefaultWithoutOctetStream(t *testing.
 
 func TestAttachmentServiceMimeAllowlistAllowsConfiguredOctetStream(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
-	svc := service.NewAttachmentService(
+	svc := attachment.NewService(
 		db,
 		config.UploadConfig{AllowedMimeTypes: []string{"text/plain", "application/octet-stream"}},
-		service.NewLocalStorage(t.TempDir()),
+		attachment.NewLocalStorage(t.TempDir()),
 	)
 
 	if !svc.IsAttachmentMimeTypeAllowed("application/octet-stream") {
@@ -320,7 +322,7 @@ func TestAttachmentServiceMimeAllowlistAllowsConfiguredOctetStream(t *testing.T)
 }
 
 func TestS3Storage_PutReturnsTrue(t *testing.T) {
-	s3 := service.NewS3Storage(
+	s3 := attachment.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
 			return true, nil
 		},
@@ -343,7 +345,7 @@ func TestS3Storage_PutReturnsTrue(t *testing.T) {
 }
 
 func TestS3Storage_PutReturnsFalseWhenBlobAlreadyExists(t *testing.T) {
-	s3 := service.NewS3Storage(
+	s3 := attachment.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
 			return false, nil
 		},
@@ -369,7 +371,7 @@ func TestAttachmentServicePresignBlobURLUsesStorageKeyAndSafeResponseHeaders(t *
 	db := newAttachmentServiceTestDB(t)
 	hash := strings.Repeat("d", 64)
 	store := &recordingPresignStorage{url: "https://s3.example.test/presigned"}
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, store)
+	svc := attachment.NewService(db, config.UploadConfig{}, store)
 
 	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
 	if err != nil {
@@ -395,7 +397,7 @@ func TestAttachmentServicePresignBlobURLUsesStorageKeyAndSafeResponseHeaders(t *
 func TestAttachmentServicePresignBlobURLRejectsInvalidHashBeforeStorage(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
 	store := &recordingPresignStorage{url: "https://s3.example.test/presigned"}
-	svc := service.NewAttachmentService(db, config.UploadConfig{}, store)
+	svc := attachment.NewService(db, config.UploadConfig{}, store)
 
 	url, err := svc.PresignBlobURL(context.Background(), "bad", "text/plain", `attachment; filename="safe.txt"`)
 	if err != nil {
@@ -412,7 +414,7 @@ func TestAttachmentServicePresignBlobURLRejectsInvalidHashBeforeStorage(t *testi
 func TestS3Storage_PresignURLDelegatesToConfiguredSigner(t *testing.T) {
 	var gotBucket, gotKey, gotType, gotDisposition string
 	var gotExpiry time.Duration
-	s3 := service.NewS3Storage(
+	s3 := attachment.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
 			return true, nil
 		},
