@@ -175,11 +175,13 @@ func startEdgeServer(t *testing.T) (*httptest.Server, *api.Handler) {
 	t.Helper()
 	bus := events.NewBus(100)
 	s := store.New()
+	workDir := t.TempDir()
 	h := &api.Handler{
-		Bus:      bus,
-		Registry: runners.NewRegistry(),
-		Store:    s,
-		Executor: lifecycle.NewMockExecutor(bus, s),
+		Bus:                bus,
+		Registry:           runners.NewRegistry(),
+		Store:              s,
+		Executor:           lifecycle.NewMockExecutor(bus, s),
+		WorkspaceAllowlist: []string{workDir},
 	}
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -311,6 +313,7 @@ func TestEdgeReceivesDispatchFromHub(t *testing.T) {
 		"prompt":    "Please review this PR for security issues.",
 		"agentId":   "codex",
 		"model":     "claude-sonnet-4-5",
+		"workDir": h.WorkspaceAllowlist[0],
 	}
 	resp := postJSON(t, ts.URL+"/v1/runs", dispatchBody)
 	if resp.StatusCode != http.StatusAccepted {
@@ -448,6 +451,7 @@ func TestEdgeFullProtocolRoundTrip(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "Analyze src/ for security vulnerabilities.",
 		"agentId":   "codex",
+		"workDir":   edgeH.WorkspaceAllowlist[0],
 	})
 	if dispatchResp.StatusCode != http.StatusAccepted {
 		t.Fatalf("phase 2 dispatch: expected 202, got %d", dispatchResp.StatusCode)

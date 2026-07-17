@@ -15,9 +15,19 @@ import (
 func newTestServer(t *testing.T) (*httptest.Server, *Handler) {
 	t.Helper()
 	h := newTestHandler()
+	// Adapter runs require a non-empty workDir inside the allowlist (#854).
+	h.WorkspaceAllowlist = []string{t.TempDir()}
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	return httptest.NewServer(mux), h
+}
+
+func testRunWorkDir(t *testing.T, h *Handler) string {
+	t.Helper()
+	if len(h.WorkspaceAllowlist) == 0 {
+		return allowTestWorkspace(t, h)
+	}
+	return h.WorkspaceAllowlist[0]
 }
 
 // getJSON performs GET and decodes the JSON body into dst.
@@ -122,11 +132,11 @@ func TestPostRunsInvalidBody(t *testing.T) {
 }
 
 func TestPostRunsSuccess(t *testing.T) {
-	server, _ := newTestServer(t)
+	server, h := newTestServer(t)
 	defer server.Close()
 
 	var body map[string]any
-	code := postJSON(t, server.URL+"/v1/runs", `{"prompt":"hello"}`, &body)
+	code := postJSON(t, server.URL+"/v1/runs", fmt.Sprintf(`{"prompt":"hello","workDir":%q}`, testRunWorkDir(t, h)), &body)
 	if code != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d: %v", code, body)
 	}
@@ -140,11 +150,12 @@ func TestPostRunsSuccess(t *testing.T) {
 }
 
 func TestPostRunsInvalidPermissionMode(t *testing.T) {
-	server, _ := newTestServer(t)
+	server, h := newTestServer(t)
 	defer server.Close()
 
 	var body map[string]any
-	code := postJSON(t, server.URL+"/v1/runs", `{"permissionMode":"nonsense"}`, &body)
+	// Invalid permission mode is checked after workDir; provide a valid workDir.
+	code := postJSON(t, server.URL+"/v1/runs", fmt.Sprintf(`{"permissionMode":"nonsense","workDir":%q}`, testRunWorkDir(t, h)), &body)
 	if code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid permission mode, got %d: %v", code, body)
 	}
@@ -326,8 +337,8 @@ func TestParseHunks_EmptyLinesSkipped(t *testing.T) {
 
 func TestParseHunkHeader_Various(t *testing.T) {
 	tests := []struct {
-		name                        string
-		line                        string
+		name                                   string
+		line                                   string
 		oldStart, oldLines, newStart, newLines int
 	}{
 		{"standard", "@@ -5,10 +3,8 @@", 5, 10, 3, 8},
@@ -566,12 +577,13 @@ func TestHealthIsIdempotent(t *testing.T) {
 }
 
 func TestPostRunsCreatesDistinctRunIDs(t *testing.T) {
-	server, _ := newTestServer(t)
+	server, h := newTestServer(t)
 	defer server.Close()
+	wd := testRunWorkDir(t, h)
 
 	var body1, body2 map[string]any
-	code1 := postJSON(t, server.URL+"/v1/runs", `{"prompt":"first"}`, &body1)
-	code2 := postJSON(t, server.URL+"/v1/runs", `{"prompt":"second"}`, &body2)
+	code1 := postJSON(t, server.URL+"/v1/runs", fmt.Sprintf(`{"prompt":"first","workDir":%q}`, wd), &body1)
+	code2 := postJSON(t, server.URL+"/v1/runs", fmt.Sprintf(`{"prompt":"second","workDir":%q}`, wd), &body2)
 	// First call: 202
 	if code1 != http.StatusAccepted {
 		t.Fatalf("first POST /v1/runs: expected 202, got %d: %v", code1, body1)
@@ -585,7 +597,7 @@ func TestPostRunsCreatesDistinctRunIDs(t *testing.T) {
 // ── POST /v1/runs with structured body tests ──
 
 func TestPostRunsWithStructuredBody(t *testing.T) {
-	server, _ := newTestServer(t)
+	server, h := newTestServer(t)
 	defer server.Close()
 
 	body := fmt.Sprintf(`{
@@ -596,8 +608,9 @@ func TestPostRunsWithStructuredBody(t *testing.T) {
 		"model": "test-model",
 		"reasoningEffort": "medium",
 		"permissionMode": "acceptEdits",
-		"includePartial": true
-	}`)
+		"includePartial": true,
+		"workDir": %q
+	}`, testRunWorkDir(t, h))
 	var resp map[string]any
 	code := postJSON(t, server.URL+"/v1/runs", body, &resp)
 	if code != http.StatusAccepted {

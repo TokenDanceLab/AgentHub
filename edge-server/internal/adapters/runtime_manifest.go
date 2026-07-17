@@ -136,10 +136,10 @@ func (a *RuntimeManifestAdapter) CapabilityHealthMetadata() map[string]any {
 }
 
 func (a *RuntimeManifestAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
-	workDir := ctx.WorkDir
-	if workDir == "" {
-		workDir = DefaultWorkDir()
-	}
+	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
+	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
+	// if a bypass path reaches BuildCommand.
+	workDir := strings.TrimSpace(ctx.WorkDir)
 	if a.manifest.Fixture.Type == runtimeManifestFixtureFile {
 		cmdPath, args := runtimeManifestFixtureReplayCommand()
 		return cmdPath, args, nil, workDir

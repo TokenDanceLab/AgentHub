@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -17,13 +16,12 @@ import (
 // RunProcessContext is an alias for the shared runnerctx.RunProcessContext.
 type RunProcessContext = runnerctx.RunProcessContext
 
-// DefaultWorkDir returns a sensible default working directory for agent runs:
-// the user's home directory, falling back to "." if unavailable.
+// DefaultWorkDir no longer invents a production workspace. Adapter runs must
+// receive an explicit workDir from the API/MCP gate (#854). Returning empty
+// keeps unit tests and defense-in-depth paths from silently expanding to the
+// user home directory (or ".") when a caller bypasses the gate.
 func DefaultWorkDir() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return "."
+	return ""
 }
 
 // AgentAdapter is the unified interface for all Agent CLI backends.
@@ -112,8 +110,8 @@ type SubAgentTask struct {
 // When multiple sub-agents are dispatched together, each receives a list
 // of its siblings so it can avoid modifying overlapping files.
 type SiblingInfo struct {
-	AgentName   string   `json:"agentName"`          // display name or adapter ID
-	TaskDesc    string   `json:"taskDesc"`            // human-readable task description
+	AgentName   string   `json:"agentName"`             // display name or adapter ID
+	TaskDesc    string   `json:"taskDesc"`              // human-readable task description
 	TargetFiles []string `json:"targetFiles,omitempty"` // files this agent is expected to modify
 }
 
@@ -206,10 +204,10 @@ const (
 	BusEventContextCompaction   = "run.agent.context_compaction"
 
 	// Plan approval gate events (P0 #3: Plan confirmation gate)
-	BusEventPlanProposed  = "run.agent.plan_proposed"
-	BusEventPlanApproved  = "run.agent.plan_approved"
-	BusEventPlanRejected  = "run.agent.plan_rejected"
-	BusEventPlanExpired   = "run.agent.plan_expired"
+	BusEventPlanProposed = "run.agent.plan_proposed"
+	BusEventPlanApproved = "run.agent.plan_approved"
+	BusEventPlanRejected = "run.agent.plan_rejected"
+	BusEventPlanExpired  = "run.agent.plan_expired"
 
 	// Tool allowlist enforcement events (Edge runtime)
 	BusEventToolRejected = "run.agent.tool_rejected"
