@@ -499,8 +499,8 @@
 }
 
 .docDeleteBtn:hover {
-  color: var(--danger, #e5484d);
-  background: color-mix(in srgb, var(--danger, #e5484d) 10%, transparent);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .docDeleteBtn svg {
@@ -517,7 +517,7 @@
   padding: var(--sp-2) var(--sp-sm);
   border: 0;
   border-radius: var(--r-xs);
-  background: var(--danger, #e5484d);
+  background: var(--danger);
   color: white;
   font: 500 0.6875rem var(--font-sans);
   cursor: pointer;
