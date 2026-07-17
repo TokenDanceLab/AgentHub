@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 28 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 49 --state open`
-- **Labels**: `spec-driven` · `phase:28`
+- **Phase 29 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 50 --state open`
+- **Labels**: `spec-driven` · `phase:29`
 
 ## References
 
@@ -60,7 +60,8 @@
 | 25 | Residual polish continue | #46 | closed (PRs #654–#658) |
 | 26 | Residual polish continue | #47 | closed (PRs #665–#669) |
 | 27 | Residual polish continue | #48 | closed (PRs #676–#681) |
-| 28 | Residual polish continue | #49 | active (#682–#687) |
+| 28 | Residual polish continue | #49 | closed (PRs #688–#692) |
+| 29 | Residual polish continue | #50 | active (#694–#699) |
 
 ## Issue Mapping (summary)
 
@@ -87,13 +88,14 @@
 | #648–#653 Phase 25 residual polish continue | closed (PRs #654–#658) |
 | #659–#664 Phase 26 residual polish continue | closed (PRs #665–#669) |
 | #670–#675 Phase 27 residual polish continue | closed (PRs #676–#681) |
-| #682–#687 Phase 28 residual polish continue | open (milestone 49) |
+| #682–#687 Phase 28 residual polish continue | closed (PRs #688–#692) |
+| #694–#699 Phase 29 residual polish continue | open (milestone 50) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=49) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 49 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=50) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 50 --state open
 git worktree list
 ```
 
@@ -108,24 +110,25 @@ git worktree list
 - [x] Phase 25 residual polish continue (#648–#653 / PRs #654–#658)
 - [x] Phase 26 residual polish continue (#659–#664 / PRs #665–#669)
 - [x] Phase 27 residual polish continue (#670–#675 / PRs #676–#681)
-- [ ] Phase 28 residual polish continue (#682–#687)
+- [x] Phase 28 residual polish continue (#682–#687 / PRs #688–#692)
+- [ ] Phase 29 residual polish continue (#694–#699)
 
 ## Current Status
 
-**Active Phase**: Phase 28 — Residual polish continue (milestone 49)
-**Active Tasks**: #682 MASTER · #683 AgentHubWorkbench · #684 AgentOpsParts · #685 Contact package · #686 SettingsPanes · #687 hygiene
+**Active Phase**: Phase 29 — Residual polish continue (milestone 50)
+**Active Tasks**: #694 MASTER · #695 AgentEditPanel · #696 ProjectPanelParts · #697 AttachmentService package · #698 WorkbenchFrameParts · #699 hygiene
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: 05b2a4bb on `master` (Phase 27 PR #676–#681 line)
-**Residual after P27**: AgentMarketParts ~218 · ContactMainParts ~224 · SessionChrome ~238 · AgentHubWorkbench ~323 · AgentOpsParts ~333 · SettingsPanes ~354 · designIcons ~1038 · agent_dispatch ~1193 · message ~783 · session ~767 · contact ~382 · attachment ~419 · workspace package ~370 · messagereaction ~217
-**Boundary map next residual**: next IM typed package (Contact recommended) / optional outbox model package move
+**Tip**: cdbfc475 on `master` (Phase 28 PR #688–#692 line)
+**Residual after P28**: AgentHubWorkbench~118 · Routes~175 · Inspector~202 · FilePreview~202 · AgentMarket~218 · AgentOps~208 · ContactMain~224 · Settings~216 · SessionChrome~238 · designIcons~1038 · FrameParts~430 · agent_dispatch~1193 · message~783 · session~767 · attachment~419 · contact~403 · workspace~370 · messagereaction~217
+**Boundary map next residual**: AttachmentService package (P29.3) / continue thin residual components
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
 
-1. Land Phase 28 issues under milestone 49 (issue-bound Workflows)
+1. Land Phase 29 issues under milestone 50 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #683 AgentHubWorkbench · #684 AgentOpsParts · #685 Contact package · #686 SettingsPanes
+3. Prefer #695 AgentEditPanel · #696 ProjectPanelParts · #697 AttachmentService package · #698 WorkbenchFrameParts
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -134,8 +137,10 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–27 closed via #471–#681; Phase 28 #682–#687 active |
+| 2026-07-17 | lead | Phase 28 closed via #688–#692; Phase 29 #694–#699 active |
 
 ## Completion notes
 
-- Phase 9–26 closed earlier; Phase 27 closed via #676–#681 (MASTER / AgentMarketParts / ContactMainParts / Workspace package / SessionChrome; #675 hygiene ops-only).
-- Phase 28 targets: MASTER sync, AgentHubWorkbench residual, AgentOpsParts residual, Contact package move, SettingsPanes residual, hygiene.
+- Phase 27 closed via #676–#681 (MASTER / AgentMarketParts / ContactMainParts / Workspace package / SessionChrome; #675 hygiene ops-only).
+- Phase 28 closed via #688–#692 (MASTER / AgentHubWorkbench / AgentOpsParts / Contact package / SettingsPanes; #687 hygiene ops-only).
+- Phase 29 targets: MASTER sync, AgentEditPanel residual, ProjectPanelParts residual, AttachmentService package move, WorkbenchFrameParts residual, hygiene.
