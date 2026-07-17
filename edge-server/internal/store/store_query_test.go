@@ -1238,3 +1238,222 @@ func TestApplyRunCleanupMapsAndPinMatchers(t *testing.T) {
 		t.Fatal("pinMatchesRemovedItems mismatch")
 	}
 }
+
+func TestStoreIfAndResolveUpdateThread(t *testing.T) {
+	t.Parallel()
+	items := map[string]int{"a": 1}
+	storeIf(items, "b", 2, false)
+	if _, ok := items["b"]; ok {
+		t.Fatal("storeIf false should no-op")
+	}
+	storeIf(items, "b", 2, true)
+	if items["b"] != 2 {
+		t.Fatalf("storeIf true = %#v", items)
+	}
+
+	title := "renamed"
+	thread, ok := resolveUpdateThread(Thread{ID: "t1", Title: "old"}, false, &title, nil, "now")
+	if ok || thread.ID != "" {
+		t.Fatalf("missing thread = %#v ok=%v", thread, ok)
+	}
+	thread, ok = resolveUpdateThread(Thread{ID: "t1", Title: "old", Status: "active"}, true, &title, nil, "now")
+	if !ok || thread.Title != "renamed" || thread.UpdatedAt != "now" {
+		t.Fatalf("resolveUpdateThread = %#v ok=%v", thread, ok)
+	}
+}
+
+func TestResolveSetRunStatusHelpers(t *testing.T) {
+	t.Parallel()
+	now := "2026-07-18T00:00:00Z"
+
+	run, ok := resolveSetRunStatus(Run{}, false, "started", now)
+	if ok || run.ID != "" {
+		t.Fatalf("missing set status = %#v ok=%v", run, ok)
+	}
+	run, ok = resolveSetRunStatus(Run{ID: "r1", Status: "queued"}, true, "started", now)
+	if !ok || run.Status != "started" || run.StartedAt != now {
+		t.Fatalf("set status = %#v ok=%v", run, ok)
+	}
+
+	run, ok = resolveSetRunStatusIf(Run{ID: "r1", Status: "queued"}, true, "started", []string{"started"}, now)
+	if ok || run.Status != "queued" {
+		t.Fatalf("disallowed status should keep run: %#v ok=%v", run, ok)
+	}
+	run, ok = resolveSetRunStatusIf(Run{ID: "r1", Status: "queued"}, true, "started", []string{"queued"}, now)
+	if !ok || run.Status != "started" {
+		t.Fatalf("allowed status = %#v ok=%v", run, ok)
+	}
+	if _, ok := resolveSetRunStatusIf(Run{}, false, "started", nil, now); ok {
+		t.Fatal("missing run should fail status-if")
+	}
+
+	run, ok = resolveSetRunEvidenceGate(Run{ID: "r1"}, true, `{"ok":true}`)
+	if !ok || run.EvidenceGateResult != `{"ok":true}` {
+		t.Fatalf("evidence gate = %#v ok=%v", run, ok)
+	}
+	if _, ok := resolveSetRunEvidenceGate(Run{}, false, "x"); ok {
+		t.Fatal("missing evidence gate should fail")
+	}
+
+	run, ok = resolveSetRunRetryCount(Run{ID: "r1"}, true, 3)
+	if !ok || run.RetryCount != 3 {
+		t.Fatalf("retry count = %#v ok=%v", run, ok)
+	}
+	if _, ok := resolveSetRunRetryCount(Run{}, false, 1); ok {
+		t.Fatal("missing retry count should fail")
+	}
+}
+
+func TestPrepareUpsertInputsAndPinRefs(t *testing.T) {
+	t.Parallel()
+
+	key, file, ok := prepareRunDiffFileUpsert(false, RunDiffFile{RunID: "r1", Path: "a.go"})
+	if ok || key != "" {
+		t.Fatalf("missing run should fail prepareRunDiffFileUpsert: key=%q ok=%v", key, ok)
+	}
+	key, file, ok = prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  ", Status: "ADD"})
+	if ok || key != "" {
+		t.Fatalf("empty path should fail: key=%q file=%#v ok=%v", key, file, ok)
+	}
+	key, file, ok = prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  src/a.go  ", Status: "ADD"})
+	if !ok || key != runDiffFileKey("r1", "src/a.go") || file.Path != "src/a.go" || file.Status != "added" {
+		t.Fatalf("prepareRunDiffFileUpsert = key=%q file=%#v ok=%v", key, file, ok)
+	}
+
+	artifact, ok := prepareArtifactForUpsert(Run{}, false, Artifact{ID: "a1", RunID: "r1"})
+	if ok {
+		t.Fatal("missing run artifact should fail")
+	}
+	artifact, ok = prepareArtifactForUpsert(Run{ID: "r1", ThreadID: "t1"}, true, Artifact{ID: "  a1  ", RunID: "r1"})
+	if !ok || artifact.ID != "a1" || artifact.ThreadID != "t1" || artifact.Kind != "file" {
+		t.Fatalf("prepareArtifactForUpsert = %#v ok=%v", artifact, ok)
+	}
+
+	preview, ok := preparePreviewForUpsert(Run{}, false, Preview{ID: "p1", RunID: "r1"})
+	if ok {
+		t.Fatal("missing run preview should fail")
+	}
+	preview, ok = preparePreviewForUpsert(Run{ID: "r1", ThreadID: "t1"}, true, Preview{ID: "  p1  ", RunID: "r1"})
+	if !ok || preview.ID != "p1" || preview.ThreadID != "t1" || preview.Status != "ready" {
+		t.Fatalf("preparePreviewForUpsert = %#v ok=%v", preview, ok)
+	}
+
+	threads := map[string]Thread{"t1": {ID: "t1"}}
+	items := map[string]Item{"i1": {ID: "i1", ThreadID: "t1"}, "i2": {ID: "i2", ThreadID: "other"}}
+	if !validatePinThreadItemRefs(threads, items, "t1", "i1") {
+		t.Fatal("valid pin refs rejected")
+	}
+	if validatePinThreadItemRefs(threads, items, "missing", "i1") {
+		t.Fatal("missing thread accepted")
+	}
+	if validatePinThreadItemRefs(threads, items, "t1", "i2") {
+		t.Fatal("item thread mismatch accepted")
+	}
+}
+
+func TestResolveUpdateAgentProfileAndErrIfMissing(t *testing.T) {
+	t.Parallel()
+	now := "2026-07-18T00:00:00Z"
+	profile, err := resolveUpdateAgentProfile(AgentProfile{}, false, map[string]any{"name": "x"}, now)
+	if err != ErrNotFound || profile.ID != "" {
+		t.Fatalf("missing agent = %#v err=%v", profile, err)
+	}
+	profile, err = resolveUpdateAgentProfile(
+		AgentProfile{ID: "ag1", Name: "old", AdapterID: "claude"},
+		true,
+		map[string]any{"name": "new"},
+		now,
+	)
+	if err != nil || profile.Name != "new" || profile.UpdatedAt != now {
+		t.Fatalf("resolveUpdateAgentProfile = %#v err=%v", profile, err)
+	}
+
+	if errIfMissing(true) != nil {
+		t.Fatal("errIfMissing true")
+	}
+	if errIfMissing(false) != ErrNotFound {
+		t.Fatal("errIfMissing false")
+	}
+}
+
+func TestApplyDeleteThreadOwnedMapsAndPlanCleanup(t *testing.T) {
+	t.Parallel()
+	runs := map[string]Run{"r1": {ID: "r1"}, "r2": {ID: "r2"}}
+	items := map[string]Item{"i1": {ID: "i1"}, "i2": {ID: "i2"}, "i3": {ID: "i3"}}
+	runOrder, itemOrder := applyDeleteThreadOwnedMaps(
+		runs, items,
+		[]string{"r1", "r2"}, []string{"i1", "i2", "i3"},
+		map[string]struct{}{"r1": {}},
+		map[string]struct{}{"i1": {}, "i2": {}},
+	)
+	if len(runs) != 1 || runs["r2"].ID != "r2" {
+		t.Fatalf("runs = %#v", runs)
+	}
+	if len(items) != 1 || items["i3"].ID != "i3" {
+		t.Fatalf("items = %#v", items)
+	}
+	if !reflect.DeepEqual(runOrder, []string{"r2"}) || !reflect.DeepEqual(itemOrder, []string{"i3"}) {
+		t.Fatalf("orders = %#v %#v", runOrder, itemOrder)
+	}
+
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	order := []string{"r1", "r2", "r3"}
+	runMap := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1", Status: "finished", FinishedAt: now.Add(-2 * time.Hour).Format(time.RFC3339)},
+		"r2": {ID: "r2", ThreadID: "t1", Status: "finished", FinishedAt: now.Add(-10 * time.Minute).Format(time.RFC3339)},
+		"r3": {ID: "r3", ThreadID: "t1", Status: "queued"},
+	}
+	remove := planRunsForCleanup(order, runMap, now, time.Hour, 1)
+	if _, ok := remove["r1"]; !ok {
+		t.Fatalf("expected r1 removed by TTL: %#v", remove)
+	}
+	if _, ok := remove["r2"]; ok {
+		t.Fatalf("r2 should remain: %#v", remove)
+	}
+	if _, ok := remove["r3"]; ok {
+		t.Fatalf("queued r3 should remain: %#v", remove)
+	}
+}
+
+func TestLookupClonedArtifactAndThreadMessage(t *testing.T) {
+	t.Parallel()
+	src := &ArtifactContentSource{Kind: ArtifactContentSourceBasename, Path: "a.txt", Readable: true}
+	artifacts := map[string]Artifact{"a1": {ID: "a1", ContentSource: src}}
+	got, ok := lookupClonedArtifact(artifacts, "a1")
+	if !ok || got.ID != "a1" {
+		t.Fatalf("lookupClonedArtifact = %#v ok=%v", got, ok)
+	}
+	got.ContentSource.Path = "mutated"
+	if artifacts["a1"].ContentSource.Path != "a.txt" {
+		t.Fatal("lookupClonedArtifact did not isolate content source")
+	}
+	if _, ok := lookupClonedArtifact(artifacts, "missing"); ok {
+		t.Fatal("missing artifact should fail")
+	}
+
+	item, err := buildThreadMessageFromThread(Thread{}, false, "i1", "user", "hi")
+	if err != ErrNotFound || item.ID != "" {
+		t.Fatalf("missing thread message = %#v err=%v", item, err)
+	}
+	item, err = buildThreadMessageFromThread(Thread{ID: "t1", ProjectID: "p1"}, true, "i1", "  ", "hello")
+	if err != nil || item.Type != "user_message" || item.Role != "user" || item.ProjectID != "p1" || item.ThreadID != "t1" {
+		t.Fatalf("buildThreadMessageFromThread = %#v err=%v", item, err)
+	}
+}
+
+func TestNewEmptyStore(t *testing.T) {
+	t.Parallel()
+	s := newEmptyStore()
+	if s == nil || s.projects == nil || s.threads == nil || s.runs == nil || s.items == nil {
+		t.Fatalf("newEmptyStore core maps nil: %#v", s)
+	}
+	if s.pins == nil || s.diffs == nil || s.artifacts == nil || s.previews == nil {
+		t.Fatalf("newEmptyStore evidence maps nil: %#v", s)
+	}
+	if s.userProfiles == nil || s.agentProfiles == nil || s.settings == nil {
+		t.Fatalf("newEmptyStore profile/settings nil: %#v", s)
+	}
+	if len(s.projectOrder) != 0 || len(s.threadOrder) != 0 {
+		t.Fatalf("newEmptyStore orders should be empty")
+	}
+}
