@@ -164,230 +164,38 @@ import {
   unwrapHubResponse,
 } from './hubClientEnvelope';
 import {
+  buildAttachmentDownloadUrl,
+  buildAttachmentFormData,
+  buildOidcAuthorizeBody,
+  buildPatchSettingsBody,
+  buildProbeAttachmentBody,
+  buildReactionBody,
+  buildStreamTaskEventBody,
+  buildTaskAckBody,
+  buildTaskDoneBody,
+  buildTaskFailBody,
+  buildTaskStreamBody,
+  buildTriggerAgentTaskBody,
+  normalizeExecutionTargetsResponse,
+  withPublicCatalogParams,
+} from './hubClientPayloadUtils';
+import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
   qs,
 } from './hubClientRequestUtils';
+import {
+  DEFAULT_HUB_TIMEOUT_MS,
+  applyBearerAuth,
+  applyDefaultJsonContentType,
+  createNetworkAppError,
+  createTimeoutAppError,
+  isAbortError,
+  isNetworkFetchTypeError,
+} from './hubClientTransportUtils';
 
-// ── Envelope / error runtime (extracted #799) ──
-export {
-  HubError,
-  isHubResponseEnvelope,
-  isHubSuccessCode,
-  parseHubError,
-  unwrapHubResponse,
-} from './hubClientEnvelope';
-
-// ── WS frame payload / typed frame DTOs (extracted #788) ──
-export type {
-  HubDevicePresencePayload,
-  HubDeviceKickedPayload,
-  HubAgentDispatchPayload,
-  HubAgentStreamPayload,
-  HubAgentDonePayload,
-  HubAgentFailedPayload,
-  HubAgentCancelPayload,
-  HubAgentRegeneratePayload,
-  HubFriendEventPayload,
-  HubFrame,
-  HubAuthFrame,
-  HubAuthOkFrame,
-  HubAuthFailFrame,
-  HubMessageNewFrame,
-  HubMessageRecallFrame,
-  HubMessageReadFrame,
-  HubSessionCreatedFrame,
-  HubSessionInfoUpdatedFrame,
-  HubSessionDissolvedFrame,
-  HubAgentDispatchFrame,
-  HubAgentStreamFrame,
-  HubAgentDoneFrame,
-  HubAgentFailedFrame,
-  HubAgentCancelFrame,
-  HubAgentRegenerateFrame,
-  HubDeviceOnlineFrame,
-  HubDeviceOfflineFrame,
-  HubDeviceKickedFrame,
-  HubNotificationNewFrame,
-  HubFriendRequestFrame,
-  HubFriendAcceptedFrame,
-  HubMessageEditedPayload,
-  HubMessageEditedFrame,
-  HubMessagePinPayload,
-  HubMessagePinFrame,
-  HubMessageUnpinPayload,
-  HubMessageUnpinFrame,
-  HubMessageReactionPayload,
-  HubMessageReactionAddedFrame,
-  HubMessageReactionRemovedFrame,
-  HubSessionMemberEventPayload,
-  HubSessionMemberJoinedFrame,
-  HubSessionMemberLeftFrame,
-  HubKnownFrame,
-} from './hubClientFrameTypes';
-
-// ── Team / profile / document / task-approval DTOs (extracted #767) ──
-export type {
-  HubAgentRunEventSummary,
-  HubAgentRunEvent,
-  HubCoordinatorRouteDecision,
-  HubAgentTeam,
-  HubAgentTeamMember,
-  HubAgentTeamDetail,
-  HubAgentTeamRun,
-  HubAgentTeamAssignment,
-  HubAgentTeamTask,
-  HubAgentTeamEvent,
-  HubTeamMemberState,
-  HubTeamTaskState,
-  HubTeamAssignmentState,
-  HubTeamApprovalState,
-  HubTeamArtifactState,
-  HubTeamConflictState,
-  HubTeamRunEventState,
-  HubTeamBudget,
-  HubTeamRunState,
-  HubTeamApprovalDecisionRequest,
-  HubTeamConflictResolutionRequest,
-  HubCreateAgentTeamRequest,
-  HubUpdateAgentTeamRequest,
-  HubAddAgentTeamMemberRequest,
-  HubStartAgentTeamRunRequest,
-  HubAttachmentRef,
-  HubProbeAttachmentResponse,
-  HubAgentProfile,
-  HubAgentProfileListResponse,
-  HubCreateAgentProfileRequest,
-  HubUpdateAgentProfileRequest,
-  AgentRunEventSummary,
-  AgentRunEvent,
-  CoordinatorRouteDecision,
-  AgentTeam,
-  AgentTeamMember,
-  AgentTeamDetail,
-  AgentTeamRun,
-  AgentTeamAssignment,
-  AgentTeamTask,
-  AgentTeamEvent,
-  TeamMemberState,
-  TeamTaskState,
-  TeamAssignmentState,
-  TeamApprovalState,
-  TeamArtifactState,
-  TeamConflictState,
-  TeamRunEventState,
-  TeamBudget,
-  TeamRunState,
-  TeamApprovalDecisionRequest,
-  TeamConflictResolutionRequest,
-  CreateAgentTeamRequest,
-  UpdateAgentTeamRequest,
-  AddAgentTeamMemberRequest,
-  StartAgentTeamRunRequest,
-  AttachmentRef,
-  ProbeAttachmentResponse,
-  AgentProfile,
-  AgentProfileListResponse,
-  CreateAgentProfileRequest,
-  UpdateAgentProfileRequest,
-  HubDocumentListItem,
-  HubDocumentListResponse,
-  HubCreateDocumentRequest,
-  HubUpdateDocumentRequest,
-  HubDocument,
-  HubAgentTaskStreamEventOptions,
-  CreateHubDocumentRequest,
-  UpdateHubDocumentRequest,
-  AgentTaskStreamEventOptions,
-  HubAgentTaskApproval,
-  HubAgentTaskApprovalList,
-  HubAgentTaskArtifact,
-  HubAgentTaskArtifactList,
-  HubTaskApprovalDecisionRequest,
-  AgentTaskApproval,
-  AgentTaskApprovalList,
-  AgentTaskArtifact,
-  AgentTaskArtifactList,
-  TaskApprovalDecisionRequest,
-  HubAgentInstance,
-  HubPendingAgentTask,
-  AgentInstance,
-  PendingAgentTask,
-};
-
-// ── Core domain DTOs (extracted #777) ──
-export type {
-  HubResponseEnvelope,
-  HubEnvelope,
-  HubClientOptions,
-  HubRegisterRequest,
-  HubLoginRequest,
-  HubAuthResponse,
-  HubUserProfile,
-  HubUpdateProfileRequest,
-  HubChangePasswordRequest,
-  HubOidcAuthorizeRequest,
-  HubOidcAuthorizeResponse,
-  HubOidcCallbackRequest,
-  HubOidcCallbackResponse,
-  HubContactType,
-  HubRelationship,
-  HubSearchResult,
-  HubFriendRequest,
-  HubContactInfo,
-  HubSessionType,
-  HubSessionRole,
-  HubSession,
-  HubSessionMember,
-  HubCreatePrivateSessionRequest,
-  HubCreateGroupSessionRequest,
-  HubCreateSessionResponse,
-  HubUpdateSessionInfoRequest,
-  HubUpdateSessionSettingsRequest,
-  HubSenderType,
-  HubContentType,
-  HubSendMessageRequest,
-  HubSendMessageResponse,
-  HubReplyToInfo,
-  HubMessageAttachment,
-  HubMessage,
-  HubRegisterDeviceRequest,
-  HubDevice,
-  HubAddAgentToSessionRequest,
-  HubCustomAgentRequest,
-  HubCustomAgent,
-  HubSkill,
-  HubMCPServer,
-  HubWorkspaceProject,
-  HubWorkspaceProjectListResponse,
-  HubCreateWorkspaceProjectRequest,
-  HubUpdateWorkspaceProjectRequest,
-  HubWorkspaceProjectThread,
-  HubCreateWorkspaceProjectThreadRequest,
-  HubSendWorkspaceProjectThreadMessageRequest,
-  HubWorkspaceProjectThreadMessage,
-  HubAgentTaskStatus,
-  HubAgentTask,
-  HubTriggerAgentTaskRequest,
-  HubTriggerAgentTaskOptions,
-  HubTaskRunRequest,
-  HubTaskAckRequest,
-  HubTaskStreamRequest,
-  HubTaskDoneRequest,
-  HubTaskFailRequest,
-  HubNotification,
-  HubPageInfo,
-  HubListResponse,
-  HubExecutionTargetType,
-  HubExecutionTarget,
-  HubExecutionTargetRequest,
-  HubExecutionTargetListResponse,
-  HubAuditEvent,
-  HubRelayCommandRequest,
-  HubRelayCommand,
-};
-
-
+// ── Public type / envelope re-exports (extracted #810) ──
+export * from './hubClientPublicReexports';
 
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
@@ -399,14 +207,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
   ): Promise<T> {
     const token = opts.getToken?.();
     const headers = new Headers(options.headers);
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
+    applyDefaultJsonContentType(headers);
+    applyBearerAuth(headers, token);
 
-    const timeoutMs = opts.timeoutMs ?? 30_000;
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_HUB_TIMEOUT_MS;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const signal = controller.signal;
@@ -468,16 +272,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
       clearTimeout(timeoutId);
 
       // Surface timeout as a distinct error
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        const timeoutError = new AppError(
-          {
-            error: {
-              code: 'TIMEOUT',
-              message: `Request timed out after ${timeoutMs}ms: ${options.method ?? 'GET'} ${path}`,
-            },
-          },
-          0,
-        );
+      if (isAbortError(error)) {
+        const timeoutError = createTimeoutAppError({
+          timeoutMs,
+          method: options.method ?? 'GET',
+          path,
+        });
         console.error(`[HubClient] ${timeoutError.message}`);
         reportApiError(timeoutError, { path, method: options.method ?? 'GET', timeoutMs });
         throw timeoutError;
@@ -486,16 +286,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       // Report all other errors
       if (error instanceof AppError) {
         reportApiError(error, { path, method: options.method ?? 'GET' });
-      } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        const netError = new AppError(
-          {
-            error: {
-              code: 'NETWORK_ERROR',
-              message: `Network request failed: ${error.message}`,
-            },
-          },
-          0,
-        );
+      } else if (isNetworkFetchTypeError(error)) {
+        const netError = createNetworkAppError((error as TypeError).message);
         console.error(`[HubClient] ${netError.message}`);
         reportApiError(netError, { path, method: options.method ?? 'GET' });
         throw netError;
@@ -531,10 +323,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
     const token = opts.getToken?.();
     const headers = new Headers();
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    const timeoutMs = opts.timeoutMs ?? 30_000;
+    applyBearerAuth(headers, token);
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_HUB_TIMEOUT_MS;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -604,10 +394,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
       request<HubOidcAuthorizeResponse>('/client/auth/oidc/authorize', {
         method: 'POST',
-        body: JSON.stringify({
-          code_challenge_method: 'S256',
-          ...body,
-        }),
+        body: JSON.stringify(buildOidcAuthorizeBody(body)),
       }),
     oidcCallback: (body: HubOidcCallbackRequest) =>
       request<HubOidcCallbackResponse>('/client/auth/oidc/callback', {
@@ -821,25 +608,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ackTask: (taskId: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
         method: 'POST',
-        ...(runId ? { body: JSON.stringify({ run_id: runId }) } : {}),
+        ...(runId ? { body: JSON.stringify(buildTaskAckBody(runId)) } : {}),
       }),
     streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
-        body: JSON.stringify({ content, ...(runId ? { run_id: runId } : {}) }),
+        body: JSON.stringify(buildTaskStreamBody(content, runId)),
       }),
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
         method: 'POST',
-        body: JSON.stringify({
-          final_content: finalContent ?? '',
-          ...(runId ? { run_id: runId } : {}),
-        }),
+        body: JSON.stringify(buildTaskDoneBody(finalContent, runId)),
       }),
     failTask: (taskId: string, error: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
         method: 'POST',
-        body: JSON.stringify({ error, ...(runId ? { run_id: runId } : {}) }),
+        body: JSON.stringify(buildTaskFailBody(error, runId)),
       }),
 
     addAgentToSession: (
@@ -856,7 +640,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       request<HubAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify({ trigger_message_id: triggerMessageId, ...options }),
+        body: JSON.stringify(buildTriggerAgentTaskBody(triggerMessageId, options)),
       }),
     cancelAgentTask: (taskId: string) =>
       requestWithFallback<void>(
@@ -880,13 +664,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
         `/web/execution-targets${qs(params ?? {})}`,
       );
-      if (Array.isArray(data)) {
-        return { items: data, page: { hasMore: false } };
-      }
-      return {
-        items: Array.isArray(data.items) ? data.items : [],
-        page: data.page ?? { hasMore: false },
-      };
+      return normalizeExecutionTargetsResponse(data);
     },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>('/web/execution-targets', {
@@ -958,7 +736,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<HubListResponse<HubSkill>>(
-        `/web/skills${qs({ is_public: 'true', ...params ?? {} })}`,
+        `/web/skills${qs(withPublicCatalogParams(params ?? {}))}`,
       ),
 
     listPublicMCPServers: (params?: {
@@ -969,7 +747,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<HubListResponse<HubMCPServer>>(
-        `/web/mcp-servers${qs({ is_public: 'true', ...params ?? {} })}`,
+        `/web/mcp-servers${qs(withPublicCatalogParams(params ?? {}))}`,
       ),
 
     // ── Workspace Projects ──────────────────────────────────────────
@@ -1025,13 +803,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
     addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
       request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'POST',
-        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+        body: JSON.stringify(buildReactionBody(sessionId, reaction)),
       }),
 
     removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
       request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'DELETE',
-        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+        body: JSON.stringify(buildReactionBody(sessionId, reaction)),
       }),
 
     listMessageReactions: (messageId: string, sessionId: string) =>
@@ -1161,28 +939,27 @@ export function createHubClient(opts: HubClientOptions = {}) {
     patchSettings: (values: Record<string, string>) =>
       request<Record<string, string>>('/client/settings', {
         method: 'PATCH',
-        body: JSON.stringify({ values }),
+        body: JSON.stringify(buildPatchSettingsBody(values)),
       }),
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
     probeAttachment: (hash: string) =>
       request<HubProbeAttachmentResponse>('/client/attachments/probe', {
         method: 'POST',
-        body: JSON.stringify({ hash }),
+        body: JSON.stringify(buildProbeAttachmentBody(hash)),
       }),
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
     uploadAttachment: (file: File, hash: string) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('hash', hash);
-      formData.append('original_name', file.name);
-      return uploadMultipart<HubAttachmentRef>('/client/attachments', formData);
+      return uploadMultipart<HubAttachmentRef>(
+        '/client/attachments',
+        buildAttachmentFormData(file, hash),
+      );
     },
 
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
-      `${baseUrl}/client/attachments/${encodeURIComponent(attachmentId)}`,
+      buildAttachmentDownloadUrl(baseUrl, attachmentId),
 
 
 
@@ -1240,12 +1017,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ) =>
       request<undefined>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
-        body: JSON.stringify({
-          event_type: eventType,
-          payload,
-          ...(options.runId ? { run_id: options.runId } : {}),
-          ...(options.clientMsgId ? { client_msg_id: options.clientMsgId } : {}),
-        }),
+        body: JSON.stringify(buildStreamTaskEventBody(eventType, payload, options)),
       }),
 
 
@@ -1269,55 +1041,3 @@ export function createHubClient(opts: HubClientOptions = {}) {
 }
 
 export type HubClient = ReturnType<typeof createHubClient>;
-
-// ── Compat aliases + SSOT gaps (extracted #799) ──
-export type {
-  EmptyHubResponse,
-  RegisterRequest,
-  LoginRequest,
-  AuthResponse,
-  UserProfile,
-  UpdateProfileRequest,
-  ChangePasswordRequest,
-  SearchResult,
-  FriendRequestInfo,
-  ContactInfo,
-  Contact,
-  Session,
-  HubSessionAlias,
-  SessionMember,
-  CreatePrivateSessionRequest,
-  CreateGroupSessionRequest,
-  SendMessageRequest,
-  SendMessageResponse,
-  ReplyToInfo,
-  MessageResponse,
-  MessageAttachment,
-  RegisterDeviceRequest,
-  Device,
-  AddAgentToSessionRequest,
-  CustomAgentRequest,
-  CustomAgent,
-  Notification,
-  ExecutionTarget,
-  ExecutionTargetType,
-  ExecutionTargetRequest,
-  ExecutionTargetListResponse,
-  WorkspaceProject,
-  WorkspaceProjectListResponse,
-  CreateWorkspaceProjectRequest,
-  UpdateWorkspaceProjectRequest,
-  WorkspaceProjectThread,
-  CreateWorkspaceProjectThreadRequest,
-  SendWorkspaceProjectThreadMessageRequest,
-  WorkspaceProjectThreadMessage,
-  AgentTask,
-  TriggerAgentTaskOptions,
-  OIDCAuthorizeRequest,
-  OIDCAuthorizeResponse,
-  OIDCCallbackRequest,
-  OIDCCallbackResponse,
-  Skill,
-  MCPServer,
-} from './hubClientCompatTypes';
-export { HUBCLIENT_SSOT_GAPS } from './hubClientCompatTypes';
