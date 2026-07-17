@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ArtifactCard from './ArtifactCard';
+import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
 
 describe('ArtifactCard', () => {
   const baseProps = {
@@ -43,6 +44,13 @@ describe('ArtifactCard', () => {
     render(<ArtifactCard {...baseProps} />);
     const iframe = screen.getByTitle('Preview: Dashboard Preview');
     expect(iframe.tagName).toBe('IFRAME');
+  });
+
+  it('uses remote sandbox without allow-same-origin', () => {
+    render(<ArtifactCard {...baseProps} />);
+    const iframe = screen.getByTitle('Preview: Dashboard Preview');
+    expect(iframe.getAttribute('sandbox')).toBe(PREVIEW_SANDBOX_REMOTE);
+    expect(iframe.getAttribute('sandbox')).not.toContain('allow-same-origin');
   });
 
   it('renders image preview for image type', () => {

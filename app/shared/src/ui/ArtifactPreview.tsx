@@ -1,6 +1,6 @@
 // ArtifactPreview — iframe preview + fullscreen + apply-diff support
 // Used inline in ChatView and as a fullscreen modal overlay.
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Globe,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import Modal from './Modal';
 import styles from './ArtifactPreview.module.css';
+import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
 
 export type ArtifactType = 'iframe' | 'page' | 'image' | 'file';
 
@@ -201,11 +202,6 @@ function ArtifactContent({
 }) {
   const { t } = useTranslation();
 
-  const sandboxPerms = useMemo(
-    () => 'allow-scripts allow-same-origin allow-popups allow-forms',
-    [],
-  );
-
   if (iframeError) {
     return (
       <div className={styles.error}>
@@ -316,7 +312,7 @@ function ArtifactContent({
         src={artifactUrl}
         className={styles.frame}
         title={displayTitle}
-        sandbox={sandboxPerms}
+        sandbox={PREVIEW_SANDBOX_REMOTE}
         onLoad={onIframeLoad}
         onError={onIframeError}
         style={{ display: iframeLoading ? 'none' : 'block' }}
