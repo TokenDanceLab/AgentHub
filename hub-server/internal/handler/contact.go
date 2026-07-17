@@ -1,23 +1,24 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/contact"
 )
 
-// ContactService is the subset of *service.ContactService used by ContactHandler.
+// ContactService is the subset of *contact.Service used by ContactHandler.
+// DTOs live in service/contact (#685 third IM typed-service package).
 type ContactService interface {
-	SearchUser(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error)
+	SearchUser(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error)
 	SendFriendRequest(ctx context.Context, userID, friendID, message string) error
-	ListFriendRequests(ctx context.Context, userID string) ([]service.RequestInfo, error)
+	ListFriendRequests(ctx context.Context, userID string) ([]contact.RequestInfo, error)
 	AcceptFriendRequest(ctx context.Context, userID, requestID string) error
 	RejectFriendRequest(ctx context.Context, userID, requestID string) error
-	ListContacts(ctx context.Context, userID string) ([]service.ContactInfo, error)
+	ListContacts(ctx context.Context, userID string) ([]contact.ContactInfo, error)
 	RemoveContact(ctx context.Context, currentUserID, friendUserID string) error
 	BlockContact(ctx context.Context, currentUserID, targetUserID string) error
 	UnblockContact(ctx context.Context, currentUserID, targetUserID string) error

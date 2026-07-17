@@ -16,12 +16,13 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/contact"
 )
 
 // ── behavioral test helpers ─────────────────────────────────────────────────
 
 // newBehaviorServiceDB creates an in-memory SQLite DB with all tables needed
-// by ContactService and SessionService, including the composite unique index
+// by contact.Service and SessionService, including the composite unique index
 // required by UpsertFriendship.
 func newBehaviorServiceDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -105,7 +106,7 @@ func TestContactService_SearchToFriendFlow(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewContactService(db, bus, cc)
+	svc := contact.NewService(db, bus, cc)
 
 	result, err := svc.SearchUser(context.Background(), alice, bob)
 	require.NoError(t, err)
@@ -160,7 +161,7 @@ func TestContactService_SendFriendRequestWhenAlreadyPending(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hello")
 	require.NoError(t, err)
 	err = svc.SendFriendRequest(context.Background(), alice, bob, "again")
@@ -175,7 +176,7 @@ func TestContactService_SendFriendRequestWhenAlreadyAccepted(t *testing.T) {
 	bob := createUser(t, db, "bob", "Bob")
 	createFriendship(t, db, alice, bob)
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hello")
 	assert.ErrorIs(t, err, errcode.FriendAlready)
 }
@@ -193,7 +194,7 @@ func TestContactService_SendFriendRequestWhenBlocked(t *testing.T) {
 		Status:   model.StatusBlocked,
 	}).Error)
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hello")
 	assert.ErrorIs(t, err, errcode.FriendBlocked)
 }
@@ -205,7 +206,7 @@ func TestContactService_RejectFriendRequest(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hi")
 	require.NoError(t, err)
 
@@ -232,7 +233,7 @@ func TestContactService_BlockAndUnblock(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 
 	// alice blocks bob
 	err := svc.BlockContact(context.Background(), alice, bob)
@@ -259,7 +260,7 @@ func TestContactService_BlockSelfReturnsError(t *testing.T) {
 	cc := newBehaviorServiceCache(t)
 	alice := createUser(t, db, "alice", "Alice")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.BlockContact(context.Background(), alice, alice)
 	assert.ErrorIs(t, err, errcode.UserInvalidParam)
 }
@@ -272,7 +273,7 @@ func TestContactService_RemoveContact(t *testing.T) {
 	bob := createUser(t, db, "bob", "Bob")
 	createFriendship(t, db, alice, bob)
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.RemoveContact(context.Background(), alice, bob)
 	require.NoError(t, err)
 
@@ -289,7 +290,7 @@ func TestContactService_UpdateRemark(t *testing.T) {
 	bob := createUser(t, db, "bob", "Bob")
 	createFriendship(t, db, alice, bob)
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.UpdateRemark(context.Background(), alice, bob, "best friend")
 	require.NoError(t, err)
 
@@ -305,7 +306,7 @@ func TestContactService_ListEmptyContacts(t *testing.T) {
 	cc := newBehaviorServiceCache(t)
 	lonely := createUser(t, db, "lonely", "Lonely")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	contacts, err := svc.ListContacts(context.Background(), lonely)
 	require.NoError(t, err)
 	assert.NotNil(t, contacts)
@@ -318,7 +319,7 @@ func TestContactService_ListEmptyRequests(t *testing.T) {
 	cc := newBehaviorServiceCache(t)
 	noreq := createUser(t, db, "noreq", "NoReq")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	requests, err := svc.ListFriendRequests(context.Background(), noreq)
 	require.NoError(t, err)
 	assert.NotNil(t, requests)
@@ -332,7 +333,7 @@ func TestContactService_AcceptAlreadyAcceptedRequestFails(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hi")
 	require.NoError(t, err)
 
@@ -355,7 +356,7 @@ func TestContactService_AcceptRequestFromWrongUserFails(t *testing.T) {
 	bob := createUser(t, db, "bob", "Bob")
 	charlie := createUser(t, db, "charlie", "Charlie")
 
-	svc := NewContactService(db, nil, cc)
+	svc := contact.NewService(db, nil, cc)
 	err := svc.SendFriendRequest(context.Background(), alice, bob, "hi")
 	require.NoError(t, err)
 

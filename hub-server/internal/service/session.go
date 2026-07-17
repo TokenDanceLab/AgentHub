@@ -20,8 +20,8 @@ import (
 // Same-package thin first seam (#593): SessionService already owns private/group
 // session lifecycle (create/list/members/leave/transfer/dissolve/settings/search).
 // This seam hardens replaceable ports (bus + cache) without a package move —
-// same pattern as MessageService (#585). ContactService and full service/im
-// subpackage extract remain deferred.
+// same pattern as MessageService (#585). Contact package-moved in #685; full
+// remaining service/im typed package extracts remain deferred.
 
 // sessionBus publishes domain events from session lifecycle paths.
 // Implemented by *Bus.
