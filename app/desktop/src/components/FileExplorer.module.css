@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--color-surface, #1e1e1e);
-  color: var(--color-text, #cccccc);
+  background: var(--surface);
+  color: var(--text-1);
   font-size: 13px;
   user-select: none;
 }
@@ -17,8 +17,8 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-secondary, #888);
-  border-bottom: 1px solid var(--color-border, #333);
+  color: var(--text-2);
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
 }
 
@@ -31,7 +31,7 @@
 .collapseBtn {
   background: none;
   border: none;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-2);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -41,8 +41,8 @@
 }
 
 .collapseBtn:hover {
-  background: var(--color-hover, #2a2a2a);
-  color: var(--color-text, #ccc);
+  background: var(--surface-hover);
+  color: var(--text-1);
 }
 
 .treeWrapper {
@@ -61,31 +61,31 @@
 }
 
 .treeWrapper::-webkit-scrollbar-thumb {
-  background: var(--color-scrollbar, #424242);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 .treeWrapper::-webkit-scrollbar-thumb:hover {
-  background: var(--color-scrollbar-hover, #555);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .empty {
   padding: 20px 12px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-2);
   font-size: 13px;
   text-align: center;
 }
 
 .loading {
   padding: 20px 12px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-2);
   font-size: 13px;
   text-align: center;
 }
 
 .errorMsg {
   padding: 20px 12px;
-  color: var(--color-danger, #e53e3e);
+  color: var(--danger);
   font-size: 13px;
   text-align: center;
 }
@@ -103,15 +103,15 @@
 }
 
 .node:hover {
-  background: var(--color-hover, #2a2a2a);
+  background: var(--surface-hover);
 }
 
 .nodeSelected {
-  background: var(--color-active, #37373d);
+  background: var(--surface-selected);
 }
 
 .nodeSelected:hover {
-  background: var(--color-active, #37373d);
+  background: var(--surface-selected);
 }
 
 .chevron {
@@ -121,7 +121,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-2);
   transition: transform 0.15s ease;
 }
 
@@ -161,8 +161,8 @@
 .contextMenu {
   position: fixed;
   z-index: var(--z-popover);
-  background: var(--color-surface-elevated, #252526);
-  border: 1px solid var(--color-border, #454545);
+  background: var(--surface-high);
+  border: 1px solid var(--bdr);
   border-radius: 6px;
   padding: 4px 0;
   min-width: 180px;
@@ -177,30 +177,30 @@
   padding: 6px 12px;
   border: none;
   background: none;
-  color: var(--color-text, #ccc);
+  color: var(--text-1);
   font-size: 13px;
   cursor: pointer;
   text-align: left;
 }
 
 .menuItem:hover {
-  background: var(--color-active, #094771);
-  color: var(--primary-foreground);
+  background: var(--surface-selected);
+  color: var(--text-1);
 }
 
 .menuItemDanger {
   composes: menuItem;
-  color: var(--color-danger, #e53e3e);
+  color: var(--danger);
 }
 
 .menuItemDanger:hover {
-  background: var(--color-danger, #e53e3e);
+  background: var(--danger);
   color: var(--destructive-foreground);
 }
 
 .menuDivider {
   height: 1px;
-  background: var(--color-border, #454545);
+  background: var(--bdr);
   margin: 4px 0;
 }
 
@@ -219,18 +219,18 @@
 }
 
 .gitStatusM {
-  background: color-mix(in oklch, var(--color-warning, #e2b714) 15%, transparent);
-  color: var(--color-warning, #e2b714);
+  background: color-mix(in oklch, var(--warning) 15%, transparent);
+  color: var(--warning);
 }
 
 .gitStatusA {
   background: var(--diff-added-bg, var(--glass-tint-moss));
-  color: var(--diff-added-border, #46954a);
+  color: var(--diff-added-border, var(--success));
 }
 
 .gitStatusD {
   background: var(--diff-removed-bg, var(--glass-tint-danger));
-  color: var(--diff-removed-border, #e5534b);
+  color: var(--diff-removed-border, var(--danger));
 }
 
 .gitStatusQuestion {
@@ -245,7 +245,7 @@
 
 .gitStatusU {
   background: var(--diff-removed-bg, var(--glass-tint-danger));
-  color: var(--diff-removed-border, #e5534b);
+  color: var(--diff-removed-border, var(--danger));
 }
 
 /* ── Drag-and-Drop ────────────────────────── */
@@ -255,12 +255,12 @@
 }
 
 .nodeDragOver {
-  background: var(--color-active, #37373d);
-  outline: 1px dashed var(--color-primary, #4fc1ff);
+  background: var(--surface-selected);
+  outline: 1px dashed var(--primary);
   outline-offset: -1px;
 }
 
 .nodeDragOverCopy {
   composes: nodeDragOver;
-  outline-color: var(--color-success, #4caf50);
+  outline-color: var(--success);
 }
