@@ -862,16 +862,22 @@ function isBrowserPreviewRuntime(): boolean {
   return typeof (globalThis as typeof globalThis & { window?: unknown }).window !== 'undefined';
 }
 
-function getPreviewWebSocketFactory(): ((url: string) => HubWebSocketLike) | undefined {
+function getPreviewWebSocketFactory():
+  | ((url: string, protocols?: string[]) => HubWebSocketLike)
+  | undefined {
   const WebSocketCtor = (globalThis as typeof globalThis & {
-    WebSocket?: new (url: string) => HubWebSocketLike;
+    WebSocket?: new (url: string, protocols?: string | string[]) => HubWebSocketLike;
   }).WebSocket;
 
   if (!WebSocketCtor) {
     return undefined;
   }
 
-  return (url: string) => new WebSocketCtor(url) as unknown as HubWebSocketLike;
+  // Prefer Sec-WebSocket-Protocol auth (agenthub.bearer.v1 + jwt) when provided.
+  return (url: string, protocols?: string[]) =>
+    (protocols && protocols.length > 0
+      ? new WebSocketCtor(url, protocols)
+      : new WebSocketCtor(url)) as unknown as HubWebSocketLike;
 }
 
 function formatHubSyncStatus(
