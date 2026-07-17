@@ -39,17 +39,18 @@ type edgeRunResponse = dispatch.EdgeRunResponse
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Residual pure surface (#811) after #800/#789/#779/#768/#756/#732 pure helpers,
-// thin first seam (#563), redispatch residual (#573), and residual ports (#617).
-// Pure surface lives in service/dispatch (loopback / runtime type / select /
-// merge / prompt+history text / task-status / edge constants / Message DTO /
-// Edge run request builder / team+target+capability+redelivery / routing /
-// task-access / payload assembly / event payloads / Payload DTO + builders /
-// capability mint resolve / trigger target mapping / model->DTO mappers /
-// route classify / redispatch prep / Edge HTTP headers / redelivery route
-// classify / target-bound availability / finalize delivery payload / Edge
-// request marshal) with thin same-package aliases below. Orchestration + ports
-// stay flat; no OpenAPI/handler/frontend; no typed DispatchService package move.
+// Pure residual closed (#823) after #811/#800/#789/#779/#768/#756/#732 pure
+// helpers, thin first seam (#563), redispatch residual (#573), and residual
+// ports (#617). Pure surface lives in service/dispatch (~1.2k prod LOC:
+// loopback / runtime type / select / merge / prompt+history text / task-status
+// / edge constants / Message DTO / Edge run request builder /
+// team+target+capability+redelivery / routing / task-access / payload assembly
+// / event payloads / Payload DTO + builders / capability mint resolve /
+// trigger target mapping / model->DTO mappers / route classify / redispatch
+// prep / Edge HTTP headers / redelivery route classify / target-bound
+// availability / finalize delivery payload / Edge request marshal) with thin
+// same-package aliases below. Orchestration + ports stay flat (~903 LOC here);
+// no OpenAPI/handler/frontend; no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -89,8 +90,8 @@ type dispatchWS interface {
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
 // retries call in through Redispatcher; Payload DTO lives in service/dispatch
 // with a thin same-package alias. Same-package extract (#563/#573/#617) + pure
-// helpers in service/dispatch (#732/#756/#768/#779/#789) — typed package move
-// still deferred.
+// helpers in service/dispatch (#732→#811, pure residual closed #823) — typed
+// package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
