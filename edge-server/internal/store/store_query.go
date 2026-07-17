@@ -225,6 +225,114 @@ func defaultAgentProfileName(name string) string {
 	return defaultNonEmpty(name, "Unnamed Agent")
 }
 
+// applyUpsertTimestamps returns CreatedAt/UpdatedAt for create-or-update paths.
+// When exists is true, CreatedAt is preserved and UpdatedAt becomes now.
+func applyUpsertTimestamps(existingCreatedAt string, exists bool, now string) (createdAt, updatedAt string) {
+	if exists {
+		return existingCreatedAt, now
+	}
+	return now, now
+}
+
+func mergeRunDiffFileUpdate(existing, incoming RunDiffFile, now string) RunDiffFile {
+	existing.Diff = incoming.Diff
+	existing.Status = incoming.Status
+	existing.UpdatedAt = now
+	return existing
+}
+
+func stampRunDiffFileCreate(file RunDiffFile, now string) RunDiffFile {
+	file.CreatedAt = now
+	file.UpdatedAt = now
+	return file
+}
+
+func stampArtifactUpsert(artifact Artifact, existingCreatedAt string, exists bool, now string) Artifact {
+	artifact.CreatedAt, artifact.UpdatedAt = applyUpsertTimestamps(existingCreatedAt, exists, now)
+	return artifact
+}
+
+func stampPreviewUpsert(preview Preview, existingCreatedAt string, exists bool, now string) Preview {
+	preview.CreatedAt, preview.UpdatedAt = applyUpsertTimestamps(existingCreatedAt, exists, now)
+	return preview
+}
+
+func buildThreadPin(threadID, itemID, pinnedBy, now string) ThreadPin {
+	return ThreadPin{
+		ThreadID:  threadID,
+		ItemID:    itemID,
+		PinnedBy:  strings.TrimSpace(pinnedBy),
+		PinnedAt:  now,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
+
+func touchThreadPin(pin ThreadPin, pinnedBy, now string) ThreadPin {
+	pin.PinnedBy = strings.TrimSpace(pinnedBy)
+	pin.PinnedAt = now
+	pin.UpdatedAt = now
+	return pin
+}
+
+func prepareUserProfileCreate(profile UserProfile, now string) UserProfile {
+	profile.CreatedAt = now
+	profile.UpdatedAt = now
+	return profile
+}
+
+func prepareAgentProfileCreate(profile AgentProfile, now string) AgentProfile {
+	profile.Name = defaultAgentProfileName(profile.Name)
+	if profile.CreatedAt == "" {
+		profile.CreatedAt = now
+	}
+	profile.UpdatedAt = now
+	return profile
+}
+
+func applyRunEvidenceGate(run Run, result string) Run {
+	run.EvidenceGateResult = result
+	return run
+}
+
+func applyRunRetryCount(run Run, count int) Run {
+	run.RetryCount = count
+	return run
+}
+
+func cloneUserSettings(settings map[string]string, mtime string) UserSettings {
+	values := make(map[string]string, len(settings))
+	for k, v := range settings {
+		values[k] = v
+	}
+	return UserSettings{
+		Values:    values,
+		UpdatedAt: mtime,
+	}
+}
+
+// collectItemIDsForRemovedRuns returns item IDs whose RunID is in removeRuns.
+func collectItemIDsForRemovedRuns(items map[string]Item, removeRuns map[string]struct{}) map[string]struct{} {
+	removed := make(map[string]struct{})
+	for id, item := range items {
+		if _, remove := removeRuns[item.RunID]; remove {
+			removed[id] = struct{}{}
+		}
+	}
+	return removed
+}
+
+// collectKeysByRunID returns map keys whose value's run id matches runID.
+func collectKeysByRunID[T any](items map[string]T, runID string, runOf func(T) string) map[string]struct{} {
+	keys := make(map[string]struct{})
+	for id, item := range items {
+		if runOf(item) == runID {
+			keys[id] = struct{}{}
+		}
+	}
+	return keys
+}
+
 // runCleanupCandidate is a pure view of a terminal run used by cleanup selection.
 type runCleanupCandidate struct {
 	id         string

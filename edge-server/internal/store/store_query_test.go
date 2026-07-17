@@ -397,3 +397,149 @@ func TestDefaultAgentProfileName(t *testing.T) {
 		t.Fatalf("kept = %q", got)
 	}
 }
+
+func TestApplyUpsertTimestamps(t *testing.T) {
+	t.Parallel()
+	created, updated := applyUpsertTimestamps("old", true, "now")
+	if created != "old" || updated != "now" {
+		t.Fatalf("exists timestamps = %q/%q", created, updated)
+	}
+	created, updated = applyUpsertTimestamps("", false, "now")
+	if created != "now" || updated != "now" {
+		t.Fatalf("create timestamps = %q/%q", created, updated)
+	}
+}
+
+func TestMergeAndStampDiffArtifactPreview(t *testing.T) {
+	t.Parallel()
+	existing := RunDiffFile{RunID: "r1", Path: "a.go", Diff: "old", Status: "modified", CreatedAt: "c0"}
+	merged := mergeRunDiffFileUpdate(existing, RunDiffFile{Diff: "new", Status: "added"}, "now")
+	if merged.Diff != "new" || merged.Status != "added" || merged.UpdatedAt != "now" || merged.CreatedAt != "c0" {
+		t.Fatalf("mergeRunDiffFileUpdate = %#v", merged)
+	}
+
+	created := stampRunDiffFileCreate(RunDiffFile{RunID: "r1", Path: "b.go", Diff: "+x"}, "ts")
+	if created.CreatedAt != "ts" || created.UpdatedAt != "ts" {
+		t.Fatalf("stampRunDiffFileCreate = %#v", created)
+	}
+
+	artifact := stampArtifactUpsert(Artifact{ID: "a1"}, "old", true, "now")
+	if artifact.CreatedAt != "old" || artifact.UpdatedAt != "now" {
+		t.Fatalf("stampArtifactUpsert update = %#v", artifact)
+	}
+	artifact = stampArtifactUpsert(Artifact{ID: "a2"}, "", false, "now")
+	if artifact.CreatedAt != "now" || artifact.UpdatedAt != "now" {
+		t.Fatalf("stampArtifactUpsert create = %#v", artifact)
+	}
+
+	preview := stampPreviewUpsert(Preview{ID: "p1"}, "old", true, "now")
+	if preview.CreatedAt != "old" || preview.UpdatedAt != "now" {
+		t.Fatalf("stampPreviewUpsert update = %#v", preview)
+	}
+	preview = stampPreviewUpsert(Preview{ID: "p2"}, "", false, "now")
+	if preview.CreatedAt != "now" || preview.UpdatedAt != "now" {
+		t.Fatalf("stampPreviewUpsert create = %#v", preview)
+	}
+}
+
+func TestBuildAndTouchThreadPin(t *testing.T) {
+	t.Parallel()
+	pin := buildThreadPin("t1", "i1", "  alice  ", "now")
+	if pin.ThreadID != "t1" || pin.ItemID != "i1" || pin.PinnedBy != "alice" {
+		t.Fatalf("buildThreadPin = %#v", pin)
+	}
+	if pin.PinnedAt != "now" || pin.CreatedAt != "now" || pin.UpdatedAt != "now" {
+		t.Fatalf("buildThreadPin timestamps = %#v", pin)
+	}
+
+	touched := touchThreadPin(pin, "  bob  ", "later")
+	if touched.PinnedBy != "bob" || touched.PinnedAt != "later" || touched.UpdatedAt != "later" {
+		t.Fatalf("touchThreadPin = %#v", touched)
+	}
+	if touched.CreatedAt != "now" {
+		t.Fatalf("CreatedAt should be preserved, got %q", touched.CreatedAt)
+	}
+}
+
+func TestPrepareUserAndAgentProfileCreate(t *testing.T) {
+	t.Parallel()
+	user := prepareUserProfileCreate(UserProfile{ID: "u1", DisplayName: "U"}, "now")
+	if user.CreatedAt != "now" || user.UpdatedAt != "now" {
+		t.Fatalf("prepareUserProfileCreate = %#v", user)
+	}
+
+	agent := prepareAgentProfileCreate(AgentProfile{ID: "a1", AdapterID: "cli"}, "now")
+	if agent.Name != "Unnamed Agent" || agent.CreatedAt != "now" || agent.UpdatedAt != "now" {
+		t.Fatalf("prepareAgentProfileCreate defaults = %#v", agent)
+	}
+	// Preserve existing CreatedAt; still refresh UpdatedAt and default empty name.
+	agent = prepareAgentProfileCreate(AgentProfile{
+		ID:        "a2",
+		Name:      "Coder",
+		AdapterID: "cli",
+		CreatedAt: "old",
+	}, "now")
+	if agent.Name != "Coder" || agent.CreatedAt != "old" || agent.UpdatedAt != "now" {
+		t.Fatalf("prepareAgentProfileCreate keep = %#v", agent)
+	}
+}
+
+func TestApplyRunEvidenceGateAndRetryCount(t *testing.T) {
+	t.Parallel()
+	run := applyRunEvidenceGate(Run{ID: "r1"}, `{"ok":true}`)
+	if run.EvidenceGateResult != `{"ok":true}` {
+		t.Fatalf("applyRunEvidenceGate = %#v", run)
+	}
+	run = applyRunRetryCount(run, 3)
+	if run.RetryCount != 3 {
+		t.Fatalf("applyRunRetryCount = %#v", run)
+	}
+}
+
+func TestCloneUserSettings(t *testing.T) {
+	t.Parallel()
+	src := map[string]string{"theme": "dark"}
+	got := cloneUserSettings(src, "mtime")
+	if got.Values["theme"] != "dark" || got.UpdatedAt != "mtime" {
+		t.Fatalf("cloneUserSettings = %#v", got)
+	}
+	got.Values["theme"] = "light"
+	if src["theme"] != "dark" {
+		t.Fatal("cloneUserSettings must isolate map values")
+	}
+}
+
+func TestCollectItemIDsForRemovedRuns(t *testing.T) {
+	t.Parallel()
+	items := map[string]Item{
+		"i1": {ID: "i1", RunID: "r1"},
+		"i2": {ID: "i2", RunID: "r2"},
+		"i3": {ID: "i3", RunID: ""},
+	}
+	got := collectItemIDsForRemovedRuns(items, map[string]struct{}{"r1": {}, "r9": {}})
+	if len(got) != 1 {
+		t.Fatalf("collectItemIDsForRemovedRuns = %#v", got)
+	}
+	if _, ok := got["i1"]; !ok {
+		t.Fatalf("expected i1, got %#v", got)
+	}
+}
+
+func TestCollectKeysByRunID(t *testing.T) {
+	t.Parallel()
+	diffs := map[string]RunDiffFile{
+		"d1": {RunID: "r1", Path: "a.go"},
+		"d2": {RunID: "r2", Path: "b.go"},
+		"d3": {RunID: "r1", Path: "c.go"},
+	}
+	got := collectKeysByRunID(diffs, "r1", func(file RunDiffFile) string { return file.RunID })
+	if len(got) != 2 {
+		t.Fatalf("collectKeysByRunID = %#v", got)
+	}
+	if _, ok := got["d1"]; !ok {
+		t.Fatalf("missing d1 in %#v", got)
+	}
+	if _, ok := got["d3"]; !ok {
+		t.Fatalf("missing d3 in %#v", got)
+	}
+}
