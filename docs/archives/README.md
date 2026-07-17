@@ -19,3 +19,14 @@ Snapshot of in-repo SDD artifacts for the cleanup-baseline program (do **not** d
   - `docs/archives/cleanup-baseline/plan/` ← copy of `docs/plan/**`
   - `docs/archives/cleanup-baseline/progress/` ← copy of `docs/progress/**` (includes MASTER snapshot)
 - Live tracker remains authoritative at `docs/progress/MASTER.md`
+
+## Live SSOT（勿混）
+
+| 面 | 路径 |
+|---|---|
+| 当前进度 | `docs/progress/MASTER.md` |
+| 当前分析 | `docs/analysis/*`（可与本快照内容漂移） |
+| 规则 | `AGENTS.md` |
+| 外部历史 | `docs/history.md` → TokenDanceLab/docs |
+
+本目录只是 cleanup-baseline **冻结快照**；改活事实不要改这里。
