@@ -114,42 +114,25 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	if err != nil {
 		return nil, err
 	}
-	if cfg.WorkDir != "" {
+	if shouldStatConfiguredWorkDir(cfg.WorkDir) {
 		info, statErr := os.Stat(cfg.WorkDir)
 		if err := validateConfiguredWorkDir(cfg.WorkDir, info, statErr); err != nil {
 			return nil, err
 		}
 	}
-	runTimeout := resolvePositiveDuration(cfg.RunTimeout, defaultRunTimeout)
-	shutdownGP := resolvePositiveDuration(cfg.ShutdownGracePeriod, defaultShutdownGracePeriod)
-	shutdownFT := resolvePositiveDuration(cfg.ShutdownForceTimeout, defaultShutdownForceTimeout)
-	faultEscalationCfg := FaultEscalationConfigFromEnv()
-	return &ProcessExecutor{
-		bus:                       bus,
-		store:                     store,
-		profile:                   profile,
-		adapter:                   adapter,
-		adapterReg:                adapterReg,
-		maxConcurrentRuns:         defaultMaxConcurrentRuns,
-		maxRunOutputBytes:         defaultRunOutputMaxBytes,
-		maxStructuredPayloadBytes: adapters.DefaultStructuredPayloadMaxBytes,
-		runTimeout:                runTimeout,
-		shutdownGracePeriod:       shutdownGP,
-		shutdownForceTimeout:      shutdownFT,
-		evidenceGateCfg:           EvidenceGateConfigFromEnv(),
-		faultEscalationCfg:        faultEscalationCfg,
-		running:                   make(map[string]context.CancelFunc),
-		stdins:                    make(map[string]io.Writer),
-		processes:                 make(map[string]*os.Process),
-		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
-		runToAgent:                make(map[string]string),
-		hubTasks:                  make(map[string]string),
-		hubOutputs:                make(map[string]*hubOutputCollector),
-		workDirs:                  make(map[string]string),
-		surfacers:                 make(map[string]*adapters.WorkdirSnapshot),
-		cancelDone:                make(map[string]chan struct{}),
-		callbackSem:               make(chan struct{}, 10), // max 10 concurrent hub callbacks
-	}, nil
+	runTimeout, shutdownGP, shutdownFT := resolveProcessExecutorTimeouts(cfg)
+	return buildProcessExecutor(
+		bus,
+		store,
+		profile,
+		adapter,
+		adapterReg,
+		runTimeout,
+		shutdownGP,
+		shutdownFT,
+		EvidenceGateConfigFromEnv(),
+		FaultEscalationConfigFromEnv(),
+	), nil
 }
 
 // SetMetrics attaches Prometheus instrumentation to this executor.
@@ -265,8 +248,9 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	// This allows Claude Code to clean up gracefully (finish current API call,
 	// flush session state) rather than being killed by SIGTERM.
 	e.mu.Lock()
-	if stdin, ok := e.stdins[runID]; ok {
-		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); err != nil {
+	stdin, hasStdin := e.stdins[runID]
+	if shouldWriteInterruptStdin(hasStdin) {
+		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); shouldLogInterruptWriteFailure(err) {
 			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
 	}
@@ -281,7 +265,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Lock()
 	proc := e.processes[runID]
 	e.mu.Unlock()
-	if proc != nil {
+	if shouldStartGracefulProcessShutdown(proc) {
 		// Graceful shutdown: run in a goroutine so Cancel() returns
 		// immediately and does not block the HTTP response. The goroutine
 		// is tracked via cancelDone so finish() can abort it early if the
@@ -303,7 +287,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 			case <-time.After(e.shutdownForceTimeout):
 			}
 			_ = proc.Kill()
-			if _, err := proc.Wait(); err != nil {
+			if _, err := proc.Wait(); shouldLogProcessWaitAfterKill(err) {
 				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
 			}
 		}()
@@ -323,9 +307,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// terminalFinish is true unless this attempt hands off to a fault-escalation
 	// successor. The deferred finish must not tear down the concurrency slot the
 	// successor just re-registered (see #867).
+	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 	terminalFinish := true
 	defer func() {
-		if terminalFinish {
+		if shouldPerformTerminalFinish(terminalFinish) {
 			e.finish(run.ID)
 		}
 	}()
@@ -379,7 +364,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 
 	var runStartTime time.Time
-	if e.metrics != nil {
+	if shouldAttachFinishMetricsDefer(e.metrics != nil) {
 		defer func() {
 			if !shouldRecordRunFinishMetrics(runStartTime) {
 				return // run never started (early failure before cmd.Start)
@@ -404,7 +389,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		var workDir string
 		adapterCtx := adapters.RunProcessContext(runCtx)
 
-		if adapter != nil {
+		if shouldUseAdapterCommand(adapter != nil) {
 			// Adapter mode: BuildCommand provides full command configuration
 			cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
 		} else {
@@ -418,7 +403,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			cmdPath = e.profile.Command
 			workDir = e.profile.WorkDir
 		}
-		if adapter != nil {
+		if shouldPublishCLIInvocationPlan(adapter != nil) {
 			plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
 			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 		}
@@ -482,7 +467,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		subprocessStart := time.Now()
 		if err := cmd.Start(); err != nil {
 			if shouldTreatStartFailureAsCancelled(ctx.Err()) {
-				if cmd.Process != nil {
+				if shouldWaitProcessAfterCancel(cmd.Process) {
 					_, _ = cmd.Process.Wait()
 				}
 				e.publishCancelled(run)
@@ -493,9 +478,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 		// If context was cancelled after Start but before we checked, kill the child.
 		if shouldKillStartedProcessOnCancel(ctx.Err()) {
-			if cmd.Process != nil {
+			if shouldKillProcessAfterCancel(cmd.Process) {
 				_ = cmd.Process.Kill()
-				_, _ = cmd.Process.Wait()
+				if shouldWaitProcessAfterCancel(cmd.Process) {
+					_, _ = cmd.Process.Wait()
+				}
 			}
 			e.publishCancelled(run)
 			return
@@ -521,13 +508,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		// Record metrics: run has started successfully
-		if e.metrics != nil {
+		if shouldRecordRunStartMetrics(e.metrics != nil) {
 			e.metrics.RecordRunStart(adapterLabel)
 			runStartTime = time.Now()
 		}
 
 		started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-		if ok {
+		if shouldPublishStatusTransition(ok) {
 			e.bus.Publish("run.started", runScope(started), RunResponse(started))
 			// Fire Hub TaskAck callback (Edge→Hub direct bridge)
 			e.fireHubAck(run.ID)
@@ -536,9 +523,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 		// Create temp file for run output persistence and replay
 		outStore, err := runnerctx.NewRunOutputStore(run.ID)
-		if err != nil {
+		if shouldLogRunOutputStoreCreateFailure(err) {
 			slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
-		} else {
+		} else if shouldTrackRunOutputStore(err) {
 			e.mu.Lock()
 			e.runOutputs[run.ID] = outStore
 			e.mu.Unlock()
@@ -556,7 +543,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		parserCtx := withParserContextValues(ctx, runCtx)
 
 		var parseErr error
-		if adapter != nil {
+		if shouldUseStructuredOutputParser(adapter != nil) {
 			wg.Add(1)
 			go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
 		} else {
@@ -578,9 +565,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// When triggered, we log the budget state and emit a compaction event
 		// so upstream session managers can compact the actual message history.
 		if shouldEmitContextCompaction(runCtx.Budget) {
-			usagePct := runCtx.Budget.UsagePercent()
-			tokensUsed := runCtx.Budget.UsedTokens.Load()
-			remaining := runCtx.Budget.Remaining()
+			usagePct, tokensUsed, remaining := contextCompactionSnapshot(runCtx.Budget)
 			slog.Info("process: context compaction threshold reached",
 				"runId", run.ID,
 				"usagePercent", usagePct,
@@ -603,7 +588,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// (stderr is read via StderrPipe in a separate goroutine and stored in
 		// outStore), so we also pass the captured stderr output.
 		var stderrCapture string
-		if outStore != nil {
+		if shouldReadOutputStoreCapture(outStore != nil) {
 			stderrCapture, _ = outStore.ReadAll()
 		}
 		if shouldRetrySessionConflict(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart)) {
@@ -633,14 +618,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Wait error is not a session-conflict retry. Leave the session-retry
 		// loop so fault-escalation can re-launch the run when configured.
 		// Terminal publishFailed happens after the escalation check below.
-		if lastWaitErr != nil {
+		if shouldBreakSessionRetryOnWaitError(lastWaitErr) {
 			break
 		}
 		// #179: handle structured output parse errors with recoverability distinction.
 		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
 		// Recoverable errors (malformed event, orphaned tool) emit a warning and
 		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-		if parseErr != nil {
+		if shouldHandleStructuredParseError(parseErr) {
 			if psErr, ok := recoverableParseStreamError(parseErr); ok {
 				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
 				e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
@@ -666,7 +651,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
 			finalStatus = resolveEvidenceFinalStatus(true, evidenceResult.Passed)
-			if !evidenceResult.Passed {
+			if shouldLogEvidenceGateFailure(evidenceResult.Passed) {
 				slog.Warn("process: evidence gate verification failed",
 					"runId", run.ID,
 					"projectType", evidenceResult.ProjectType,
@@ -676,7 +661,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
-		if ok {
+		if shouldPublishStatusTransition(ok) {
 			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 			e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
 			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
@@ -691,7 +676,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if shouldAttemptFaultEscalation(lastWaitErr, e.faultEscalationCfg) {
 		r, ok := e.store.GetRun(run.ID)
 		if ok && shouldFaultEscalateRetry(e.faultEscalationCfg, r.RetryCount) {
-			newCount := r.RetryCount + 1
+			newCount := nextFaultEscalationRetryCount(r.RetryCount)
 			e.store.SetRunRetryCount(run.ID, newCount)
 			run.RetryCount = newCount
 			// Re-queue from started (normal wait failure) or failed (defensive).
@@ -744,7 +729,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 	offset := 0
 	for {
 		n, err := reader.Read(buf)
-		if n > 0 {
+		if shouldProcessOutputRead(n) {
 			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
 			if shouldPublishOutputChunk(len(allowed), truncatedNow) {
 				text := string(allowed)
@@ -766,14 +751,14 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					e.fireHubStream(run.ID, text)
 				}
 				payload := runOutputBatchPayload(run.ID, stream, text, offset, truncatedNow, written, maxBytes)
-				if truncatedNow {
+				if shouldLogRunOutputTruncation(truncatedNow) {
 					slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
 				}
 				e.bus.Publish("run.output.batch", runScope(run), payload)
 				offset += len(allowed)
 			}
 		}
-		if err != nil {
+		if shouldStopOutputRead(err) {
 			return
 		}
 	}
@@ -782,7 +767,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	slog.Debug("executor.run.failed", "runId", run.ID, "error", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
-	if ok {
+	if shouldPublishStatusTransition(ok) {
 		exitCode := ExitCodeFromErr(err)
 		classified := ClassifyError(err, exitCode)
 		if shouldPersistClassifiedFailure(classified) {
@@ -801,10 +786,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 	if !ok {
 		return
 	}
-	repository, ok := e.store.(interface {
-		store.Reader
-		store.Writer
-	})
+	repository, ok := asAgentFailureRepository(e.store)
 	if !ok {
 		return
 	}
@@ -823,7 +805,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	cancelled, ok := e.store.SetRunStatusIf(run.ID, "cancelled", "queued", "started", "cancelling")
-	if ok {
+	if shouldPublishStatusTransition(ok) {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
 		// Fire Hub callback if configured
 		e.fireHubFail(cancelled.ID, cancelledFailReason())
@@ -834,14 +816,11 @@ func (e *ProcessExecutor) publishCancelled(run store.Run) {
 // checkPersistError logs and emits a persistence_error event when the FileStore
 // has a pending persistence failure after a status transition.
 func (e *ProcessExecutor) checkPersistError(runID string) {
-	type persistChecker interface {
-		LastPersistError() error
-	}
-	pc, ok := e.store.(persistChecker)
+	pc, ok := asPersistErrorSource(e.store)
 	if !ok {
 		return
 	}
-	if persistErr := pc.LastPersistError(); persistErr != nil {
+	if persistErr := pc.LastPersistError(); shouldEmitPersistenceError(persistErr) {
 		slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
 		scope, payload := persistenceErrorScopePayload(runID, persistErr)
 		e.bus.Publish("run.persistence_error", scope, payload)
@@ -850,10 +829,7 @@ func (e *ProcessExecutor) checkPersistError(runID string) {
 
 func (e *ProcessExecutor) runStatus(runID string) string {
 	run, ok := e.store.GetRun(runID)
-	if !ok {
-		return ""
-	}
-	return run.Status
+	return runStatusFromLookup(run, ok)
 }
 
 func (e *ProcessExecutor) finish(runID string) {
@@ -876,11 +852,11 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.hubOutputs, runID)
 	delete(e.workDirs, runID)
 	delete(e.surfacers, runID)
-	if done, ok := e.cancelDone[runID]; ok {
+	if done, ok := e.cancelDone[runID]; shouldCloseCancelDoneChannel(ok) {
 		close(done)
 		delete(e.cancelDone, runID)
 	}
-	if s, ok := e.runOutputs[runID]; ok {
+	if s, ok := e.runOutputs[runID]; shouldCloseTrackedRunOutput(ok) {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
@@ -898,7 +874,7 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	snapshot := e.surfacers[runID]
 	e.mu.Unlock()
 
-	if snapshot == nil {
+	if !shouldSurfaceWithSnapshot(snapshot) {
 		return // no workdir tracked for this run
 	}
 
@@ -1004,7 +980,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
-	if budget, ok := budgetFromParserContext(ctx); ok {
+	if budget, ok := budgetFromParserContext(ctx); shouldApplyBudgetAwareEmitter(ok) {
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
