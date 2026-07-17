@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -981,5 +982,197 @@ func TestAsStoreWriter(t *testing.T) {
 	var runStore store.RunLifecycleStore
 	if _, ok := asStoreWriter(runStore); ok {
 		t.Fatal("nil store should not implement Writer")
+	}
+}
+
+func TestResolveProcessExecutorTimeoutsAndWorkDir(t *testing.T) {
+	t.Parallel()
+	runTO, grace, force := resolveProcessExecutorTimeouts(ProcessExecutorConfig{})
+	if runTO != defaultRunTimeout || grace != defaultShutdownGracePeriod || force != defaultShutdownForceTimeout {
+		t.Fatalf("defaults run=%v grace=%v force=%v", runTO, grace, force)
+	}
+	runTO, grace, force = resolveProcessExecutorTimeouts(ProcessExecutorConfig{
+		RunTimeout:           2 * time.Minute,
+		ShutdownGracePeriod:  3 * time.Second,
+		ShutdownForceTimeout: 4 * time.Second,
+	})
+	if runTO != 2*time.Minute || grace != 3*time.Second || force != 4*time.Second {
+		t.Fatalf("custom run=%v grace=%v force=%v", runTO, grace, force)
+	}
+	if shouldStatConfiguredWorkDir("") {
+		t.Fatal("empty workdir should not stat")
+	}
+	if !shouldStatConfiguredWorkDir("D:/tmp/ws") {
+		t.Fatal("non-empty workdir should stat")
+	}
+}
+
+func TestBuildProcessExecutor(t *testing.T) {
+	t.Parallel()
+	bus := events.NewBus(8)
+	st := store.New()
+	profile, err := NewGenericRunnerProfile("echo", nil, nil, nil, "")
+	if err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+	exec := buildProcessExecutor(
+		bus,
+		st,
+		profile,
+		nil,
+		nil,
+		defaultRunTimeout,
+		defaultShutdownGracePeriod,
+		defaultShutdownForceTimeout,
+		EvidenceGateConfig{},
+		FaultEscalationConfig{},
+	)
+	if exec == nil {
+		t.Fatal("expected executor")
+	}
+	if exec.bus != bus || exec.store != st {
+		t.Fatal("deps not wired")
+	}
+	if exec.maxConcurrentRuns != defaultMaxConcurrentRuns {
+		t.Fatalf("max concurrent %d", exec.maxConcurrentRuns)
+	}
+	if exec.running == nil || exec.stdins == nil || exec.processes == nil || exec.callbackSem == nil {
+		t.Fatal("maps/sem not initialized")
+	}
+	if cap(exec.callbackSem) != 10 {
+		t.Fatalf("callback sem cap %d", cap(exec.callbackSem))
+	}
+}
+
+func TestCancelAndFinishPredicates(t *testing.T) {
+	t.Parallel()
+	if shouldWriteInterruptStdin(false) || !shouldWriteInterruptStdin(true) {
+		t.Fatal("interrupt stdin predicate")
+	}
+	if shouldStartGracefulProcessShutdown(nil) {
+		t.Fatal("nil process should not escalate")
+	}
+	if !shouldPerformTerminalFinish(true) || shouldPerformTerminalFinish(false) {
+		t.Fatal("terminal finish predicate")
+	}
+	if !shouldAttachFinishMetricsDefer(true) || shouldAttachFinishMetricsDefer(false) {
+		t.Fatal("finish metrics defer")
+	}
+	if !shouldRecordRunStartMetrics(true) || shouldRecordRunStartMetrics(false) {
+		t.Fatal("start metrics")
+	}
+	if !shouldUseAdapterCommand(true) || shouldUseAdapterCommand(false) {
+		t.Fatal("adapter command")
+	}
+	if !shouldPublishCLIInvocationPlan(true) || shouldPublishCLIInvocationPlan(false) {
+		t.Fatal("cli plan")
+	}
+	if !shouldUseStructuredOutputParser(true) || shouldUseStructuredOutputParser(false) {
+		t.Fatal("structured parser")
+	}
+	if !shouldReadOutputStoreCapture(true) || shouldReadOutputStoreCapture(false) {
+		t.Fatal("output store capture")
+	}
+	if !shouldBreakSessionRetryOnWaitError(errors.New("x")) || shouldBreakSessionRetryOnWaitError(nil) {
+		t.Fatal("session retry break")
+	}
+	if !shouldHandleStructuredParseError(errors.New("x")) || shouldHandleStructuredParseError(nil) {
+		t.Fatal("parse error handle")
+	}
+	if !shouldLogEvidenceGateFailure(false) || shouldLogEvidenceGateFailure(true) {
+		t.Fatal("evidence gate log")
+	}
+	if !shouldPublishStatusTransition(true) || shouldPublishStatusTransition(false) {
+		t.Fatal("status transition")
+	}
+	if !shouldProcessOutputRead(3) || shouldProcessOutputRead(0) {
+		t.Fatal("output read")
+	}
+	if !shouldLogRunOutputTruncation(true) || shouldLogRunOutputTruncation(false) {
+		t.Fatal("truncation log")
+	}
+	if !shouldStopOutputRead(io.EOF) || shouldStopOutputRead(nil) {
+		t.Fatal("stop output read")
+	}
+	if !shouldEmitPersistenceError(errors.New("disk")) || shouldEmitPersistenceError(nil) {
+		t.Fatal("persist error emit")
+	}
+	if !shouldCloseCancelDoneChannel(true) || shouldCloseCancelDoneChannel(false) {
+		t.Fatal("cancel done channel")
+	}
+	if !shouldCloseTrackedRunOutput(true) || shouldCloseTrackedRunOutput(false) {
+		t.Fatal("tracked output close")
+	}
+	if shouldSurfaceWithSnapshot(nil) {
+		t.Fatal("nil snapshot")
+	}
+	if !shouldApplyBudgetAwareEmitter(true) || shouldApplyBudgetAwareEmitter(false) {
+		t.Fatal("budget emitter")
+	}
+	if !shouldClearRunAgentMappingOnStartFailure(errors.New("x")) || shouldClearRunAgentMappingOnStartFailure(nil) {
+		t.Fatal("clear run mapping")
+	}
+	if nextFaultEscalationRetryCount(2) != 3 {
+		t.Fatal("retry count")
+	}
+	if !shouldKillProcessAfterCancel(&os.Process{}) || shouldKillProcessAfterCancel(nil) {
+		t.Fatal("kill after cancel")
+	}
+	if !shouldWaitProcessAfterCancel(&os.Process{}) || shouldWaitProcessAfterCancel(nil) {
+		t.Fatal("wait after cancel")
+	}
+	if !shouldLogInterruptWriteFailure(errors.New("x")) || shouldLogInterruptWriteFailure(nil) {
+		t.Fatal("interrupt write log")
+	}
+	if !shouldLogProcessWaitAfterKill(errors.New("x")) || shouldLogProcessWaitAfterKill(nil) {
+		t.Fatal("wait after kill log")
+	}
+	if !shouldLogRunOutputStoreCreateFailure(errors.New("x")) || shouldLogRunOutputStoreCreateFailure(nil) {
+		t.Fatal("output store create log")
+	}
+	if !shouldTrackRunOutputStore(nil) || shouldTrackRunOutputStore(errors.New("x")) {
+		t.Fatal("track output store")
+	}
+	if !shouldCloseStdinPipe(true) || shouldCloseStdinPipe(false) {
+		t.Fatal("close stdin pipe")
+	}
+	if !shouldResetSessionRetryStatus(true) || shouldResetSessionRetryStatus(false) {
+		t.Fatal("session retry reset")
+	}
+}
+
+func TestRunStatusFromLookupAndFailureRepository(t *testing.T) {
+	t.Parallel()
+	if got := runStatusFromLookup(store.Run{}, false); got != "" {
+		t.Fatalf("missing -> %q", got)
+	}
+	if got := runStatusFromLookup(store.Run{Status: "started"}, true); got != "started" {
+		t.Fatalf("found -> %q", got)
+	}
+	s := store.New()
+	if _, ok := asAgentFailureRepository(s); !ok {
+		t.Fatal("in-memory store should implement failure repository")
+	}
+	var runStore store.RunLifecycleStore
+	if _, ok := asAgentFailureRepository(runStore); ok {
+		t.Fatal("nil store should not implement failure repository")
+	}
+	if _, ok := asPersistErrorSource(s); ok {
+		// in-memory store may not expose LastPersistError; just ensure no panic
+		_ = ok
+	}
+}
+
+func TestContextCompactionSnapshot(t *testing.T) {
+	t.Parallel()
+	usage, used, remaining := contextCompactionSnapshot(nil)
+	if usage != 0 || used != 0 || remaining != 0 {
+		t.Fatalf("nil budget %v %v %v", usage, used, remaining)
+	}
+	budget := runnerctx.NewContextBudget(100_000)
+	budget.UsedTokens.Store(1_000)
+	usage, used, remaining = contextCompactionSnapshot(budget)
+	if used != 1_000 || remaining != budget.Remaining() || usage != budget.UsagePercent() {
+		t.Fatalf("snapshot usage=%v used=%v remaining=%v", usage, used, remaining)
 	}
 }
