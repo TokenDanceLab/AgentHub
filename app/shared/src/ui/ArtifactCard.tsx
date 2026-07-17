@@ -1,6 +1,7 @@
 import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { formatComposerAttachmentSize as formatSize } from '../composer/attachments';
 import styles from './ArtifactCard.module.css';
+import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
 
 export interface ArtifactCardProps {
   artifactId: string;
@@ -104,7 +105,7 @@ export default function ArtifactCard({
               src={previewUrl}
               title={`Preview: ${title}`}
               className={styles.previewFrame}
-              sandbox="allow-scripts allow-same-origin"
+              sandbox={PREVIEW_SANDBOX_REMOTE}
             />
           )}
         </div>

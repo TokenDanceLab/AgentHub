@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { highlightLine } from '../../ui/syntaxHighlight';
 import MarkdownContent from '../../ui/Markdown';
+import { PREVIEW_SANDBOX_SRCDOC } from '../../ui/previewSandbox';
 import { DesignFileIcon } from '../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import { diffLineClass, highlightDiffLine } from './FilePreviewHelpers';
@@ -82,7 +83,7 @@ export function HtmlPreview({ content }: { content: string }): React.ReactElemen
       title="HTML 预览"
       style={{ flex: 1, border: 0, minHeight: 0 }}
       srcDoc={content}
-      sandbox="allow-scripts"
+      sandbox={PREVIEW_SANDBOX_SRCDOC}
       role="document"
     />
   );

@@ -5,6 +5,7 @@ import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../
 import { DocxPreview } from '../../ui/DocxPreview';
 import { SlideshowPreview } from '../../ui/SlideshowPreview';
 import { TablePreview } from '../../ui/TablePreview';
+import { PREVIEW_SANDBOX_SRCDOC } from '../../ui/previewSandbox';
 import { DesignFileIcon } from '../designIcons';
 import styles from '../AgentHubWorkbench.module.css';
 import { FilePreview } from './FilePreview';
@@ -250,7 +251,7 @@ function NativeHtmlPreview({ content }: { content: string }): React.ReactElement
       title="HTML 预览"
       style={{ flex: 1, border: 0, minHeight: 0, width: '100%' }}
       srcDoc={content}
-      sandbox="allow-scripts"
+      sandbox={PREVIEW_SANDBOX_SRCDOC}
       role="document"
     />
   );
