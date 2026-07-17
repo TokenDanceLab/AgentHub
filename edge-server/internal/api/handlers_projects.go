@@ -12,7 +12,7 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	writeSuccess(w, http.StatusOK, listResponse(filterProjectsByOwner(repo.ListProjects(), userID)))
 }
 
@@ -42,7 +42,7 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimPrefix(r.URL.Path, "/v1/projects/")
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if project, ok := repo.GetProject(projectID); ok {
 		if !isProjectOwnedBy(repo, project.ID, userID) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
@@ -57,7 +57,7 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("projectId")
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	writeSuccess(w, http.StatusOK, listResponse(filterThreadsByOwner(repo.ListThreads(projectID), repo, userID)))
 }
 
@@ -92,7 +92,7 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 	threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if thread, ok := repo.GetThread(threadID); ok {
 		if !isThreadOwnedBy(repo, thread.ID, userID) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
@@ -162,7 +162,7 @@ func (h *Handler) ArchiveThread(w http.ResponseWriter, r *http.Request, threadID
 
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
 	repository := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
@@ -233,7 +233,7 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 
 func (h *Handler) GetThreadPins(w http.ResponseWriter, r *http.Request, threadID string) {
 	repository := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
@@ -304,7 +304,7 @@ func (h *Handler) DeleteThreadPin(w http.ResponseWriter, r *http.Request, thread
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if item, ok := repo.GetItem(itemID); ok {
 		if !isItemOwnedBy(repo, item.ID, userID) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
@@ -318,7 +318,7 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
 	repository := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if _, ok := repository.GetRun(runID); !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
