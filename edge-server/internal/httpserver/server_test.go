@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -298,6 +299,35 @@ func TestCORSWithOptionsRequest(t *testing.T) {
 	}
 }
 
+func TestCORSPreflightAllowsCapabilityTokenHeader(t *testing.T) {
+	// Dual-token auth reads X-AgentHub-Capability-Token (handlers_runs.go).
+	// Browser preflight must allow that header or cross-origin run-start fails.
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called for OPTIONS preflight")
+	}), false, nil)
+
+	req := httptest.NewRequest(http.MethodOptions, "/v1/runs", nil)
+	req.Header.Set("Origin", "http://localhost:5199")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type, authorization, x-agenthub-capability-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("OPTIONS status = %d, want 204", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5199" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+	headers := rec.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(headers, "X-AgentHub-Capability-Token") {
+		t.Fatalf("Access-Control-Allow-Headers = %q, want capability token header", headers)
+	}
+	if !strings.Contains(headers, "X-AgentHub-Edge-Token") {
+		t.Fatalf("Access-Control-Allow-Headers = %q, want edge token header", headers)
+	}
+}
+
 func TestCORSHeadersSet(t *testing.T) {
 	called := false
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -325,7 +355,7 @@ func TestCORSHeadersSet(t *testing.T) {
 		t.Fatalf("Access-Control-Allow-Methods = %q", methods)
 	}
 	headers := rec.Header().Get("Access-Control-Allow-Headers")
-	if headers != "Content-Type, Authorization, X-AgentHub-Edge-Token" {
+	if headers != "Content-Type, Authorization, X-AgentHub-Edge-Token, X-AgentHub-Capability-Token" {
 		t.Fatalf("Access-Control-Allow-Headers = %q", headers)
 	}
 }
