@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/workspace"
 )
 
 type messageServiceWithReactions struct {
@@ -135,8 +136,8 @@ func (a *App) Run(ctx context.Context) error {
 	pbSvc := service.NewProviderBindingService(a.DB)
 	a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
 
-	// Workspace service
-	workspaceSvc := service.NewWorkspaceService(a.DB)
+	// Workspace service (second IM typed-service package; DB-only, no bus/cache)
+	workspaceSvc := workspace.NewService(a.DB)
 	a.WorkspaceHandler = handler.NewWorkspaceHandler(workspaceSvc)
 
 	// Audit service
