@@ -287,17 +287,15 @@ func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	existing, exists := s.projects[id]
-	project, err, created := resolveCreateProject(existing, exists, id, name, ownerID, nowString())
-	s.projectOrder = putTracked(s.projects, s.projectOrder, id, project, created)
+	project, order, err := createProjectInMaps(s.projects, s.projectOrder, id, name, ownerID, nowString())
+	s.projectOrder = order
 	return project, err
 }
 
 func (s *Store) GetProject(id string) (Project, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	project, ok := s.projects[id]
-	return project, ok
+	return lookupByID(s.projects, id)
 }
 
 func (s *Store) ListProjects() []Project {
@@ -310,28 +308,21 @@ func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabe
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, projectExists := s.projects[projectID]
-	existing, exists := s.threads[id]
-	thread, err, created := resolveCreateThread(existing, exists, projectExists, id, projectID, title, kind, avatarColor, avatarLabel, nowString())
-	s.threadOrder = putTracked(s.threads, s.threadOrder, id, thread, created)
+	thread, order, err := createThreadInMaps(s.projects, s.threads, s.threadOrder, id, projectID, title, kind, avatarColor, avatarLabel, nowString())
+	s.threadOrder = order
 	return thread, err
 }
 
 func (s *Store) GetThread(id string) (Thread, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	thread, ok := s.threads[id]
-	return thread, ok
+	return lookupByID(s.threads, id)
 }
 
 func (s *Store) UpdateThread(id string, title *string, status *string) (Thread, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	thread, exists := s.threads[id]
-	thread, ok := resolveUpdateThread(thread, exists, title, status, nowString())
-	storeIf(s.threads, id, thread, ok)
-	return thread, ok
+	return updateThreadInMaps(s.threads, id, title, status, nowString())
 }
 
 func (s *Store) DeleteThread(id string) bool {
@@ -364,18 +355,15 @@ func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	existing, exists := s.runs[id]
-	refsOK := validateCreateRunRefs(s.projects, s.threads, projectID, threadID)
-	run, err, created := resolveCreateRun(existing, exists, refsOK, id, projectID, threadID, nowString())
-	s.runOrder = putTracked(s.runs, s.runOrder, id, run, created)
+	run, order, err := createRunInMaps(s.projects, s.threads, s.runs, s.runOrder, id, projectID, threadID, nowString())
+	s.runOrder = order
 	return run, err
 }
 
 func (s *Store) GetRun(id string) (Run, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	run, ok := s.runs[id]
-	return run, ok
+	return lookupByID(s.runs, id)
 }
 
 func (s *Store) ListRuns(threadID string) []Run {
@@ -388,16 +376,9 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, runExists := s.runs[file.RunID]
-	key, file, ok := prepareRunDiffFileUpsert(runExists, file)
-	if !ok {
-		return RunDiffFile{}, ErrNotFound
-	}
-	now := nowString()
-	existing, exists := s.diffs[key]
-	file, created := resolveRunDiffFileUpsert(existing, exists, file, now)
-	s.diffOrder = putUpsert(s.diffs, s.diffOrder, key, file, created)
-	return file, nil
+	file, order, err := upsertRunDiffFileInMaps(s.runs, s.diffs, s.diffOrder, file, nowString())
+	s.diffOrder = order
+	return file, err
 }
 
 func (s *Store) ListRunDiffFiles(runID string) []RunDiffFile {
@@ -410,17 +391,9 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, runExists := s.runs[artifact.RunID]
-	var ok bool
-	artifact, ok = prepareArtifactForUpsert(run, runExists, artifact)
-	if !ok {
-		return Artifact{}, ErrNotFound
-	}
-	now := nowString()
-	existing, exists := s.artifacts[artifact.ID]
-	artifact = resolveArtifactUpsert(artifact, existing, exists, now)
-	s.artifactOrder = putUpsert(s.artifacts, s.artifactOrder, artifact.ID, cloneArtifact(artifact), !exists)
-	return cloneArtifact(artifact), nil
+	artifact, order, err := upsertArtifactInMaps(s.runs, s.artifacts, s.artifactOrder, artifact, nowString())
+	s.artifactOrder = order
+	return artifact, err
 }
 
 func (s *Store) ListArtifacts(runID string) []Artifact {
@@ -439,17 +412,9 @@ func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, runExists := s.runs[preview.RunID]
-	var ok bool
-	preview, ok = preparePreviewForUpsert(run, runExists, preview)
-	if !ok {
-		return Preview{}, ErrNotFound
-	}
-	now := nowString()
-	existing, exists := s.previews[preview.ID]
-	preview = resolvePreviewUpsert(preview, existing, exists, now)
-	s.previewOrder = putUpsert(s.previews, s.previewOrder, preview.ID, preview, !exists)
-	return preview, nil
+	preview, order, err := upsertPreviewInMaps(s.runs, s.previews, s.previewOrder, preview, nowString())
+	s.previewOrder = order
+	return preview, err
 }
 
 func (s *Store) ListPreviews(runID string) []Preview {
@@ -461,17 +426,14 @@ func (s *Store) ListPreviews(runID string) []Preview {
 func (s *Store) GetPreview(id string) (Preview, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	preview, ok := s.previews[id]
-	return preview, ok
+	return lookupByID(s.previews, id)
 }
 
 func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	opts.Now = resolveCleanupNow(opts.Now, time.Now().UTC())
-	removeRuns := planRunsForCleanup(s.runOrder, s.runs, opts.Now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
+	removeRuns := planRunCleanup(s.runOrder, s.runs, opts, time.Now().UTC())
 	if len(removeRuns) == 0 {
 		return RunCleanupResult{}
 	}
@@ -479,36 +441,27 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	for id := range removeRuns {
 		s.removeRunEvidence(id)
 	}
-	var removedItemIDs map[string]struct{}
-	var removedItems int
-	s.runOrder, s.itemOrder, removedItemIDs, removedItems = applyRunCleanupMaps(
+	var pinMatch func(ThreadPin) bool
+	var result RunCleanupResult
+	s.runOrder, s.itemOrder, pinMatch, result = applyPlannedRunCleanup(
 		s.runs, s.items, s.runOrder, s.itemOrder, removeRuns,
 	)
-	if removedItems > 0 {
-		s.removePins(pinMatchesRemovedItems(removedItemIDs))
+	if pinMatch != nil {
+		s.removePins(pinMatch)
 	}
-
-	return buildRunCleanupResult(len(removeRuns), removedItems)
+	return result
 }
 
 func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	run, exists := s.runs[id]
-	run, ok := resolveSetRunStatus(run, exists, status, nowString())
-	storeIf(s.runs, id, run, ok)
-	return run, ok
+	return setRunStatusInMaps(s.runs, id, status, nowString())
 }
 
 func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	run, exists := s.runs[id]
-	run, ok := resolveSetRunStatusIf(run, exists, status, allowedCurrent, nowString())
-	storeIf(s.runs, id, run, ok)
-	return run, ok
+	return setRunStatusIfInMaps(s.runs, id, status, allowedCurrent, nowString())
 }
 
 // SetRunEvidenceGate stores the evidence gate verification result on a run.
@@ -516,11 +469,7 @@ func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run
 func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	run, exists := s.runs[id]
-	run, ok := resolveSetRunEvidenceGate(run, exists, result)
-	storeIf(s.runs, id, run, ok)
-	return run, ok
+	return setRunEvidenceGateInMaps(s.runs, id, result)
 }
 
 // SetRunRetryCount updates the retry count on a run. Used by the fault
@@ -528,21 +477,15 @@ func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
 func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	run, exists := s.runs[id]
-	run, ok := resolveSetRunRetryCount(run, exists, count)
-	storeIf(s.runs, id, run, ok)
-	return run, ok
+	return setRunRetryCountInMaps(s.runs, id, count)
 }
 
 func (s *Store) CreateItem(item Item) (Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	existing, exists := s.items[item.ID]
-	refsOK := validateCreateItemRefs(s.projects, s.threads, s.runs, item)
-	item, err, created := resolveCreateItem(existing, exists, refsOK, item, nowString())
-	s.itemOrder = putTracked(s.items, s.itemOrder, item.ID, item, created)
+	item, order, err := createItemInMaps(s.projects, s.threads, s.runs, s.items, s.itemOrder, item, nowString())
+	s.itemOrder = order
 	return item, err
 }
 
@@ -560,8 +503,7 @@ func (s *Store) CreateThreadMessage(itemID, threadID, role, content string) (Ite
 func (s *Store) GetItem(id string) (Item, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	item, ok := s.items[id]
-	return item, ok
+	return lookupByID(s.items, id)
 }
 
 func (s *Store) ListThreadItems(threadID string) []Item {
@@ -574,16 +516,9 @@ func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !validatePinThreadItemRefs(s.threads, s.items, threadID, itemID) {
-		return ThreadPin{}, ErrNotFound
-	}
-
-	now := nowString()
-	key := threadPinKey(threadID, itemID)
-	existing, exists := s.pins[key]
-	pin, created := resolveThreadPinUpsert(existing, exists, threadID, itemID, pinnedBy, now)
-	s.pinOrder = putUpsert(s.pins, s.pinOrder, key, pin, created)
-	return pin, nil
+	pin, order, err := upsertThreadPinInMaps(s.threads, s.items, s.pins, s.pinOrder, threadID, itemID, pinnedBy, nowString())
+	s.pinOrder = order
+	return pin, err
 }
 
 func (s *Store) DeleteThreadPin(threadID, itemID string) bool {
@@ -619,17 +554,15 @@ func (s *Store) CreateUserProfile(profile UserProfile) (UserProfile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	existing, exists := s.userProfiles[profile.ID]
-	profile, created := resolveCreateUserProfile(existing, exists, profile, nowString())
-	s.userProfileOrder = putTracked(s.userProfiles, s.userProfileOrder, profile.ID, profile, created)
+	profile, order := createUserProfileInMaps(s.userProfiles, s.userProfileOrder, profile, nowString())
+	s.userProfileOrder = order
 	return profile, nil
 }
 
 func (s *Store) GetUserProfile(id string) (UserProfile, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	profile, ok := s.userProfiles[id]
-	return profile, ok
+	return lookupByID(s.userProfiles, id)
 }
 
 func (s *Store) ListUserProfiles() []UserProfile {
@@ -652,17 +585,15 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	existing, exists := s.agentProfiles[profile.ID]
-	profile, err, created := resolveCreateAgentProfile(existing, exists, profile, nowString())
-	s.agentProfileOrder = putTracked(s.agentProfiles, s.agentProfileOrder, profile.ID, profile, created)
+	profile, order, err := createAgentProfileInMaps(s.agentProfiles, s.agentProfileOrder, profile, nowString())
+	s.agentProfileOrder = order
 	return profile, err
 }
 
 func (s *Store) GetAgentProfile(id string) (AgentProfile, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	profile, ok := s.agentProfiles[id]
-	return profile, ok
+	return lookupByID(s.agentProfiles, id)
 }
 
 func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
@@ -674,14 +605,7 @@ func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
 func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	profile, exists := s.agentProfiles[id]
-	profile, err := resolveUpdateAgentProfile(profile, exists, patch, nowString())
-	if err != nil {
-		return AgentProfile{}, err
-	}
-	s.agentProfiles[id] = profile
-	return profile, nil
+	return updateAgentProfileInMaps(s.agentProfiles, id, patch, nowString())
 }
 
 func (s *Store) DeleteAgentProfile(id string) error {
@@ -705,8 +629,7 @@ func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.settingsMtime = nowString()
 	var view UserSettings
-	s.settings, view = applySettingsUpsert(s.settings, patch, s.settingsMtime)
+	s.settings, s.settingsMtime, view = upsertSettingsInMaps(s.settings, patch, nowString())
 	return view
 }
