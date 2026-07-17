@@ -163,22 +163,7 @@ import {
   readJson,
   unwrapHubResponse,
 } from './hubClientEnvelope';
-import {
-  buildAttachmentDownloadUrl,
-  buildAttachmentFormData,
-  buildOidcAuthorizeBody,
-  buildPatchSettingsBody,
-  buildProbeAttachmentBody,
-  buildReactionBody,
-  buildStreamTaskEventBody,
-  buildTaskAckBody,
-  buildTaskDoneBody,
-  buildTaskFailBody,
-  buildTaskStreamBody,
-  buildTriggerAgentTaskBody,
-  normalizeExecutionTargetsResponse,
-  withPublicCatalogParams,
-} from './hubClientPayloadUtils';
+import * as hubPayload from './hubClientPayloadUtils';
 import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
@@ -365,7 +350,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     refresh: (refreshToken: string) =>
       request<HubAuthResponse>('/client/auth/refresh', {
         method: 'POST',
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        body: JSON.stringify(hubPayload.buildRefreshBody(refreshToken)),
       }),
     logout: () => request<void>('/client/auth/logout', { method: 'POST' }),
     me: () => request<HubUserProfile>('/client/auth/me'),
@@ -394,7 +379,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
       request<HubOidcAuthorizeResponse>('/client/auth/oidc/authorize', {
         method: 'POST',
-        body: JSON.stringify(buildOidcAuthorizeBody(body)),
+        body: JSON.stringify(hubPayload.buildOidcAuthorizeBody(body)),
       }),
     oidcCallback: (body: HubOidcCallbackRequest) =>
       request<HubOidcCallbackResponse>('/client/auth/oidc/callback', {
@@ -403,14 +388,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     searchUser: (targetUserId: string) =>
-      request<HubSearchResult>(
-        `/client/contacts/search?id=${encodeURIComponent(targetUserId)}`,
-      ),
+      request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
     listContacts: () => request<HubContactInfo[]>('/client/contacts'),
     sendFriendRequest: (friendId: string, message?: string) =>
       request<void>('/client/contacts/friend-requests', {
         method: 'POST',
-        body: JSON.stringify({ friend_id: friendId, message }),
+        body: JSON.stringify(hubPayload.buildFriendRequestBody(friendId, message)),
       }),
     listFriendRequests: () =>
       request<HubFriendRequest[]>('/client/contacts/friend-requests'),
@@ -443,15 +426,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/contacts/${encodeURIComponent(friendUserId)}/remark`,
         {
           method: 'PUT',
-          body: JSON.stringify({ remark }),
+          body: JSON.stringify(hubPayload.buildRemarkBody(remark)),
         },
       ),
 
     listSessions: () => request<HubSession[]>('/client/sessions'),
     searchSessions: (q: string) =>
-      request<HubSession[]>(
-        `/client/sessions/search?q=${encodeURIComponent(q)}`,
-      ),
+      request<HubSession[]>(hubPayload.buildSearchSessionsPath(q)),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
       request<HubCreateSessionResponse>('/client/sessions/private', {
         method: 'POST',
@@ -465,7 +446,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     addSessionMembers: (sessionId: string, memberIds: string[]) =>
       request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/members`, {
         method: 'POST',
-        body: JSON.stringify({ member_ids: memberIds }),
+        body: JSON.stringify(hubPayload.buildMemberIdsBody(memberIds)),
       }),
     removeSessionMember: (sessionId: string, userId: string) =>
       request<void>(
@@ -481,7 +462,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/sessions/${encodeURIComponent(sessionId)}/transfer-owner`,
         {
           method: 'POST',
-          body: JSON.stringify({ new_owner_id: newOwnerId }),
+          body: JSON.stringify(hubPayload.buildTransferOwnerBody(newOwnerId)),
         },
       ),
     dissolveSession: (sessionId: string) =>
@@ -535,7 +516,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     markRead: (sessionId: string, lastReadSeq: number) =>
       request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/read`, {
         method: 'POST',
-        body: JSON.stringify({ last_read_seq: lastReadSeq }),
+        body: JSON.stringify(hubPayload.buildMarkReadBody(lastReadSeq)),
       }),
     recallMessage: (messageId: string) =>
       request<void>(`/client/messages/${encodeURIComponent(messageId)}/recall`, {
@@ -544,19 +525,19 @@ export function createHubClient(opts: HubClientOptions = {}) {
     pinMessage: (messageId: string, sessionId: string) =>
       request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
         method: 'POST',
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify(hubPayload.buildSessionIdBody(sessionId)),
       }),
     unpinMessage: (messageId: string, sessionId: string) =>
       request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
         method: 'DELETE',
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify(hubPayload.buildSessionIdBody(sessionId)),
       }),
     forwardMessage: (messageId: string, targetSessionIds: string[]) =>
       request<void>(
         `/client/messages/${encodeURIComponent(messageId)}/forward`,
         {
           method: 'POST',
-          body: JSON.stringify({ target_session_ids: targetSessionIds }),
+          body: JSON.stringify(hubPayload.buildForwardMessageBody(targetSessionIds)),
         },
       ),
     listPinnedMessages: (sessionId: string) =>
@@ -587,18 +568,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/notifications${qs(params ?? {})}`,
       ),
     markNotificationRead: (id: string) =>
-      requestWithFallback<void>(
-        [
-          `/client/notifications/${encodeURIComponent(id)}:read`,
-          `/client/notifications/${encodeURIComponent(id)}/read`,
-        ],
-        { method: 'POST' },
-      ),
+      requestWithFallback<void>(hubPayload.buildMarkNotificationReadPaths(id), {
+        method: 'POST',
+      }),
     readAllNotifications: () =>
-      requestWithFallback<void>(
-        ['/client/notifications:read-all', '/client/notifications/read-all'],
-        { method: 'POST' },
-      ),
+      requestWithFallback<void>(hubPayload.buildReadAllNotificationsPaths(), {
+        method: 'POST',
+      }),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
       requestWithFallback<HubDevice>(['/edge/devices:register', '/edge/devices/register'], {
@@ -608,22 +584,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ackTask: (taskId: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
         method: 'POST',
-        ...(runId ? { body: JSON.stringify(buildTaskAckBody(runId)) } : {}),
+        ...(runId ? { body: JSON.stringify(hubPayload.buildTaskAckBody(runId)) } : {}),
       }),
     streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
-        body: JSON.stringify(buildTaskStreamBody(content, runId)),
+        body: JSON.stringify(hubPayload.buildTaskStreamBody(content, runId)),
       }),
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
         method: 'POST',
-        body: JSON.stringify(buildTaskDoneBody(finalContent, runId)),
+        body: JSON.stringify(hubPayload.buildTaskDoneBody(finalContent, runId)),
       }),
     failTask: (taskId: string, error: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
         method: 'POST',
-        body: JSON.stringify(buildTaskFailBody(error, runId)),
+        body: JSON.stringify(hubPayload.buildTaskFailBody(error, runId)),
       }),
 
     addAgentToSession: (
@@ -640,16 +616,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       request<HubAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify(buildTriggerAgentTaskBody(triggerMessageId, options)),
+        body: JSON.stringify(hubPayload.buildTriggerAgentTaskBody(triggerMessageId, options)),
       }),
     cancelAgentTask: (taskId: string) =>
-      requestWithFallback<void>(
-        [
-          `/web/agent-tasks/${encodeURIComponent(taskId)}:cancel`,
-          `/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`,
-        ],
-        { method: 'POST' },
-      ),
+      requestWithFallback<void>(hubPayload.buildCancelAgentTaskPaths(taskId), {
+        method: 'POST',
+      }),
 
     regenerateAgentTask: (taskId: string) =>
       request<HubAgentTask>(`/web/agent-tasks/${encodeURIComponent(taskId)}/regenerate`, {
@@ -664,7 +636,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
         `/web/execution-targets${qs(params ?? {})}`,
       );
-      return normalizeExecutionTargetsResponse(data);
+      return hubPayload.normalizeExecutionTargetsResponse(data);
     },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>('/web/execution-targets', {
@@ -736,7 +708,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<HubListResponse<HubSkill>>(
-        `/web/skills${qs(withPublicCatalogParams(params ?? {}))}`,
+        `/web/skills${qs(hubPayload.withPublicCatalogParams(params ?? {}))}`,
       ),
 
     listPublicMCPServers: (params?: {
@@ -747,7 +719,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<HubListResponse<HubMCPServer>>(
-        `/web/mcp-servers${qs(withPublicCatalogParams(params ?? {}))}`,
+        `/web/mcp-servers${qs(hubPayload.withPublicCatalogParams(params ?? {}))}`,
       ),
 
     // ── Workspace Projects ──────────────────────────────────────────
@@ -803,17 +775,17 @@ export function createHubClient(opts: HubClientOptions = {}) {
     addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
       request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'POST',
-        body: JSON.stringify(buildReactionBody(sessionId, reaction)),
+        body: JSON.stringify(hubPayload.buildReactionBody(sessionId, reaction)),
       }),
 
     removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
       request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
         method: 'DELETE',
-        body: JSON.stringify(buildReactionBody(sessionId, reaction)),
+        body: JSON.stringify(hubPayload.buildReactionBody(sessionId, reaction)),
       }),
 
     listMessageReactions: (messageId: string, sessionId: string) =>
-      request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
+      request<Record<string, unknown>[]>(hubPayload.buildListMessageReactionsPath(messageId, sessionId)),
 
     getTaskRunEventSummary: (taskId: string) =>
       request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events/summary`),
@@ -824,7 +796,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     /** Fetch task run events with event_seq strictly after the given value (for replay gap fill). */
     listTaskRunEventsAfter: (taskId: string, afterSeq: number) =>
-      request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
+      request<HubAgentRunEvent[]>(hubPayload.buildListTaskRunEventsAfterPath(taskId, afterSeq)),
 
     createAgentTeam: (data: HubCreateAgentTeamRequest) =>
       request<HubAgentTeam>('/web/agent-teams', {
@@ -888,13 +860,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       approvalId: string,
       decision: HubTeamApprovalDecisionRequest,
     ) =>
-      request<HubTeamApprovalState>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
-        {
-          method: 'POST',
-          body: JSON.stringify(decision),
-        },
-      ),
+      request<HubTeamApprovalState>(hubPayload.buildDecideTeamApprovalPath(teamId, runId, approvalId), {
+        method: 'POST',
+        body: JSON.stringify(decision),
+      }),
 
     resolveTeamConflict: (
       teamId: string,
@@ -902,13 +871,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       conflictId: string,
       resolution: HubTeamConflictResolutionRequest,
     ) =>
-      request<HubTeamConflictState>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`,
-        {
-          method: 'POST',
-          body: JSON.stringify(resolution),
-        },
-      ),
+      request<HubTeamConflictState>(hubPayload.buildResolveTeamConflictPath(teamId, runId, conflictId), {
+        method: 'POST',
+        body: JSON.stringify(resolution),
+      }),
 
     listAgentProfiles: (params?: {
       runtime_id?: string;
@@ -939,27 +905,27 @@ export function createHubClient(opts: HubClientOptions = {}) {
     patchSettings: (values: Record<string, string>) =>
       request<Record<string, string>>('/client/settings', {
         method: 'PATCH',
-        body: JSON.stringify(buildPatchSettingsBody(values)),
+        body: JSON.stringify(hubPayload.buildPatchSettingsBody(values)),
       }),
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
     probeAttachment: (hash: string) =>
       request<HubProbeAttachmentResponse>('/client/attachments/probe', {
         method: 'POST',
-        body: JSON.stringify(buildProbeAttachmentBody(hash)),
+        body: JSON.stringify(hubPayload.buildProbeAttachmentBody(hash)),
       }),
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
     uploadAttachment: (file: File, hash: string) => {
       return uploadMultipart<HubAttachmentRef>(
         '/client/attachments',
-        buildAttachmentFormData(file, hash),
+        hubPayload.buildAttachmentFormData(file, hash),
       );
     },
 
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
-      buildAttachmentDownloadUrl(baseUrl, attachmentId),
+      hubPayload.buildAttachmentDownloadUrl(baseUrl, attachmentId),
 
 
 
@@ -1001,13 +967,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
 
     postTeamRouteDecision: (teamId: string, runId: string, decision: HubCoordinatorRouteDecision) =>
-      request<Record<string, unknown>>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
-        {
-          method: 'POST',
-          body: JSON.stringify(decision),
-        },
-      ),
+      request<Record<string, unknown>>(hubPayload.buildPostTeamRouteDecisionPath(teamId, runId), {
+        method: 'POST',
+        body: JSON.stringify(decision),
+      }),
 
     streamTaskEvent: (
       taskId: string,
@@ -1017,7 +980,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ) =>
       request<undefined>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
-        body: JSON.stringify(buildStreamTaskEventBody(eventType, payload, options)),
+        body: JSON.stringify(hubPayload.buildStreamTaskEventBody(eventType, payload, options)),
       }),
 
 
