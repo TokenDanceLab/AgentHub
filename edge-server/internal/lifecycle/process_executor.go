@@ -128,18 +128,9 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 			return nil, fmt.Errorf("process workdir %q is not a directory", cfg.WorkDir)
 		}
 	}
-	runTimeout := cfg.RunTimeout
-	if runTimeout <= 0 {
-		runTimeout = defaultRunTimeout
-	}
-	shutdownGP := cfg.ShutdownGracePeriod
-	if shutdownGP <= 0 {
-		shutdownGP = defaultShutdownGracePeriod
-	}
-	shutdownFT := cfg.ShutdownForceTimeout
-	if shutdownFT <= 0 {
-		shutdownFT = defaultShutdownForceTimeout
-	}
+	runTimeout := resolvePositiveDuration(cfg.RunTimeout, defaultRunTimeout)
+	shutdownGP := resolvePositiveDuration(cfg.ShutdownGracePeriod, defaultShutdownGracePeriod)
+	shutdownFT := resolvePositiveDuration(cfg.ShutdownForceTimeout, defaultShutdownForceTimeout)
 	faultEscalationCfg := FaultEscalationConfigFromEnv()
 	return &ProcessExecutor{
 		bus:                       bus,
@@ -168,31 +159,6 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		callbackSem:               make(chan struct{}, 10), // max 10 concurrent hub callbacks
 	}, nil
 }
-
-// defaultRunTimeout is the hard deadline for any agent run. A hung subprocess
-// should not block the executor goroutine forever.
-const defaultRunTimeout = 30 * time.Minute
-
-// defaultShutdownGracePeriod is the time between sending a stdin interrupt and
-// escalating to SIGTERM (Unix) or Kill (Windows).
-const defaultShutdownGracePeriod = 10 * time.Second
-
-// defaultShutdownForceTimeout is the time between SIGTERM and SIGKILL on Unix.
-const defaultShutdownForceTimeout = 5 * time.Second
-
-const (
-	defaultMaxConcurrentRuns          = 5
-	defaultReadBufferSize             = 32 * 1024
-	defaultRunOutputMaxBytes          = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
-	hubCallbackTimeout                = 15 * time.Second
-	persistedAssistantMessageMaxBytes = 200 * 1024
-	persistedFailureMessageMaxBytes   = 8 * 1024
-
-	// sessionRetryWindow is the maximum wall-clock duration (from cmd.Start to
-	// cmd.Wait) within which a "session already in use" or "no conversation
-	// found" error triggers an automatic retry with a fresh session ID.
-	sessionRetryWindow = 10 * time.Second
-)
 
 // SetMetrics attaches Prometheus instrumentation to this executor.
 // It is safe to call with nil to disable metrics.
@@ -272,10 +238,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	max := e.maxConcurrentRuns
-	if max <= 0 {
-		max = defaultMaxConcurrentRuns
-	}
+	max := resolveMaxConcurrentRuns(e.maxConcurrentRuns)
 	if len(e.running) >= max {
 		return ErrTooManyConcurrentRuns
 	}
@@ -411,9 +374,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var adapterLabel string
 	if e.metrics != nil {
 		if adapter != nil {
-			adapterLabel = adapter.Metadata().ID
+			adapterLabel = adapterMetricsLabel(adapter.Metadata().ID, true)
 		} else {
-			adapterLabel = "none"
+			adapterLabel = adapterMetricsLabel("", false)
 		}
 	}
 
@@ -421,12 +384,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// before launching the agent process. If the API validation is somehow
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
-	if runCtx.PermissionMode == "bypassPermissions" {
+	if isForbiddenPermissionMode(runCtx.PermissionMode) {
 		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
 			"runId", run.ID,
 			"agentId", runCtx.AgentID,
 		)
-		runCtx.PermissionMode = "default"
+		runCtx.PermissionMode = normalizePermissionMode(runCtx.PermissionMode)
 	}
 
 	var runStartTime time.Time
@@ -447,7 +410,6 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// ("Session ID ... is already in use" or "No conversation found with session ID"),
 	// generate a fresh random session ID and retry once. This handles the case where
 	// a stale CC process from a previous Edge instance still holds the session lock.
-	const maxSessionRetries = 2
 	var lastWaitErr error
 	for attempt := 0; attempt < maxSessionRetries; attempt++ {
 		var cmdPath string
@@ -654,13 +616,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"tokensUsed", tokensUsed,
 				"tokensRemaining", remaining,
 			)
-			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
-				"runId":           run.ID,
-				"usagePercent":    usagePct,
-				"tokensUsed":      tokensUsed,
-				"tokensRemaining": remaining,
-				"threshold":       runnerctx.CompactionThreshold,
-			})
+			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run),
+				contextCompactionPayload(run.ID, usagePct, tokensUsed, remaining))
 		}
 
 		if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
@@ -706,7 +663,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Not retrying — process the final result.
 		if lastWaitErr != nil {
 			e.publishFailed(run, errorWithRunOutput(lastWaitErr, outStore))
-			e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
+			e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 			return
 		}
 		// #179: handle structured output parse errors with recoverability distinction.
@@ -717,14 +674,15 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			var psErr *adapters.ParseStreamError
 			if errors.As(parseErr, &psErr) && psErr.Recoverable() {
 				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
-				e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
-					"runId":   run.ID,
-					"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
-					"warning": psErr.Error(),
-				})
+				e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
+					recoverableParseWarningPayload(
+						run.ID,
+						fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
+						psErr.Error(),
+					))
 			} else {
 				e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
-				e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+				e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
 				return
 			}
 		}
@@ -737,8 +695,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		if isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir) {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
+			finalStatus = evidenceGateFinalStatus(evidenceResult.Passed)
 			if !evidenceResult.Passed {
-				finalStatus = "completed_with_issues"
 				slog.Warn("process: evidence gate verification failed",
 					"runId", run.ID,
 					"projectType", evidenceResult.ProjectType,
@@ -776,11 +734,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				delete(e.runOutputs, run.ID)
 			}
 			e.mu.Unlock()
-			e.bus.Publish("run.fault_escalation.retry", runScope(run), map[string]any{
-				"runId":      run.ID,
-				"retryCount": newCount,
-				"maxRetries": e.faultEscalationCfg.MaxRetries,
-			})
+			e.bus.Publish("run.fault_escalation.retry", runScope(run),
+				faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
 			slog.Warn("process: fault escalation auto-retry",
 				"runId", run.ID,
 				"retryCount", newCount,
@@ -798,16 +753,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			return
 		}
 		// Max retries reached — emit escalation exhausted event.
-		e.bus.Publish("run.fault_escalation.exhausted", runScope(run), map[string]any{
-			"runId":      run.ID,
-			"maxRetries": e.faultEscalationCfg.MaxRetries,
-		})
+		e.bus.Publish("run.fault_escalation.exhausted", runScope(run),
+			faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
 		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
 	}
 	// Report the last error.
 	if lastWaitErr != nil {
 		e.publishFailed(run, errorWithRunOutput(lastWaitErr, nil))
-		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
+		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 	}
 }
 
@@ -825,12 +778,9 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 				// Log stderr to structured logger so CC failure diagnostics
 				// are visible in Edge server logs without subscribing to bus events.
 				if stream == "stderr" && text != "" {
-					for _, line := range strings.Split(text, "\n") {
-						line = strings.TrimRight(line, "\r")
-						if line != "" {
-							sanitizedLine, _ := recursiveSanitizeString(line)
-							slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
-						}
+					for _, line := range stderrLogLines(text) {
+						sanitizedLine, _ := recursiveSanitizeString(line)
+						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 					}
 				}
 				if outStore != nil && len(allowed) > 0 {
@@ -842,18 +792,8 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					e.recordHubOutput(run.ID, text)
 					e.fireHubStream(run.ID, text)
 				}
-				payload := map[string]any{
-					"runId":  run.ID,
-					"stream": stream,
-					"chunks": []map[string]any{
-						{"offset": offset, "text": text},
-					},
-				}
+				payload := runOutputBatchPayload(run.ID, stream, text, offset, truncatedNow, written, maxBytes)
 				if truncatedNow {
-					payload["truncated"] = true
-					payload["maxBytes"] = maxBytes
-					payload["bytesWritten"] = written
-					payload["message"] = fmt.Sprintf("run output truncated after %d bytes", maxBytes)
 					slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
 				}
 				e.bus.Publish("run.output.batch", runScope(run), payload)
@@ -875,11 +815,8 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 		if classified != nil {
 			e.persistAgentFailureMessage(failed, classified.Message)
 		}
-		e.bus.Publish("run.failed", runScope(failed), map[string]any{
-			"runId":  failed.ID,
-			"status": failed.Status,
-			"error":  classified,
-		})
+		e.bus.Publish("run.failed", runScope(failed),
+			runFailedEventPayload(failed.ID, failed.Status, classified))
 		// Fire Hub callback if configured
 		e.fireHubFail(failed.ID, classified.Message)
 	}
@@ -903,26 +840,12 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 			return
 		}
 	}
-	item, err := repository.CreateItem(store.Item{
-		ID:        transcriptItemID(run.ID),
-		ProjectID: run.ProjectID,
-		ThreadID:  run.ThreadID,
-		RunID:     run.ID,
-		Type:      "agent_message",
-		Role:      "agent",
-		Status:    "failed",
-		Content:   content,
-	})
+	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
 	if err != nil {
 		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "error", err)
 		return
 	}
-	scope := map[string]any{
-		"projectId": item.ProjectID,
-		"threadId":  item.ThreadID,
-		"runId":     item.RunID,
-		"itemId":    item.ID,
-	}
+	scope := itemEventScope(item)
 	e.bus.Publish("message.created", scope, item)
 	e.bus.Publish("item.created", scope, item)
 }
@@ -949,10 +872,8 @@ func (e *ProcessExecutor) checkPersistError(runID string) {
 	}
 	if persistErr := pc.LastPersistError(); persistErr != nil {
 		slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
-		e.bus.Publish("run.persistence_error", map[string]any{"runId": runID}, map[string]any{
-			"runId": runID,
-			"error": persistErr.Error(),
-		})
+		scope, payload := persistenceErrorScopePayload(runID, persistErr)
+		e.bus.Publish("run.persistence_error", scope, payload)
 	}
 }
 
@@ -1046,18 +967,14 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		return
 	}
 
-	msgType := agents.MsgTypeResult
-	switch status {
-	case "failed", "cancelled":
-		msgType = agents.MsgTypeError
-		e.agentRegistry.SetStatus(agentID, agents.StatusError, "")
-	case "finished", "completed_with_issues":
+	msgType := subAgentResultMsgType(status)
+	if regStatus, update := subAgentRegistryTerminalStatus(status); update {
 		// completed_with_issues is a terminal status set by the evidence gate
-		// when verification fails. It is still a result, so msgType stays
-		// MsgTypeResult, but the agent registry must be updated to StatusCompleted
-		// so the parent orchestrator does not wait indefinitely for a child it
-		// thinks is still running.
-		e.agentRegistry.SetStatus(agentID, agents.StatusCompleted, "")
+		// when verification fails. It is still a result (MsgTypeResult), but the
+		// agent registry must be updated to StatusCompleted so the parent
+		// orchestrator does not wait indefinitely for a child it thinks is still
+		// running.
+		e.agentRegistry.SetStatus(agentID, regStatus, "")
 	}
 
 	// Sanitize the sub-agent result before it enters the message queue.
@@ -1067,20 +984,14 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 
 	e.messageQueue.EnsureAgent(inst.ParentID, 64)
 	e.messageQueue.Send(agents.Message{
-		ID:          "msg_" + runID,
+		ID:          subAgentMessageID(runID),
 		FromAgentID: agentID,
 		ToAgentID:   inst.ParentID,
 		Type:        msgType,
 		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
-		Payload: map[string]any{
-			"runId":             runID,
-			"status":            status,
-			"agentId":           agentID,
-			"agentName":         inst.Name,
-			"result":            sanitizedResult,
-			"_sanitized":        sanitizeReason != "",
-			"_sanitized_reason": sanitizeReason,
-		},
+		Payload: subAgentResultQueuePayload(
+			runID, status, agentID, inst.Name, sanitizedResult, sanitizeReason,
+		),
 		Timestamp: time.Now().UTC(),
 	})
 
@@ -1211,19 +1122,17 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		}
 	}()
 
-	runID = "run_" + task.TaskID
-	agentInstanceID = "agent_" + task.TaskID
+	runID = subAgentRunID(task.TaskID)
+	agentInstanceID = subAgentInstanceID(task.TaskID)
 
 	// Resolve ThreadID: each sub-agent MUST have its own distinct thread so
 	// that its context space is fully isolated from the parent. If the task
 	// provides an explicit ThreadID we use it; otherwise we create a
 	// hierarchical child thread ID derived from the parent ThreadID.
 	// This prevents context contamination between parent and child.
-	threadID := task.ThreadID
-	if threadID == "" {
-		threadID = parentRun.ThreadID + "/sub/" + runID
-	}
+	threadID := resolveSubAgentThreadID(parentRun.ThreadID, runID, task.ThreadID)
 
+	//
 	// Create the run in the store
 	run, createErr := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
 	if createErr != nil {
@@ -1248,7 +1157,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 			ThreadID:  threadID,
 			ParentID:  parentRun.ID,
 			Depth:     task.Depth,
-			AgentPath: "/" + parentRun.ID + "/" + agentInstanceID,
+			AgentPath: subAgentPath(parentRun.ID, agentInstanceID),
 			CreatedAt: time.Now(),
 			LastSeen:  time.Now(),
 		}
@@ -1263,12 +1172,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	}
 
 	// Emit run.queued
-	scope := map[string]any{
-		"projectId": run.ProjectID,
-		"threadId":  run.ThreadID,
-		"runId":     run.ID,
-	}
-	e.bus.Publish("run.queued", scope, run)
+	e.bus.Publish("run.queued", runScope(run), run)
 
 	// Build run context with the task prompt, target agent, and an isolated
 	// context budget allocated from the parent via AllocateChild.
@@ -1302,13 +1206,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// the same workspace concurrently.
 	if len(task.SiblingAgents) > 0 {
 		siblingPrompt := adapters.BuildSiblingContextPrompt(task.SiblingAgents)
-		if siblingPrompt != "" {
-			if runCtx.AppendSystemPrompt != "" {
-				runCtx.AppendSystemPrompt = siblingPrompt + "\n\n" + runCtx.AppendSystemPrompt
-			} else {
-				runCtx.AppendSystemPrompt = siblingPrompt
-			}
-		}
+		runCtx.AppendSystemPrompt = appendSystemPromptPrefix(runCtx.AppendSystemPrompt, siblingPrompt)
 	}
 
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
