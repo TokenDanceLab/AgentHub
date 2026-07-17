@@ -3298,23 +3298,80 @@ func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) 
 	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
-	// HubJWTSecret is empty — dual-token check is skipped entirely
+	// HubJWTSecret is empty and no Hub identity — local single-tenant path
+	// still allowed without capability (AH-SR-046 / #899).
 	h.HubJWTSecret = ""
 	h.EdgeDeviceID = ""
 	h.ensureDefaults()
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"no dual token","workDir":%q}`, workDir)))
-	// No capability token header
+	// No capability token header, no Hub identity in context
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
 
-	// When HubJWTSecret is empty, PostRuns behaves exactly as before (no dual-token gate).
+	// Local empty identity + empty secret remains allowed without capability.
 	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected status 202 (no dual-token gate), got %d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("expected status 202 (local single-tenant, no dual-token gate), got %d body=%s", rec.Code, rec.Body.String())
 	}
 	if len(executor.started) != 1 {
 		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_HubIdentityMissingCapabilityReturns403(t *testing.T) {
+	// #899: Hub identity + secret set + missing capability → 403 (no soft-skip).
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = testCapSecret
+	h.EdgeDeviceID = "test-edge-001"
+	h.ensureDefaults()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub identity no cap","workDir":%q}`, workDir)))
+	// Hub identity present, but no X-AgentHub-Capability-Token
+	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-hub")
+	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrCapabilityTokenInvalid.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestRunStartDualToken_HubIdentityEmptySecretFailsClosed(t *testing.T) {
+	// #899: Hub identity + empty secret → fail closed (config error), not soft-skip.
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.HubJWTSecret = ""
+	h.EdgeDeviceID = ""
+	h.ensureDefaults()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub identity no secret","workDir":%q}`, workDir)))
+	// Inject Hub identity even though secret is empty (defense-in-depth residual).
+	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-hub")
+	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 (fail closed config error), got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), errcode.ErrNotConfigured.Code)
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
 	}
 }
 

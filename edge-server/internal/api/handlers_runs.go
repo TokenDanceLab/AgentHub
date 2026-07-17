@@ -128,9 +128,17 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
-	// Dual-token auth (AH-SR-046): when HubJWTSecret is configured, PostRuns
-	// requires BOTH a valid identity JWT (checked by middleware) AND a
+	// Dual-token auth (AH-SR-046): when a Hub user identity is present on the
+	// request, PostRuns requires BOTH that identity (middleware) AND a
 	// per-run capability token that binds user/device/target/project.
+	// Pure local-auth (no Hub identity) remains allowed without capability
+	// when HubJWTSecret is empty. If Hub identity is present but the secret
+	// is empty/misconfigured, fail closed — never soft-skip capability.
+	hubUserID := hubUserFromRequest(r)
+	if hubUserID != "" && h.HubJWTSecret == "" {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrNotConfigured.WithMessage("Hub JWT secret not configured; dual-token capability validation required when Hub identity is present")))
+		return
+	}
 	if h.HubJWTSecret != "" {
 		capToken := strings.TrimSpace(r.Header.Get("X-AgentHub-Capability-Token"))
 		if capToken == "" {
