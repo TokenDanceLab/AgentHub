@@ -1,34 +1,70 @@
 import type { QueryClient } from '@tanstack/react-query';
 import {
   allowsWorkbenchDemoRuntimeMutation,
-  createWorkbenchDemoStore,
-  demoWorkbenchAgents,
-  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
-  resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
   type WorkbenchDataMode,
   type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
-import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
+import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
-import type { TranscriptBlock } from '@shared/transcript';
-import type { AgentInfo } from '@shared/types';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
   type AgentInstance,
   type ExecutionTarget,
   type HubClient,
-  type MessageResponse,
   type PendingAgentTask,
   type SendMessageResponse,
 } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 import { createWebSettingsAdapter } from './webSettingsAdapter';
+import { recordWebAgentTaskIndex } from './webPlatformAgentTask';
+import {
+  buildHubAgentTaskModelParams,
+  isDispatchableLocalEdgeTarget,
+  targetDispatchBlockerLabel,
+} from './webPlatformDispatchHelpers';
+import { webConversations } from './webPlatformFixtures';
+import {
+  confirmOptimisticHubMessage,
+  optimisticHubMessageFromIntent,
+  removeOptimisticHubMessage,
+  resolveComposerMessageContent,
+  upsertHubMessage,
+} from './webPlatformMessageHelpers';
+
+// Stable public surface re-exports (consumers keep importing from webPlatform).
+export type { WebActiveAgentTask } from './webPlatformAgentTask';
+export {
+  compactActiveAgentTask,
+  readStoredWebActiveAgentTask,
+  recordWebAgentTaskIndex,
+  webActiveAgentTaskQueryKey,
+  webAgentTaskIndexQueryKey,
+} from './webPlatformAgentTask';
+export {
+  webAgents,
+  webConversations,
+  webHubEmptyConversation,
+  webHubEmptyTranscript,
+  webTranscript,
+} from './webPlatformFixtures';
+export {
+  agentInfoToWorkbenchAgent,
+  hubSessionToWorkbenchConversation,
+  resolveWebWorkbenchAgents,
+  resolveWebWorkbenchConversations,
+  webConversationWithPinnedMessages,
+} from './webPlatformMapping';
+export {
+  confirmOptimisticHubMessage,
+  optimisticHubMessageFromIntent,
+  removeOptimisticHubMessage,
+  upsertHubMessage,
+} from './webPlatformMessageHelpers';
 
 type WebRunHubClient =
   Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'> &
@@ -42,17 +78,6 @@ interface SessionAgentInstanceBinding {
   profileId: string;
   runtimeId: string;
   agentInstance: AgentInstance;
-}
-
-export interface WebActiveAgentTask {
-  taskId: string;
-  sessionId?: string;
-  agentInstanceId?: string;
-  triggerMessageId?: string;
-  targetId?: string;
-  edgeRunId?: string;
-  edgeDeviceId?: string;
-  status: string;
 }
 
 export interface WebPlatformOptions {
@@ -72,121 +97,6 @@ export interface WebPlatformOptions {
 }
 
 const defaultHubClient = createHubClient({ getToken: getAccessToken });
-const demoStore = createWorkbenchDemoStore();
-
-export const webConversations: WorkbenchConversation[] = demoStore.conversations;
-export const webAgents: WorkbenchAgent[] = demoWorkbenchAgents;
-export const webTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript('builder');
-
-export const webHubEmptyConversation: WorkbenchConversation = {
-  id: 'hub-empty-workspace',
-  title: 'Hub 工作台',
-  kind: 'group',
-  subtitle: '暂无 Hub 会话',
-};
-
-export const webHubEmptyTranscript: TranscriptBlock[] = [
-  {
-    id: 'web-hub-empty',
-    kind: 'text',
-    author: { id: 'hub', name: 'Hub', role: 'system' },
-    text: 'Hub session 已连接，暂无可显示会话。',
-  },
-];
-
-export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
-  return {
-    id: agent.profileId ?? agent.id,
-    name: agent.name,
-    ...(agent.description ? { description: agent.description } : {}),
-    ...(agent.runtimeId ? { icon: agent.runtimeId } : {}),
-    status: agent.status,
-    ...(agent.model ? { model: agent.model } : {}),
-    ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
-    ...(agent.provider ? { provider: agent.provider } : {}),
-    ...(agent.approvalPolicy ? { approvalPolicy: agent.approvalPolicy } : {}),
-    ...(agent.permissionMode ? { permissionMode: agent.permissionMode } : {}),
-    ...(agent.reasoningEffort ? { reasoningEffort: agent.reasoningEffort } : {}),
-    ...(agent.skills ? { skills: agent.skills } : {}),
-    ...(agent.toolAllowlist ? { toolAllowlist: agent.toolAllowlist } : {}),
-    ...(agent.targetPreferences ? { targetPreferences: agent.targetPreferences } : {}),
-  };
-}
-
-export function resolveWebWorkbenchAgents(
-  hubAgents: AgentInfo[] | undefined,
-  dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
-): WorkbenchAgent[] {
-  const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
-  if (isWorkbenchRealDataMode(dataMode)) return mapped;
-  return mapped.length > 0 ? mapped : webAgents;
-}
-
-export function hubSessionToWorkbenchConversation(session: Session): WorkbenchConversation | null {
-  const id = session.id ?? session.session_id;
-  if (!id) return null;
-  const isPrivate = session.type === 'private';
-  const fallbackTitle = isPrivate ? 'Hub 私聊' : 'Hub 群聊';
-
-  return {
-    id,
-    title: session.name?.trim() || fallbackTitle,
-    kind: isPrivate ? 'direct' : 'group',
-    subtitle: session.member_count != null
-      ? `Hub ${session.type} · ${session.member_count} members`
-      : `Hub ${session.type}`,
-    ...(session.unread_count ? { unreadCount: session.unread_count } : {}),
-  };
-}
-
-export function webConversationWithPinnedMessages(
-  conversation: WorkbenchConversation,
-  pins: MessageResponse[] | undefined,
-): WorkbenchConversation {
-  const firstPin = pins?.[0];
-  if (!firstPin) {
-    const { pinnedAnnouncement: _removed, ...withoutPin } = conversation;
-    return withoutPin;
-  }
-
-  const pinnedTime = formatHubPinTime(firstPin.created_at);
-  return {
-    ...conversation,
-    pinnedAnnouncement: {
-      title: conversation.title,
-      content: firstPin.content,
-      author: firstPin.sender_id || 'Hub',
-      ...(pinnedTime ? { time: pinnedTime } : {}),
-      sourceId: firstPin.id,
-    },
-  };
-}
-
-export function resolveWebWorkbenchConversations(
-  sessions: Session[] | undefined,
-  hubAuthenticated: boolean,
-  dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
-): WorkbenchConversation[] {
-  const mapped = hubAuthenticated
-    ? (sessions
-        ?.map(hubSessionToWorkbenchConversation)
-        .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [])
-    : [];
-
-  if (mapped.length > 0) return mapped;
-  if (isWorkbenchRealDataMode(dataMode)) return [webHubEmptyConversation];
-  return webConversations;
-}
-
-function formatHubPinTime(timestamp: string | undefined): string | undefined {
-  if (!timestamp) return undefined;
-  const parsed = Date.parse(timestamp);
-  if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
   const hubClient = options.hubClient ?? defaultHubClient;
@@ -364,54 +274,12 @@ export async function submitWebComposerIntent(
   return { intentId: task.id || message.message_id };
 }
 
-function buildAttachmentContentJSON(
-  attachment: ComposerAttachment,
-  text?: string,
-): string {
-  const ref = attachment.attachmentRef;
-  if (!ref) return JSON.stringify({ name: attachment.name });
-  const payload: Record<string, string> = {
-    attachment_id: ref.id,
-    name: ref.original_name ?? ref.name ?? attachment.name,
-  };
-  if (text?.trim()) {
-    payload.caption = text.trim();
-  }
-  return JSON.stringify(payload);
-}
-
-function firstUploadedAttachment(
-  attachments: ComposerAttachment[],
-  mimePrefix: string,
-): ComposerAttachment | undefined {
-  return attachments.find((a) => a.mime?.startsWith(mimePrefix) && a.attachmentRef);
-}
-
 async function sendComposerMessage(
   hubClient: WebRunHubClient,
   clientMessageId: string,
   intent: ComposerIntent,
 ): Promise<SendMessageResponse> {
-  const hasAttachments = intent.attachments.length > 0;
-  const firstImageAttachment = hasAttachments
-    ? firstUploadedAttachment(intent.attachments, 'image/')
-    : undefined;
-  const firstFileAttachment = hasAttachments && !firstImageAttachment
-    ? firstUploadedAttachment(intent.attachments, '')
-    : undefined;
-
-  let contentType: import('@shared/hubClient').HubContentType = 'text';
-  let content: string;
-
-  if (firstImageAttachment?.attachmentRef) {
-    contentType = 'image';
-    content = buildAttachmentContentJSON(firstImageAttachment, intent.text.trim());
-  } else if (firstFileAttachment?.attachmentRef) {
-    contentType = 'file';
-    content = buildAttachmentContentJSON(firstFileAttachment, intent.text.trim());
-  } else {
-    content = buildHubComposerPrompt(intent);
-  }
+  const { contentType, content } = resolveComposerMessageContent(intent);
 
   return hubClient.sendMessage(intent.conversationId, {
     client_msg_id: clientMessageId,
@@ -419,194 +287,6 @@ async function sendComposerMessage(
     content,
     ...(intent.replyTo ? { reply_to_message_id: intent.replyTo.messageId } : {}),
   });
-}
-
-export function optimisticHubMessageFromIntent(
-  intent: ComposerIntent,
-  clientMessageId: string,
-  createdAt: string,
-): MessageResponse {
-  const hasAttachments = intent.attachments.length > 0;
-  const firstImageAttachment = hasAttachments
-    ? firstUploadedAttachment(intent.attachments, 'image/')
-    : undefined;
-  const firstFileAttachment = hasAttachments && !firstImageAttachment
-    ? firstUploadedAttachment(intent.attachments, '')
-    : undefined;
-
-  let contentType: import('@shared/hubClient').HubContentType = 'text';
-  let content: string;
-
-  if (firstImageAttachment?.attachmentRef) {
-    contentType = 'image';
-    content = buildAttachmentContentJSON(firstImageAttachment, intent.text.trim());
-  } else if (firstFileAttachment?.attachmentRef) {
-    contentType = 'file';
-    content = buildAttachmentContentJSON(firstFileAttachment, intent.text.trim());
-  } else {
-    content = buildHubComposerPrompt(intent);
-  }
-
-  const attachmentRefs = intent.attachments
-    .filter((a): a is ComposerAttachment & { attachmentRef: AttachmentRef } => Boolean(a.attachmentRef));
-
-  return {
-    id: clientMessageId,
-    session_id: intent.conversationId,
-    seq_id: Number.MAX_SAFE_INTEGER,
-    client_msg_id: clientMessageId,
-    sender_type: 'user',
-    sender_id: 'web-current-user',
-    content_type: contentType,
-    content,
-    created_at: createdAt,
-    ...(intent.replyTo
-      ? {
-          reply_to: {
-            id: intent.replyTo.messageId,
-            sender_id: intent.replyTo.author,
-            content_type: 'text',
-            content: '',
-            recalled: false,
-            created_at: createdAt,
-          },
-        }
-      : {}),
-    ...(attachmentRefs.length > 0
-      ? {
-          attachments: attachmentRefs.map((a) => ({
-            id: a.attachmentRef.id,
-            hash: a.attachmentRef.hash ?? '',
-            size: a.attachmentRef.size,
-            mime_type: a.attachmentRef.mime_type,
-            ...(a.attachmentRef.original_name ? { original_name: a.attachmentRef.original_name } : {}),
-            ...(a.attachmentRef.metadata ? { metadata: a.attachmentRef.metadata } : {}),
-            ...(a.attachmentRef.created_at ? { created_at: a.attachmentRef.created_at } : {}),
-          })),
-        }
-      : {}),
-  };
-}
-
-export function upsertHubMessage(
-  queryClient: QueryClient | undefined,
-  message: MessageResponse,
-): void {
-  queryClient?.setQueryData<MessageResponse[]>(
-    hubMessagesQueryKey(message.session_id),
-    (current = []) => [
-      ...current.filter((item) => item.client_msg_id !== message.client_msg_id && item.id !== message.id),
-      message,
-    ],
-  );
-}
-
-export function confirmOptimisticHubMessage(
-  queryClient: QueryClient | undefined,
-  sessionId: string,
-  clientMessageId: string,
-  response: SendMessageResponse,
-): void {
-  queryClient?.setQueryData<MessageResponse[]>(
-    hubMessagesQueryKey(sessionId),
-    (current = []) => current.map((message) =>
-      message.client_msg_id === clientMessageId
-        ? {
-            ...message,
-            id: response.message_id,
-            seq_id: response.seq_id,
-            created_at: response.created_at,
-          }
-        : message,
-    ),
-  );
-}
-
-export function removeOptimisticHubMessage(
-  queryClient: QueryClient | undefined,
-  sessionId: string,
-  clientMessageId: string,
-): void {
-  queryClient?.setQueryData<MessageResponse[]>(
-    hubMessagesQueryKey(sessionId),
-    (current = []) => current.filter((message) => message.client_msg_id !== clientMessageId),
-  );
-}
-
-function hubMessagesQueryKey(sessionId: string): [string, string, string] {
-  return ['web-v4', 'hub-messages', sessionId];
-}
-
-export function webActiveAgentTaskQueryKey(sessionId: string): [string, string, string] {
-  return ['web-v4', 'active-agent-task', sessionId];
-}
-
-export function webAgentTaskIndexQueryKey(taskId: string): [string, string, string] {
-  return ['web-v4', 'agent-task-index', taskId];
-}
-
-export function recordWebAgentTaskIndex(
-  queryClient: QueryClient | undefined,
-  task: WebActiveAgentTask,
-): void {
-  queryClient?.setQueryData(webAgentTaskIndexQueryKey(task.taskId), task);
-  if (!task.sessionId) return;
-  queryClient?.setQueryData(webActiveAgentTaskQueryKey(task.sessionId), task);
-  writeStoredWebActiveAgentTask(task.sessionId, task);
-}
-
-export function readStoredWebActiveAgentTask(sessionId: string): WebActiveAgentTask | null {
-  if (typeof localStorage === 'undefined') return null;
-  const raw = localStorage.getItem(webActiveAgentTaskStorageKey(sessionId));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const record = parsed as Record<string, unknown>;
-    const taskId = stringField(record.taskId);
-    const status = stringField(record.status);
-    if (!taskId || !status) return null;
-    const storedSessionId = stringField(record.sessionId) ?? sessionId;
-    const agentInstanceId = stringField(record.agentInstanceId);
-    const triggerMessageId = stringField(record.triggerMessageId);
-    const targetId = stringField(record.targetId);
-    const edgeRunId = stringField(record.edgeRunId);
-    const edgeDeviceId = stringField(record.edgeDeviceId);
-    return compactActiveAgentTask({
-      taskId,
-      sessionId: storedSessionId,
-      ...(agentInstanceId ? { agentInstanceId } : {}),
-      ...(triggerMessageId ? { triggerMessageId } : {}),
-      ...(targetId ? { targetId } : {}),
-      ...(edgeRunId ? { edgeRunId } : {}),
-      ...(edgeDeviceId ? { edgeDeviceId } : {}),
-      status,
-    });
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredWebActiveAgentTask(sessionId: string, task: WebActiveAgentTask): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(webActiveAgentTaskStorageKey(sessionId), JSON.stringify(compactActiveAgentTask(task)));
-}
-
-function webActiveAgentTaskStorageKey(sessionId: string): string {
-  return `agenthub.web.activeAgentTask.${sessionId}`;
-}
-
-function compactActiveAgentTask(task: WebActiveAgentTask): WebActiveAgentTask {
-  return {
-    taskId: task.taskId,
-    ...(task.sessionId ? { sessionId: task.sessionId } : {}),
-    ...(task.agentInstanceId ? { agentInstanceId: task.agentInstanceId } : {}),
-    ...(task.triggerMessageId ? { triggerMessageId: task.triggerMessageId } : {}),
-    ...(task.targetId ? { targetId: task.targetId } : {}),
-    ...(task.edgeRunId ? { edgeRunId: task.edgeRunId } : {}),
-    ...(task.edgeDeviceId ? { edgeDeviceId: task.edgeDeviceId } : {}),
-    status: task.status,
-  };
 }
 
 function sessionAgentBindingsQueryKey(sessionId: string): [string, string, string] {
@@ -696,11 +376,7 @@ async function resolveWebDispatchTarget(
     target_type: 'local_edge',
     pageSize: 50,
   });
-  const onlineLocalEdgeTargets = inventory.items.filter((target) =>
-    target.target_type === 'local_edge' &&
-    target.is_online === true &&
-    (target.health_state === 'online' || target.health_state === 'healthy')
-  );
+  const onlineLocalEdgeTargets = inventory.items.filter(isDispatchableLocalEdgeTarget);
   const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
   if (!target) {
     const requested = inventory.items.find((item) => item.id === requestedTargetId);
@@ -712,56 +388,6 @@ async function resolveWebDispatchTarget(
     throw new Error('Selected Desktop/Edge target is missing from Hub inventory.');
   }
   return target;
-}
-
-function targetDispatchBlockerLabel(target: ExecutionTarget): string {
-  if (target.target_type !== 'local_edge') return `target type ${target.target_type}`;
-  const healthState = target.health_state;
-  if (healthState === 'online' || healthState === 'healthy') return target.is_online ? 'online' : 'offline';
-  return healthState || (target.is_online ? 'unknown' : 'offline');
-}
-
-function buildHubComposerPrompt(intent: ComposerIntent): string {
-  const lines = [intent.text.trim()];
-  const attachmentContext = intent.attachments
-    .filter((attachment) => attachment.contentPreview?.trim())
-    .map((attachment) => {
-      const source = attachment.source ? ` (${attachment.source})` : '';
-      return `### ${attachment.name}${source}\n${attachment.contentPreview}`;
-    });
-
-  if (attachmentContext.length > 0) {
-    lines.push('[AgentHub attachments]', attachmentContext.join('\n\n'));
-  }
-
-  return lines.filter(Boolean).join('\n\n');
-}
-
-function buildHubAgentTaskModelParams(intent: ComposerIntent): Record<string, unknown> {
-  return {
-    source: 'web-v4-workbench',
-    mode: intent.mode,
-    approval_mode: intent.approvalMode,
-    ...(intent.workDir ? { work_dir: intent.workDir } : {}),
-    mentions: intent.mentions.map((mention) => ({
-      id: mention.id,
-      label: mention.label,
-      ...(mention.runtimeId ? { runtime_id: mention.runtimeId } : {}),
-      ...(mention.model ? { model: mention.model } : {}),
-    })),
-    attachments: intent.attachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      ...(attachment.source ? { source: attachment.source } : {}),
-      ...(attachment.kind ? { kind: attachment.kind } : {}),
-      ...(attachment.mime ? { mime: attachment.mime } : {}),
-      ...(attachment.truncated != null ? { truncated: attachment.truncated } : {}),
-    })),
-  };
-}
-
-function stringField(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function newClientMessageId(): string {
