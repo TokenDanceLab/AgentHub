@@ -101,6 +101,13 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
 - UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web 主视口优先 `1440x810`。
 
+前端 CI 易踩坑（cleanup 实测，2026-07-17）：
+
+- `exactOptionalPropertyTypes`：禁止 `...{ optional: maybeUndefined }`；只在 defined 时赋值；async handler 传给 `() => void` 时用 `void fn()` 包装。
+- `noUncheckedIndexedAccess`：CSS module / `Record<string, string>` 索引用 `styles.foo ?? ''`，不要假设必有 key。
+- CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
+- Nav 图标只用 `DesignNavIcon`；禁止再引入散落的 nav glyph 组件。
+
 ## 6. Git 和 worktree
 
 当前开发基线是 `dev/delicious233`，合并路径：
@@ -166,7 +173,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 架构决策摘要写 `docs/decisions.md`；旧 ADR 正文只在 `docs/history.md` 指向的外部归档中追溯。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- AgentHub 源仓不再保留 `docs/archive/` 或 `docs/archives/`；当前执行中的 SPEC 才可以临时使用 `docs/analysis/`、`docs/plan/` 和 `docs/progress/`。
+- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。允许保留既有 `docs/archives/cleanup-baseline/` 快照；不要再新增平行 `docs/archives/*` 叙事目录。当前执行中的 SPEC 使用 `docs/analysis/`、`docs/plan/`、`docs/progress/`。
 - `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/release/`、`scripts/smoke/` 和 `scripts/lib/`；不要新增根级脚本 wrapper。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
