@@ -234,7 +234,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	if !ok {
 		return store.ErrNotFound
 	}
-	if current.Status != "queued" {
+	if !isQueuedRunStatus(current.Status) {
 		return ErrRunAlreadyStarted
 	}
 
@@ -268,9 +268,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	if !ok {
 		return CancelResult{Found: false, Status: "not_found"}
 	}
-	switch run.Status {
-	case "queued", "started", "cancelling":
-	default:
+	if !isCancellableRunStatus(run.Status) {
 		return CancelResult{Run: run, Found: true, Status: run.Status}
 	}
 
@@ -381,11 +379,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Resolve adapter label for Prometheus metrics
 	var adapterLabel string
 	if e.metrics != nil {
-		if adapter != nil {
-			adapterLabel = adapterMetricsLabel(adapter.Metadata().ID, true)
-		} else {
-			adapterLabel = adapterMetricsLabel("", false)
-		}
+		adapterLabel = resolveAdapterMetricsLabel(adapter)
 	}
 
 	// SEC-02: Defense-in-depth — reject 'bypassPermissions' at the executor level
@@ -486,7 +480,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			return
 		}
 		var stdin io.WriteCloser
-		if adapter != nil && adapter.NeedsStdin() {
+		if needsAdapterStdin(adapter) {
 			stdin, err = cmd.StdinPipe()
 			if err != nil {
 				e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
@@ -545,7 +539,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// via stdin interrupt). An open pipe with no data causes CLI agents
 		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
 		// eagerly when neither mechanism requires stdin.
-		if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
+		if stdin != nil && shouldCloseStdinEagerly(adapter.NeedsStdin(), e.decisionLoopFactory != nil) {
 			_ = stdin.Close()
 			e.mu.Lock()
 			delete(e.stdins, run.ID)
@@ -585,14 +579,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Also inject RunProcessContext unconditionally — SDK adapters
 		// (anthropic-sdk, openai-sdk) need prompt, model, and messages
 		// regardless of whether a WorkDir is set.
-		parserCtx := ctx
-		if runCtx.Budget != nil {
-			parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
-		}
-		if runCtx.WorkDir != "" {
-			parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
-		}
-		parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
+		parserCtx := withParserContextValues(ctx, runCtx)
 
 		var parseErr error
 		if adapter != nil {
@@ -645,7 +632,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		if outStore != nil {
 			stderrCapture, _ = outStore.ReadAll()
 		}
-		if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr, stderrCapture) && time.Since(subprocessStart) < sessionRetryWindow {
+		if shouldRetrySessionConflict(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart)) {
 			newSession := newRandomSessionID()
 			slog.Warn("process: session conflict detected, retrying with fresh session ID",
 				"runId", run.ID,
@@ -681,8 +668,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Recoverable errors (malformed event, orphaned tool) emit a warning and
 		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
 		if parseErr != nil {
-			var psErr *adapters.ParseStreamError
-			if errors.As(parseErr, &psErr) && psErr.Recoverable() {
+			if psErr, ok := recoverableParseStreamError(parseErr); ok {
 				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
 				e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
 					recoverableParseWarningPayload(
@@ -727,9 +713,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 
 	// Exhausted session retries — attempt fault escalation if configured.
-	if lastWaitErr != nil && e.faultEscalationCfg.Enabled && e.faultEscalationCfg.MaxRetries > 0 {
+	if lastWaitErr != nil && faultEscalationActive(e.faultEscalationCfg) {
 		r, ok := e.store.GetRun(run.ID)
-		if ok && r.RetryCount < e.faultEscalationCfg.MaxRetries {
+		if ok && shouldFaultEscalateRetry(e.faultEscalationCfg, r.RetryCount) {
 			newCount := r.RetryCount + 1
 			e.store.SetRunRetryCount(run.ID, newCount)
 			run.RetryCount = newCount
@@ -1174,14 +1160,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// The child budget is independent — it does NOT reference the parent's
 	// UsedTokens counter, so the child's token consumption never pollutes
 	// the parent's budget tracking.
-	runCtx := RunProcessContext{
-		Run:       run,
-		Prompt:    task.Prompt,
-		AgentID:   task.AgentID,
-		Budget:    childBudget(task.Budget, task.Depth),
-		Model:     task.Model,
-		SessionID: threadID, // always set to child's own thread
-	}
+	runCtx := newSubAgentRunContext(run, task, threadID)
 
 	// Inject AgentHub memory into the sub-agent run so it has persistent context.
 	// Mirror the same logic as the PostRuns handler in api/handlers.go.
@@ -1199,10 +1178,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// Inject sibling context so the sub-agent knows about other agents working
 	// in parallel. This prevents file conflicts when multiple sub-agents modify
 	// the same workspace concurrently.
-	if len(task.SiblingAgents) > 0 {
-		siblingPrompt := adapters.BuildSiblingContextPrompt(task.SiblingAgents)
-		runCtx.AppendSystemPrompt = appendSystemPromptPrefix(runCtx.AppendSystemPrompt, siblingPrompt)
-	}
+	runCtx.AppendSystemPrompt = withSiblingSystemPrompt(runCtx.AppendSystemPrompt, task.SiblingAgents)
 
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
