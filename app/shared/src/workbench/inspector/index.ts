@@ -32,3 +32,27 @@ export {
   evidenceOverviewTasks,
   fileTypeFromName,
 } from './InspectorModePanels';
+
+export {
+  BrowserModeBody,
+  FilesModeBody,
+  OverviewModeBody,
+} from './InspectorModeBodies';
+export type {
+  BrowserModeBodyProps,
+  FilesModeBodyProps,
+  OverviewModeBodyProps,
+} from './InspectorModeBodies';
+
+export {
+  InspectorMonitorHead,
+  defaultVisibleTabs,
+  getInspectorTabs,
+  getQuickOpenItems,
+  inspectorTabLabel,
+} from './InspectorTabChrome';
+export type {
+  InspectorMode,
+  InspectorMonitorHeadProps,
+  InspectorTabDef,
+} from './InspectorTabChrome';
