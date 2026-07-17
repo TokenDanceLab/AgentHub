@@ -1,14 +1,7 @@
-import React, { useCallback, useEffect, useRef, type FormEvent } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  ComposerAction,
-  ComposerAttachment,
-  ComposerMention,
-  ComposerState,
-} from '../composer';
 import { browserFilesToComposerAttachments } from '../composer';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
-import type { ComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 import {
   ComposerAgentPicker,
@@ -23,217 +16,148 @@ import {
   ComposerTargetPicker,
 } from './UnifiedComposerParts';
 import {
-  COMPOSER_FILE_ACCEPT,
-  buildTextWithNewline,
-  canSubmitFromKeyDown,
-  deriveUnifiedComposerState,
-  findMentionById,
-  isExecutionTargetStillValid,
-  shouldSubmitComposerKey,
-  type AttachmentUploadState,
-  type ComposerStatusHints,
-} from './unifiedComposerHelpers';
+  buildUnifiedComposerHostState,
+  cancelQuoteAction,
+  cancelReplyAction,
+  dispatchComposerAttachmentAdds,
+  planAddMentionAction,
+  planComposerHostKeyDownEffect,
+  removeAttachmentAction,
+  removeMentionAction,
+  resolveComposerFilePickChange,
+  resolveComposerOpenFilePicker,
+  setComposerTextAction,
+  shouldClearExecutionTarget,
+  type UnifiedComposerProps,
+} from './unifiedComposerHostHelpers';
 
-export type { AttachmentUploadState, ComposerStatusHints };
-
-export interface UnifiedComposerProps {
-  composer: ComposerState;
-  dispatchComposer: React.Dispatch<ComposerAction>;
-  executionTargets?: Array<{ id: string; label: string }> | undefined;
-  executionTargetId?: string | undefined;
-  mentionableAgents?: ComposerMention[];
-  onExecutionTargetChange?: ((executionTargetId: string) => void) | undefined;
-  onPickLocalAttachments?: (() => Promise<ComposerAttachment[]>) | undefined;
-  submitBehavior?: ComposerSubmitBehavior | undefined;
-  status?: {
-    dataMode?: string | undefined;
-    replayLabel?: string | undefined;
-    targetLabel?: string | undefined;
-    targetState?: string | undefined;
-  } | undefined;
-  uploadProgresses?: Record<string, AttachmentUploadState>;
-  onSubmit(event: FormEvent<HTMLFormElement>): void;
-  inputRef?: React.Ref<HTMLTextAreaElement>;
-  targetLabel?: string | undefined;
-}
+export type {
+  AttachmentUploadState,
+  ComposerStatusHints,
+  UnifiedComposerProps,
+} from './unifiedComposerHostHelpers';
 
 export function UnifiedComposer({
   composer,
   dispatchComposer,
   executionTargets,
-  executionTargetId = '',
+  executionTargetId,
   inputRef,
-  mentionableAgents = [],
+  mentionableAgents,
   onExecutionTargetChange,
   onPickLocalAttachments,
   onSubmit,
   status,
-  submitBehavior = 'enter-send',
-  targetLabel = 'AgentHub',
+  submitBehavior,
+  targetLabel,
   uploadProgresses,
 }: UnifiedComposerProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const derived = deriveUnifiedComposerState({
+  const { runtime, view } = buildUnifiedComposerHostState({
     composer,
     executionTargets,
     executionTargetId,
     mentionableAgents,
+    submitBehavior,
+    targetLabel,
+    onPickLocalAttachments,
     status,
+    uploadProgresses,
   });
-  const {
-    isSubmitting,
-    targetSelectionRequired,
-    targetSelected,
-    submitDisabled,
-    selectedTargetLabel,
-    selectedAgentLabel,
-    availableMentionOptions,
-    statusItems,
-    mainchainTask,
-  } = derived;
-
+  const { chromeModel } = view;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isExecutionTargetStillValid(executionTargets, executionTargetId)) return;
+    if (!shouldClearExecutionTarget(executionTargets, runtime.executionTargetId)) return;
     onExecutionTargetChange?.('');
-  }, [executionTargetId, executionTargets, onExecutionTargetChange]);
+  }, [runtime.executionTargetId, executionTargets, onExecutionTargetChange]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    const plan = shouldSubmitComposerKey({
-      key: event.key,
-      altKey: event.altKey,
-      shiftKey: event.shiftKey,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      isComposing: event.nativeEvent.isComposing,
-      submitBehavior,
-    });
-
-    if (plan.insertNewline) {
-      event.preventDefault();
-      insertComposerNewline(event.currentTarget);
-      return;
-    }
-    if (!plan.shouldSubmit) return;
-
-    event.preventDefault();
-    // Use the textarea's current DOM value instead of composer.text to avoid
-    // stale-state issues: React batches state updates, so the latest onChange
-    // dispatch may not have re-rendered yet when Enter fires immediately after.
-    const currentText = event.currentTarget.value ?? '';
-    if (canSubmitFromKeyDown({
-      currentText,
+    const effect = planComposerHostKeyDownEffect({
+      event,
+      submitBehavior: runtime.submitBehavior,
+      composerText: composer.text,
       attachments: composer.attachments,
-      isSubmitting,
-      targetSelectionRequired,
-      executionTargetId,
-    })) {
-      event.currentTarget.form?.requestSubmit();
-    }
-  }
-
-  function insertComposerNewline(input: HTMLTextAreaElement): void {
-    const { nextText, caret } = buildTextWithNewline({
-      text: composer.text,
-      selectionStart: input.selectionStart,
-      selectionEnd: input.selectionEnd,
+      isSubmitting: view.isSubmitting,
+      targetSelectionRequired: view.targetSelectionRequired,
+      executionTargetId: runtime.executionTargetId,
     });
-    dispatchComposer({ type: 'setText', text: nextText });
-    window.requestAnimationFrame(() => {
-      input.selectionStart = caret;
-      input.selectionEnd = caret;
-    });
-  }
-
-  function selectMention(agentId: string): void {
-    const mention = findMentionById(mentionableAgents, agentId);
-    if (!mention) return;
-    dispatchComposer({ type: 'addMention', mention });
-  }
-
-  const handleFilePick = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const fileList = event.target.files;
-    if (!fileList || fileList.length === 0) return;
-
-    // Desktop platform: delegate to the native file picker if available
-    if (onPickLocalAttachments) {
-      try {
-        const attachments = await onPickLocalAttachments();
-        attachments.forEach((attachment) => {
-          dispatchComposer({ type: 'addAttachment', attachment });
-        });
-      } catch {
-        // User cancelled or picker failed — nothing to do
-      }
-      // Reset so the same file can be picked again
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // Web platform: use browser file input directly
-    const files = Array.from(fileList);
-    const attachments = await browserFilesToComposerAttachments(files);
-    attachments.forEach((attachment) => {
-      dispatchComposer({ type: 'addAttachment', attachment });
-    });
-    // Reset so the same file can be picked again
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [dispatchComposer, onPickLocalAttachments]);
-
-  function openFilePicker(): void {
-    // Desktop: use the platform-native picker
-    if (onPickLocalAttachments) {
-      void onPickLocalAttachments().then((attachments) => {
-        attachments.forEach((attachment) => {
-          dispatchComposer({ type: 'addAttachment', attachment });
-        });
-      }).catch(() => {
-        // User cancelled
+    if (effect.kind === 'none') return;
+    event.preventDefault();
+    if (effect.kind === 'insert-newline') {
+      const input = event.currentTarget;
+      dispatchComposer(effect.textAction);
+      window.requestAnimationFrame(() => {
+        input.selectionStart = effect.caret.selectionStart;
+        input.selectionEnd = effect.caret.selectionEnd;
       });
       return;
     }
-    // Web: trigger the hidden file input
-    fileInputRef.current?.click();
+    if (effect.kind === 'submit') event.currentTarget.form?.requestSubmit();
+  }
+
+  function selectMention(agentId: string): void {
+    const action = planAddMentionAction(runtime.mentionableAgents, agentId);
+    if (action) dispatchComposer(action);
+  }
+
+  const handleFilePick = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const result = await resolveComposerFilePickChange({
+      fileList: event.target.files,
+      hasNativePicker: runtime.hasNativePicker,
+      onPickLocalAttachments,
+      browserFilesToAttachments: browserFilesToComposerAttachments,
+    });
+    if (result.kind === 'noop') return;
+    dispatchComposerAttachmentAdds(dispatchComposer, result.attachments);
+    if (result.resetInput && fileInputRef.current) fileInputRef.current.value = '';
+  }, [dispatchComposer, onPickLocalAttachments, runtime.hasNativePicker]);
+
+  function openFilePicker(): void {
+    void resolveComposerOpenFilePicker({
+      hasNativePicker: runtime.hasNativePicker,
+      onPickLocalAttachments,
+    }).then((result) => {
+      if (result.kind === 'web-input') {
+        fileInputRef.current?.click();
+        return;
+      }
+      dispatchComposerAttachmentAdds(dispatchComposer, result.attachments);
+    });
   }
 
   return (
     <form className={styles.composer} onSubmit={onSubmit}>
-      {composer.replyTo && (
+      {chromeModel.replyTo && (
         <ComposerReplyBar
-          isSubmitting={isSubmitting}
-          onCancel={() => dispatchComposer({ type: 'setReplyTo', replyTo: null })}
-          replyTo={composer.replyTo}
+          isSubmitting={view.isSubmitting}
+          onCancel={() => dispatchComposer(cancelReplyAction())}
+          replyTo={chromeModel.replyTo}
         />
       )}
-      {composer.quote && (
+      {chromeModel.quote && (
         <ComposerQuoteBar
-          isSubmitting={isSubmitting}
-          onCancel={() => dispatchComposer({ type: 'setQuote', quote: null })}
-          quote={composer.quote}
+          isSubmitting={view.isSubmitting}
+          onCancel={() => dispatchComposer(cancelQuoteAction())}
+          quote={chromeModel.quote}
         />
       )}
-      {composer.mentions.length > 0 && (
+      {chromeModel.mentions && (
         <ComposerMentionChips
-          isSubmitting={isSubmitting}
-          mentions={composer.mentions}
-          onRemove={(mentionId) => dispatchComposer({ type: 'removeMention', mentionId })}
+          isSubmitting={view.isSubmitting}
+          mentions={chromeModel.mentions}
+          onRemove={(id) => dispatchComposer(removeMentionAction(id))}
         />
       )}
-      {composer.mentions.length > 0 && (
-        <ComposerMainchainStrip
-          mainchainTask={mainchainTask}
-          selectedAgentLabel={selectedAgentLabel}
-          selectedTargetLabel={selectedTargetLabel}
-          targetSelected={targetSelected}
-        />
+      {chromeModel.mainchain && (
+        <ComposerMainchainStrip {...chromeModel.mainchain} />
       )}
-      {composer.attachments.length > 0 && (
+      {chromeModel.attachment && (
         <ComposerAttachmentBar
-          attachments={composer.attachments}
-          isSubmitting={isSubmitting}
-          onRemove={(attachmentId) => dispatchComposer({ type: 'removeAttachment', attachmentId })}
-          uploadProgresses={uploadProgresses}
+          attachments={chromeModel.attachment.attachments}
+          isSubmitting={view.isSubmitting}
+          onRemove={(id) => dispatchComposer(removeAttachmentAction(id))}
+          uploadProgresses={chromeModel.attachment.uploadProgresses}
         />
       )}
       <div className={styles.composerRow}>
@@ -242,15 +166,14 @@ export function UnifiedComposer({
           data-composer-input
           className={styles.composerInput}
           ref={inputRef}
-          onChange={(event) => dispatchComposer({ type: 'setText', text: event.target.value })}
+          onChange={(e) => dispatchComposer(setComposerTextAction(e.target.value))}
           onKeyDown={handleKeyDown}
-          placeholder={`发消息给 ${targetLabel}`}
+          placeholder={view.inputPlaceholder}
           rows={1}
           value={composer.text}
         />
-
         <input
-          accept={COMPOSER_FILE_ACCEPT}
+          accept={view.fileAccept}
           aria-hidden="true"
           hidden
           onChange={handleFilePick}
@@ -259,33 +182,28 @@ export function UnifiedComposer({
           tabIndex={-1}
           type="file"
         />
-
-        <ComposerAttachButton isSubmitting={isSubmitting} onClick={openFilePicker} />
-
-        {mentionableAgents.length > 0 && (
+        <ComposerAttachButton isSubmitting={view.isSubmitting} onClick={openFilePicker} />
+        {chromeModel.agentOptions && (
           <ComposerAgentPicker
-            availableMentionOptions={availableMentionOptions}
-            isSubmitting={isSubmitting}
+            availableMentionOptions={chromeModel.agentOptions}
+            isSubmitting={view.isSubmitting}
             onSelect={selectMention}
           />
         )}
-
-        {executionTargets && (
+        {chromeModel.targetPicker && (
           <ComposerTargetPicker
-            executionTargetId={executionTargetId}
-            executionTargets={executionTargets}
-            isSubmitting={isSubmitting}
-            onChange={(nextTargetId) => onExecutionTargetChange?.(nextTargetId)}
+            {...chromeModel.targetPicker}
+            isSubmitting={view.isSubmitting}
+            onChange={(id) => onExecutionTargetChange?.(id)}
           />
         )}
-
         <ComposerSendButton
-          hasMentions={composer.mentions.length > 0}
-          submitDisabled={submitDisabled}
+          hasMentions={view.hasMentions}
+          submitDisabled={view.submitDisabled}
         />
       </div>
-      {statusItems.length > 0 && (
-        <ComposerStatusStrip statusItems={statusItems} />
+      {chromeModel.statusItems && (
+        <ComposerStatusStrip statusItems={chromeModel.statusItems} />
       )}
     </form>
   );
