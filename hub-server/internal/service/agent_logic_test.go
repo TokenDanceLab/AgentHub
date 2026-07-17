@@ -10,6 +10,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -17,9 +18,9 @@ import (
 
 func TestNormalizeRuntimeAgentType(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		want     string
+		name  string
+		input string
+		want  string
 	}{
 		{name: "claude-code exact", input: "claude-code", want: "claude-code"},
 		{name: "claude short", input: "claude", want: "claude-code"},
@@ -37,7 +38,7 @@ func TestNormalizeRuntimeAgentType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, normalizeRuntimeAgentType(tt.input))
+			assert.Equal(t, tt.want, dispatch.NormalizeRuntimeAgentType(tt.input))
 		})
 	}
 }
@@ -57,7 +58,7 @@ func TestMapSenderType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expect, mapSenderType(tt.input))
+			assert.Equal(t, tt.expect, dispatch.MapSenderType(tt.input))
 		})
 	}
 }
@@ -66,37 +67,37 @@ func TestMapSenderType(t *testing.T) {
 
 func TestExtractMessageText(t *testing.T) {
 	t.Run("nil message", func(t *testing.T) {
-		assert.Equal(t, "", extractMessageText(nil))
+		assert.Equal(t, "", dispatch.ExtractMessageText(nil))
 	})
 
 	t.Run("text content", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeText, Content: `{"text":"hello world"}`}
-		assert.Equal(t, "hello world", extractMessageText(msg))
+		assert.Equal(t, "hello world", dispatch.ExtractMessageText(msg))
 	})
 
 	t.Run("code content", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeCode, Content: `{"text":"fmt.Println(\"hi\")"}`}
-		assert.Equal(t, `fmt.Println("hi")`, extractMessageText(msg))
+		assert.Equal(t, `fmt.Println("hi")`, dispatch.ExtractMessageText(msg))
 	})
 
 	t.Run("diff content", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeDiff, Content: `{"text":"+added line"}`}
-		assert.Equal(t, "+added line", extractMessageText(msg))
+		assert.Equal(t, "+added line", dispatch.ExtractMessageText(msg))
 	})
 
 	t.Run("empty text in content", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeText, Content: `{"text":""}`}
-		assert.Equal(t, `{"text":""}`, extractMessageText(msg))
+		assert.Equal(t, `{"text":""}`, dispatch.ExtractMessageText(msg))
 	})
 
 	t.Run("non-text content type", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeImage, Content: `{"url":"https://example.com/img.png"}`}
-		assert.Equal(t, `{"url":"https://example.com/img.png"}`, extractMessageText(msg))
+		assert.Equal(t, `{"url":"https://example.com/img.png"}`, dispatch.ExtractMessageText(msg))
 	})
 
 	t.Run("unparseable content", func(t *testing.T) {
 		msg := &model.Message{ContentType: model.ContentTypeText, Content: `not-json`}
-		assert.Equal(t, "not-json", extractMessageText(msg))
+		assert.Equal(t, "not-json", dispatch.ExtractMessageText(msg))
 	})
 }
 
@@ -393,10 +394,10 @@ func TestDispatchService_SetPortsComposition(t *testing.T) {
 }
 
 func TestIsLoopback(t *testing.T) {
-	assert.True(t, isLoopback("http://127.0.0.1:3210"))
-	assert.True(t, isLoopback("http://localhost:3210"))
-	assert.True(t, isLoopback("http://[::1]:3210"))
-	assert.False(t, isLoopback("http://localhost.evil.com"))
-	assert.False(t, isLoopback("http://edge.example.com"))
-	assert.False(t, isLoopback("not a url"))
+	assert.True(t, dispatch.IsLoopback("http://127.0.0.1:3210"))
+	assert.True(t, dispatch.IsLoopback("http://localhost:3210"))
+	assert.True(t, dispatch.IsLoopback("http://[::1]:3210"))
+	assert.False(t, dispatch.IsLoopback("http://localhost.evil.com"))
+	assert.False(t, dispatch.IsLoopback("http://edge.example.com"))
+	assert.False(t, dispatch.IsLoopback("not a url"))
 }
