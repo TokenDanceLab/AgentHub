@@ -10,7 +10,7 @@ import type { TaskEditDraft, TaskGroup, TaskStatus } from './types';
    task counts. No React / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export type TaskTableCss = typeof styles;
+export type TaskTableCss = Record<string, string>;
 
 export type ClassNamePart = string | undefined | null | false;
 
@@ -25,7 +25,7 @@ export function joinClassNames(...parts: ClassNamePart[]): string {
  */
 export function taskStatusIconModifier(
   status: TaskStatus,
-  css: Pick<TaskTableCss, 'nameIconDone' | 'nameIconRunning'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   if (status === '已完成') return css.nameIconDone;
   if (status === '进行中') return css.nameIconRunning;
@@ -35,7 +35,7 @@ export function taskStatusIconModifier(
 /** Full className for TaskStatusIcon. */
 export function taskStatusIconClassName(
   status: TaskStatus,
-  css: Pick<TaskTableCss, 'nameIcon' | 'nameIconDone' | 'nameIconRunning'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.nameIcon, taskStatusIconModifier(status, css));
 }
@@ -43,7 +43,7 @@ export function taskStatusIconClassName(
 /** Table surface class: five-column layout when creator is hidden. */
 export function taskTableClassName(
   showCreatorColumn: boolean,
-  css: Pick<TaskTableCss, 'table' | 'tableFiveColumns'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.table, !showCreatorColumn && css.tableFiveColumns, 'task-table');
 }
@@ -51,28 +51,28 @@ export function taskTableClassName(
 /** Display-row className including selected state. */
 export function taskDisplayRowClassName(
   selected: boolean,
-  css: Pick<TaskTableCss, 'row' | 'rowSelected'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.row, selected && css.rowSelected, 'task-row');
 }
 
 /** Edit-row className (always selected + edit surface). */
 export function taskEditRowClassName(
-  css: Pick<TaskTableCss, 'row' | 'rowSelected' | 'editRow'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.row, css.rowSelected, css.editRow, 'task-row');
 }
 
 /** Group title className. */
 export function taskGroupTitleClassName(
-  css: Pick<TaskTableCss, 'groupTitle'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.groupTitle, 'task-group-title');
 }
 
 /** Add-row button className. */
 export function taskAddRowClassName(
-  css: Pick<TaskTableCss, 'addRow'> = styles,
+  css: TaskTableCss = styles,
 ): string {
   return joinClassNames(css.addRow, 'task-add-row');
 }
