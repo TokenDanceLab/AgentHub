@@ -98,6 +98,15 @@ type edgeRunResponse struct {
 }
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
+//
+// Residual ports / composition cleanup (#617) after thin first seam (#563) and
+// redispatch residual (#573). Same-package only: narrow replaceable ports
+// (bus/outbox/cache/ws/relay), nil-safe publish + outbox wrappers, and Set*
+// injectors. Pure helpers (isLoopback / normalizeRuntimeAgentType /
+// selectAgentInstance / mergeModelParams / promptFromMessage /
+// extractMessageText / mapSenderType) stay package-private in this file.
+// dispatchPayload stays package-private; no OpenAPI/handler/frontend; no
+// package move. Next residual = IM subpackages / optional outbox model move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -114,28 +123,47 @@ type dispatchBus interface {
 	Publish(ctx context.Context, event Event)
 }
 
+// dispatchCache is the route / offline-queue subset of agentCache used by
+// DispatchService. Narrower than agentCache (no AllocateSeq) so dispatch
+// composition does not depend on agent catalog/control cache surface.
+// Implemented by *cache.Client and cache.NoOpCache.
+type dispatchCache interface {
+	GetRoute(ctx context.Context, userID, deviceType string) (string, error)
+	GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error)
+	PushPendingTask(ctx context.Context, userID, taskJSON string) error
+	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
+}
+
+// dispatchWS is the WebSocket connection lookup/push port used for device-bound
+// and inviter desktop dispatch. Implemented by *ws.Manager.
+type dispatchWS interface {
+	FindByConnID(connID string) *ws.Conn
+	PushToConn(connID string, frame ws.Frame) ws.DeliveryResult
+}
+
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
 // retries call in through Redispatcher; dispatchPayload stays package-private.
-// Same-package extract (#563 thin seam + #573 redispatch residual) — not a package move.
+// Same-package extract (#563 thin seam + #573 redispatch residual + #617 ports
+// residual) — not a package move.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
-	mgr         *ws.Manager
-	cacheClient agentCache
+	mgr         dispatchWS
+	cacheClient dispatchCache
 	relay       relayDispatcher
 	outbox      dispatchOutbox
 }
 
-// NewDispatchService constructs a DispatchService. bus/outbox/relay may be nil for
-// partial tests; write paths that need them will fail or degrade accordingly.
-func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr *ws.Manager, cacheClient agentCache, relay relayDispatcher, outbox dispatchOutbox) *DispatchService {
+// NewDispatchService constructs a DispatchService. bus/outbox/relay/mgr may be
+// nil for partial tests; write paths that need them fail, degrade, or no-op.
+func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClient dispatchCache, relay relayDispatcher, outbox dispatchOutbox) *DispatchService {
 	return &DispatchService{
 		db:          db,
 		bus:         bus,
 		mgr:         mgr,
-		cacheClient: resolveAgentCache(cacheClient),
+		cacheClient: resolveDispatchCache(cacheClient),
 		relay:       relay,
 		outbox:      outbox,
 	}
@@ -155,6 +183,46 @@ func (s *DispatchService) SetBus(bus dispatchBus) {
 		return
 	}
 	s.bus = bus
+}
+
+// SetCache injects (or replaces) the route / offline-queue cache port.
+func (s *DispatchService) SetCache(cacheClient dispatchCache) {
+	if s == nil {
+		return
+	}
+	s.cacheClient = resolveDispatchCache(cacheClient)
+}
+
+// SetManager injects (or replaces) the WebSocket manager port.
+func (s *DispatchService) SetManager(mgr dispatchWS) {
+	if s == nil {
+		return
+	}
+	s.mgr = mgr
+}
+
+// SetRelay injects (or replaces) the hub_relay command dispatcher port.
+func (s *DispatchService) SetRelay(relay relayDispatcher) {
+	if s == nil {
+		return
+	}
+	s.relay = relay
+}
+
+// publish is a nil-safe wrapper over the bus port (cancel/regenerate events).
+func (s *DispatchService) publish(ctx context.Context, event Event) {
+	if s == nil || s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, event)
+}
+
+// cachePort is a nil-safe accessor for the route / offline-queue cache port.
+func (s *DispatchService) cachePort() dispatchCache {
+	if s == nil {
+		return resolveDispatchCache(nil)
+	}
+	return resolveDispatchCache(s.cacheClient)
 }
 
 // recordDelivery is a nil-safe wrapper over the outbox port.
@@ -559,7 +627,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		}
 	}
 
-	cacheClient := resolveAgentCache(s.cacheClient)
+	cacheClient := s.cachePort()
 	if task.TargetID != "" {
 		if task.EdgeDeviceID == "" {
 			slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
@@ -751,7 +819,7 @@ func mapSenderType(t string) string {
 	}
 }
 
-func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient agentCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
+func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
 	queueTargetTask := func(reason string, err error) {
 		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
 			slog.Error("failed to push target-bound agent task to offline queue", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
@@ -817,7 +885,7 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 		return errcode.ErrBadRequest
 	}
 
-	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
+	s.publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
 		"task_id":           taskID,
 		"agent_instance_id": task.AgentInstanceID,
 		"session_id":        ai.SessionID,
@@ -860,7 +928,7 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 		return nil, err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "agent.regenerate", Payload: map[string]string{
+	s.publish(ctx, Event{Type: "agent.regenerate", Payload: map[string]string{
 		"original_task_id":   taskID,
 		"new_task_id":        newTask.ID,
 		"agent_instance_id":  ai.ID,
@@ -1026,7 +1094,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 	}
 
 	// Route by device: push to WebSocket or offline queue.
-	cacheClient := resolveAgentCache(s.cacheClient)
+	cacheClient := s.cachePort()
 	if task.EdgeDeviceID != "" {
 		connID, err := cacheClient.GetRouteForDevice(ctx, task.TriggeredByUserID, "desktop", task.EdgeDeviceID)
 		if err == nil && connID != "" && s.mgr != nil {
