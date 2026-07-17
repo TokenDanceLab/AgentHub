@@ -1,0 +1,126 @@
+import type {
+  AgentHubPlatform,
+  WorkbenchAgent,
+  WorkbenchConversation,
+} from '../platform';
+import type { TranscriptBlock, ApprovalDecisionAction } from '../transcript';
+import type { ConnectionStatusKind } from './GlobalRail';
+import type { RuntimeEvidenceSnapshot } from './RightInspector';
+import type {
+  WorkbenchAgentProfilesStatus,
+  WorkbenchContactsData,
+  WorkbenchContactsActions,
+  WorkbenchDocumentsActions,
+} from './WorkbenchRoutes';
+import type { HubClient } from '../hubClient';
+import type { AgentConfig, ProjectDraft, DocRow } from './pages';
+import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
+import type { ProjectInfo } from './pages/ProjectsPage';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AgentHubWorkbenchTypes — public props contract residual extract (#683).
+   Pure types only; no React / no intentional UX change.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export interface AgentHubWorkbenchStatus {
+  dataMode?: string;
+  replayLabel?: string;
+  targetLabel?: string;
+  targetState?: string;
+  /** Whether the workbench is loading initial data (threads/conversations not yet loaded). */
+  initialLoading?: boolean;
+  /** Error message from initial data load, if any. */
+  loadError?: string;
+}
+
+export interface AgentHubWorkbenchProjectsStatus {
+  loading?: boolean | undefined;
+  error?: string | undefined;
+  actionError?: string | undefined;
+  saving?: boolean | undefined;
+}
+
+export interface AgentHubWorkbenchModelCatalogItem {
+  id: string;
+  label: string;
+  value: string;
+  provider?: string;
+  status: string;
+  description?: string;
+  default?: boolean;
+  tags?: string[];
+}
+
+export interface AgentHubWorkbenchProps {
+  platform: AgentHubPlatform;
+  conversations: WorkbenchConversation[];
+  agents?: WorkbenchAgent[];
+  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  workbenchStatus?: AgentHubWorkbenchStatus | undefined;
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
+  contacts?: WorkbenchContactsData | undefined;
+  projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
+  projectsStatus?: AgentHubWorkbenchProjectsStatus | undefined;
+  activeConversationId?: string;
+  onActiveConversationChange?: ((conversationId: string) => void) | undefined;
+  /** Called when the user toggles pin on a session. Parent should call Hub API and refresh. */
+  onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
+  /** Called when the user toggles archive on a session. Parent should call Hub API and refresh. */
+  onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
+  onLogout?: (() => void) | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  /** Hub client for direct project API access when onProjectCreate/Update are not provided. */
+  hubClient?: HubClient | undefined;
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+  /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
+  onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  /** Contact mutation actions passed through to ContactsPage. */
+  contactsActions?: WorkbenchContactsActions | undefined;
+  /** Document rows for DocsPage (real data first, mock fallback). */
+  documents?: DocRow[] | undefined;
+  /** Document mutation actions wired to Hub Documents API. */
+  documentsActions?: WorkbenchDocumentsActions | undefined;
+  /** Model catalog items from Edge API. When provided, the Agents page
+   *  Models tab shows real model data instead of mock fixtures. */
+  modelCatalog?: AgentHubWorkbenchModelCatalogItem[] | undefined;
+  /** cc-switch transparent proxy status from Edge API. */
+  ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
+  /** cc-switch provider model alias mappings. */
+  ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  showComposerAgentPicker?: boolean | undefined;
+  showComposerStatus?: boolean | undefined;
+  showMainchainStatus?: boolean | undefined;
+  transcript: TranscriptBlock[];
+  /** Current user profile info, shown in GlobalRail avatar and profile popover. */
+  userDisplayName?: string | undefined;
+  userAvatarUrl?: string | undefined;
+  /** Current user's Hub ID, used to distinguish "my" messages/tasks from others. */
+  currentUserId?: string | undefined;
+  /** Public Skill market items from Hub API. */
+  skillMarketItems?: SkillMarketItem[] | undefined;
+  /** Whether Skill market data is loading. */
+  skillMarketLoading?: boolean | undefined;
+  /** Public MCP Server market items from Hub API. */
+  mcpMarketItems?: MCPMarketItem[] | undefined;
+  /** Whether MCP Server market data is loading. */
+  mcpMarketLoading?: boolean | undefined;
+  /** Block ID to highlight (e.g. from a search result click). Cleared after 3 s animation. */
+  highlightedBlockId?: string | undefined;
+  /** Called when the highlight animation ends. */
+  onHighlightEnd?: (() => void) | undefined;
+  /** Called when the user requests regeneration of an agent message. Receives the block ID. */
+  onRegenerate?: ((blockId: string) => void) | undefined;
+  /** WebSocket connection status for the rail indicator dot. */
+  connectionStatus?: ConnectionStatusKind | undefined;
+}
