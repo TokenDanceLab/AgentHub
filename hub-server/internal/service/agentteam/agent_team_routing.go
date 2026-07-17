@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -16,22 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
-const supervisorRouteDecisionSchema = `{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["delegate","review","approve","finish"]},"next_worker":{"type":"string","description":"AgentTeamMember id to receive delegate/review/approve work"},"instructions":{"type":"string","description":"Concrete task prompt for the next worker"},"reasoning":{"type":"string","description":"Why this route is appropriate"},"context":{"type":"string","description":"Additional context for the next worker"},"approved":{"type":"boolean"},"feedback":{"type":"string"},"summary":{"type":"string","description":"Final TeamRun summary for action=finish"},"blocked_reason":{"type":"string","description":"Why the TeamRun cannot continue"},"correlation_id":{"type":"string","description":"Optional id linking this route to prior work"}}}`
-
-const supervisorRoutePrompt = "AgentHub TeamRun supervisor mode: decide the next team step with the structured output schema. Use action=delegate/review/approve with next_worker set to an AgentTeamMember id and instructions set to the next task, or action=finish with summary/blocked_reason when the TeamRun is done or blocked. Do not start sub-agents locally; Hub will create TeamAssignment and dispatch them."
-
-func supervisorRouteModelParams() string {
-	data, err := json.Marshal(map[string]string{
-		"structured_output_schema": supervisorRouteDecisionSchema,
-		"append_system_prompt":     supervisorRoutePrompt,
-	})
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-// GetTeamRun returns a single team run, verifying owner access.
+// HandleRouteDecision consumes a typed supervisor route decision and records
+// the accepted or rejected route in the TeamEvent log.
 func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
 	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
 		return nil, err
@@ -47,7 +31,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		return nil, errcode.AgentTaskNotFound
 	}
 
-	decision.Action = strings.ToLower(strings.TrimSpace(decision.Action))
+	decision.Action = normalizeRouteAction(decision.Action)
 	if !model.ValidActions()[decision.Action] {
 		return nil, s.rejectRouteDecision(runID, decision, "invalid action")
 	}
@@ -132,17 +116,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		}
 		return nil, err
 	}
-	task := &model.AgentTeamTask{
-		TeamRunID:        runID,
-		AssignmentID:     &assignment.ID,
-		AssigneeMemberID: worker.ID,
-		ParentTaskID:     stringPtrOrNil(strings.TrimSpace(decision.ParentTaskID)),
-		Status:           model.TeamTaskStatusPending,
-		Objective:        decision.Instructions,
-		InputRefs:        "{}",
-		Attempt:          1,
-		RiskLevel:        model.TeamTaskRiskNormal,
-	}
+	task := newTeamTaskFromRoute(runID, assignment.ID, worker.ID, decision)
 	if err := repository.CreateTeamTask(s.db, task); err != nil {
 		return nil, err
 	}
@@ -175,14 +149,7 @@ func (s *AgentTeamService) finishRouteDecision(runID string, decision model.Coor
 	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
 		return err
 	}
-	status := model.TeamRunStatusCompleted
-	eventType := model.TeamEventRunCompleted
-	payload := map[string]string{"summary": decision.Summary}
-	if strings.TrimSpace(decision.BlockedReason) != "" {
-		status = model.TeamRunStatusFailed
-		eventType = model.TeamEventRunFailed
-		payload = map[string]string{"blocked_reason": decision.BlockedReason}
-	}
+	status, eventType, payload := finishRouteOutcome(decision)
 	if err := repository.UpdateTeamRunStatus(s.db, runID, status); err != nil {
 		return err
 	}
@@ -206,43 +173,12 @@ func (s *AgentTeamService) appendRouteRejected(runID string, decision model.Coor
 	})
 }
 
-func routeAuditStateFromDecision(status string, decision model.CoordinatorRouteDecision, fallbackReason string, createdAt time.Time) model.TeamRouteAuditState {
-	return model.TeamRouteAuditState{
-		Status:        status,
-		Action:        decision.Action,
-		SubtaskID:     decision.SubtaskID,
-		ParentTaskID:  decision.ParentTaskID,
-		AgentID:       firstNonEmptyString(decision.AgentID, decision.NextWorker),
-		Reason:        firstNonEmptyString(decision.Reason, fallbackReason),
-		CorrelationID: decision.CorrelationID,
-		CreatedAt:     createdAt,
-	}
-}
-
 func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
 	events, err := repository.ListTeamEventsByRun(s.db, runID)
 	if err != nil {
 		return 0, err
 	}
-	targetAction := strings.ToLower(strings.TrimSpace(decision.Action))
-	targetWorker := strings.TrimSpace(decision.NextWorker)
-	targetInstructions := strings.TrimSpace(decision.Instructions)
-	count := 0
-	for _, event := range events {
-		if event.Type != model.TeamEventRouteDecided {
-			continue
-		}
-		var previous model.CoordinatorRouteDecision
-		if err := json.Unmarshal([]byte(event.Payload), &previous); err != nil {
-			continue
-		}
-		if strings.ToLower(strings.TrimSpace(previous.Action)) == targetAction &&
-			strings.TrimSpace(previous.NextWorker) == targetWorker &&
-			strings.TrimSpace(previous.Instructions) == targetInstructions {
-			count++
-		}
-	}
-	return count, nil
+	return countMatchingRouteDecisionsInEvents(events, decision), nil
 }
 
 func (s *AgentTeamService) appendTeamEvent(runID, eventType string, payload any) error {
@@ -392,10 +328,10 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return errcode.AgentTaskNotFound
 	}
 
-	if a.Status != model.AssignmentStatusPending && a.Status != model.AssignmentStatusDispatched {
+	if !canDispatchAssignmentStatus(a.Status) {
 		return errcode.ErrBadRequest
 	}
-	if a.RunID != nil && strings.TrimSpace(*a.RunID) != "" {
+	if assignmentAlreadyBound(a) {
 		return nil
 	}
 
@@ -414,14 +350,7 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return errcode.AgentNotFound
 	}
 
-	var targetAIID string
-	for i := range agents {
-		agent := &agents[i]
-		if toMember.AgentProfileID != nil && agent.CustomAgentID != nil && *agent.CustomAgentID == *toMember.AgentProfileID {
-			targetAIID = agent.ID
-			break
-		}
-	}
+	targetAIID := findAgentInstanceIDForMember(agents, toMember)
 	if targetAIID == "" {
 		return errcode.AgentNotFound
 	}
@@ -451,11 +380,7 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 	if err := repository.UpdateTeamTaskDispatchBinding(s.db, teamTask.ID, pendingTask.ID); err != nil {
 		return err
 	}
-	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentDispatched, map[string]string{
-		"assignment_id": assignmentID,
-		"team_task_id":  teamTask.ID,
-		"agent_task_id": pendingTask.ID,
-	}); err != nil {
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentDispatched, assignmentDispatchedEventPayload(assignmentID, teamTask.ID, pendingTask.ID)); err != nil {
 		return err
 	}
 
@@ -470,17 +395,7 @@ func (s *AgentTeamService) ensureTeamTaskForAssignment(a *model.AgentTeamAssignm
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	assignmentID := a.ID
-	task = &model.AgentTeamTask{
-		TeamRunID:        a.TeamRunID,
-		AssignmentID:     &assignmentID,
-		AssigneeMemberID: a.ToMemberID,
-		Status:           model.TeamTaskStatusPending,
-		Objective:        a.TaskPrompt,
-		InputRefs:        "{}",
-		Attempt:          1,
-		RiskLevel:        model.TeamTaskRiskNormal,
-	}
+	task = newTeamTaskFromAssignment(a)
 	if err := repository.CreateTeamTask(s.db, task); err != nil {
 		return nil, err
 	}
@@ -518,15 +433,6 @@ func (s *AgentTeamService) createAssignmentDispatchMessage(ctx context.Context, 
 		return "", err
 	}
 	return msg.ID, nil
-}
-
-func assignmentDispatchPrompt(a *model.AgentTeamAssignment) string {
-	prompt := strings.TrimSpace(a.TaskPrompt)
-	contextStr := strings.TrimSpace(a.Context)
-	if contextStr == "" {
-		return prompt
-	}
-	return prompt + "\n\nContext:\n" + contextStr
 }
 
 // CompleteAssignment marks a running assignment as done with the given result.
@@ -620,77 +526,27 @@ func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.A
 		return
 	}
 
-	// Find the supervisor for AI review.
-	var supervisor *model.AgentTeamMember
-	for i := range members {
-		if members[i].Role == model.TeamMemberRoleSupervisor {
-			supervisor = &members[i]
-			break
-		}
+	supervisor := findTeamSupervisor(members)
+	if supervisor == nil {
+		slog.Error("fault escalation: no supervisor member", "teamRunId", run.ID)
+		return
 	}
 
 	// Layer 2: AI review — the supervisor analyzes the error and decides next steps.
-	reviewInstructions := fmt.Sprintf(
-		"Fault escalation: review the following run failure and decide next steps.\n\n"+
-			"Failed assignment: %s\n"+
-			"Error context: %s\n"+
-			"Retry count: %s (max: %s)\n\n"+
-			"Actions:\n"+
-			"- If the error is recoverable (e.g., fixable bug), suggest a fix and reassign.\n"+
-			"- If a different agent would be better suited, suggest reassignment.\n"+
-			"- If the error is not recoverable, respond with action=finish and blocked_reason.",
-		a.ID, escalationCtx["error"], escalationCtx["retries"], escalationCtx["maxRetries"],
-	)
-
-	// Create a review decision for the supervisor.
-	decision := model.CoordinatorRouteDecision{
-		Action:       "review",
-		NextWorker:   supervisor.ID,
-		Instructions: reviewInstructions,
-		Reasoning:    fmt.Sprintf("Fault escalation Layer 2 triggered: assignment %s failed after %s retries", a.ID, escalationCtx["retries"]),
-		CorrelationID: a.ID,
-	}
+	decision := buildFaultEscalationReviewDecision(a.ID, supervisor.ID, escalationCtx)
 
 	if _, err := s.HandleRouteDecision(ctx, run.TriggerUserID, run.TeamID, run.ID, decision); err != nil {
 		slog.Error("fault escalation: failed to create review decision", "teamRunId", run.ID, "error", err)
 		return
 	}
 
-	_ = s.appendTeamEvent(run.ID, "team.escalation.review", map[string]any{
-		"assignment_id": a.ID,
-		"phase":         "review",
-		"error":         escalationCtx["error"],
-		"retries":       escalationCtx["retries"],
-		"maxRetries":    escalationCtx["maxRetries"],
-	})
+	_ = s.appendTeamEvent(run.ID, "team.escalation.review", faultEscalationReviewEventPayload(a.ID, escalationCtx))
 
 	slog.Warn("fault escalation: AI review triggered",
 		"teamRunId", run.ID,
 		"assignmentId", a.ID,
 		"retries", escalationCtx["retries"],
 	)
-}
-
-// parseFaultEscalationReason extracts structured metadata from a fault
-// escalation reason string produced by the Edge server.
-//
-// Expected format: "[fault_escalation] retries=N maxRetries=M error=..."
-func parseFaultEscalationReason(reason string) map[string]string {
-	result := map[string]string{
-		"retries":    "0",
-		"maxRetries": "1",
-		"error":      reason,
-	}
-	// Strip prefix.
-	if idx := strings.Index(reason, "[fault_escalation]"); idx >= 0 {
-		rest := reason[idx+len("[fault_escalation]"):]
-		for _, part := range strings.Fields(rest) {
-			if kv := strings.SplitN(part, "=", 2); len(kv) == 2 {
-				result[kv[0]] = kv[1]
-			}
-		}
-	}
-	return result
 }
 
 func (s *AgentTeamService) ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error) {
