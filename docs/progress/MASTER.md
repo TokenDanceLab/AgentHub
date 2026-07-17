@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-18
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 43 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 64 --state open`
-- **Labels**: `spec-driven` · `phase:43`
+- **Phase 44 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 65 --state open`
+- **Labels**: `spec-driven` · `phase:44`
 
 ## References
 
@@ -47,7 +47,8 @@
 | 37–40 | Residual polish continue | #58–#61 | closed (PRs #793–#831) |
 | 41 | Residual polish continue | #62 | closed (PRs #844–#851) |
 | 42 | Security gates + residual polish | #63 | closed (PRs #858–#864) |
-| 43 | Delivery/executor stability + residual | #64 | active (#865–#870) |
+| 43 | Delivery/executor stability + residual | #64 | closed (PRs #871–#875) |
+| 44 | Security residual + design system + mobile auth | #65 | active (#876–#881) |
 
 ## Issue Mapping (summary)
 
@@ -61,13 +62,14 @@
 | #787–#826 Phase 37–40 residual polish continue | closed (PRs #793–#831; hygiene ops-only) |
 | #832–#843 Phase 41 residual polish continue | closed (PRs #844–#851; #837/#843 hygiene ops-only) |
 | #852–#857 Phase 42 security gates + residual polish | closed (PRs #858–#864; #857 hygiene ops-only) |
-| #865–#870 Phase 43 delivery/executor stability + residual | open (milestone 64) |
+| #865–#870 Phase 43 delivery/executor stability + residual | closed (PRs #871–#875; #870 hygiene ops-only) |
+| #876–#881 Phase 44 security residual + design + mobile auth | open (milestone 65) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=64) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 64 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=65) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 65 --state open
 git worktree list
 ```
 
@@ -81,25 +83,26 @@ git worktree list
 - [x] Phase 37–40 residual polish continue (#787–#826 / PRs #793–#831)
 - [x] Phase 41 residual polish continue (#832–#843 / PRs #844–#851)
 - [x] Phase 42 security gates + residual polish (#852–#857 / PRs #858–#864)
-- [ ] Phase 43 delivery/executor stability + residual (#865–#870)
+- [x] Phase 43 delivery/executor stability + residual (#865–#870 / PRs #871–#875)
+- [ ] Phase 44 security residual + design system + mobile auth (#876–#881)
 
 ## Current Status
 
-**Active Phase**: Phase 43 — Delivery/executor stability + residual (milestone 64)
-**Active Tasks**: #865 MASTER · #866 outbox redispatch→sent P0 · #867 PE escalation/finish P0 · #868 desktop done/fail/ack P1 · #869 store residual · #870 hygiene
+**Active Phase**: Phase 44 — Security residual + design system + mobile auth (milestone 65)
+**Active Tasks**: #876 MASTER · #877 Edge CORS capability header P1 · #878 ownership fail-closed P1 · #879 desktop design tokens P1 · #880 mobile WS token race P1 · #881 hygiene
 **Blockers**: None
-**Stability note**: 16-agent review P0s — outbox redispatch must mark delivery sent (#866); ProcessExecutor separate attempt-cleanup from terminal finish on fault-escalation (#867); P1 desktop Hub done/fail/ack error surface (#868)
+**Stability note**: Partial 16-agent review (security-auth / design-system / mobile-rn) — Edge CORS allow `X-AgentHub-Capability` (#877); ownership fail-closed when userID empty (#878); desktop FileExplorer + EntryGate token SSOT (#879); mobile RN WS `access_token` + hubClient token race (#880)
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: d3556019 on `master` (Phase 42 PR #858–#864 line)
-**Residual after P42**: process_executor ~1223 · store ~1200 · hubClient ~981 · delivery_outbox ~425 · orchestrator_failure ~1013
-**Boundary map next residual**: outbox redispatch→sent / PE escalation-finish / desktop hub error surface / store residual
+**Tip**: c86b74c6 on `master` (Phase 43 PR #871–#875 line)
+**Residual after P43**: process_executor / store / hubClient / delivery_outbox / orchestrator_failure — P0s landed; next is security residual + design/mobile
+**Boundary map next residual**: Edge CORS capability / ownership fail-closed / desktop design tokens / mobile WS token race
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
 
-1. Land Phase 43 issues under milestone 64 (issue-bound Workflows)
+1. Land Phase 44 issues under milestone 65 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #866 outbox P0 · #867 PE finish P0 · #868 desktop ack P1 · #869 store residual
+3. Prefer #877 CORS P1 · #878 ownership fail-closed P1 · #879 design tokens · #880 mobile token race
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -108,9 +111,9 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | Phase 42 closed via #858–#864; Phase 43 stability active |
+| 2026-07-18 | lead | Phase 42–43 closed; Phase 44 security/design/mobile active |
 
 ## Completion notes
 
-- Phase 42 closed via #858–#864 (MASTER / JWT audience gate P0 / workDir P0 / artifact sandbox P1 / process_executor residual; #857 hygiene ops-only). Tip ~d3556019.
-- Phase 43 targets: MASTER sync, outbox redispatch→sent P0, PE escalation/finish P0, desktop done/fail/ack P1, store residual, hygiene.
+- Phase 43 closed via #871–#875 (MASTER / outbox redispatch→sent P0 / PE escalation-finish P0 / desktop done-fail-ack P1 / store residual; #870 hygiene ops-only). Tip ~c86b74c6.
+- Phase 44 targets: MASTER sync, Edge CORS capability header P1, ownership fail-closed P1, desktop design token SSOT, mobile WS access_token + hubClient race, hygiene.
