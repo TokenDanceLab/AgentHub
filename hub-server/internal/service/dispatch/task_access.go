@@ -38,6 +38,15 @@ func TaskNotFoundIfNotOwner(triggeredByUserID, userID string) error {
 	return errcode.AgentTaskNotFound
 }
 
+// CancelTaskNoRowsError returns ErrBadRequest when an atomic cancel update
+// affected zero rows (status raced / already terminal).
+func CancelTaskNoRowsError(rowsAffected int64) error {
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
+	return nil
+}
+
 // NewPendingTaskSnapshot builds a PendingTaskSnapshot from column values.
 func NewPendingTaskSnapshot(
 	id, agentInstanceID, triggeredByUserID, status, edgeDeviceID, edgeRunID, targetID string,
