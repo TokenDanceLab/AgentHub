@@ -625,6 +625,26 @@ export function buildChangePasswordFallbackPath(): string {
   return '/client/auth/password';
 }
 
+/** Primary change-password attempt (POST /change-password). */
+export function buildChangePasswordPrimary(
+  body: unknown,
+): { path: string; init: { method: 'POST'; body: string } } {
+  return {
+    path: buildChangePasswordPath(),
+    init: buildJsonPostInit(body),
+  };
+}
+
+/** Fallback change-password attempt (PUT /password) for older hubs. */
+export function buildChangePasswordFallback(
+  body: unknown,
+): { path: string; init: { method: 'PUT'; body: string } } {
+  return {
+    path: buildChangePasswordFallbackPath(),
+    init: buildJsonPutInit(body),
+  };
+}
+
 export function buildOidcAuthorizePath(): string {
   return '/client/auth/oidc/authorize';
 }
