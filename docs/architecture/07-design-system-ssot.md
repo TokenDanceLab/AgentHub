@@ -1,7 +1,7 @@
 # Design system SSOT map
 
 最后更新：2026-07-17
-Issue: #466 (P9.1) / #491 (chatview drift inventory) / #518 (chatview radius·type·dark residual)
+Issue: #466 (P9.1) / #491 (chatview drift inventory) / #518 (chatview radius·type·dark residual) / #607 (residual inventory + shared UI bare-token cluster)
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
 > 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
@@ -51,8 +51,8 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | Item | Status | Follow-up |
 |---|---|---|
 | ThemeContext dual providers | **Mitigated in #466** — preset constants + apply moved to shared; providers are thin wrappers | Optional: one shared React provider with `enablePresets` |
-| Stale CSS status fallbacks | **Partial fix in #466** — `ApprovalCard.module.css` uses bare status tokens; **#482** Welcome/Auth glass hardcodes → `--glass-*` | Continue on EntryGate / FileExplorer / IM panels |
-| Chatview parallel spacing / density | **Partial in #491** — chatview `--sp-md` aliases base compat `--space-md` (12px); lg/xl stay dense 20/28. **#518 residual inventory** — radius (3/6/10/14 vs base 6/8/12/16), dense type (`--body` 13px / `--label-xs` 11px), and full dark palette (incl. primary `#3399dd` vs `#29ABE2`) remain intentional forks; **no further zero-visual alias** (audit §6.14) | Full merge + dark palette → `themes.css` (or dual-scale product decision) needs deliberate visual redesign + standalone load-path plan |
+| Stale CSS status fallbacks | **#466** ApprovalCard bare status tokens; **#482** Welcome/Auth glass; **#607** shared UI + DocsPage + FileSearchDialog bare semantic/surface tokens (`DeployCard` / `CollapsibleBlock` / `ProgressBar` / `Avatar` / `Button` gradient / Docs delete / FileSearch primary). Re-audit: no remaining `var(--danger|success|warning|primary|info|brand|destructive|skill, …)` in app CSS | Continue hardcode passes on EntryGate / FileExplorer / IM panels / ModelDropdown (literal hex density, not fallback form) |
+| Chatview parallel spacing / density | **Partial in #491** — chatview `--sp-md` aliases base compat `--space-md` (12px); lg/xl stay dense 20/28. **#518 residual inventory** — radius (3/6/10/14 vs base 6/8/12/16), dense type (`--body` 13px / `--label-xs` 11px), and full dark palette (incl. primary `#3399dd` vs `#29ABE2`) remain intentional forks; **#607 reconfirmed hold** — no further zero-visual alias (audit §6.14 / §7) | Full merge + dark palette → `themes.css` (or dual-scale product decision) needs deliberate visual redesign + standalone load-path plan |
 | Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing decls → `--sp-*` / compat `--space-md|3xl`; odd steps (3/5/7/9/18…) + sizes left raw | Optional: scale extension or redesign normalize |
 | `designTokens.ts` not package-exported | Open | Export when mobile/web path aliases stabilize |
 | Mobile RN color SSOT | Open | Align RN values to themes.css via registry |

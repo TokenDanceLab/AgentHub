@@ -93,7 +93,7 @@
 
 .modeTabActive {
   color: var(--foreground);
-  border-bottom-color: var(--primary, #5b9bd5);
+  border-bottom-color: var(--primary);
 }
 
 /* ── Results ── */
@@ -173,7 +173,7 @@
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--glass-tint-sky);
-  color: var(--primary, #5b9bd5);
+  color: var(--primary);
   white-space: nowrap;
 }
 
