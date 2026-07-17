@@ -265,6 +265,101 @@ func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
 	}
 }
 
+// TestWSAuthMiddlewareAcceptsSubprotocolBearerToken is the #921 primary browser
+// path: Sec-WebSocket-Protocol carries "agenthub.bearer.v1, <jwt>" without a
+// query access_token.
+func TestWSAuthMiddlewareAcceptsSubprotocolBearerToken(t *testing.T) {
+	token := makeToken("user-proto", "web", "device-proto")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "")
+	c.Request.Header.Set("Sec-WebSocket-Protocol", WSBearerSubprotocol+", "+token)
+
+	WSAuthMiddleware(testConfig())(c)
+
+	if c.IsAborted() {
+		t.Fatalf("expected Sec-WebSocket-Protocol bearer token to authenticate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("auth_source"); got != "hub_local" {
+		t.Fatalf("auth_source = %q, want hub_local", got)
+	}
+	if got := c.GetString("user_id"); got != "user-proto" {
+		t.Fatalf("user_id = %q, want user-proto", got)
+	}
+	if got := c.GetString("device_type"); got != "web" {
+		t.Fatalf("device_type = %q, want web", got)
+	}
+}
+
+// TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm covers the alternate
+// single-token convention: access_token.<jwt>.
+func TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm(t *testing.T) {
+	token := makeToken("user-at", "web", "device-at")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "")
+	c.Request.Header.Set("Sec-WebSocket-Protocol", "access_token."+token)
+
+	WSAuthMiddleware(testConfig())(c)
+
+	if c.IsAborted() {
+		t.Fatalf("expected access_token.<jwt> subprotocol to authenticate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("user_id"); got != "user-at" {
+		t.Fatalf("user_id = %q, want user-at", got)
+	}
+	if got := c.GetString("auth_source"); got != "hub_local" {
+		t.Fatalf("auth_source = %q, want hub_local", got)
+	}
+}
+
+func TestWSAuthMiddlewarePrefersSubprotocolOverQuery(t *testing.T) {
+	protoToken := makeToken("user-proto", "web", "device-proto")
+	queryToken := makeToken("user-query", "web", "device-query")
+	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+queryToken, "")
+	c.Request.Header.Set("Sec-WebSocket-Protocol", WSBearerSubprotocol+", "+protoToken)
+
+	WSAuthMiddleware(testConfig())(c)
+
+	if c.IsAborted() {
+		t.Fatalf("expected subprotocol token to win over query, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("user_id"); got != "user-proto" {
+		t.Fatalf("user_id = %q, want user-proto (subprotocol preferred over query)", got)
+	}
+}
+
+func TestWSAuthMiddlewareRejectsMissingToken(t *testing.T) {
+	c, w := ginRequest(http.MethodGet, "/client/ws", "")
+	WSAuthMiddleware(testConfig())(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected missing WS token to be rejected")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestTokenFromWSSubprotocols(t *testing.T) {
+	token := "header.payload.sig"
+	cases := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{"empty", nil, ""},
+		{"marker only", []string{WSBearerSubprotocol}, ""},
+		{"preferred form", []string{WSBearerSubprotocol + ", " + token}, token},
+		{"access_token form", []string{"access_token." + token}, token},
+		{"multi header values", []string{WSBearerSubprotocol, token}, token},
+		{"access_token preferred over raw", []string{WSBearerSubprotocol + ", other.jwt, access_token." + token}, token},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tokenFromWSSubprotocols(tc.values); got != tc.want {
+				t.Fatalf("tokenFromWSSubprotocols(%v) = %q, want %q", tc.values, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestWSAuthMiddlewareRejectsNonHubSessionPurpose is the #889 regression:
 // tokens with a non-empty purpose (edge-api / run-start) must not upgrade WS.
 // ParseToken rejects them at the product gate (401); the shared enforceHubSession

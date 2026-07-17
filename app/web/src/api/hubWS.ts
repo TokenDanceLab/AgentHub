@@ -3,8 +3,11 @@
 // via the Transport abstraction.
 //
 // Protocol (matching hub-server/internal/router/router.go + ws/frame.go):
-//   1. WebSocket connects to ws://host/client/ws?access_token=<hub-jwt>
-//   2. Hub validates the Hub-issued token during HTTP upgrade.
+//   1. WebSocket connects to ws://host/client/ws
+//      Auth is carried via Sec-WebSocket-Protocol (preferred browser path):
+//        protocols: ["agenthub.bearer.v1", "<hub-jwt>"]
+//      Query ?access_token= is a legacy fallback only (mobile / older clients).
+//   2. Hub validates the Hub-issued token during HTTP upgrade (WSAuthMiddleware).
 //   3. Server responds after upgrade: {"type":"auth.ok","payload":null}
 //      or rejects the upgrade before a WebSocket is established.
 //   4. After auth, bidirectional events flow with {type, payload} framing.
@@ -32,6 +35,11 @@ export interface HubWSOptions {
   onAuthSuccess?: () => void;
   /** Called when the server rejects WebSocket authentication after upgrade. */
   onAuthFail?: (reason: string) => void;
+  /**
+   * When true, also append access_token to the WS URL (legacy fallback).
+   * Default false — browser path prefers Sec-WebSocket-Protocol only.
+   */
+  useQueryTokenFallback?: boolean;
 }
 
 export interface HubWSHandle {
@@ -59,9 +67,26 @@ export interface HubWSHandle {
   isAuthenticated: () => boolean;
 }
 
-// ── Implementation ───────────────────────────────
+// ── Auth carriage helpers ─────────────────────────
 
-function withAccessToken(url: string, token: string | null): string {
+/**
+ * Fixed Sec-WebSocket-Protocol marker negotiated with Hub WS upgrades.
+ * Paired with the raw Hub JWT as a second subprotocol value.
+ * Must match hub-server middleware.WSBearerSubprotocol.
+ */
+export const WS_BEARER_SUBPROTOCOL = 'agenthub.bearer.v1';
+
+/**
+ * Build WebSocket subprotocols that carry a Hub JWT without putting it in the URL.
+ * Returns undefined when token is missing so the socket opens without auth protocols.
+ */
+export function buildWSAuthProtocols(token: string | null | undefined): string[] | undefined {
+  if (!token) return undefined;
+  return [WS_BEARER_SUBPROTOCOL, token];
+}
+
+/** Legacy query-token helper kept for tests and optional fallback callers. */
+export function withAccessToken(url: string, token: string | null): string {
   if (!token) return url;
   try {
     const parsed = new URL(url);
@@ -73,14 +98,24 @@ function withAccessToken(url: string, token: string | null): string {
   }
 }
 
+// ── Implementation ───────────────────────────────
+
 export function createHubWS(opts: HubWSOptions): HubWSHandle {
   const baseUrl = opts.url ?? HUB_WS_URL;
-  const authURL = () => withAccessToken(baseUrl, opts.getToken());
+  const useQueryFallback = opts.useQueryTokenFallback === true;
+
+  const connectURL = (): string => {
+    if (!useQueryFallback) return baseUrl;
+    return withAccessToken(baseUrl, opts.getToken());
+  };
+
+  const authProtocols = (): string[] | undefined => buildWSAuthProtocols(opts.getToken());
 
   const transport: Transport =
     opts.transport ??
     new WebSocketTransport({
-      url: authURL(),
+      url: baseUrl,
+      protocols: authProtocols,
       maxRetries: 10,
     });
 
@@ -165,7 +200,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
   return {
     connect(): void {
-      transport.connect(authURL());
+      transport.connect(connectURL());
     },
 
     send(type: string, payload: unknown): void {
@@ -211,10 +246,10 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     reconnect(): void {
       authenticated = false;
       if (transport.reconnect) {
-        transport.reconnect(authURL());
+        transport.reconnect(connectURL());
         return;
       }
-      transport.connect(authURL());
+      transport.connect(connectURL());
     },
 
     getStatus(): TransportStatus {
