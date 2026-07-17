@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -108,23 +107,17 @@ type ProcessExecutor struct {
 // callback, decision loop, metrics) via the fluent With* methods before calling
 // Start for the first time.
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
-	if bus == nil {
-		return nil, ErrProcessBusRequired
-	}
-	if store == nil {
-		return nil, ErrProcessStoreRequired
+	if err := requireProcessExecutorDeps(bus, store); err != nil {
+		return nil, err
 	}
 	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
 	if err != nil {
 		return nil, err
 	}
 	if cfg.WorkDir != "" {
-		info, err := os.Stat(cfg.WorkDir)
-		if err != nil {
-			return nil, fmt.Errorf("process workdir %q is not accessible: %w", cfg.WorkDir, err)
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("process workdir %q is not a directory", cfg.WorkDir)
+		info, statErr := os.Stat(cfg.WorkDir)
+		if err := validateConfiguredWorkDir(cfg.WorkDir, info, statErr); err != nil {
+			return nil, err
 		}
 	}
 	runTimeout := resolvePositiveDuration(cfg.RunTimeout, defaultRunTimeout)
@@ -320,10 +313,8 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
 	if !ok {
-		if current, found := e.store.GetRun(runID); found {
-			return cancelResultWithRun(current)
-		}
-		return cancelResultNotFound()
+		current, found := e.store.GetRun(runID)
+		return lookupCancelResult(current, found)
 	}
 	return cancelResultWithRun(run)
 }
@@ -367,16 +358,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"agentId", runCtx.AgentID,
 				"error", err,
 			)
-			e.publishFailed(run, fmt.Errorf("adapter preflight failed: %w", err))
+			e.publishFailed(run, adapterPreflightFailed(err))
 			return
 		}
 	}
 
 	// Resolve adapter label for Prometheus metrics
-	var adapterLabel string
-	if e.metrics != nil {
-		adapterLabel = resolveAdapterMetricsLabel(adapter)
-	}
+	adapterLabel := resolveMetricsAdapterLabel(e.metrics != nil, adapter)
 
 	// SEC-02: Defense-in-depth — reject 'bypassPermissions' at the executor level
 	// before launching the agent process. If the API validation is somehow
@@ -393,7 +381,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var runStartTime time.Time
 	if e.metrics != nil {
 		defer func() {
-			if runStartTime.IsZero() {
+			if !shouldRecordRunFinishMetrics(runStartTime) {
 				return // run never started (early failure before cmd.Start)
 			}
 			r, ok := e.store.GetRun(run.ID)
@@ -457,19 +445,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
+			e.publishFailed(run, pipeOpenError("stdout", err))
 			return
 		}
 		stderr, err := cmd.StderrPipe()
 		if err != nil {
-			e.publishFailed(run, fmt.Errorf("open stderr pipe: %w", err))
+			e.publishFailed(run, pipeOpenError("stderr", err))
 			return
 		}
 		var stdin io.WriteCloser
 		if needsAdapterStdin(adapter) {
 			stdin, err = cmd.StdinPipe()
 			if err != nil {
-				e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
+				e.publishFailed(run, pipeOpenError("stdin", err))
 				return
 			}
 			e.mu.Lock()
@@ -493,7 +481,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		)
 		subprocessStart := time.Now()
 		if err := cmd.Start(); err != nil {
-			if ctx.Err() != nil {
+			if shouldTreatStartFailureAsCancelled(ctx.Err()) {
 				if cmd.Process != nil {
 					_, _ = cmd.Process.Wait()
 				}
@@ -504,7 +492,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			return
 		}
 		// If context was cancelled after Start but before we checked, kill the child.
-		if ctx.Err() != nil {
+		if shouldKillStartedProcessOnCancel(ctx.Err()) {
 			if cmd.Process != nil {
 				_ = cmd.Process.Kill()
 				_, _ = cmd.Process.Wait()
@@ -525,7 +513,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// via stdin interrupt). An open pipe with no data causes CLI agents
 		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
 		// eagerly when neither mechanism requires stdin.
-		if stdin != nil && shouldCloseStdinEagerly(adapter.NeedsStdin(), e.decisionLoopFactory != nil) {
+		if shouldCloseStdinAfterStart(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil) {
 			_ = stdin.Close()
 			e.mu.Lock()
 			delete(e.stdins, run.ID)
@@ -662,7 +650,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 						psErr.Error(),
 					))
 			} else {
-				e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
+				e.publishFailed(run, structuredOutputParseFailed(parseErr))
 				e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
 				return
 			}
@@ -699,7 +687,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 
 	// Exhausted session retries — attempt fault escalation if configured.
-	if lastWaitErr != nil && faultEscalationActive(e.faultEscalationCfg) {
+	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
+	if shouldAttemptFaultEscalation(lastWaitErr, e.faultEscalationCfg) {
 		r, ok := e.store.GetRun(run.ID)
 		if ok && shouldFaultEscalateRetry(e.faultEscalationCfg, r.RetryCount) {
 			newCount := r.RetryCount + 1
@@ -742,7 +731,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
 	}
 	// Report the last error (terminal failure after retries exhausted or disabled).
-	if lastWaitErr != nil {
+	if shouldPublishTerminalWaitFailure(lastWaitErr) {
 		e.publishFailed(run, errorWithRunOutput(lastWaitErr, lastOutStore))
 		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 	}
@@ -757,22 +746,22 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 		n, err := reader.Read(buf)
 		if n > 0 {
 			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
-			if len(allowed) > 0 || truncatedNow {
+			if shouldPublishOutputChunk(len(allowed), truncatedNow) {
 				text := string(allowed)
 				// Log stderr to structured logger so CC failure diagnostics
 				// are visible in Edge server logs without subscribing to bus events.
-				if stream == "stderr" && text != "" {
+				if shouldLogStderrLines(stream, text) {
 					for _, line := range stderrLogLines(text) {
 						sanitizedLine, _ := recursiveSanitizeString(line)
 						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 					}
 				}
-				if outStore != nil && len(allowed) > 0 {
+				if shouldWriteRunOutputStore(outStore != nil, len(allowed)) {
 					if _, err := outStore.Write(text); err != nil {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 					}
 				}
-				if stream == "stdout" && text != "" {
+				if shouldForwardStdoutToHub(stream, text) {
 					e.recordHubOutput(run.ID, text)
 					e.fireHubStream(run.ID, text)
 				}
@@ -796,7 +785,7 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	if ok {
 		exitCode := ExitCodeFromErr(err)
 		classified := ClassifyError(err, exitCode)
-		if classified != nil {
+		if shouldPersistClassifiedFailure(classified) {
 			e.persistAgentFailureMessage(failed, classified.Message)
 		}
 		e.bus.Publish("run.failed", runScope(failed),
@@ -837,7 +826,7 @@ func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	if ok {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
 		// Fire Hub callback if configured
-		e.fireHubFail(cancelled.ID, "run cancelled")
+		e.fireHubFail(cancelled.ID, cancelledFailReason())
 	}
 	e.checkPersistError(run.ID)
 }
@@ -870,7 +859,7 @@ func (e *ProcessExecutor) runStatus(runID string) string {
 func (e *ProcessExecutor) finish(runID string) {
 	// Cascade: when a parent agent finishes, recursively terminate all
 	// descendant sub-agents (Codex AgentTree shutdown pattern).
-	if e.agentRegistry != nil {
+	if shouldCascadeAgentShutdown(e.agentRegistry != nil) {
 		e.agentRegistry.ShutdownCascade(runID)
 	}
 
@@ -920,7 +909,7 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	}
 
 	// Resolve a store.Writer for direct persistence.
-	writer, ok := e.store.(store.Writer)
+	writer, ok := asStoreWriter(e.store)
 	if !ok {
 		slog.Debug("surfacing: store does not implement Writer, skipping", "runId", runID)
 		return
@@ -949,7 +938,6 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		return
 	}
 
-	msgType := subAgentResultMsgType(status)
 	if regStatus, update := subAgentRegistryTerminalStatus(status); update {
 		// completed_with_issues is a terminal status set by the evidence gate
 		// when verification fails. It is still a result (MsgTypeResult), but the
@@ -965,17 +953,16 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	sanitizedResult, sanitizeReason := SanitizeSubAgentResult(payload)
 
 	e.messageQueue.EnsureAgent(inst.ParentID, 64)
-	e.messageQueue.Send(agents.Message{
-		ID:          subAgentMessageID(runID),
-		FromAgentID: agentID,
-		ToAgentID:   inst.ParentID,
-		Type:        msgType,
-		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
-		Payload: subAgentResultQueuePayload(
-			runID, status, agentID, inst.Name, sanitizedResult, sanitizeReason,
-		),
-		Timestamp: time.Now().UTC(),
-	})
+	e.messageQueue.Send(buildSubAgentResultMessage(
+		runID,
+		agentID,
+		inst.Name,
+		inst.ParentID,
+		status,
+		sanitizedResult,
+		sanitizeReason,
+		time.Now().UTC(),
+	))
 
 	// Store structured result in the aggregator's collector for eventual
 	// synthesis when all children of the parent complete (or timeout).
@@ -986,7 +973,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// aggregator. This ensures that even if the message queue copy is
 	// tampered with, the raw persisted output does not leak API keys,
 	// file paths, or stack traces.
-	if e.resultAgg != nil {
+	if shouldStoreSubAgentAggregatorResult(e.resultAgg != nil) {
 		e.resultAgg.StoreSubAgentResult(inst.ParentID, buildSubAgentResult(
 			agentID,
 			inst.Name,
@@ -1024,7 +1011,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	// Wrap emitter with decision-loop step tracking and max-steps enforcement.
 	// When configured, tool_call events increment a step counter and force-finish
 	// is triggered when maxSteps is exceeded.
-	if e.decisionLoopFactory != nil {
+	if shouldWrapDecisionLoopEmitter(e.decisionLoopFactory != nil) {
 		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
 	}
 
@@ -1044,7 +1031,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		slog.Error("structured output parse error", "runId", run.ID, "error", err)
 		*parseErr = err
 	}
-	if transcriptEmitter != nil {
+	if shouldFlushTranscriptEmitter(transcriptEmitter != nil) {
 		transcriptEmitter.Flush()
 	}
 }
@@ -1070,7 +1057,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// CanSpawn (seeing count=4) and both subsequently increment, exceeding
 	// MaxChildrenPerAgent=5.
 	slotReserved := false
-	if e.agentRegistry != nil {
+	if shouldReserveSpawnSlot(e.agentRegistry != nil) {
 		if err := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); err != nil {
 			slog.Warn("spawn slot rejected",
 				"parentRunId", parentRun.ID,
@@ -1116,7 +1103,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// monitors only the child's tokens, and parent/child results are
 	// independently routed via the message queue.
 	registered := false
-	if e.agentRegistry != nil {
+	if shouldRegisterSubAgentInstance(e.agentRegistry != nil) {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
 		if regErr := e.agentRegistry.Register(inst); regErr != nil {
 			slog.Warn("failed to register sub-agent instance in registry",
