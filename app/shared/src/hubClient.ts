@@ -1,4 +1,4 @@
-import { AppError, reportApiError } from './errors';
+import { reportApiError } from './errors';
 import type {
   HubAgentRunEventSummary,
   HubAgentRunEvent,
@@ -91,18 +91,24 @@ import * as hubPayload from './hubClientPayloadUtils';
 import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
+  shouldContinueRouteFallback,
 } from './hubClientRequestUtils';
 import {
-  applyBearerAuth,
-  applyDefaultJsonContentType,
+  applyRefreshedBearerAuth,
+  buildHubFetchInit,
   buildHubUrl,
+  buildMultipartFetchInit,
+  classifyHubRequestCatch,
+  createAuthOnlyHeaders,
+  createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
-  isAbortError,
-  isNetworkFetchTypeError,
   normalizeHubBaseUrl,
   requestMethodOf,
+  resolveHubFetch,
   resolveHubTimeoutMs,
+  shouldAttemptTokenRefresh,
+  toReportableError,
 } from './hubClientTransportUtils';
 
 // ── Public type / envelope re-exports (extracted #810) ──
@@ -110,46 +116,40 @@ export * from './hubClientPublicReexports';
 
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = normalizeHubBaseUrl(opts.baseUrl);
-  const fetchImpl = opts.fetch;
+  const fetchImpl = resolveHubFetch(opts.fetch);
 
   async function request<T>(
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const token = opts.getToken?.();
-    const headers = new Headers(options.headers);
-    applyDefaultJsonContentType(headers);
-    applyBearerAuth(headers, token);
-
+    const headers = createJsonAuthHeaders(options.headers, opts.getToken?.());
     const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    const signal = controller.signal;
     const method = requestMethodOf(options);
+    const url = buildHubUrl(baseUrl, path);
 
     try {
-      const response = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
-        ...options,
-        headers,
-        signal,
-      });
+      const response = await fetchImpl(
+        url,
+        buildHubFetchInit(options, headers, controller.signal),
+      );
       clearTimeout(timeoutId);
 
       // ── Token refresh recovery on 401 ──────────────────
-      if (response.status === 401 && opts.onRefreshToken) {
+      if (shouldAttemptTokenRefresh(response.status, Boolean(opts.onRefreshToken))) {
         try {
-          const newToken = await opts.onRefreshToken();
+          const newToken = await opts.onRefreshToken!();
           if (newToken) {
             // Retry once with fresh token
-            headers.set('Authorization', `Bearer ${newToken}`);
+            applyRefreshedBearerAuth(headers, newToken);
             const retryController = new AbortController();
             const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
             try {
-              const retryResponse = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
-                ...options,
-                headers,
-                signal: retryController.signal,
-              });
+              const retryResponse = await fetchImpl(
+                url,
+                buildHubFetchInit(options, headers, retryController.signal),
+              );
               clearTimeout(retryTimeoutId);
               return await parseHubSuccessResponse<T>(retryResponse);
             } catch (retryErr) {
@@ -159,7 +159,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
           }
         } catch (refreshErr) {
           console.error('[HubClient] Token refresh failed', refreshErr);
-          reportApiError(refreshErr instanceof Error ? refreshErr : new Error(String(refreshErr)), {
+          reportApiError(toReportableError(refreshErr), {
             path,
             context: 'token_refresh',
           });
@@ -170,28 +170,24 @@ export function createHubClient(opts: HubClientOptions = {}) {
     } catch (error) {
       clearTimeout(timeoutId);
 
-      // Surface timeout as a distinct error
-      if (isAbortError(error)) {
-        const timeoutError = createTimeoutAppError({
-          timeoutMs,
-          method,
-          path,
-        });
+      const classified = classifyHubRequestCatch(error);
+      if (classified.kind === 'timeout') {
+        const timeoutError = createTimeoutAppError({ timeoutMs, method, path });
         console.error(`[HubClient] ${timeoutError.message}`);
         reportApiError(timeoutError, { path, method, timeoutMs });
         throw timeoutError;
       }
-
-      // Report all other errors
-      if (error instanceof AppError) {
-        reportApiError(error, { path, method });
-      } else if (isNetworkFetchTypeError(error)) {
-        const netError = createNetworkAppError((error as TypeError).message);
+      if (classified.kind === 'app') {
+        reportApiError(classified.error, { path, method });
+        throw classified.error;
+      }
+      if (classified.kind === 'network') {
+        const netError = createNetworkAppError(classified.message);
         console.error(`[HubClient] ${netError.message}`);
         reportApiError(netError, { path, method });
         throw netError;
       }
-      throw error;
+      throw classified.error;
     }
   }
 
@@ -206,7 +202,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       try {
         return await request<T>(path, options);
       } catch (error) {
-        if (index < paths.length - 1 && isRouteFallbackError(error)) {
+        if (shouldContinueRouteFallback(index, paths.length, error)) {
           fallbackError = error;
           continue;
         }
@@ -218,20 +214,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
   }
 
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
-    const token = opts.getToken?.();
-    const headers = new Headers();
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    applyBearerAuth(headers, token);
+    const headers = createAuthOnlyHeaders(opts.getToken?.());
     const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
-        ...hubPayload.buildPostInit(),
-        headers,
-        body: formData,
-        signal: controller.signal,
-      });
+      const response = await fetchImpl(
+        buildHubUrl(baseUrl, path),
+        buildMultipartFetchInit(headers, formData, controller.signal),
+      );
       clearTimeout(timeoutId);
       return await parseHubSuccessResponse<T>(response);
     } catch (error) {

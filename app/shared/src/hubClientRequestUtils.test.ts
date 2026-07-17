@@ -4,9 +4,10 @@ import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
   qs,
+  shouldContinueRouteFallback,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799)', () => {
+describe('hubClientRequestUtils (#799 / #935)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -26,6 +27,15 @@ describe('hubClientRequestUtils (#799)', () => {
       false,
     );
     expect(isRouteFallbackError(new Error('boom'))).toBe(false);
+  });
+
+  it('decides whether requestWithFallback should continue (#935)', () => {
+    const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
+    const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
+    expect(shouldContinueRouteFallback(0, 2, notFound)).toBe(true);
+    expect(shouldContinueRouteFallback(1, 2, notFound)).toBe(false);
+    expect(shouldContinueRouteFallback(0, 2, server)).toBe(false);
+    expect(shouldContinueRouteFallback(0, 1, notFound)).toBe(false);
   });
 
   it('normalizes register-device defaults and capabilities arrays', () => {

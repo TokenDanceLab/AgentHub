@@ -4,17 +4,26 @@ import {
   DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,
   applyDefaultJsonContentType,
+  applyRefreshedBearerAuth,
+  buildHubFetchInit,
   buildHubUrl,
+  buildMultipartFetchInit,
+  classifyHubRequestCatch,
+  createAuthOnlyHeaders,
+  createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
   isAbortError,
   isNetworkFetchTypeError,
   normalizeHubBaseUrl,
   requestMethodOf,
+  resolveHubFetch,
   resolveHubTimeoutMs,
+  shouldAttemptTokenRefresh,
+  toReportableError,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -30,6 +39,58 @@ describe('hubClientTransportUtils (#810 / #913)', () => {
     expect(buildHubUrl('https://hub.example.com', '/client/auth/me')).toBe(
       'https://hub.example.com/client/auth/me',
     );
+  });
+
+  it('resolves fetch, builds fetch inits, and classifies residual transport (#935)', () => {
+    const injected = (async () => new Response()) as typeof globalThis.fetch;
+    expect(resolveHubFetch(injected)).toBe(injected);
+    expect(resolveHubFetch(undefined)).toBe(globalThis.fetch);
+
+    const headers = createJsonAuthHeaders({ 'X-Test': '1' }, 'tok');
+    expect(headers.get('X-Test')).toBe('1');
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('Bearer tok');
+
+    const authOnly = createAuthOnlyHeaders('tok-up');
+    expect(authOnly.get('Authorization')).toBe('Bearer tok-up');
+    expect(authOnly.has('Content-Type')).toBe(false);
+
+    applyRefreshedBearerAuth(headers, 'tok-2');
+    expect(headers.get('Authorization')).toBe('Bearer tok-2');
+
+    const controller = new AbortController();
+    expect(buildHubFetchInit({ method: 'PUT' }, headers, controller.signal)).toEqual({
+      method: 'PUT',
+      headers,
+      signal: controller.signal,
+    });
+
+    const form = new FormData();
+    form.append('hash', 'abc');
+    expect(buildMultipartFetchInit(authOnly, form, controller.signal)).toEqual({
+      method: 'POST',
+      headers: authOnly,
+      body: form,
+      signal: controller.signal,
+    });
+
+    expect(shouldAttemptTokenRefresh(401, true)).toBe(true);
+    expect(shouldAttemptTokenRefresh(401, false)).toBe(false);
+    expect(shouldAttemptTokenRefresh(403, true)).toBe(false);
+
+    expect(toReportableError(new Error('e'))).toMatchObject({ message: 'e' });
+    expect(toReportableError('boom')).toMatchObject({ message: 'boom' });
+
+    expect(classifyHubRequestCatch(new DOMException('Aborted', 'AbortError'))).toEqual({
+      kind: 'timeout',
+    });
+    const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 500);
+    expect(classifyHubRequestCatch(appErr)).toEqual({ kind: 'app', error: appErr });
+    expect(classifyHubRequestCatch(new TypeError('Failed to fetch'))).toEqual({
+      kind: 'network',
+      message: 'Failed to fetch',
+    });
+    expect(classifyHubRequestCatch('other')).toEqual({ kind: 'other', error: 'other' });
   });
 
   it('classifies AbortError and network fetch TypeError', () => {
