@@ -149,6 +149,9 @@ docs/handoffs/
 # Temp & Cache
 # =============================================================================
 .tmp/
+# Desktop local verify / screenshot dumps (not production)
+app/desktop/tmp-*
+**/tmp-verify-*.mjs
 tmp/
 .expo/
 **/.expo/
