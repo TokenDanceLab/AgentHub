@@ -32,6 +32,17 @@ type CapabilityMintResolved struct {
 	TTL       time.Duration
 }
 
+// NewCapabilityMintInput builds CapabilityMintInput from env + payload fields.
+func NewCapabilityMintInput(jwtSecret, payloadDeviceID, envDeviceID, triggerUserID, targetID string) CapabilityMintInput {
+	return CapabilityMintInput{
+		JWTSecret:       jwtSecret,
+		PayloadDeviceID: payloadDeviceID,
+		EnvDeviceID:     envDeviceID,
+		TriggerUserID:   triggerUserID,
+		TargetID:        targetID,
+	}
+}
+
 // ResolveCapabilityMint returns capability mint bindings or Ok=false when minting
 // should be skipped (empty secret or unresolved device).
 func ResolveCapabilityMint(in CapabilityMintInput) CapabilityMintResolved {
