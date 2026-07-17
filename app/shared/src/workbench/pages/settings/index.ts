@@ -12,6 +12,12 @@ export {
   PANE_RENDERERS,
 } from './SettingsPanes';
 
+export { SettingsNav } from './SettingsNav';
+export type { SettingsNavProps } from './SettingsNav';
+
+export { SettingsMain } from './SettingsMain';
+export type { SettingsMainProps } from './SettingsMain';
+
 export {
   NavGlyph,
   SettingsScopeRow,
