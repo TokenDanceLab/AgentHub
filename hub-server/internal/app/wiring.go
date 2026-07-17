@@ -20,22 +20,23 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 type messageServiceWithReactions struct {
 	*service.MessageService
-	reactions *service.MessageReactionService
+	reactions *messagereaction.Service
 }
 
-func (s messageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (s messageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return s.reactions.AddMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
-func (s messageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (s messageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
-func (s messageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+func (s messageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 	return s.reactions.ListMessageReactions(ctx, userID, sessionID, msgID)
 }
 
@@ -102,7 +103,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
-	a.MessageReactionService = service.NewMessageReactionService(a.DB, a.bus)
+	a.MessageReactionService = messagereaction.NewService(a.DB, a.bus)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 
 	// Execution Target service (needed by DeviceService).

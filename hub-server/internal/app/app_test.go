@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
 	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/glebarez/sqlite"
@@ -406,7 +407,7 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 		t.Run(tt.name, func(t *testing.T) {
 			bus.Publish(context.Background(), service.Event{
 				Type: tt.eventType,
-				Payload: service.MessageReactionEventPayload{
+				Payload: messagereaction.MessageReactionEventPayload{
 					Action:    tt.action,
 					UserID:    "user-2",
 					MessageID: "msg-1",

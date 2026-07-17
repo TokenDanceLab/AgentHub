@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -119,7 +120,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 	} {
 		reactionEvent := reactionEvent
 		a.bus.Subscribe(reactionEvent.eventType, func(ctx context.Context, event service.Event) {
-			payload, ok := event.Payload.(service.MessageReactionEventPayload)
+			payload, ok := event.Payload.(messagereaction.MessageReactionEventPayload)
 			if !ok {
 				return
 			}

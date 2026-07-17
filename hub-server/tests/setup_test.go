@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -43,18 +44,18 @@ var (
 
 type testMessageServiceWithReactions struct {
 	*service.MessageService
-	reactions *service.MessageReactionService
+	reactions *messagereaction.Service
 }
 
-func (s testMessageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (s testMessageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return s.reactions.AddMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
-func (s testMessageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (s testMessageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
-func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 	return s.reactions.ListMessageReactions(ctx, userID, sessionID, msgID)
 }
 
@@ -110,7 +111,7 @@ func TestMain(m *testing.M) {
 	sessionService := service.NewSessionService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	messageService := service.NewMessageService(db, bus, cacheClient)
-	messageReactionService := service.NewMessageReactionService(db, bus)
+	messageReactionService := messagereaction.NewService(db, bus)
 	messageHandler := handler.NewMessageHandler(testMessageServiceWithReactions{
 		MessageService: messageService,
 		reactions:      messageReactionService,
