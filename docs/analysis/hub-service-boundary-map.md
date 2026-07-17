@@ -1,9 +1,9 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-17
-> issue: #662 (first IM typed-service package move `service/messagereaction`; prior #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
-> status: map current — pure helpers closed for runtime + **#628/#639/#651 IM pure package** (`service/im`) + **#662 first IM typed-service package** (`service/messagereaction`); workspace remains DB-only; Message/Session/Contact/Attachment thin ports still same-package; remaining IM typed-service package moves one-at-a-time; next residual = next IM typed package (Workspace recommended next) / optional outbox model package move
-> companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/messagereaction`
+> issue: #673 (second IM typed-service package move `service/workspace`; prior #662 / #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
+> status: map current — pure helpers closed for runtime + **#628/#639/#651 IM pure package** (`service/im`) + **#662 first IM typed-service package** (`service/messagereaction`) + **#673 second IM typed-service package** (`service/workspace`, DB-only); Message/Session/Contact/Attachment thin ports still same-package; remaining IM typed-service package moves one-at-a-time; next residual = next IM typed package (Contact recommended next) / optional outbox model package move
+> companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/messagereaction` / `service/workspace`
 
 This document is the authoritative **read-only boundary map** for
 `hub-server/internal/service`. It records package shape, coupling risks,
@@ -22,6 +22,7 @@ an acceptance sketch.
 | Pure extract `service/deliveryoutbox` | ~30–40 | unit tests | pure helpers | backoff/truncate + retry constants; no DB/WS/cache/`*AgentService` (#514) |
 | Pure extract `service/im` | ~280 | unit tests | pure helpers | content/attachment + reaction normalize/summary + workspace thread content + workspace name/description fields; no DB/WS/cache/`*Service` (#628/#639/#651) |
 | Typed extract `service/messagereaction` | ~217 | ~278 | 2 | **DONE #662** first IM typed-service package; Bus port + DTOs + add/remove/list; pure helpers stay in `im` |
+| Typed extract `service/workspace` | ~370 | ~273 | 2 | **DONE #673** second IM typed-service package; DB-only Service + DTOs + project/thread CRUD; pure helpers stay in `im`; no bus/cache ports invented |
 | Same-package type extract `DeliveryOutbox` | **landed #540 + #551** | existing `TestOutbox_*` + fake Redispatcher tests | still in flat `service` | opaque `Redispatcher`; private `deliveryOutboxRecord` + repo helpers; scan returns `DeliveryOutboxEntry`; redispatch uses `redispatchTarget` |
 | Same-package type extract `DispatchService` | **landed #563 thin first seam + #573 redispatch residual + #617 ports residual** | existing `agent_test` / `agent_logic_test` + `TestOutbox_*` | still in flat `service` | injected `dispatchBus` / `dispatchOutbox` / narrow `dispatchCache` / `dispatchWS` / relay; `dispatchPayload` private; redispatch via `dispatchRedispatcher` |
 | Same-package type extract `MessageService` | **landed #585 thin first seam** | existing `message_test` / `message_edit_test` + port no-op tests | still in flat `service` | injected `messageBus` / `messageCache`; send/edit/pin/forward/search ownership clarified; no package move |
@@ -33,8 +34,8 @@ an acceptance sketch.
 **Shape note:** not one god struct — **25+ `*Service` types** already exist
 (including `RunEventService`, `EdgeCallbackService`, `DeliveryOutbox`,
 `DispatchService`, `MessageService`, `SessionService`, `ContactService`,
-`AttachmentService`). **`messagereaction.Service`** is extracted (#662). Concentration remains **package flatness + residual
-`AgentService` facade sprawl + remaining IM surfaces** (workspace DB-only residual; remaining typed package moves). Outbox journal + retry-loop orchestration
+`AttachmentService`). **`messagereaction.Service`** is extracted (#662). **`workspace.Service`** is extracted (#673, DB-only). Concentration remains **package flatness + residual
+`AgentService` facade sprawl + remaining IM surfaces** (remaining typed package moves). Outbox journal + retry-loop orchestration
 are on `DeliveryOutbox`; trigger/dispatch/cancel/regenerate **and redispatch**
 are on `DispatchService` behind facades. Redispatch
 (`redispatchDelivery` / `retryDispatchToTarget`) lives on `*DispatchService`
@@ -56,6 +57,8 @@ name/description helpers + reaction summary projection helpers landed in `servic
 typed IM package move sketched in §6g.
 **#662:** first IM typed-service package move **landed** as `service/messagereaction` (agentteam-style);
 flat `message_reaction.go` removed; pure helpers stay in `service/im`; JSON/OpenAPI names preserved.
+**#673:** second IM typed-service package move **landed** as `service/workspace` (agentteam-style);
+flat `workspace.go` removed; pure helpers stay in `service/im`; DB-only (no invented bus/cache ports); JSON/OpenAPI names preserved.
 
 Precedent: `service/agentteam` uses **local interfaces**
 (`agentTeamAgentSvc`, `agentTeamCache`, `agentTeamControlSvc`) + `*service.Bus`.
@@ -75,7 +78,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | Domain | Prod LOC | Files (prod) | Role |
 |--------|---------:|--------------|------|
 | **agent_runtime** | ~2,9xx | `agent.go`, `agent_custom.go`, `agent_dispatch.go` (`DispatchService` + residual ports + facade, ~1,1xx), `agent_run_event.go` (`RunEventService` + facade), `agent_edge_callback.go` (`EdgeCallbackService` + facade), `delivery_outbox.go` (~820), `agent_control.go`, `agent_team_helpers.go` (compat wrappers), `relay.go` | Task dispatch, edge callback, outbox retry, run-event projection |
-| **im_messaging** | ~2,8xx | `message.go` (~790; `MessageService` + ports + im aliases), `session.go` (~760; `SessionService` + ports), `contact.go` (~380; `ContactService` + ports), `attachment.go` (~420; `AttachmentService` + `ObjectStorage` port + im aliases), `workspace.go`, `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments (reaction extracted) |
+| **im_messaging** | ~2,4xx | `message.go` (~790; `MessageService` + ports + im aliases), `session.go` (~760; `SessionService` + ports), `contact.go` (~380; `ContactService` + ports), `attachment.go` (~420; `AttachmentService` + `ObjectStorage` port + im aliases), `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments (reaction + workspace extracted) |
 | **agent_catalog** | ~1,133 | `agent_profile.go`, `document.go`, `skill.go`, `mcp_server.go`, `provider_binding.go` | Profiles/docs/market installables |
 | **identity_auth** | ~829 | `auth.go`, `oidc.go`, `device.go`, `user_settings.go` | Login/OIDC/device/settings |
 | **execution_target** | ~516 | `execution_target.go` | Local-edge targets + health |
@@ -85,6 +88,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | **deliveryoutbox/** (subpkg) | ~30–40 | pure retry/truncate helpers | **Extracted in #514** |
 | **im/** (subpkg) | ~280 | pure content/attachment/reaction/workspace-content/workspace-fields helpers | **Extracted in #628/#639/#651** |
 | **messagereaction/** (subpkg) | ~217 | typed reaction orchestration + Bus port + DTOs | **Extracted in #662** |
+| **workspace/** (subpkg) | ~370 | typed workspace project/thread CRUD + DTOs (DB-only) | **Extracted in #673** |
 
 ### Named hotspots
 
@@ -97,7 +101,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | `contact.go` | ~380 | `ContactService` + ports: search/request/accept/reject/list/remove/block/unblock/remark | injected `contactBus` / `contactCache` (**#594**) |
 | `attachment.go` | ~420 | `AttachmentService` + `ObjectStorage` port: probe/save/store/get/delete/presign/access + mime policy; thin aliases to `im` pure helpers | injected `ObjectStorage` + `SetStorage` (**#606**); pure hash/path/metadata → `im` (**#628**); LocalStorage / S3Storage implementers |
 | `messagereaction/` | ~217 | typed `Service` + `Bus` port: add/remove/list reactions + access checks; DTOs; uses pure `im` normalize/summary | **#662 package move** from flat `message_reaction.go`; pure helpers remain in `im` |
-| `workspace.go` | ~360 | `WorkspaceService` project/thread CRUD (DB-only); thin aliases to `im` workspace thread content + name/description normalize | pure thread content → `im` (**#639**); pure name/description → `im` (**#651**); no bus/cache ports (none exist) |
+| `workspace/` | ~370 | typed `Service` (DB-only): project/thread CRUD + DTOs; thin aliases to `im` workspace thread content + name/description normalize | **#673 package move** from flat `workspace.go`; pure helpers remain in `im`; no bus/cache ports invented |
 | `agent_edge_callback.go` | ~520 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**); outbox rebind via `DeliveryOutbox` (**#540**) |
 | `agent_run_event.go` | 237 | `RunEventService` + `AgentService` facade | repo; `agentevent` project; injected `runEventControl` (**#478 done**) |
 
@@ -147,6 +151,9 @@ Precedent: `service/agentteam` uses **local interfaces**
   `#662`: first IM typed-service package move **landed** (`service/messagereaction`);
   wiring/app/handler/tests import new package; JSON field names + OpenAPI schema names
   unchanged; pure helpers remain in `service/im`; one service only.
+  `#673`: second IM typed-service package move **landed** (`service/workspace`);
+  wiring/handler/tests import new package; DB-only (no bus/cache); pure helpers remain
+  in `service/im`; one service only; JSON/OpenAPI names unchanged.
 
 ## 2. Coupling risks
 
@@ -162,8 +169,8 @@ Precedent: `service/agentteam` uses **local interfaces**
 10. **Handler interfaces already thin the edge** — package extract without service-side ports still leaves fat concrete type for tests/wiring.
 
 Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
-`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual + residual ports (#617)** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** / **`ContactService` thin first seam (#594)** / **`AttachmentService` thin first seam (#606)** / **`service/im` pure helpers first seam (#628)** / **deeper IM pure helpers + MessageReactionService bus port (#639)** / **workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651)** / **first IM typed-service package move `service/messagereaction` (#662)** → next IM typed package / optional delivery model package move.
-**“先接口后搬家；一次一个 seam.”** — runtime + message + session + contact + attachment ports done thin; reaction **package-moved** (#662); workspace ports residual closed as N/A (DB-only); IM pure package closed (**#628/#639/#651**); **do not big-bang package moves.**
+`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual + residual ports (#617)** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** / **`ContactService` thin first seam (#594)** / **`AttachmentService` thin first seam (#606)** / **`service/im` pure helpers first seam (#628)** / **deeper IM pure helpers + MessageReactionService bus port (#639)** / **workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651)** / **first IM typed-service package move `service/messagereaction` (#662)** / **second IM typed-service package move `service/workspace` (#673)** → next IM typed package (Contact recommended) / optional delivery model package move.
+**“先接口后搬家；一次一个 seam.”** — runtime + message + session + contact + attachment ports done thin; reaction **package-moved** (#662); workspace **package-moved** (#673, DB-only); IM pure package closed (**#628/#639/#651**); **do not big-bang package moves.**
 
 ## 3. Extract candidates ranked (lowest risk first)
 
@@ -172,7 +179,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | **1** | **Pure run-event projection/validation package** (`service/agentevent`) | **Lowest** | High seam | **DONE in #468** |
 | 2 | Same-package **interface boundary only** (export projector/ports; methods stay) | Very low | Medium | Superseded by #478 type extract for run-events |
 | 3 | Mechanical move of already-standalone small services (`public_stats`, `user_settings`) | Low | Low | LOC theater — defer |
-| 4 | `MessageReactionService` / `WorkspaceService` subpkg | Low–med | Medium | **MessageReaction DONE #662**; Workspace still deferred |
+| 4 | `MessageReactionService` / `WorkspaceService` subpkg | Low–med | Medium | **MessageReaction DONE #662**; **Workspace DONE #673** |
 | **5** | **`RunEventService` type split (methods + inject control)** | Medium | High | **DONE in #478** |
 | **6** | **`EdgeCallbackService` type split (ack/stream/done/fail + ports)** | Medium | High | **DONE in #505** |
 | **6b** | **Pure outbox helpers only** (`NextRetryDelay`/`TruncateString` + retry constants in `service/deliveryoutbox`) | Low | Low–med | **DONE in #514** |
@@ -187,9 +194,10 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | **8g** | **Deeper IM pure helpers + MessageReaction bus port** (reaction/workspace content + `messageReactionBus`) | **Lowest residual (IM)** | Med seam | **DONE #639** — pure reaction/workspace helpers + reaction bus port; workspace stays DB-only |
 | **8h** | **Workspace pure field helpers + reaction summary pure helpers + typed-move sketch** | **Lowest residual (IM)** | Med seam | **DONE #651** — no invented workspace ports; pure name/description + summary projection; §6g first-move sketch |
 | **8i** | **First IM typed-service package move (`service/messagereaction`)** | **Lowest typed move** | High seam | **DONE #662** — agentteam-style package; Bus port; pure helpers stay in `im`; one service only |
+| **8j** | **Second IM typed-service package move (`service/workspace`)** | **Lowest remaining typed move** | High seam | **DONE #673** — agentteam-style package; DB-only; pure helpers stay in `im`; no invented bus/cache ports; one service only |
 | 9 | Optional outbox model package move (`deliveryOutboxRecord` → model/repo) | High | Med | Deferred after #551 private ownership; higher risk than IM pure/port seams |
-| 10 | IM typed-service subpackages (message/session/contact/attachment/workspace) | Med | High | **reaction DONE #662**; remaining one package per PR after pure helpers + port hardening |
-| 10b | Optional workspace ports residual (if bus/cache appears) | Low | Low | **Closed as N/A in #651** — WorkspaceService remains DB-only |
+| 10 | IM typed-service subpackages (message/session/contact/attachment) | Med | High | **reaction DONE #662**; **workspace DONE #673**; remaining one package per PR after pure helpers + port hardening |
+| 10b | Optional workspace ports residual (if bus/cache appears) | Low | Low | **Closed as N/A in #651/#673** — `workspace.Service` remains DB-only |
 
 ## 4. Landed extracts
 
@@ -399,7 +407,11 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] Redispatch residual moved onto `DispatchService` (`redispatchDelivery` / `retryDispatchToTarget` / task snapshot) (#573)
 - [x] `dispatchRedispatcher` (+ lazy adapter for test literals) injects DispatchService into `DeliveryOutbox`; no `dispatchPayload` export
 - [x] `dispatchOutbox` port gains `MoveDeliveryToDeadLetter` for redispatch dead-letter path
-- [x] Boundary map residual next = IM subpackages / optional model package move; no package move
+- [x] Boundary map residual next = next IM typed package (Contact recommended) / remaining IM packages one-at-a-time / optional outbox model package move
+- [x] Second IM typed-service package move: `service/workspace` owns Service + DTOs + project/thread methods (#673)
+- [x] No invented workspace bus/cache ports; pure helpers remain in `service/im`
+- [x] Flat `workspace.go` removed; wiring/handler/tests import `service/workspace`
+- [x] One service only; no OpenAPI/handler/frontend redesign
 - [x] `MessageService` thin first seam: `messageBus` / `messageCache` ports + nil-safe publish (#585)
 - [x] Message ownership clarified (send/edit/recall/pin/forward/search/read); no OpenAPI/handler/frontend
 - [x] Existing `message_*` tests + short suite green; port no-op unit tests
@@ -459,7 +471,8 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 15. ~~**Deeper IM pure helpers / MessageReaction bus port**~~ — **DONE #639** (reaction/workspace content pure helpers + `messageReactionBus`)
 16. ~~**Optional workspace ports residual / pure residual + typed-move sketch**~~ — **DONE #651** (ports residual N/A; pure field/summary helpers; §6g sketch)
 17. ~~**First IM typed-service package move**~~ — **DONE #662** (`service/messagereaction`; agentteam-style; pure helpers stay in `im`)
-18. **Next IM typed-service subpackage** — recommend `WorkspaceService` next (DB-only, no ports to invent); then Contact/Attachment/Session/Message one package per PR.
+18. ~~**Second IM typed-service package move**~~ — **DONE #673** (`service/workspace`; DB-only; pure helpers stay in `im`; no invented bus/cache ports)
+19. **Next IM typed-service subpackage** — recommend `ContactService` next (bus+cache ports already hardened); then Attachment/Session/Message one package per PR.
 19. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
 20. **Optional outbox model package move** — deferred/high-risk; not required before remaining IM typed-service subpackages.
 
@@ -863,6 +876,12 @@ type DispatchService struct {
 
 **DONE in #662.** Package `hub-server/internal/service/messagereaction` owns typed reaction orchestration. Flat `service/message_reaction.go` removed. Pure helpers remain in `service/im`.
 
+### 6h. Second IM typed-service package move (#673 landed; Workspace)
+
+#### Status
+
+**DONE in #673.** Package `hub-server/internal/service/workspace` owns typed workspace project/thread orchestration. Flat `service/workspace.go` removed. Pure helpers remain in `service/im`. Service stays **DB-only** — no bus/cache ports invented.
+
 #### Decision for #651
 
 | Option | Risk | Verdict for #651 |
@@ -915,33 +934,44 @@ type Service struct {
 - [x] `go test` green for new package + residual flat service/app/handler/router tests
 - [x] No OpenAPI / handler contract / frontend redesign
 
-#### File ownership (current, post-#662)
+#### File ownership (current, post-#662/#673)
 
 | Path | Owns | Notes |
 |------|------|-------|
 | `service/im/` (~280) | pure content/attachment/reaction/workspace-content/workspace-fields + reaction summary | **#628/#639/#651** pure only |
 | `service/messagereaction/` (~217) | typed `Service` + `Bus` + DTOs + add/remove/list | **#662** first IM typed package |
-| `service/workspace.go` (~360) | `WorkspaceService` DB-only CRUD/threads; thin aliases to `im` | ports residual N/A; next typed candidate |
+| `service/workspace/` (~370) | typed `Service` (DB-only) + DTOs + project/thread CRUD | **#673** second IM typed package |
 | `handler/message.go` | thin handler interface; reaction DTOs from `messagereaction` | compile path only; JSON names stable |
-| `app/wiring.go` | `messagereaction.NewService(db, bus)`, `NewWorkspaceService(db)` | agentteam-style import |
+| `handler/workspace.go` | thin handler interface; workspace DTOs from `workspace` | compile path only; JSON names stable |
+| `app/wiring.go` | `messagereaction.NewService(db, bus)`, `workspace.NewService(db)` | agentteam-style import |
+
+**Acceptance (#673)**
+
+- [x] New package owns typed workspace methods + response/request DTOs
+- [x] DB-only construction (`NewService(db)`); **no** invented bus/cache ports
+- [x] Pure helpers remain in `service/im` (no re-embed into typed package)
+- [x] Wiring/handler/tests point at new package without OpenAPI change
+- [x] **One** service only — no multi-service move in the same PR
+- [x] `go test` green for new package + residual flat service/app/handler tests
+- [x] No OpenAPI / handler contract / frontend redesign
 
 ### Follow-up issue ready
 
 | Field | Value |
 |-------|-------|
-| Suggested title | `[P26.x] Hub next IM typed-service package move (Workspace recommended) after #662` |
-| Depends on | #662 MessageReaction package move |
-| Scope | Move **only** `WorkspaceService` to a sibling package (agentteam-style); keep pure helpers in `service/im`; preserve handler contracts |
+| Suggested title | `[P26.x] Hub next IM typed-service package move (Contact recommended) after #673` |
+| Depends on | #673 Workspace package move |
+| Scope | Move **only** `ContactService` to a sibling package (agentteam-style); keep pure helpers in `service/im`; preserve handler contracts |
 | Non-goals | Big-bang package move of remaining IM typed services; inventing workspace bus/cache ports; OpenAPI/frontend redesign; DispatchService package move; outbox model package move |
-| Primary files | `service/workspace.go` → new package; `app/wiring.go`; related tests; boundary map |
-| Risk note | Pure IM package closed (#628/#639/#651); MessageReaction typed package landed (#662); Message + Session + Contact + Attachment ports closed but still flat; workspace ports residual N/A |
+| Primary files | `service/contact.go` → new package; `app/wiring.go`; related tests; boundary map |
+| Risk note | Pure IM package closed (#628/#639/#651); MessageReaction + Workspace typed packages landed (#662/#673); Message + Session + Contact + Attachment ports closed but still flat |
 
 ## 7. Bottom line
 
-- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** + **`im`** are pure seams; **`messagereaction`** is the first IM typed-service extract; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, **`DispatchService`**, **`MessageService`**, **`SessionService`**, **`ContactService`**, and **`AttachmentService`** are orchestration type extracts (IM services were pre-typed; #585/#593/#594/#606/#639 ports; #617 dispatch residual ports; #628/#639/#651 pure IM helpers; #662 MessageReaction package).
-- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; runtime redispatch + residual ports **closed** on `DispatchService`; optional outbox model package move still high-risk; remaining IM typed-service package moves (workspace/contact/attachment/session/message) still deferred one-at-a-time.
-- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam** + **#594 ContactService thin first seam** + **#606 AttachmentService thin first seam** + **#617 DispatchService residual ports** + pure **`im`** (#628) + deeper pure **`im`** + **MessageReaction bus port** (#639) + workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651) + **first IM typed package `messagereaction` (#662)**.
-- **Pure residual (runtime):** **closed**. **Pure residual (IM):** first + deeper + #651 residual **landed** (#628/#639/#651). **First typed IM package residual:** **landed** (#662).
+- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** + **`im`** are pure seams; **`messagereaction`** + **`workspace`** are IM typed-service extracts; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, **`DispatchService`**, **`MessageService`**, **`SessionService`**, **`ContactService`**, and **`AttachmentService`** are orchestration type extracts (IM services were pre-typed; #585/#593/#594/#606/#639 ports; #617 dispatch residual ports; #628/#639/#651 pure IM helpers; #662 MessageReaction package; #673 Workspace package).
+- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; runtime redispatch + residual ports **closed** on `DispatchService`; optional outbox model package move still high-risk; remaining IM typed-service package moves (contact/attachment/session/message) still deferred one-at-a-time.
+- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam** + **#594 ContactService thin first seam** + **#606 AttachmentService thin first seam** + **#617 DispatchService residual ports** + pure **`im`** (#628) + deeper pure **`im`** + **MessageReaction bus port** (#639) + workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651) + **first IM typed package `messagereaction` (#662)** + **second IM typed package `workspace` (#673)**.
+- **Pure residual (runtime):** **closed**. **Pure residual (IM):** first + deeper + #651 residual **landed** (#628/#639/#651). **First typed IM package residual:** **landed** (#662). **Second typed IM package residual:** **landed** (#673).
 - **#540 decision:** thin same-package extract **landed**. Redispatch initially stayed on `AgentService` behind port; no DispatchService big-bang.
 - **#551 decision:** model ownership residual **landed** (option A). Private GORM record + repo helpers on `DeliveryOutbox`; `DeliveryOutboxEntry` scan view; redispatch `redispatchTarget`; edge-callback acker removed. Full package move deferred.
 - **#563 decision:** thin same-package `DispatchService` **landed**. Trigger/dispatch/cancel/regenerate + edge HTTP/capability/history moved; facades preserve handlers; `dispatchPayload` stays private.
@@ -955,7 +985,8 @@ type Service struct {
 - **#639 decision:** deeper IM residual **landed** as pure reaction/workspace-content helpers plus `MessageReactionService` `messageReactionBus` thin port. Chosen over inventing workspace bus/cache ports (WorkspaceService is DB-only) and over typed IM package moves (still higher risk). Thin aliases preserve same-package surfaces; no OpenAPI/handler/frontend.
 - **#651 decision:** workspace ports residual **closed as N/A** (still DB-only). Landed remaining pure workspace name/description helpers + reaction summary projection helpers in `service/im`, plus §6g first typed-move sketch recommending **MessageReactionService** as the smallest next package extract. No big-bang typed IM move; no OpenAPI/handler/frontend.
 - **#662 decision:** first IM typed-service package move **landed** as `service/messagereaction` (agentteam-style). Bus port + DTOs + methods moved; pure helpers stay in `service/im`; wiring/app/handler/tests updated; flat aliases avoided (import cycle with `service.Event`). One service only; no OpenAPI/handler/frontend redesign.
-- **Next code step:** next IM typed-service package move (`WorkspaceService` recommended) / remaining IM typed packages one-at-a-time / optional outbox model package move (still deferred/high-risk).
+- **#673 decision:** second IM typed-service package move **landed** as `service/workspace` (agentteam-style). DTOs + methods moved; pure helpers stay in `service/im`; DB-only (no invented bus/cache ports); wiring/handler/tests updated; flat `workspace.go` removed. One service only; no OpenAPI/handler/frontend redesign.
+- **Next code step:** next IM typed-service package move (`ContactService` recommended) / remaining IM typed packages one-at-a-time / optional outbox model package move (still deferred/high-risk).
 
 ## Key paths
 
@@ -972,7 +1003,7 @@ type Service struct {
 - `hub-server/internal/service/contact.go` (`ContactService` + `contactBus` / `contactCache` ports)
 - `hub-server/internal/service/attachment.go` (`AttachmentService` + `ObjectStorage` port + im aliases)
 - `hub-server/internal/service/messagereaction/` (typed reaction Service + Bus + DTOs; #662)
-- `hub-server/internal/service/workspace.go` (`WorkspaceService` + im content/field aliases; DB-only)
+- `hub-server/internal/service/workspace/` (typed workspace Service + DTOs; DB-only; #673)
 - `hub-server/internal/service/im/` (pure IM content/attachment/reaction/workspace-content/workspace-fields helpers; #628/#639/#651)
-- `hub-server/internal/app/wiring.go` (`StartDeliveryRetryLoop`, `NewMessageService`, `NewSessionService`, `NewContactService`, `NewAttachmentService`, `messagereaction.NewService`)
+- `hub-server/internal/app/wiring.go` (`StartDeliveryRetryLoop`, `NewMessageService`, `NewSessionService`, `NewContactService`, `NewAttachmentService`, `messagereaction.NewService`, `workspace.NewService`)
 - `docs/analysis/cleanup-strategy.md`
