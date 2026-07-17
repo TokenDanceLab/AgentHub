@@ -261,6 +261,101 @@ func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
 	}
 }
 
+
+func TestAuthMiddlewareRejectsEdgeToken(t *testing.T) {
+	token, err := jwtutil.GenerateEdgeToken("user-edge", "edge-dev-1", testSecret(), time.Hour)
+	if err != nil {
+		t.Fatalf("GenerateEdgeToken: %v", err)
+	}
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected edge JWT to be rejected on product AuthMiddleware")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
+	}
+}
+
+func TestAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
+	// testSecret is long enough for capability mint (>= 32).
+	token, err := jwtutil.IssueCapabilityToken([]byte(testSecret()), "user-1", "edge-1", "proj_1", "run-start", time.Minute)
+	if err != nil {
+		t.Fatalf("IssueCapabilityToken: %v", err)
+	}
+	c, w := ginRequest(http.MethodGet, "/client/sessions", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected capability JWT to be rejected on product AuthMiddleware")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
+	}
+}
+
+func TestAuthMiddlewareProductTokenStillReachesHandler(t *testing.T) {
+	token := makeToken("user-product", "web", "dev-web-1")
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+	if c.IsAborted() {
+		t.Fatalf("product token must authenticate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("auth_source"); got != "hub_local" {
+		t.Fatalf("auth_source = %q, want hub_local", got)
+	}
+	if got := c.GetString("user_id"); got != "user-product" {
+		t.Fatalf("user_id = %q, want user-product", got)
+	}
+	// RequireHubSession still accepts product hub_local.
+	RequireHubSession()(c)
+	if c.IsAborted() {
+		t.Fatal("RequireHubSession must accept product hub_local session")
+	}
+}
+
+func TestWSAuthMiddlewareRejectsEdgeToken(t *testing.T) {
+	token, err := jwtutil.GenerateEdgeToken("user-edge", "edge-dev-ws", testSecret(), time.Hour)
+	if err != nil {
+		t.Fatalf("GenerateEdgeToken: %v", err)
+	}
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
+	WSAuthMiddleware(testConfig())(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected edge JWT to be rejected on WSAuthMiddleware")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
+	}
+}
+
+func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
+	token, err := jwtutil.IssueCapabilityToken([]byte(testSecret()), "user-1", "edge-1", "proj_1", "run-start", time.Minute)
+	if err != nil {
+		t.Fatalf("IssueCapabilityToken: %v", err)
+	}
+	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
+	WSAuthMiddleware(testConfig())(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected capability JWT to be rejected on WSAuthMiddleware")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
 func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks string) {
 	t.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)

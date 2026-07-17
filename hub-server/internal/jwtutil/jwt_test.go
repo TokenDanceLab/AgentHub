@@ -221,6 +221,105 @@ func claimStringsContain(values jwt.ClaimStrings, want string) bool {
 	return false
 }
 
+
+func TestParseToken_RejectsEdgeToken(t *testing.T) {
+	secret := "hub-secret-at-least-32-bytes-long!!"
+	token, err := GenerateEdgeToken("user-1", "edge-device-1", secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateEdgeToken: %v", err)
+	}
+	if _, err := ParseToken(token, secret); err == nil {
+		t.Fatal("ParseToken must reject edge-scoped tokens (aud=agenthub-edge, purpose=edge-api)")
+	}
+}
+
+func TestParseToken_RejectsCapabilityToken(t *testing.T) {
+	secret := []byte("hub-local-secret-minimum-32-chars!!")
+	token, err := IssueCapabilityToken(secret, "user-1", "edge-1", "proj_local", "run-start", time.Minute)
+	if err != nil {
+		t.Fatalf("IssueCapabilityToken: %v", err)
+	}
+	if _, err := ParseToken(token, string(secret)); err == nil {
+		t.Fatal("ParseToken must reject capability tokens (aud=agenthub-edge, purpose=run-start)")
+	}
+}
+
+func TestParseToken_RejectsPurposeOnlyToken(t *testing.T) {
+	secret := "test-secret-for-purpose-only-token!!"
+	now := time.Now()
+	claims := Claims{
+		UserID:     "user-1",
+		DeviceType: "desktop",
+		DeviceID:   "dev-1",
+		Purpose:    "run-start",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-api"},
+			Subject:   "user-1",
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	if _, err := ParseToken(token, secret); err == nil {
+		t.Fatal("ParseToken must reject non-empty purpose even with product audience")
+	}
+}
+
+func TestParseToken_AcceptsLegacyEmptyAudience(t *testing.T) {
+	secret := "test-secret-legacy-empty-aud!!!!!!!"
+	now := time.Now()
+	claims := Claims{
+		UserID:     "user-1",
+		DeviceType: "desktop",
+		DeviceID:   "dev-1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			// No Issuer / Audience: pre-R08 product session shape.
+			Subject:   "user-1",
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	got, err := ParseToken(token, secret)
+	if err != nil {
+		t.Fatalf("legacy empty-aud product token must still parse: %v", err)
+	}
+	if got.UserID != "user-1" || got.DeviceType != "desktop" {
+		t.Fatalf("unexpected claims: %+v", got)
+	}
+}
+
+func TestParseToken_RejectsUnknownAudience(t *testing.T) {
+	secret := "test-secret-unknown-audience!!!!!!!"
+	now := time.Now()
+	claims := Claims{
+		UserID:     "user-1",
+		DeviceType: "desktop",
+		DeviceID:   "dev-1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"other-service"},
+			Subject:   "user-1",
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	if _, err := ParseToken(token, secret); err == nil {
+		t.Fatal("ParseToken must reject unknown audience")
+	}
+}
+
 // ── KeyManager / Key Rotation tests ──────────────────────────────────────────
 
 func TestKeyRotation(t *testing.T) {
@@ -497,16 +596,21 @@ func TestKeyRotation_SignEdgeToken(t *testing.T) {
 		t.Fatalf("kid = %q, want edge-key", kid)
 	}
 
-	// Full parse through KeyManager.
-	claims, err := km.ParseToken(token)
-	if err != nil {
-		t.Fatalf("ParseToken failed: %v", err)
+	// Product ParseToken must reject edge-scoped tokens (#853).
+	if _, err := km.ParseToken(token); err == nil {
+		t.Fatal("KeyManager.ParseToken must reject edge-scoped tokens on product path")
 	}
-	if claims.Purpose != "edge-api" {
-		t.Errorf("purpose = %q, want edge-api", claims.Purpose)
+
+	// Claims shape is still edge-scoped when inspected without product gate.
+	rawClaims, ok := unverified.Claims.(*Claims)
+	if !ok {
+		t.Fatal("expected Claims type")
 	}
-	if claims.DeviceType != "edge" {
-		t.Errorf("device_type = %q, want edge", claims.DeviceType)
+	if rawClaims.Purpose != "edge-api" {
+		t.Errorf("purpose = %q, want edge-api", rawClaims.Purpose)
+	}
+	if rawClaims.DeviceType != "edge" {
+		t.Errorf("device_type = %q, want edge", rawClaims.DeviceType)
 	}
 }
 
