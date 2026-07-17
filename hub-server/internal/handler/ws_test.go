@@ -106,7 +106,8 @@ func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
 	}
 }
 
-func TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade(t *testing.T) {
+func TestWebSocketRouteRejectsHubLocalQueryTokenBeforeUpgrade(t *testing.T) {
+	// #954: query access_token is no longer accepted for Hub WS upgrades.
 	token, err := jwtutil.GenerateAccessToken("user-ws-query", "web", "device-ws-query", testWSSecret, time.Hour)
 	if err != nil {
 		t.Fatalf("generate access token: %v", err)
@@ -116,15 +117,83 @@ func TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade(t *testing.T) {
 	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
 		JWT: config.JWTConfig{Secret: testWSSecret},
 	})
-	conn := dialWebSocket(t, wsURL+"?access_token="+url.QueryEscape(token))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, resp, dialErr := websocket.Dial(ctx, wsURL+"?access_token="+url.QueryEscape(token), nil)
+	if conn != nil {
+		conn.Close(websocket.StatusNormalClosure, "")
+	}
+	if dialErr == nil {
+		t.Fatal("expected query-token Hub WS upgrade to fail after #954")
+	}
+	if resp == nil {
+		t.Fatalf("expected HTTP response for rejected upgrade, got err=%v", dialErr)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+	if got := manager.FindByUserDevice("user-ws-query", "web"); got != nil {
+		t.Fatal("query token must not register a Hub WebSocket session")
+	}
+}
+
+func TestWebSocketRouteAcceptsHubLocalBearerTokenBeforeUpgrade(t *testing.T) {
+	token, err := jwtutil.GenerateAccessToken("user-ws-bearer", "web", "device-ws-bearer", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, _, dialErr := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
+	})
+	if dialErr != nil {
+		t.Fatalf("dial websocket with bearer: %v", dialErr)
+	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	frame := readFrame(t, conn)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
 	}
-	if got := manager.FindByUserDevice("user-ws-query", "web"); got == nil {
-		t.Fatal("expected Hub-local query token to register WebSocket session")
+	if got := manager.FindByUserDevice("user-ws-bearer", "web"); got == nil {
+		t.Fatal("expected Hub-local bearer token to register WebSocket session")
+	}
+}
+
+func TestWebSocketRouteAcceptsSubprotocolTokenBeforeUpgrade(t *testing.T) {
+	token, err := jwtutil.GenerateAccessToken("user-ws-proto", "web", "device-ws-proto", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, _, dialErr := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		// coder/websocket maps Subprotocols to Sec-WebSocket-Protocol.
+		// Prefer explicit access_token.<jwt> form so the JWT is not split on commas.
+		Subprotocols: []string{"access_token." + token},
+	})
+	if dialErr != nil {
+		t.Fatalf("dial websocket with subprotocol: %v", dialErr)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	frame := readFrame(t, conn)
+	if frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	}
+	if got := manager.FindByUserDevice("user-ws-proto", "web"); got == nil {
+		t.Fatal("expected subprotocol token to register WebSocket session")
 	}
 }
 
