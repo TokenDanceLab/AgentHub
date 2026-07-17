@@ -6,7 +6,7 @@
 // flat service package (agent_dispatch.go); the Payload DTO lives here with a
 // thin same-package alias so redispatch JSON stays stable.
 //
-// See docs/analysis/hub-service-boundary-map.md (#800 residual continue;
-// #789 residual continue; #779 residual continue; #768 residual continue;
-// #756 pure surface; #732 pure residual; ports residual #617).
+// See docs/analysis/hub-service-boundary-map.md (#811 residual continue;
+// #800 residual continue; #789 residual continue; #779 residual continue;
+// #768 residual continue; #756 pure surface; #732 pure residual; ports residual #617).
 package dispatch
