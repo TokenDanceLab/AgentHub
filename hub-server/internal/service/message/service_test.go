@@ -1,8 +1,11 @@
-package service
+package message
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,12 +13,41 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
-// mockMsgCache implements messageCache for testing.
+
+func newTestBus(t *testing.T) *service.Bus {
+	t.Helper()
+	b, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(b.Close)
+	return b
+}
+
+func newMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
+	t.Helper()
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherFunc(func(expectedSQL, actualSQL string) error {
+		if strings.Contains(actualSQL, expectedSQL) {
+			return nil
+		}
+		return fmt.Errorf("expected SQL containing %q, got %q", expectedSQL, actualSQL)
+	})))
+	require.NoError(t, err)
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            false,
+	})
+	require.NoError(t, err)
+	return gormDB, mock, sqlDB
+}
+
 type mockMsgCache struct {
 	seq int64
 	err error
@@ -25,30 +57,30 @@ func (m *mockMsgCache) AllocateSeq(ctx context.Context, sessionID string) (int64
 	return m.seq, m.err
 }
 
-// recordingMsgBus is a messageBus test double that records Publish calls.
+// recordingMsgBus is a Bus test double that records Publish calls.
 type recordingMsgBus struct {
-	events []Event
+	events []service.Event
 }
 
-func (b *recordingMsgBus) Publish(ctx context.Context, event Event) {
+func (b *recordingMsgBus) Publish(ctx context.Context, event service.Event) {
 	b.events = append(b.events, event)
 }
 
-func TestMessageService_NilBusPublishIsNoop(t *testing.T) {
-	svc := &MessageService{db: nil, bus: nil, cacheClient: &mockMsgCache{seq: 1}}
+func TestService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &Service{db: nil, bus: nil, cacheClient: &mockMsgCache{seq: 1}}
 	// Must not panic when bus port is unset (read-only/partial construction).
-	svc.publish(context.Background(), Event{Type: "message.new", Payload: "x"})
+	svc.publish(context.Background(), service.Event{Type: "message.new", Payload: "x"})
 }
 
-func TestMessageService_SetBusAndSetCachePorts(t *testing.T) {
+func TestService_SetBusAndSetCachePorts(t *testing.T) {
 	bus := &recordingMsgBus{}
 	cache := &mockMsgCache{seq: 9}
-	svc := NewMessageService(nil, nil, nil)
+	svc := NewService(nil, nil, nil)
 	require.NotNil(t, svc)
 
 	svc.SetBus(bus)
 	svc.SetCache(cache)
-	svc.publish(context.Background(), Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
+	svc.publish(context.Background(), service.Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
 
 	require.Len(t, bus.events, 1)
 	assert.Equal(t, "message.read", bus.events[0].Type)
@@ -76,7 +108,7 @@ func TestSendMessage_InvalidContentType(t *testing.T) {
 	db, _, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "invalid_type",
@@ -89,7 +121,7 @@ func TestSendMessage_InvalidContentJSON(t *testing.T) {
 	db, _, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 
 	// Missing required "text" field for code type
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
@@ -147,7 +179,7 @@ func TestSendMessage_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "text",
@@ -170,7 +202,7 @@ func TestSendMessage_SessionDissolved(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved"}).
 			AddRow("sess-1", "group", true))
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "code",
@@ -202,7 +234,7 @@ func TestSendMessage_BlockedByReceiver(t *testing.T) {
 		WithArgs("other-user", "user-1", "blocked").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "text",
@@ -231,7 +263,7 @@ func TestSendMessage_DuplicateClientMsgID(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "content", "created_at"}).
 			AddRow("existing-msg", "sess-1", 42, "msg-1", "hello", now))
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "text",
@@ -274,7 +306,7 @@ func TestSendMessage_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 42}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 42}}
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "text",
@@ -317,7 +349,7 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 99}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 99}}
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-c",
 		ContentType: "code",
@@ -333,7 +365,7 @@ func TestSendMessage_NormalizesNonTextContentBeforeJsonbWrite(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
 	seedMessageSessionMember(t, db, "sess-code", "user-1")
 
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 5}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 5}}
 	resp, err := svc.SendMessage(context.Background(), "sess-code", "user-1", SendMessageRequest{
 		ClientMsgID: "11111111-1111-4111-8111-111111111111",
 		ContentType: "code",
@@ -353,7 +385,7 @@ func TestSendMessage_RejectsInvalidDeployCardJSONBeforeDBLookup(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
 
-	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	svc := &Service{db: db, cacheClient: &mockMsgCache{seq: 1}}
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-deploy-card",
 		ContentType: "deploy_card",
@@ -365,7 +397,7 @@ func TestSendMessage_RejectsInvalidDeployCardJSONBeforeDBLookup(t *testing.T) {
 
 func TestSendMessage_FileContentRecordsAttachmentReference(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
 	ctx := context.Background()
 
 	if err := db.Exec(`INSERT INTO sessions (id, type, next_seq, dissolved) VALUES ('sess-file', 'group', 0, 0)`).Error; err != nil {
@@ -399,7 +431,7 @@ func TestSendMessage_FileContentRecordsAttachmentReference(t *testing.T) {
 
 func TestSendMessage_ImageContentWithAttachmentIDRecordsAndReadsAttachment(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 10}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 10}}
 	ctx := context.Background()
 
 	seedMessageSessionMember(t, db, "sess-image", "user-1")
@@ -432,7 +464,7 @@ func TestSendMessage_ImageContentWithAttachmentIDRecordsAndReadsAttachment(t *te
 
 func TestSendMessage_ImageContentWithURLDoesNotRequireAttachment(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 11}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 11}}
 	ctx := context.Background()
 
 	seedMessageSessionMember(t, db, "sess-image-url", "user-1")
@@ -454,7 +486,7 @@ func TestSendMessage_ImageContentWithURLDoesNotRequireAttachment(t *testing.T) {
 
 func TestSendMessage_FileContentRejectsInvalidAttachmentID(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 8}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 8}}
 	ctx := context.Background()
 
 	if err := db.Exec(`INSERT INTO sessions (id, type, next_seq, dissolved) VALUES ('sess-file-invalid', 'group', 0, 0)`).Error; err != nil {
@@ -474,7 +506,7 @@ func TestSendMessage_FileContentRejectsInvalidAttachmentID(t *testing.T) {
 
 func TestSendMessage_FileContentRejectsAttachmentOwnedByAnotherUser(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 9}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 9}}
 	ctx := context.Background()
 
 	if err := db.Exec(`INSERT INTO sessions (id, type, next_seq, dissolved) VALUES ('sess-file-owned', 'group', 0, 0)`).Error; err != nil {
@@ -527,7 +559,7 @@ func TestSendMessage_NilCacheUsesDBSeqFallback(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := NewMessageService(db, newTestBus(t), nil)
+	svc := NewService(db, newTestBus(t), nil)
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-nil-cache",
 		ContentType: "text",
@@ -549,7 +581,7 @@ func TestRecallMessage_NotFound(t *testing.T) {
 		WithArgs("msg-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.RecallMessage(context.Background(), "msg-99", "user-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -568,7 +600,7 @@ func TestRecallMessage_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -588,7 +620,7 @@ func TestRecallMessage_NotSenderNorOwner(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -608,7 +640,7 @@ func TestRecallMessage_TimeoutForNonOwner(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -632,7 +664,7 @@ func TestRecallMessage_SuccessAsSender(t *testing.T) {
 		WithArgs(true, "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := &MessageService{db: db, bus: newTestBus(t)}
+	svc := &Service{db: db, bus: newTestBus(t)}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -656,7 +688,7 @@ func TestRecallMessage_SuccessAsOwner(t *testing.T) {
 		WithArgs(true, "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := &MessageService{db: db, bus: newTestBus(t)}
+	svc := &Service{db: db, bus: newTestBus(t)}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -672,7 +704,7 @@ func TestPinMessage_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -701,7 +733,7 @@ func TestPinMessage_LimitExceeded(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(50))
 	mock.ExpectRollback()
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -719,7 +751,7 @@ func TestPinMessage_RejectsMessageOutsideSession(t *testing.T) {
 		WithArgs("sess-1", "msg-other", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-other")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -750,7 +782,7 @@ func TestPinMessage_DuplicatePin(t *testing.T) {
 		WillReturnError(errors.New("duplicate key value violates unique constraint"))
 	mock.ExpectRollback()
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -781,7 +813,7 @@ func TestPinMessage_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	svc := &MessageService{db: db, bus: newTestBus(t)}
+	svc := &Service{db: db, bus: newTestBus(t)}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -797,7 +829,7 @@ func TestUnpinMessage_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.UnpinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -815,7 +847,7 @@ func TestUnpinMessage_Success(t *testing.T) {
 		WithArgs("sess-1", "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := &MessageService{db: db, bus: newTestBus(t)}
+	svc := &Service{db: db, bus: newTestBus(t)}
 	err := svc.UnpinMessage(context.Background(), "user-1", "sess-1", "msg-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -831,7 +863,7 @@ func TestGetMessages_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	_, err := svc.GetMessages(context.Background(), "sess-1", "user-1", 0, 50)
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -851,7 +883,7 @@ func TestGetMessages_Success(t *testing.T) {
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-1", "text", `{"text":"hello"}`, false, time.Now()).
 			AddRow("msg-2", "sess-1", 2, "c2", "user", "user-2", "text", `{"text":"hi"}`, false, time.Now()))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	msgs, err := svc.GetMessages(context.Background(), "sess-1", "user-1", 0, 50)
 	require.NoError(t, err)
 	assert.Len(t, msgs, 2)
@@ -862,7 +894,7 @@ func TestGetMessages_Success(t *testing.T) {
 
 func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 
 	seedMessageSessionMember(t, db, "sess-read-attachments", "reader-1")
 	require.NoError(t, db.Exec(`INSERT INTO messages (
@@ -898,7 +930,7 @@ func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T)
 
 func TestForwardMessage_PreservesOriginalSenderIdentity(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
-	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
 	ctx := context.Background()
 
 	seedMessageSessionMember(t, db, "sess-forward-src", "forwarder-1")
@@ -936,7 +968,7 @@ func TestMarkRead_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -960,7 +992,7 @@ func TestMarkRead_Success(t *testing.T) {
 		WithArgs(42, "sess-1", "user", "user-1", 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := &MessageService{db: db, bus: newTestBus(t)}
+	svc := &Service{db: db, bus: newTestBus(t)}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -983,7 +1015,7 @@ func TestMarkRead_SeqNotAdvanced(t *testing.T) {
 
 	// No UpdateLastReadSeq and no bus publish expected
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -999,7 +1031,7 @@ func TestListPinnedMessages_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	_, err := svc.ListPinnedMessages(context.Background(), "user-1", "sess-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -1017,7 +1049,7 @@ func TestListPinnedMessages_Empty(t *testing.T) {
 		WithArgs("sess-1", 100).
 		WillReturnRows(sqlmock.NewRows([]string{"session_id", "message_id", "pinned_by_user_id", "pinned_at"}))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	pins, err := svc.ListPinnedMessages(context.Background(), "user-1", "sess-1")
 	require.NoError(t, err)
 	assert.Empty(t, pins)
@@ -1042,7 +1074,7 @@ func TestListPinnedMessages_WithPins(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	pins, err := svc.ListPinnedMessages(context.Background(), "user-1", "sess-1")
 	require.NoError(t, err)
 	assert.Len(t, pins, 1)
@@ -1069,7 +1101,7 @@ func TestListPinnedMessages_FiltersMessagesOutsideSession(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
-	svc := &MessageService{db: db}
+	svc := &Service{db: db}
 	pins, err := svc.ListPinnedMessages(context.Background(), "user-1", "sess-1")
 	require.NoError(t, err)
 	require.Len(t, pins, 1)
