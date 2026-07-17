@@ -206,11 +206,8 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	defer e.mu.Unlock()
 
 	current, ok := e.store.GetRun(run.ID)
-	if !ok {
-		return store.ErrNotFound
-	}
-	if !isQueuedRunStatus(current.Status) {
-		return ErrRunAlreadyStarted
+	if err := validateStartRunState(ok, current.Status); err != nil {
+		return err
 	}
 
 	_, alreadyRunning := e.running[run.ID]
@@ -237,11 +234,8 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 // cancelled). Cancel is safe to call on a run that has already finished.
 func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	run, ok := e.store.GetRun(runID)
-	if !ok {
-		return cancelResultNotFound()
-	}
-	if !isCancellableRunStatus(run.Status) {
-		return cancelResultWithRun(run)
+	if early, proceed := cancelPrecheck(run, ok); !proceed {
+		return early
 	}
 
 	// Send adapter-specific interrupt via stdin before canceling context.
@@ -256,8 +250,8 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	}
 	cancel, ok := e.running[runID]
 	e.mu.Unlock()
-	if !ok {
-		return cancelResultNotRunning()
+	if early, proceed := cancelRunningLookup(ok); !proceed {
+		return early
 	}
 
 	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
@@ -370,7 +364,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				return // run never started (early failure before cmd.Start)
 			}
 			r, ok := e.store.GetRun(run.ID)
-			if !ok {
+			if !shouldRecordFinishMetricsForRun(ok) {
 				return
 			}
 			e.metrics.RecordRunFinish(adapterLabel, r.Status, time.Since(runStartTime).Seconds())
@@ -501,7 +495,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
 		// eagerly when neither mechanism requires stdin.
 		if shouldCloseStdinAfterStart(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil) {
-			_ = stdin.Close()
+			if shouldCloseStdinPipe(stdin != nil) {
+				_ = stdin.Close()
+			}
 			e.mu.Lock()
 			delete(e.stdins, run.ID)
 			e.mu.Unlock()
@@ -603,13 +599,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// Clean up the tracked process from this attempt before retrying.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
-			if s, ok := e.runOutputs[run.ID]; ok {
+			if s, ok := e.runOutputs[run.ID]; shouldCloseTrackedRunOutput(ok) {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
 			e.mu.Unlock()
 			// Reset run status back to queued so the retry can transition to started.
-			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok {
+			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); shouldResetSessionRetryStatus(ok) {
 				slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
 			}
 			continue
@@ -647,7 +643,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// of finished, and the full evidence output is stored in run metadata.
 		gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir)
 		finalStatus := resolveEvidenceFinalStatus(gateEnabled, true)
-		if gateEnabled {
+		if shouldRunEvidenceGate(gateEnabled) {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
 			finalStatus = resolveEvidenceFinalStatus(true, evidenceResult.Passed)
@@ -675,26 +671,26 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 	if shouldAttemptFaultEscalation(lastWaitErr, e.faultEscalationCfg) {
 		r, ok := e.store.GetRun(run.ID)
-		if ok && shouldFaultEscalateRetry(e.faultEscalationCfg, r.RetryCount) {
+		if shouldAcceptFaultEscalationRetry(ok, e.faultEscalationCfg, r.RetryCount) {
 			newCount := nextFaultEscalationRetryCount(r.RetryCount)
 			e.store.SetRunRetryCount(run.ID, newCount)
 			run.RetryCount = newCount
 			// Re-queue from started (normal wait failure) or failed (defensive).
-			if _, ok2 := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok2 {
-				run.Status = "queued"
-			}
-			// Attempt-local cleanup only — leave concurrency slot / hub bookkeeping
+			// Status mutation only - #867 successor handoff stays below.
+			_, requeued := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed")
+			run = applyFaultEscalationQueuedStatus(run, requeued)
+			// Attempt-local cleanup only - leave concurrency slot / hub bookkeeping
 			// for the successor attempt. Terminal finish is owned by the successor.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
-			if s, ok3 := e.runOutputs[run.ID]; ok3 {
+			if s, ok3 := e.runOutputs[run.ID]; shouldCloseTrackedRunOutput(ok3) {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
 			// Re-register the cancel func before releasing the slot ownership so
 			// Cancel() and max-concurrent accounting stay consistent across handoff.
 			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
-			if oldCancel, ok4 := e.running[run.ID]; ok4 {
+			if oldCancel, ok4 := e.running[run.ID]; shouldInvokeOldCancelOnEscalationHandoff(ok4) {
 				oldCancel()
 			}
 			e.running[run.ID] = cancel
@@ -742,7 +738,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					}
 				}
 				if shouldWriteRunOutputStore(outStore != nil, len(allowed)) {
-					if _, err := outStore.Write(text); err != nil {
+					if _, err := outStore.Write(text); shouldLogRunOutputStoreWriteFailure(err) {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 					}
 				}
@@ -794,7 +790,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
-	if err != nil {
+	if shouldLogAgentFailurePersistError(err) {
 		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "error", err)
 		return
 	}
@@ -857,7 +853,7 @@ func (e *ProcessExecutor) finish(runID string) {
 		delete(e.cancelDone, runID)
 	}
 	if s, ok := e.runOutputs[runID]; shouldCloseTrackedRunOutput(ok) {
-		if err := s.Close(); err != nil {
+		if err := s.Close(); shouldLogRunOutputStoreCloseFailure(err) {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
 		delete(e.runOutputs, runID)
@@ -905,7 +901,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	e.mu.Lock()
 	agentID, ok := e.runToAgent[runID]
 	e.mu.Unlock()
-	if !ok {
+	if !shouldLookupSubAgentMapping(ok) {
 		return
 	}
 
@@ -1034,14 +1030,14 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// MaxChildrenPerAgent=5.
 	slotReserved := false
 	if shouldReserveSpawnSlot(e.agentRegistry != nil) {
-		if err := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); err != nil {
+		if reserveErr := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); shouldLogSpawnSlotRejection(reserveErr) {
 			slog.Warn("spawn slot rejected",
 				"parentRunId", parentRun.ID,
 				"taskId", task.TaskID,
 				"depth", task.Depth,
-				"error", err,
+				"error", reserveErr,
 			)
-			return "", "", err
+			return "", "", reserveErr
 		}
 		slotReserved = true
 	}
@@ -1055,8 +1051,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		}
 	}()
 
-	runID = subAgentRunID(task.TaskID)
-	agentInstanceID = subAgentInstanceID(task.TaskID)
+	runID, agentInstanceID = subAgentSpawnIDs(task.TaskID)
 
 	// Resolve ThreadID: each sub-agent MUST have its own distinct thread so
 	// that its context space is fully isolated from the parent. If the task
@@ -1065,10 +1060,9 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// This prevents context contamination between parent and child.
 	threadID := resolveSubAgentThreadID(parentRun.ThreadID, runID, task.ThreadID)
 
-	//
 	// Create the run in the store
 	run, createErr := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
-	if createErr != nil {
+	if shouldLogSubAgentCreateFailure(createErr) {
 		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", createErr)
 		err = createErr
 		return "", "", err
@@ -1081,7 +1075,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	registered := false
 	if shouldRegisterSubAgentInstance(e.agentRegistry != nil) {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
-		if regErr := e.agentRegistry.Register(inst); regErr != nil {
+		if regErr := e.agentRegistry.Register(inst); shouldLogSubAgentRegisterFailure(regErr) {
 			slog.Warn("failed to register sub-agent instance in registry",
 				"agentInstanceId", agentInstanceID,
 				"error", regErr,
@@ -1096,7 +1090,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 
 	// Build run context with the task prompt, target agent, and an isolated
 	// context budget allocated from the parent via AllocateChild.
-	// The child budget is independent — it does NOT reference the parent's
+	// The child budget is independent - it does NOT reference the parent's
 	// UsedTokens counter, so the child's token consumption never pollutes
 	// the parent's budget tracking.
 	runCtx := newSubAgentRunContext(run, task, threadID)
@@ -1120,7 +1114,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Unlock()
 
 	// Start the run
-	if startErr := e.Start(run, runCtx); startErr != nil {
+	if startErr := e.Start(run, runCtx); shouldClearRunAgentMappingOnStartFailure(startErr) {
 		slog.Error("failed to start sub-agent run", "runId", runID, "error", startErr)
 		e.mu.Lock()
 		delete(e.runToAgent, runID)
