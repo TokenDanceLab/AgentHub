@@ -543,3 +543,145 @@ func TestCollectKeysByRunID(t *testing.T) {
 		t.Fatalf("missing d3 in %#v", got)
 	}
 }
+
+func TestCollectKeysByThreadID(t *testing.T) {
+	t.Parallel()
+	runs := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1"},
+		"r2": {ID: "r2", ThreadID: "t2"},
+		"r3": {ID: "r3", ThreadID: "t1"},
+	}
+	got := collectKeysByThreadID(runs, "t1", func(run Run) string { return run.ThreadID })
+	if len(got) != 2 {
+		t.Fatalf("collectKeysByThreadID = %#v", got)
+	}
+	if _, ok := got["r1"]; !ok {
+		t.Fatalf("missing r1 in %#v", got)
+	}
+	if _, ok := got["r3"]; !ok {
+		t.Fatalf("missing r3 in %#v", got)
+	}
+}
+
+func TestOrderWithoutRemovedAndKeepPresent(t *testing.T) {
+	t.Parallel()
+	// filterIDs reuses the backing array; use independent inputs per call.
+	got := orderWithoutRemoved([]string{"a", "b", "c", "d"}, map[string]struct{}{"b": {}, "d": {}})
+	want := []string{"a", "c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("orderWithoutRemoved = %#v, want %#v", got, want)
+	}
+
+	items := map[string]int{"a": 1, "c": 3}
+	kept := orderKeepPresent([]string{"a", "b", "c", "d"}, items)
+	if !reflect.DeepEqual(kept, want) {
+		t.Fatalf("orderKeepPresent = %#v, want %#v", kept, want)
+	}
+}
+
+func TestScopedLookups(t *testing.T) {
+	t.Parallel()
+	threads := map[string]Thread{
+		"t1": {ID: "t1", ProjectID: "p1"},
+		"t2": {ID: "t2", ProjectID: "p2"},
+	}
+	if _, ok := lookupThreadInProject(threads, "t1", "p1"); !ok {
+		t.Fatal("lookupThreadInProject match should succeed")
+	}
+	if _, ok := lookupThreadInProject(threads, "t1", "p2"); ok {
+		t.Fatal("lookupThreadInProject project mismatch should fail")
+	}
+	if _, ok := lookupThreadInProject(threads, "missing", "p1"); ok {
+		t.Fatal("lookupThreadInProject missing should fail")
+	}
+
+	runs := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1"},
+	}
+	if _, ok := lookupRunInThread(runs, "r1", "t1"); !ok {
+		t.Fatal("lookupRunInThread match should succeed")
+	}
+	if _, ok := lookupRunInThread(runs, "r1", "t2"); ok {
+		t.Fatal("lookupRunInThread thread mismatch should fail")
+	}
+
+	items := map[string]Item{
+		"i1": {ID: "i1", ThreadID: "t1"},
+	}
+	if _, ok := lookupItemInThread(items, "i1", "t1"); !ok {
+		t.Fatal("lookupItemInThread match should succeed")
+	}
+	if _, ok := lookupItemInThread(items, "i1", "t2"); ok {
+		t.Fatal("lookupItemInThread thread mismatch should fail")
+	}
+}
+
+func TestExistingThreadConflict(t *testing.T) {
+	t.Parallel()
+	if !existingThreadConflict(Thread{ProjectID: "p1"}, "p2") {
+		t.Fatal("different project should conflict")
+	}
+	if existingThreadConflict(Thread{ProjectID: "p1"}, "p1") {
+		t.Fatal("same project should not conflict")
+	}
+}
+
+func TestTouchAgentProfileAndEnsureSettingsMap(t *testing.T) {
+	t.Parallel()
+	profile := touchAgentProfile(AgentProfile{ID: "a1", Name: "Coder", CreatedAt: "old"}, "now")
+	if profile.UpdatedAt != "now" || profile.CreatedAt != "old" || profile.Name != "Coder" {
+		t.Fatalf("touchAgentProfile = %#v", profile)
+	}
+
+	if got := ensureSettingsMap(nil); got == nil || len(got) != 0 {
+		t.Fatalf("ensureSettingsMap(nil) = %#v", got)
+	}
+	src := map[string]string{"theme": "dark"}
+	if got := ensureSettingsMap(src); got["theme"] != "dark" {
+		t.Fatalf("ensureSettingsMap keep = %#v", got)
+	}
+	// Same map identity when non-nil.
+	if got := ensureSettingsMap(src); &got == nil {
+		t.Fatal("unexpected nil")
+	}
+}
+
+func TestResolveCleanupNow(t *testing.T) {
+	t.Parallel()
+	fallback := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	if got := resolveCleanupNow(time.Time{}, fallback); !got.Equal(fallback) {
+		t.Fatalf("zero now should use fallback, got %v", got)
+	}
+	pinned := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	if got := resolveCleanupNow(pinned, fallback); !got.Equal(pinned) {
+		t.Fatalf("non-zero now should be kept, got %v", got)
+	}
+}
+
+func TestCollectRunEvidenceKeys(t *testing.T) {
+	t.Parallel()
+	diffs := map[string]RunDiffFile{
+		"d1": {RunID: "r1"},
+		"d2": {RunID: "r2"},
+	}
+	artifacts := map[string]Artifact{
+		"a1": {ID: "a1", RunID: "r1"},
+		"a2": {ID: "a2", RunID: "r9"},
+	}
+	previews := map[string]Preview{
+		"p1": {ID: "p1", RunID: "r1"},
+	}
+	diffKeys, artifactKeys, previewKeys := collectRunEvidenceKeys(diffs, artifacts, previews, "r1")
+	if len(diffKeys) != 1 || len(artifactKeys) != 1 || len(previewKeys) != 1 {
+		t.Fatalf("keys = diffs=%#v arts=%#v previews=%#v", diffKeys, artifactKeys, previewKeys)
+	}
+	if _, ok := diffKeys["d1"]; !ok {
+		t.Fatalf("missing d1: %#v", diffKeys)
+	}
+	if _, ok := artifactKeys["a1"]; !ok {
+		t.Fatalf("missing a1: %#v", artifactKeys)
+	}
+	if _, ok := previewKeys["p1"]; !ok {
+		t.Fatalf("missing p1: %#v", previewKeys)
+	}
+}
