@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -11,19 +11,20 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/workspace"
 )
 
-// WorkspaceService is the subset of *service.WorkspaceService used by WorkspaceHandler.
+// WorkspaceService is the subset of *workspace.Service used by WorkspaceHandler.
+// DTOs live in service/workspace (#673 second IM typed-service package).
 type WorkspaceService interface {
 	Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error)
 	Get(ctx context.Context, id, ownerID string) (*model.Workspace, error)
-	Update(ctx context.Context, id, ownerID string, req *service.WorkspaceUpdate) (*model.Workspace, error)
-	List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*service.WorkspaceListResult, error)
-	ListThreads(ctx context.Context, projectID, ownerID string) ([]service.WorkspaceThread, error)
-	CreateThread(ctx context.Context, projectID, ownerID string, req *service.CreateWorkspaceThreadRequest) (*service.WorkspaceThread, error)
-	CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req service.SendWorkspaceThreadMessageRequest) (*service.WorkspaceThreadMessage, error)
-	ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]service.WorkspaceThreadMessage, error)
+	Update(ctx context.Context, id, ownerID string, req *workspace.WorkspaceUpdate) (*model.Workspace, error)
+	List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*workspace.WorkspaceListResult, error)
+	ListThreads(ctx context.Context, projectID, ownerID string) ([]workspace.WorkspaceThread, error)
+	CreateThread(ctx context.Context, projectID, ownerID string, req *workspace.CreateWorkspaceThreadRequest) (*workspace.WorkspaceThread, error)
+	CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req workspace.SendWorkspaceThreadMessageRequest) (*workspace.WorkspaceThreadMessage, error)
+	ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]workspace.WorkspaceThreadMessage, error)
 }
 
 type WorkspaceHandler struct {
@@ -51,7 +52,7 @@ func (h *WorkspaceHandler) CreateWorkspace(c *gin.Context) {
 		return
 	}
 
-	workspace, err := h.service.Create(c.Request.Context(), c.GetString("user_id"), &model.Workspace{
+	ws, err := h.service.Create(c.Request.Context(), c.GetString("user_id"), &model.Workspace{
 		Name:        req.Name,
 		Description: req.Description,
 	})
@@ -64,11 +65,11 @@ func (h *WorkspaceHandler) CreateWorkspace(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	c.JSON(http.StatusOK, Response{Code: errcode.OK.Code, Data: workspace})
+	c.JSON(http.StatusOK, Response{Code: errcode.OK.Code, Data: ws})
 }
 
 func (h *WorkspaceHandler) GetWorkspace(c *gin.Context) {
-	workspace, err := h.service.Get(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	ws, err := h.service.Get(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -78,7 +79,7 @@ func (h *WorkspaceHandler) GetWorkspace(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, workspace)
+	OK(c, ws)
 }
 
 func (h *WorkspaceHandler) ListWorkspaces(c *gin.Context) {
@@ -112,7 +113,7 @@ func (h *WorkspaceHandler) UpdateWorkspace(c *gin.Context) {
 		return
 	}
 
-	workspace, err := h.service.Update(c.Request.Context(), c.Param("id"), c.GetString("user_id"), &service.WorkspaceUpdate{
+	ws, err := h.service.Update(c.Request.Context(), c.Param("id"), c.GetString("user_id"), &workspace.WorkspaceUpdate{
 		Name:        req.Name,
 		Description: req.Description,
 	})
@@ -125,7 +126,7 @@ func (h *WorkspaceHandler) UpdateWorkspace(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, workspace)
+	OK(c, ws)
 }
 
 type createProjectThreadReq struct {
@@ -152,7 +153,7 @@ func (h *WorkspaceHandler) CreateProjectThread(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	thread, err := h.service.CreateThread(c.Request.Context(), c.Param("id"), c.GetString("user_id"), &service.CreateWorkspaceThreadRequest{
+	thread, err := h.service.CreateThread(c.Request.Context(), c.Param("id"), c.GetString("user_id"), &workspace.CreateWorkspaceThreadRequest{
 		Name: req.Name,
 	})
 	if err != nil {
@@ -168,7 +169,7 @@ func (h *WorkspaceHandler) CreateProjectThread(c *gin.Context) {
 }
 
 func (h *WorkspaceHandler) CreateProjectThreadMessage(c *gin.Context) {
-	var req service.SendWorkspaceThreadMessageRequest
+	var req workspace.SendWorkspaceThreadMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)
 		return
