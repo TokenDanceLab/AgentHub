@@ -117,7 +117,7 @@
 }
 
 .artifactInfo:focus-visible {
-  outline: 1px solid var(--color-primary, #5d68cc);
+  outline: 1px solid var(--primary);
 }
 
 .artifactPath {

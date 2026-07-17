@@ -89,7 +89,7 @@
 }
 
 .healthDotGreen {
-  background: var(--color-success);
+  background: var(--success);
 }
 
 .healthDotYellow {
@@ -97,7 +97,7 @@
 }
 
 .healthDotRed {
-  background: var(--color-danger);
+  background: var(--danger);
 }
 
 /* ── Recent threads section ────────────── */
