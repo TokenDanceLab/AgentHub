@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
 func newMockDBAgent(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
@@ -158,7 +159,7 @@ func TestPromptFromMessage_TextPayload(t *testing.T) {
 		Content:     `{"text":"Run real Codex against this repo"}`,
 	}
 
-	require.Equal(t, "Run real Codex against this repo", promptFromMessage(msg))
+	require.Equal(t, "Run real Codex against this repo", dispatch.PromptFromMessage(msg))
 }
 
 func TestDispatchTaskIncludesPrompt(t *testing.T) {
@@ -921,7 +922,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 }
 
 func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
-	merged := mergeModelParams(
+	merged := dispatch.MergeModelParams(
 		`{"model":"claude-sonnet-4-6","reasoning_effort":"medium","permission_mode":"default"}`,
 		`{"reasoning_effort":"high","work_dir":"D:\\Projects\\ExampleAgentHub"}`,
 	)
@@ -941,7 +942,7 @@ func TestSelectAgentInstanceHonorsRequestedRuntime(t *testing.T) {
 		{ID: "agent-opencode", AgentType: "opencode"},
 	}
 
-	selected, err := selectAgentInstance(agents, "", "codex", "")
+	selected, err := dispatch.SelectAgentInstance(agents, "", "codex", "")
 
 	require.NoError(t, err)
 	require.Equal(t, "agent-codex", selected.ID)
@@ -952,7 +953,7 @@ func TestSelectAgentInstanceRejectsMissingRequestedRuntime(t *testing.T) {
 		{ID: "agent-claude", AgentType: "claude-code"},
 	}
 
-	_, err := selectAgentInstance(agents, "", "opencode", "")
+	_, err := dispatch.SelectAgentInstance(agents, "", "opencode", "")
 
 	require.ErrorIs(t, err, errcode.AgentNotFound)
 }
