@@ -20,13 +20,28 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// newJTI returns a cryptographically random JWT ID (jti) for access-token
+// revocation. Opaque base64url; uniqueness is the only requirement.
+func newJTI() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
 func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.Duration) (string, error) {
 	now := time.Now()
+	jti, err := newJTI()
+	if err != nil {
+		return "", fmt.Errorf("mint access jti: %w", err)
+	}
 	claims := Claims{
 		UserID:     userID,
 		DeviceType: deviceType,
 		DeviceID:   deviceID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Issuer:    "agenthub-hub",
 			Audience:  jwt.ClaimStrings{"agenthub-api"},
 			Subject:   userID,
@@ -260,11 +275,16 @@ func (km *KeyManager) SetActiveKey(kid string) error {
 // SignAccessToken builds and signs an access token with the active key.
 func (km *KeyManager) SignAccessToken(userID, deviceType, deviceID string, ttl time.Duration) (string, error) {
 	now := time.Now()
+	jti, err := newJTI()
+	if err != nil {
+		return "", fmt.Errorf("mint access jti: %w", err)
+	}
 	claims := &Claims{
 		UserID:     userID,
 		DeviceType: deviceType,
 		DeviceID:   deviceID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Issuer:    "agenthub-hub",
 			Audience:  jwt.ClaimStrings{"agenthub-api"},
 			Subject:   userID,

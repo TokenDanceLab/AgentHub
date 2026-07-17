@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -518,6 +519,103 @@ func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks 
 func tokenDanceMiddlewareKID(pub *rsa.PublicKey) string {
 	hash := sha256.Sum256(pub.N.Bytes())
 	return base64.RawURLEncoding.EncodeToString(hash[:16])
+}
+
+type stubAccessBlacklist struct {
+	blacklisted map[string]bool
+}
+
+func (s stubAccessBlacklist) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
+	return s.blacklisted[jti], nil
+}
+
+func TestAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
+	token := makeToken("user-bl", "desktop", "dev-bl")
+	claims, err := jwtutil.ParseToken(token, testSecret())
+	if err != nil {
+		t.Fatalf("ParseToken: %v", err)
+	}
+	if claims.ID == "" {
+		t.Fatal("expected minted jti")
+	}
+	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}})
+	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
+
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+	if !c.IsAborted() {
+		t.Fatal("expected blacklisted access jti to be rejected")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestWSAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
+	token := makeToken("user-ws-bl", "web", "dev-ws-bl")
+	claims, err := jwtutil.ParseToken(token, testSecret())
+	if err != nil {
+		t.Fatalf("ParseToken: %v", err)
+	}
+	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}})
+	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
+
+	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
+	WSAuthMiddleware(testConfig())(c)
+	if !c.IsAborted() {
+		t.Fatal("expected blacklisted access jti to be rejected on WS")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestAuthMiddlewareAcceptsLegacyTokenWithoutJTI(t *testing.T) {
+	// Legacy product token: no RegisteredClaims.ID (pre-#888).
+	now := time.Now()
+	legacyClaims := jwtutil.Claims{
+		UserID:     "user-legacy",
+		DeviceType: "desktop",
+		DeviceID:   "dev-legacy",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-api"},
+			Subject:   "user-legacy",
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, legacyClaims).SignedString([]byte(testSecret()))
+	if err != nil {
+		t.Fatalf("sign legacy: %v", err)
+	}
+	// Even with a blacklist checker present, missing jti is accept-with-log.
+	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{"any": true}})
+	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
+
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+	if c.IsAborted() {
+		t.Fatalf("legacy missing-jti token must be accepted, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("user_id"); got != "user-legacy" {
+		t.Fatalf("user_id = %q, want user-legacy", got)
+	}
+	if got := c.GetString("access_jti"); got != "" {
+		t.Fatalf("access_jti = %q, want empty for legacy", got)
+	}
+}
+
+func TestAuthMiddlewareSetsAccessJTI(t *testing.T) {
+	token := makeToken("user-jti", "mobile", "dev-jti")
+	c, _ := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	AuthMiddleware(testConfig())(c)
+	if c.IsAborted() {
+		t.Fatal("expected auth success")
+	}
+	if got := c.GetString("access_jti"); got == "" {
+		t.Fatal("expected access_jti context value from minted jti")
+	}
 }
 
 // --- DeviceTypeCheck tests ---

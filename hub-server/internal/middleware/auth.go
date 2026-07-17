@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -16,6 +17,22 @@ import (
 // audit events. Set by the app during initialization to wire the AuditService
 // into middleware without creating import cycles.
 var AuditPermissionFn func(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string)
+
+// AccessTokenBlacklistChecker is the subset of cache used to reject revoked
+// access JWTs by jti after logout (#888). Optional: when nil, blacklist checks
+// are skipped (unit tests without Redis).
+type AccessTokenBlacklistChecker interface {
+	IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error)
+}
+
+// accessTokenBlacklist is set during app wiring; nil means no blacklist check.
+var accessTokenBlacklist AccessTokenBlacklistChecker
+
+// SetAccessTokenBlacklist wires the Redis-backed access-token jti blacklist
+// checker used by AuthMiddleware and WSAuthMiddleware. Pass nil to disable.
+func SetAccessTokenBlacklist(c AccessTokenBlacklistChecker) {
+	accessTokenBlacklist = c
+}
 
 // AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
 // classifies the auth source.
@@ -69,6 +86,9 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if !acceptAccessClaims(c, claims) {
+			return
+		}
 		setHubLocalClaims(c, claims)
 		if !enforceHubSession(c) {
 			return
@@ -78,7 +98,7 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 }
 
 // validateToken is a shared helper that validates a JWT token string and sets
-// Gin context values. Used by both AuthMiddleware and WSAuthMiddleware.
+// Gin context values. Used by AuthMiddleware.
 func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
 	if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
@@ -103,17 +123,22 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 		c.Abort()
 		return
 	}
+	if !acceptAccessClaims(c, claims) {
+		return
+	}
 	setHubLocalClaims(c, claims)
 	c.Next()
 }
 
 // setHubLocalClaims injects Hub product-session identity into the Gin context.
 // Purpose is recorded so enforceHubSession can re-check the product gate.
+// access_jti is set when the access token carries a jti (#888).
 func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 	c.Set("user_id", claims.UserID)
 	c.Set("device_type", claims.DeviceType)
 	c.Set("device_id", claims.DeviceID)
 	c.Set("purpose", claims.Purpose)
+	c.Set("access_jti", claims.ID)
 	c.Set("auth_source", "hub_local")
 }
 
@@ -152,6 +177,39 @@ func enforceHubSession(c *gin.Context) bool {
 	fail(c, errcode.ErrForbidden)
 	c.Abort()
 	return false
+}
+
+// acceptAccessClaims enforces the access-token jti blacklist after ParseToken
+// (#888). Policy for legacy tokens without jti: accept-with-log for
+// compatibility until those tokens expire naturally.
+func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
+	if claims.ID == "" {
+		slog.Info("access jwt missing jti; accepting legacy token until TTL",
+			"user_id", claims.UserID,
+			"device_id", claims.DeviceID,
+			"path", c.FullPath(),
+		)
+		return true
+	}
+	if accessTokenBlacklist == nil {
+		return true
+	}
+	blacklisted, err := accessTokenBlacklist.IsAccessTokenBlacklisted(c.Request.Context(), claims.ID)
+	if err != nil {
+		// Checker already fail-opens on Redis errors; treat residual errors as open.
+		slog.Warn("access jti blacklist check error, fail-open", "jti", claims.ID, "error", err)
+		return true
+	}
+	if blacklisted {
+		auditPermission(c, claims.UserID, "auth_validate", false, map[string]interface{}{
+			"reason": "access_jti_blacklisted",
+			"path":   c.FullPath(),
+		}, c.ClientIP())
+		fail(c, errcode.AuthInvalidToken)
+		c.Abort()
+		return false
+	}
+	return true
 }
 
 // RequireHubSession is a middleware that requires a Hub-issued local session.

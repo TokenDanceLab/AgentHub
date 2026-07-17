@@ -242,7 +242,7 @@ func TestLogout(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	svc := NewAuthService(db, jwtCfg(), nil)
-	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "")
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -258,7 +258,7 @@ func TestLogout_BlacklistsInRedis(t *testing.T) {
 
 	cacheClient := testCacheClient(t)
 	svc := NewAuthService(db, jwtCfg(), cacheClient)
-	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop")
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
@@ -281,7 +281,7 @@ func TestLogout_WithDeviceType(t *testing.T) {
 
 	cacheClient := testCacheClient(t)
 	svc := NewAuthService(db, jwtCfg(), cacheClient)
-	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop")
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
@@ -303,7 +303,7 @@ func TestLogout_WithoutDeviceType(t *testing.T) {
 
 	cacheClient := testCacheClient(t)
 	svc := NewAuthService(db, jwtCfg(), cacheClient)
-	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "")
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
@@ -313,6 +313,32 @@ func TestLogout_WithoutDeviceType(t *testing.T) {
 	exists, redisErr := cacheClient.GetRDB().Exists(ctx, key).Result()
 	require.NoError(t, redisErr)
 	assert.Equal(t, int64(1), exists)
+}
+
+// #888: Logout blacklists access token jti so middleware can reject it immediately.
+func TestLogout_BlacklistsAccessJTI(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	cacheClient := testCacheClient(t)
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "access-jti-abc")
+	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	ctx := context.Background()
+	key := "at_blacklist:access-jti-abc"
+	exists, redisErr := cacheClient.GetRDB().Exists(ctx, key).Result()
+	require.NoError(t, redisErr)
+	assert.Equal(t, int64(1), exists)
+
+	blacklisted, err := cacheClient.IsAccessTokenBlacklisted(ctx, "access-jti-abc")
+	require.NoError(t, err)
+	assert.True(t, blacklisted)
 }
 
 // ==================== GetMe ====================
@@ -388,4 +414,3 @@ func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
 	assert.Equal(t, "New Name", user.Nickname)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
-
