@@ -46,3 +46,32 @@ func RedeliveryOfflineLogKind(preferDevice bool) string {
 	}
 	return "fallback"
 }
+
+// RedispatchPrepLogMessage returns the historical redispatchDelivery slog message
+// for a prep dead-letter kind (marshal vs unmarshal branch).
+func RedispatchPrepLogMessage(kind string) string {
+	if IsPayloadMarshalDeadLetter(kind) {
+		return "failed to marshal redispatch payload"
+	}
+	return "failed to unmarshal delivery payload for redispatch"
+}
+
+// RedispatchOfflineSuccessLogMessage returns the historical success slog message
+// after PushPendingTask on redispatch fallthrough.
+func RedispatchOfflineSuccessLogMessage(preferDevice bool) string {
+	if preferDevice {
+		return "redispatch: queued to offline queue"
+	}
+	return "redispatch: queued to fallback queue"
+}
+
+// RedispatchOfflineSuccessIncludesUserID is true when the offline-queue success
+// log historically included user_id (device-bound path only).
+func RedispatchOfflineSuccessIncludesUserID(preferDevice bool) bool {
+	return preferDevice
+}
+
+// RedeliveryWSPushSucceeded is true when a redispatch WS push was queued.
+func RedeliveryWSPushSucceeded(queued bool) bool {
+	return queued
+}

@@ -3,7 +3,9 @@ package dispatch
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -157,4 +159,101 @@ func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
 
 	// smoke: queued pending task still builds
 	_ = model.TaskStatusQueued
+}
+
+func TestTriggerGuards(t *testing.T) {
+	assert.Equal(t, "t1", NormalizeOptionalTargetID(" t1 "))
+	assert.True(t, IsEmptyTargetID(""))
+	assert.True(t, IsEmptyTargetID("  "))
+	assert.False(t, IsEmptyTargetID("t1"))
+
+	require.ErrorIs(t, TriggerSessionDissolvedError(true), errcode.SessionDissolved)
+	require.NoError(t, TriggerSessionDissolvedError(false))
+
+	require.ErrorIs(t, TriggerAgentsAvailableError(errors.New("db"), 1), errcode.AgentNotFound)
+	require.ErrorIs(t, TriggerAgentsAvailableError(nil, 0), errcode.AgentNotFound)
+	require.NoError(t, TriggerAgentsAvailableError(nil, 2))
+
+	require.ErrorIs(t, TriggerMemberActiveError(false), errcode.SessionNotMember)
+	require.NoError(t, TriggerMemberActiveError(true))
+}
+
+func TestTargetBoundAndOutboxHelpers(t *testing.T) {
+	assert.True(t, IsTargetBoundConnUsable(true, "u1", DesktopDeviceType, "d1", "u1", "d1"))
+	assert.False(t, IsTargetBoundConnUsable(false, "u1", DesktopDeviceType, "d1", "u1", "d1"))
+	assert.False(t, IsTargetBoundConnUsable(true, "u2", DesktopDeviceType, "d1", "u1", "d1"))
+	assert.Equal(t, TargetBoundReasonRouteUnavailable, "route unavailable")
+	assert.Equal(t, TargetBoundReasonConnMismatch, "connection mismatch")
+	assert.Equal(t, TargetBoundReasonWSNotQueued, "websocket delivery not queued")
+
+	err := ErrOutboxUnavailable()
+	require.Error(t, err)
+	assert.Equal(t, OutboxUnavailableErrorMessage, err.Error())
+}
+
+func TestEdgeHTTPPrepHelpers(t *testing.T) {
+	parts, insecure, err := PrepareEdgeHTTPRequest(
+		DefaultEdgeHTTPURL, "secret",
+		"hi", "claude-code", "sys", "task-1", "del-1",
+		nil, nil, nil, "cap",
+	)
+	require.NoError(t, err)
+	assert.False(t, insecure)
+	assert.Equal(t, DefaultEdgeHTTPURL+"/v1/runs", parts.RunsURL)
+	assert.Equal(t, "Bearer secret", parts.Headers.Get("Authorization"))
+	assert.Equal(t, "cap", parts.Headers.Get(CapabilityTokenHeader))
+	assert.NotEmpty(t, parts.Body)
+	assert.Equal(t, time.Duration(EdgeHTTPClientTimeoutSeconds)*time.Second, parts.Timeout)
+
+	parts, insecure, err = PrepareEdgeHTTPRequest(
+		"http://example.com:3210", "",
+		"hi", "claude-code", "", "task-1", "",
+		nil, nil, nil, "",
+	)
+	require.NoError(t, err)
+	assert.True(t, insecure)
+	assert.Equal(t, "http://example.com:3210", parts.EdgeURL)
+
+	runID, nonSuccess, decodeErr := EdgeHTTPDispatchResult(http.StatusAccepted, []byte(`{"success":true,"data":{"runId":"run-9"}}`))
+	require.NoError(t, decodeErr)
+	assert.False(t, nonSuccess)
+	assert.Equal(t, "run-9", runID)
+
+	runID, nonSuccess, decodeErr = EdgeHTTPDispatchResult(http.StatusBadRequest, []byte(`nope`))
+	require.NoError(t, decodeErr)
+	assert.True(t, nonSuccess)
+	assert.Equal(t, "", runID)
+
+	_, nonSuccess, decodeErr = EdgeHTTPDispatchResult(http.StatusOK, []byte(`{`))
+	assert.False(t, nonSuccess)
+	require.Error(t, decodeErr)
+}
+
+func TestHistoryPresenceAndCancelNoRows(t *testing.T) {
+	assert.True(t, HistoryTriggerMessageLoadable(nil, true))
+	assert.False(t, HistoryTriggerMessageLoadable(errors.New("x"), true))
+	assert.False(t, HistoryTriggerMessageLoadable(nil, false))
+	assert.True(t, HistoryMessagesPresent(nil, 1))
+	assert.False(t, HistoryMessagesPresent(nil, 0))
+	assert.True(t, PinnedRowsPresent(nil, 2))
+	assert.False(t, PinnedRowsPresent(errors.New("x"), 2))
+
+	require.ErrorIs(t, CancelTaskNoRowsError(0), errcode.ErrBadRequest)
+	require.NoError(t, CancelTaskNoRowsError(1))
+}
+
+func TestRedispatchLogHelpers(t *testing.T) {
+	assert.Equal(t, "failed to marshal redispatch payload", RedispatchPrepLogMessage(DeadLetterKindPayloadMarshal))
+	assert.Equal(t, "failed to unmarshal delivery payload for redispatch", RedispatchPrepLogMessage(DeadLetterKindPayloadUnmarshal))
+	assert.Equal(t, "redispatch: queued to offline queue", RedispatchOfflineSuccessLogMessage(true))
+	assert.Equal(t, "redispatch: queued to fallback queue", RedispatchOfflineSuccessLogMessage(false))
+	assert.True(t, RedispatchOfflineSuccessIncludesUserID(true))
+	assert.False(t, RedispatchOfflineSuccessIncludesUserID(false))
+	assert.True(t, RedeliveryWSPushSucceeded(true))
+	assert.False(t, RedeliveryWSPushSucceeded(false))
+
+	in := NewCapabilityMintInput("sec", "d1", "", "u1", "t1")
+	assert.Equal(t, "sec", in.JWTSecret)
+	assert.Equal(t, "d1", in.PayloadDeviceID)
+	assert.Equal(t, "u1", in.TriggerUserID)
 }
