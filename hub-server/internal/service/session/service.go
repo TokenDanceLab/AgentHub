@@ -2,7 +2,8 @@
 //
 // It is the fifth IM typed-service package (agentteam-style; #708), extracting
 // the session domain from the flat service package. Bus+Cache ports were
-// hardened in #593; package move only. Pure helpers remain outside this package.
+// hardened in #593; package move only. Pure residual mappers/DTO/builders
+// live alongside this file (#825).
 package session
 
 import (
@@ -11,7 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -42,7 +42,8 @@ type Cache interface {
 // Member/meta cache invalidation uses injected Cache; domain events go through
 // Bus. This package is the fifth IM typed-service extract (#708) after
 // messagereaction (#662), workspace (#673), contact (#685), and attachment
-// (#697). Ports were hardened in #593; package move only.
+// (#697). Ports were hardened in #593; package move only. Pure residual
+// mappers/DTO/builders extracted in #825.
 type Service struct {
 	db          *gorm.DB
 	cacheClient Cache
@@ -96,32 +97,6 @@ func isNilCache(c any) bool {
 	}
 }
 
-// CreateSessionResponse is the API/handler DTO for session create.
-// JSON field names are contract-stable.
-type CreateSessionResponse struct {
-	SessionID string `json:"session_id"`
-	Type      string `json:"type"`
-	Created   bool   `json:"created"`
-}
-
-// SessionListItem is the API/handler DTO for one session list/search row.
-// JSON field names are contract-stable.
-type SessionListItem struct {
-	SessionID     string     `json:"session_id"`
-	Type          string     `json:"type"`
-	Name          string     `json:"name,omitempty"`
-	AvatarURL     string     `json:"avatar_url,omitempty"`
-	OwnerUserID   string     `json:"owner_user_id,omitempty"`
-	Pinned        bool       `json:"pinned"`
-	Archived      bool       `json:"archived"`
-	Muted         bool       `json:"muted"`
-	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
-	UnreadCount   int64      `json:"unread_count"`
-	MemberCount   int64      `json:"member_count"`
-	Role          string     `json:"role"`
-	CreatedAt     time.Time  `json:"created_at"`
-}
-
 func (s *Service) CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*CreateSessionResponse, error) {
 	if targetUserID == currentUserID {
 		return nil, errcode.ErrBadRequest
@@ -149,7 +124,7 @@ func (s *Service) CreatePrivateSession(ctx context.Context, currentUserID, targe
 		return nil, err
 	}
 	if existing != nil {
-		return &CreateSessionResponse{SessionID: existing.ID, Type: existing.Type, Created: false}, nil
+		return NewExistingSessionResponse(existing.ID, existing.Type), nil
 	}
 
 	session := &model.Session{Type: model.SessionTypePrivate}
@@ -157,11 +132,7 @@ func (s *Service) CreatePrivateSession(ctx context.Context, currentUserID, targe
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
-		members := []*model.SessionMember{
-			{SessionID: session.ID, MemberType: model.MemberTypeUser, MemberID: currentUserID, Role: model.MemberRoleMember},
-			{SessionID: session.ID, MemberType: model.MemberTypeUser, MemberID: targetUserID, Role: model.MemberRoleMember},
-		}
-		return repository.BatchCreateMembers(tx, members)
+		return repository.BatchCreateMembers(tx, PrivateSessionMembers(session.ID, currentUserID, targetUserID))
 	})
 	if err != nil {
 		return nil, err
@@ -170,14 +141,9 @@ func (s *Service) CreatePrivateSession(ctx context.Context, currentUserID, targe
 	if err := resolveCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
-	s.publishEvent(ctx, "session.created", map[string]interface{}{
-		"session_id": session.ID,
-		"type":       model.SessionTypePrivate,
-		"owner_id":   "",
-		"members":    []string{currentUserID, targetUserID},
-	})
+	s.publishEvent(ctx, EventTypeSessionCreated, PrivateSessionCreatedPayload(session.ID, currentUserID, targetUserID))
 
-	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypePrivate, Created: true}, nil
+	return NewCreateSessionResponse(session.ID, model.SessionTypePrivate, true), nil
 }
 
 func (s *Service) CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*CreateSessionResponse, error) {
@@ -190,14 +156,8 @@ func (s *Service) CreateGroupSession(ctx context.Context, ownerUserID, name stri
 		if err != nil {
 			return nil, err
 		}
-		friendSet := make(map[string]bool)
-		for _, id := range friendIDs {
-			friendSet[id] = true
-		}
-		for _, mid := range memberIDs {
-			if !friendSet[mid] {
-				return nil, errcode.ErrBadRequest
-			}
+		if !AllAreFriends(friendIDs, memberIDs) {
+			return nil, errcode.ErrBadRequest
 		}
 	}
 
@@ -206,15 +166,7 @@ func (s *Service) CreateGroupSession(ctx context.Context, ownerUserID, name stri
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
-		members := []*model.SessionMember{
-			{SessionID: session.ID, MemberType: model.MemberTypeUser, MemberID: ownerUserID, Role: model.MemberRoleOwner},
-		}
-		for _, mid := range memberIDs {
-			members = append(members, &model.SessionMember{
-				SessionID: session.ID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
-			})
-		}
-		return repository.BatchCreateMembers(tx, members)
+		return repository.BatchCreateMembers(tx, GroupSessionMembers(session.ID, ownerUserID, memberIDs))
 	})
 	if err != nil {
 		return nil, err
@@ -223,16 +175,11 @@ func (s *Service) CreateGroupSession(ctx context.Context, ownerUserID, name stri
 	if err := resolveCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
-	members := append([]string{ownerUserID}, memberIDs...)
-	s.publishEvent(ctx, "session.created", map[string]interface{}{
-		"session_id": session.ID,
-		"type":       model.SessionTypeGroup,
-		"name":       name,
-		"owner_id":   ownerUserID,
-		"members":    members,
-	})
+	s.publishEvent(ctx, EventTypeSessionCreated, GroupSessionCreatedPayload(
+		session.ID, name, ownerUserID, GroupMemberIDsForEvent(ownerUserID, memberIDs),
+	))
 
-	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypeGroup, Created: true}, nil
+	return NewCreateSessionResponse(session.ID, model.SessionTypeGroup, true), nil
 }
 
 func (s *Service) ListSessions(ctx context.Context, userID string) ([]SessionListItem, error) {
@@ -240,33 +187,7 @@ func (s *Service) ListSessions(ctx context.Context, userID string) ([]SessionLis
 	if err != nil {
 		return nil, err
 	}
-	result := make([]SessionListItem, len(sessions))
-	for i, sess := range sessions {
-		unread := sess.NextSeq - sess.LastReadSeq
-		if unread < 0 {
-			unread = 0
-		}
-		oid := ""
-		if sess.OwnerUserID != nil {
-			oid = *sess.OwnerUserID
-		}
-		result[i] = SessionListItem{
-			SessionID:     sess.ID,
-			Type:          sess.Type,
-			Name:          sess.Name,
-			AvatarURL:     sess.AvatarURL,
-			OwnerUserID:   oid,
-			Pinned:        sess.Pinned,
-			Archived:      sess.Archived,
-			Muted:         sess.Muted,
-			LastMessageAt: sess.LastMessageAt,
-			UnreadCount:   unread,
-			MemberCount:   sess.MemberCount,
-			Role:          sess.Role,
-			CreatedAt:     sess.CreatedAt,
-		}
-	}
-	return result, nil
+	return MapSessionListItems(sessions), nil
 }
 
 func (s *Service) getSession(ctx context.Context, sessionID string) (*model.Session, error) {
@@ -318,36 +239,20 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 	if err != nil {
 		return err
 	}
-	friendSet := make(map[string]bool)
-	for _, id := range friendIDs {
-		friendSet[id] = true
-	}
-	for _, mid := range memberIDs {
-		if !friendSet[mid] {
-			return errcode.ErrBadRequest
-		}
+	if !AllAreFriends(friendIDs, memberIDs) {
+		return errcode.ErrBadRequest
 	}
 
 	// Deduplicate member IDs to prevent duplicate key violations
-	seen := make(map[string]bool, len(memberIDs))
-	unique := make([]string, 0, len(memberIDs))
-	for _, mid := range memberIDs {
-		if !seen[mid] {
-			seen[mid] = true
-			unique = append(unique, mid)
-		}
-	}
-	memberIDs = unique
+	memberIDs = DeduplicateIDs(memberIDs)
 
 	// Batch check active membership instead of N individual queries (fixes N+1 N3).
 	activeMap, err := repository.AreMembersActive(s.db, sessionID, model.MemberTypeUser, memberIDs)
 	if err != nil {
 		return err
 	}
-	for _, mid := range memberIDs {
-		if activeMap[mid] {
-			return errcode.GroupAlreadyMember
-		}
+	if AnyActiveMember(activeMap, memberIDs) {
+		return errcode.GroupAlreadyMember
 	}
 
 	// Batch check soft-deleted membership instead of N individual queries (fixes N+1 N3).
@@ -356,23 +261,7 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 		return err
 	}
 
-	var toReactivate []string
-	members := make([]*model.SessionMember, 0, len(memberIDs))
-	joinedMembers := make([]*model.SessionMember, 0, len(memberIDs))
-	for _, mid := range memberIDs {
-		if softDeletedMap[mid] {
-			toReactivate = append(toReactivate, mid)
-			joinedMembers = append(joinedMembers, &model.SessionMember{
-				SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
-			})
-			continue
-		}
-		member := &model.SessionMember{
-			SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
-		}
-		members = append(members, member)
-		joinedMembers = append(joinedMembers, member)
-	}
+	toReactivate, members, joinedMembers := PartitionJoinMembers(sessionID, memberIDs, softDeletedMap)
 
 	// Batch reactivate soft-deleted members in a single query.
 	if len(toReactivate) > 0 {
@@ -385,13 +274,9 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 			return err
 		}
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
-	for _, member := range joinedMembers {
-		s.publishEvent(ctx, "session.member_joined", map[string]interface{}{
-			"session_id":  sessionID,
-			"member_id":   member.MemberID,
-			"member_type": member.MemberType,
-		})
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	for _, m := range joinedMembers {
+		s.publishEvent(ctx, EventTypeSessionMemberJoined, MemberJoinedPayload(sessionID, m.MemberID, m.MemberType))
 	}
 	return nil
 }
@@ -414,7 +299,7 @@ func (s *Service) RemoveGroupMember(ctx context.Context, currentUserID, sessionI
 	}
 
 	// #97: prevent owner from removing themselves
-	if session.OwnerUserID != nil && targetUserID == *session.OwnerUserID {
+	if IsSessionOwnerID(session.OwnerUserID, targetUserID) {
 		return errcode.GroupOwnerCannotLeave
 	}
 
@@ -434,11 +319,8 @@ func (s *Service) RemoveGroupMember(ctx context.Context, currentUserID, sessionI
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
-	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
-		"session_id": sessionID,
-		"member_id":  targetUserID,
-	})
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, targetUserID))
 	return nil
 }
 
@@ -461,14 +343,7 @@ func (s *Service) LeaveGroup(ctx context.Context, currentUserID, sessionID strin
 		if err != nil {
 			return err
 		}
-		otherActive := false
-		for _, m := range members {
-			if m.MemberID != currentUserID {
-				otherActive = true
-				break
-			}
-		}
-		if otherActive {
+		if HasOtherActiveMember(members, currentUserID) {
 			return errcode.GroupOwnerCannotLeave
 		}
 	}
@@ -481,11 +356,8 @@ func (s *Service) LeaveGroup(ctx context.Context, currentUserID, sessionID strin
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
-	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
-		"session_id": sessionID,
-		"member_id":  currentUserID,
-	})
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, currentUserID))
 	return nil
 }
 
@@ -517,7 +389,7 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, currentUserID, ses
 	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID), SessionMetaCacheKey(sessionID))
 	return nil
 }
 
@@ -583,15 +455,13 @@ func (s *Service) DissolveGroup(ctx context.Context, currentUserID, sessionID st
 			}
 		}
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID), SessionMetaCacheKey(sessionID))
 
 	slog.Info("dissolve group: session dissolved",
 		"session_id", sessionID, "dissolved_by", currentUserID,
 		"members_cleaned", cleanupCount, "cleanup_errors", cleanupErrors)
 
-	s.publishEvent(ctx, "session.dissolved", map[string]interface{}{
-		"session_id": sessionID,
-	})
+	s.publishEvent(ctx, EventTypeSessionDissolved, SessionDissolvedPayload(sessionID))
 	return nil
 }
 
@@ -613,27 +483,12 @@ func (s *Service) UpdateGroupInfo(ctx context.Context, currentUserID, sessionID 
 		return errcode.GroupNotOwner
 	}
 
-	changes := make(map[string]interface{})
-	if name != nil {
-		session.Name = *name
-		changes["name"] = *name
-	}
-	if avatarURL != nil {
-		session.AvatarURL = *avatarURL
-		changes["avatar_url"] = *avatarURL
-	}
-	if announcement != nil {
-		session.Announcement = *announcement
-		changes["announcement"] = *announcement
-	}
+	changes := ApplyGroupInfoChanges(session, name, avatarURL, announcement)
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:meta:"+sessionID)
-	s.publishEvent(ctx, "session.info_updated", map[string]interface{}{
-		"session_id": sessionID,
-		"changes":    changes,
-	})
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMetaCacheKey(sessionID))
+	s.publishEvent(ctx, EventTypeSessionInfoUpdated, SessionInfoUpdatedPayload(sessionID, changes))
 	return nil
 }
 
@@ -665,14 +520,7 @@ func (s *Service) DeleteForMe(ctx context.Context, currentUserID, sessionID stri
 		if err != nil {
 			return err
 		}
-		otherActive := false
-		for _, m := range members {
-			if m.MemberID != currentUserID && m.MemberType == model.MemberTypeUser {
-				otherActive = true
-				break
-			}
-		}
-		if otherActive {
+		if HasOtherActiveUser(members, currentUserID) {
 			return errcode.GroupOwnerCannotLeave
 		}
 	}
@@ -687,11 +535,8 @@ func (s *Service) DeleteForMe(ctx context.Context, currentUserID, sessionID stri
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
-	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
-		"session_id": sessionID,
-		"member_id":  currentUserID,
-	})
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, currentUserID))
 	return nil
 }
 
@@ -700,33 +545,7 @@ func (s *Service) SearchSessions(ctx context.Context, userID, q string) ([]Sessi
 	if err != nil {
 		return nil, err
 	}
-	result := make([]SessionListItem, len(sessions))
-	for i, sess := range sessions {
-		unread := sess.NextSeq - sess.LastReadSeq
-		if unread < 0 {
-			unread = 0
-		}
-		oid := ""
-		if sess.OwnerUserID != nil {
-			oid = *sess.OwnerUserID
-		}
-		result[i] = SessionListItem{
-			SessionID:     sess.ID,
-			Type:          sess.Type,
-			Name:          sess.Name,
-			AvatarURL:     sess.AvatarURL,
-			OwnerUserID:   oid,
-			Pinned:        sess.Pinned,
-			Archived:      sess.Archived,
-			Muted:         sess.Muted,
-			LastMessageAt: sess.LastMessageAt,
-			UnreadCount:   unread,
-			MemberCount:   sess.MemberCount,
-			Role:          sess.Role,
-			CreatedAt:     sess.CreatedAt,
-		}
-	}
-	return result, nil
+	return MapSessionListItems(sessions), nil
 }
 
 // ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
