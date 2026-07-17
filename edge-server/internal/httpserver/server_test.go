@@ -524,7 +524,9 @@ func TestLocalAuthMiddlewareAllowsHealthAndOptionsWithoutToken(t *testing.T) {
 	}
 }
 
-func TestLocalAuthMiddlewareAllowsWebSocketQueryToken(t *testing.T) {
+// TestLocalAuthMiddlewareRejectsWebSocketQueryToken is the #965 fail-closed
+// gate: query-only access_token must no longer authenticate Edge /v1/events.
+func TestLocalAuthMiddlewareRejectsWebSocketQueryToken(t *testing.T) {
 	called := false
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
@@ -538,11 +540,110 @@ func TestLocalAuthMiddlewareAllowsWebSocketQueryToken(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 for query-only access_token", rec.Code)
+	}
+	if called {
+		t.Fatal("websocket handler should not be called with query-only access_token")
+	}
+}
+
+// TestLocalAuthMiddlewareAllowsWebSocketSubprotocolToken covers the preferred
+// browser/desktop path: Sec-WebSocket-Protocol carries
+// "agenthub.edge.bearer.v1, <token>" without a query access_token.
+func TestLocalAuthMiddlewareAllowsWebSocketSubprotocolToken(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}), "edge-secret", "", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Protocol", WSEdgeBearerSubprotocol+", edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
 	if rec.Code != http.StatusSwitchingProtocols {
 		t.Fatalf("status = %d, want 101", rec.Code)
 	}
 	if !called {
-		t.Fatal("websocket handler was not called with a valid query token")
+		t.Fatal("websocket handler was not called with a valid Sec-WebSocket-Protocol token")
+	}
+}
+
+// TestLocalAuthMiddlewareAllowsWebSocketAccessTokenSubprotocolForm covers the
+// alternate single-token convention: access_token.<edge-token>.
+func TestLocalAuthMiddlewareAllowsWebSocketAccessTokenSubprotocolForm(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}), "edge-secret", "", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Protocol", "access_token.edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSwitchingProtocols {
+		t.Fatalf("status = %d, want 101", rec.Code)
+	}
+	if !called {
+		t.Fatal("websocket handler was not called with access_token.<token> subprotocol")
+	}
+}
+
+// TestLocalAuthMiddlewareAllowsWebSocketEdgeHeaderToken ensures native clients
+// can still authenticate /v1/events via X-AgentHub-Edge-Token.
+func TestLocalAuthMiddlewareAllowsWebSocketEdgeHeaderToken(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}), "edge-secret", "", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("X-AgentHub-Edge-Token", "edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSwitchingProtocols {
+		t.Fatalf("status = %d, want 101", rec.Code)
+	}
+	if !called {
+		t.Fatal("websocket handler was not called with X-AgentHub-Edge-Token")
+	}
+}
+
+func TestTokenFromWSSubprotocols(t *testing.T) {
+	token := "edge-secret-token"
+	cases := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{"empty", nil, ""},
+		{"marker only", []string{WSEdgeBearerSubprotocol}, ""},
+		{"preferred form", []string{WSEdgeBearerSubprotocol + ", " + token}, token},
+		{"access_token form", []string{"access_token." + token}, token},
+		{"multi header values", []string{WSEdgeBearerSubprotocol, token}, token},
+		{"access_token preferred over raw", []string{WSEdgeBearerSubprotocol + ", other.token, access_token." + token}, token},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tokenFromWSSubprotocols(tc.values); got != tc.want {
+				t.Fatalf("tokenFromWSSubprotocols(%v) = %q, want %q", tc.values, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -1181,7 +1282,9 @@ func TestLocalAuthMiddleware_WebSocketRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParam(t *testing.T) {
+// TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParamRejected is the
+// integrated #965 fail-closed gate under dual local+Hub JWT config.
+func TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParamRejected(t *testing.T) {
 	called := false
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
@@ -1195,11 +1298,34 @@ func TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParam(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 (query access_token rejected)", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called for query-only access_token on WebSocket")
+	}
+}
+
+func TestLocalAuthMiddleware_WebSocketAuthTokenViaSubprotocol(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), "edge-secret", testHubJWTSecret, "test-device")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "upgrade")
+	req.Header.Set("Sec-WebSocket-Protocol", WSEdgeBearerSubprotocol+", edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (WebSocket with valid access_token)", rec.Code)
+		t.Fatalf("status = %d, want 200 (WebSocket with Sec-WebSocket-Protocol token)", rec.Code)
 	}
 	if !called {
-		t.Fatal("handler should be called for authenticated WebSocket via access_token query param")
+		t.Fatal("handler should be called for authenticated WebSocket via Sec-WebSocket-Protocol")
 	}
 }
 

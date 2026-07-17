@@ -6,8 +6,8 @@
 // When no transport is provided, creates its own WebSocket internally
 // (backward compatible with existing callers).
 
-import { WS_URL, getEdgeWsUrl } from '@/config';
-import { withEdgeAuthQuery } from './edgeAuth';
+import { getEdgeWsUrl } from '@/config';
+import { buildEdgeWSAuthProtocols, withEdgeAuthQuery } from './edgeAuth';
 import type { Transport, TransportStatus } from './transport';
 import type { EventEnvelope } from '@shared/events';
 import { reportApiError } from '@shared/errors';
@@ -34,6 +34,12 @@ export interface EventStreamOptions {
   /** Optional Transport instance. When provided, the stream uses it
    *  for connection management instead of creating its own WebSocket. */
   transport?: Transport;
+  /**
+   * When true, also append access_token to the WS URL (legacy fallback).
+   * Default false — Edge rejects query access_token (#965); prefer
+   * Sec-WebSocket-Protocol via buildEdgeWSAuthProtocols.
+   */
+  useQueryTokenFallback?: boolean;
 }
 
 export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOptions): StreamHandle {
@@ -51,6 +57,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
   }
 
   const providedTransport = opts?.transport ?? null;
+  const useQueryFallback = opts?.useQueryTokenFallback === true;
 
   // Internal WebSocket (only used when no transport is provided)
   let ws: WebSocket | null = null;
@@ -168,9 +175,16 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
   function connectDirect() {
     if (closed) return;
-    const url = withEdgeAuthQuery(lastCursor ? `${baseUrl}?cursor=${encodeURIComponent(lastCursor)}` : baseUrl);
+    const plainUrl = lastCursor
+      ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(lastCursor)}`
+      : baseUrl;
+    // Default: keep token out of the URL. Optional legacy query fallback is off.
+    const url = useQueryFallback ? withEdgeAuthQuery(plainUrl) : plainUrl;
+    const protocols = buildEdgeWSAuthProtocols();
 
-    ws = new WebSocket(url);
+    ws = protocols && protocols.length > 0
+      ? new WebSocket(url, protocols)
+      : new WebSocket(url);
 
     ws.onopen = () => {
       retryCount = 0;

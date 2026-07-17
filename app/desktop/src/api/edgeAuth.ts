@@ -65,6 +65,33 @@ export function edgeAuthHeaders(base?: HeadersInit): HeadersInit | undefined {
   };
 }
 
+/**
+ * Fixed Sec-WebSocket-Protocol marker negotiated with Edge /v1/events upgrades.
+ * Paired with the raw Edge token as a second subprotocol value.
+ * Must match edge-server httpserver.WSEdgeBearerSubprotocol.
+ */
+export const EDGE_WS_BEARER_SUBPROTOCOL = 'agenthub.edge.bearer.v1';
+
+/**
+ * Build WebSocket subprotocols that carry an Edge auth token without putting
+ * it in the URL. Returns undefined when token is missing so the socket opens
+ * without auth protocols.
+ *
+ * Convention (preferred desktop/browser path):
+ *   protocols: ["agenthub.edge.bearer.v1", "<edge-token>"]
+ */
+export function buildEdgeWSAuthProtocols(
+  token: string | null | undefined = getEdgeAuthToken(),
+): string[] | undefined {
+  if (!token) return undefined;
+  return [EDGE_WS_BEARER_SUBPROTOCOL, token];
+}
+
+/**
+ * Legacy query-token helper. Prefer Sec-WebSocket-Protocol via
+ * buildEdgeWSAuthProtocols; query access_token is rejected by Edge (#965).
+ * Kept only for optional tests / temporary fallback callers (default off).
+ */
 export function withEdgeAuthQuery(url: string): string {
   const token = getEdgeAuthToken();
   if (!token) return url;
