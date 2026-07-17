@@ -93,7 +93,7 @@
 .gradient {
   color: var(--primary-foreground, #fff);
   font-weight: 700;
-  background: var(--brand, oklch(0.55 0.16 255));
+  background: var(--brand);
   box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
 }
 .gradient:hover:not(:disabled) {

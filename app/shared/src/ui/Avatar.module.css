@@ -19,8 +19,8 @@
 .lg { width: 42px; height: 42px; font-size: 16px; border-radius: 12px; }
 
 .brand {
-  background: color-mix(in oklch, var(--brand, oklch(0.55 0.16 255)) 14%, transparent);
-  color: var(--brand, oklch(0.55 0.16 255));
+  background: color-mix(in oklch, var(--brand) 14%, transparent);
+  color: var(--brand);
   box-shadow: none;
 }
 
