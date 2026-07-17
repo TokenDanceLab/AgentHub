@@ -15,8 +15,10 @@ import {
   buildAttachmentsPath,
   buildBlockContactPath,
   buildCancelAgentTaskPaths,
+  buildChangePasswordFallback,
   buildChangePasswordFallbackPath,
   buildChangePasswordPath,
+  buildChangePasswordPrimary,
   buildContactRemarkPath,
   buildCreateGroupSessionPath,
   buildCreatePrivateSessionPath,
@@ -514,6 +516,18 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913)', () => {
     expect(buildPostWithOptionalJsonBody(buildTaskAckBody('run-9'))).toEqual({
       method: 'POST',
       body: JSON.stringify({ run_id: 'run-9' }),
+    });
+  });
+
+  it('builds change-password primary/fallback request pairs (#957)', () => {
+    const body = { old_password: 'a', new_password: 'b' };
+    expect(buildChangePasswordPrimary(body)).toEqual({
+      path: '/client/auth/change-password',
+      init: { method: 'POST', body: JSON.stringify(body) },
+    });
+    expect(buildChangePasswordFallback(body)).toEqual({
+      path: '/client/auth/password',
+      init: { method: 'PUT', body: JSON.stringify(body) },
     });
   });
 });
