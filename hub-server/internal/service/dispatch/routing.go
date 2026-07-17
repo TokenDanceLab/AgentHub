@@ -95,6 +95,55 @@ func PreferDeviceBoundRedelivery(edgeDeviceID string) bool {
 	return edgeDeviceID != ""
 }
 
+// TargetBoundRouteUnavailable is true when a target-bound route lookup cannot
+// proceed to WebSocket push (lookup error, empty conn id, or missing manager).
+// Mirrors the historical dispatchTargetBoundTask predicate.
+func TargetBoundRouteUnavailable(routeErr error, connID string, mgrAvailable bool) bool {
+	return !CanPushInviterDesktop(connID, mgrAvailable, routeErr)
+}
+
+// ClassifyRedeliveryPrimaryRoute is the pure first-choice redelivery path before
+// connection lookups: try local Edge HTTP for unbound tasks, else device-bound
+// WS when an edge device is present, else inviter desktop fallback.
+// HTTP miss still falls through to inviter (preferDevice is false when edge id empty).
+func ClassifyRedeliveryPrimaryRoute(targetID, edgeDeviceID string) RouteKind {
+	if ShouldTryHTTPRedelivery(targetID, edgeDeviceID) {
+		return RouteHTTP
+	}
+	if PreferDeviceBoundRedelivery(edgeDeviceID) {
+		return RouteTargetBound
+	}
+	return RouteInviterDesktop
+}
+
+// ClassifyRedeliveryRoute classifies post-HTTP redelivery given pure connection
+// facts. preferDevice is PreferDeviceBoundRedelivery(edgeDeviceID). Device path
+// requires user-match; inviter path only requires a found conn. Side-effects
+// (PushToConn / offline queue) stay orchestration-side. When WS push is attempted
+// but not queued, callers still fall through to offline (historical behavior).
+func ClassifyRedeliveryRoute(
+	preferDevice bool,
+	connID string,
+	mgrAvailable bool,
+	routeErr error,
+	connFound bool,
+	connUserMatch bool,
+) RouteKind {
+	if !CanPushInviterDesktop(connID, mgrAvailable, routeErr) {
+		return RouteOffline
+	}
+	if preferDevice {
+		if connFound && connUserMatch {
+			return RouteTargetBound
+		}
+		return RouteOffline
+	}
+	if connFound {
+		return RouteInviterDesktop
+	}
+	return RouteOffline
+}
+
 // PinMessageIDs extracts MessageID values from pin rows in order.
 func PinMessageIDs(messageIDs []string) []string {
 	if len(messageIDs) == 0 {

@@ -43,3 +43,16 @@ func BuildEdgeRunRequest(
 	}
 	return req
 }
+
+// MarshalEdgeRunRequest builds and JSON-marshals an Edge /v1/runs body.
+// HTTP client construction stays orchestration-side.
+func MarshalEdgeRunRequest(
+	prompt, agentType, systemPrompt, hubTaskID, deliveryID string,
+	messages, pinned []Message,
+	outputSchema *json.RawMessage,
+) ([]byte, error) {
+	return json.Marshal(BuildEdgeRunRequest(
+		prompt, agentType, systemPrompt, hubTaskID, deliveryID,
+		messages, pinned, outputSchema,
+	))
+}
