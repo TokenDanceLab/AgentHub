@@ -8,6 +8,7 @@ import {
   buildHubFetchInit,
   buildHubUrl,
   buildMultipartFetchInit,
+  buildTokenRefreshFailedLogPrefix,
   buildTokenRefreshReportContext,
   classifyHubRequestCatch,
   createAuthOnlyHeaders,
@@ -15,9 +16,13 @@ import {
   createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
+  hasTokenRefreshHandler,
   isAbortError,
   isNetworkFetchTypeError,
   normalizeHubBaseUrl,
+  planHubRequestCatchEffects,
+  prepareHubRequestContext,
+  prepareMultipartUploadContext,
   requestMethodOf,
   resolveHubFetch,
   resolveHubRequestCatch,
@@ -28,7 +33,7 @@ import {
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935 / #957)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -157,6 +162,68 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957)', () => {
     }
 
     expect(resolveHubRequestCatch('other', ctx)).toEqual({ kind: 'other', error: 'other' });
+  });
+
+  it('peels request/upload context + catch effect plan (#978)', () => {
+    expect(hasTokenRefreshHandler(undefined)).toBe(false);
+    expect(hasTokenRefreshHandler(null as unknown as undefined)).toBe(false);
+    expect(hasTokenRefreshHandler(async () => 'tok')).toBe(true);
+    expect(buildTokenRefreshFailedLogPrefix()).toBe('[HubClient] Token refresh failed');
+
+    const prepared = prepareHubRequestContext({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      options: { method: 'POST' },
+      token: 'tok-1',
+      timeoutMs: 9_000,
+    });
+    expect(prepared.method).toBe('POST');
+    expect(prepared.timeoutMs).toBe(9_000);
+    expect(prepared.url).toBe('https://hub.example.com/client/auth/me');
+    expect(prepared.headers.get('Authorization')).toBe('Bearer tok-1');
+    expect(prepared.headers.get('Content-Type')).toBe('application/json');
+
+    const multipart = prepareMultipartUploadContext({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/attachments',
+      token: 'tok-up',
+    });
+    expect(multipart.url).toBe('https://hub.example.com/client/attachments');
+    expect(multipart.timeoutMs).toBe(DEFAULT_HUB_TIMEOUT_MS);
+    expect(multipart.headers.get('Authorization')).toBe('Bearer tok-up');
+    expect(multipart.headers.has('Content-Type')).toBe(false);
+
+    const ctx = { timeoutMs: 5_000, method: 'GET', path: '/web/projects' };
+    const timeoutEffects = planHubRequestCatchEffects(
+      new DOMException('Aborted', 'AbortError'),
+      ctx,
+    );
+    expect(timeoutEffects).toMatchObject({
+      logMessage: expect.stringContaining('[HubClient]'),
+      report: { context: ctx },
+    });
+    expect('logMessage' in timeoutEffects).toBe(true);
+    expect('report' in timeoutEffects).toBe(true);
+
+    const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 403);
+    const appEffects = planHubRequestCatchEffects(appErr, ctx);
+    expect(appEffects).toEqual({
+      error: appErr,
+      report: { error: appErr, context: { path: ctx.path, method: ctx.method } },
+    });
+    expect('logMessage' in appEffects).toBe(false);
+
+    const netEffects = planHubRequestCatchEffects(new TypeError('Failed to fetch'), ctx);
+    expect(netEffects).toMatchObject({
+      logMessage: expect.stringContaining('Network request failed'),
+      report: { context: { path: ctx.path, method: ctx.method } },
+    });
+    expect('logMessage' in netEffects).toBe(true);
+
+    const otherEffects = planHubRequestCatchEffects('other', ctx);
+    expect(otherEffects).toEqual({ error: 'other' });
+    expect('logMessage' in otherEffects).toBe(false);
+    expect('report' in otherEffects).toBe(false);
   });
 
   it('classifies AbortError and network fetch TypeError', () => {

@@ -716,3 +716,280 @@ export function buildProbeAttachmentPath(): string {
 export function buildAttachmentsPath(): string {
   return '/client/attachments';
 }
+
+// ── Composite path+init residual (#978) ───────────────────────────────────────
+
+export type HubJsonPathInit = {
+  path: string;
+  init: { method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body: string };
+};
+
+export type HubMethodPathInit = {
+  path: string;
+  init: { method: 'POST' } | { method: 'POST'; body: string } | { method: 'DELETE' };
+};
+
+export function buildRefreshRequest(refreshToken: string): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildRefreshPath(),
+    init: buildJsonPostInit(buildRefreshBody(refreshToken)),
+  };
+}
+
+export function buildOidcAuthorizeRequest(body: HubOidcAuthorizeRequest): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildOidcAuthorizePath(),
+    init: buildJsonPostInit(buildOidcAuthorizeBody(body)),
+  };
+}
+
+export function buildSendFriendRequest(friendId: string, message?: string): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildFriendRequestsPath(),
+    init: buildJsonPostInit(buildFriendRequestBody(friendId, message)),
+  };
+}
+
+export function buildUpdateContactRemarkRequest(
+  friendUserId: string,
+  remark: string,
+): {
+  path: string;
+  init: { method: 'PUT'; body: string };
+} {
+  return {
+    path: buildContactRemarkPath(friendUserId),
+    init: buildJsonPutInit(buildRemarkBody(remark)),
+  };
+}
+
+export function buildAddSessionMembersRequest(
+  sessionId: string,
+  memberIds: string[],
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildSessionMembersPath(sessionId),
+    init: buildJsonPostInit(buildMemberIdsBody(memberIds)),
+  };
+}
+
+export function buildTransferSessionOwnershipRequest(
+  sessionId: string,
+  newOwnerId: string,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildTransferSessionOwnerPath(sessionId),
+    init: buildJsonPostInit(buildTransferOwnerBody(newOwnerId)),
+  };
+}
+
+export function buildMarkReadRequest(
+  sessionId: string,
+  lastReadSeq: number,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildMarkReadPath(sessionId),
+    init: buildJsonPostInit(buildMarkReadBody(lastReadSeq)),
+  };
+}
+
+export function buildPinMessageRequest(
+  messageId: string,
+  sessionId: string,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildPinMessagePath(messageId),
+    init: buildJsonPostInit(buildSessionIdBody(sessionId)),
+  };
+}
+
+export function buildUnpinMessageRequest(
+  messageId: string,
+  sessionId: string,
+): {
+  path: string;
+  init: { method: 'DELETE'; body: string };
+} {
+  return {
+    path: buildPinMessagePath(messageId),
+    init: buildJsonDeleteInit(buildSessionIdBody(sessionId)),
+  };
+}
+
+export function buildForwardMessageRequest(
+  messageId: string,
+  targetSessionIds: string[],
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildForwardMessagePath(messageId),
+    init: buildJsonPostInit(buildForwardMessageBody(targetSessionIds)),
+  };
+}
+
+export function buildAckTaskRequest(
+  taskId: string,
+  runId?: string,
+): {
+  path: string;
+  init: { method: 'POST' } | { method: 'POST'; body: string };
+} {
+  return {
+    path: buildAckTaskPath(taskId),
+    init: buildPostWithOptionalJsonBody(buildTaskAckBody(runId)),
+  };
+}
+
+export function buildStreamTaskRequest(
+  taskId: string,
+  content: string,
+  runId?: string,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildStreamTaskPath(taskId),
+    init: buildJsonPostInit(buildTaskStreamBody(content, runId)),
+  };
+}
+
+export function buildDoneTaskRequest(
+  taskId: string,
+  finalContent?: string,
+  runId?: string,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildDoneTaskPath(taskId),
+    init: buildJsonPostInit(buildTaskDoneBody(finalContent, runId)),
+  };
+}
+
+export function buildFailTaskRequest(
+  taskId: string,
+  error: string,
+  runId?: string,
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildFailTaskPath(taskId),
+    init: buildJsonPostInit(buildTaskFailBody(error, runId)),
+  };
+}
+
+export function buildTriggerAgentTaskRequest(
+  triggerMessageId: string,
+  options: HubTriggerAgentTaskOptions = {},
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildAgentTasksPath(),
+    init: buildJsonPostInit(buildTriggerAgentTaskBody(triggerMessageId, options)),
+  };
+}
+
+export function buildAddMessageReactionRequest(
+  messageId: string,
+  sessionId: string,
+  reaction: { emoji: string },
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildMessageReactionsPath(messageId),
+    init: buildJsonPostInit(buildReactionBody(sessionId, reaction)),
+  };
+}
+
+export function buildRemoveMessageReactionRequest(
+  messageId: string,
+  sessionId: string,
+  reaction: { emoji: string },
+): {
+  path: string;
+  init: { method: 'DELETE'; body: string };
+} {
+  return {
+    path: buildMessageReactionsPath(messageId),
+    init: buildJsonDeleteInit(buildReactionBody(sessionId, reaction)),
+  };
+}
+
+export function buildPatchSettingsRequest(values: Record<string, string>): {
+  path: string;
+  init: { method: 'PATCH'; body: string };
+} {
+  return {
+    path: buildSettingsPath(),
+    init: buildJsonPatchInit(buildPatchSettingsBody(values)),
+  };
+}
+
+export function buildProbeAttachmentRequest(hash: string): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildProbeAttachmentPath(),
+    init: buildJsonPostInit(buildProbeAttachmentBody(hash)),
+  };
+}
+
+export function buildStreamTaskEventRequest(
+  taskId: string,
+  eventType: string,
+  payload: unknown,
+  options: HubAgentTaskStreamEventOptions = {},
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildStreamTaskPath(taskId),
+    init: buildJsonPostInit(buildStreamTaskEventBody(eventType, payload, options)),
+  };
+}
+
+export function buildUploadAttachmentRequest(
+  file: File,
+  hash: string,
+): {
+  path: string;
+  formData: FormData;
+} {
+  return {
+    path: buildAttachmentsPath(),
+    formData: buildAttachmentFormData(file, hash),
+  };
+}
