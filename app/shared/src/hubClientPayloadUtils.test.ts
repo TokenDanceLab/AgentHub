@@ -3,6 +3,9 @@ import {
   buildAcceptFriendRequestPath,
   buildAckRelayCommandPath,
   buildAckTaskPath,
+  buildAckTaskRequest,
+  buildAddMessageReactionRequest,
+  buildAddSessionMembersRequest,
   buildAgentProfilePath,
   buildAgentProfilesPath,
   buildAgentTasksPath,
@@ -31,12 +34,15 @@ import {
   buildDocumentPath,
   buildDocumentsPath,
   buildDoneTaskPath,
+  buildDoneTaskRequest,
   buildEditMessagePath,
   buildExecutionTargetPath,
   buildExecutionTargetsPath,
   buildFailTaskPath,
+  buildFailTaskRequest,
   buildForwardMessageBody,
   buildForwardMessagePath,
+  buildForwardMessageRequest,
   buildFriendRequestBody,
   buildFriendRequestsPath,
   buildGetMessagesPath,
@@ -70,27 +76,33 @@ import {
   buildMarkNotificationReadPaths,
   buildMarkReadBody,
   buildMarkReadPath,
+  buildMarkReadRequest,
   buildMemberIdsBody,
   buildMePath,
   buildMessageReactionsPath,
   buildOidcAuthorizeBody,
   buildOidcAuthorizePath,
+  buildOidcAuthorizeRequest,
   buildOidcCallbackPath,
   buildOptionalJsonBody,
   buildPatchSettingsBody,
+  buildPatchSettingsRequest,
   buildPingExecutionTargetPath,
   buildPinMessagePath,
+  buildPinMessageRequest,
   buildPostInit,
   buildPostTeamRouteDecisionPath,
   buildPostWithOptionalJsonBody,
   buildProbeAttachmentBody,
   buildProbeAttachmentPath,
+  buildProbeAttachmentRequest,
   buildPutInit,
   buildReactionBody,
   buildReadAllNotificationsPaths,
   buildRecallMessagePath,
   buildRefreshBody,
   buildRefreshPath,
+  buildRefreshRequest,
   buildRegenerateAgentTaskPath,
   buildRegisterDevicePaths,
   buildRegisterPath,
@@ -100,12 +112,14 @@ import {
   buildRemarkBody,
   buildRemoveAgentTeamMemberPath,
   buildRemoveContactPath,
+  buildRemoveMessageReactionRequest,
   buildRemoveSessionMemberPath,
   buildResolveTeamConflictPath,
   buildSearchMessagesPath,
   buildSearchSessionMessagesPath,
   buildSearchSessionsPath,
   buildSearchUserPath,
+  buildSendFriendRequest,
   buildSendWorkspaceProjectThreadMessagePath,
   buildSessionAgentsPath,
   buildSessionIdBody,
@@ -116,7 +130,9 @@ import {
   buildSessionSettingsPath,
   buildSettingsPath,
   buildStreamTaskEventBody,
+  buildStreamTaskEventRequest,
   buildStreamTaskPath,
+  buildStreamTaskRequest,
   buildSyncMessagesPath,
   buildTaskAckBody,
   buildTaskDoneBody,
@@ -125,9 +141,14 @@ import {
   buildTaskStreamBody,
   buildTransferOwnerBody,
   buildTransferSessionOwnerPath,
+  buildTransferSessionOwnershipRequest,
   buildTriggerAgentTaskBody,
+  buildTriggerAgentTaskRequest,
   buildUnblockContactPath,
+  buildUnpinMessageRequest,
+  buildUpdateContactRemarkRequest,
   buildUpdateProfilePath,
+  buildUploadAttachmentRequest,
   buildWorkspaceProjectPath,
   buildWorkspaceProjectsPath,
   buildWorkspaceProjectThreadsPath,
@@ -135,7 +156,7 @@ import {
   withPublicCatalogParams,
 } from './hubClientPayloadUtils';
 
-describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913)', () => {
+describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () => {
   it('normalizes execution-target array vs {items,page} responses', () => {
     expect(
       normalizeExecutionTargetsResponse([
@@ -529,5 +550,115 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913)', () => {
       path: '/client/auth/password',
       init: { method: 'PUT', body: JSON.stringify(body) },
     });
+  });
+
+  it('builds composite path+init residual helpers (#978)', () => {
+    expect(buildRefreshRequest('rt-1')).toEqual({
+      path: '/client/auth/refresh',
+      init: { method: 'POST', body: JSON.stringify({ refresh_token: 'rt-1' }) },
+    });
+    expect(buildOidcAuthorizeRequest({ code_challenge: 'xyz' })).toEqual({
+      path: '/client/auth/oidc/authorize',
+      init: {
+        method: 'POST',
+        body: JSON.stringify({ code_challenge_method: 'S256', code_challenge: 'xyz' }),
+      },
+    });
+    expect(buildSendFriendRequest('u-2', 'hi')).toEqual({
+      path: '/client/contacts/friend-requests',
+      init: { method: 'POST', body: JSON.stringify({ friend_id: 'u-2', message: 'hi' }) },
+    });
+    expect(buildSendFriendRequest('u-3')).toEqual({
+      path: '/client/contacts/friend-requests',
+      init: { method: 'POST', body: JSON.stringify({ friend_id: 'u-3' }) },
+    });
+    expect(buildUpdateContactRemarkRequest('user/c', 'buddy')).toEqual({
+      path: '/client/contacts/user%2Fc/remark',
+      init: { method: 'PUT', body: JSON.stringify({ remark: 'buddy' }) },
+    });
+    expect(buildAddSessionMembersRequest('sess/1', ['a', 'b'])).toEqual({
+      path: '/client/sessions/sess%2F1/members',
+      init: { method: 'POST', body: JSON.stringify({ member_ids: ['a', 'b'] }) },
+    });
+    expect(buildTransferSessionOwnershipRequest('sess/1', 'owner-9')).toEqual({
+      path: '/client/sessions/sess%2F1/transfer-owner',
+      init: { method: 'POST', body: JSON.stringify({ new_owner_id: 'owner-9' }) },
+    });
+    expect(buildMarkReadRequest('sess/1', 42)).toEqual({
+      path: '/client/sessions/sess%2F1/read',
+      init: { method: 'POST', body: JSON.stringify({ last_read_seq: 42 }) },
+    });
+    expect(buildPinMessageRequest('msg/1', 'sess/9')).toEqual({
+      path: '/client/messages/msg%2F1/pin',
+      init: { method: 'POST', body: JSON.stringify({ session_id: 'sess/9' }) },
+    });
+    expect(buildUnpinMessageRequest('msg/1', 'sess/9')).toEqual({
+      path: '/client/messages/msg%2F1/pin',
+      init: { method: 'DELETE', body: JSON.stringify({ session_id: 'sess/9' }) },
+    });
+    expect(buildForwardMessageRequest('msg/1', ['s1', 's2'])).toEqual({
+      path: '/client/messages/msg%2F1/forward',
+      init: { method: 'POST', body: JSON.stringify({ target_session_ids: ['s1', 's2'] }) },
+    });
+
+    expect(buildAckTaskRequest('task/1')).toEqual({
+      path: '/edge/agent-tasks/task%2F1/ack',
+      init: { method: 'POST' },
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(buildAckTaskRequest('task/1').init, 'body'),
+    ).toBe(false);
+    expect(buildAckTaskRequest('task/1', 'run-9')).toEqual({
+      path: '/edge/agent-tasks/task%2F1/ack',
+      init: { method: 'POST', body: JSON.stringify({ run_id: 'run-9' }) },
+    });
+    expect(buildStreamTaskRequest('task/1', 'hello', 'run-2')).toEqual({
+      path: '/edge/agent-tasks/task%2F1/stream',
+      init: { method: 'POST', body: JSON.stringify({ content: 'hello', run_id: 'run-2' }) },
+    });
+    expect(buildDoneTaskRequest('task/1', 'done')).toEqual({
+      path: '/edge/agent-tasks/task%2F1/done',
+      init: { method: 'POST', body: JSON.stringify({ final_content: 'done' }) },
+    });
+    expect(buildFailTaskRequest('task/1', 'boom', 'run-4')).toEqual({
+      path: '/edge/agent-tasks/task%2F1/fail',
+      init: { method: 'POST', body: JSON.stringify({ error: 'boom', run_id: 'run-4' }) },
+    });
+    expect(buildTriggerAgentTaskRequest('msg-1', { agent_type: 'claude' })).toEqual({
+      path: '/web/agent-tasks',
+      init: {
+        method: 'POST',
+        body: JSON.stringify({ trigger_message_id: 'msg-1', agent_type: 'claude' }),
+      },
+    });
+    expect(buildAddMessageReactionRequest('msg/1', 'sess-1', { emoji: '👍' })).toEqual({
+      path: '/client/messages/msg%2F1/reactions',
+      init: { method: 'POST', body: JSON.stringify({ session_id: 'sess-1', emoji: '👍' }) },
+    });
+    expect(buildRemoveMessageReactionRequest('msg/1', 'sess-1', { emoji: '👍' })).toEqual({
+      path: '/client/messages/msg%2F1/reactions',
+      init: { method: 'DELETE', body: JSON.stringify({ session_id: 'sess-1', emoji: '👍' }) },
+    });
+    expect(buildPatchSettingsRequest({ theme: 'dark' })).toEqual({
+      path: '/client/settings',
+      init: { method: 'PATCH', body: JSON.stringify({ values: { theme: 'dark' } }) },
+    });
+    expect(buildProbeAttachmentRequest('sha256')).toEqual({
+      path: '/client/attachments/probe',
+      init: { method: 'POST', body: JSON.stringify({ hash: 'sha256' }) },
+    });
+    expect(buildStreamTaskEventRequest('task/1', 'token', { t: 1 }, { runId: 'r1' })).toEqual({
+      path: '/edge/agent-tasks/task%2F1/stream',
+      init: {
+        method: 'POST',
+        body: JSON.stringify({ event_type: 'token', payload: { t: 1 }, run_id: 'r1' }),
+      },
+    });
+
+    const file = new File(['hello'], 'note.txt', { type: 'text/plain' });
+    const upload = buildUploadAttachmentRequest(file, 'hash-1');
+    expect(upload.path).toBe('/client/attachments');
+    expect(upload.formData.get('hash')).toBe('hash-1');
+    expect(upload.formData.get('original_name')).toBe('note.txt');
   });
 });
