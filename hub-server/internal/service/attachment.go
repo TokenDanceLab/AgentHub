@@ -20,9 +20,19 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// ObjectStorage abstracts blob storage for attachment content.
-// LocalStorage implements it with the local filesystem; S3Storage
-// implements it with any S3-compatible object store.
+// ── AttachmentService ports + type ───────────────────────────────────────────
+//
+// Same-package thin first seam (#606): AttachmentService already owns attachment
+// metadata + blob orchestration (probe/save/store/get/delete/presign/access-check
+// + mime allowlist). This seam hardens replaceable storage port ownership without
+// a package move — same pattern as MessageService (#585) / SessionService (#593) /
+// ContactService (#594). Full service/im subpackage extract remains deferred.
+// Optional deliveryOutboxRecord model/repository package move remains high-risk
+// after #551 private ownership and is not chosen here.
+//
+// ObjectStorage is the attachment blob storage port. LocalStorage implements it
+// with the local filesystem; S3Storage implements it with any S3-compatible
+// object store. Production wiring injects a concrete store; tests inject fakes.
 type ObjectStorage interface {
 	// Put stores a blob at the given key. Returns (true, nil) when a
 	// new blob was created, (false, nil) when it already existed.
@@ -181,14 +191,36 @@ func (s *S3Storage) PresignURL(ctx context.Context, key string, contentType stri
 
 // ── AttachmentService ───────────────────────────────────────────────────────
 
+// AttachmentService owns attachment metadata + blob orchestration in the flat
+// service package: hash probe/dedup save, blob put/get/delete/presign, active
+// session-member access check, and upload mime/size policy. Blob I/O goes
+// through the injected ObjectStorage port. Not a package move (#606).
 type AttachmentService struct {
 	db        *gorm.DB
 	uploadCfg config.UploadConfig
 	storage   ObjectStorage
 }
 
+// NewAttachmentService constructs an AttachmentService.
+// storage may be nil for metadata-only/partial tests; blob paths error or no-op.
 func NewAttachmentService(db *gorm.DB, uploadCfg config.UploadConfig, storage ObjectStorage) *AttachmentService {
 	return &AttachmentService{db: db, uploadCfg: uploadCfg, storage: storage}
+}
+
+// SetStorage injects (or replaces) the attachment blob storage port.
+func (s *AttachmentService) SetStorage(storage ObjectStorage) {
+	if s == nil {
+		return
+	}
+	s.storage = storage
+}
+
+// storagePort is a nil-safe accessor for the ObjectStorage port.
+func (s *AttachmentService) storagePort() ObjectStorage {
+	if s == nil {
+		return nil
+	}
+	return s.storage
 }
 
 func (s *AttachmentService) ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error) {
@@ -267,7 +299,11 @@ func (s *AttachmentService) StoreBlob(ctx context.Context, hash string, r io.Rea
 	if key == "" {
 		return false, fmt.Errorf("invalid attachment hash: %s", hash)
 	}
-	return s.storage.Put(ctx, key, r, contentType)
+	store := s.storagePort()
+	if store == nil {
+		return false, fmt.Errorf("attachment storage is not configured")
+	}
+	return store.Put(ctx, key, r, contentType)
 }
 
 // GetBlob retrieves attachment content from storage. The caller must close
@@ -277,7 +313,11 @@ func (s *AttachmentService) GetBlob(ctx context.Context, hash string) (io.ReadCl
 	if key == "" {
 		return nil, fmt.Errorf("invalid attachment hash: %s", hash)
 	}
-	return s.storage.Get(ctx, key)
+	store := s.storagePort()
+	if store == nil {
+		return nil, fmt.Errorf("attachment storage is not configured")
+	}
+	return store.Get(ctx, key)
 }
 
 // DeleteBlob removes attachment content from storage.
@@ -286,17 +326,25 @@ func (s *AttachmentService) DeleteBlob(ctx context.Context, hash string) error {
 	if key == "" {
 		return nil
 	}
-	return s.storage.Delete(ctx, key)
+	store := s.storagePort()
+	if store == nil {
+		return nil
+	}
+	return store.Delete(ctx, key)
 }
 
 // BlobLocalPath returns the filesystem path for the blob when using local
-// storage. Returns an empty string for remote storage.
+// storage. Returns an empty string for remote storage or when storage is unset.
 func (s *AttachmentService) BlobLocalPath(hash string) string {
 	key := PathFromHash(hash)
 	if key == "" {
 		return ""
 	}
-	return s.storage.LocalPath(key)
+	store := s.storagePort()
+	if store == nil {
+		return ""
+	}
+	return store.LocalPath(key)
 }
 
 // PresignBlobURL returns a direct-download URL for remote storage when the
@@ -306,7 +354,11 @@ func (s *AttachmentService) PresignBlobURL(ctx context.Context, hash string, con
 	if key == "" {
 		return "", nil
 	}
-	return s.storage.PresignURL(ctx, key, contentType, contentDisposition, 15*time.Minute)
+	store := s.storagePort()
+	if store == nil {
+		return "", nil
+	}
+	return store.PresignURL(ctx, key, contentType, contentDisposition, 15*time.Minute)
 }
 
 func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {
