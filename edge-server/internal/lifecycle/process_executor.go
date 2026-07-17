@@ -262,10 +262,10 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	run, ok := e.store.GetRun(runID)
 	if !ok {
-		return CancelResult{Found: false, Status: "not_found"}
+		return cancelResultNotFound()
 	}
 	if !isCancellableRunStatus(run.Status) {
-		return CancelResult{Run: run, Found: true, Status: run.Status}
+		return cancelResultWithRun(run)
 	}
 
 	// Send adapter-specific interrupt via stdin before canceling context.
@@ -273,14 +273,14 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	// flush session state) rather than being killed by SIGTERM.
 	e.mu.Lock()
 	if stdin, ok := e.stdins[runID]; ok {
-		if err := adapters.WriteInterrupt(stdin, "interrupt-"+runID); err != nil {
+		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); err != nil {
 			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
 	}
 	cancel, ok := e.running[runID]
 	e.mu.Unlock()
 	if !ok {
-		return CancelResult{Found: false, Status: "not_running"}
+		return cancelResultNotRunning()
 	}
 
 	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
@@ -321,11 +321,11 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
 	if !ok {
 		if current, found := e.store.GetRun(runID); found {
-			return CancelResult{Run: current, Found: true, Status: current.Status}
+			return cancelResultWithRun(current)
 		}
-		return CancelResult{Found: false, Status: "not_found"}
+		return cancelResultNotFound()
 	}
-	return CancelResult{Run: run, Found: true, Status: run.Status}
+	return cancelResultWithRun(run)
 }
 
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
@@ -360,7 +360,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Preflight check: if the adapter implements PreflightAdapter, verify
 	// it is properly configured (e.g. API keys, credentials) before launching
 	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
-	if preflight, ok := adapter.(adapters.PreflightAdapter); ok && preflight != nil {
+	if preflight, ok := asPreflightAdapter(adapter); ok {
 		if err := preflight.PreflightCheck(); err != nil {
 			slog.Warn("process: adapter preflight check failed",
 				"runId", run.ID,
@@ -437,7 +437,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 		// Take workdir snapshot for auto-surface detection (post-finish).
 		// Captures pre-run file state so we can detect new/modified files.
-		if workDir != "" {
+		if shouldTrackWorkDir(workDir) {
 			snapshot := adapters.TakeWorkdirSnapshot(workDir)
 			e.mu.Lock()
 			e.workDirs[run.ID] = workDir
@@ -589,7 +589,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// whether the context budget exceeded the auto-compaction threshold.
 		// When triggered, we log the budget state and emit a compaction event
 		// so upstream session managers can compact the actual message history.
-		if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
+		if shouldEmitContextCompaction(runCtx.Budget) {
 			usagePct := runCtx.Budget.UsagePercent()
 			tokensUsed := runCtx.Budget.UsedTokens.Load()
 			remaining := runCtx.Budget.Remaining()
@@ -672,11 +672,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// TypeScript typecheck+test, generic file existence) against the workDir.
 		// If verification fails, the run is marked as completed_with_issues instead
 		// of finished, and the full evidence output is stored in run metadata.
-		finalStatus := "finished"
-		if isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir) {
+		gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir)
+		finalStatus := resolveEvidenceFinalStatus(gateEnabled, true)
+		if gateEnabled {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-			finalStatus = evidenceGateFinalStatus(evidenceResult.Passed)
+			finalStatus = resolveEvidenceFinalStatus(true, evidenceResult.Passed)
 			if !evidenceResult.Passed {
 				slog.Warn("process: evidence gate verification failed",
 					"runId", run.ID,
@@ -986,14 +987,14 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// tampered with, the raw persisted output does not leak API keys,
 	// file paths, or stack traces.
 	if e.resultAgg != nil {
-		e.resultAgg.StoreSubAgentResult(inst.ParentID, SubAgentResult{
-			AgentID:     agentID,
-			AgentName:   inst.Name,
-			RunID:       runID,
-			Status:      status,
-			Output:      aggregatorOutput(payload, sanitizedResult, sanitizeReason),
-			CompletedAt: time.Now().UTC(),
-		})
+		e.resultAgg.StoreSubAgentResult(inst.ParentID, buildSubAgentResult(
+			agentID,
+			inst.Name,
+			runID,
+			status,
+			aggregatorOutput(payload, sanitizedResult, sanitizeReason),
+			time.Now().UTC(),
+		))
 	}
 
 	// Decrement per-parent active child count so the slot can be reused.
@@ -1010,13 +1011,9 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
-	if evidenceEmitter := newRuntimeEvidenceEmitter(e.store, run, emitter); evidenceEmitter != nil {
-		emitter = evidenceEmitter
-	}
+	emitter = coalesceEmitter(emitter, newRuntimeEvidenceEmitter(e.store, run, emitter))
 	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
-	if transcriptEmitter != nil {
-		emitter = transcriptEmitter
-	}
+	emitter = coalesceEmitter(emitter, transcriptEmitter)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -1090,7 +1087,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// On success, the slot is released by sendSubAgentResult when the child
 	// run completes (keeps increment/decrement pair lexically close).
 	defer func() {
-		if err != nil && slotReserved {
+		if shouldReleaseReservedSpawnSlot(err, slotReserved) {
 			e.agentRegistry.DecrChildCount(parentRun.ID)
 		}
 	}()
@@ -1171,7 +1168,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		// Set slotReserved=false BEFORE Unregister to prevent the
 		// deferred DecrChildCount from double-decrementing.
 		// Unregister already decrements childrenCount internally.
-		if registered {
+		if shouldUnregisterOnStartFailure(registered) {
 			slotReserved = false
 			e.agentRegistry.Unregister(agentInstanceID)
 		}
