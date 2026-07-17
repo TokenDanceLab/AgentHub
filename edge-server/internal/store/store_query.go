@@ -333,6 +333,99 @@ func collectKeysByRunID[T any](items map[string]T, runID string, runOf func(T) s
 	return keys
 }
 
+// collectKeysByThreadID returns map keys whose value's thread id matches threadID.
+func collectKeysByThreadID[T any](items map[string]T, threadID string, threadOf func(T) string) map[string]struct{} {
+	keys := make(map[string]struct{})
+	for id, item := range items {
+		if threadOf(item) == threadID {
+			keys[id] = struct{}{}
+		}
+	}
+	return keys
+}
+
+// orderWithoutRemoved drops any id present in remove from order, preserving relative order.
+func orderWithoutRemoved(order []string, remove map[string]struct{}) []string {
+	return filterIDs(order, func(id string) bool {
+		_, drop := remove[id]
+		return !drop
+	})
+}
+
+// orderKeepPresent keeps only ids that still exist in items.
+func orderKeepPresent[T any](order []string, items map[string]T) []string {
+	return filterIDs(order, func(id string) bool {
+		_, ok := items[id]
+		return ok
+	})
+}
+
+// lookupThreadInProject returns the thread when it exists and belongs to projectID.
+func lookupThreadInProject(threads map[string]Thread, threadID, projectID string) (Thread, bool) {
+	thread, ok := threads[threadID]
+	if !ok || thread.ProjectID != projectID {
+		return Thread{}, false
+	}
+	return thread, true
+}
+
+// lookupRunInThread returns the run when it exists and belongs to threadID.
+func lookupRunInThread(runs map[string]Run, runID, threadID string) (Run, bool) {
+	run, ok := runs[runID]
+	if !ok || run.ThreadID != threadID {
+		return Run{}, false
+	}
+	return run, true
+}
+
+// lookupItemInThread returns the item when it exists and belongs to threadID.
+func lookupItemInThread(items map[string]Item, itemID, threadID string) (Item, bool) {
+	item, ok := items[itemID]
+	if !ok || item.ThreadID != threadID {
+		return Item{}, false
+	}
+	return item, true
+}
+
+// existingThreadConflict reports whether an already-stored thread may be reused for projectID.
+// ok is false when the thread belongs to a different project.
+func existingThreadConflict(existing Thread, projectID string) bool {
+	return existing.ProjectID != projectID
+}
+
+func touchAgentProfile(profile AgentProfile, now string) AgentProfile {
+	profile.UpdatedAt = now
+	return profile
+}
+
+func ensureSettingsMap(settings map[string]string) map[string]string {
+	if settings == nil {
+		return make(map[string]string)
+	}
+	return settings
+}
+
+// resolveCleanupNow fills a zero Now with the provided fallback (usually UTC now).
+func resolveCleanupNow(now, fallback time.Time) time.Time {
+	if now.IsZero() {
+		return fallback
+	}
+	return now
+}
+
+// collectRunEvidenceKeys returns evidence map keys scoped to a single run.
+func collectRunEvidenceKeys(
+	diffs map[string]RunDiffFile,
+	artifacts map[string]Artifact,
+	previews map[string]Preview,
+	runID string,
+) (diffKeys, artifactKeys, previewKeys map[string]struct{}) {
+	diffKeys = collectKeysByRunID(diffs, runID, func(file RunDiffFile) string { return file.RunID })
+	artifactKeys = collectKeysByRunID(artifacts, runID, func(artifact Artifact) string { return artifact.RunID })
+	previewKeys = collectKeysByRunID(previews, runID, func(preview Preview) string { return preview.RunID })
+	return diffKeys, artifactKeys, previewKeys
+}
+
 // runCleanupCandidate is a pure view of a terminal run used by cleanup selection.
 type runCleanupCandidate struct {
 	id         string

@@ -347,7 +347,7 @@ func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabe
 		return Thread{}, ErrNotFound
 	}
 	if existing, ok := s.threads[id]; ok {
-		if existing.ProjectID != projectID {
+		if existingThreadConflict(existing, projectID) {
 			return Thread{}, fmt.Errorf("thread %q already exists in project %q", id, existing.ProjectID)
 		}
 		return existing, nil
@@ -388,19 +388,19 @@ func (s *Store) DeleteThread(id string) bool {
 	delete(s.threads, id)
 	s.threadOrder = removeString(s.threadOrder, id)
 
-	for runID, run := range s.runs {
-		if run.ThreadID == id {
-			delete(s.runs, runID)
-			s.runOrder = removeString(s.runOrder, runID)
-			s.removeRunEvidence(runID)
-		}
+	runIDs := collectKeysByThreadID(s.runs, id, func(run Run) string { return run.ThreadID })
+	for runID := range runIDs {
+		delete(s.runs, runID)
+		s.removeRunEvidence(runID)
 	}
-	for itemID, item := range s.items {
-		if item.ThreadID == id {
-			delete(s.items, itemID)
-			s.itemOrder = removeString(s.itemOrder, itemID)
-		}
+	s.runOrder = orderWithoutRemoved(s.runOrder, runIDs)
+
+	itemIDs := collectKeysByThreadID(s.items, id, func(item Item) string { return item.ThreadID })
+	for itemID := range itemIDs {
+		delete(s.items, itemID)
 	}
+	s.itemOrder = orderWithoutRemoved(s.itemOrder, itemIDs)
+
 	s.removePins(func(pin ThreadPin) bool {
 		return pin.ThreadID == id
 	})
@@ -422,8 +422,7 @@ func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
 	if _, ok := s.projects[projectID]; !ok {
 		return Run{}, ErrNotFound
 	}
-	thread, ok := s.threads[threadID]
-	if !ok || thread.ProjectID != projectID {
+	if _, ok := lookupThreadInProject(s.threads, threadID, projectID); !ok {
 		return Run{}, ErrNotFound
 	}
 	if existing, ok := s.runs[id]; ok {
@@ -566,9 +565,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if opts.Now.IsZero() {
-		opts.Now = time.Now().UTC()
-	}
+	opts.Now = resolveCleanupNow(opts.Now, time.Now().UTC())
 
 	candidates := buildTerminalCleanupCandidates(s.runOrder, s.runs)
 	removeRuns := selectRunsForCleanup(candidates, opts.Now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
@@ -581,10 +578,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 		delete(s.runs, id)
 		s.removeRunEvidence(id)
 	}
-	s.runOrder = filterIDs(s.runOrder, func(id string) bool {
-		_, remove := removeRuns[id]
-		return !remove
-	})
+	s.runOrder = orderWithoutRemoved(s.runOrder, removeRuns)
 
 	removedItemIDs := collectItemIDsForRemovedRuns(s.items, removeRuns)
 	for id := range removedItemIDs {
@@ -592,10 +586,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	}
 	removedItems := len(removedItemIDs)
 	if removedItems > 0 {
-		s.itemOrder = filterIDs(s.itemOrder, func(id string) bool {
-			_, ok := s.items[id]
-			return ok
-		})
+		s.itemOrder = orderKeepPresent(s.itemOrder, s.items)
 		s.removePins(func(pin ThreadPin) bool {
 			_, removed := removedItemIDs[pin.ItemID]
 			return removed
@@ -674,13 +665,11 @@ func (s *Store) CreateItem(item Item) (Item, error) {
 	if _, ok := s.projects[item.ProjectID]; !ok {
 		return Item{}, ErrNotFound
 	}
-	thread, ok := s.threads[item.ThreadID]
-	if !ok || thread.ProjectID != item.ProjectID {
+	if _, ok := lookupThreadInProject(s.threads, item.ThreadID, item.ProjectID); !ok {
 		return Item{}, ErrNotFound
 	}
 	if item.RunID != "" {
-		run, ok := s.runs[item.RunID]
-		if !ok || run.ThreadID != item.ThreadID {
+		if _, ok := lookupRunInThread(s.runs, item.RunID, item.ThreadID); !ok {
 			return Item{}, ErrNotFound
 		}
 	}
@@ -728,8 +717,7 @@ func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, err
 	if _, ok := s.threads[threadID]; !ok {
 		return ThreadPin{}, ErrNotFound
 	}
-	item, ok := s.items[itemID]
-	if !ok || item.ThreadID != threadID {
+	if _, ok := lookupItemInThread(s.items, itemID, threadID); !ok {
 		return ThreadPin{}, ErrNotFound
 	}
 
@@ -780,34 +768,23 @@ func (s *Store) removePins(match func(ThreadPin) bool) {
 			delete(s.pins, id)
 		}
 	}
-	s.pinOrder = filterIDs(s.pinOrder, func(id string) bool {
-		_, ok := s.pins[id]
-		return ok
-	})
+	s.pinOrder = orderKeepPresent(s.pinOrder, s.pins)
 }
 
 func (s *Store) removeRunEvidence(runID string) {
-	for id := range collectKeysByRunID(s.diffs, runID, func(file RunDiffFile) string { return file.RunID }) {
+	diffKeys, artifactKeys, previewKeys := collectRunEvidenceKeys(s.diffs, s.artifacts, s.previews, runID)
+	for id := range diffKeys {
 		delete(s.diffs, id)
 	}
-	s.diffOrder = filterIDs(s.diffOrder, func(id string) bool {
-		_, ok := s.diffs[id]
-		return ok
-	})
-	for id := range collectKeysByRunID(s.artifacts, runID, func(artifact Artifact) string { return artifact.RunID }) {
+	s.diffOrder = orderKeepPresent(s.diffOrder, s.diffs)
+	for id := range artifactKeys {
 		delete(s.artifacts, id)
 	}
-	s.artifactOrder = filterIDs(s.artifactOrder, func(id string) bool {
-		_, ok := s.artifacts[id]
-		return ok
-	})
-	for id := range collectKeysByRunID(s.previews, runID, func(preview Preview) string { return preview.RunID }) {
+	s.artifactOrder = orderKeepPresent(s.artifactOrder, s.artifacts)
+	for id := range previewKeys {
 		delete(s.previews, id)
 	}
-	s.previewOrder = filterIDs(s.previewOrder, func(id string) bool {
-		_, ok := s.previews[id]
-		return ok
-	})
+	s.previewOrder = orderKeepPresent(s.previewOrder, s.previews)
 }
 
 // ── UserProfile CRUD ──────────────────────────────────────
@@ -887,8 +864,7 @@ func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfil
 	if !ok {
 		return AgentProfile{}, ErrNotFound
 	}
-	profile = applyAgentProfilePatch(profile, patch)
-	profile.UpdatedAt = nowString()
+	profile = touchAgentProfile(applyAgentProfilePatch(profile, patch), nowString())
 	s.agentProfiles[id] = profile
 	return profile, nil
 }
@@ -917,9 +893,7 @@ func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.settings == nil {
-		s.settings = make(map[string]string)
-	}
+	s.settings = ensureSettingsMap(s.settings)
 	applySettingsPatch(s.settings, patch)
 	s.settingsMtime = nowString()
 	return cloneUserSettings(s.settings, s.settingsMtime)
