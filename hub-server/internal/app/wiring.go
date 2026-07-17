@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/workspace"
@@ -89,9 +90,9 @@ func (a *App) Run(ctx context.Context) error {
 	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
 	a.NotificationService = service.NewNotificationService(a.DB, a.mgr)
 	// Attachment storage: S3 when configured, otherwise local filesystem.
-	var attachmentStorage service.ObjectStorage
+	var attachmentStorage attachment.ObjectStorage
 	if a.Config.S3.IsConfigured() {
-		s3Store, err := service.NewS3StorageFromConfig(ctx, a.Config.S3)
+		s3Store, err := attachment.NewS3StorageFromConfig(ctx, a.Config.S3)
 		if err != nil {
 			return fmt.Errorf("s3 attachment storage init failed: %w", err)
 		} else {
@@ -99,9 +100,9 @@ func (a *App) Run(ctx context.Context) error {
 			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
 		}
 	} else {
-		attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
+		attachmentStorage = attachment.NewLocalStorage(a.Config.Upload.Dir)
 	}
-	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
+	a.AttachmentService = attachment.NewService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = contact.NewService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)

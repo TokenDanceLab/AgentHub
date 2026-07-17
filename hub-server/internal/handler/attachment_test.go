@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/attachment"
 )
 
 type mockAttachmentService struct {
@@ -436,10 +437,10 @@ func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	sum := sha256.Sum256(content)
 	hash := hex.EncodeToString(sum[:])
 
-	svc := service.NewAttachmentService(
+	svc := attachment.NewService(
 		db,
 		config.UploadConfig{Dir: uploadDir, MaxSize: 1024},
-		service.NewLocalStorage(uploadDir),
+		attachment.NewLocalStorage(uploadDir),
 	)
 	h := handler.NewAttachmentHandler(svc)
 

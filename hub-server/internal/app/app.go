@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -42,7 +43,7 @@ type App struct {
 	MessageReactionService *messagereaction.Service
 	AgentService           *service.AgentService
 	AgentControlService    *service.AgentControlService
-	AttachmentService      *service.AttachmentService
+	AttachmentService      *attachment.Service
 	NotificationService    *service.NotificationService
 	DeviceService          *service.DeviceService
 		DocumentService        *service.DocumentService
