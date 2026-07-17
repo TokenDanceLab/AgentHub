@@ -65,9 +65,10 @@ type WorkspaceThreadMessage struct {
 }
 
 // WorkspaceService exposes Web-owned project CRUD backed by Hub workspaces.
-// #639: pure thread-message content normalize helpers live in service/im;
-// WorkspaceService keeps thin aliases for same-package call sites. No bus/cache
-// ports yet (service is DB-only); typed package move remains deferred.
+// #639/#651: pure thread-message content + name/description normalize helpers
+// live in service/im; WorkspaceService keeps thin aliases for same-package call
+// sites. No bus/cache ports (service is DB-only); typed package move remains
+// deferred — see boundary map §6g for the next IM typed-service sketch.
 type WorkspaceService struct {
 	db *gorm.DB
 }
@@ -77,8 +78,8 @@ func NewWorkspaceService(db *gorm.DB) *WorkspaceService {
 }
 
 func (s *WorkspaceService) Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error) {
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
+	name, err := normalizeWorkspaceName(req.Name)
+	if err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage("workspace name is required")
 	}
 
@@ -93,7 +94,7 @@ func (s *WorkspaceService) Create(ctx context.Context, ownerID string, req *mode
 	req.ID = ""
 	req.OwnerID = ownerID
 	req.Name = name
-	req.Description = strings.TrimSpace(req.Description)
+	req.Description = normalizeWorkspaceDescription(req.Description)
 	if err := repository.CreateWorkspace(s.db, req); err != nil {
 		return nil, err
 	}
@@ -127,8 +128,8 @@ func (s *WorkspaceService) Update(ctx context.Context, id, ownerID string, req *
 	}
 
 	if req.Name != nil {
-		name := strings.TrimSpace(*req.Name)
-		if name == "" {
+		name, err := normalizeWorkspaceName(*req.Name)
+		if err != nil {
 			return nil, errcode.ErrBadRequest.WithMessage("workspace name is required")
 		}
 		if name != workspace.Name {
@@ -143,7 +144,7 @@ func (s *WorkspaceService) Update(ctx context.Context, id, ownerID string, req *
 		workspace.Name = name
 	}
 	if req.Description != nil {
-		workspace.Description = strings.TrimSpace(*req.Description)
+		workspace.Description = normalizeWorkspaceDescription(*req.Description)
 	}
 
 	if err := repository.UpdateWorkspace(s.db, workspace); err != nil {
@@ -153,7 +154,7 @@ func (s *WorkspaceService) Update(ctx context.Context, id, ownerID string, req *
 }
 
 func (s *WorkspaceService) List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*WorkspaceListResult, error) {
-	workspaces, hasMore, err := repository.ListWorkspaces(s.db, ownerID, strings.TrimSpace(q), cursor, pageSize)
+	workspaces, hasMore, err := repository.ListWorkspaces(s.db, ownerID, normalizeWorkspaceDescription(q), cursor, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +184,8 @@ func (s *WorkspaceService) CreateThread(ctx context.Context, projectID, ownerID 
 	if _, err := s.Get(ctx, projectID, ownerID); err != nil {
 		return nil, err
 	}
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
+	name, err := normalizeWorkspaceName(req.Name)
+	if err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage("thread name is required")
 	}
 
@@ -194,7 +195,7 @@ func (s *WorkspaceService) CreateThread(ctx context.Context, projectID, ownerID 
 		OwnerUserID: &ownerID,
 		WorkspaceID: &projectID,
 	}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
@@ -349,4 +350,14 @@ func workspaceThreadMessageFromModel(msg model.Message, projectID, threadID stri
 // im.NormalizeWorkspaceThreadMessageContent.
 func normalizeWorkspaceThreadMessageContent(contentType, content string) (string, error) {
 	return im.NormalizeWorkspaceThreadMessageContent(contentType, content)
+}
+
+// normalizeWorkspaceName is a thin alias to im.NormalizeRequiredName.
+func normalizeWorkspaceName(name string) (string, error) {
+	return im.NormalizeRequiredName(name)
+}
+
+// normalizeWorkspaceDescription is a thin alias to im.NormalizeOptionalText.
+func normalizeWorkspaceDescription(text string) string {
+	return im.NormalizeOptionalText(text)
 }
