@@ -5,9 +5,11 @@ import {
   normalizeRegisterDeviceRequest,
   qs,
   shouldContinueRouteFallback,
+  shouldUseChangePasswordFallback,
+  unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799 / #935)', () => {
+describe('hubClientRequestUtils (#799 / #935 / #957)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -36,6 +38,19 @@ describe('hubClientRequestUtils (#799 / #935)', () => {
     expect(shouldContinueRouteFallback(1, 2, notFound)).toBe(false);
     expect(shouldContinueRouteFallback(0, 2, server)).toBe(false);
     expect(shouldContinueRouteFallback(0, 1, notFound)).toBe(false);
+  });
+
+  it('peels change-password fallback + unresolved route residual (#957)', () => {
+    const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
+    const methodNotAllowed = new AppError({ error: { code: 'x', message: 'm' } }, 405);
+    const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
+    expect(shouldUseChangePasswordFallback(notFound)).toBe(true);
+    expect(shouldUseChangePasswordFallback(methodNotAllowed)).toBe(true);
+    expect(shouldUseChangePasswordFallback(server)).toBe(false);
+    expect(shouldUseChangePasswordFallback(new Error('boom'))).toBe(false);
+
+    expect(unresolvedRouteFallbackError(notFound)).toBe(notFound);
+    expect(unresolvedRouteFallbackError(undefined)).toBeUndefined();
   });
 
   it('normalizes register-device defaults and capabilities arrays', () => {
