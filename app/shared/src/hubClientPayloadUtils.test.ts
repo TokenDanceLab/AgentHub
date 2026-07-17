@@ -2,21 +2,39 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAttachmentDownloadUrl,
   buildAttachmentFormData,
+  buildCancelAgentTaskPaths,
+  buildDecideTeamApprovalPath,
+  buildForwardMessageBody,
+  buildFriendRequestBody,
+  buildListMessageReactionsPath,
+  buildListTaskRunEventsAfterPath,
+  buildMarkNotificationReadPaths,
+  buildMarkReadBody,
+  buildMemberIdsBody,
   buildOidcAuthorizeBody,
   buildPatchSettingsBody,
+  buildPostTeamRouteDecisionPath,
   buildProbeAttachmentBody,
   buildReactionBody,
+  buildReadAllNotificationsPaths,
+  buildRefreshBody,
+  buildRemarkBody,
+  buildResolveTeamConflictPath,
+  buildSearchSessionsPath,
+  buildSearchUserPath,
+  buildSessionIdBody,
   buildStreamTaskEventBody,
   buildTaskAckBody,
   buildTaskDoneBody,
   buildTaskFailBody,
   buildTaskStreamBody,
+  buildTransferOwnerBody,
   buildTriggerAgentTaskBody,
   normalizeExecutionTargetsResponse,
   withPublicCatalogParams,
 } from './hubClientPayloadUtils';
 
-describe('hubClientPayloadUtils (#810)', () => {
+describe('hubClientPayloadUtils (#810 / #822)', () => {
   it('normalizes execution-target array vs {items,page} responses', () => {
     expect(
       normalizeExecutionTargetsResponse([
@@ -119,6 +137,60 @@ describe('hubClientPayloadUtils (#810)', () => {
       session_id: 'sess-1',
       emoji: '👍',
     });
+  });
+
+  it('builds residual request-body object literals (#822)', () => {
+    expect(buildRefreshBody('rt-1')).toEqual({ refresh_token: 'rt-1' });
+    expect(buildFriendRequestBody('u-2', 'hi')).toEqual({
+      friend_id: 'u-2',
+      message: 'hi',
+    });
+    expect(buildFriendRequestBody('u-3')).toEqual({
+      friend_id: 'u-3',
+      message: undefined,
+    });
+    expect(buildRemarkBody('buddy')).toEqual({ remark: 'buddy' });
+    expect(buildMemberIdsBody(['a', 'b'])).toEqual({ member_ids: ['a', 'b'] });
+    expect(buildTransferOwnerBody('owner-9')).toEqual({ new_owner_id: 'owner-9' });
+    expect(buildMarkReadBody(42)).toEqual({ last_read_seq: 42 });
+    expect(buildSessionIdBody('sess-9')).toEqual({ session_id: 'sess-9' });
+    expect(buildForwardMessageBody(['s1', 's2'])).toEqual({
+      target_session_ids: ['s1', 's2'],
+    });
+  });
+
+  it('builds residual path/query helpers (#822)', () => {
+    expect(buildSearchUserPath('user/1')).toBe('/client/contacts/search?id=user%2F1');
+    expect(buildSearchSessionsPath('hello world')).toBe(
+      '/client/sessions/search?q=hello%20world',
+    );
+    expect(buildListMessageReactionsPath('msg/1', 'sess/2')).toBe(
+      '/client/messages/msg%2F1/reactions?session_id=sess%2F2',
+    );
+    expect(buildListTaskRunEventsAfterPath('task/1', 7)).toBe(
+      '/web/agent-tasks/task%2F1/events?after_seq=7&limit=500',
+    );
+    expect(buildCancelAgentTaskPaths('task/1')).toEqual([
+      '/web/agent-tasks/task%2F1:cancel',
+      '/web/agent-tasks/task%2F1/cancel',
+    ]);
+    expect(buildMarkNotificationReadPaths('n/1')).toEqual([
+      '/client/notifications/n%2F1:read',
+      '/client/notifications/n%2F1/read',
+    ]);
+    expect(buildReadAllNotificationsPaths()).toEqual([
+      '/client/notifications:read-all',
+      '/client/notifications/read-all',
+    ]);
+    expect(buildDecideTeamApprovalPath('t/1', 'r/2', 'a/3')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/approvals/a%2F3/decide',
+    );
+    expect(buildResolveTeamConflictPath('t/1', 'r/2', 'c/3')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/conflicts/c%2F3/resolve',
+    );
+    expect(buildPostTeamRouteDecisionPath('t/1', 'r/2')).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/route-decisions',
+    );
   });
 
   it('merges public catalog params and builds attachment helpers', () => {
