@@ -8,8 +8,10 @@ import {
   buildHubFetchInit,
   buildHubUrl,
   buildMultipartFetchInit,
+  buildTokenRefreshReportContext,
   classifyHubRequestCatch,
   createAuthOnlyHeaders,
+  createHubAbortTimeout,
   createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
@@ -18,12 +20,15 @@ import {
   normalizeHubBaseUrl,
   requestMethodOf,
   resolveHubFetch,
+  resolveHubRequestCatch,
   resolveHubTimeoutMs,
   shouldAttemptTokenRefresh,
+  shouldRetryWithRefreshedToken,
   toReportableError,
+  withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -91,6 +96,67 @@ describe('hubClientTransportUtils (#810 / #913 / #935)', () => {
       message: 'Failed to fetch',
     });
     expect(classifyHubRequestCatch('other')).toEqual({ kind: 'other', error: 'other' });
+  });
+
+  it('peels abort timeout, refresh retry, and catch resolution (#957)', async () => {
+    expect(shouldRetryWithRefreshedToken('tok')).toBe(true);
+    expect(shouldRetryWithRefreshedToken('')).toBe(false);
+    expect(shouldRetryWithRefreshedToken(null)).toBe(false);
+    expect(shouldRetryWithRefreshedToken(undefined)).toBe(false);
+
+    expect(buildTokenRefreshReportContext('/client/auth/me')).toEqual({
+      path: '/client/auth/me',
+      context: 'token_refresh',
+    });
+
+    const abort = createHubAbortTimeout(30_000);
+    expect(abort.signal.aborted).toBe(false);
+    abort.clear();
+
+    const ok = await withHubAbortTimeout(30_000, async (signal) => {
+      expect(signal.aborted).toBe(false);
+      return 42;
+    });
+    expect(ok).toBe(42);
+
+    await expect(
+      withHubAbortTimeout(30_000, async () => {
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+
+    const ctx = { timeoutMs: 5_000, method: 'GET', path: '/web/projects' };
+    const timeoutResolved = resolveHubRequestCatch(
+      new DOMException('Aborted', 'AbortError'),
+      ctx,
+    );
+    expect(timeoutResolved.kind).toBe('timeout');
+    if (timeoutResolved.kind === 'timeout') {
+      expect(timeoutResolved.error).toMatchObject({
+        code: 'TIMEOUT',
+        message: 'Request timed out after 5000ms: GET /web/projects',
+      });
+      expect(timeoutResolved.logMessage).toContain('[HubClient]');
+      expect(timeoutResolved.reportContext).toEqual(ctx);
+    }
+
+    const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 403);
+    const appResolved = resolveHubRequestCatch(appErr, ctx);
+    expect(appResolved).toEqual({
+      kind: 'app',
+      error: appErr,
+      reportContext: { path: ctx.path, method: ctx.method },
+    });
+
+    const netResolved = resolveHubRequestCatch(new TypeError('Failed to fetch'), ctx);
+    expect(netResolved.kind).toBe('network');
+    if (netResolved.kind === 'network') {
+      expect(netResolved.error).toMatchObject({ code: 'NETWORK_ERROR' });
+      expect(netResolved.logMessage).toContain('Network request failed');
+      expect(netResolved.reportContext).toEqual({ path: ctx.path, method: ctx.method });
+    }
+
+    expect(resolveHubRequestCatch('other', ctx)).toEqual({ kind: 'other', error: 'other' });
   });
 
   it('classifies AbortError and network fetch TypeError', () => {
