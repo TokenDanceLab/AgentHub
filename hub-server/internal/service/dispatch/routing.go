@@ -1,5 +1,7 @@
 package dispatch
 
+import "github.com/agenthub/hub-server/internal/model"
+
 // HubRelayTargetType is the execution-target type that routes through hub_relay
 // CreateCommand instead of device-bound WebSocket.
 const HubRelayTargetType = "hub_relay"
@@ -9,6 +11,49 @@ const DesktopDeviceType = "desktop"
 
 // AgentDispatchRelayCommand is the relay command name for hub_relay agent dispatch.
 const AgentDispatchRelayCommand = "agent_dispatch"
+
+// RouteKind is the pure primary route classification for dispatchTask (side-effects
+// stay in orchestration: HTTP client, WS push, outbox, repo).
+type RouteKind string
+
+const (
+	// RouteHTTP: unbound task may try local Edge HTTP first.
+	RouteHTTP RouteKind = "http"
+	// RouteHubRelay: target-bound hub_relay with relay service available.
+	RouteHubRelay RouteKind = "hub_relay"
+	// RouteTargetBound: target-bound device WS path (including hub_relay without relay).
+	RouteTargetBound RouteKind = "target_bound"
+	// RouteMissingEdge: target-bound but edge device id is missing (abort).
+	RouteMissingEdge RouteKind = "missing_edge"
+	// RouteInviterDesktop: unbound fallback via inviter desktop WebSocket.
+	RouteInviterDesktop RouteKind = "inviter_desktop"
+	// RouteOffline: unbound fallback to Redis pending queue.
+	RouteOffline RouteKind = "offline"
+)
+
+// ClassifyPrimaryDispatchRoute decides the primary route for a task from pure
+// routing inputs. HTTP is "try first" for unbound tasks; callers keep HTTP/WS/
+// outbox side-effects. Inviter desktop vs offline is ClassifyUnboundFallbackRoute.
+func ClassifyPrimaryDispatchRoute(targetID, targetType, edgeDeviceID string, relayOK bool) RouteKind {
+	if ShouldTryHTTPDispatch(targetID) {
+		return RouteHTTP
+	}
+	if MissingTargetEdgeDevice(targetID, edgeDeviceID) {
+		return RouteMissingEdge
+	}
+	if IsHubRelayRoute(targetType, relayOK) {
+		return RouteHubRelay
+	}
+	return RouteTargetBound
+}
+
+// ClassifyUnboundFallbackRoute classifies post-HTTP unbound routing (desktop vs offline).
+func ClassifyUnboundFallbackRoute(connID string, mgrAvailable bool, routeErr error) RouteKind {
+	if CanPushInviterDesktop(connID, mgrAvailable, routeErr) {
+		return RouteInviterDesktop
+	}
+	return RouteOffline
+}
 
 // ShouldTryHTTPDispatch is true when an unbound task may attempt local Edge HTTP
 // first (no explicit target binding).
@@ -58,4 +103,16 @@ func PinMessageIDs(messageIDs []string) []string {
 	out := make([]string, len(messageIDs))
 	copy(out, messageIDs)
 	return out
+}
+
+// PinMessageIDsFromModels extracts MessageID values from pin rows in order.
+func PinMessageIDsFromModels(pins []model.MessagePin) []string {
+	if len(pins) == 0 {
+		return nil
+	}
+	raw := make([]string, len(pins))
+	for i := range pins {
+		raw[i] = pins[i].MessageID
+	}
+	return PinMessageIDs(raw)
 }
