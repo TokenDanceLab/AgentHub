@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -32,7 +31,7 @@ type edgeCallbackSeq interface {
 }
 
 // edgeCallbackOutbox auto-acks delivery journal rows when Edge acks a task.
-// Implemented by deliveryOutboxAcker (same-package outbox model access).
+// Implemented solely by *DeliveryOutbox (owns deliveryOutboxRecord persistence).
 type edgeCallbackOutbox interface {
 	autoAckDeliveriesForTask(ctx context.Context, taskID string)
 }
@@ -42,34 +41,6 @@ type seqAllocatorFunc func(ctx context.Context, sessionID string) (int64, error)
 
 func (f seqAllocatorFunc) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	return f(ctx, sessionID)
-}
-
-// deliveryOutboxAcker implements edgeCallbackOutbox against the delivery outbox table.
-type deliveryOutboxAcker struct {
-	db *gorm.DB
-}
-
-// autoAckDeliveriesForTask marks all pending/sent/retrying delivery outbox
-// entries for a task as delivered. This is called when the Edge acks the task.
-func (a *deliveryOutboxAcker) autoAckDeliveriesForTask(ctx context.Context, taskID string) {
-	if a == nil || a.db == nil {
-		return
-	}
-	now := time.Now()
-	result := a.db.WithContext(ctx).
-		Model(&deliveryOutboxRecord{}).
-		Where("task_id = ? AND status IN ?", taskID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
-		Updates(map[string]interface{}{
-			"status":       DeliveryStatusDelivered,
-			"delivered_at": &now,
-		})
-	if result.Error != nil {
-		slog.Warn("failed to auto-ack deliveries for task", "task_id", taskID, "error", result.Error)
-		return
-	}
-	if result.RowsAffected > 0 {
-		slog.Debug("auto-acked deliveries for task", "task_id", taskID, "count", result.RowsAffected)
-	}
 }
 
 // EdgeCallbackService owns Edge task ack/stream/done/fail orchestration.
@@ -484,19 +455,12 @@ func (s *AgentService) edgeCallbackService() *EdgeCallbackService {
 	if s.edgeCallbacks != nil {
 		return s.edgeCallbacks
 	}
-	// Prefer composed DeliveryOutbox (implements edgeCallbackOutbox); fall back
-	// to the narrow deliveryOutboxAcker when only db is set.
-	var outbox edgeCallbackOutbox
-	if s.deliveryOutbox != nil {
-		outbox = s.deliveryOutbox
-	} else {
-		outbox = s.deliveryOutboxService()
-	}
+	// DeliveryOutbox is the sole edgeCallbackOutbox implementer (owns model).
 	return NewEdgeCallbackService(
 		s.db,
 		s.bus,
 		seqAllocatorFunc(s.allocateSeq),
-		outbox,
+		s.deliveryOutboxService(),
 	)
 }
 
