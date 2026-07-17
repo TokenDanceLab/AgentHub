@@ -123,13 +123,25 @@ export function createHubClient(opts: HubClientOptions = {}) {
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const { headers, timeoutMs, method, url } = prepareHubRequestContext({
+    const requestCtx: {
+      baseUrl: string;
+      path: string;
+      options: RequestInit;
+      token?: string | null;
+      timeoutMs?: number;
+    } = {
       baseUrl,
       path,
       options,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
-    });
+    };
+    const token = opts.getToken?.();
+    if (token !== undefined) {
+      requestCtx.token = token;
+    }
+    if (opts.timeoutMs !== undefined) {
+      requestCtx.timeoutMs = opts.timeoutMs;
+    }
+    const { headers, timeoutMs, method, url } = prepareHubRequestContext(requestCtx);
 
     try {
       const response = await withHubAbortTimeout(timeoutMs, (signal) =>
@@ -195,12 +207,23 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    const { headers, timeoutMs, url } = prepareMultipartUploadContext({
+    const multipartCtx: {
+      baseUrl: string;
+      path: string;
+      token?: string | null;
+      timeoutMs?: number;
+    } = {
       baseUrl,
       path,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
-    });
+    };
+    const multipartToken = opts.getToken?.();
+    if (multipartToken !== undefined) {
+      multipartCtx.token = multipartToken;
+    }
+    if (opts.timeoutMs !== undefined) {
+      multipartCtx.timeoutMs = opts.timeoutMs;
+    }
+    const { headers, timeoutMs, url } = prepareMultipartUploadContext(multipartCtx);
     const response = await withHubAbortTimeout(timeoutMs, (signal) =>
       fetchImpl(url, buildMultipartFetchInit(headers, formData, signal)),
     );
