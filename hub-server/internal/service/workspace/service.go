@@ -1,4 +1,4 @@
-package service
+package workspace
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 )
 
 // WorkspaceListResult holds paginated Hub project/workspace results.
+// JSON field names are contract-stable (OpenAPI list envelope).
 type WorkspaceListResult struct {
 	Items   []model.Workspace `json:"items"`
 	HasMore bool              `json:"has_more"`
@@ -29,6 +30,7 @@ type WorkspaceUpdate struct {
 }
 
 // WorkspaceThread is the Web project-facing projection of a Hub group session.
+// JSON field names are contract-stable for /web/projects thread routes.
 type WorkspaceThread struct {
 	ID            string     `json:"id"`
 	ProjectID     string     `json:"project_id"`
@@ -41,16 +43,20 @@ type WorkspaceThread struct {
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
+// CreateWorkspaceThreadRequest is the create-thread body for Web project threads.
 type CreateWorkspaceThreadRequest struct {
 	Name string `json:"name"`
 }
 
+// SendWorkspaceThreadMessageRequest is the send-message body for Web project threads.
 type SendWorkspaceThreadMessageRequest struct {
 	ClientMsgID string `json:"client_msg_id"`
 	ContentType string `json:"content_type"`
 	Content     string `json:"content"`
 }
 
+// WorkspaceThreadMessage is the Web project-facing projection of a Hub message.
+// JSON field names are contract-stable for /web/projects thread message routes.
 type WorkspaceThreadMessage struct {
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"project_id"`
@@ -64,20 +70,21 @@ type WorkspaceThreadMessage struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// WorkspaceService exposes Web-owned project CRUD backed by Hub workspaces.
-// #639/#651: pure thread-message content + name/description normalize helpers
-// live in service/im; WorkspaceService keeps thin aliases for same-package call
-// sites. No bus/cache ports (service is DB-only); typed package move remains
-// deferred — see boundary map §6g for the next IM typed-service sketch.
-type WorkspaceService struct {
+// Service exposes Web-owned project CRUD backed by Hub workspaces.
+// DB-only (no bus/cache ports — none exist). Pure thread-message content +
+// name/description normalize helpers remain in service/im (#628/#639/#651);
+// this package is the second IM typed-service extract (#673) after
+// messagereaction (#662).
+type Service struct {
 	db *gorm.DB
 }
 
-func NewWorkspaceService(db *gorm.DB) *WorkspaceService {
-	return &WorkspaceService{db: db}
+// NewService constructs a workspace service.
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
-func (s *WorkspaceService) Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error) {
 	name, err := normalizeWorkspaceName(req.Name)
 	if err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage("workspace name is required")
@@ -101,7 +108,7 @@ func (s *WorkspaceService) Create(ctx context.Context, ownerID string, req *mode
 	return req, nil
 }
 
-func (s *WorkspaceService) Get(ctx context.Context, id, ownerID string) (*model.Workspace, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.Workspace, error) {
 	workspace, err := repository.GetWorkspaceByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -115,7 +122,7 @@ func (s *WorkspaceService) Get(ctx context.Context, id, ownerID string) (*model.
 	return workspace, nil
 }
 
-func (s *WorkspaceService) Update(ctx context.Context, id, ownerID string, req *WorkspaceUpdate) (*model.Workspace, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, req *WorkspaceUpdate) (*model.Workspace, error) {
 	workspace, err := repository.GetWorkspaceByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -153,7 +160,7 @@ func (s *WorkspaceService) Update(ctx context.Context, id, ownerID string, req *
 	return workspace, nil
 }
 
-func (s *WorkspaceService) List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*WorkspaceListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*WorkspaceListResult, error) {
 	workspaces, hasMore, err := repository.ListWorkspaces(s.db, ownerID, normalizeWorkspaceDescription(q), cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -165,7 +172,7 @@ func (s *WorkspaceService) List(ctx context.Context, ownerID, q, cursor string, 
 	return &WorkspaceListResult{Items: workspaces, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
-func (s *WorkspaceService) ListThreads(ctx context.Context, projectID, ownerID string) ([]WorkspaceThread, error) {
+func (s *Service) ListThreads(ctx context.Context, projectID, ownerID string) ([]WorkspaceThread, error) {
 	if _, err := s.Get(ctx, projectID, ownerID); err != nil {
 		return nil, err
 	}
@@ -180,7 +187,7 @@ func (s *WorkspaceService) ListThreads(ctx context.Context, projectID, ownerID s
 	return threads, nil
 }
 
-func (s *WorkspaceService) CreateThread(ctx context.Context, projectID, ownerID string, req *CreateWorkspaceThreadRequest) (*WorkspaceThread, error) {
+func (s *Service) CreateThread(ctx context.Context, projectID, ownerID string, req *CreateWorkspaceThreadRequest) (*WorkspaceThread, error) {
 	if _, err := s.Get(ctx, projectID, ownerID); err != nil {
 		return nil, err
 	}
@@ -221,7 +228,7 @@ func (s *WorkspaceService) CreateThread(ctx context.Context, projectID, ownerID 
 	}, nil
 }
 
-func (s *WorkspaceService) CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req SendWorkspaceThreadMessageRequest) (*WorkspaceThreadMessage, error) {
+func (s *Service) CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req SendWorkspaceThreadMessageRequest) (*WorkspaceThreadMessage, error) {
 	session, err := s.requireProjectThread(ctx, projectID, threadID, ownerID)
 	if err != nil {
 		return nil, err
@@ -270,7 +277,7 @@ func (s *WorkspaceService) CreateThreadMessage(ctx context.Context, projectID, t
 	return workspaceThreadMessageFromModel(*msg, projectID, session.ID), nil
 }
 
-func (s *WorkspaceService) ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]WorkspaceThreadMessage, error) {
+func (s *Service) ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]WorkspaceThreadMessage, error) {
 	session, err := s.requireProjectThread(ctx, projectID, threadID, ownerID)
 	if err != nil {
 		return nil, err
@@ -289,7 +296,7 @@ func (s *WorkspaceService) ListThreadMessages(ctx context.Context, projectID, th
 	return result, nil
 }
 
-func (s *WorkspaceService) requireProjectThread(ctx context.Context, projectID, threadID, ownerID string) (*model.Session, error) {
+func (s *Service) requireProjectThread(ctx context.Context, projectID, threadID, ownerID string) (*model.Session, error) {
 	if _, err := s.Get(ctx, projectID, ownerID); err != nil {
 		return nil, err
 	}
