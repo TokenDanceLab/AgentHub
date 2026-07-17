@@ -20,7 +20,7 @@ const testDeviceID = "11111111-1111-4111-8111-111111111111"
 // mockAuthService implements handler.AuthService.
 type mockAuthService struct {
 	refreshTokenFn  func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	logoutFn        func(ctx context.Context, userID, deviceID, deviceType string) error
+	logoutFn        func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error
 	getMeFn         func(ctx context.Context, userID string) (*model.User, error)
 	updateProfileFn func(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
 }
@@ -28,8 +28,8 @@ type mockAuthService struct {
 func (m *mockAuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
 	return m.refreshTokenFn(ctx, rawRefreshToken)
 }
-func (m *mockAuthService) Logout(ctx context.Context, userID, deviceID, deviceType string) error {
-	return m.logoutFn(ctx, userID, deviceID, deviceType)
+func (m *mockAuthService) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
+	return m.logoutFn(ctx, userID, deviceID, deviceType, accessJTI)
 }
 func (m *mockAuthService) GetMe(ctx context.Context, userID string) (*model.User, error) {
 	return m.getMeFn(ctx, userID)
@@ -145,7 +145,7 @@ func TestAuthHandler_Refresh_BadRequest(t *testing.T) {
 func TestAuthHandler_Logout_Success(t *testing.T) {
 	capturedDeviceType := ""
 	svc := &mockAuthService{
-		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
 			capturedDeviceType = deviceType
 			return nil
 		},
@@ -167,7 +167,7 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 func TestAuthHandler_Logout_WithDeviceType(t *testing.T) {
 	capturedDeviceType := ""
 	svc := &mockAuthService{
-		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
 			capturedDeviceType = deviceType
 			return nil
 		},
@@ -188,7 +188,7 @@ func TestAuthHandler_Logout_WithDeviceType(t *testing.T) {
 
 func TestAuthHandler_Logout_Error(t *testing.T) {
 	svc := &mockAuthService{
-		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
 			return context.DeadlineExceeded
 		},
 	}

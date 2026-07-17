@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -15,7 +15,7 @@ import (
 // AuthService is the subset of *service.AuthService used by AuthHandler.
 type AuthService interface {
 	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	Logout(ctx context.Context, userID, deviceID, deviceType string) error
+	Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error
 	GetMe(ctx context.Context, userID string) (*model.User, error)
 	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
 }
@@ -58,7 +58,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	deviceID := c.GetString("device_id")
 	// Scope revocation by device_type if provided as a query parameter (#149).
 	deviceType := c.Query("device_type")
-	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType); err != nil {
+	// access_jti is set by AuthMiddleware after ParseToken (#888).
+	accessJTI := c.GetString("access_jti")
+	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType, accessJTI); err != nil {
 		slog.Error("auth logout error", "request_id", middleware.GetRequestID(c), "error", err)
 		Fail(c, errcode.ErrInternal)
 		return
