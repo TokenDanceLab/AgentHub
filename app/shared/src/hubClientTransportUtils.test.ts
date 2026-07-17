@@ -4,15 +4,32 @@ import {
   DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,
   applyDefaultJsonContentType,
+  buildHubUrl,
   createNetworkAppError,
   createTimeoutAppError,
   isAbortError,
   isNetworkFetchTypeError,
+  normalizeHubBaseUrl,
+  requestMethodOf,
+  resolveHubTimeoutMs,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810)', () => {
+describe('hubClientTransportUtils (#810 / #913)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it('normalizes base URL, timeout, method, and hub URL (#913)', () => {
+    expect(normalizeHubBaseUrl(undefined)).toBe('');
+    expect(normalizeHubBaseUrl('https://hub.example.com/')).toBe('https://hub.example.com');
+    expect(normalizeHubBaseUrl('https://hub.example.com///')).toBe('https://hub.example.com');
+    expect(resolveHubTimeoutMs(undefined)).toBe(DEFAULT_HUB_TIMEOUT_MS);
+    expect(resolveHubTimeoutMs(12_000)).toBe(12_000);
+    expect(requestMethodOf({})).toBe('GET');
+    expect(requestMethodOf({ method: 'POST' })).toBe('POST');
+    expect(buildHubUrl('https://hub.example.com', '/client/auth/me')).toBe(
+      'https://hub.example.com/client/auth/me',
+    );
   });
 
   it('classifies AbortError and network fetch TypeError', () => {
