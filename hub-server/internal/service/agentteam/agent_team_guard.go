@@ -292,32 +292,3 @@ func payloadString(payload string, keys ...string) string {
 	return ""
 }
 
-func findSupervisorAndWorker(members []model.AgentTeamMember, workerID string) (*model.AgentTeamMember, *model.AgentTeamMember) {
-	var supervisor *model.AgentTeamMember
-	var worker *model.AgentTeamMember
-	for i := range members {
-		member := &members[i]
-		if supervisor == nil && member.Role == model.TeamMemberRoleSupervisor {
-			supervisor = member
-		}
-		if member.ID == workerID {
-			worker = member
-		}
-	}
-	if supervisor == nil && len(members) > 0 {
-		supervisor = &members[0]
-	}
-	return supervisor, worker
-}
-
-func routeAssignmentType(action string) string {
-	switch action {
-	case "review":
-		return model.AssignmentTypeReview
-	case "approve":
-		return model.AssignmentTypeApprove
-	default:
-		return model.AssignmentTypeDelegate
-	}
-}
-
