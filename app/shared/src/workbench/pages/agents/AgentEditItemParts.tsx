@@ -1,0 +1,313 @@
+import React from 'react';
+import { DesignNavIcon } from '../../designIcons';
+import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
+import { agentConfigToAgentSpecFixture } from '../../agentProfileCatalog';
+import { formatAgentHubAgentSpecV1 } from '../../../agentSpec';
+import { Select } from '../../../ui';
+import styles from '../AgentsPage.module.css';
+import { ConfigSummaryRow, formatList } from './shared';
+import {
+  AgentAvatar,
+  CapabilityBadge,
+  stateClass,
+} from './AgentInstalledParts';
+import {
+  EDIT_ENGINE_OPTIONS,
+  EDIT_MODEL_OPTIONS,
+  EDIT_MODE_OPTIONS,
+  EDIT_STATE_OPTIONS,
+  TOOL_PERMISSION_LABELS,
+  buildStatusNoticeClassName,
+  defaultToolPermission,
+  getEditFieldConfigs,
+} from './AgentEditHelpers';
+import type {
+  AgentConfig,
+  AgentRecentEvent,
+  ToolPermission,
+} from './types';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Agent edit panel presentational sub-parts.
+
+   Extracted from AgentEditPanel as Phase 29 residual thin #695.
+   CSS remains on shared AgentsPage.module.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── AgentSpecFixturePanel ── */
+
+export const AgentSpecFixturePanel: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
+  const spec = agentConfigToAgentSpecFixture(agent);
+  const preview = formatAgentHubAgentSpecV1(spec);
+
+  return (
+    <section className={styles['agent-spec-fixture']} aria-label={`${agent.name} AgentSpec fixture`}>
+      <div className={styles['section-title-row']}>
+        <h3>AgentSpec fixture</h3>
+        <span>no-spend</span>
+      </div>
+      <div className={styles['agent-spec-grid']}>
+        <ConfigSummaryRow label="Runtime" value={`${spec.runtime.id} · ${spec.runtime.profile}`} />
+        <ConfigSummaryRow label="Model" value={`${spec.runtime.provider} / ${spec.runtime.model}`} />
+        <ConfigSummaryRow label="Tools" value={formatList(spec.tool_allowlist, '未声明 tool')} />
+        <ConfigSummaryRow label="MCP" value={formatList(spec.mcp_servers.map((server) => server.id), '未绑定 MCP')} />
+        <ConfigSummaryRow label="Memory" value={`${spec.memory_policy.mode} · ${spec.memory_policy.retention}`} />
+        <ConfigSummaryRow label="Approval" value={[
+          spec.approval_policy.mode,
+          formatList(spec.approval_policy.require_approval_for, ''),
+        ].filter(Boolean).join(' · ')} />
+      </div>
+      <pre className={styles['agent-spec-preview']}>{preview}</pre>
+      <p className={styles['agent-spec-note']}>
+        仅编译 fixture JSON，不导入 SDK、不启动 CLI、不调用模型。
+      </p>
+    </section>
+  );
+};
+
+/* ── AgentEditGrid ── */
+
+export const AgentEditGrid: React.FC<{
+  agent: AgentConfig;
+  onFieldChange?: ((field: string, value: string) => void) | undefined;
+}> = ({ agent, onFieldChange }) => {
+  const fieldConfigs = getEditFieldConfigs();
+  return (
+    <div className={styles['agent-edit-grid']}>
+      {fieldConfigs.map((field) => (
+        <label key={field.key}>
+          {field.label}
+          {field.type === 'select' ? (
+            <Select
+              ariaLabel={field.label}
+              className={styles['field-select'] ?? ''}
+              value={String(agent[field.key as keyof AgentConfig] ?? '')}
+              options={field.options!}
+              onChange={(value) => onFieldChange?.(field.key, value)}
+            />
+          ) : (
+            <input
+              value={String(agent[field.key as keyof AgentConfig] ?? '')}
+              onChange={(e) => onFieldChange?.(field.key, e.target.value)}
+            />
+          )}
+        </label>
+      ))}
+    </div>
+  );
+};
+
+/* ── AgentMcpMemorySection ── */
+
+export const AgentMcpMemorySection: React.FC<{ agent: AgentConfig }> = ({ agent }) => (
+  <section className={styles['agent-skill-editor']}>
+    <div className={styles['section-title-row']}>
+      <h3>MCP / Memory</h3>
+      <span>{agent.memoryRetention || 'policy pending'}</span>
+    </div>
+    <div className={styles['agent-token-grid']}>
+      {(agent.mcpServers ?? []).map((server) => (
+        <span key={`mcp-${server}`} className={styles['agent-token']}>
+          <RuntimeBrandIcon kind="tool" name="MCP Server" size="compact" framed={false} decorative />
+          {server}
+        </span>
+      ))}
+      {(agent.memorySources ?? []).map((source) => (
+        <span key={`memory-${source}`} className={styles['agent-token']}>
+          <RuntimeBrandIcon kind="tool" name="Agent Profile" size="compact" framed={false} decorative />
+          {source}
+        </span>
+      ))}
+    </div>
+  </section>
+);
+
+/* ── AgentSkillChipGrid ── */
+
+export const AgentSkillChipGrid: React.FC<{
+  agent: AgentConfig;
+  allSkills: string[];
+  onAgentSkillToggle?: ((skill: string) => void) | undefined;
+}> = ({ agent, allSkills, onAgentSkillToggle }) => (
+  <section className={styles['agent-skill-editor']}>
+    <div className={styles['section-title-row']}>
+      <h3>Skills</h3>
+      <span>{agent.skills.length} enabled</span>
+    </div>
+    <div className={styles['skill-chip-grid']}>
+      {allSkills.map((skill) => (
+        <button
+          key={skill}
+          className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
+          type="button"
+          onClick={() => onAgentSkillToggle?.(skill)}
+        >
+          <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
+          {skill}
+        </button>
+      ))}
+    </div>
+  </section>
+);
+
+/* ── AgentToolPermissions ── */
+
+export const AgentToolPermissions: React.FC<{
+  agent: AgentConfig;
+  allTools: string[];
+  onToolPermissionSet?: ((tool: string, value: ToolPermission) => void) | undefined;
+}> = ({ agent, allTools, onToolPermissionSet }) => (
+  <section className={styles['editable-tools']}>
+    <div className={styles['section-title-row']}>
+      <h3>工具权限</h3>
+      <span>Allow / Confirm / Deny</span>
+    </div>
+    {allTools.map((tool) => (
+      <div key={tool} className={`${styles['scope-row']} ${styles.editable}`}>
+        <span>{tool}</span>
+        <div className={styles['permission-segment']}>
+          {TOOL_PERMISSION_LABELS.map((option) => (
+            <button
+              key={option}
+              className={`${defaultToolPermission(agent.tools, tool) === option ? styles.active : ''}`}
+              type="button"
+              onClick={() => onToolPermissionSet?.(tool, option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    ))}
+  </section>
+);
+
+/* ── AgentMiniLog ── */
+
+export const AgentMiniLog: React.FC<{ recentEvents: AgentRecentEvent[] }> = ({ recentEvents }) => (
+  <section className={styles['agent-mini-log']}>
+    <div className={styles['section-title-row']}>
+      <h3>最近运行</h3>
+      <span>{recentEvents.length} events</span>
+    </div>
+    {recentEvents.map((evt, i) => (
+      <div key={i}>
+        <time>{evt.time}</time>
+        <span>{evt.text}</span>
+      </div>
+    ))}
+  </section>
+);
+
+/* ── AgentDetailHead ── */
+
+export const AgentDetailHead: React.FC<{
+  agent: AgentConfig;
+  saveStateLabel: string;
+  isDirty: boolean;
+  onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+}> = ({ agent, saveStateLabel, isDirty, onAgentProfileOpen }) => (
+  <div className={`${styles['detail-head']} ${styles.editable}`}>
+    <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
+    <div>
+      <h2>{agent.name}</h2>
+      <span>{agent.role.trim() || 'Hub AgentProfile'} Agent</span>
+    </div>
+    <span className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}>
+      {saveStateLabel}
+    </span>
+  </div>
+);
+
+/* ── AgentRuntimeLine ── */
+
+export const AgentRuntimeLine: React.FC<{ agent: AgentConfig }> = ({ agent }) => (
+  <div className={styles['agent-runtime-line']}>
+    <span className={`${styles.state} ${stateClass(agent.state)}`} />
+    <RuntimeBrandIcon kind="runtime" name={agent.runtimeId ?? agent.engine} size="compact" framed={false} />
+    <strong>{agent.engine}</strong>
+    <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
+  </div>
+);
+
+/* ── AgentCapabilityStrip ── */
+
+interface CapabilitySummary {
+  agentsMd: string;
+  skills: string;
+  mcp: string;
+  memory: string;
+  tools: string;
+  avatar: string;
+  readiness: string;
+}
+
+export const AgentCapabilityStrip: React.FC<{
+  agent: AgentConfig;
+  capabilitySummary: CapabilitySummary;
+}> = ({ agent, capabilitySummary }) => (
+  <div className={styles['agent-capability-strip']} aria-label={`${agent.name} capability readiness`}>
+    <CapabilityBadge label="AGENTS.md" value={capabilitySummary.agentsMd} />
+    <CapabilityBadge label="Skills" value={capabilitySummary.skills} />
+    <CapabilityBadge label="MCP" value={capabilitySummary.mcp} />
+    <CapabilityBadge label="Memory" value={capabilitySummary.memory} />
+    <CapabilityBadge label="Tools" value={capabilitySummary.tools} />
+    <CapabilityBadge label="Avatar" value={capabilitySummary.avatar} />
+    <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
+      {capabilitySummary.readiness}
+    </span>
+  </div>
+);
+
+/* ── AgentConfigSummary ── */
+
+export const AgentConfigSummary: React.FC<{
+  agent: AgentConfig;
+  capabilitySummary: CapabilitySummary;
+}> = ({ agent, capabilitySummary }) => (
+  <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
+    <ConfigSummaryRow label="AGENTS.md" value={capabilitySummary.agentsMd} />
+    <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
+    <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
+    <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
+    <ConfigSummaryRow label="Target" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明 target')} />
+  </div>
+);
+
+/* ── AgentEditActions ── */
+
+export const AgentEditActions: React.FC<{
+  isBusy: boolean;
+  isSaving: boolean;
+  isDeleting: boolean;
+  onAgentSave?: (() => void) | undefined;
+  onAgentDuplicate?: (() => void) | undefined;
+  onAgentDelete?: (() => void) | undefined;
+}> = ({ isBusy, isSaving, isDeleting, onAgentSave, onAgentDuplicate, onAgentDelete }) => (
+  <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
+    <button
+      className={`${styles.btn} ${styles['btn-p']}`}
+      type="button"
+      disabled={isBusy}
+      onClick={onAgentSave}
+    >
+      {isSaving ? '保存中' : '保存配置'}
+    </button>
+    <button
+      className={`${styles.btn} ${styles['btn-s']}`}
+      type="button"
+      disabled={isBusy}
+      onClick={onAgentDuplicate}
+    >
+      复制 Agent
+    </button>
+    <button
+      className={`${styles.btn} ${styles['btn-d']}`}
+      type="button"
+      disabled={isBusy}
+      onClick={onAgentDelete}
+    >
+      {isDeleting ? '删除中' : '删除'}
+    </button>
+  </div>
+);
