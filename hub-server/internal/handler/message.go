@@ -10,9 +10,11 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 // MessageService is the subset of *service.MessageService used by MessageHandler.
+// Reaction methods use messagereaction DTOs (#662 first IM typed-service package).
 type MessageService interface {
 	SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
 	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
@@ -25,9 +27,9 @@ type MessageService interface {
 	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
 	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
-	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
-	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
-	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
+	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
+	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
+	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error)
 }
 
 type MessageHandler struct {

@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 func TestNoRouteReturnsNotFound(t *testing.T) {
@@ -172,13 +173,13 @@ func (routerMessageServiceStub) MarkRead(ctx context.Context, userID, sessionID 
 func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (routerMessageServiceStub) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+func (routerMessageServiceStub) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 	return nil, nil
 }
 
