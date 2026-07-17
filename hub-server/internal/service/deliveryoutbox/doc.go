@@ -4,9 +4,12 @@
 // dependencies so DeliveryOutbox orchestration can reuse status, eligibility,
 // backoff, and string helpers without pulling journal/repository code.
 //
-// Orchestration, private GORM model, Redispatcher ports, and AgentService
-// facades remain in the flat service package (delivery_outbox.go). Full model
-// package move stays deferred.
+// Pure residual is closed (#514 backoff/truncate, #744 status/eligibility).
+// Flat service package keeps orchestration split across adjacent files (#801):
+//   - delivery_outbox.go — ports, journal, retry loop, redispatch adapters
+//   - delivery_outbox_model.go — GORM record, Entry DTO, redispatchTarget, repo
+//   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
+// Full model package move stays deferred (high-risk residual).
 //
-// See docs/analysis/hub-service-boundary-map.md (#744; prior pure extract #514).
+// See docs/analysis/hub-service-boundary-map.md (#744; prior pure extract #514; #801).
 package deliveryoutbox
