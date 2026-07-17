@@ -94,6 +94,7 @@ export { default as ArtifactCard } from './ArtifactCard';
 export type { ArtifactCardProps } from './ArtifactCard';
 export { default as ArtifactPreview } from './ArtifactPreview';
 export type { ArtifactPreviewProps, ArtifactType } from './ArtifactPreview';
+export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox';
 export { default as DeployCard } from './DeployCard';
 export type { DeployCardProps } from './DeployCard';
 export { default as LinkCard } from './LinkCard';
