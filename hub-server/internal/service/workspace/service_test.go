@@ -1,4 +1,4 @@
-package service
+package workspace
 
 import (
 	"context"
@@ -89,7 +89,7 @@ func seedWorkspace(t *testing.T, db *gorm.DB, id, ownerID, name string) {
 
 func TestWorkspaceCreateRequiresNameAndOwnerScope(t *testing.T) {
 	db := newWorkspaceTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	_, err := svc.Create(context.Background(), "owner-1", &model.Workspace{Name: "   "})
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -110,7 +110,7 @@ func TestWorkspaceCreateRequiresNameAndOwnerScope(t *testing.T) {
 func TestWorkspaceCreateRejectsDuplicateOwnerName(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	_, err := svc.Create(context.Background(), "owner-1", &model.Workspace{Name: "AgentHub"})
 	require.ErrorIs(t, err, errcode.UserInvalidParam)
@@ -123,7 +123,7 @@ func TestWorkspaceUpdateIsOwnerScopedAndChecksDuplicateName(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "First")
 	seedWorkspace(t, db, "workspace-2", "owner-1", "Second")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	updatedName := "Updated"
 	_, err := svc.Update(context.Background(), "workspace-1", "other-owner", &WorkspaceUpdate{Name: &updatedName})
@@ -147,7 +147,7 @@ func TestWorkspaceUpdateIsOwnerScopedAndChecksDuplicateName(t *testing.T) {
 func TestWorkspaceUpdatePreservesOmittedFieldsAndAllowsExplicitDescriptionClear(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "First")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	nextName := "Renamed"
 	workspace, err := svc.Update(context.Background(), "workspace-1", "owner-1", &WorkspaceUpdate{Name: &nextName})
@@ -172,7 +172,7 @@ func TestWorkspaceListSupportsOwnerScopeSearchAndPagination(t *testing.T) {
 	seedWorkspace(t, db, "workspace-2", "owner-1", "Beta")
 	seedWorkspace(t, db, "workspace-3", "owner-1", "Gamma")
 	seedWorkspace(t, db, "workspace-4", "owner-2", "Alpha")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	page, err := svc.List(context.Background(), "owner-1", "", "", 2)
 	require.NoError(t, err)
@@ -195,7 +195,7 @@ func TestWorkspaceListSupportsOwnerScopeSearchAndPagination(t *testing.T) {
 func TestWorkspaceProjectThreadsPreserveProjectAndMessageContext(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{
 		Name: "项目群",
@@ -234,7 +234,7 @@ func TestWorkspaceProjectThreadsPreserveProjectAndMessageContext(t *testing.T) {
 func TestWorkspaceProjectThreadMessagePreservesA2AMetadata(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{Name: "项目群"})
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestWorkspaceProjectThreadsAreOwnerAndProjectScoped(t *testing.T) {
 	db := newWorkspaceTestDB(t)
 	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
 	seedWorkspace(t, db, "workspace-2", "owner-1", "Other")
-	svc := NewWorkspaceService(db)
+	svc := NewService(db)
 
 	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{Name: "项目群"})
 	require.NoError(t, err)
