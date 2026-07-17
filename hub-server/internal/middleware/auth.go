@@ -42,6 +42,9 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 // WebSocket upgrade requests. It checks the Authorization header first (for
 // native clients), then falls back to the "access_token" query parameter
 // (for browser WebSocket clients which cannot set custom headers).
+//
+// After ParseToken it applies the same hub-session purpose/device gate as
+// RequireHubSession so non-product tokens cannot upgrade WebSocket.
 func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenStr string
@@ -66,10 +69,10 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set("user_id", claims.UserID)
-		c.Set("device_type", claims.DeviceType)
-		c.Set("device_id", claims.DeviceID)
-		c.Set("auth_source", "hub_local")
+		setHubLocalClaims(c, claims)
+		if !enforceHubSession(c) {
+			return
+		}
 		c.Next()
 	}
 }
@@ -100,25 +103,64 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 		c.Abort()
 		return
 	}
+	setHubLocalClaims(c, claims)
+	c.Next()
+}
+
+// setHubLocalClaims injects Hub product-session identity into the Gin context.
+// Purpose is recorded so enforceHubSession can re-check the product gate.
+func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 	c.Set("user_id", claims.UserID)
 	c.Set("device_type", claims.DeviceType)
 	c.Set("device_id", claims.DeviceID)
+	c.Set("purpose", claims.Purpose)
 	c.Set("auth_source", "hub_local")
-	c.Next()
+}
+
+// enforceHubSession applies the post-parse Hub product-session policy shared by
+// RequireHubSession and WSAuthMiddleware. It rejects:
+//   - non-hub_local auth_source (e.g. TokenDance identity bearer)
+//   - non-empty purpose (edge-api / run-start / capability class)
+//   - edge / tokendance_bearer device_type (defense in depth)
+// On rejection it audits, fails closed with 403, and aborts the request.
+// Returns true when the session is allowed to proceed.
+func enforceHubSession(c *gin.Context) bool {
+	authSource := c.GetString("auth_source")
+	deviceType := c.GetString("device_type")
+	purpose := c.GetString("purpose")
+
+	reason := ""
+	switch {
+	case authSource != "hub_local":
+		reason = "auth_source"
+	case purpose != "":
+		reason = "purpose"
+	case deviceType == "edge" || deviceType == "tokendance_bearer":
+		reason = "device_type"
+	}
+	if reason == "" {
+		return true
+	}
+
+	auditPermission(c, c.GetString("user_id"), "hub_session_required", false, map[string]interface{}{
+		"auth_source": authSource,
+		"device_type": deviceType,
+		"purpose":     purpose,
+		"reason":      reason,
+		"path":        c.FullPath(),
+	}, c.ClientIP())
+	fail(c, errcode.ErrForbidden)
+	c.Abort()
+	return false
 }
 
 // RequireHubSession is a middleware that requires a Hub-issued local session.
 // TokenDance ID bearer tokens prove identity only; they must not authorize Hub
 // product APIs, device routing, Web task dispatch, or user-local resources.
+// WebSocket upgrades share the same post-parse gate via WSAuthMiddleware.
 func RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.GetString("auth_source") != "hub_local" {
-			auditPermission(c, c.GetString("user_id"), "hub_session_required", false, map[string]interface{}{
-				"auth_source": c.GetString("auth_source"),
-				"path":        c.FullPath(),
-			}, c.ClientIP())
-			fail(c, errcode.ErrForbidden)
-			c.Abort()
+		if !enforceHubSession(c) {
 			return
 		}
 		c.Next()
