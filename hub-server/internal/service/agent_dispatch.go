@@ -52,12 +52,9 @@ type dispatchPayload struct {
 	OutputSchema *json.RawMessage `json:"structured_output_schema,omitempty"`
 }
 
-// dispatchMessage represents a single message in thread history or pinned context.
-type dispatchMessage struct {
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	Timestamp string `json:"timestamp"` // RFC 3339
-}
+// dispatchMessage is a same-package alias for the pure dispatch.Message DTO so
+// payload JSON tags and redispatch unmarshaling stay stable (#756).
+type dispatchMessage = dispatch.Message
 
 type dispatchTeamContext struct {
 	TeamID         string
@@ -72,22 +69,6 @@ type dispatchTargetSnapshot struct {
 	DeviceID   string
 }
 
-// edgeRunRequest is the payload POSTed to the Edge /v1/runs endpoint for HTTP dispatch.
-type edgeRunRequest struct {
-	ProjectID      string            `json:"projectId"`
-	ThreadID       string            `json:"threadId"`
-	Prompt         string            `json:"prompt"`
-	AgentID        string            `json:"agentId,omitempty"`
-	Model          string            `json:"model,omitempty"`
-	SystemPrompt   string            `json:"systemPrompt,omitempty"`
-	HubTaskID      string            `json:"hubTaskId"`
-	DeliveryID     string            `json:"deliveryId,omitempty"`
-	Messages       []dispatchMessage `json:"messages,omitempty"`
-	PinnedMessages []dispatchMessage `json:"pinnedMessages,omitempty"`
-	// StructuredOutputSchema is the JSON Schema for structured output (--json-schema).
-	StructuredOutputSchema string `json:"structuredOutputSchema,omitempty"`
-}
-
 // edgeRunResponse captures the relevant fields from Edge's /v1/runs response.
 type edgeRunResponse struct {
 	Success bool `json:"success"`
@@ -98,13 +79,13 @@ type edgeRunResponse struct {
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Residual pure-helper extract (#732) after thin first seam (#563), redispatch
-// residual (#573), and residual ports (#617). Pure helpers live in
-// service/dispatch (isLoopback / normalizeRuntimeAgentType /
-// selectAgentInstance / mergeModelParams / promptFromMessage /
-// extractMessageText / mapSenderType) with thin same-package aliases below.
-// Orchestration + ports stay flat; dispatchPayload stays package-private;
-// no OpenAPI/handler/frontend; no typed DispatchService package move.
+// Residual pure-helper extract (#756) after pure helpers (#732), thin first
+// seam (#563), redispatch residual (#573), and residual ports (#617). Pure
+// surface lives in service/dispatch (loopback / runtime type / select / merge /
+// prompt+history text / task-status / edge constants / Message DTO / Edge run
+// request builder) with thin same-package aliases below. Orchestration + ports
+// stay flat; dispatchPayload stays package-private; no OpenAPI/handler/frontend;
+// no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -143,8 +124,8 @@ type dispatchWS interface {
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
 // retries call in through Redispatcher; dispatchPayload stays package-private.
-// Same-package extract (#563/#573/#617) + pure helpers in service/dispatch (#732)
-// — typed package move still deferred.
+// Same-package extract (#563/#573/#617) + pure helpers in service/dispatch
+// (#732/#756) - typed package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -251,37 +232,27 @@ func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, delivery
 // local Edge server. Returns the Edge run ID on success, or empty string if
 // the Edge server is unreachable or returns an error.
 func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
-	edgeURL := os.Getenv("AGENTHUB_EDGE_URL")
-	if edgeURL == "" {
-		edgeURL = "http://127.0.0.1:3210"
-	}
+	edgeURL := dispatch.ResolveEdgeHTTPURL(os.Getenv("AGENTHUB_EDGE_URL"))
 
 	// AH-SR-053: Warn when AGENTHUB_EDGE_URL is non-loopback and non-HTTPS —
 	// dispatch payloads contain user prompts and system instructions sent in
 	// cleartext over the network.
-	if !strings.HasPrefix(edgeURL, "https://") && !isLoopback(edgeURL) {
+	if dispatch.IsInsecureNonLoopbackEdge(edgeURL) {
 		slog.Error("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", edgeURL)
 		return ""
 	}
 
-	// Build the Edge run request from the dispatch payload.
-	reqBody := edgeRunRequest{
-		ProjectID:      "proj_local",
-		ThreadID:       "thread_local",
-		Prompt:         dp.Prompt,
-		AgentID:        normalizeRuntimeAgentType(dp.AgentType),
-		Model:          "claude",
-		SystemPrompt:   dp.SystemPrompt,
-		HubTaskID:      task.ID,
-		DeliveryID:     dp.DeliveryID,
-		Messages:       dp.Messages,
-		PinnedMessages: dp.PinnedMessages,
-	}
-
-	// Serialize OutputSchema to string for Edge HTTP dispatch.
-	if dp.OutputSchema != nil && len(*dp.OutputSchema) > 0 {
-		reqBody.StructuredOutputSchema = string(*dp.OutputSchema)
-	}
+	// Build the Edge run request from the dispatch payload (pure builder #756).
+	reqBody := dispatch.BuildEdgeRunRequest(
+		dp.Prompt,
+		dp.AgentType,
+		dp.SystemPrompt,
+		task.ID,
+		dp.DeliveryID,
+		dp.Messages,
+		dp.PinnedMessages,
+		dp.OutputSchema,
+	)
 
 	body, err := json.Marshal(reqBody)
 	if err != nil {
@@ -335,8 +306,8 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	return runID
 }
 
-// Thin aliases to service/dispatch pure helpers (#732). Keep same-package call
-// sites and existing tests stable without re-embedding helper bodies here.
+// Thin aliases to service/dispatch pure helpers (#732/#756). Keep same-package
+// call sites and existing tests stable without re-embedding helper bodies here.
 func isLoopback(rawURL string) bool {
 	return dispatch.IsLoopback(rawURL)
 }
@@ -351,6 +322,18 @@ func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, ta
 
 func mergeModelParams(base, override string) string {
 	return dispatch.MergeModelParams(base, override)
+}
+
+func isTerminalTaskStatus(status string) bool {
+	return dispatch.IsTerminalTaskStatus(status)
+}
+
+func canRegenerateTaskStatus(status string) bool {
+	return dispatch.CanRegenerateTaskStatus(status)
+}
+
+func isRetryableTaskStatus(status string) bool {
+	return dispatch.IsRetryableTaskStatus(status)
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
@@ -529,7 +512,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 	if task.TargetID == "" {
 		if edgeRunID := s.dispatchToEdgeHTTP(ctx, task, &dp); edgeRunID != "" {
 			// Mark as dispatched with a synthetic device ID indicating HTTP dispatch.
-			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, "http-edge-local"); err != nil {
+			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); err != nil {
 				slog.Error("failed to mark http-dispatched task", "task_id", task.ID, "error", err)
 			}
 			// Mark delivery as sent.
@@ -644,7 +627,7 @@ func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) di
 }
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
-// Limits to a maximum of 50 messages to avoid oversized dispatch payloads.
+// Limits to dispatch.MaxThreadHistory messages to avoid oversized dispatch payloads.
 func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
 	if sessionID == "" || triggerMessageID == "" {
 		return nil
@@ -653,21 +636,12 @@ func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) 
 	if err != nil || triggerMsg == nil {
 		return nil
 	}
-	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, 50)
+	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, dispatch.MaxThreadHistory)
 	if err != nil || len(msgs) == 0 {
 		return nil
 	}
-	// Reverse to chronological order (GetMessagesBySession returns DESC).
-	result := make([]dispatchMessage, len(msgs))
-	for i := range msgs {
-		content := extractMessageText(&msgs[i])
-		result[len(msgs)-1-i] = dispatchMessage{
-			Role:      mapSenderType(msgs[i].SenderType),
-			Content:   content,
-			Timestamp: msgs[i].CreatedAt.UTC().Format(time.RFC3339),
-		}
-	}
-	return result
+	// Reverse to chronological order (GetMessagesBySession returns DESC) via pure mapper (#756).
+	return dispatch.MapMessagesChronological(msgs, true)
 }
 
 // loadPinnedMessages loads pinned messages for a session for context continuity.
@@ -687,22 +661,10 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 	if err != nil {
 		return nil
 	}
-	result := make([]dispatchMessage, 0, len(msgs))
-	for _, m := range msgs {
-		content := extractMessageText(&m)
-		if content == "" {
-			continue
-		}
-		result = append(result, dispatchMessage{
-			Role:      mapSenderType(m.SenderType),
-			Content:   content,
-			Timestamp: m.CreatedAt.UTC().Format(time.RFC3339),
-		})
-	}
-	return result
+	return dispatch.MapPinnedMessages(msgs)
 }
 
-// Thin aliases to service/dispatch pure helpers (#732).
+// Thin aliases to service/dispatch pure helpers (#732/#756).
 func extractMessageText(msg *model.Message) string {
 	return dispatch.ExtractMessageText(msg)
 }
@@ -756,9 +718,8 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 	if task.TriggeredByUserID != userID {
 		return errcode.AgentTaskNotFound
 	}
-	if task.Status == model.TaskStatusDone || task.Status == model.TaskStatusFailed ||
-		task.Status == model.TaskStatusCancelled || task.Status == model.TaskStatusTimeout {
-		if task.Status == model.TaskStatusCancelled {
+	if isTerminalTaskStatus(task.Status) {
+		if dispatch.IsCancelledTaskStatus(task.Status) {
 			return errcode.AgentTaskCancelled
 		}
 		return errcode.AgentTaskTimeout
@@ -803,10 +764,7 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 	}
 
 	// Only allow regenerating from terminal tasks (done/failed/cancelled/timeout).
-	switch original.Status {
-	case model.TaskStatusDone, model.TaskStatusFailed, model.TaskStatusCancelled, model.TaskStatusTimeout:
-		// ok
-	default:
+	if !canRegenerateTaskStatus(original.Status) {
 		return nil, errcode.ErrBadRequest.WithMessage("can only regenerate completed or failed tasks")
 	}
 
@@ -847,14 +805,14 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	}
 	userID := strings.TrimSpace(dp.TriggerUserID)
 	if userID == "" {
-		userID = "hub-dispatch"
+		userID = dispatch.FallbackCapabilityUserID
 	}
-	// Edge HTTP dispatch currently uses proj_local / thread_local; keep capability bindings aligned.
-	projectID := "proj_local"
-	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, "run-start", 5*time.Minute, jwtutil.CapabilityIssueOptions{
-		Action:   "run-start",
+	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
+	projectID := dispatch.LocalProjectID
+	token, err := jwtutil.IssueCapabilityToken([]byte(secret), userID, deviceID, projectID, dispatch.DefaultCapabilityAction, 5*time.Minute, jwtutil.CapabilityIssueOptions{
+		Action:   dispatch.DefaultCapabilityAction,
 		TargetID: strings.TrimSpace(dp.TargetID),
-		ThreadID: "thread_local",
+		ThreadID: dispatch.LocalThreadID,
 	})
 	if err != nil {
 		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", deviceID)
@@ -919,7 +877,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 	}
 
 	// Only retry if task is still in a retryable state.
-	if task.Status != "queued" && task.Status != "dispatched" && task.Status != "running" {
+	if !isRetryableTaskStatus(task.Status) {
 		slog.Info("redispatch: task in terminal state, moving delivery to dead-letter",
 			"delivery_id", rec.DeliveryID,
 			"task_id", rec.TaskID,
