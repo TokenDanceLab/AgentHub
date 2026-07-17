@@ -444,30 +444,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			e.mu.Unlock()
 		}
 		setResourceLimits(cmd)
-		argSummary := summarizeProcessArgsForLog(args)
-		slog.Debug("executor.subprocess.starting",
-			"runId", run.ID,
-			"commandName", processCommandNameForLog(cmdPath),
-			"commandRedacted", true,
-			"argCount", len(args),
-			"argFlags", argSummary.ArgFlags,
-			"configKeys", argSummary.ConfigKeys,
-			"positionalArgCount", argSummary.PositionalArgCount,
-			"unknownFlagCount", argSummary.UnknownFlagCount,
-			"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
-			"argsRedacted", true,
-			"attempt", attempt,
-		)
+		slog.Debug("executor.subprocess.starting", subprocessStartingLogArgs(run.ID, cmdPath, args, attempt)...)
 		subprocessStart := time.Now()
-		if err := cmd.Start(); err != nil {
-			if shouldTreatStartFailureAsCancelled(ctx.Err()) {
-				if shouldWaitProcessAfterCancel(cmd.Process) {
-					_, _ = cmd.Process.Wait()
-				}
-				e.publishCancelled(run)
-				return
+		startErr := cmd.Start()
+		switch classifyCmdStartOutcome(startErr, ctx.Err()) {
+		case cmdStartCancelled:
+			if shouldWaitProcessAfterCancel(cmd.Process) {
+				_, _ = cmd.Process.Wait()
 			}
-			e.publishFailed(run, err)
+			e.publishCancelled(run)
+			return
+		case cmdStartFailed:
+			e.publishFailed(run, startErr)
 			return
 		}
 		// If context was cancelled after Start but before we checked, kill the child.
@@ -482,12 +470,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			return
 		}
 
-		slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
+		slog.Debug("executor.subprocess.started", subprocessStartedLogArgs(run.ID, cmd.Process)...)
 
 		// Track process for graceful shutdown signals (SIGTERM on Unix).
-		e.mu.Lock()
-		e.processes[run.ID] = cmd.Process
-		e.mu.Unlock()
+		if shouldTrackStartedProcess(cmd.Process) {
+			e.mu.Lock()
+			e.processes[run.ID] = cmd.Process
+			e.mu.Unlock()
+		}
 
 		// Close stdin unless the adapter needs it for the control protocol
 		// (permission responses) or a DecisionLoop is configured (force-finish
@@ -495,12 +485,16 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
 		// eagerly when neither mechanism requires stdin.
 		if shouldCloseStdinAfterStart(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil) {
+			closed := false
 			if shouldCloseStdinPipe(stdin != nil) {
 				_ = stdin.Close()
+				closed = true
 			}
-			e.mu.Lock()
-			delete(e.stdins, run.ID)
-			e.mu.Unlock()
+			if shouldClearStdinAfterEagerClose(closed || stdin != nil) {
+				e.mu.Lock()
+				delete(e.stdins, run.ID)
+				e.mu.Unlock()
+			}
 		}
 
 		// Record metrics: run has started successfully
@@ -621,20 +615,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
 		// Recoverable errors (malformed event, orphaned tool) emit a warning and
 		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-		if shouldHandleStructuredParseError(parseErr) {
-			if psErr, ok := recoverableParseStreamError(parseErr); ok {
-				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
-				e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
-					recoverableParseWarningPayload(
-						run.ID,
-						recoverableParseWarningMessage(psErr.Unwrap()),
-						psErr.Error(),
-					))
-			} else {
-				e.publishFailed(run, structuredOutputParseFailed(parseErr))
-				e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
-				return
-			}
+		parseOutcome, psErr := classifyStructuredParseOutcome(parseErr)
+		if shouldPublishRecoverableParseWarning(parseOutcome) {
+			slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
+			e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
+				recoverableParseWarningPayload(
+					run.ID,
+					recoverableParseWarningMessage(psErr.Unwrap()),
+					psErr.Error(),
+				))
+		} else if shouldFailOnStructuredParse(parseOutcome) {
+			e.publishFailed(run, structuredOutputParseFailed(parseErr))
+			e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
+			return
 		}
 		// Evidence gate: run post-completion verification before marking finished.
 		// When enabled (default), the gate runs type-specific checks (Go build+vet,
@@ -642,12 +635,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// If verification fails, the run is marked as completed_with_issues instead
 		// of finished, and the full evidence output is stored in run metadata.
 		gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir)
-		finalStatus := resolveEvidenceFinalStatus(gateEnabled, true)
+		evidencePlan := planEvidenceGateOutcome(gateEnabled, true)
+		finalStatus := evidencePlan.FinalStatus
 		if shouldRunEvidenceGate(gateEnabled) {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-			finalStatus = resolveEvidenceFinalStatus(true, evidenceResult.Passed)
-			if shouldLogEvidenceGateFailure(evidenceResult.Passed) {
+			evidencePlan = planEvidenceGateOutcome(true, evidenceResult.Passed)
+			finalStatus = evidencePlan.FinalStatus
+			if evidencePlan.LogFailure {
 				slog.Warn("process: evidence gate verification failed",
 					"runId", run.ID,
 					"projectType", evidenceResult.ProjectType,
@@ -1027,18 +1022,21 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// This prevents the TOCTOU race where two concurrent goroutines both pass
 	// CanSpawn (seeing count=4) and both subsequently increment, exceeding
 	// MaxChildrenPerAgent=5.
-	slotReserved := false
+	var reserveErr error
 	if shouldReserveSpawnSlot(e.agentRegistry != nil) {
-		if reserveErr := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); shouldLogSpawnSlotRejection(reserveErr) {
+		reserveErr = e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth)
+	}
+	slotReserved, reject := evaluateSpawnSlotReservation(e.agentRegistry != nil, reserveErr)
+	if reject != nil {
+		if shouldLogSpawnSlotRejection(reject) {
 			slog.Warn("spawn slot rejected",
 				"parentRunId", parentRun.ID,
 				"taskId", task.TaskID,
 				"depth", task.Depth,
-				"error", reserveErr,
+				"error", reject,
 			)
-			return "", "", reserveErr
 		}
-		slotReserved = true
+		return "", "", reject
 	}
 
 	// Deferred cleanup: release the reserved slot on any error exit path.
@@ -1074,13 +1072,14 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	registered := false
 	if shouldRegisterSubAgentInstance(e.agentRegistry != nil) {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
-		if regErr := e.agentRegistry.Register(inst); shouldLogSubAgentRegisterFailure(regErr) {
+		regErr := e.agentRegistry.Register(inst)
+		var logFailure bool
+		registered, logFailure = evaluateSubAgentRegistration(true, regErr)
+		if logFailure {
 			slog.Warn("failed to register sub-agent instance in registry",
 				"agentInstanceId", agentInstanceID,
 				"error", regErr,
 			)
-		} else if shouldMarkSubAgentRegistered(regErr) {
-			registered = true
 		}
 	}
 
@@ -1124,8 +1123,8 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		// Set slotReserved=false BEFORE Unregister to prevent the
 		// deferred DecrChildCount from double-decrementing.
 		// Unregister already decrements childrenCount internally.
+		slotReserved = slotReservedAfterUnregister(registered, slotReserved)
 		if shouldUnregisterOnStartFailure(registered) {
-			slotReserved = false
 			e.agentRegistry.Unregister(agentInstanceID)
 		}
 		_, _ = e.store.SetRunStatus(runID, "failed")

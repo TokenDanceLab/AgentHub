@@ -1345,3 +1345,105 @@ func TestCancelTransitionAndPublishPureHelpers(t *testing.T) {
 		t.Fatalf("classified %#v", classified)
 	}
 }
+
+func TestCmdStartAndSpawnPureHelpers(t *testing.T) {
+	t.Parallel()
+	if classifyCmdStartOutcome(nil, nil) != cmdStartOK {
+		t.Fatal("start ok")
+	}
+	if classifyCmdStartOutcome(errors.New("x"), context.Canceled) != cmdStartCancelled {
+		t.Fatal("start cancelled")
+	}
+	if classifyCmdStartOutcome(errors.New("x"), nil) != cmdStartFailed {
+		t.Fatal("start failed")
+	}
+
+	outcome, psErr := classifyStructuredParseOutcome(nil)
+	if outcome != structuredParseNone || psErr != nil {
+		t.Fatalf("none %#v %v", outcome, psErr)
+	}
+	fatalOutcome, _ := classifyStructuredParseOutcome(errors.New("boom"))
+	if fatalOutcome != structuredParseFatal {
+		t.Fatalf("fatal %v", fatalOutcome)
+	}
+	if !shouldPublishRecoverableParseWarning(structuredParseRecoverable) || shouldPublishRecoverableParseWarning(structuredParseNone) {
+		t.Fatal("recoverable warning predicate")
+	}
+	if !shouldFailOnStructuredParse(structuredParseFatal) || shouldFailOnStructuredParse(structuredParseRecoverable) {
+		t.Fatal("fatal parse predicate")
+	}
+
+	args := subprocessStartingLogArgs("run1", "/bin/echo", []string{"-n", "hi"}, 0)
+	if len(args) < 10 || args[0] != "runId" || args[1] != "run1" {
+		t.Fatalf("starting log args %#v", args)
+	}
+	started := subprocessStartedLogArgs("run1", nil)
+	if processPIDForLog(nil) != 0 || len(started) != 4 {
+		t.Fatalf("started log %#v", started)
+	}
+	if shouldTrackStartedProcess(nil) || !shouldTrackStartedProcess(&os.Process{}) {
+		t.Fatal("track process")
+	}
+
+	reserved, reject := evaluateSpawnSlotReservation(false, errors.New("x"))
+	if reserved || reject != nil {
+		t.Fatalf("no registry %#v %v", reserved, reject)
+	}
+	reserved, reject = evaluateSpawnSlotReservation(true, errors.New("full"))
+	if reserved || reject == nil {
+		t.Fatalf("reject %#v %v", reserved, reject)
+	}
+	reserved, reject = evaluateSpawnSlotReservation(true, nil)
+	if !reserved || reject != nil {
+		t.Fatalf("reserved %#v %v", reserved, reject)
+	}
+
+	registered, logFailure := evaluateSubAgentRegistration(false, nil)
+	if registered || logFailure {
+		t.Fatal("no registry registration")
+	}
+	registered, logFailure = evaluateSubAgentRegistration(true, errors.New("x"))
+	if registered || !logFailure {
+		t.Fatal("register failure")
+	}
+	registered, logFailure = evaluateSubAgentRegistration(true, nil)
+	if !registered || logFailure {
+		t.Fatal("register ok")
+	}
+	if slotReservedAfterUnregister(true, true) {
+		t.Fatal("clear after unregister")
+	}
+	if !slotReservedAfterUnregister(false, true) {
+		t.Fatal("keep reserved when not registered")
+	}
+
+	plan := planEvidenceGateOutcome(false, false)
+	if plan.FinalStatus != "finished" || plan.LogFailure {
+		t.Fatalf("disabled gate %#v", plan)
+	}
+	plan = planEvidenceGateOutcome(true, false)
+	if plan.FinalStatus != "completed_with_issues" || !plan.LogFailure {
+		t.Fatalf("failed gate %#v", plan)
+	}
+	plan = planEvidenceGateOutcome(true, true)
+	if plan.FinalStatus != "finished" || plan.LogFailure {
+		t.Fatalf("passed gate %#v", plan)
+	}
+
+	if shouldApplyHubCallbackSideEffect("", hubCallbackStream) || !shouldApplyHubCallbackSideEffect("x", hubCallbackStream) {
+		t.Fatal("hub side effect apply")
+	}
+	if !isHubCallbackStreamEffect(hubCallbackStream) || isHubCallbackStreamEffect(hubCallbackFallback) {
+		t.Fatal("stream effect")
+	}
+	if !isHubCallbackFallbackEffect(hubCallbackFallback) || isHubCallbackFallbackEffect(hubCallbackStream) {
+		t.Fatal("fallback effect")
+	}
+	if !shouldClearStdinAfterEagerClose(true) || shouldClearStdinAfterEagerClose(false) {
+		t.Fatal("clear stdin")
+	}
+	keys := finishRunMapKeys()
+	if len(keys) < 8 || keys[0] != "running" {
+		t.Fatalf("finish keys %#v", keys)
+	}
+}

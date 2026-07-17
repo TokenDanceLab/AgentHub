@@ -1111,3 +1111,184 @@ func classifyPublishedFailure(err error) *RunError {
 func shouldLogForbiddenPermissionMode(forbidden bool) bool {
 	return forbidden
 }
+
+// cmdStartOutcome classifies cmd.Start results for the run() launch path.
+type cmdStartOutcome int
+
+const (
+	cmdStartOK cmdStartOutcome = iota
+	cmdStartCancelled
+	cmdStartFailed
+)
+
+// classifyCmdStartOutcome maps a cmd.Start error + run-context error into a pure
+// launch outcome. Control-flow (wait/kill/publish) stays in the executor.
+func classifyCmdStartOutcome(startErr, ctxErr error) cmdStartOutcome {
+	if startErr == nil {
+		return cmdStartOK
+	}
+	if shouldTreatStartFailureAsCancelled(ctxErr) {
+		return cmdStartCancelled
+	}
+	return cmdStartFailed
+}
+
+// structuredParseOutcome classifies ParseStream errors for the session-retry loop.
+type structuredParseOutcome int
+
+const (
+	structuredParseNone structuredParseOutcome = iota
+	structuredParseRecoverable
+	structuredParseFatal
+)
+
+// classifyStructuredParseOutcome distinguishes none / recoverable warning /
+// fatal publishFailed paths without reworking #179 recovery semantics.
+func classifyStructuredParseOutcome(parseErr error) (structuredParseOutcome, *adapters.ParseStreamError) {
+	if !shouldHandleStructuredParseError(parseErr) {
+		return structuredParseNone, nil
+	}
+	if psErr, ok := recoverableParseStreamError(parseErr); ok {
+		return structuredParseRecoverable, psErr
+	}
+	return structuredParseFatal, nil
+}
+
+// subprocessStartingLogArgs builds redacted slog attributes for the
+// executor.subprocess.starting debug event.
+func subprocessStartingLogArgs(runID, cmdPath string, args []string, attempt int) []any {
+	argSummary := summarizeProcessArgsForLog(args)
+	return []any{
+		"runId", runID,
+		"commandName", processCommandNameForLog(cmdPath),
+		"commandRedacted", true,
+		"argCount", len(args),
+		"argFlags", argSummary.ArgFlags,
+		"configKeys", argSummary.ConfigKeys,
+		"positionalArgCount", argSummary.PositionalArgCount,
+		"unknownFlagCount", argSummary.UnknownFlagCount,
+		"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
+		"argsRedacted", true,
+		"attempt", attempt,
+	}
+}
+
+// subprocessStartedLogArgs builds slog attributes for executor.subprocess.started.
+func subprocessStartedLogArgs(runID string, proc *os.Process) []any {
+	return []any{
+		"runId", runID,
+		"pid", processPIDForLog(proc),
+	}
+}
+
+// processPIDForLog returns the process PID, or 0 when the handle is nil.
+func processPIDForLog(proc *os.Process) int {
+	if proc == nil {
+		return 0
+	}
+	return proc.Pid
+}
+
+// shouldTrackStartedProcess reports whether a just-started process handle should
+// be retained for graceful shutdown signals.
+func shouldTrackStartedProcess(proc *os.Process) bool {
+	return proc != nil
+}
+
+// evaluateSpawnSlotReservation maps a TryReserveSlot result to reserved/reject
+// without touching registry state. hasRegistry gates the call site.
+func evaluateSpawnSlotReservation(hasRegistry bool, reserveErr error) (reserved bool, reject error) {
+	if !shouldReserveSpawnSlot(hasRegistry) {
+		return false, nil
+	}
+	if shouldLogSpawnSlotRejection(reserveErr) {
+		return false, reserveErr
+	}
+	return true, nil
+}
+
+// evaluateSubAgentRegistration maps a registry Register result to registered /
+// logFailure flags. hasRegistry gates the call site.
+func evaluateSubAgentRegistration(hasRegistry bool, regErr error) (registered, logFailure bool) {
+	if !shouldRegisterSubAgentInstance(hasRegistry) {
+		return false, false
+	}
+	if shouldLogSubAgentRegisterFailure(regErr) {
+		return false, true
+	}
+	return shouldMarkSubAgentRegistered(regErr), false
+}
+
+// slotReservedAfterUnregister clears the reserved flag when Unregister will
+// already DecrChildCount, preventing the deferred release from double-decrementing.
+func slotReservedAfterUnregister(registered, slotReserved bool) bool {
+	if shouldUnregisterOnStartFailure(registered) {
+		return false
+	}
+	return slotReserved
+}
+
+// evidenceGateOutcome is the pure publish plan after evidence verification.
+type evidenceGateOutcome struct {
+	FinalStatus string
+	LogFailure  bool
+}
+
+// planEvidenceGateOutcome resolves the terminal status and whether verification
+// failure should be warned. When the gate is disabled, status is finished.
+func planEvidenceGateOutcome(gateEnabled, passed bool) evidenceGateOutcome {
+	return evidenceGateOutcome{
+		FinalStatus: resolveEvidenceFinalStatus(gateEnabled, passed),
+		LogFailure:  gateEnabled && shouldLogEvidenceGateFailure(passed),
+	}
+}
+
+// shouldApplyHubCallbackSideEffect reports whether hubCallbackEmitter should
+// forward extracted text into stream/fallback collectors.
+func shouldApplyHubCallbackSideEffect(text string, effect hubCallbackSideEffect) bool {
+	return text != "" && effect != hubCallbackNone
+}
+
+// isHubCallbackStreamEffect reports whether the side-effect is live stream text.
+func isHubCallbackStreamEffect(effect hubCallbackSideEffect) bool {
+	return effect == hubCallbackStream
+}
+
+// isHubCallbackFallbackEffect reports whether the side-effect is final fallback text.
+func isHubCallbackFallbackEffect(effect hubCallbackSideEffect) bool {
+	return effect == hubCallbackFallback
+}
+
+// shouldClearStdinAfterEagerClose reports whether the run's stdin map entry should
+// be dropped after an eager post-start close.
+func shouldClearStdinAfterEagerClose(closed bool) bool {
+	return closed
+}
+
+// shouldPublishRecoverableParseWarning reports whether a recoverable parse path
+// should emit a context-warning bus event (always true for that branch).
+func shouldPublishRecoverableParseWarning(outcome structuredParseOutcome) bool {
+	return outcome == structuredParseRecoverable
+}
+
+// shouldFailOnStructuredParse reports whether a fatal parse path should publishFailed.
+func shouldFailOnStructuredParse(outcome structuredParseOutcome) bool {
+	return outcome == structuredParseFatal
+}
+
+// finishRunMapKeys lists executor map keys cleaned on terminal finish. Pure
+// documentation of the finish() cleanup set (no map mutation).
+func finishRunMapKeys() []string {
+	return []string{
+		"running",
+		"stdins",
+		"processes",
+		"runToAgent",
+		"hubTasks",
+		"hubOutputs",
+		"workDirs",
+		"surfacers",
+		"cancelDone",
+		"runOutputs",
+	}
+}
