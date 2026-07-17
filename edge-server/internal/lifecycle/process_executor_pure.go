@@ -885,3 +885,126 @@ func shouldTrackRunOutputStore(err error) bool {
 func shouldCloseStdinPipe(stdinOpen bool) bool {
 	return stdinOpen
 }
+
+// validateStartRunState reports whether Start may proceed for a looked-up run.
+// Missing runs yield store.ErrNotFound; non-queued statuses yield ErrRunAlreadyStarted.
+func validateStartRunState(found bool, status string) error {
+	if !found {
+		return store.ErrNotFound
+	}
+	if !isQueuedRunStatus(status) {
+		return ErrRunAlreadyStarted
+	}
+	return nil
+}
+
+// cancelPrecheck returns an early CancelResult when the store lookup fails or the
+// run is no longer cancellable. proceed is true only when Cancel should continue.
+func cancelPrecheck(run store.Run, found bool) (result CancelResult, proceed bool) {
+	if !found {
+		return cancelResultNotFound(), false
+	}
+	if !isCancellableRunStatus(run.Status) {
+		return cancelResultWithRun(run), false
+	}
+	return CancelResult{}, true
+}
+
+// cancelRunningLookup returns an early CancelResult when the run has no live
+// cancel func. proceed is true only when Cancel should continue shutdown.
+func cancelRunningLookup(found bool) (result CancelResult, proceed bool) {
+	if !found {
+		return cancelResultNotRunning(), false
+	}
+	return CancelResult{}, true
+}
+
+// shouldRecordFinishMetricsForRun reports whether finish metrics may be recorded
+// for a successfully looked-up run.
+func shouldRecordFinishMetricsForRun(found bool) bool {
+	return found
+}
+
+// shouldRunEvidenceGate reports whether post-completion evidence verification
+// should execute for the current run.
+func shouldRunEvidenceGate(gateEnabled bool) bool {
+	return gateEnabled
+}
+
+// shouldAcceptFaultEscalationRetry reports whether a looked-up run may accept
+// one more fault-escalation auto-retry. Control-flow handoff stays in run().
+func shouldAcceptFaultEscalationRetry(found bool, cfg FaultEscalationConfig, retryCount int) bool {
+	return found && shouldFaultEscalateRetry(cfg, retryCount)
+}
+
+// applyFaultEscalationQueuedStatus marks the in-memory run as queued when the
+// store re-queue transition succeeded. Pure status mutation only.
+func applyFaultEscalationQueuedStatus(run store.Run, requeued bool) store.Run {
+	if requeued {
+		run.Status = "queued"
+	}
+	return run
+}
+
+// shouldInvokeOldCancelOnEscalationHandoff reports whether the previous attempt's
+// cancel func should be invoked before re-registering the successor cancel.
+func shouldInvokeOldCancelOnEscalationHandoff(found bool) bool {
+	return found
+}
+
+// shouldLogRunOutputStoreWriteFailure reports whether a run-output store write
+// error should be warned (non-fatal).
+func shouldLogRunOutputStoreWriteFailure(err error) bool {
+	return err != nil
+}
+
+// shouldLogAgentFailurePersistError reports whether CreateItem failure for a
+// failure agent_message should be warned.
+func shouldLogAgentFailurePersistError(err error) bool {
+	return err != nil
+}
+
+// shouldLogRunOutputStoreCloseFailure reports whether closing a tracked run
+// output store failed and should be warned.
+func shouldLogRunOutputStoreCloseFailure(err error) bool {
+	return err != nil
+}
+
+// shouldLogSpawnSlotRejection reports whether TryReserveSlot rejected the spawn.
+func shouldLogSpawnSlotRejection(err error) bool {
+	return err != nil
+}
+
+// shouldLogSubAgentCreateFailure reports whether CreateRun failed for a spawn.
+func shouldLogSubAgentCreateFailure(err error) bool {
+	return err != nil
+}
+
+// shouldLogSubAgentRegisterFailure reports whether registry Register failed for
+// a spawned child (non-fatal; spawn continues without registry tracking).
+func shouldLogSubAgentRegisterFailure(err error) bool {
+	return err != nil
+}
+
+// subAgentSpawnIDs builds the stable run and agent-instance IDs for a task.
+func subAgentSpawnIDs(taskID string) (runID, agentInstanceID string) {
+	return subAgentRunID(taskID), subAgentInstanceID(taskID)
+}
+
+// shouldLookupSubAgentMapping reports whether a run→agent map entry was found
+// for result delivery.
+func shouldLookupSubAgentMapping(found bool) bool {
+	return found
+}
+
+// shouldHaveHubOutputCollector reports whether a hub output collector exists for
+// the run (used by record/final helpers).
+func shouldHaveHubOutputCollector(hasCollector bool) bool {
+	return hasCollector
+}
+
+// shouldLogHubCallbackFailure reports whether a Hub callback transport error
+// should be warned (callbacks never block lifecycle).
+func shouldLogHubCallbackFailure(err error) bool {
+	return err != nil
+}
