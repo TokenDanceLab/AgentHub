@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
@@ -238,12 +237,9 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	max := resolveMaxConcurrentRuns(e.maxConcurrentRuns)
-	if len(e.running) >= max {
-		return ErrTooManyConcurrentRuns
-	}
-	if _, ok := e.running[run.ID]; ok {
-		return ErrRunAlreadyStarted
+	_, alreadyRunning := e.running[run.ID]
+	if err := canStartRun(len(e.running), e.maxConcurrentRuns, alreadyRunning); err != nil {
+		return err
 	}
 	// Create context and atomically insert cancel into the map while holding
 	// the lock, so a concurrent Cancel can never miss the cancel func.
@@ -344,7 +340,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}()
 
 	// Store Hub task ID for Edge→Hub direct callback reporting
-	if runCtx.HubTaskID != "" {
+	if shouldRecordHubTask(runCtx.HubTaskID) {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
 		e.mu.Unlock()
@@ -352,7 +348,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
-	if e.adapterReg != nil && (runCtx.AgentID != "" || adapter != nil) {
+	if shouldResolveAdapter(e.adapterReg != nil, runCtx.AgentID, adapter != nil) {
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
 		if err != nil {
 			e.publishFailed(run, err)
@@ -386,12 +382,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// before launching the agent process. If the API validation is somehow
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
-	if isForbiddenPermissionMode(runCtx.PermissionMode) {
+	if mode, forbidden := sanitizePermissionMode(runCtx.PermissionMode); forbidden {
 		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
 			"runId", run.ID,
 			"agentId", runCtx.AgentID,
 		)
-		runCtx.PermissionMode = normalizePermissionMode(runCtx.PermissionMode)
+		runCtx.PermissionMode = mode
 	}
 
 	var runStartTime time.Time
@@ -456,19 +452,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 		cmd := exec.CommandContext(ctx, cmdPath, args...)
 		cmd.Dir = workDir
-		if adapter != nil {
-			// Adapter mode: the adapter returns only auth env vars (e.g.
-			// ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL) that must be overlaid on
-			// top of the sanitized parent environment. Passing them as
-			// profileEnv would replace the entire child env with just those
-			// vars, stripping PATH, SYSTEMROOT and other OS essentials — which
-			// causes the CLI to fail immediately. Instead, merge adapter env
-			// into extraEnv so SanitizedEnv provides the full OS base plus the
-			// adapter's auth passthrough.
-			cmd.Env = envForRun(run, nil, append(extraEnv, env...))
-		} else {
-			cmd.Env = envForRun(run, env, extraEnv)
-		}
+		// Adapter mode overlays auth env onto a sanitized base; profile mode
+		// uses the administrator-configured env base. See envForAdapterOrProfile.
+		cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
@@ -617,7 +603,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				contextCompactionPayload(run.ID, usagePct, tokensUsed, remaining))
 		}
 
-		if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
+		if shouldTreatAsCancelled(ctx.Err(), e.runStatus(run.ID)) {
 			e.publishCancelled(run)
 			e.sendSubAgentResult(run.ID, "cancelled", nil)
 			return
@@ -640,8 +626,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"newSessionId", newSession,
 				"error", lastWaitErr,
 			)
-			runCtx.SessionID = newSession
-			runCtx.ContinueLast = false
+			runCtx = withFreshSession(runCtx, newSession)
 			// Clean up the tracked process from this attempt before retrying.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
@@ -673,7 +658,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
 					recoverableParseWarningPayload(
 						run.ID,
-						fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
+						recoverableParseWarningMessage(psErr.Unwrap()),
 						psErr.Error(),
 					))
 			} else {
@@ -822,8 +807,8 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 }
 
 func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
-	content = strings.TrimSpace(content)
-	if content == "" {
+	content, ok := trimAgentFailureContent(content)
+	if !ok {
 		return
 	}
 	repository, ok := e.store.(interface {
@@ -833,10 +818,8 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 	if !ok {
 		return
 	}
-	for _, item := range repository.ListThreadItems(run.ThreadID) {
-		if item.RunID == run.ID && item.Type == "agent_message" {
-			return
-		}
+	if hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID) {
+		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
 	if err != nil {
@@ -931,7 +914,7 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 
 	// Only surface for successfully finished runs.
 	current, ok := e.store.GetRun(runID)
-	if !ok || current.Status != "finished" {
+	if !shouldSurfaceRunArtifacts(ok, current.Status) {
 		return
 	}
 
@@ -949,7 +932,7 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 // back to its parent agent via the message queue. This enables the orchestrator
 // to aggregate results from dispatched sub-agents.
 func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) {
-	if e.agentRegistry == nil || e.messageQueue == nil {
+	if !shouldDeliverSubAgentResult(e.agentRegistry != nil, e.messageQueue != nil) {
 		return
 	}
 
@@ -961,7 +944,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	}
 
 	inst, found := e.agentRegistry.Get(agentID)
-	if !found || inst.ParentID == "" {
+	if !shouldRouteSubAgentToParent(found, inst.ParentID) {
 		return
 	}
 
@@ -1037,7 +1020,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
-	if budget, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); ok && budget != nil {
+	if budget, ok := budgetFromParserContext(ctx); ok {
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
@@ -1056,12 +1039,8 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	// This is the unified security layer: all three adapters (Claude Code,
 	// Codex, OpenCode) are covered at the ProcessExecutor level, regardless
 	// of whether they use NDJSONStreamParser or emit events directly.
-	hooks := adapters.HookChain{adapters.NewSecurityHook()}
-	if rc, ok := adapters.RunProcessContextFromContext(ctx); ok && len(rc.AllowedTools) > 0 {
-		allowlistHook := adapters.NewToolAllowlistHook(rc.AllowedTools, emitter, scope)
-		// Prepend: allowlist check runs before security classification
-		hooks = adapters.HookChain{allowlistHook, adapters.NewSecurityHook()}
-	}
+	allowedTools, _ := allowedToolsFromParserContext(ctx)
+	hooks := buildProcessSecurityHooks(allowedTools, emitter, scope)
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
@@ -1168,12 +1147,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Lock()
 	parentWorkDir := e.workDirs[parentRun.ID]
 	e.mu.Unlock()
-	if parentWorkDir != "" {
-		runCtx.WorkDir = parentWorkDir
-		if memPrompt := runnerctx.BuildMemoryPrompt(parentWorkDir, threadID, task.AgentID); memPrompt != "" {
-			runCtx.SkillsPrompt = memPrompt
-		}
-	}
+	runCtx = applyParentWorkDirMemory(runCtx, parentWorkDir, threadID, task.AgentID)
 
 	// Inject sibling context so the sub-agent knows about other agents working
 	// in parallel. This prevents file conflicts when multiple sub-agents modify
