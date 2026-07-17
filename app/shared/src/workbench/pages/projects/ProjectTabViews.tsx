@@ -2,6 +2,8 @@
    Projects detail tab bodies (runs / artifacts / archive / settings).
 
    Residual extract from ProjectPanelViews for Phase 23 #626.
+   Residual thin (#696): imports refactored — Announcement / FeedPanel /
+   ProjectMembers moved to own files; inline SectionHead → shared helper.
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -13,12 +15,13 @@ import {
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 import styles from '../ProjectsPage.module.css';
+import { ProjectAnnouncement } from './ProjectAnnouncement';
+import { ProjectFeedPanel } from './ProjectFeedPanel';
+import { ProjectMembers } from './ProjectMembers';
+import { ProjectSectionHead } from './ProjectPanelHelpers';
 import {
-  Announcement,
   ArtifactIndexPanel,
   ArtifactsPanel,
-  FeedPanel,
-  ProjectMembers,
   ProjectPreviewPanel,
   RunsPanel,
   RunSummaryPanel,
@@ -52,12 +55,7 @@ export function RunsTab({
       />
       <RunSummaryPanel project={project} />
       <section className={`${styles.detailPanel} ${styles.feedPanel} project-detail-panel project-feed`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="notes" size={15} />运行记录
-          </h2>
-          <span>Recent</span>
-        </div>
+        <ProjectSectionHead icon="notes" title="运行记录" meta="Recent" />
         {project.runs.map((run) => (
           <div key={run.id} className={styles.feedRow}>
             <time className={styles.feedTime}>{runStatusLabel(run.status)}</time>
@@ -90,12 +88,7 @@ export function ArtifactsTab({
       />
       <ArtifactIndexPanel artifacts={project.artifacts} />
       <section className={`${styles.detailPanel} ${styles.feedPanel} project-detail-panel project-feed`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="package" size={15} />交付动态
-          </h2>
-          <span>{project.artifacts.length} files</span>
-        </div>
+        <ProjectSectionHead icon="package" title="交付动态" meta={`${project.artifacts.length} files`} />
         {project.artifacts.map((artifact) => (
           <div key={artifact.id} className={styles.feedRow}>
             <time className={styles.feedTime}>{artifact.type}</time>
@@ -120,12 +113,7 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
   return (
     <div className={styles.detailLayout}>
       <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="archive" size={15} />归档检查
-          </h2>
-          <span>{archiveItems.length} checks</span>
-        </div>
+        <ProjectSectionHead icon="archive" title="归档检查" meta={`${archiveItems.length} checks`} />
         {archiveItems.map((item) => (
           <div key={item.id} className={styles.archiveRow}>
             <span className={`${styles.stateDot} ${item.status === '可归档' || item.status === '已整理' ? styles.stateCompleted : styles.stateWaiting}`} />
@@ -136,12 +124,7 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
         ))}
       </section>
       <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="package" size={15} />归档包
-          </h2>
-          <span>Draft</span>
-        </div>
+        <ProjectSectionHead icon="package" title="归档包" meta="Draft" />
         <button type="button" className={`${styles.artifactRow} project-artifact`} data-card-surface>
           <DesignFileIcon className={styles.fileIcon} name={`${project.id}-handoff.md`} type="md" />
           <span className={styles.artifactName}>{project.id}-handoff.md</span>
@@ -151,7 +134,7 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
           <span className={styles.artifactName}>{project.id}-manifest.xlsx</span>
         </button>
       </section>
-      <FeedPanel feed={project.feed} />
+      <ProjectFeedPanel feed={project.feed} />
     </div>
   );
 }
@@ -173,17 +156,12 @@ export function SettingsTab({
 
   return (
     <div className={styles.detailLayout}>
-      <Announcement
+      <ProjectAnnouncement
         text={project.announcement}
         onEdit={undefined}
       />
       <section className={`${styles.detailPanel} ${styles.settingsPanel} project-detail-panel`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="tools" size={15} />项目设置
-          </h2>
-          <span>{settings.length} 项</span>
-        </div>
+        <ProjectSectionHead icon="tools" title="项目设置" meta={`${settings.length} 项`} />
         {settings.map((item) => (
           <div key={item.label} className={styles.settingRow}>
             <div>
@@ -195,12 +173,7 @@ export function SettingsTab({
         ))}
       </section>
       <section className={`${styles.detailPanel} ${styles.settingsSidePanel} project-detail-panel`} data-card-surface>
-        <div className={styles.sectionHead}>
-          <h2>
-            <DesignNavIcon name="users" size={15} />成员策略
-          </h2>
-          <span>{project.members.length} people</span>
-        </div>
+        <ProjectSectionHead icon="users" title="成员策略" meta={`${project.members.length} people`} />
         <ProjectMembers members={project.members} profiles={profiles} />
       </section>
     </div>

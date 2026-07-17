@@ -2,14 +2,13 @@
    Projects detail presentational panels.
 
    Residual extract from ProjectPanelViews for Phase 23 #626.
+   Residual thin (#696): Announcement / FeedPanel / ProjectMembers moved
+   to their own files; SectionHead + MemberChip shared via helpers.
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
-import {
-  DesignFileIcon,
-  DesignNavIcon,
-} from '../../designIcons';
+import { DesignFileIcon } from '../../designIcons';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import { FilePreview } from '../../inspector';
 import {
@@ -24,39 +23,10 @@ import {
 } from './shared';
 import type {
   ProjectArtifact,
-  ProjectFeedItem,
   ProjectInfo,
   ProjectRun,
 } from './types';
-
-export function Announcement({
-  text,
-  onEdit,
-}: {
-  text: string;
-  onEdit?: (() => void) | undefined;
-}) {
-  return (
-    <section className={`${styles.announcement} project-announcement`} data-card-surface>
-      <span className={styles.announcementMark} />
-      <div className={styles.announcementBody}>
-        <strong className={styles.announcementLabel}>
-          <DesignNavIcon name="notes" size={15} />项目公告
-        </strong>
-        <p className={styles.announcementText}>{text}</p>
-      </div>
-      {onEdit ? (
-        <button
-          type="button"
-          className={styles.announcementEditBtn}
-          onClick={onEdit}
-        >
-          编辑
-        </button>
-      ) : null}
-    </section>
-  );
-}
+import { ProjectMemberChip, ProjectSectionHead } from './ProjectPanelHelpers';
 
 export function MembersCard({
   members,
@@ -67,33 +37,11 @@ export function MembersCard({
 }) {
   return (
     <section className={`${styles.membersCard} project-members-card`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="users" size={15} />成员
-        </h2>
-        <span>{members.length} people</span>
-      </div>
+      <ProjectSectionHead icon="users" title="成员" meta={`${members.length} people`} />
       <div className={`${styles.memberChips} project-members`}>
-        {members.map((name) => {
-          const profile = resolveWorkbenchProfile(name, profiles);
-          return (
-            <span
-              key={name}
-              className={styles.memberChip}
-              data-profile-kind={profile.kind}
-              title={`${profile.name} · ${profile.label}`}
-            >
-              <span
-                className={styles.memberAvatar}
-                style={{ '--member-avatar-color': profile.color } as React.CSSProperties}
-              >
-                {profile.initials}
-              </span>
-              <span className={styles.memberName}>{profile.name}</span>
-              <em className={styles.memberKind}>{profile.label}</em>
-            </span>
-          );
-        })}
+        {members.map((name) => (
+          <ProjectMemberChip key={name} name={name} profiles={profiles} />
+        ))}
       </div>
     </section>
   );
@@ -133,12 +81,7 @@ export function RunsPanel({
 }) {
   return (
     <section className={`${styles.detailPanel} ${styles.runsPanel} project-detail-panel project-runs-panel`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="running" size={15} />项目运行
-        </h2>
-        <span>{meta}</span>
-      </div>
+      <ProjectSectionHead icon="running" title="项目运行" meta={meta} />
       {runs.map((run) => (
         <button
           key={run.id}
@@ -164,12 +107,7 @@ export function RunSummaryPanel({ project }: { project: ProjectInfo }) {
 
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="grid" size={15} />运行摘要
-        </h2>
-        <span>{project.runs.length} total</span>
-      </div>
+      <ProjectSectionHead icon="grid" title="运行摘要" meta={`${project.runs.length} total`} />
       <div className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <span className={`${styles.stateDot} ${styles.stateRunning}`} />
@@ -200,12 +138,7 @@ export function ArtifactsPanel({
 }) {
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="package" size={15} />产物
-        </h2>
-        <span>{artifacts.length} files</span>
-      </div>
+      <ProjectSectionHead icon="package" title="产物" meta={`${artifacts.length} files`} />
       {artifacts.map((a) => (
         <button
           key={a.id}
@@ -225,36 +158,12 @@ export function ArtifactsPanel({
 export function ArtifactIndexPanel({ artifacts }: { artifacts: ProjectArtifact[] }) {
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="notes" size={15} />产物索引
-        </h2>
-        <span>{artifacts.length} entries</span>
-      </div>
+      <ProjectSectionHead icon="notes" title="产物索引" meta={`${artifacts.length} entries`} />
       {artifacts.map((artifact, index) => (
         <div key={artifact.id} className={styles.metaRow}>
           <span>{String(index + 1).padStart(2, '0')}</span>
           <strong>{artifactTypeLabel(artifact.type)}</strong>
           <em>{artifact.name}</em>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-export function FeedPanel({ feed }: { feed: ProjectFeedItem[] }) {
-  return (
-    <section className={`${styles.detailPanel} ${styles.feedPanel} project-detail-panel`} data-card-surface>
-      <div className={styles.sectionHead}>
-        <h2>
-          <DesignNavIcon name="notes" size={15} />最近动态
-        </h2>
-        <span>Today</span>
-      </div>
-      {feed.map((item) => (
-        <div key={item.id} className={styles.feedRow}>
-          <time className={styles.feedTime}>{item.time}</time>
-          <span>{item.text}</span>
         </div>
       ))}
     </section>
@@ -288,38 +197,5 @@ export function ProjectPreviewPanel({
         onClose={onClosePreview ?? (() => {})}
       />
     </section>
-  );
-}
-
-export function ProjectMembers({
-  members,
-  profiles = [],
-}: {
-  members: string[];
-  profiles?: WorkbenchProfileSource[] | undefined;
-}) {
-  return (
-    <div className={`${styles.memberChips} project-members`}>
-      {members.map((name) => {
-        const profile = resolveWorkbenchProfile(name, profiles);
-        return (
-          <span
-            key={name}
-            className={styles.memberChip}
-            data-profile-kind={profile.kind}
-            title={`${profile.name} · ${profile.label}`}
-          >
-            <span
-              className={styles.memberAvatar}
-              style={{ '--member-avatar-color': profile.color } as React.CSSProperties}
-            >
-              {profile.initials}
-            </span>
-            <span className={styles.memberName}>{profile.name}</span>
-            <em className={styles.memberKind}>{profile.label}</em>
-          </span>
-        );
-      })}
-    </div>
   );
 }
