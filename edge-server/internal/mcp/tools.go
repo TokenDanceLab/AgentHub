@@ -77,7 +77,7 @@ func (s *Server) listTools() []Tool {
 		},
 		{
 			Name:        "agenthub_start_run",
-			Description: "Start a new agent run on an AgentHub Edge thread. The configured agent will execute the given prompt and produce streaming events.\nExample: {\"name\": \"agenthub_start_run\", \"arguments\": {\"projectId\": \"proj_abc\", \"threadId\": \"thread_xyz\", \"prompt\": \"Fix the N+1 query in user list\", \"agentId\": \"claude-code\", \"model\": \"claude-sonnet-4-20250514\"}}\nOutput: JSON object with \"runId\", \"projectId\", \"threadId\", \"status\" (\"started\"), and \"message\".\nErrors: Returns an error if the thread already has an active run, the project or thread is not found, workDir is outside the configured allowlist, required fields are missing, or the executor failed to start the run.",
+			Description: "Start a new agent run on an AgentHub Edge thread. The configured agent will execute the given prompt and produce streaming events.\nExample: {\"name\": \"agenthub_start_run\", \"arguments\": {\"projectId\": \"proj_abc\", \"threadId\": \"thread_xyz\", \"prompt\": \"Fix the N+1 query in user list\", \"agentId\": \"claude-code\", \"model\": \"claude-sonnet-4-20250514\", \"workDir\": \"/path/to/workspace\"}}\nOutput: JSON object with \"runId\", \"projectId\", \"threadId\", \"status\" (\"started\"), and \"message\".\nErrors: Returns an error if workDir is missing/empty, the thread already has an active run, the project or thread is not found, workDir is outside the configured allowlist, required fields are missing, or the executor failed to start the run.",
 			InputSchema: jsonSchema(`{
 				"type": "object",
 				"properties": {
@@ -103,10 +103,10 @@ func (s *Server) listTools() []Tool {
 					},
 					"workDir": {
 						"type": "string",
-						"description": "Optional working directory for the agent."
+						"description": "Required working directory for the agent run; must be non-empty and inside the Edge workspace allowlist."
 					}
 				},
-				"required": ["projectId", "threadId", "prompt"]
+				"required": ["projectId", "threadId", "prompt", "workDir"]
 			}`),
 		},
 		{
@@ -236,9 +236,9 @@ func (s *Server) listTools() []Tool {
 					"prompt": {"type": "string", "description": "The user prompt/message."},
 					"agentId": {"type": "string", "description": "Optional agent adapter ID."},
 					"model": {"type": "string", "description": "Optional model override."},
-					"workDir": {"type": "string", "description": "Optional working directory."}
+					"workDir": {"type": "string", "description": "Required working directory for the agent run."}
 				},
-				"required": ["projectId", "threadId", "prompt"]
+				"required": ["projectId", "threadId", "prompt", "workDir"]
 			}`),
 		},
 		{
@@ -450,16 +450,16 @@ func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 
 // toolStartRun implements the agenthub_start_run tool.
 //
-// Validates workDir against the workspace allowlist (AH-SR-006), mirrors the
-// REST API validation in Handler.validateWorkDirAllowed. Creates a run record,
+// Requires non-empty workDir and validates it against the workspace allowlist
+// (AH-SR-006 / #854), mirroring REST validateRunWorkDir. Creates a run record,
 // publishes run.queued, creates a user message item, and starts the agent
 // executor.
 //
 // Returns an error if:
 //   - The thread already has an active run (queued or started)
 //   - The project or thread is not found
-//   - workDir is outside the configured allowlist
-//   - Required fields (projectId, threadId, prompt) are missing
+//   - workDir is missing/empty or outside the configured allowlist
+//   - Required fields (projectId, threadId, prompt, workDir) are missing
 func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	if s.store == nil {
 		return nil, errcode.ErrStoreNotConfigured
@@ -489,42 +489,44 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 		return nil, errcode.ErrPromptRequired
 	}
 
-	// Validate workDir against workspace allowlist (AH-SR-006).
-	// This mirrors the REST API validation in Handler.validateWorkDirAllowed.
-	if params.WorkDir != "" {
-		if len(s.workspaceAllowlist) == 0 {
-			return nil, errcode.ErrWorkspaceAllowlistNotConfigured
+	// Require non-empty workDir for adapter runs (#854), then validate against
+	// the workspace allowlist (AH-SR-006). Mirrors REST validateRunWorkDir.
+	params.WorkDir = strings.TrimSpace(params.WorkDir)
+	if params.WorkDir == "" {
+		return nil, errcode.ErrWorkDirRequired
+	}
+	if len(s.workspaceAllowlist) == 0 {
+		return nil, errcode.ErrWorkspaceAllowlistNotConfigured
+	}
+	allowed := false
+	candidate, err := filepath.Abs(params.WorkDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid workDir: %w", err)
+	}
+	for _, root := range s.workspaceAllowlist {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
 		}
-		allowed := false
-		candidate, err := filepath.Abs(params.WorkDir)
+		absRoot, err := filepath.Abs(root)
 		if err != nil {
-			return nil, fmt.Errorf("invalid workDir: %w", err)
+			continue
 		}
-		for _, root := range s.workspaceAllowlist {
-			root = strings.TrimSpace(root)
-			if root == "" {
-				continue
-			}
-			absRoot, err := filepath.Abs(root)
-			if err != nil {
-				continue
-			}
-			rel, err := filepath.Rel(absRoot, candidate)
-			if err != nil {
-				continue
-			}
-			if !strings.HasPrefix(rel, "..") && rel != "." {
-				allowed = true
-				break
-			}
-			if strings.EqualFold(filepath.Clean(candidate), filepath.Clean(absRoot)) {
-				allowed = true
-				break
-			}
+		rel, err := filepath.Rel(absRoot, candidate)
+		if err != nil {
+			continue
 		}
-		if !allowed {
-			return nil, errcode.ErrWorkspaceNotAllowed
+		if !strings.HasPrefix(rel, "..") && rel != "." {
+			allowed = true
+			break
 		}
+		if strings.EqualFold(filepath.Clean(candidate), filepath.Clean(absRoot)) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return nil, errcode.ErrWorkspaceNotAllowed
 	}
 
 	// Verify project and thread exist

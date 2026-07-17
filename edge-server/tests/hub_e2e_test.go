@@ -171,11 +171,13 @@ func startEdgeWithHubCallbacks(t *testing.T, hubURL string) (*httptest.Server, *
 		processExecutor.SetHubCallback(hubClient)
 	}
 
+	workDir := t.TempDir()
 	h := &api.Handler{
-		Bus:      bus,
-		Registry: runners.NewRegistry(),
-		Store:    storeRepo,
-		Executor: processExecutor,
+		Bus:                bus,
+		Registry:           runners.NewRegistry(),
+		Store:              storeRepo,
+		Executor:           processExecutor,
+		WorkspaceAllowlist: []string{workDir},
 	}
 
 	mux := http.NewServeMux()
@@ -212,6 +214,7 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "E2E test: complete run",
 		"hubTaskId": taskID,
+		"workDir": edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -308,11 +311,13 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 	hubClient := hub.NewCallbackClient(mockHub.URL(), "")
 	processExecutor.SetHubCallback(hubClient)
 
+	workDir := t.TempDir()
 	h := &api.Handler{
-		Bus:      bus,
-		Registry: runners.NewRegistry(),
-		Store:    storeRepo,
-		Executor: processExecutor,
+		Bus:                bus,
+		Registry:           runners.NewRegistry(),
+		Store:              storeRepo,
+		Executor:           processExecutor,
+		WorkspaceAllowlist: []string{workDir},
 	}
 
 	mux := http.NewServeMux()
@@ -327,6 +332,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "E2E test: failing run",
 		"hubTaskId": taskID,
+		"workDir":   workDir,
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -454,7 +460,7 @@ func TestHubE2E_NoCallbackWhenNotConfigured(t *testing.T) {
 	}
 
 	mockHub := newHubCallbackMock(t)
-	edgeTS, _ := startEdgeWithHubCallbacks(t, mockHub.URL())
+	edgeTS, edgeH := startEdgeWithHubCallbacks(t, mockHub.URL())
 
 	// Create a run WITHOUT hubTaskId
 	runResp := postJSON(t, edgeTS.URL+"/v1/runs", map[string]any{
@@ -462,6 +468,7 @@ func TestHubE2E_NoCallbackWhenNotConfigured(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "E2E test: no callback",
 		// No hubTaskId
+		"workDir": edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -506,6 +513,7 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "Complete round trip test",
 		"hubTaskId": taskID,
+		"workDir": edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {

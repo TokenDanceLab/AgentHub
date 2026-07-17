@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -484,6 +485,36 @@ func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 		}
 		if a.metadata.Description == "" {
 			t.Fatalf("%s adapter Description is empty", a.name)
+		}
+	}
+}
+
+func TestDefaultWorkDirDoesNotReturnHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	got := DefaultWorkDir()
+	if got != "" {
+		t.Fatalf("DefaultWorkDir() = %q, want empty (no home fallback)", got)
+	}
+	if err == nil && home != "" && got == home {
+		t.Fatalf("DefaultWorkDir must not return user home %q", home)
+	}
+}
+
+func TestClaudeBuildCommandOmitsAddDirWhenWorkDirEmpty(t *testing.T) {
+	adapter := NewClaudeCodeAdapter("claude", "sonnet", "")
+	_, args, _, workDir := adapter.BuildCommand(RunProcessContext{Prompt: "hello"})
+	if workDir != "" {
+		t.Fatalf("workDir = %q, want empty", workDir)
+	}
+	for i, a := range args {
+		if a == "--add-dir" {
+			// On Windows an --add-dir for TempDir may still be present; ensure it is not home.
+			if i+1 < len(args) {
+				home, err := os.UserHomeDir()
+				if err == nil && home != "" && args[i+1] == home {
+					t.Fatalf("--add-dir should not grant home: %q", args[i+1])
+				}
+			}
 		}
 	}
 }

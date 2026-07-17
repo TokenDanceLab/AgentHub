@@ -332,12 +332,13 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--fork-session")
 	}
 
-	// Allow tool access to the working directory
-	workDir := ctx.WorkDir
-	if workDir == "" {
-		workDir = DefaultWorkDir()
+	// Allow tool access to the working directory when an explicit workDir is set.
+	// Empty workDir is rejected at the REST/MCP gate (#854); do not invent a
+	// home/default root here (that previously expanded to UserHomeDir).
+	workDir := strings.TrimSpace(ctx.WorkDir)
+	if workDir != "" {
+		args = append(args, "--add-dir", workDir)
 	}
-	args = append(args, "--add-dir", workDir)
 
 	// On Windows, also grant access to the system temp directory so the agent
 	// can write to it when prompts reference /tmp.

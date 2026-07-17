@@ -196,8 +196,13 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found")))
 		return
 	}
-	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
+	req.WorkDir = strings.TrimSpace(req.WorkDir)
+	if err := h.validateRunWorkDir(req.WorkDir); err != nil {
 		h.runCreateMu.Unlock()
+		if errors.Is(err, errcode.ErrWorkDirRequired) {
+			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrWorkDirRequired))
+			return
+		}
 		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
 		return
 	}
