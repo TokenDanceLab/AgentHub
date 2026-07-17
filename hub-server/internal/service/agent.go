@@ -47,6 +47,11 @@ type AgentService struct {
 	// a lazy facade via deliveryOutboxService(). Redispatch stays on AgentService
 	// behind the Redispatcher port.
 	deliveryOutbox *DeliveryOutbox
+	// dispatch owns trigger/dispatch/cancel/regenerate orchestration.
+	// Constructed in NewAgentService; tests using struct literals fall back to
+	// a lazy facade via dispatchService(). Redispatch path reuses
+	// DispatchService.dispatchToEdgeHTTP for the HTTP route.
+	dispatch *DispatchService
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
@@ -62,6 +67,8 @@ func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.
 		seqAllocatorFunc(s.allocateSeq),
 		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
 	)
+	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
+	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox)
 	return s
 }
 

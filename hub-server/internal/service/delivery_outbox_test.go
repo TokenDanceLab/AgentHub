@@ -671,7 +671,7 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
