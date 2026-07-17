@@ -2,24 +2,57 @@ package service
 
 import (
 	"context"
-	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/im"
 )
 
-const maxMessageReactionLength = 64
+// ── MessageReactionService ports + type ──────────────────────────────────────
+//
+// Same-package thin residual seam (#639): MessageReactionService already owns
+// reaction add/remove/list orchestration. This seam hardens a replaceable bus
+// port (messageReactionBus) and moves pure reaction normalize into service/im,
+// matching MessageService (#585) / service/im pure helpers (#628). Not a
+// package move; OpenAPI/handler/frontend unchanged.
 
-type MessageReactionService struct {
-	db  *gorm.DB
-	bus *Bus
+// messageReactionBus publishes domain events from reaction write paths.
+// Implemented by *Bus.
+type messageReactionBus interface {
+	Publish(ctx context.Context, event Event)
 }
 
-func NewMessageReactionService(db *gorm.DB, bus *Bus) *MessageReactionService {
+// MessageReactionService owns IM message reaction orchestration in the flat
+// service package: add/remove/list summaries + access checks. Domain events go
+// through messageReactionBus. Not a package move (#639).
+type MessageReactionService struct {
+	db  *gorm.DB
+	bus messageReactionBus
+}
+
+// NewMessageReactionService constructs a MessageReactionService.
+// bus may be nil for read-only/partial tests; write paths that publish no-op.
+func NewMessageReactionService(db *gorm.DB, bus messageReactionBus) *MessageReactionService {
 	return &MessageReactionService{db: db, bus: bus}
+}
+
+// SetBus injects (or replaces) the event bus port.
+func (s *MessageReactionService) SetBus(bus messageReactionBus) {
+	if s == nil {
+		return
+	}
+	s.bus = bus
+}
+
+// publish is a nil-safe wrapper over the bus port.
+func (s *MessageReactionService) publish(ctx context.Context, event Event) {
+	if s == nil || s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, event)
 }
 
 type MessageReactionResponse struct {
@@ -129,12 +162,14 @@ func (s *MessageReactionService) ListMessageReactions(ctx context.Context, userI
 	return resp, nil
 }
 
+// normalizeMessageReaction is a thin alias to im.NormalizeMessageReaction that
+// maps pure-helper errors to the package domain error.
 func normalizeMessageReaction(reaction string) (string, error) {
-	reaction = strings.TrimSpace(reaction)
-	if reaction == "" || len([]rune(reaction)) > maxMessageReactionLength {
+	normalized, err := im.NormalizeMessageReaction(reaction)
+	if err != nil {
 		return "", errcode.ErrBadRequest
 	}
-	return reaction, nil
+	return normalized, nil
 }
 
 func (s *MessageReactionService) ensureMessageReactionAccess(sessionID, messageID, userID string) error {
@@ -180,10 +215,10 @@ func (s *MessageReactionService) messageReactionSnapshot(sessionID, messageID, u
 }
 
 func (s *MessageReactionService) publishMessageReactionEvent(ctx context.Context, eventType, action, userID string, resp *MessageReactionResponse) {
-	if s.bus == nil || resp == nil {
+	if resp == nil {
 		return
 	}
-	s.bus.Publish(ctx, Event{
+	s.publish(ctx, Event{
 		Type: eventType,
 		Payload: MessageReactionEventPayload{
 			Action:    action,
