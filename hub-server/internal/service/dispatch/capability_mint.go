@@ -66,3 +66,38 @@ func ResolveCapabilityMint(in CapabilityMintInput) CapabilityMintResolved {
 		TTL:       CapabilityTokenTTL,
 	}
 }
+
+// CapabilityMintFromEnv resolves mint bindings from raw env + payload fields
+// (issueRunStartCapability composition helper).
+func CapabilityMintFromEnv(jwtSecret, payloadDeviceID, envDeviceID, triggerUserID, targetID string) CapabilityMintResolved {
+	return ResolveCapabilityMint(NewCapabilityMintInput(
+		jwtSecret, payloadDeviceID, envDeviceID, triggerUserID, targetID,
+	))
+}
+
+// CapabilityTokenIssueArgs is the pure jwtutil.IssueCapabilityToken argument surface
+// derived from a successful CapabilityMintResolved (Ok must already be true).
+type CapabilityTokenIssueArgs struct {
+	Secret    []byte
+	UserID    string
+	DeviceID  string
+	ProjectID string
+	Action    string
+	TTL       time.Duration
+	TargetID  string
+	ThreadID  string
+}
+
+// CapabilityTokenArgs builds IssueCapabilityToken arguments from resolved mint bindings.
+func CapabilityTokenArgs(resolved CapabilityMintResolved) CapabilityTokenIssueArgs {
+	return CapabilityTokenIssueArgs{
+		Secret:    []byte(resolved.Secret),
+		UserID:    resolved.UserID,
+		DeviceID:  resolved.DeviceID,
+		ProjectID: resolved.ProjectID,
+		Action:    resolved.Action,
+		TTL:       resolved.TTL,
+		TargetID:  resolved.TargetID,
+		ThreadID:  resolved.ThreadID,
+	}
+}
