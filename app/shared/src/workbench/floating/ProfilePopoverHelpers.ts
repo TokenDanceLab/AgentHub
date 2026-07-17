@@ -32,11 +32,7 @@ export interface AccountSpace {
   description: string;
 }
 
-export type ProfilePopoverCss = {
-  agent: string;
-  group: string;
-  account: string;
-};
+export type ProfilePopoverCss = Record<string, string>;
 
 export type ProfilePopoverRect = {
   top: number;
@@ -60,9 +56,9 @@ export function profileVariantClass(
   variant: ProfileVariant,
   css: ProfilePopoverCss,
 ): string {
-  if (variant === 'agent') return css.agent;
-  if (variant === 'group') return css.group;
-  if (variant === 'account') return css.account;
+  if (variant === 'agent') return css.agent ?? '';
+  if (variant === 'group') return css.group ?? '';
+  if (variant === 'account') return css.account ?? '';
   return '';
 }
 
