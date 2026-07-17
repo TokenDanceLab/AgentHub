@@ -7,19 +7,19 @@
 /* ── Status messages ─────────────────────────────────── */
 .loading {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
 .error {
   padding: var(--space-lg);
-  color: var(--td-danger);
+  color: var(--danger);
   font-size: var(--font-size-xs);
 }
 
 .empty {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
@@ -29,9 +29,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: var(--td-radius-panel);
-  border: 1px solid var(--td-line);
-  background: var(--surface-raised);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--bdr);
+  background: var(--surface-high);
 }
 
 .cardLeft {
@@ -44,7 +44,7 @@
   display: flex;
   gap: var(--space-lg);
   font-size: var(--font-size-xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 /* ── Avatar ──────────────────────────────────────────── */
@@ -52,7 +52,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--td-plum);
+  background: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,7 +72,7 @@
 .memberName {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--td-ink);
+  color: var(--text-1);
 }
 
 .roleBadge {
@@ -92,15 +92,15 @@
 
 .roleExecutor {
   background: var(--glass-tint-sky);
-  color: var(--td-plum);
+  color: var(--primary);
 }
 
 .roleReviewer {
   background: var(--glass-tint-plum);
-  color: var(--td-plum);
+  color: var(--primary);
 }
 
 .roleDefault {
-  background: var(--td-tint);
-  color: var(--td-ink-muted);
+  background: var(--muted);
+  color: var(--text-2);
 }

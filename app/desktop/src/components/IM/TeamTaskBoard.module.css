@@ -7,19 +7,19 @@
 /* ── Status messages ─────────────────────────────────── */
 .loading {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
 .error {
   padding: var(--space-lg);
-  color: var(--td-danger);
+  color: var(--danger);
   font-size: var(--font-size-xs);
 }
 
 .empty {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
@@ -34,7 +34,7 @@
   margin: 0;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -42,9 +42,9 @@
 /* ── Task card ───────────────────────────────────────── */
 .card {
   padding: 10px 12px;
-  border-radius: var(--td-radius-panel);
-  border: 1px solid var(--td-line);
-  background: var(--surface-raised);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--bdr);
+  background: var(--surface-high);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -61,7 +61,7 @@
   font-weight: var(--font-weight-medium);
   flex: 1;
   line-height: var(--line-height-tight);
-  color: var(--td-ink);
+  color: var(--text-1);
 }
 
 .cardMeta {
@@ -69,7 +69,7 @@
   align-items: center;
   gap: var(--space-sm);
   font-size: var(--font-size-2xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 /* ── Status dot ──────────────────────────────────────── */
@@ -82,11 +82,11 @@
 }
 
 .statusPending {
-  background: var(--td-ink-muted);
+  background: var(--text-2);
 }
 
 .statusDispatched {
-  background: var(--td-plum);
+  background: var(--primary);
 }
 
 .statusRunning {
@@ -94,15 +94,15 @@
 }
 
 .statusDone {
-  background: var(--td-moss);
+  background: var(--success);
 }
 
 .statusFailed {
-  background: var(--td-danger);
+  background: var(--danger);
 }
 
 .statusCancelled {
-  background: var(--td-ink-muted);
+  background: var(--text-2);
 }
 
 /* ── Risk badge ──────────────────────────────────────── */
@@ -117,10 +117,10 @@
 
 .riskHigh {
   background: var(--glass-tint-danger);
-  color: var(--td-danger);
+  color: var(--danger);
 }
 
 .riskNormal {
-  background: var(--td-tint);
-  color: var(--td-ink-muted);
+  background: var(--muted);
+  color: var(--text-2);
 }
