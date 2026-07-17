@@ -8,6 +8,14 @@ export {
   ProjectEditor,
 } from './ProjectDetailViews';
 
+export { ProjectNav } from './ProjectNav';
+export type { ProjectNavProps } from './ProjectNav';
+
+export { ProjectMain } from './ProjectMain';
+export type { ProjectMainProps } from './ProjectMain';
+
+export { useProjectEditor } from './useProjectEditor';
+
 export {
   stateDotClass,
   runStatusLabel,
