@@ -14,14 +14,19 @@ import (
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
-// ── Outbox status constants ─────────────────────────────────────────────────
+// ── Outbox status constants (aliases to pure deliveryoutbox package) ────────
+//
+// Residual pure-helper extract (#744) after pure backoff/truncate (#514), thin
+// type + Redispatcher (#540), and model ownership residual (#551). Status /
+// eligibility / last-error helpers live in service/deliveryoutbox; thin aliases
+// keep existing call sites stable. Full model package move remains deferred.
 
 const (
-	DeliveryStatusPending   = "pending"
-	DeliveryStatusSent      = "sent"
-	DeliveryStatusDelivered = "delivered"
-	DeliveryStatusRetrying  = "retrying"
-	DeliveryStatusDead      = "dead"
+	DeliveryStatusPending   = deliveryoutbox.StatusPending
+	DeliveryStatusSent      = deliveryoutbox.StatusSent
+	DeliveryStatusDelivered = deliveryoutbox.StatusDelivered
+	DeliveryStatusRetrying  = deliveryoutbox.StatusRetrying
+	DeliveryStatusDead      = deliveryoutbox.StatusDead
 )
 
 // ── Delivery outbox TTL constants (aliases to pure deliveryoutbox package) ──
@@ -249,8 +254,7 @@ func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string
 // the dispatch with the matching delivery_id.
 func (o *DeliveryOutbox) AckDelivery(ctx context.Context, deliveryID string) error {
 	now := time.Now()
-	active := []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}
-	rows, err := o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
+	rows, err := o.updateOutboxByDeliveryID(ctx, deliveryID, deliveryoutbox.ActiveStatuses(), map[string]interface{}{
 		"status":       DeliveryStatusDelivered,
 		"delivered_at": &now,
 	})
@@ -279,7 +283,7 @@ func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]Deliver
 	// Pending deliveries past their initial timeout → retryable.
 	err := o.db.WithContext(ctx).
 		Model(outboxModel()).
-		Where("status = ? AND created_at <= ?", DeliveryStatusPending, now.Add(-DeliveryPendingTimeout)).
+		Where("status = ? AND created_at <= ?", DeliveryStatusPending, deliveryoutbox.PendingRetryCutoff(now)).
 		Limit(DeliveryOutboxMaxBatch).
 		Find(&records).Error
 	if err != nil {
@@ -290,7 +294,7 @@ func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]Deliver
 	var sentRecords []deliveryOutboxRecord
 	err = o.db.WithContext(ctx).
 		Model(outboxModel()).
-		Where("status = ? AND updated_at <= ?", DeliveryStatusSent, now.Add(-DeliverySentTimeout)).
+		Where("status = ? AND updated_at <= ?", DeliveryStatusSent, deliveryoutbox.SentRetryCutoff(now)).
 		Limit(DeliveryOutboxMaxBatch).
 		Find(&sentRecords).Error
 	if err != nil {
@@ -333,14 +337,14 @@ func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID st
 		return false, fmt.Errorf("find delivery for retry: %w", err)
 	}
 
-	active := []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}
-	newAttempt := rec.AttemptCount + 1
-	if newAttempt >= rec.MaxAttempts {
+	active := deliveryoutbox.ActiveStatuses()
+	newAttempt := deliveryoutbox.NextAttempt(rec.AttemptCount)
+	if deliveryoutbox.ShouldDeadLetter(rec.AttemptCount, rec.MaxAttempts) {
 		// Move to dead-letter.
 		_, updateErr := o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
 			"status":        DeliveryStatusDead,
 			"attempt_count": newAttempt,
-			"last_error":    deliveryoutbox.TruncateString(lastError, 1024),
+			"last_error":    deliveryoutbox.TruncateLastError(lastError),
 			"next_retry_at": nil,
 		})
 		if updateErr != nil {
@@ -360,7 +364,7 @@ func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID st
 	_, err = o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
 		"status":        DeliveryStatusRetrying,
 		"attempt_count": newAttempt,
-		"last_error":    deliveryoutbox.TruncateString(lastError, 1024),
+		"last_error":    deliveryoutbox.TruncateLastError(lastError),
 		"next_retry_at": &nextRetry,
 	})
 	if err != nil {
@@ -380,10 +384,9 @@ func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID st
 // MoveDeliveryToDeadLetter explicitly moves a delivery to dead-letter status.
 // This is used when a retry attempt encounters a non-retryable error.
 func (o *DeliveryOutbox) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error {
-	active := []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}
-	_, err := o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
+	_, err := o.updateOutboxByDeliveryID(ctx, deliveryID, deliveryoutbox.ActiveStatuses(), map[string]interface{}{
 		"status":     DeliveryStatusDead,
-		"last_error": deliveryoutbox.TruncateString(lastError, 1024),
+		"last_error": deliveryoutbox.TruncateLastError(lastError),
 	})
 	if err != nil {
 		return fmt.Errorf("move to dead-letter: %w", err)
@@ -413,7 +416,7 @@ func (o *DeliveryOutbox) GetDeliveryStatus(ctx context.Context, deliveryID strin
 func (o *DeliveryOutbox) CleanupOldDeliveries(ctx context.Context, olderThan time.Duration) (int64, error) {
 	cutoff := time.Now().Add(-olderThan)
 	result := o.db.WithContext(ctx).
-		Where("status IN ? AND updated_at <= ?", []string{DeliveryStatusDelivered, DeliveryStatusDead}, cutoff).
+		Where("status IN ? AND updated_at <= ?", deliveryoutbox.CleanupStatuses(), cutoff).
 		Delete(outboxModel())
 	if result.Error != nil {
 		return 0, fmt.Errorf("cleanup old deliveries: %w", result.Error)
@@ -460,7 +463,7 @@ func (o *DeliveryOutbox) autoAckDeliveriesForTask(ctx context.Context, taskID st
 	now := time.Now()
 	result := o.db.WithContext(ctx).
 		Model(outboxModel()).
-		Where("task_id = ? AND status IN ?", taskID, []string{DeliveryStatusPending, DeliveryStatusSent, DeliveryStatusRetrying}).
+		Where("task_id = ? AND status IN ?", taskID, deliveryoutbox.ActiveStatuses()).
 		Updates(map[string]interface{}{
 			"status":       DeliveryStatusDelivered,
 			"delivered_at": &now,
