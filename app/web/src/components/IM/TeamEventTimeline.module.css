@@ -34,7 +34,7 @@
   width: 2px;
   flex: 1;
   min-height: 12px;
-  background: var(--color-border, rgba(255, 255, 255, 0.08));
+  background: var(--bdr);
   margin: 2px 0;
 }
 
@@ -58,27 +58,27 @@
 .eventType {
   font-size: 12px;
   font-weight: 500;
-  color: var(--color-text, #e5e7eb);
+  color: var(--text-1);
 }
 
 .eventSeq {
   font-size: 10px;
   font-family: monospace;
-  color: var(--color-text-secondary, #9ca3af);
-  background: var(--color-surface-variant, rgba(255, 255, 255, 0.05));
+  color: var(--text-2);
+  background: var(--surface-high);
   padding: 0 5px;
   border-radius: 3px;
 }
 
 .eventTime {
   font-size: 10px;
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
 .eventDetails {
   font-size: 11px;
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--text-2);
   line-height: 1.4;
   margin-top: 2px;
   word-break: break-word;
@@ -104,16 +104,16 @@
   align-items: center;
   gap: 8px;
   padding: 24px;
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--text-2);
   font-size: 13px;
   text-align: center;
 }
 
 .emptyIcon {
   opacity: 0.4;
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--text-2);
 }
 
 .error {
-  color: var(--color-danger, #ef4444);
+  color: var(--danger);
 }
