@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -106,7 +107,7 @@ func TestMain(m *testing.M) {
 	authHandler := handler.NewAuthHandler(authService)
 	deviceService := service.NewDeviceService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
-	contactService := service.NewContactService(db, bus, cacheClient)
+	contactService := contact.NewService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
 	sessionService := service.NewSessionService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)

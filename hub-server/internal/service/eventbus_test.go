@@ -355,3 +355,27 @@ func TestBusHighConcurrencyPublish(t *testing.T) {
 
 	assert.Equal(t, int64(numEvents), total.Load(), "all events must be delivered")
 }
+
+
+func captureServiceEvents(bus *Bus, eventType string) <-chan Event {
+	events := make(chan Event, 1)
+	bus.Subscribe(eventType, func(ctx context.Context, event Event) {
+		events <- event
+	})
+	return events
+}
+
+func waitForServiceEventPayload(t *testing.T, events <-chan Event) map[string]interface{} {
+	t.Helper()
+	select {
+	case event := <-events:
+		payload, ok := event.Payload.(map[string]interface{})
+		if !ok {
+			t.Fatalf("event payload should be a map, got %T", event.Payload)
+		}
+		return payload
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for service event")
+		return nil
+	}
+}
