@@ -1,4 +1,4 @@
-package service
+package message
 
 import (
 	"context"
@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/service"
 )
+
 
 func TestEditMessage_SuccessUpdatesContentAndPublishesEvent(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
@@ -21,12 +23,12 @@ func TestEditMessage_SuccessUpdatesContentAndPublishesEvent(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"original"}`, false, time.Now(),
 	).Error)
 
-	seen := make(chan Event, 1)
-	bus.Subscribe("message.edited", func(ctx context.Context, event Event) {
+	seen := make(chan service.Event, 1)
+	bus.Subscribe("message.edited", func(ctx context.Context, event service.Event) {
 		seen <- event
 	})
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	resp, err := svc.EditMessage(context.Background(), "msg-edit", "user-1", EditMessageRequest{
 		ContentType: "text",
 		Content:     "edited text",
@@ -63,7 +65,7 @@ func TestEditMessage_RejectsNonSender(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"original"}`, false, time.Now(),
 	).Error)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "msg-edit", "user-2", EditMessageRequest{
 		ContentType: "text",
 		Content:     "not allowed",
@@ -81,7 +83,7 @@ func TestEditMessage_RejectsRecalledMessage(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"original"}`, true, time.Now(),
 	).Error)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "msg-edit", "user-1", EditMessageRequest{
 		ContentType: "text",
 		Content:     "not allowed",
@@ -99,7 +101,7 @@ func TestEditMessage_RejectsAgentMessage(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "agent", "user-1", "text", `{"text":"agent"}`, false, time.Now(),
 	).Error)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "msg-edit", "user-1", EditMessageRequest{
 		ContentType: "text",
 		Content:     "not allowed",
@@ -117,7 +119,7 @@ func TestEditMessage_RejectsExpiredWindow(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"old"}`, false, time.Now().Add(-time.Hour),
 	).Error)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "msg-edit", "user-1", EditMessageRequest{
 		ContentType: "text",
 		Content:     "too late",
@@ -135,7 +137,7 @@ func TestEditMessage_RejectsInvalidContent(t *testing.T) {
 		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"original"}`, false, time.Now(),
 	).Error)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "msg-edit", "user-1", EditMessageRequest{
 		ContentType: "file",
 		Content:     `{"name":"missing attachment id"}`,
@@ -147,7 +149,7 @@ func TestEditMessage_NotFound(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
 	bus := newTestBus(t)
 
-	svc := &MessageService{db: db, bus: bus}
+	svc := &Service{db: db, bus: bus}
 	_, err := svc.EditMessage(context.Background(), "missing", "user-1", EditMessageRequest{
 		ContentType: "text",
 		Content:     "ignored",

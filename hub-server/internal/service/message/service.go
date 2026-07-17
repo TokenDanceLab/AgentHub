@@ -1,64 +1,66 @@
-package service
+// Package message owns IM message orchestration for Hub.
+//
+// It is the sixth IM typed-service package (agentteam-style; #720), extracting
+// the message domain from the flat service package. Bus+Cache ports were
+// hardened in #585; package move only. Pure helpers remain in service/im.
+package message
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/im"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
-// ── MessageService ports + type ──────────────────────────────────────────────
-//
-// Same-package thin first seam (#585): MessageService already owns IM message
-// orchestration (send/edit/recall/pin/forward/search/read). This seam hardens
-// replaceable ports (bus + cache) without a package move — same pattern as
-// DispatchService / EdgeCallbackService / DeliveryOutbox.
-// #628: pure content normalize/attachment-id helpers live in service/im;
-// MessageService keeps thin aliases for same-package call sites.
-
-// messageBus publishes domain events from message write/lifecycle paths.
-// Implemented by *Bus.
-type messageBus interface {
-	Publish(ctx context.Context, event Event)
+// Bus publishes domain events from message write/lifecycle paths.
+// *service.Bus satisfies this port via Publish(ctx, service.Event).
+type Bus interface {
+	Publish(ctx context.Context, event service.Event)
 }
 
-// messageCache is the subset of *cache.Client methods used by MessageService.
+// Cache is the subset of *cache.Client methods used by Message Service.
 // Implemented by *cache.Client and cache.NoOpCache.
-type messageCache interface {
+type Cache interface {
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
-// MessageService owns IM message orchestration in the flat service package:
-// send/edit/recall, pin/unpin/list-pins, forward, mark-read, search, and
-// history projection. Seq allocation uses injected messageCache with DB
-// fallback; domain events go through messageBus. Not a package move (#585).
-type MessageService struct {
+// Service owns IM message orchestration: send/edit/recall, pin/unpin/list-pins,
+// forward, mark-read, search, and history projection. Seq allocation uses
+// injected Cache with DB fallback; domain events go through Bus. This package
+// is the sixth IM typed-service extract (#720) after messagereaction (#662),
+// workspace (#673), contact (#685), attachment (#697), and session (#708).
+// Ports were hardened in #585; package move only. Pure content helpers remain
+// in service/im and are not re-embedded.
+type Service struct {
 	db          *gorm.DB
-	bus         messageBus
-	cacheClient messageCache
+	bus         Bus
+	cacheClient Cache
 }
 
-// NewMessageService constructs a MessageService.
+// NewService constructs a message service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
 // cacheClient may be nil and falls back to cache.NoOpCache (DB seq path).
-func NewMessageService(db *gorm.DB, bus messageBus, cacheClient messageCache) *MessageService {
-	return &MessageService{db: db, bus: bus, cacheClient: resolveMessageCache(cacheClient)}
+func NewService(db *gorm.DB, bus Bus, cacheClient Cache) *Service {
+	return &Service{db: db, bus: bus, cacheClient: resolveCache(cacheClient)}
 }
 
 // SetBus injects (or replaces) the event bus port.
-func (s *MessageService) SetBus(bus messageBus) {
+func (s *Service) SetBus(bus Bus) {
 	if s == nil {
 		return
 	}
@@ -66,23 +68,23 @@ func (s *MessageService) SetBus(bus messageBus) {
 }
 
 // SetCache injects (or replaces) the sequence cache port.
-func (s *MessageService) SetCache(cacheClient messageCache) {
+func (s *Service) SetCache(cacheClient Cache) {
 	if s == nil {
 		return
 	}
-	s.cacheClient = resolveMessageCache(cacheClient)
+	s.cacheClient = resolveCache(cacheClient)
 }
 
 // publish is a nil-safe wrapper over the bus port.
-func (s *MessageService) publish(ctx context.Context, event Event) {
+func (s *Service) publish(ctx context.Context, event service.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
 	s.bus.Publish(ctx, event)
 }
 
-func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := resolveMessageCache(s.cacheClient).AllocateSeq(ctx, sessionID)
+func (s *Service) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := resolveCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
 		// #154: Redis allocation does not update last_message_at, so touch it here
 		// to ensure the session appears in recent conversations.
@@ -99,6 +101,26 @@ func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int
 		return txErr
 	})
 	return fallbackSeq, err
+}
+
+func resolveCache(c Cache) Cache {
+	if isNilCache(c) {
+		return cache.NoOpCache{}
+	}
+	return c
+}
+
+func isNilCache(c any) bool {
+	if c == nil {
+		return true
+	}
+	v := reflect.ValueOf(c)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 type SendMessageRequest struct {
@@ -164,7 +186,7 @@ func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
 	return im.AttachmentIDsFromContent(contentType, content)
 }
 
-func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
+func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
 	if !im.IsValidContentType(req.ContentType) {
 		return nil, errcode.ErrBadRequest
 	}
@@ -284,7 +306,7 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		return nil, err
 	}
 
-	s.publish(ctx, Event{Type: "message.new", Payload: msg})
+	s.publish(ctx, service.Event{Type: "message.new", Payload: msg})
 
 	return &SendMessageResponse{
 		MessageID: msg.ID,
@@ -293,7 +315,7 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 	}, nil
 }
 
-func (s *MessageService) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
+func (s *Service) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
 	attachment, err := repository.GetAttachmentByID(s.db, attachmentID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -315,7 +337,7 @@ func (s *MessageService) ensureAttachmentReferenceAllowed(userID, attachmentID s
 	return nil
 }
 
-func (s *MessageService) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]MessageResponse, error) {
+func (s *Service) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]MessageResponse, error) {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return nil, err
@@ -332,7 +354,7 @@ func (s *MessageService) GetMessages(ctx context.Context, sessionID, userID stri
 	return s.toMessageResponses(msgs), nil
 }
 
-func (s *MessageService) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]MessageResponse, error) {
+func (s *Service) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]MessageResponse, error) {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return nil, err
@@ -349,7 +371,7 @@ func (s *MessageService) GetMessagesIncremental(ctx context.Context, sessionID, 
 	return s.toMessageResponses(msgs), nil
 }
 
-func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageResponse {
+func (s *Service) toMessageResponses(msgs []model.Message) []MessageResponse {
 	result := make([]MessageResponse, len(msgs))
 	attachmentsByMessage := s.attachmentsByMessageID(msgs)
 
@@ -422,7 +444,7 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 	return result
 }
 
-func (s *MessageService) attachmentsByMessageID(msgs []model.Message) map[string][]model.Attachment {
+func (s *Service) attachmentsByMessageID(msgs []model.Message) map[string][]model.Attachment {
 	messageIDs := make([]string, 0)
 	seen := make(map[string]struct{})
 	for _, msg := range msgs {
@@ -447,7 +469,7 @@ func (s *MessageService) attachmentsByMessageID(msgs []model.Message) map[string
 	return attachmentsByMessage
 }
 
-func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string) error {
+func (s *Service) RecallMessage(ctx context.Context, msgID, userID string) error {
 	msg, err := repository.GetMessageByID(s.db, msgID)
 	if err != nil {
 		return errcode.MsgNotFound
@@ -473,12 +495,12 @@ func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string
 		return err
 	}
 
-	s.publish(ctx, Event{Type: "message.recall", Payload: msg})
+	s.publish(ctx, service.Event{Type: "message.recall", Payload: msg})
 
 	return nil
 }
 
-func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, req EditMessageRequest) (*EditMessageResponse, error) {
+func (s *Service) EditMessage(ctx context.Context, msgID, userID string, req EditMessageRequest) (*EditMessageResponse, error) {
 	msg, err := repository.GetMessageByID(s.db, msgID)
 	if err != nil {
 		return nil, errcode.MsgNotFound
@@ -529,7 +551,7 @@ func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, 
 	if err != nil {
 		return nil, err
 	}
-	s.publish(ctx, Event{Type: "message.edited", Payload: updated})
+	s.publish(ctx, service.Event{Type: "message.edited", Payload: updated})
 
 	editedAt := ""
 	if updated.EditedAt != nil {
@@ -538,7 +560,7 @@ func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, 
 	return &EditMessageResponse{MessageID: msgID, EditedAt: editedAt}, nil
 }
 
-func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgID string) error {
+func (s *Service) PinMessage(ctx context.Context, userID, sessionID, msgID string) error {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return err
@@ -566,12 +588,12 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 		return err
 	}
 
-	s.publish(ctx, Event{Type: "message.pin", Payload: pin})
+	s.publish(ctx, service.Event{Type: "message.pin", Payload: pin})
 
 	return nil
 }
 
-func (s *MessageService) UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error {
+func (s *Service) UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return err
@@ -584,7 +606,7 @@ func (s *MessageService) UnpinMessage(ctx context.Context, userID, sessionID, ms
 		return err
 	}
 
-	s.publish(ctx, Event{Type: "message.unpin", Payload: map[string]string{
+	s.publish(ctx, service.Event{Type: "message.unpin", Payload: map[string]string{
 		"session_id": sessionID,
 		"message_id": msgID,
 	}})
@@ -592,7 +614,7 @@ func (s *MessageService) UnpinMessage(ctx context.Context, userID, sessionID, ms
 	return nil
 }
 
-func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]MessageResponse, error) {
+func (s *Service) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]MessageResponse, error) {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return nil, err
@@ -635,7 +657,7 @@ func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, session
 	return s.toMessageResponses(ordered), nil
 }
 
-func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
+func (s *Service) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
 	if len(targetSessionIDs) > config.MaxForwardTargets {
 		return errcode.ErrBadRequest
 	}
@@ -663,7 +685,7 @@ func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID strin
 	return g.Wait()
 }
 
-func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *model.Message, sessionID string) error {
+func (s *Service) forwardOne(ctx context.Context, userID string, msg *model.Message, sessionID string) error {
 	// Validate membership
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
@@ -728,12 +750,12 @@ func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *mod
 	}
 
 	// Publish event
-	s.publish(ctx, Event{Type: "message.new", Payload: forwarded})
+	s.publish(ctx, service.Event{Type: "message.new", Payload: forwarded})
 
 	return nil
 }
 
-func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
+func (s *Service) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return err
@@ -753,7 +775,7 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 		return err
 	}
 
-	s.publish(ctx, Event{Type: "message.read", Payload: map[string]interface{}{
+	s.publish(ctx, service.Event{Type: "message.read", Payload: map[string]interface{}{
 		"session_id":    sessionID,
 		"user_id":       userID,
 		"last_read_seq": lastReadSeq,
@@ -762,7 +784,7 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 	return nil
 }
 
-func (s *MessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]MessageResponse, error) {
+func (s *Service) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]MessageResponse, error) {
 	if sessionID != "" {
 		active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 		if err != nil || !active {

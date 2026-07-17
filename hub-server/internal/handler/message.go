@@ -9,24 +9,25 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
-// MessageService is the subset of *service.MessageService used by MessageHandler.
+// MessageService is the subset of *message.Service used by MessageHandler.
+// DTOs live in service/message (#720 sixth IM typed-service package).
 // Reaction methods use messagereaction DTOs (#662 first IM typed-service package).
 type MessageService interface {
-	SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
-	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
-	GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
-	EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
+	SendMessage(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error)
+	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error)
+	GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]message.MessageResponse, error)
+	EditMessage(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error)
 	RecallMessage(ctx context.Context, msgID, userID string) error
 	PinMessage(ctx context.Context, userID, sessionID, msgID string) error
 	UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error
-	ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error)
 	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error)
 	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error)
@@ -44,7 +45,7 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 
-	var req service.SendMessageRequest
+	var req message.SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)
 		return
@@ -168,7 +169,7 @@ func (h *MessageHandler) EditMessage(c *gin.Context) {
 	userID := c.GetString("user_id")
 	msgID := c.Param("id")
 
-	var req service.EditMessageRequest
+	var req message.EditMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)
 		return

@@ -30,6 +30,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -46,7 +47,7 @@ var (
 )
 
 type testMessageServiceWithReactions struct {
-	*service.MessageService
+	*message.Service
 	reactions *messagereaction.Service
 }
 
@@ -113,10 +114,10 @@ func TestMain(m *testing.M) {
 	contactHandler := handler.NewContactHandler(contactService)
 	sessionService := session.NewService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
-	messageService := service.NewMessageService(db, bus, cacheClient)
+	messageService := message.NewService(db, bus, cacheClient)
 	messageReactionService := messagereaction.NewService(db, bus)
 	messageHandler := handler.NewMessageHandler(testMessageServiceWithReactions{
-		MessageService: messageService,
+		Service: messageService,
 		reactions:      messageReactionService,
 	})
 	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
