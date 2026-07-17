@@ -259,8 +259,132 @@ func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
 	if got := c.GetString("device_type"); got != "web" {
 		t.Fatalf("device_type = %q, want web", got)
 	}
+	if got := c.GetString("purpose"); got != "" {
+		t.Fatalf("purpose = %q, want empty product session purpose", got)
+	}
 }
 
+// TestWSAuthMiddlewareRejectsNonHubSessionPurpose is the #889 regression:
+// tokens with a non-empty purpose (edge-api / run-start) must not upgrade WS.
+// ParseToken rejects them at the product gate (401); the shared enforceHubSession
+// gate is defense-in-depth for the same policy on REST and WS.
+func TestWSAuthMiddlewareRejectsNonHubSessionPurpose(t *testing.T) {
+	secret := testSecret()
+	cases := []struct {
+		name  string
+		token string
+	}{
+		{
+			name: "edge-api purpose",
+			token: mustSignClaims(t, jwtutil.Claims{
+				UserID:     "user-edge",
+				DeviceType: "desktop",
+				DeviceID:   "dev-1",
+				Purpose:    jwtutil.PurposeEdge,
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    "agenthub-hub",
+					Audience:  jwt.ClaimStrings{jwtutil.AudienceAPI},
+					Subject:   "user-edge",
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+				},
+			}, secret),
+		},
+		{
+			name: "run-start purpose",
+			token: mustSignClaims(t, jwtutil.Claims{
+				UserID:     "user-cap",
+				DeviceType: "desktop",
+				DeviceID:   "dev-1",
+				Purpose:    jwtutil.PurposeRun,
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    "agenthub-hub",
+					Audience:  jwt.ClaimStrings{jwtutil.AudienceAPI},
+					Subject:   "user-cap",
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+				},
+			}, secret),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+tc.token)
+			WSAuthMiddleware(testConfig())(c)
+
+			if !c.IsAborted() {
+				t.Fatal("expected non-hub-session purpose token to be rejected on WS upgrade")
+			}
+			// Product ParseToken rejects non-empty purpose as invalid token (401).
+			// Either 401 (parse gate) or 403 (hub-session gate) is a closed door.
+			if w.Code != http.StatusUnauthorized && w.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want 401 or 403", w.Code)
+			}
+			if got := c.GetString("auth_source"); got != "" {
+				t.Fatalf("auth_source = %q, want empty after rejection", got)
+			}
+		})
+	}
+}
+
+// TestEnforceHubSessionRejectsPurposeAndDeviceType covers the shared post-parse
+// gate used by both RequireHubSession and WSAuthMiddleware (#889).
+func TestEnforceHubSessionRejectsPurposeAndDeviceType(t *testing.T) {
+	cases := []struct {
+		name       string
+		authSource string
+		deviceType string
+		purpose    string
+		wantOK     bool
+	}{
+		{"hub product session", "hub_local", "web", "", true},
+		{"desktop product session", "hub_local", "desktop", "", true},
+		{"non-empty purpose edge-api", "hub_local", "desktop", "edge-api", false},
+		{"non-empty purpose run-start", "hub_local", "web", "run-start", false},
+		{"edge device_type", "hub_local", "edge", "", false},
+		{"tokendance_bearer device_type", "hub_local", "tokendance_bearer", "", false},
+		{"tokendance auth_source", "tokendance_id", "tokendance_bearer", "", false},
+		{"empty auth_source", "", "web", "", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, w := ginRequest(http.MethodGet, "/client/ws", "")
+			c.Set("auth_source", tc.authSource)
+			c.Set("device_type", tc.deviceType)
+			c.Set("purpose", tc.purpose)
+			c.Set("user_id", "user-gate")
+
+			ok := enforceHubSession(c)
+			if ok != tc.wantOK {
+				t.Fatalf("enforceHubSession = %v, want %v (status=%d body=%s)", ok, tc.wantOK, w.Code, w.Body.String())
+			}
+			if tc.wantOK {
+				if c.IsAborted() {
+					t.Fatal("expected request not aborted for valid hub session")
+				}
+				return
+			}
+			if !c.IsAborted() {
+				t.Fatal("expected request aborted for invalid hub session")
+			}
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want 403", w.Code)
+			}
+		})
+	}
+}
+
+func mustSignClaims(t *testing.T, claims jwtutil.Claims, secret string) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	return signed
+}
 
 func TestAuthMiddlewareRejectsEdgeToken(t *testing.T) {
 	token, err := jwtutil.GenerateEdgeToken("user-edge", "edge-dev-1", testSecret(), time.Hour)
@@ -665,6 +789,36 @@ func TestRequireHubSessionBlocksEmptyAuthSource(t *testing.T) {
 	}
 	if called {
 		t.Fatal("expected next handler NOT to be called")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestRequireHubSessionBlocksNonEmptyPurpose(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("hub_local")
+	c.Set("purpose", "edge-api")
+	c.Set("device_type", "desktop")
+
+	RequireHubSession()(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected RequireHubSession to reject non-empty purpose")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestRequireHubSessionBlocksEdgeDeviceType(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("hub_local")
+	c.Set("device_type", "edge")
+	c.Set("purpose", "")
+
+	RequireHubSession()(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected RequireHubSession to reject edge device_type")
 	}
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", w.Code)
