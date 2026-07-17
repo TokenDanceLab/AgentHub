@@ -241,19 +241,7 @@ type Store struct {
 }
 
 func New() *Store {
-	return &Store{
-		projects:      make(map[string]Project),
-		threads:       make(map[string]Thread),
-		runs:          make(map[string]Run),
-		items:         make(map[string]Item),
-		pins:          make(map[string]ThreadPin),
-		diffs:         make(map[string]RunDiffFile),
-		artifacts:     make(map[string]Artifact),
-		previews:      make(map[string]Preview),
-		userProfiles:  make(map[string]UserProfile),
-		agentProfiles: make(map[string]AgentProfile),
-		settings:      make(map[string]string),
-	}
+	return newEmptyStore()
 }
 
 func (s *Store) snapshot() fileSnapshot {
@@ -340,13 +328,10 @@ func (s *Store) UpdateThread(id string, title *string, status *string) (Thread, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	thread, ok := s.threads[id]
-	if !ok {
-		return Thread{}, false
-	}
-	thread = applyThreadUpdate(thread, title, status, nowString())
-	s.threads[id] = thread
-	return thread, true
+	thread, exists := s.threads[id]
+	thread, ok := resolveUpdateThread(thread, exists, title, status, nowString())
+	storeIf(s.threads, id, thread, ok)
+	return thread, ok
 }
 
 func (s *Store) DeleteThread(id string) bool {
@@ -363,10 +348,7 @@ func (s *Store) DeleteThread(id string) bool {
 	for runID := range runIDs {
 		s.removeRunEvidence(runID)
 	}
-	deleteMapKeys(s.runs, runIDs)
-	s.runOrder = orderWithoutRemoved(s.runOrder, runIDs)
-	deleteMapKeys(s.items, itemIDs)
-	s.itemOrder = orderWithoutRemoved(s.itemOrder, itemIDs)
+	s.runOrder, s.itemOrder = applyDeleteThreadOwnedMaps(s.runs, s.items, s.runOrder, s.itemOrder, runIDs, itemIDs)
 
 	s.removePins(pinMatchesThread(id))
 	return true
@@ -406,14 +388,11 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.runs[file.RunID]; !ok {
+	_, runExists := s.runs[file.RunID]
+	key, file, ok := prepareRunDiffFileUpsert(runExists, file)
+	if !ok {
 		return RunDiffFile{}, ErrNotFound
 	}
-	file = normalizeRunDiffFileInput(file)
-	if file.Path == "" {
-		return RunDiffFile{}, ErrNotFound
-	}
-	key := runDiffFileKey(file.RunID, file.Path)
 	now := nowString()
 	existing, exists := s.diffs[key]
 	file, created := resolveRunDiffFileUpsert(existing, exists, file, now)
@@ -431,11 +410,9 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[artifact.RunID]
-	if !ok {
-		return Artifact{}, ErrNotFound
-	}
-	artifact, ok = prepareArtifactInput(artifact, run.ThreadID)
+	run, runExists := s.runs[artifact.RunID]
+	var ok bool
+	artifact, ok = prepareArtifactForUpsert(run, runExists, artifact)
 	if !ok {
 		return Artifact{}, ErrNotFound
 	}
@@ -455,20 +432,16 @@ func (s *Store) ListArtifacts(runID string) []Artifact {
 func (s *Store) GetArtifact(id string) (Artifact, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	artifact, ok := s.artifacts[id]
-	return cloneArtifact(artifact), ok
+	return lookupClonedArtifact(s.artifacts, id)
 }
 
 func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[preview.RunID]
-	if !ok {
-		return Preview{}, ErrNotFound
-	}
-	preview, ok = preparePreviewInput(preview, run.ThreadID)
+	run, runExists := s.runs[preview.RunID]
+	var ok bool
+	preview, ok = preparePreviewForUpsert(run, runExists, preview)
 	if !ok {
 		return Preview{}, ErrNotFound
 	}
@@ -498,10 +471,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	defer s.mu.Unlock()
 
 	opts.Now = resolveCleanupNow(opts.Now, time.Now().UTC())
-
-	candidates := buildTerminalCleanupCandidates(s.runOrder, s.runs)
-	removeRuns := selectRunsForCleanup(candidates, opts.Now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
-
+	removeRuns := planRunsForCleanup(s.runOrder, s.runs, opts.Now, opts.TerminalTTL, opts.MaxTerminalRunsPerThread)
 	if len(removeRuns) == 0 {
 		return RunCleanupResult{}
 	}
@@ -525,29 +495,20 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[id]
-	if !ok {
-		return Run{}, false
-	}
-	run = applyRunStatus(run, status, nowString())
-	s.runs[id] = run
-	return run, true
+	run, exists := s.runs[id]
+	run, ok := resolveSetRunStatus(run, exists, status, nowString())
+	storeIf(s.runs, id, run, ok)
+	return run, ok
 }
 
 func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[id]
-	if !ok {
-		return Run{}, false
-	}
-	if !isAllowedCurrentStatus(run.Status, allowedCurrent) {
-		return run, false
-	}
-	run = applyRunStatus(run, status, nowString())
-	s.runs[id] = run
-	return run, true
+	run, exists := s.runs[id]
+	run, ok := resolveSetRunStatusIf(run, exists, status, allowedCurrent, nowString())
+	storeIf(s.runs, id, run, ok)
+	return run, ok
 }
 
 // SetRunEvidenceGate stores the evidence gate verification result on a run.
@@ -556,13 +517,10 @@ func (s *Store) SetRunEvidenceGate(id, result string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[id]
-	if !ok {
-		return Run{}, false
-	}
-	run = applyRunEvidenceGate(run, result)
-	s.runs[id] = run
-	return run, true
+	run, exists := s.runs[id]
+	run, ok := resolveSetRunEvidenceGate(run, exists, result)
+	storeIf(s.runs, id, run, ok)
+	return run, ok
 }
 
 // SetRunRetryCount updates the retry count on a run. Used by the fault
@@ -571,13 +529,10 @@ func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	run, ok := s.runs[id]
-	if !ok {
-		return Run{}, false
-	}
-	run = applyRunRetryCount(run, count)
-	s.runs[id] = run
-	return run, true
+	run, exists := s.runs[id]
+	run, ok := resolveSetRunRetryCount(run, exists, count)
+	storeIf(s.runs, id, run, ok)
+	return run, ok
 }
 
 func (s *Store) CreateItem(item Item) (Item, error) {
@@ -593,12 +548,13 @@ func (s *Store) CreateItem(item Item) (Item, error) {
 
 func (s *Store) CreateThreadMessage(itemID, threadID, role, content string) (Item, error) {
 	s.mu.RLock()
-	thread, ok := s.threads[threadID]
+	thread, exists := s.threads[threadID]
 	s.mu.RUnlock()
-	if !ok {
-		return Item{}, ErrNotFound
+	item, err := buildThreadMessageFromThread(thread, exists, itemID, role, content)
+	if err != nil {
+		return Item{}, err
 	}
-	return s.CreateItem(buildUserMessageItem(itemID, thread.ProjectID, thread.ID, role, content))
+	return s.CreateItem(item)
 }
 
 func (s *Store) GetItem(id string) (Item, bool) {
@@ -618,10 +574,7 @@ func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.threads[threadID]; !ok {
-		return ThreadPin{}, ErrNotFound
-	}
-	if _, ok := lookupItemInThread(s.items, itemID, threadID); !ok {
+	if !validatePinThreadItemRefs(s.threads, s.items, threadID, itemID) {
 		return ThreadPin{}, ErrNotFound
 	}
 
@@ -722,11 +675,11 @@ func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfil
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	profile, ok := s.agentProfiles[id]
-	if !ok {
-		return AgentProfile{}, ErrNotFound
+	profile, exists := s.agentProfiles[id]
+	profile, err := resolveUpdateAgentProfile(profile, exists, patch, nowString())
+	if err != nil {
+		return AgentProfile{}, err
 	}
-	profile = touchAgentProfile(applyAgentProfilePatch(profile, patch), nowString())
 	s.agentProfiles[id] = profile
 	return profile, nil
 }
@@ -737,10 +690,7 @@ func (s *Store) DeleteAgentProfile(id string) error {
 
 	var ok bool
 	s.agentProfileOrder, ok = deleteTracked(s.agentProfiles, s.agentProfileOrder, id)
-	if !ok {
-		return ErrNotFound
-	}
-	return nil
+	return errIfMissing(ok)
 }
 
 // ── UserSettings CRUD ──────────────────────────────────────
