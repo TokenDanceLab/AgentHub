@@ -1,4 +1,10 @@
-import { createHubWsUrl, type HubWsEvent, type HubWsEventType } from './hubClient';
+import {
+  buildWSAuthProtocols,
+  createHubWsUrl,
+  type HubWsEvent,
+  type HubWsEventType,
+  type HubWsUrlOptions,
+} from './hubClient';
 import { HUB_EVENTS } from '@agenthub/shared/hubEvents';
 
 export type HubEventStreamStatus = 'connecting' | 'open' | 'error' | 'closed';
@@ -11,7 +17,11 @@ export interface HubWebSocketLike {
   close: () => void;
 }
 
-export type HubWebSocketFactory = (url: string) => HubWebSocketLike;
+/**
+ * Factory for Hub WS sockets. Optional `protocols` carries JWT via
+ * Sec-WebSocket-Protocol (agenthub.bearer.v1 + raw JWT), matching web (#921).
+ */
+export type HubWebSocketFactory = (url: string, protocols?: string[]) => HubWebSocketLike;
 
 export type HubEventStreamErrorKind = 'parse_error' | 'invalid_event' | 'socket_error';
 
@@ -25,6 +35,11 @@ export interface CreateHubEventStreamOptions {
   baseUrl: string;
   token?: string;
   since?: string;
+  /**
+   * When true, also append access_token to the WS URL (legacy fallback).
+   * Default false — prefer Sec-WebSocket-Protocol only.
+   */
+  useQueryTokenFallback?: boolean;
   createWebSocket: HubWebSocketFactory;
   onEvent?: (event: HubWsEvent) => void;
   onError?: (error: HubEventStreamError) => void;
@@ -84,16 +99,21 @@ const knownEventTypes = new Set<HubWsEventType>([
 
 export function createHubEventStream(options: CreateHubEventStreamOptions): HubEventStream {
   let closed = false;
-  const wsUrlOptions: { since?: string; token?: string } = {};
+  const useQueryFallback = options.useQueryTokenFallback === true;
+  const wsUrlOptions: HubWsUrlOptions = {};
 
   if (options.since) {
     wsUrlOptions.since = options.since;
   }
-  if (options.token) {
+  // Default path: keep JWT out of the URL; pass via Sec-WebSocket-Protocol.
+  // Query access_token only when explicitly opted into legacy fallback.
+  if (options.token && useQueryFallback) {
     wsUrlOptions.token = options.token;
+    wsUrlOptions.useQueryTokenFallback = true;
   }
 
-  const socket = options.createWebSocket(createHubWsUrl(options.baseUrl, wsUrlOptions));
+  const protocols = buildWSAuthProtocols(options.token);
+  const socket = options.createWebSocket(createHubWsUrl(options.baseUrl, wsUrlOptions), protocols);
 
   options.onStatusChange?.('connecting');
 
