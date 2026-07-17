@@ -148,10 +148,10 @@ describe('Mobile Hub lifecycle bridge', () => {
     expect(sockets).toHaveLength(2);
   });
 
-  it('passes token to WS URL when provided', () => {
+  it('passes access_token to WS URL when provided', () => {
     const appState = new FakeAppState('active');
     const createWebSocket = vi.fn((url: string) => {
-      expect(url).toContain('token=test-jwt');
+      expect(new URL(url).searchParams.get('access_token')).toBe('test-jwt');
       return new FakeSocket();
     });
 
