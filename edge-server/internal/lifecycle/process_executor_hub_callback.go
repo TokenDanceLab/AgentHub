@@ -33,7 +33,7 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
-		if err := e.hubCallback.TaskAck(ctx, taskID, runID); err != nil {
+		if err := e.hubCallback.TaskAck(ctx, taskID, runID); shouldLogHubCallbackFailure(err) {
 			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()
@@ -47,7 +47,7 @@ func (e *ProcessExecutor) recordHubOutput(runID, text string) {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if collector == nil {
+	if !shouldHaveHubOutputCollector(collector != nil) {
 		return
 	}
 	collector.Append(text)
@@ -61,7 +61,7 @@ func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if collector == nil {
+	if !shouldHaveHubOutputCollector(collector != nil) {
 		return
 	}
 	collector.SetFallback(text)
@@ -71,7 +71,7 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if collector == nil {
+	if !shouldHaveHubOutputCollector(collector != nil) {
 		return ""
 	}
 	return collector.Final()
@@ -97,7 +97,7 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 			defer func() { <-e.callbackSem }()
 			ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 			defer cancel()
-			if err := e.hubCallback.TaskStream(ctx, taskID, runID, chunk); err != nil {
+			if err := e.hubCallback.TaskStream(ctx, taskID, runID, chunk); shouldLogHubCallbackFailure(err) {
 				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "error", err)
 			}
 		}()
@@ -116,7 +116,7 @@ func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
 		result := hubTaskDoneResult(runID, content)
-		if err := e.hubCallback.TaskDone(ctx, taskID, result); err != nil {
+		if err := e.hubCallback.TaskDone(ctx, taskID, result); shouldLogHubCallbackFailure(err) {
 			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()
@@ -158,7 +158,7 @@ func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
-		if err := e.hubCallback.TaskFail(ctx, taskID, runID, reason); err != nil {
+		if err := e.hubCallback.TaskFail(ctx, taskID, runID, reason); shouldLogHubCallbackFailure(err) {
 			slog.Warn("hub callback fail failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	}()

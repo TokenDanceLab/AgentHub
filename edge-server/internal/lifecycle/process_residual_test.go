@@ -1176,3 +1176,103 @@ func TestContextCompactionSnapshot(t *testing.T) {
 		t.Fatalf("snapshot usage=%v used=%v remaining=%v", usage, used, remaining)
 	}
 }
+
+func TestValidateStartAndCancelPrechecks(t *testing.T) {
+	t.Parallel()
+	if err := validateStartRunState(false, "queued"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("missing run: %v", err)
+	}
+	if err := validateStartRunState(true, "started"); !errors.Is(err, ErrRunAlreadyStarted) {
+		t.Fatalf("non-queued: %v", err)
+	}
+	if err := validateStartRunState(true, "queued"); err != nil {
+		t.Fatalf("queued ok: %v", err)
+	}
+
+	run := store.Run{ID: "r1", Status: "finished"}
+	res, proceed := cancelPrecheck(run, false)
+	if proceed || res.Found || res.Status != "not_found" {
+		t.Fatalf("missing precheck %#v proceed=%v", res, proceed)
+	}
+	res, proceed = cancelPrecheck(run, true)
+	if proceed || !res.Found || res.Status != "finished" {
+		t.Fatalf("terminal precheck %#v proceed=%v", res, proceed)
+	}
+	run.Status = "started"
+	res, proceed = cancelPrecheck(run, true)
+	if !proceed || res.Found {
+		t.Fatalf("cancellable precheck %#v proceed=%v", res, proceed)
+	}
+
+	res, proceed = cancelRunningLookup(false)
+	if proceed || res.Found || res.Status != "not_running" {
+		t.Fatalf("not running %#v proceed=%v", res, proceed)
+	}
+	res, proceed = cancelRunningLookup(true)
+	if !proceed || res.Found {
+		t.Fatalf("running lookup %#v proceed=%v", res, proceed)
+	}
+}
+
+func TestFaultEscalationAndSpawnPureHelpers(t *testing.T) {
+	t.Parallel()
+	if !shouldRecordFinishMetricsForRun(true) || shouldRecordFinishMetricsForRun(false) {
+		t.Fatal("finish metrics found")
+	}
+	if !shouldRunEvidenceGate(true) || shouldRunEvidenceGate(false) {
+		t.Fatal("evidence gate")
+	}
+	cfg := FaultEscalationConfig{Enabled: true, MaxRetries: 2}
+	if !shouldAcceptFaultEscalationRetry(true, cfg, 0) {
+		t.Fatal("accept retry")
+	}
+	if shouldAcceptFaultEscalationRetry(false, cfg, 0) {
+		t.Fatal("missing run reject")
+	}
+	if shouldAcceptFaultEscalationRetry(true, cfg, 2) {
+		t.Fatal("exhausted reject")
+	}
+	run := store.Run{ID: "r1", Status: "started"}
+	got := applyFaultEscalationQueuedStatus(run, true)
+	if got.Status != "queued" {
+		t.Fatalf("requeued status %q", got.Status)
+	}
+	got = applyFaultEscalationQueuedStatus(run, false)
+	if got.Status != "started" {
+		t.Fatalf("not requeued status %q", got.Status)
+	}
+	if !shouldInvokeOldCancelOnEscalationHandoff(true) || shouldInvokeOldCancelOnEscalationHandoff(false) {
+		t.Fatal("old cancel handoff")
+	}
+	if !shouldLogRunOutputStoreWriteFailure(errors.New("x")) || shouldLogRunOutputStoreWriteFailure(nil) {
+		t.Fatal("output write log")
+	}
+	if !shouldLogAgentFailurePersistError(errors.New("x")) || shouldLogAgentFailurePersistError(nil) {
+		t.Fatal("failure persist log")
+	}
+	if !shouldLogRunOutputStoreCloseFailure(errors.New("x")) || shouldLogRunOutputStoreCloseFailure(nil) {
+		t.Fatal("output close log")
+	}
+	if !shouldLogSpawnSlotRejection(errors.New("x")) || shouldLogSpawnSlotRejection(nil) {
+		t.Fatal("spawn slot log")
+	}
+	if !shouldLogSubAgentCreateFailure(errors.New("x")) || shouldLogSubAgentCreateFailure(nil) {
+		t.Fatal("spawn create log")
+	}
+	if !shouldLogSubAgentRegisterFailure(errors.New("x")) || shouldLogSubAgentRegisterFailure(nil) {
+		t.Fatal("spawn register log")
+	}
+	runID, agentID := subAgentSpawnIDs("task_9")
+	if runID != "run_task_9" || agentID != "agent_task_9" {
+		t.Fatalf("spawn ids %q %q", runID, agentID)
+	}
+	if !shouldLookupSubAgentMapping(true) || shouldLookupSubAgentMapping(false) {
+		t.Fatal("subagent mapping")
+	}
+	if !shouldHaveHubOutputCollector(true) || shouldHaveHubOutputCollector(false) {
+		t.Fatal("hub collector")
+	}
+	if !shouldLogHubCallbackFailure(errors.New("x")) || shouldLogHubCallbackFailure(nil) {
+		t.Fatal("hub callback log")
+	}
+}
