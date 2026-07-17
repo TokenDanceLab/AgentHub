@@ -354,4 +354,3 @@ func TestContactService_AcceptRequestFromWrongUserFails(t *testing.T) {
 	err = svc.AcceptFriendRequest(context.Background(), charlie, requests[0].RequestID)
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 }
-
