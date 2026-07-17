@@ -34,12 +34,12 @@ func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("journal snapshot: %v", err)))
 		return
 	}
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	repo := ensureStore(h)
 	out := make([]map[string]any, 0, len(entries))
 	for _, e := range entries {
-		if userID != "" {
-			// Fail closed: unowned / unscoped journal rows are hidden from Hub JWT callers.
+		// Local single-tenant bypass sees all rows; empty userID fails closed.
+		if !isLocalSingleTenant(userID) {
 			if e.RunID == "" || !isRunOwnedBy(repo, e.RunID, userID) {
 				continue
 			}

@@ -20,7 +20,7 @@ import (
 func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("threadId")
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	writeSuccess(w, http.StatusOK, listResponse(filterRunsByOwner(repo.ListRuns(threadID), repo, userID)))
 }
 
