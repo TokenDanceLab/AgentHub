@@ -4,27 +4,39 @@ import {
   buildAckRelayCommandPath,
   buildAckTaskPath,
   buildAgentProfilePath,
+  buildAgentProfilesPath,
+  buildAgentTasksPath,
   buildAgentTeamMembersPath,
   buildAgentTeamPath,
   buildAgentTeamRunsPath,
+  buildAgentTeamsPath,
   buildAttachmentDownloadUrl,
   buildAttachmentFormData,
+  buildAttachmentsPath,
   buildBlockContactPath,
   buildCancelAgentTaskPaths,
+  buildChangePasswordFallbackPath,
+  buildChangePasswordPath,
   buildContactRemarkPath,
+  buildCreateGroupSessionPath,
+  buildCreatePrivateSessionPath,
   buildCustomAgentPath,
+  buildCustomAgentsPath,
   buildDecideTaskApprovalPath,
   buildDecideTeamApprovalPath,
   buildDeleteInit,
   buildDissolveSessionPath,
   buildDocumentPath,
+  buildDocumentsPath,
   buildDoneTaskPath,
   buildEditMessagePath,
   buildExecutionTargetPath,
+  buildExecutionTargetsPath,
   buildFailTaskPath,
   buildForwardMessageBody,
   buildForwardMessagePath,
   buildFriendRequestBody,
+  buildFriendRequestsPath,
   buildGetMessagesPath,
   buildGetTeamRunPath,
   buildGetTeamRunStatePath,
@@ -35,42 +47,54 @@ import {
   buildLeaveSessionPath,
   buildListAgentProfilesPath,
   buildListAuditEventsPath,
+  buildListContactsPath,
   buildListDocumentsPath,
   buildListExecutionTargetsPath,
   buildListMessageReactionsPath,
   buildListNotificationsPath,
   buildListPublicMCPServersPath,
   buildListPublicSkillsPath,
+  buildListSessionsPath,
   buildListTaskApprovalsPath,
   buildListTaskArtifactsPath,
   buildListTaskRunEventsAfterPath,
   buildListTaskRunEventsPath,
   buildListTeamEventsPath,
   buildListTeamTasksPath,
-  buildListWorkspaceProjectThreadMessagesPath,
   buildListWorkspaceProjectsPath,
+  buildListWorkspaceProjectThreadMessagesPath,
+  buildLoginPath,
+  buildLogoutPath,
   buildMarkNotificationReadPaths,
   buildMarkReadBody,
   buildMarkReadPath,
   buildMemberIdsBody,
+  buildMePath,
   buildMessageReactionsPath,
   buildOidcAuthorizeBody,
+  buildOidcAuthorizePath,
+  buildOidcCallbackPath,
   buildOptionalJsonBody,
   buildPatchSettingsBody,
-  buildPinMessagePath,
   buildPingExecutionTargetPath,
+  buildPinMessagePath,
   buildPostInit,
   buildPostTeamRouteDecisionPath,
+  buildPostWithOptionalJsonBody,
   buildProbeAttachmentBody,
+  buildProbeAttachmentPath,
   buildPutInit,
   buildReactionBody,
   buildReadAllNotificationsPaths,
   buildRecallMessagePath,
   buildRefreshBody,
+  buildRefreshPath,
   buildRegenerateAgentTaskPath,
   buildRegisterDevicePaths,
+  buildRegisterPath,
   buildRejectFriendRequestPath,
   buildRelayCommandPath,
+  buildRelayCommandsPath,
   buildRemarkBody,
   buildRemoveAgentTeamMemberPath,
   buildRemoveContactPath,
@@ -88,6 +112,7 @@ import {
   buildSessionPath,
   buildSessionPinsPath,
   buildSessionSettingsPath,
+  buildSettingsPath,
   buildStreamTaskEventBody,
   buildStreamTaskPath,
   buildSyncMessagesPath,
@@ -100,13 +125,15 @@ import {
   buildTransferSessionOwnerPath,
   buildTriggerAgentTaskBody,
   buildUnblockContactPath,
+  buildUpdateProfilePath,
   buildWorkspaceProjectPath,
+  buildWorkspaceProjectsPath,
   buildWorkspaceProjectThreadsPath,
   normalizeExecutionTargetsResponse,
   withPublicCatalogParams,
 } from './hubClientPayloadUtils';
 
-describe('hubClientPayloadUtils (#810 / #822 / #833 / #901)', () => {
+describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913)', () => {
   it('normalizes execution-target array vs {items,page} responses', () => {
     expect(
       normalizeExecutionTargetsResponse([
@@ -444,5 +471,49 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901)', () => {
     expect(buildPostInit()).toEqual({ method: 'POST' });
     expect(buildPutInit()).toEqual({ method: 'PUT' });
     expect(buildDeleteInit()).toEqual({ method: 'DELETE' });
+  });
+
+  it('builds static path residual helpers (#913)', () => {
+    expect(buildRegisterPath()).toBe('/client/auth/register');
+    expect(buildLoginPath()).toBe('/client/auth/login');
+    expect(buildRefreshPath()).toBe('/client/auth/refresh');
+    expect(buildLogoutPath()).toBe('/client/auth/logout');
+    expect(buildMePath()).toBe('/client/auth/me');
+    expect(buildUpdateProfilePath()).toBe('/client/auth/profile');
+    expect(buildChangePasswordPath()).toBe('/client/auth/change-password');
+    expect(buildChangePasswordFallbackPath()).toBe('/client/auth/password');
+    expect(buildOidcAuthorizePath()).toBe('/client/auth/oidc/authorize');
+    expect(buildOidcCallbackPath()).toBe('/client/auth/oidc/callback');
+    expect(buildListContactsPath()).toBe('/client/contacts');
+    expect(buildFriendRequestsPath()).toBe('/client/contacts/friend-requests');
+    expect(buildListSessionsPath()).toBe('/client/sessions');
+    expect(buildCreatePrivateSessionPath()).toBe('/client/sessions/private');
+    expect(buildCreateGroupSessionPath()).toBe('/client/sessions/group');
+    expect(buildAgentTasksPath()).toBe('/web/agent-tasks');
+    expect(buildExecutionTargetsPath()).toBe('/web/execution-targets');
+    expect(buildRelayCommandsPath()).toBe('/web/relay/commands');
+    expect(buildCustomAgentsPath()).toBe('/web/custom-agents');
+    expect(buildAgentTeamsPath()).toBe('/web/agent-teams');
+    expect(buildAgentProfilesPath()).toBe('/web/agent-profiles');
+    expect(buildDocumentsPath()).toBe('/web/documents');
+    expect(buildWorkspaceProjectsPath()).toBe('/web/projects');
+    expect(buildSettingsPath()).toBe('/client/settings');
+    expect(buildProbeAttachmentPath()).toBe('/client/attachments/probe');
+    expect(buildAttachmentsPath()).toBe('/client/attachments');
+  });
+
+  it('builds optional POST body init with exactOptional omit (#913)', () => {
+    expect(buildPostWithOptionalJsonBody(undefined)).toEqual({ method: 'POST' });
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        buildPostWithOptionalJsonBody(undefined),
+        'body',
+      ),
+    ).toBe(false);
+    expect(buildPostWithOptionalJsonBody(buildTaskAckBody())).toEqual({ method: 'POST' });
+    expect(buildPostWithOptionalJsonBody(buildTaskAckBody('run-9'))).toEqual({
+      method: 'POST',
+      body: JSON.stringify({ run_id: 'run-9' }),
+    });
   });
 });
