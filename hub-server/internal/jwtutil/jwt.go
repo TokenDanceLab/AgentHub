@@ -57,6 +57,28 @@ func GenerateEdgeToken(userID, deviceID, secret string, ttl time.Duration) (stri
 	return token.SignedString([]byte(secret))
 }
 
+// Product JWT audiences / edge token class markers.
+// Product session tokens use agenthub-api (or legacy empty aud).
+// Edge identity and capability grants use agenthub-edge and must never
+// authenticate Hub product APIs (/client, /web, WS, /cloud).
+const (
+	AudienceAPI  = "agenthub-api"
+	AudienceEdge = "agenthub-edge"
+	PurposeEdge  = "edge-api"
+	PurposeRun   = "run-start"
+)
+
+// ParseToken parses a Hub-issued product session JWT (HS256).
+//
+// Product acceptance rules (#853 / token-type confusion fix):
+//   - Signature + HS256 only
+//   - Issuer lenient when empty (pre-R08), else must be agenthub-hub
+//   - Audience: empty (legacy) or must contain agenthub-api; agenthub-edge rejected
+//   - Purpose: must be empty; edge-api / run-start / any non-empty purpose rejected
+//   - device_type "edge" rejected (defense in depth)
+//
+// Edge identity (GenerateEdgeToken) and capability (IssueCapabilityToken) tokens
+// share the same secret plane but are Edge-only; this parser rejects them.
 func ParseToken(tokenString, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
@@ -70,24 +92,47 @@ func ParseToken(tokenString, secret string) (*Claims, error) {
 	if !ok || !token.Valid {
 		return nil, jwt.ErrSignatureInvalid
 	}
-	// Lenient iss/aud validation: only check when claims are present, so
-	// tokens issued before R08 (without iss/aud) are not rejected.
-	if claims.Issuer != "" && claims.Issuer != "agenthub-hub" {
-		return nil, fmt.Errorf("jwt issuer mismatch: got %q, want agenthub-hub", claims.Issuer)
-	}
-	if len(claims.Audience) > 0 {
-		found := false
-		for _, a := range claims.Audience {
-			if a == "agenthub-api" || a == "agenthub-edge" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("jwt audience does not contain agenthub-api or agenthub-edge")
-		}
+	if err := validateProductClaims(claims); err != nil {
+		return nil, err
 	}
 	return claims, nil
+}
+
+// validateProductClaims enforces product-session token class after signature
+// verification. Shared by ParseToken and KeyManager.ParseToken.
+func validateProductClaims(claims *Claims) error {
+	// Lenient iss: only check when present so pre-R08 tokens still work.
+	if claims.Issuer != "" && claims.Issuer != "agenthub-hub" {
+		return fmt.Errorf("jwt issuer mismatch: got %q, want agenthub-hub", claims.Issuer)
+	}
+
+	// Audience: reject edge audience; require product audience when present.
+	if len(claims.Audience) > 0 {
+		hasAPI := false
+		for _, a := range claims.Audience {
+			if a == AudienceEdge {
+				return fmt.Errorf("jwt audience %q is not valid for product sessions", AudienceEdge)
+			}
+			if a == AudienceAPI {
+				hasAPI = true
+			}
+		}
+		if !hasAPI {
+			return fmt.Errorf("jwt audience does not contain %s", AudienceAPI)
+		}
+	}
+
+	// Purpose: product sessions have no purpose; edge/capability tokens do.
+	if claims.Purpose != "" {
+		return fmt.Errorf("jwt purpose %q is not valid for product sessions", claims.Purpose)
+	}
+
+	// Defense in depth: edge device_type never authenticates product APIs.
+	if claims.DeviceType == "edge" {
+		return fmt.Errorf("jwt device_type %q is not valid for product sessions", claims.DeviceType)
+	}
+
+	return nil
 }
 
 func GenerateRefreshToken() (string, error) {
@@ -261,8 +306,9 @@ func (km *KeyManager) signClaims(claims *Claims) (string, error) {
 	return token.SignedString(secret)
 }
 
-// ParseToken parses and validates a JWT string using the key identified by the
-// kid header. It rejects tokens without a kid header.
+// ParseToken parses and validates a product-session JWT using the key identified
+// by the kid header. It rejects tokens without a kid header and applies the
+// same product token-class gate as ParseToken (no edge/capability acceptance).
 func (km *KeyManager) ParseToken(tokenString string) (*Claims, error) {
 	// First pass: extract kid without verification.
 	parser := jwt.NewParser()
@@ -298,22 +344,8 @@ func (km *KeyManager) ParseToken(tokenString string) (*Claims, error) {
 	if !ok || !token.Valid {
 		return nil, jwt.ErrSignatureInvalid
 	}
-
-	// Lenient iss/aud validation: only check when claims are present.
-	if claims.Issuer != "" && claims.Issuer != "agenthub-hub" {
-		return nil, fmt.Errorf("jwt issuer mismatch: got %q, want agenthub-hub", claims.Issuer)
-	}
-	if len(claims.Audience) > 0 {
-		found := false
-		for _, a := range claims.Audience {
-			if a == "agenthub-api" || a == "agenthub-edge" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("jwt audience does not contain agenthub-api or agenthub-edge")
-		}
+	if err := validateProductClaims(claims); err != nil {
+		return nil, err
 	}
 	return claims, nil
 }
