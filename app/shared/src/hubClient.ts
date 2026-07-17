@@ -4,20 +4,12 @@ import type {
   HubAgentRunEvent,
   HubCoordinatorRouteDecision,
   HubAgentTeam,
-  HubAgentTeamMember,
   HubAgentTeamDetail,
   HubAgentTeamRun,
-  HubAgentTeamAssignment,
   HubAgentTeamTask,
   HubAgentTeamEvent,
-  HubTeamMemberState,
-  HubTeamTaskState,
-  HubTeamAssignmentState,
   HubTeamApprovalState,
-  HubTeamArtifactState,
   HubTeamConflictState,
-  HubTeamRunEventState,
-  HubTeamBudget,
   HubTeamRunState,
   HubTeamApprovalDecisionRequest,
   HubTeamConflictResolutionRequest,
@@ -31,65 +23,19 @@ import type {
   HubAgentProfileListResponse,
   HubCreateAgentProfileRequest,
   HubUpdateAgentProfileRequest,
-  AgentRunEventSummary,
-  AgentRunEvent,
-  CoordinatorRouteDecision,
-  AgentTeam,
-  AgentTeamMember,
-  AgentTeamDetail,
-  AgentTeamRun,
-  AgentTeamAssignment,
-  AgentTeamTask,
-  AgentTeamEvent,
-  TeamMemberState,
-  TeamTaskState,
-  TeamAssignmentState,
-  TeamApprovalState,
-  TeamArtifactState,
-  TeamConflictState,
-  TeamRunEventState,
-  TeamBudget,
-  TeamRunState,
-  TeamApprovalDecisionRequest,
-  TeamConflictResolutionRequest,
-  CreateAgentTeamRequest,
-  UpdateAgentTeamRequest,
-  AddAgentTeamMemberRequest,
-  StartAgentTeamRunRequest,
-  AttachmentRef,
-  ProbeAttachmentResponse,
-  AgentProfile,
-  AgentProfileListResponse,
-  CreateAgentProfileRequest,
-  UpdateAgentProfileRequest,
-  HubDocumentListItem,
   HubDocumentListResponse,
   HubCreateDocumentRequest,
   HubUpdateDocumentRequest,
   HubDocument,
   HubAgentTaskStreamEventOptions,
-  CreateHubDocumentRequest,
-  UpdateHubDocumentRequest,
-  AgentTaskStreamEventOptions,
   HubAgentTaskApproval,
   HubAgentTaskApprovalList,
-  HubAgentTaskArtifact,
   HubAgentTaskArtifactList,
   HubTaskApprovalDecisionRequest,
-  AgentTaskApproval,
-  AgentTaskApprovalList,
-  AgentTaskArtifact,
-  AgentTaskArtifactList,
-  TaskApprovalDecisionRequest,
   HubAgentInstance,
-  HubPendingAgentTask,
-  AgentInstance,
-  PendingAgentTask,
 } from './hubClientTeamTypes';
 
 import type {
-  HubResponseEnvelope,
-  HubEnvelope,
   HubClientOptions,
   HubRegisterRequest,
   HubLoginRequest,
@@ -101,26 +47,17 @@ import type {
   HubOidcAuthorizeResponse,
   HubOidcCallbackRequest,
   HubOidcCallbackResponse,
-  HubContactType,
-  HubRelationship,
   HubSearchResult,
   HubFriendRequest,
   HubContactInfo,
-  HubSessionType,
-  HubSessionRole,
   HubSession,
-  HubSessionMember,
   HubCreatePrivateSessionRequest,
   HubCreateGroupSessionRequest,
   HubCreateSessionResponse,
   HubUpdateSessionInfoRequest,
   HubUpdateSessionSettingsRequest,
-  HubSenderType,
-  HubContentType,
   HubSendMessageRequest,
   HubSendMessageResponse,
-  HubReplyToInfo,
-  HubMessageAttachment,
   HubMessage,
   HubRegisterDeviceRequest,
   HubDevice,
@@ -137,19 +74,10 @@ import type {
   HubCreateWorkspaceProjectThreadRequest,
   HubSendWorkspaceProjectThreadMessageRequest,
   HubWorkspaceProjectThreadMessage,
-  HubAgentTaskStatus,
   HubAgentTask,
-  HubTriggerAgentTaskRequest,
   HubTriggerAgentTaskOptions,
-  HubTaskRunRequest,
-  HubTaskAckRequest,
-  HubTaskStreamRequest,
-  HubTaskDoneRequest,
-  HubTaskFailRequest,
   HubNotification,
-  HubPageInfo,
   HubListResponse,
-  HubExecutionTargetType,
   HubExecutionTarget,
   HubExecutionTargetRequest,
   HubExecutionTargetListResponse,
@@ -165,20 +93,23 @@ import {
   normalizeRegisterDeviceRequest,
 } from './hubClientRequestUtils';
 import {
-  DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,
   applyDefaultJsonContentType,
+  buildHubUrl,
   createNetworkAppError,
   createTimeoutAppError,
   isAbortError,
   isNetworkFetchTypeError,
+  normalizeHubBaseUrl,
+  requestMethodOf,
+  resolveHubTimeoutMs,
 } from './hubClientTransportUtils';
 
 // ── Public type / envelope re-exports (extracted #810) ──
 export * from './hubClientPublicReexports';
 
 export function createHubClient(opts: HubClientOptions = {}) {
-  const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
+  const baseUrl = normalizeHubBaseUrl(opts.baseUrl);
   const fetchImpl = opts.fetch;
 
   async function request<T>(
@@ -190,13 +121,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
     applyDefaultJsonContentType(headers);
     applyBearerAuth(headers, token);
 
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_HUB_TIMEOUT_MS;
+    const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const signal = controller.signal;
+    const method = requestMethodOf(options);
 
     try {
-      const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
+      const response = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
         ...options,
         headers,
         signal,
@@ -213,7 +145,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
             const retryController = new AbortController();
             const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
             try {
-              const retryResponse = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
+              const retryResponse = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
                 ...options,
                 headers,
                 signal: retryController.signal,
@@ -242,21 +174,21 @@ export function createHubClient(opts: HubClientOptions = {}) {
       if (isAbortError(error)) {
         const timeoutError = createTimeoutAppError({
           timeoutMs,
-          method: options.method ?? 'GET',
+          method,
           path,
         });
         console.error(`[HubClient] ${timeoutError.message}`);
-        reportApiError(timeoutError, { path, method: options.method ?? 'GET', timeoutMs });
+        reportApiError(timeoutError, { path, method, timeoutMs });
         throw timeoutError;
       }
 
       // Report all other errors
       if (error instanceof AppError) {
-        reportApiError(error, { path, method: options.method ?? 'GET' });
+        reportApiError(error, { path, method });
       } else if (isNetworkFetchTypeError(error)) {
         const netError = createNetworkAppError((error as TypeError).message);
         console.error(`[HubClient] ${netError.message}`);
-        reportApiError(netError, { path, method: options.method ?? 'GET' });
+        reportApiError(netError, { path, method });
         throw netError;
       }
       throw error;
@@ -290,12 +222,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
     const headers = new Headers();
     // Let the runtime set multipart boundary; do not force JSON content-type.
     applyBearerAuth(headers, token);
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_HUB_TIMEOUT_MS;
+    const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
-        method: 'POST',
+      const response = await (fetchImpl ?? globalThis.fetch)(buildHubUrl(baseUrl, path), {
+        ...hubPayload.buildPostInit(),
         headers,
         body: formData,
         signal: controller.signal,
@@ -312,52 +244,55 @@ export function createHubClient(opts: HubClientOptions = {}) {
     request,
 
     register: (body: HubRegisterRequest) =>
-      request<{ user_id: string }>('/client/auth/register', hubPayload.buildJsonPostInit(body)),
+      request<{ user_id: string }>(hubPayload.buildRegisterPath(), hubPayload.buildJsonPostInit(body)),
     login: (body: HubLoginRequest) =>
-      request<HubAuthResponse>('/client/auth/login', hubPayload.buildJsonPostInit(body)),
+      request<HubAuthResponse>(hubPayload.buildLoginPath(), hubPayload.buildJsonPostInit(body)),
     refresh: (refreshToken: string) =>
       request<HubAuthResponse>(
-        '/client/auth/refresh',
+        hubPayload.buildRefreshPath(),
         hubPayload.buildJsonPostInit(hubPayload.buildRefreshBody(refreshToken)),
       ),
-    logout: () => request<void>('/client/auth/logout', hubPayload.buildPostInit()),
-    me: () => request<HubUserProfile>('/client/auth/me'),
+    logout: () => request<void>(hubPayload.buildLogoutPath(), hubPayload.buildPostInit()),
+    me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
-      request<HubUserProfile>('/client/auth/profile', hubPayload.buildJsonPutInit(body)),
+      request<HubUserProfile>(hubPayload.buildUpdateProfilePath(), hubPayload.buildJsonPutInit(body)),
     changePassword: async (body: HubChangePasswordRequest) => {
       try {
         return await request<void>(
-          '/client/auth/change-password',
+          hubPayload.buildChangePasswordPath(),
           hubPayload.buildJsonPostInit(body),
         );
       } catch (error) {
         if (isRouteFallbackError(error)) {
-          return request<void>('/client/auth/password', hubPayload.buildJsonPutInit(body));
+          return request<void>(
+            hubPayload.buildChangePasswordFallbackPath(),
+            hubPayload.buildJsonPutInit(body),
+          );
         }
         throw error;
       }
     },
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
       request<HubOidcAuthorizeResponse>(
-        '/client/auth/oidc/authorize',
+        hubPayload.buildOidcAuthorizePath(),
         hubPayload.buildJsonPostInit(hubPayload.buildOidcAuthorizeBody(body)),
       ),
     oidcCallback: (body: HubOidcCallbackRequest) =>
       request<HubOidcCallbackResponse>(
-        '/client/auth/oidc/callback',
+        hubPayload.buildOidcCallbackPath(),
         hubPayload.buildJsonPostInit(body),
       ),
 
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
-    listContacts: () => request<HubContactInfo[]>('/client/contacts'),
+    listContacts: () => request<HubContactInfo[]>(hubPayload.buildListContactsPath()),
     sendFriendRequest: (friendId: string, message?: string) =>
       request<void>(
-        '/client/contacts/friend-requests',
+        hubPayload.buildFriendRequestsPath(),
         hubPayload.buildJsonPostInit(hubPayload.buildFriendRequestBody(friendId, message)),
       ),
     listFriendRequests: () =>
-      request<HubFriendRequest[]>('/client/contacts/friend-requests'),
+      request<HubFriendRequest[]>(hubPayload.buildFriendRequestsPath()),
     acceptFriendRequest: (requestId: string) =>
       request<void>(
         hubPayload.buildAcceptFriendRequestPath(requestId),
@@ -383,17 +318,17 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildJsonPutInit(hubPayload.buildRemarkBody(remark)),
       ),
 
-    listSessions: () => request<HubSession[]>('/client/sessions'),
+    listSessions: () => request<HubSession[]>(hubPayload.buildListSessionsPath()),
     searchSessions: (q: string) =>
       request<HubSession[]>(hubPayload.buildSearchSessionsPath(q)),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
       request<HubCreateSessionResponse>(
-        '/client/sessions/private',
+        hubPayload.buildCreatePrivateSessionPath(),
         hubPayload.buildJsonPostInit(body),
       ),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
       request<HubCreateSessionResponse>(
-        '/client/sessions/group',
+        hubPayload.buildCreateGroupSessionPath(),
         hubPayload.buildJsonPostInit(body),
       ),
     addSessionMembers: (sessionId: string, memberIds: string[]) =>
@@ -506,10 +441,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildJsonPostInit(normalizeRegisterDeviceRequest(body)),
       ),
     ackTask: (taskId: string, runId?: string) =>
-      request<void>(hubPayload.buildAckTaskPath(taskId), {
-        ...hubPayload.buildPostInit(),
-        ...hubPayload.buildOptionalJsonBody(hubPayload.buildTaskAckBody(runId)),
-      }),
+      request<void>(
+        hubPayload.buildAckTaskPath(taskId),
+        hubPayload.buildPostWithOptionalJsonBody(hubPayload.buildTaskAckBody(runId)),
+      ),
     streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(
         hubPayload.buildStreamTaskPath(taskId),
@@ -536,7 +471,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       request<HubAgentTask>(
-        '/web/agent-tasks',
+        hubPayload.buildAgentTasksPath(),
         hubPayload.buildJsonPostInit(
           hubPayload.buildTriggerAgentTaskBody(triggerMessageId, options),
         ),
@@ -565,7 +500,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>(
-        '/web/execution-targets',
+        hubPayload.buildExecutionTargetsPath(),
         hubPayload.buildJsonPostInit(body),
       ),
     getExecutionTarget: (id: string) =>
@@ -588,15 +523,21 @@ export function createHubClient(opts: HubClientOptions = {}) {
     listAuditEvents: (params?: { pageSize?: number; pageCursor?: string }) =>
       request<HubListResponse<HubAuditEvent>>(hubPayload.buildListAuditEventsPath(params)),
     createRelayCommand: (body: HubRelayCommandRequest) =>
-      request<HubRelayCommand>('/web/relay/commands', hubPayload.buildJsonPostInit(body)),
+      request<HubRelayCommand>(
+        hubPayload.buildRelayCommandsPath(),
+        hubPayload.buildJsonPostInit(body),
+      ),
     getRelayCommand: (id: string) =>
       request<HubRelayCommand>(hubPayload.buildRelayCommandPath(id)),
     ackRelayCommand: (id: string) =>
       request<void>(hubPayload.buildAckRelayCommandPath(id), hubPayload.buildPostInit()),
 
-    listCustomAgents: () => request<HubCustomAgent[]>('/web/custom-agents'),
+    listCustomAgents: () => request<HubCustomAgent[]>(hubPayload.buildCustomAgentsPath()),
     createCustomAgent: (body: HubCustomAgentRequest) =>
-      request<HubCustomAgent>('/web/custom-agents', hubPayload.buildJsonPostInit(body)),
+      request<HubCustomAgent>(
+        hubPayload.buildCustomAgentsPath(),
+        hubPayload.buildJsonPostInit(body),
+      ),
     updateCustomAgent: (id: string, body: HubCustomAgentRequest) =>
       request<void>(hubPayload.buildCustomAgentPath(id), hubPayload.buildJsonPutInit(body)),
     deleteCustomAgent: (id: string) =>
@@ -626,7 +567,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getWorkspaceProject: (id: string) =>
       request<HubWorkspaceProject>(hubPayload.buildWorkspaceProjectPath(id)),
     createWorkspaceProject: (data: HubCreateWorkspaceProjectRequest) =>
-      request<HubWorkspaceProject>('/web/projects', hubPayload.buildJsonPostInit(data)),
+      request<HubWorkspaceProject>(
+        hubPayload.buildWorkspaceProjectsPath(),
+        hubPayload.buildJsonPostInit(data),
+      ),
     updateWorkspaceProject: (id: string, data: HubUpdateWorkspaceProjectRequest) =>
       request<HubWorkspaceProject>(
         hubPayload.buildWorkspaceProjectPath(id),
@@ -696,9 +640,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentRunEvent[]>(hubPayload.buildListTaskRunEventsAfterPath(taskId, afterSeq)),
 
     createAgentTeam: (data: HubCreateAgentTeamRequest) =>
-      request<HubAgentTeam>('/web/agent-teams', hubPayload.buildJsonPostInit(data)),
+      request<HubAgentTeam>(hubPayload.buildAgentTeamsPath(), hubPayload.buildJsonPostInit(data)),
 
-    listAgentTeams: () => request<HubAgentTeam[]>('/web/agent-teams'),
+    listAgentTeams: () => request<HubAgentTeam[]>(hubPayload.buildAgentTeamsPath()),
 
     getAgentTeam: (teamId: string) =>
       request<HubAgentTeamDetail>(hubPayload.buildAgentTeamPath(teamId)),
@@ -767,7 +711,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentProfileListResponse>(hubPayload.buildListAgentProfilesPath(params)),
 
     createAgentProfile: (data: HubCreateAgentProfileRequest) =>
-      request<HubAgentProfile>('/web/agent-profiles', hubPayload.buildJsonPostInit(data)),
+      request<HubAgentProfile>(
+        hubPayload.buildAgentProfilesPath(),
+        hubPayload.buildJsonPostInit(data),
+      ),
 
     updateAgentProfile: (id: string, data: HubUpdateAgentProfileRequest) =>
       request<HubAgentProfile>(
@@ -778,25 +725,25 @@ export function createHubClient(opts: HubClientOptions = {}) {
     deleteAgentProfile: (id: string) =>
       request<undefined>(hubPayload.buildAgentProfilePath(id), hubPayload.buildDeleteInit()),
 
-    fetchSettings: () => request<Record<string, string>>('/client/settings'),
+    fetchSettings: () => request<Record<string, string>>(hubPayload.buildSettingsPath()),
 
     patchSettings: (values: Record<string, string>) =>
       request<Record<string, string>>(
-        '/client/settings',
+        hubPayload.buildSettingsPath(),
         hubPayload.buildJsonPatchInit(hubPayload.buildPatchSettingsBody(values)),
       ),
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
     probeAttachment: (hash: string) =>
       request<HubProbeAttachmentResponse>(
-        '/client/attachments/probe',
+        hubPayload.buildProbeAttachmentPath(),
         hubPayload.buildJsonPostInit(hubPayload.buildProbeAttachmentBody(hash)),
       ),
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
     uploadAttachment: (file: File, hash: string) =>
       uploadMultipart<HubAttachmentRef>(
-        '/client/attachments',
+        hubPayload.buildAttachmentsPath(),
         hubPayload.buildAttachmentFormData(file, hash),
       ),
 
@@ -816,7 +763,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getDocument: (id: string) => request<HubDocument>(hubPayload.buildDocumentPath(id)),
 
     createDocument: (data: HubCreateDocumentRequest) =>
-      request<HubDocument>('/web/documents', hubPayload.buildJsonPostInit(data)),
+      request<HubDocument>(hubPayload.buildDocumentsPath(), hubPayload.buildJsonPostInit(data)),
 
     updateDocument: (id: string, data: HubUpdateDocumentRequest) =>
       request<HubDocument>(hubPayload.buildDocumentPath(id), hubPayload.buildJsonPatchInit(data)),
