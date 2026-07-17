@@ -539,6 +539,216 @@ func buildRunCleanupResult(removedRuns, removedItems int) RunCleanupResult {
 	}
 }
 
+// putTracked stores value and appends id to order when created is true.
+// When created is false the maps/order are left unchanged.
+func putTracked[T any](items map[string]T, order []string, id string, value T, created bool) []string {
+	if !created {
+		return order
+	}
+	items[id] = value
+	return append(order, id)
+}
+
+// putUpsert always stores value and appends id to order only on first create.
+func putUpsert[T any](items map[string]T, order []string, id string, value T, created bool) []string {
+	items[id] = value
+	if created {
+		return append(order, id)
+	}
+	return order
+}
+
+// deleteTracked removes id from items and order when present.
+func deleteTracked[T any](items map[string]T, order []string, id string) ([]string, bool) {
+	if _, ok := items[id]; !ok {
+		return order, false
+	}
+	delete(items, id)
+	return removeString(order, id), true
+}
+
+// collectThreadOwnedKeys returns run and item keys owned by threadID.
+func collectThreadOwnedKeys(runs map[string]Run, items map[string]Item, threadID string) (runIDs, itemIDs map[string]struct{}) {
+	runIDs = collectKeysByThreadID(runs, threadID, func(run Run) string { return run.ThreadID })
+	itemIDs = collectKeysByThreadID(items, threadID, func(item Item) string { return item.ThreadID })
+	return runIDs, itemIDs
+}
+
+// pruneMatchingPins deletes pins matching match and returns the compacted order.
+func pruneMatchingPins(pins map[string]ThreadPin, order []string, match func(ThreadPin) bool) []string {
+	if len(pins) == 0 {
+		return order
+	}
+	deleteMapKeys(pins, collectMatchingPinKeys(pins, match))
+	return orderKeepPresent(order, pins)
+}
+
+// pruneRunEvidence deletes evidence scoped to runID and returns compacted orders.
+func pruneRunEvidence(
+	diffs map[string]RunDiffFile,
+	artifacts map[string]Artifact,
+	previews map[string]Preview,
+	diffOrder, artifactOrder, previewOrder []string,
+	runID string,
+) (newDiffOrder, newArtifactOrder, newPreviewOrder []string) {
+	diffKeys, artifactKeys, previewKeys := collectRunEvidenceKeys(diffs, artifacts, previews, runID)
+	deleteMapKeys(diffs, diffKeys)
+	deleteMapKeys(artifacts, artifactKeys)
+	deleteMapKeys(previews, previewKeys)
+	return orderKeepPresent(diffOrder, diffs),
+		orderKeepPresent(artifactOrder, artifacts),
+		orderKeepPresent(previewOrder, previews)
+}
+
+// validateCreateRunRefs checks project/thread references for CreateRun.
+func validateCreateRunRefs(projects map[string]Project, threads map[string]Thread, projectID, threadID string) bool {
+	if _, ok := projects[projectID]; !ok {
+		return false
+	}
+	if _, ok := lookupThreadInProject(threads, threadID, projectID); !ok {
+		return false
+	}
+	return true
+}
+
+// validateCreateItemRefs checks project/thread/run references for CreateItem.
+func validateCreateItemRefs(
+	projects map[string]Project,
+	threads map[string]Thread,
+	runs map[string]Run,
+	item Item,
+) bool {
+	if _, ok := projects[item.ProjectID]; !ok {
+		return false
+	}
+	if _, ok := lookupThreadInProject(threads, item.ThreadID, item.ProjectID); !ok {
+		return false
+	}
+	if item.RunID != "" {
+		if _, ok := lookupRunInThread(runs, item.RunID, item.ThreadID); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// resolveCreateProject returns a new project, or the existing one with ErrProjectExists.
+// created is true only when the new project should be stored.
+func resolveCreateProject(existing Project, exists bool, id, name, ownerID, now string) (Project, error, bool) {
+	if exists {
+		return existing, ErrProjectExists, false
+	}
+	return buildProject(id, name, ownerID, now), nil, true
+}
+
+// resolveCreateThread decides create vs reuse vs conflict for CreateThread.
+// created is true when a new thread value should be stored.
+func resolveCreateThread(
+	existing Thread,
+	exists bool,
+	projectExists bool,
+	id, projectID, title, kind, avatarColor, avatarLabel, now string,
+) (Thread, error, bool) {
+	if !projectExists {
+		return Thread{}, ErrNotFound, false
+	}
+	if exists {
+		if existingThreadConflict(existing, projectID) {
+			return Thread{}, errThreadExistsInProject(id, existing.ProjectID), false
+		}
+		return existing, nil, false
+	}
+	return buildThread(id, projectID, title, kind, avatarColor, avatarLabel, now), nil, true
+}
+
+// resolveCreateRun returns existing reuse or a new queued run.
+// created is true when a new run should be stored.
+func resolveCreateRun(existing Run, exists bool, refsOK bool, id, projectID, threadID, now string) (Run, error, bool) {
+	if !refsOK {
+		return Run{}, ErrNotFound, false
+	}
+	if exists {
+		return existing, nil, false
+	}
+	return buildQueuedRun(id, projectID, threadID, now), nil, true
+}
+
+// resolveCreateItem returns existing reuse or a prepared new item.
+// created is true when a new item should be stored.
+func resolveCreateItem(existing Item, exists bool, refsOK bool, item Item, now string) (Item, error, bool) {
+	if !refsOK {
+		return Item{}, ErrNotFound, false
+	}
+	if exists {
+		return existing, nil, false
+	}
+	return prepareItemDefaults(item, now), nil, true
+}
+
+// resolveCreateUserProfile returns existing reuse or a prepared new profile.
+// created is true when a new profile should be stored.
+func resolveCreateUserProfile(existing UserProfile, exists bool, profile UserProfile, now string) (UserProfile, bool) {
+	if exists {
+		return existing, false
+	}
+	return prepareUserProfileCreate(profile, now), true
+}
+
+// resolveCreateAgentProfile validates and prepares agent profile create.
+// created is true when a new profile should be stored.
+func resolveCreateAgentProfile(existing AgentProfile, exists bool, profile AgentProfile, now string) (AgentProfile, error, bool) {
+	if err := validateAgentProfileCreate(profile); err != nil {
+		return AgentProfile{}, err, false
+	}
+	if exists {
+		return AgentProfile{}, errAgentProfileExists(profile.ID), false
+	}
+	return prepareAgentProfileCreate(profile, now), nil, true
+}
+
+// applySettingsUpsert patches settings and returns the updated map plus cloned view.
+func applySettingsUpsert(settings map[string]string, patch map[string]string, now string) (map[string]string, UserSettings) {
+	settings = ensureSettingsMap(settings)
+	applySettingsPatch(settings, patch)
+	return settings, cloneUserSettings(settings, now)
+}
+
+// applyRunCleanupMaps deletes selected runs/items and returns updated orders + counts.
+// Evidence pruning is the caller's responsibility (via pruneRunEvidence / removeRunEvidence).
+func applyRunCleanupMaps(
+	runs map[string]Run,
+	items map[string]Item,
+	runOrder, itemOrder []string,
+	removeRuns map[string]struct{},
+) (newRunOrder, newItemOrder []string, removedItemIDs map[string]struct{}, removedItems int) {
+	deleteMapKeys(runs, removeRuns)
+	newRunOrder = orderWithoutRemoved(runOrder, removeRuns)
+	removedItemIDs = collectItemIDsForRemovedRuns(items, removeRuns)
+	deleteMapKeys(items, removedItemIDs)
+	removedItems = len(removedItemIDs)
+	if removedItems > 0 {
+		newItemOrder = orderKeepPresent(itemOrder, items)
+	} else {
+		newItemOrder = itemOrder
+	}
+	return newRunOrder, newItemOrder, removedItemIDs, removedItems
+}
+
+// pinMatchesThread reports whether a pin belongs to threadID.
+func pinMatchesThread(threadID string) func(ThreadPin) bool {
+	return func(pin ThreadPin) bool {
+		return pin.ThreadID == threadID
+	}
+}
+
+// pinMatchesRemovedItems reports whether a pin's item was removed.
+func pinMatchesRemovedItems(removedItemIDs map[string]struct{}) func(ThreadPin) bool {
+	return func(pin ThreadPin) bool {
+		_, removed := removedItemIDs[pin.ItemID]
+		return removed
+	}
+}
+
 // errThreadExistsInProject is returned when CreateThread collides across projects.
 func errThreadExistsInProject(threadID, projectID string) error {
 	return fmt.Errorf("thread %q already exists in project %q", threadID, projectID)

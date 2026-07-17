@@ -935,3 +935,306 @@ func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
 		t.Fatalf("materializeFileSnapshot failed to clone artifact: %#v", gotArtifacts["a1"])
 	}
 }
+
+func TestPutTrackedAndPutUpsert(t *testing.T) {
+	t.Parallel()
+	items := map[string]int{}
+	order := []string{}
+
+	order = putTracked(items, order, "a", 1, false)
+	if len(items) != 0 || len(order) != 0 {
+		t.Fatalf("putTracked false should no-op: items=%#v order=%#v", items, order)
+	}
+	order = putTracked(items, order, "a", 1, true)
+	if items["a"] != 1 || !reflect.DeepEqual(order, []string{"a"}) {
+		t.Fatalf("putTracked true = items=%#v order=%#v", items, order)
+	}
+
+	order = putUpsert(items, order, "a", 9, false)
+	if items["a"] != 9 || !reflect.DeepEqual(order, []string{"a"}) {
+		t.Fatalf("putUpsert update = items=%#v order=%#v", items, order)
+	}
+	order = putUpsert(items, order, "b", 2, true)
+	if items["b"] != 2 || !reflect.DeepEqual(order, []string{"a", "b"}) {
+		t.Fatalf("putUpsert create = items=%#v order=%#v", items, order)
+	}
+}
+
+func TestDeleteTracked(t *testing.T) {
+	t.Parallel()
+	items := map[string]string{"a": "1", "b": "2"}
+	order := []string{"a", "b"}
+
+	order, ok := deleteTracked(items, order, "missing")
+	if ok || !reflect.DeepEqual(order, []string{"a", "b"}) || len(items) != 2 {
+		t.Fatalf("deleteTracked missing = ok=%v order=%#v items=%#v", ok, order, items)
+	}
+	order, ok = deleteTracked(items, order, "a")
+	if !ok || !reflect.DeepEqual(order, []string{"b"}) || len(items) != 1 {
+		t.Fatalf("deleteTracked a = ok=%v order=%#v items=%#v", ok, order, items)
+	}
+	if _, still := items["a"]; still {
+		t.Fatal("deleteTracked left key a")
+	}
+}
+
+func TestCollectThreadOwnedKeys(t *testing.T) {
+	t.Parallel()
+	runs := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1"},
+		"r2": {ID: "r2", ThreadID: "t2"},
+	}
+	items := map[string]Item{
+		"i1": {ID: "i1", ThreadID: "t1"},
+		"i2": {ID: "i2", ThreadID: "t1"},
+		"i3": {ID: "i3", ThreadID: "t9"},
+	}
+	runIDs, itemIDs := collectThreadOwnedKeys(runs, items, "t1")
+	if len(runIDs) != 1 {
+		t.Fatalf("runIDs = %#v", runIDs)
+	}
+	if _, ok := runIDs["r1"]; !ok {
+		t.Fatalf("missing r1 in %#v", runIDs)
+	}
+	if len(itemIDs) != 2 {
+		t.Fatalf("itemIDs = %#v", itemIDs)
+	}
+	if _, ok := itemIDs["i1"]; !ok {
+		t.Fatalf("missing i1 in %#v", itemIDs)
+	}
+	if _, ok := itemIDs["i2"]; !ok {
+		t.Fatalf("missing i2 in %#v", itemIDs)
+	}
+}
+
+func TestPruneMatchingPinsAndRunEvidence(t *testing.T) {
+	t.Parallel()
+	pins := map[string]ThreadPin{
+		"p1": {ThreadID: "t1", ItemID: "i1"},
+		"p2": {ThreadID: "t2", ItemID: "i2"},
+	}
+	pinOrder := []string{"p1", "p2"}
+	pinOrder = pruneMatchingPins(pins, pinOrder, pinMatchesThread("t1"))
+	if len(pins) != 1 || pins["p2"].ThreadID != "t2" || !reflect.DeepEqual(pinOrder, []string{"p2"}) {
+		t.Fatalf("pruneMatchingPins = pins=%#v order=%#v", pins, pinOrder)
+	}
+	// empty pins early return
+	emptyOrder := []string{"x"}
+	emptyOrder = pruneMatchingPins(map[string]ThreadPin{}, emptyOrder, pinMatchesThread("t1"))
+	if !reflect.DeepEqual(emptyOrder, []string{"x"}) {
+		t.Fatalf("empty pruneMatchingPins changed order: %#v", emptyOrder)
+	}
+
+	diffs := map[string]RunDiffFile{
+		"d1": {RunID: "r1", Path: "a.go"},
+		"d2": {RunID: "r2", Path: "b.go"},
+	}
+	artifacts := map[string]Artifact{
+		"a1": {ID: "a1", RunID: "r1"},
+		"a2": {ID: "a2", RunID: "r9"},
+	}
+	previews := map[string]Preview{
+		"pv1": {ID: "pv1", RunID: "r1"},
+		"pv2": {ID: "pv2", RunID: "r2"},
+	}
+	diffOrder, artifactOrder, previewOrder := pruneRunEvidence(
+		diffs, artifacts, previews,
+		[]string{"d1", "d2"}, []string{"a1", "a2"}, []string{"pv1", "pv2"},
+		"r1",
+	)
+	if len(diffs) != 1 || len(artifacts) != 1 || len(previews) != 1 {
+		t.Fatalf("pruneRunEvidence maps = diffs=%#v arts=%#v previews=%#v", diffs, artifacts, previews)
+	}
+	if !reflect.DeepEqual(diffOrder, []string{"d2"}) || !reflect.DeepEqual(artifactOrder, []string{"a2"}) || !reflect.DeepEqual(previewOrder, []string{"pv2"}) {
+		t.Fatalf("pruneRunEvidence orders = %#v %#v %#v", diffOrder, artifactOrder, previewOrder)
+	}
+}
+
+func TestValidateCreateRefs(t *testing.T) {
+	t.Parallel()
+	projects := map[string]Project{"p1": {ID: "p1"}}
+	threads := map[string]Thread{"t1": {ID: "t1", ProjectID: "p1"}}
+	runs := map[string]Run{"r1": {ID: "r1", ThreadID: "t1"}}
+
+	if !validateCreateRunRefs(projects, threads, "p1", "t1") {
+		t.Fatal("validateCreateRunRefs expected ok")
+	}
+	if validateCreateRunRefs(projects, threads, "missing", "t1") {
+		t.Fatal("missing project should fail")
+	}
+	if validateCreateRunRefs(projects, threads, "p1", "missing") {
+		t.Fatal("missing thread should fail")
+	}
+	if validateCreateRunRefs(projects, map[string]Thread{"t2": {ID: "t2", ProjectID: "other"}}, "p1", "t2") {
+		t.Fatal("thread project mismatch should fail")
+	}
+
+	item := Item{ProjectID: "p1", ThreadID: "t1", RunID: "r1"}
+	if !validateCreateItemRefs(projects, threads, runs, item) {
+		t.Fatal("validateCreateItemRefs expected ok")
+	}
+	if !validateCreateItemRefs(projects, threads, runs, Item{ProjectID: "p1", ThreadID: "t1"}) {
+		t.Fatal("empty run id should skip run check")
+	}
+	if validateCreateItemRefs(projects, threads, runs, Item{ProjectID: "p1", ThreadID: "t1", RunID: "missing"}) {
+		t.Fatal("missing run should fail")
+	}
+	if validateCreateItemRefs(projects, threads, map[string]Run{"r9": {ID: "r9", ThreadID: "other"}}, Item{ProjectID: "p1", ThreadID: "t1", RunID: "r9"}) {
+		t.Fatal("run thread mismatch should fail")
+	}
+}
+
+func TestResolveCreateHelpers(t *testing.T) {
+	t.Parallel()
+	now := "2026-07-18T00:00:00Z"
+
+	project, err, created := resolveCreateProject(Project{}, false, "p1", "", "owner", now)
+	if err != nil || !created || project.ID != "p1" || project.Name != "Local Project" {
+		t.Fatalf("resolveCreateProject create = %#v err=%v created=%v", project, err, created)
+	}
+	project, err, created = resolveCreateProject(Project{ID: "p1", Name: "Existing"}, true, "p1", "x", "o", now)
+	if err != ErrProjectExists || created || project.Name != "Existing" {
+		t.Fatalf("resolveCreateProject exists = %#v err=%v created=%v", project, err, created)
+	}
+
+	thread, err, created := resolveCreateThread(Thread{}, false, false, "t1", "p1", "title", "chat", "blue", "A", now)
+	if err != ErrNotFound || created {
+		t.Fatalf("resolveCreateThread missing project = err=%v created=%v", err, created)
+	}
+	thread, err, created = resolveCreateThread(
+		Thread{ID: "t1", ProjectID: "other"}, true, true,
+		"t1", "p1", "title", "chat", "blue", "A", now,
+	)
+	if err == nil || created || err.Error() != "thread \"t1\" already exists in project \"other\"" {
+		t.Fatalf("resolveCreateThread conflict = %#v err=%v created=%v", thread, err, created)
+	}
+	existing := Thread{ID: "t1", ProjectID: "p1", Title: "keep"}
+	thread, err, created = resolveCreateThread(existing, true, true, "t1", "p1", "title", "chat", "blue", "A", now)
+	if err != nil || created || thread.Title != "keep" {
+		t.Fatalf("resolveCreateThread reuse = %#v err=%v created=%v", thread, err, created)
+	}
+	thread, err, created = resolveCreateThread(Thread{}, false, true, "t1", "p1", "", "chat", "blue", "A", now)
+	if err != nil || !created || thread.Title != "New Thread" {
+		t.Fatalf("resolveCreateThread create = %#v err=%v created=%v", thread, err, created)
+	}
+
+	run, err, created := resolveCreateRun(Run{}, false, false, "r1", "p1", "t1", now)
+	if err != ErrNotFound || created {
+		t.Fatalf("resolveCreateRun refs fail = err=%v created=%v", err, created)
+	}
+	run, err, created = resolveCreateRun(Run{ID: "r1", Status: "started"}, true, true, "r1", "p1", "t1", now)
+	if err != nil || created || run.Status != "started" {
+		t.Fatalf("resolveCreateRun reuse = %#v err=%v created=%v", run, err, created)
+	}
+	run, err, created = resolveCreateRun(Run{}, false, true, "r1", "p1", "t1", now)
+	if err != nil || !created || run.Status != "queued" {
+		t.Fatalf("resolveCreateRun create = %#v err=%v created=%v", run, err, created)
+	}
+
+	item, err, created := resolveCreateItem(Item{}, false, false, Item{ID: "i1"}, now)
+	if err != ErrNotFound || created {
+		t.Fatalf("resolveCreateItem refs fail = err=%v created=%v", err, created)
+	}
+	item, err, created = resolveCreateItem(Item{ID: "i1", Type: "old"}, true, true, Item{ID: "i1"}, now)
+	if err != nil || created || item.Type != "old" {
+		t.Fatalf("resolveCreateItem reuse = %#v err=%v created=%v", item, err, created)
+	}
+	item, err, created = resolveCreateItem(Item{}, false, true, Item{ID: "i1"}, now)
+	if err != nil || !created || item.Type != "event" || item.Status != "created" {
+		t.Fatalf("resolveCreateItem create = %#v err=%v created=%v", item, err, created)
+	}
+
+	profile, created := resolveCreateUserProfile(UserProfile{ID: "u1", DisplayName: "keep"}, true, UserProfile{ID: "u1"}, now)
+	if created || profile.DisplayName != "keep" {
+		t.Fatalf("resolveCreateUserProfile reuse = %#v created=%v", profile, created)
+	}
+	profile, created = resolveCreateUserProfile(UserProfile{}, false, UserProfile{ID: "u1", DisplayName: "New"}, now)
+	if !created || profile.CreatedAt != now || profile.UpdatedAt != now {
+		t.Fatalf("resolveCreateUserProfile create = %#v created=%v", profile, created)
+	}
+
+	agent, err, created := resolveCreateAgentProfile(AgentProfile{}, false, AgentProfile{ID: "", AdapterID: "a"}, now)
+	if err == nil || created {
+		t.Fatalf("resolveCreateAgentProfile invalid = err=%v created=%v", err, created)
+	}
+	agent, err, created = resolveCreateAgentProfile(AgentProfile{ID: "ag1"}, true, AgentProfile{ID: "ag1", AdapterID: "claude"}, now)
+	if err == nil || created || err.Error() != "agent profile \"ag1\" already exists" {
+		t.Fatalf("resolveCreateAgentProfile exists = err=%v created=%v", err, created)
+	}
+	agent, err, created = resolveCreateAgentProfile(AgentProfile{}, false, AgentProfile{ID: "ag1", AdapterID: "claude", Name: ""}, now)
+	if err != nil || !created || agent.Name != "Unnamed Agent" || agent.UpdatedAt != now {
+		t.Fatalf("resolveCreateAgentProfile create = %#v err=%v created=%v", agent, err, created)
+	}
+}
+
+func TestApplySettingsUpsert(t *testing.T) {
+	t.Parallel()
+	settings, view := applySettingsUpsert(nil, map[string]string{" theme ": "dark", "": "x"}, "now")
+	if settings["theme"] != "dark" || view.Values["theme"] != "dark" || view.UpdatedAt != "now" {
+		t.Fatalf("applySettingsUpsert = settings=%#v view=%#v", settings, view)
+	}
+	if _, ok := settings[""]; ok {
+		t.Fatal("empty key should be ignored")
+	}
+	// Isolation of returned view values.
+	settings["theme"] = "light"
+	if view.Values["theme"] != "dark" {
+		t.Fatalf("view not isolated: %#v", view)
+	}
+}
+
+func TestApplyRunCleanupMapsAndPinMatchers(t *testing.T) {
+	t.Parallel()
+	runs := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1"},
+		"r2": {ID: "r2", ThreadID: "t1"},
+	}
+	items := map[string]Item{
+		"i1": {ID: "i1", RunID: "r1"},
+		"i2": {ID: "i2", RunID: "r2"},
+		"i3": {ID: "i3", RunID: "keep"},
+	}
+	runOrder := []string{"r1", "r2"}
+	itemOrder := []string{"i1", "i2", "i3"}
+	removeRuns := map[string]struct{}{"r1": {}}
+
+	newRunOrder, newItemOrder, removedItemIDs, removedItems := applyRunCleanupMaps(
+		runs, items, runOrder, itemOrder, removeRuns,
+	)
+	if len(runs) != 1 || runs["r2"].ID != "r2" {
+		t.Fatalf("runs after cleanup = %#v", runs)
+	}
+	if !reflect.DeepEqual(newRunOrder, []string{"r2"}) {
+		t.Fatalf("newRunOrder = %#v", newRunOrder)
+	}
+	if removedItems != 1 || len(removedItemIDs) != 1 {
+		t.Fatalf("removedItems=%d ids=%#v", removedItems, removedItemIDs)
+	}
+	if _, ok := items["i1"]; ok {
+		t.Fatal("item i1 should be deleted")
+	}
+	if !reflect.DeepEqual(newItemOrder, []string{"i2", "i3"}) {
+		t.Fatalf("newItemOrder = %#v", newItemOrder)
+	}
+
+	// No removed items keeps itemOrder pointer-equivalent content.
+	runs2 := map[string]Run{"r2": {ID: "r2"}}
+	items2 := map[string]Item{"i2": {ID: "i2", RunID: "r2"}}
+	_, keptItemOrder, _, removed := applyRunCleanupMaps(
+		runs2, items2, []string{"r2"}, []string{"i2"}, map[string]struct{}{"missing": {}},
+	)
+	if removed != 0 || !reflect.DeepEqual(keptItemOrder, []string{"i2"}) {
+		t.Fatalf("no-item cleanup = removed=%d order=%#v", removed, keptItemOrder)
+	}
+
+	if !pinMatchesThread("t1")(ThreadPin{ThreadID: "t1"}) {
+		t.Fatal("pinMatchesThread true")
+	}
+	if pinMatchesThread("t1")(ThreadPin{ThreadID: "t2"}) {
+		t.Fatal("pinMatchesThread false")
+	}
+	matchRemoved := pinMatchesRemovedItems(map[string]struct{}{"i1": {}})
+	if !matchRemoved(ThreadPin{ItemID: "i1"}) || matchRemoved(ThreadPin{ItemID: "i2"}) {
+		t.Fatal("pinMatchesRemovedItems mismatch")
+	}
+}
