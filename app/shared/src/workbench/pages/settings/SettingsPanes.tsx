@@ -1,18 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Settings pane content renderers — extracted for Phase 18 #572.
+   Residual thin: helpers + parts (#686).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  DesignNavIcon,
-  DESIGN_NAV_GLYPH_SIZE,
-  DESIGN_NAV_GLYPH_STROKE_WIDTH,
-} from '../../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
-import { getWorkbenchDataModeContract } from '../../../demo';
-import type { LocalCliDiscoveryManifest } from '../../../platform';
-import styles from '../SettingsPage.module.css';
 import {
   DataModeControl,
   SettingPath,
@@ -22,113 +15,23 @@ import {
   SettingsRow,
   SettingsSection,
 } from './shared';
+import {
+  AgentConfigLink,
+  DataModeStatus,
+  LocalCliDiscoveryStatus,
+  StatePreviewSection,
+} from './SettingsPaneParts';
+import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
-import type { SettingsPageProps, SettingsPaneId, StatePanelKind } from './types';
+import type { SettingsPageProps, SettingsPaneId } from './types';
 
-/* ── Data mode status ── */
-
-export function DataModeStatus({
-  mode,
-}: {
-  mode: string;
-}): React.ReactElement {
-  const detail = getWorkbenchDataModeContract(mode);
-  const label = detail.mode === 'auto'
-    ? 'Auto fallback'
-    : detail.mode === 'approved-real'
-      ? 'Approved real'
-      : `${detail.displayLabel} data`;
-
-  return (
-    <section className={styles.modeStatus} aria-label="数据模式状态">
-      <div className={styles.modeStatusHead}>
-        <span>{label}</span>
-        <span className={styles.modeStatusSpacer} aria-hidden="true" />
-        <em>{detail.displayLabel}</em>
-      </div>
-      <strong>{detail.title}</strong>
-      <p>{detail.description}</p>
-      <dl className={styles.modeFacts}>
-        <div>
-          <dt>Desktop</dt>
-          <dd>{detail.desktopLabel}</dd>
-        </div>
-        <div>
-          <dt>Web</dt>
-          <dd>{detail.webLabel}</dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
-
-export function LocalCliDiscoveryStatus({
-  discovery,
-}: {
-  discovery: LocalCliDiscoveryManifest;
-}): React.ReactElement {
-  return (
-    <SettingsSection title="CLI 诊断">
-      <SettingsRow label="发现模式" description="只做 no-spend CLI 状态发现；不执行 Run、带 prompt 的命令、模型调用或 secrets。">
-        <SettingValue value={discovery.mode} />
-      </SettingsRow>
-      <SettingsRow label="就绪 manifest" description="后续 approved-real 验证必须对齐的 readiness 文档。">
-        <SettingPath value={discovery.readinessManifest} />
-      </SettingsRow>
-      <SettingsRow label="就绪脚本" description="静态 gate 和 no-spend command discovery 的验证入口。">
-        <SettingPath value={discovery.readinessScript} />
-      </SettingsRow>
-      {discovery.items.map((item) => (
-        <SettingsRow
-          key={item.id}
-          label={item.name}
-          description={`${item.version ? `version ${item.version}` : 'version unknown'} · ${item.path}`}
-        >
-          <SettingValue value={`${item.installed ? 'installed' : 'missing'} · ${item.noSpend ? 'no-spend' : 'requires approval'}`} />
-        </SettingsRow>
-      ))}
-    </SettingsSection>
-  );
-}
-
-/* ── State panel ── */
-
-interface StatePanelProps {
-  kind: StatePanelKind;
-  label: string;
-  title: string;
-  copy: string;
-  actionLabel: string;
-  onAction?: () => void;
-}
-
-export function StatePanel({ kind, label, title, copy, actionLabel, onAction }: StatePanelProps): React.ReactElement {
-  const kindClass =
-    kind === 'empty' ? styles.statePanelEmpty :
-    kind === 'invalid' ? styles.statePanelInvalid :
-    styles.statePanelMissing;
-
-  const stateIcon = (
-    kind === 'missing' ? 'error404' :
-    kind === 'invalid' ? 'lock' :
-    'inbox'
-  );
-
-  return (
-    <article className={`${styles.statePanel} ${kindClass} state-panel ${kind}`} aria-label={label}>
-      <div className={`${styles.stateMark} state-mark`} aria-hidden="true">
-        <DesignNavIcon
-          name={stateIcon}
-          size={DESIGN_NAV_GLYPH_SIZE}
-          strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
-        />
-      </div>
-      <h3>{title}</h3>
-      <p>{copy}</p>
-      <button type="button" onClick={onAction}>{actionLabel}</button>
-    </article>
-  );
-}
+export {
+  DataModeStatus,
+  LocalCliDiscoveryStatus,
+  StatePanel,
+  StatePreviewSection,
+  AgentConfigLink,
+} from './SettingsPaneParts';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Pane content renderers
@@ -217,36 +120,26 @@ export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement 
       </SettingsSection>
 
       <SettingsSection title="权限策略">
-        {(PERMISSION_ROWS).map(([tool, value, desc]) => (
+        {PERMISSION_ROWS.map(([tool, value, desc]) => (
           <SettingsRow key={tool} label={tool} description={desc} wide>
             <SettingSegment
               options={['允许', '需确认', '禁止']}
-              active={props.permissions[tool] ?? value}
+              active={resolvePermissionValue(props.permissions, tool, value)}
               onChange={(v) => props.onChangeSetting(`perm_${tool}`, v)}
             />
           </SettingsRow>
         ))}
       </SettingsSection>
 
-      {props.onOpenAgentConfig && (
-        <section className={styles.agentConfigLink} aria-label={t('aria.agentConfig')}>
-          <div className={styles.agentConfigLinkContent}>
-            <h3>单个 Agent 配置</h3>
-            <p>
-              为每个 Agent 单独配置运行器 (CC/Codex/OpenCode/SDK)、模型、System Prompt
-              和 MCP 绑定。
-            </p>
-          </div>
-          <button
-            className={styles.agentConfigLinkBtn}
-            type="button"
-            onClick={props.onOpenAgentConfig}
-          >
-            打开 Agent 配置
-            <DesignNavIcon name="external" size={14} />
-          </button>
-        </section>
-      )}
+      {props.onOpenAgentConfig ? (
+        <AgentConfigLink
+          ariaLabel={t('aria.agentConfig')}
+          title="单个 Agent 配置"
+          description="为每个 Agent 单独配置运行器 (CC/Codex/OpenCode/SDK)、模型、System Prompt 和 MCP 绑定。"
+          actionLabel="打开 Agent 配置"
+          onOpen={props.onOpenAgentConfig}
+        />
+      ) : null}
     </>
   );
 }
@@ -309,38 +202,7 @@ export function StatesPane(props: SettingsPageProps): React.ReactElement {
         </SettingsRow>
       </SettingsSection>
 
-      <section className={`${styles.stateSystem} state-system settings-state-system`}>
-        <div className={`${styles.sectionTitleRow} section-title-row`}>
-          <h2>状态组件预览</h2>
-          <span>Design System</span>
-        </div>
-        <div className={`${styles.stateGrid} state-grid`}>
-          <StatePanel
-            kind="empty"
-            label="空列表"
-            title="还没有云文档"
-            copy="创建第一份文档或从本地上传文件。"
-            actionLabel="新建文档"
-            onAction={() => props.onChangeSetting('action_state_empty', '新建文档')}
-          />
-          <StatePanel
-            kind="invalid"
-            label="无效状态"
-            title="链接已失效"
-            copy="该分享链接过期，或你没有访问权限。"
-            actionLabel="请求权限"
-            onAction={() => props.onChangeSetting('action_state_invalid', '请求权限')}
-          />
-          <StatePanel
-            kind="missing"
-            label="404"
-            title="页面不存在"
-            copy="该项目页可能已归档、删除或移动。"
-            actionLabel="返回项目"
-            onAction={() => props.onChangeSetting('action_state_missing', '返回项目')}
-          />
-        </div>
-      </section>
+      <StatePreviewSection onChangeSetting={props.onChangeSetting} />
     </>
   );
 }
