@@ -7,6 +7,17 @@ export {
 } from './AgentMarketViews';
 
 export {
+  AgentMarketToolbar,
+  MarketCard,
+  MarketFeaturedSection,
+  MarketTemplatesList,
+  SkillMarketToolbar,
+  SkillMarketSection,
+  McpMarketToolbar,
+  McpMarketSection,
+} from './AgentMarketParts';
+
+export {
   AgentInstalledView,
 } from './AgentInstalledViews';
 
