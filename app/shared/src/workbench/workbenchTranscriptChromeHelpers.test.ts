@@ -6,7 +6,9 @@ import {
   WORKBENCH_PULSE_MS,
   WORKBENCH_TOAST_MS,
   addIdIfMissing,
+  applySelectionHotkeyPlan,
   applyTranscriptChromeSideEffects,
+  beginSelectionHold,
   blockTitle,
   buildContextMenuState,
   buildPermissionApprovalDecision,
@@ -15,18 +17,34 @@ import {
   buildTranscriptMultiSelectActions,
   cardActionLabel,
   cardLinkForBlock,
+  clearPulseTimers,
+  clearTimeoutIfSet,
+  createEnterSelectionSnapshot,
+  createExitSelectionSnapshot,
+  createResetSelectionSnapshot,
   createSelectionHoldState,
+  createTranscriptChromeController,
+  disposeSelectionHoldRef,
+  disposeToastAndPulseTimers,
   isNestedInteractiveTarget,
   mergeUniqueIds,
   multiActionLabel,
+  planBeginHoldSelection,
+  planBlockPointerUp,
+  planBlockSelect,
   planContextAction,
   planMultiAction,
+  planSelectionHotkeyEffect,
   planTranscriptBlockAction,
+  planUpdateHoldSelection,
   removeIdFromList,
   resolveBlockTitleById,
   resolveQuoteText,
+  resolveSelectBarRectFromElement,
   resolveSelectionHotkey,
   resolveSelectionRangeIds,
+  schedulePulseTimer,
+  scheduleWorkbenchToastTimer,
   selectBarRectFromWorkspace,
   selectionHotkeyPreventsDefault,
   shouldBeginHoldSelection,
@@ -34,6 +52,7 @@ import {
   shouldHandleSelectionPointerUp,
   toggleIdInList,
   transcriptBlockIds,
+  writeClipboardText,
 } from './workbenchTranscriptChromeHelpers';
 
 const t = (key: string, options?: Record<string, unknown>) => (
@@ -506,5 +525,261 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(handlers.pulseBlock).toHaveBeenCalledWith('a');
     expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('done');
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
+  });
+
+  it('builds residual selection snapshots without undefined optionals', () => {
+    expect(createExitSelectionSnapshot()).toEqual({
+      selectionMode: false,
+      selectedBlockIds: [],
+    });
+    expect(createEnterSelectionSnapshot('b1')).toEqual({
+      selectionMode: true,
+      selectedBlockIds: ['b1'],
+    });
+    expect(createResetSelectionSnapshot()).toEqual({
+      contextMenu: null,
+      selectionMode: false,
+      selectedBlockIds: [],
+      actionedBlockIds: [],
+      softHiddenBlockIds: [],
+    });
+  });
+
+  it('plans residual block select/hold/pointer-up flows', () => {
+    const card = document.createElement('div');
+    document.body.append(card);
+    const transcript = [
+      textBlock({ id: 'a' }),
+      textBlock({ id: 'b' }),
+      textBlock({ id: 'c' }),
+    ];
+
+    expect(planBlockSelect('b', false, transcript, ['a'])).toEqual({
+      type: 'toggle',
+      blockId: 'b',
+    });
+    expect(planBlockSelect('c', true, transcript, ['a'])).toEqual({
+      type: 'range',
+      rangeIds: ['a', 'b', 'c'],
+    });
+    expect(planBlockSelect('missing', true, transcript, ['missing-2'])).toEqual({
+      type: 'toggle',
+      blockId: 'missing',
+    });
+
+    expect(planBeginHoldSelection('b1', {
+      button: 1,
+      target: card,
+      currentTarget: card,
+      shiftKey: false,
+      clientX: 1,
+      clientY: 2,
+    })).toEqual({ type: 'ignore' });
+    expect(planBeginHoldSelection('b1', {
+      button: 0,
+      target: card,
+      currentTarget: card,
+      shiftKey: false,
+      clientX: 1,
+      clientY: 2,
+    })).toEqual({
+      type: 'begin',
+      blockId: 'b1',
+      clientX: 1,
+      clientY: 2,
+      delayMs: SELECTION_HOLD_DELAY_MS,
+    });
+
+    expect(planUpdateHoldSelection(null, 0, 0)).toEqual({ type: 'noop' });
+    expect(planUpdateHoldSelection({ x: 0, y: 0 }, 0, 0)).toEqual({ type: 'noop' });
+    expect(planUpdateHoldSelection({ x: 0, y: 0 }, 100, 0)).toEqual({ type: 'cancel' });
+
+    expect(planBlockPointerUp('b1', {
+      suppressPointerUp: true,
+      selectionMode: true,
+      event: {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 0,
+        clientY: 0,
+      },
+    })).toEqual({ type: 'consumeSuppress' });
+    expect(planBlockPointerUp('b1', {
+      suppressPointerUp: false,
+      selectionMode: false,
+      event: {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: true,
+        clientX: 0,
+        clientY: 0,
+      },
+    })).toEqual({ type: 'noop' });
+    expect(planBlockPointerUp('b1', {
+      suppressPointerUp: false,
+      selectionMode: true,
+      event: {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: true,
+        clientX: 0,
+        clientY: 0,
+      },
+    })).toEqual({ type: 'select', blockId: 'b1', shiftKey: true });
+
+    card.remove();
+  });
+
+  it('disposes timers, schedules pulse/toast, and applies hotkey plans', () => {
+    vi.useFakeTimers();
+    const holdRef = {
+      current: createSelectionHoldState('b1', 1, 2, window.setTimeout(() => {}, 1000) as unknown as number),
+    };
+    disposeSelectionHoldRef(holdRef);
+    expect(holdRef.current).toBeNull();
+
+    const toastTimerRef = { current: null as number | null };
+    const pulseTimers = new Map<string, number>();
+    const onHide = vi.fn();
+    const onPulseEnd = vi.fn();
+    scheduleWorkbenchToastTimer(toastTimerRef, onHide, 50);
+    schedulePulseTimer(pulseTimers, 'b1', onPulseEnd, 50);
+    expect(toastTimerRef.current).not.toBeNull();
+    expect(pulseTimers.has('b1')).toBe(true);
+
+    vi.advanceTimersByTime(50);
+    expect(onHide).toHaveBeenCalledOnce();
+    expect(onPulseEnd).toHaveBeenCalledOnce();
+    expect(pulseTimers.has('b1')).toBe(false);
+
+    toastTimerRef.current = window.setTimeout(() => {}, 1000);
+    pulseTimers.set('x', window.setTimeout(() => {}, 1000));
+    disposeToastAndPulseTimers(toastTimerRef, { current: pulseTimers });
+    expect(toastTimerRef.current).toBeNull();
+    expect(pulseTimers.size).toBe(0);
+
+    clearTimeoutIfSet(null);
+    clearPulseTimers(new Map([['a', window.setTimeout(() => {}, 1000)]]));
+
+    const clearSelection = vi.fn();
+    const selectAll = vi.fn();
+    const runMultiAction = vi.fn();
+    const plan = planSelectionHotkeyEffect(
+      { key: 'Escape', ctrlKey: false, metaKey: false },
+      [textBlock({ id: 'a' })],
+    );
+    expect(plan).not.toBeNull();
+    if (plan) applySelectionHotkeyPlan(plan, { clearSelection, selectAll, runMultiAction });
+    expect(clearSelection).toHaveBeenCalledOnce();
+
+    const selectAllPlan = planSelectionHotkeyEffect(
+      { key: 'a', ctrlKey: true, metaKey: false },
+      [textBlock({ id: 'a' }), textBlock({ id: 'b' })],
+    );
+    if (selectAllPlan) {
+      applySelectionHotkeyPlan(selectAllPlan, { clearSelection, selectAll, runMultiAction });
+    }
+    expect(selectAll).toHaveBeenCalledWith(['a', 'b']);
+
+    const deletePlan = planSelectionHotkeyEffect(
+      { key: 'Delete', ctrlKey: false, metaKey: false },
+      [textBlock({ id: 'a' })],
+    );
+    if (deletePlan) {
+      applySelectionHotkeyPlan(deletePlan, { clearSelection, selectAll, runMultiAction });
+    }
+    expect(runMultiAction).toHaveBeenCalledWith('delete');
+
+    const holdStarted = vi.fn();
+    const holdRef2 = { current: null as ReturnType<typeof createSelectionHoldState> | null };
+    beginSelectionHold(holdRef2, {
+      type: 'begin',
+      blockId: 'b9',
+      clientX: 3,
+      clientY: 4,
+      delayMs: 20,
+    }, holdStarted);
+    expect(holdRef2.current?.blockId).toBe('b9');
+    vi.advanceTimersByTime(20);
+    expect(holdStarted).toHaveBeenCalledOnce();
+    expect(holdRef2.current).toBeNull();
+
+    const element = {
+      getBoundingClientRect: () => ({ left: 10, width: 200 } as DOMRect),
+    };
+    expect(resolveSelectBarRectFromElement(element)).toEqual({ left: 10, width: 200 });
+    expect(resolveSelectBarRectFromElement(null)).toBeNull();
+
+    writeClipboardText('clipboard-safe');
+    vi.useRealTimers();
+  });
+
+  it('creates a residual transcript chrome controller for selection/toast flows', () => {
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn((value: string[] | ((current: string[]) => string[])) => {
+        if (typeof value === 'function') value(['a']);
+      }),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+    };
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null as ((action: string) => void) | null },
+      toastTimerRef: { current: null as number | null },
+      pulseTimersRef: { current: new Map<string, number>() },
+    };
+    const controller = createTranscriptChromeController({
+      refs,
+      writers,
+      getTranscript: () => [textBlock({ id: 'a', text: 'Alpha' }), textBlock({ id: 'b', text: 'Beta' })],
+      getSelectedBlockIds: () => ['a'],
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    });
+
+    controller.showWorkbenchToast('hello');
+    expect(writers.setToastMessage).toHaveBeenCalledWith('hello');
+    expect(writers.setToastVisible).toHaveBeenCalledWith(true);
+
+    controller.exitSelection();
+    expect(writers.setSelectionMode).toHaveBeenCalledWith(false);
+    expect(writers.setSelectedBlockIds).toHaveBeenCalledWith([]);
+
+    controller.enterSelection('b');
+    expect(refs.selectionModeRef.current).toBe(true);
+    expect(writers.setSelectedBlockIds).toHaveBeenCalledWith(['b']);
+
+    controller.handleBlockSelect('b');
+    expect(writers.setSelectedBlockIds).toHaveBeenCalled();
+
+    controller.resetSelection();
+    expect(writers.setContextMenu).toHaveBeenCalledWith(null);
+
+    const multi = controller.multiSelectActions();
+    expect(multi.map((action) => action.label)).toContain('bar.selectAll');
+    expect(controller.contextMenuGroups('a').flat().map((item) => item.label)).toContain('context.copy');
+
+    controller.handleSelectionHotkey({
+      key: 'Escape',
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault: vi.fn(),
+    });
+    expect(writers.setSelectionMode).toHaveBeenCalledWith(false);
+
+    controller.disposeSelectionHold();
+    controller.disposeTimers();
   });
 });
