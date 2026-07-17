@@ -1,20 +1,21 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/session"
 )
 
-// SessionService is the subset of *service.SessionService used by SessionHandler.
+// SessionService is the subset of *session.Service used by SessionHandler.
+// DTOs live in service/session (#708 fifth IM typed-service package).
 type SessionService interface {
-	CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error)
-	CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error)
-	ListSessions(ctx context.Context, userID string) ([]service.SessionListItem, error)
+	CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error)
+	CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error)
+	ListSessions(ctx context.Context, userID string) ([]session.SessionListItem, error)
 	AddGroupMembers(ctx context.Context, currentUserID, sessionID string, memberIDs []string) error
 	RemoveGroupMember(ctx context.Context, currentUserID, sessionID, targetUserID string) error
 	LeaveGroup(ctx context.Context, currentUserID, sessionID string) error
@@ -23,7 +24,7 @@ type SessionService interface {
 	UpdateGroupInfo(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error
 	UpdateMemberSettings(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error
 	DeleteForMe(ctx context.Context, currentUserID, sessionID string) error
-	SearchSessions(ctx context.Context, userID, q string) ([]service.SessionListItem, error)
+	SearchSessions(ctx context.Context, userID, q string) ([]session.SessionListItem, error)
 }
 
 type SessionHandler struct {

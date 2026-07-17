@@ -23,6 +23,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
 
@@ -104,7 +105,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.AttachmentService = attachment.NewService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = contact.NewService(a.DB, a.bus, a.CacheClient)
-	a.SessionService = service.NewSessionService(a.DB, a.CacheClient, a.bus)
+	a.SessionService = session.NewService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.MessageReactionService = messagereaction.NewService(a.DB, a.bus)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)

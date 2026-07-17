@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/glebarez/sqlite"
@@ -679,7 +680,7 @@ func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
 
 	a := &App{
 		DB:             db,
-		SessionService: service.NewSessionService(db, nil, bus),
+		SessionService: session.NewService(db, nil, bus),
 		mgr:            mgr,
 		bus:            bus,
 	}
