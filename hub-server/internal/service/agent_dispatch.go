@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -22,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -99,14 +98,13 @@ type edgeRunResponse struct {
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Residual ports / composition cleanup (#617) after thin first seam (#563) and
-// redispatch residual (#573). Same-package only: narrow replaceable ports
-// (bus/outbox/cache/ws/relay), nil-safe publish + outbox wrappers, and Set*
-// injectors. Pure helpers (isLoopback / normalizeRuntimeAgentType /
+// Residual pure-helper extract (#732) after thin first seam (#563), redispatch
+// residual (#573), and residual ports (#617). Pure helpers live in
+// service/dispatch (isLoopback / normalizeRuntimeAgentType /
 // selectAgentInstance / mergeModelParams / promptFromMessage /
-// extractMessageText / mapSenderType) stay package-private in this file.
-// dispatchPayload stays package-private; no OpenAPI/handler/frontend; no
-// package move. Next residual = IM subpackages / optional outbox model move.
+// extractMessageText / mapSenderType) with thin same-package aliases below.
+// Orchestration + ports stay flat; dispatchPayload stays package-private;
+// no OpenAPI/handler/frontend; no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -145,8 +143,8 @@ type dispatchWS interface {
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
 // retries call in through Redispatcher; dispatchPayload stays package-private.
-// Same-package extract (#563 thin seam + #573 redispatch residual + #617 ports
-// residual) — not a package move.
+// Same-package extract (#563/#573/#617) + pure helpers in service/dispatch (#732)
+// — typed package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -337,95 +335,22 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	return runID
 }
 
-// isLoopback reports whether rawURL has a loopback hostname.
-// Uses url.Parse + net.ParseIP for accurate loopback detection — simple
-// substring matching (e.g. strings.Contains) is vulnerable to bypass via
-// domains like localhost.evil.com.
+// Thin aliases to service/dispatch pure helpers (#732). Keep same-package call
+// sites and existing tests stable without re-embedding helper bodies here.
 func isLoopback(rawURL string) bool {
-	u, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil {
-		return false
-	}
-	host := u.Hostname()
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return dispatch.IsLoopback(rawURL)
 }
 
 func normalizeRuntimeAgentType(agentType string) string {
-	key := strings.TrimSpace(strings.ToLower(agentType))
-	if key == "" {
-		return ""
-	}
-	if key == "claude" || strings.Contains(key, "claude-code") || strings.Contains(key, "claude") {
-		return "claude-code"
-	}
-	if strings.Contains(key, "opencode") {
-		return "opencode"
-	}
-	if strings.Contains(key, "codex") || strings.Contains(key, "gpt") {
-		return "codex"
-	}
-	return key
+	return dispatch.NormalizeRuntimeAgentType(agentType)
 }
 
 func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, targetAgentType, targetCustomAgentID string) (*model.AgentInstance, error) {
-	targetAgentInstanceID = strings.TrimSpace(targetAgentInstanceID)
-	targetAgentType = normalizeRuntimeAgentType(targetAgentType)
-	targetCustomAgentID = strings.TrimSpace(targetCustomAgentID)
-	targetRequested := targetAgentInstanceID != "" || targetAgentType != "" || targetCustomAgentID != ""
-
-	if len(agents) == 0 {
-		return nil, errcode.AgentNotFound
-	}
-	if !targetRequested {
-		return &agents[0], nil
-	}
-
-	for i := range agents {
-		agent := &agents[i]
-		if targetAgentInstanceID != "" && agent.ID != targetAgentInstanceID {
-			continue
-		}
-		if targetAgentType != "" && normalizeRuntimeAgentType(agent.AgentType) != targetAgentType {
-			continue
-		}
-		if targetCustomAgentID != "" && (agent.CustomAgentID == nil || *agent.CustomAgentID != targetCustomAgentID) {
-			continue
-		}
-		return agent, nil
-	}
-	return nil, errcode.AgentNotFound
+	return dispatch.SelectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
 }
 
 func mergeModelParams(base, override string) string {
-	base = strings.TrimSpace(base)
-	override = strings.TrimSpace(override)
-	if base == "" {
-		return override
-	}
-	if override == "" {
-		return base
-	}
-
-	var merged map[string]any
-	if err := json.Unmarshal([]byte(base), &merged); err != nil || merged == nil {
-		return override
-	}
-	var incoming map[string]any
-	if err := json.Unmarshal([]byte(override), &incoming); err != nil || incoming == nil {
-		return override
-	}
-	for key, value := range incoming {
-		merged[key] = value
-	}
-	data, err := json.Marshal(merged)
-	if err != nil {
-		return override
-	}
-	return string(data)
+	return dispatch.MergeModelParams(base, override)
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
@@ -547,19 +472,7 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 }
 
 func promptFromMessage(msg *model.Message) string {
-	if msg == nil {
-		return ""
-	}
-	switch msg.ContentType {
-	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
-		var payload struct {
-			Text string `json:"text"`
-		}
-		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && strings.TrimSpace(payload.Text) != "" {
-			return payload.Text
-		}
-	}
-	return msg.Content
+	return dispatch.PromptFromMessage(msg)
 }
 
 func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
@@ -789,34 +702,13 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 	return result
 }
 
-// extractMessageText extracts the human-readable text from a message's JSON content.
+// Thin aliases to service/dispatch pure helpers (#732).
 func extractMessageText(msg *model.Message) string {
-	if msg == nil {
-		return ""
-	}
-	switch msg.ContentType {
-	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
-		var payload struct {
-			Text string `json:"text"`
-		}
-		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && payload.Text != "" {
-			return payload.Text
-		}
-	}
-	// For non-text messages or unparseable content, just return raw content.
-	return msg.Content
+	return dispatch.ExtractMessageText(msg)
 }
 
-// mapSenderType maps Hub sender types to standard roles (user/assistant/system).
 func mapSenderType(t string) string {
-	switch t {
-	case model.SenderTypeAgent:
-		return "assistant"
-	case model.SenderTypeUser:
-		return "user"
-	default:
-		return t
-	}
+	return dispatch.MapSenderType(t)
 }
 
 func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
