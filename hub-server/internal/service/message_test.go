@@ -25,6 +25,35 @@ func (m *mockMsgCache) AllocateSeq(ctx context.Context, sessionID string) (int64
 	return m.seq, m.err
 }
 
+// recordingMsgBus is a messageBus test double that records Publish calls.
+type recordingMsgBus struct {
+	events []Event
+}
+
+func (b *recordingMsgBus) Publish(ctx context.Context, event Event) {
+	b.events = append(b.events, event)
+}
+
+func TestMessageService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &MessageService{db: nil, bus: nil, cacheClient: &mockMsgCache{seq: 1}}
+	// Must not panic when bus port is unset (read-only/partial construction).
+	svc.publish(context.Background(), Event{Type: "message.new", Payload: "x"})
+}
+
+func TestMessageService_SetBusAndSetCachePorts(t *testing.T) {
+	bus := &recordingMsgBus{}
+	cache := &mockMsgCache{seq: 9}
+	svc := NewMessageService(nil, nil, nil)
+	require.NotNil(t, svc)
+
+	svc.SetBus(bus)
+	svc.SetCache(cache)
+	svc.publish(context.Background(), Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
+
+	require.Len(t, bus.events, 1)
+	assert.Equal(t, "message.read", bus.events[0].Type)
+	assert.Equal(t, int64(9), cache.seq)
+}
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains from newMockDB)
 const (
