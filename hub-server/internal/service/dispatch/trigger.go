@@ -4,8 +4,45 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
+
+// NormalizeOptionalTargetID trims an optional execution-target id for validation.
+func NormalizeOptionalTargetID(targetID string) string {
+	return strings.TrimSpace(targetID)
+}
+
+// IsEmptyTargetID is true when no execution target was requested (validate no-op).
+func IsEmptyTargetID(targetID string) bool {
+	return strings.TrimSpace(targetID) == ""
+}
+
+// TriggerSessionDissolvedError returns SessionDissolved when the session is dissolved.
+func TriggerSessionDissolvedError(dissolved bool) error {
+	if dissolved {
+		return errcode.SessionDissolved
+	}
+	return nil
+}
+
+// TriggerAgentsAvailableError returns AgentNotFound when the inviter has no agents
+// or the list query failed (historical TriggerAgentTask error collapse).
+func TriggerAgentsAvailableError(listErr error, agentCount int) error {
+	if listErr != nil || agentCount == 0 {
+		return errcode.AgentNotFound
+	}
+	return nil
+}
+
+// TriggerMemberActiveError returns SessionNotMember when the inviter is not an
+// active session member.
+func TriggerMemberActiveError(active bool) error {
+	if !active {
+		return errcode.SessionNotMember
+	}
+	return nil
+}
 
 // ApplyValidatedTarget maps a validated TargetSnapshot onto trigger task fields.
 // When target is nil (no target requested / validation no-op), all returns are empty.
