@@ -150,7 +150,7 @@ describe('webPlatformMessageHelpers pure helpers', () => {
       mentions: [],
       attachments: [],
       approvalMode: 'suggest',
-      replyTo: { messageId: 'msg-prev', author: 'alice' },
+      replyTo: { messageId: 'msg-prev', author: 'alice', preview: 'prev text' },
     }, 'client-msg-1', '2026-06-07T00:00:00Z');
 
     expect(optimistic).toMatchObject({
