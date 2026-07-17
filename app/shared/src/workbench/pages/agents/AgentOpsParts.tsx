@@ -1,11 +1,20 @@
 import React from 'react';
-import {
-  DesignNavIcon,
-  DESIGN_NAV_ICON_SIZE,
-} from '../../designIcons';
-import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import styles from '../AgentsPage.module.css';
-import { permissionClass, riskClass } from './shared';
+import { auditEntryKey } from './AgentOpsHelpers';
+import {
+  AuditEntryRow,
+  AuditFilterChip,
+  CcSwitchCurrentProviders,
+  CcSwitchStatusBadge,
+  CcSwitchStatusGrid,
+  ModelCard,
+  ModelHealthRow,
+  ModelRouteRow,
+  PolicyApprovalCheck,
+  PolicyRuleRow,
+  ToolMatrixAgentRow,
+  ToolMatrixHead,
+} from './AgentOpsItemParts';
 import type {
   AuditEntry,
   CCSwitchProviderInfo,
@@ -21,6 +30,7 @@ import type {
    Shared ops-view presentational subpanels.
 
    Extracted from AgentOpsViews as Phase 23 residual thin #629.
+   Further residual thin: helpers + item parts (#684).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -34,27 +44,7 @@ export const PolicyMatrixSection: React.FC<{
     </div>
     <div className={styles['agent-rule-list']}>
       {policyRules.map((rule) => (
-        <button
-          key={rule.name}
-          className={`${styles['agent-rule-row']} agent-card`}
-          data-card-surface
-          type="button"
-        >
-          <span className={styles['rule-icon']}>
-            <DesignNavIcon
-              name={rule.riskLevel === '高风险' ? 'policy' : 'tools'}
-              size={DESIGN_NAV_ICON_SIZE}
-            />
-          </span>
-          <div>
-            <strong>{rule.name}</strong>
-            <small>{rule.description}</small>
-          </div>
-          <em className={styles[riskClass(rule.riskLevel)]}>
-            {rule.riskLevel}
-          </em>
-          <b>{rule.action}</b>
-        </button>
+        <PolicyRuleRow key={rule.name} rule={rule} />
       ))}
     </div>
   </section>
@@ -70,14 +60,13 @@ export const PolicyApprovalSection: React.FC<{
       <span>demo</span>
     </div>
     {checks.map((item, i) => (
-      <label key={i} className={styles['policy-check']}>
-        <input
-          type="checkbox"
-          checked={item.checked}
-          onChange={(e) => onApprovalToggle?.(i, e.target.checked)}
-        />
-        <span>{item.label}</span>
-      </label>
+      <PolicyApprovalCheck
+        key={i}
+        label={item.label}
+        checked={item.checked}
+        index={i}
+        onApprovalToggle={onApprovalToggle}
+      />
     ))}
     <div className={styles['policy-note']}>
       <strong>策略命中顺序</strong>
@@ -98,39 +87,13 @@ export const ToolPermissionMatrix: React.FC<{
       <span>{toolMatrixAgents.length} agents</span>
     </div>
     <div className={styles['tool-matrix']}>
-      <div className={styles['tool-matrix-head']}>
-        <span>Agent</span>
-        {toolMatrixTools.map((tool) => (
-          <span key={tool} className={styles['tool-head-cell']}>
-            <RuntimeBrandIcon kind="tool" name={tool} size="compact" framed={false} />
-            {tool}
-          </span>
-        ))}
-      </div>
+      <ToolMatrixHead tools={toolMatrixTools} />
       {toolMatrixAgents.map((agent) => (
-        <button
+        <ToolMatrixAgentRow
           key={agent.id}
-          className={styles['tool-matrix-row']}
-          type="button"
-        >
-          <span className={styles['tool-agent-cell']}>
-            <span
-              className={styles['agent-symbol']}
-              style={{ background: agent.color }}
-            >
-              {agent.initials}
-            </span>
-            <strong>{agent.name}</strong>
-          </span>
-          {toolMatrixTools.map((tool) => (
-            <em
-              key={tool}
-              className={styles[permissionClass(agent.permissions[tool] || '需确认')]}
-            >
-              {agent.permissions[tool] || '需确认'}
-            </em>
-          ))}
-        </button>
+          agent={agent}
+          tools={toolMatrixTools}
+        />
       ))}
     </div>
   </section>
@@ -160,55 +123,10 @@ export const CcSwitchStatusSection: React.FC<{
   <section className={styles['ccswitch-section']}>
     <div className={styles['section-title-row']}>
       <h2>cc-switch 透明代理</h2>
-      <span className={`${styles['ccswitch-badge']} ${ccSwitchStatus.routingActive ? styles.active : styles.inactive}`}>
-        {ccSwitchStatus.routingActive ? '已连接' : '未启用'}
-      </span>
+      <CcSwitchStatusBadge routingActive={ccSwitchStatus.routingActive} />
     </div>
-    <div className={styles['ccswitch-status-grid']}>
-      <div className={styles['ccswitch-status-row']}>
-        <span>安装状态</span>
-        <strong>{ccSwitchStatus.installed ? '已安装' : '未检测到'}</strong>
-      </div>
-      <div className={styles['ccswitch-status-row']}>
-        <span>路由状态</span>
-        <strong>{ccSwitchStatus.routingActive ? '活跃' : '未启用'}</strong>
-      </div>
-      {ccSwitchStatus.proxyPort ? (
-        <div className={styles['ccswitch-status-row']}>
-          <span>代理端口</span>
-          <strong>{ccSwitchStatus.proxyPort}</strong>
-        </div>
-      ) : null}
-      {ccSwitchStatus.activeAppTypes?.length ? (
-        <div className={styles['ccswitch-status-row']}>
-          <span>活跃应用</span>
-          <strong>{ccSwitchStatus.activeAppTypes.join(', ')}</strong>
-        </div>
-      ) : null}
-    </div>
-    {ccSwitchProviders.filter((p) => p.isCurrent).map((provider) => (
-      <div key={provider.providerId} className={styles['ccswitch-provider']}>
-        <div className={styles['section-title-row']}>
-          <h3>{provider.providerName}</h3>
-          <span>current provider</span>
-        </div>
-        {provider.modelAliases && Object.keys(provider.modelAliases).length > 0 ? (
-          <div className={styles['ccswitch-alias-grid']}>
-            {Object.entries(provider.modelAliases)
-              .filter(([key]) => !key.endsWith('_name'))
-              .map(([alias, resolved]) => (
-                <div key={alias} className={styles['ccswitch-alias-row']}>
-                  <span>{alias}</span>
-                  <em>&rarr;</em>
-                  <strong>{resolved}</strong>
-                </div>
-              ))}
-          </div>
-        ) : (
-          <p className={styles['ccswitch-no-aliases']}>当前 Provider 无模型别名映射</p>
-        )}
-      </div>
-    ))}
+    <CcSwitchStatusGrid status={ccSwitchStatus} />
+    <CcSwitchCurrentProviders providers={ccSwitchProviders} />
   </section>
 );
 
@@ -217,15 +135,7 @@ export const ModelCardsGrid: React.FC<{
 }> = ({ models }) => (
   <div className={styles['model-grid']}>
     {models.map((model) => (
-      <article key={model.name} className={`${styles['model-card']} agent-card`} data-card-surface>
-        <RuntimeBrandIcon kind="model" name={model.name} size="large" />
-        <div>
-          <h2>{model.name}</h2>
-          <p>{model.description}</p>
-          <small>{model.assignedAgents}</small>
-        </div>
-        <span className={styles['model-state']}>{model.state}</span>
-      </article>
+      <ModelCard key={model.name} model={model} />
     ))}
   </div>
 );
@@ -240,27 +150,11 @@ export const ModelRoutingSection: React.FC<{
       <span>priority</span>
     </div>
     {modelRoutes.map((route) => (
-      <button
+      <ModelRouteRow
         key={route.agentId}
-        className={styles['model-route-row']}
-        type="button"
-        onClick={() => onModelRouteClick?.(route.agentId)}
-      >
-        <span
-          className={styles['agent-symbol']}
-          style={{ background: route.agentColor }}
-        >
-          {route.agentInitials}
-        </span>
-        <div>
-          <strong>{route.agentName}</strong>
-          <small>
-            {route.role} · {route.mode}
-          </small>
-        </div>
-        <RuntimeBrandIcon kind="model" name={route.model} size="compact" framed={false} />
-        <em>{route.model}</em>
-      </button>
+        route={route}
+        onModelRouteClick={onModelRouteClick}
+      />
     ))}
   </section>
 );
@@ -274,12 +168,7 @@ export const ModelHealthSection: React.FC<{
       <span>mock</span>
     </div>
     {modelHealthRows.map((row) => (
-      <div key={row.name} className={styles['model-health-row']}>
-        <RuntimeBrandIcon kind="model" name={row.name} size="compact" framed={false} />
-        <strong>{row.name}</strong>
-        <span>{row.status}</span>
-        <em>{row.meta}</em>
-      </div>
+      <ModelHealthRow key={row.name} row={row} />
     ))}
   </section>
 );
@@ -291,14 +180,12 @@ export const AuditFilterBar: React.FC<{
 }> = ({ filters, activeAuditFilter, onAuditFilterChange }) => (
   <div className={styles['audit-filter-bar']}>
     {filters.map((filter) => (
-      <button
+      <AuditFilterChip
         key={filter}
-        className={`${activeAuditFilter === filter ? styles.active : ''}`}
-        type="button"
-        onClick={() => onAuditFilterChange?.(filter)}
-      >
-        {filter}
-      </button>
+        filter={filter}
+        active={activeAuditFilter === filter}
+        onAuditFilterChange={onAuditFilterChange}
+      />
     ))}
   </div>
 );
@@ -315,19 +202,7 @@ export const AuditEntriesSection: React.FC<{
       <span>目标</span>
     </div>
     {auditEntries.map((entry, i) => (
-      <button
-        key={`${entry.time}-${entry.agent}-${entry.tool}-${i}`}
-        className={styles['audit-row']}
-        type="button"
-      >
-        <time>{entry.time}</time>
-        <strong>{entry.agent}</strong>
-        <span>{entry.tool}</span>
-        <em className={styles[permissionClass(entry.result)]}>
-          {entry.result}
-        </em>
-        <small>{entry.target}</small>
-      </button>
+      <AuditEntryRow key={auditEntryKey(entry, i)} entry={entry} />
     ))}
   </section>
 );
