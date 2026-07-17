@@ -18,6 +18,54 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
+// mockContactCache implements contactCache for testing.
+type mockContactCache struct {
+	invalidated []string
+	online      map[string]bool
+}
+
+func (m *mockContactCache) Invalidate(ctx context.Context, keys ...string) error {
+	m.invalidated = append(m.invalidated, keys...)
+	return nil
+}
+
+func (m *mockContactCache) IsOnline(ctx context.Context, userID string) (bool, error) {
+	if m.online == nil {
+		return false, nil
+	}
+	return m.online[userID], nil
+}
+
+// recordingContactBus is a contactBus test double that records Publish calls.
+type recordingContactBus struct {
+	events []Event
+}
+
+func (b *recordingContactBus) Publish(ctx context.Context, event Event) {
+	b.events = append(b.events, event)
+}
+
+func TestContactService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &ContactService{db: nil, bus: nil, cacheClient: &mockContactCache{}}
+	// Must not panic when bus port is unset (read-only/partial construction).
+	svc.publish(context.Background(), Event{Type: "friend.request", Payload: "x"})
+}
+
+func TestContactService_SetBusAndSetCachePorts(t *testing.T) {
+	bus := &recordingContactBus{}
+	cache := &mockContactCache{}
+	svc := NewContactService(nil, nil, nil)
+	require.NotNil(t, svc)
+
+	svc.SetBus(bus)
+	svc.SetCache(cache)
+	svc.publish(context.Background(), Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
+
+	require.Len(t, bus.events, 1)
+	assert.Equal(t, "friend.accepted", bus.events[0].Type)
+	require.NotNil(t, svc.cacheClient)
+}
+
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains)
 const (
 	sqlcUserByID          = `FROM "users" WHERE id =`
