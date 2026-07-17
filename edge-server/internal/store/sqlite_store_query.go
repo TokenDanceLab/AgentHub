@@ -435,3 +435,209 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
+
+// isBlankSQLiteSnapshotPayload reports whether a legacy snapshot payload is empty.
+func isBlankSQLiteSnapshotPayload(payload string) bool {
+	return strings.TrimSpace(payload) == ""
+}
+
+// decodeSQLiteSnapshotPayload decodes a full fileSnapshot JSON blob and rejects trailing data.
+func decodeSQLiteSnapshotPayload(payload string) (fileSnapshot, error) {
+	var snapshot fileSnapshot
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	if err := decoder.Decode(&snapshot); err != nil {
+		return fileSnapshot{}, err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return fileSnapshot{}, errors.New("trailing data")
+	}
+	return snapshot, nil
+}
+
+// encodeSQLiteSnapshotPayload marshals a snapshot for the agenthub_store_snapshots table.
+func encodeSQLiteSnapshotPayload(snapshot fileSnapshot) ([]byte, error) {
+	return json.Marshal(snapshot)
+}
+
+// buildJSONPayloadMap marshals each map value to a JSON string keyed by id.
+// Marshal errors are ignored to preserve the previous projection delta behavior.
+func buildJSONPayloadMap[V any](items map[string]V) map[string]string {
+	result := make(map[string]string, len(items))
+	for id, value := range items {
+		payload, _ := json.Marshal(value)
+		result[id] = string(payload)
+	}
+	return result
+}
+
+// workspaceProjectionWrite holds pure columns for an edge_workspaces upsert.
+type workspaceProjectionWrite struct {
+	WorkspaceID string
+	LocalPath   string
+	Name        string
+	Status      string
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+// prepareWorkspaceProjectionWrite decodes a project payload into projection columns.
+// skip is true when the project has no ID and should not be written.
+func prepareWorkspaceProjectionWrite(payload, now string) (workspaceProjectionWrite, bool, error) {
+	var proj Project
+	if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+		return workspaceProjectionWrite{}, false, err
+	}
+	if proj.ID == "" {
+		return workspaceProjectionWrite{}, true, nil
+	}
+	createdAt := firstNonEmpty(proj.CreatedAt, now)
+	return workspaceProjectionWrite{
+		WorkspaceID: proj.ID,
+		LocalPath:   proj.ID,
+		Name:        firstNonEmpty(proj.Name, proj.ID),
+		Status:      firstNonEmpty(proj.Status, "active"),
+		CreatedAt:   createdAt,
+		UpdatedAt:   firstNonEmpty(proj.UpdatedAt, createdAt),
+	}, false, nil
+}
+
+// runProjectionWrite holds pure columns for an edge_runs upsert.
+type runProjectionWrite struct {
+	RunID       string
+	WorkspaceID string
+	ThreadID    any
+	Status      string
+	CreatedAt   string
+	StartedAt   any
+	FinishedAt  any
+}
+
+// prepareRunProjectionWrite decodes a run payload into projection columns.
+// skip is true when the run lacks required IDs or its project is missing from newSnapshot.
+func prepareRunProjectionWrite(payload string, projects map[string]Project, now string) (runProjectionWrite, bool, error) {
+	var run Run
+	if err := json.Unmarshal([]byte(payload), &run); err != nil {
+		return runProjectionWrite{}, false, err
+	}
+	if run.ID == "" || run.ProjectID == "" {
+		return runProjectionWrite{}, true, nil
+	}
+	if _, ok := projects[run.ProjectID]; !ok {
+		return runProjectionWrite{}, true, nil
+	}
+	return runProjectionWrite{
+		RunID:       run.ID,
+		WorkspaceID: run.ProjectID,
+		ThreadID:    nullString(run.ThreadID),
+		Status:      firstNonEmpty(run.Status, "queued"),
+		CreatedAt:   firstNonEmpty(run.CreatedAt, now),
+		StartedAt:   nullString(run.StartedAt),
+		FinishedAt:  nullString(run.FinishedAt),
+	}, false, nil
+}
+
+// artifactProjectionWrite holds pure columns for an edge_artifacts upsert.
+type artifactProjectionWrite struct {
+	ArtifactID            string
+	WorkspaceID           string
+	RunID                 string
+	Kind                  string
+	Path                  string
+	CreatedAt             string
+	UpdatedAt             string
+	MetadataJSON          string
+	ContentSourceKind     string
+	ContentSourcePath     string
+	ContentSourceReadable int
+}
+
+// prepareArtifactProjectionWrite decodes an artifactProjection payload into write columns.
+func prepareArtifactProjectionWrite(payload, now string) (artifactProjectionWrite, bool, error) {
+	var proj artifactProjection
+	if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+		return artifactProjectionWrite{}, false, err
+	}
+	if proj.ArtifactID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+		return artifactProjectionWrite{}, true, nil
+	}
+	createdAt := firstNonEmpty(proj.CreatedAt, now)
+	return artifactProjectionWrite{
+		ArtifactID:            proj.ArtifactID,
+		WorkspaceID:           proj.WorkspaceID,
+		RunID:                 proj.RunID,
+		Kind:                  firstNonEmpty(proj.Kind, "file"),
+		Path:                  proj.Path,
+		CreatedAt:             createdAt,
+		UpdatedAt:             firstNonEmpty(proj.UpdatedAt, createdAt),
+		MetadataJSON:          proj.MetadataJSON,
+		ContentSourceKind:     proj.ContentSourceKind,
+		ContentSourcePath:     proj.ContentSourcePath,
+		ContentSourceReadable: proj.ContentSourceReadable,
+	}, false, nil
+}
+
+// diffProjectionWrite holds pure columns for an edge_diffs upsert.
+type diffProjectionWrite struct {
+	DiffID      string
+	WorkspaceID string
+	RunID       string
+	SummaryJSON string
+	PatchPath   string
+	Status      string
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+// prepareDiffProjectionWrite decodes a diffProjection payload into write columns.
+func prepareDiffProjectionWrite(payload, now string) (diffProjectionWrite, bool, error) {
+	var proj diffProjection
+	if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+		return diffProjectionWrite{}, false, err
+	}
+	if proj.DiffID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+		return diffProjectionWrite{}, true, nil
+	}
+	createdAt := firstNonEmpty(proj.CreatedAt, now)
+	return diffProjectionWrite{
+		DiffID:      proj.DiffID,
+		WorkspaceID: proj.WorkspaceID,
+		RunID:       proj.RunID,
+		SummaryJSON: proj.SummaryJSON,
+		PatchPath:   proj.PatchPath,
+		Status:      firstNonEmpty(proj.Status, "modified"),
+		CreatedAt:   createdAt,
+		UpdatedAt:   firstNonEmpty(proj.UpdatedAt, createdAt),
+	}, false, nil
+}
+
+// previewProjectionWrite holds pure columns for an edge_previews upsert.
+type previewProjectionWrite struct {
+	PreviewID   string
+	WorkspaceID string
+	RunID       string
+	URL         string
+	Status      string
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+// preparePreviewProjectionWrite decodes a previewProjection payload into write columns.
+func preparePreviewProjectionWrite(payload, now string) (previewProjectionWrite, bool, error) {
+	var proj previewProjection
+	if err := json.Unmarshal([]byte(payload), &proj); err != nil {
+		return previewProjectionWrite{}, false, err
+	}
+	if proj.PreviewID == "" || proj.RunID == "" || proj.WorkspaceID == "" {
+		return previewProjectionWrite{}, true, nil
+	}
+	createdAt := firstNonEmpty(proj.CreatedAt, now)
+	return previewProjectionWrite{
+		PreviewID:   proj.PreviewID,
+		WorkspaceID: proj.WorkspaceID,
+		RunID:       proj.RunID,
+		URL:         proj.URL,
+		Status:      firstNonEmpty(proj.Status, "created"),
+		CreatedAt:   createdAt,
+		UpdatedAt:   firstNonEmpty(proj.UpdatedAt, createdAt),
+	}, false, nil
+}
