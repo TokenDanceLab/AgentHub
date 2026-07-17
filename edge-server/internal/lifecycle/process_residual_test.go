@@ -2,9 +2,11 @@ package lifecycle
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -165,6 +167,65 @@ func TestSubAgentErrorAndQueuePayload(t *testing.T) {
 	q2 := subAgentResultQueuePayload("run_1", "finished", "a1", "worker", "ok", "")
 	if q2["_sanitized"] != false {
 		t.Fatalf("unsanitized %#v", q2)
+	}
+}
+
+func TestAggregatorOutput(t *testing.T) {
+	t.Parallel()
+	raw := "secret raw"
+	sanitized := "redacted"
+	if got := aggregatorOutput(raw, sanitized, ""); got != raw {
+		t.Fatalf("unchanged reason -> %v, want raw", got)
+	}
+	if got := aggregatorOutput(raw, sanitized, "api-keys-redacted"); got != sanitized {
+		t.Fatalf("with reason -> %v, want sanitized", got)
+	}
+}
+
+func TestNewSubAgentInstance(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 18, 1, 2, 3, 0, time.UTC)
+	task := adapters.SubAgentTask{AgentID: "worker", Depth: 2}
+	inst := newSubAgentInstance("run_parent", "agent_child", "run_child", "th_child", task, now)
+	if inst == nil {
+		t.Fatal("expected instance")
+	}
+	if inst.ID != "agent_child" || inst.Name != "worker" || inst.AdapterID != "worker" {
+		t.Fatalf("ids %#v", inst)
+	}
+	if inst.Role != "sub-agent" || inst.Status != agents.StatusIdle {
+		t.Fatalf("role/status %#v", inst)
+	}
+	if inst.RunID != "run_child" || inst.ThreadID != "th_child" || inst.ParentID != "run_parent" {
+		t.Fatalf("linkage %#v", inst)
+	}
+	if inst.Depth != 2 || inst.AgentPath != "/run_parent/agent_child" {
+		t.Fatalf("depth/path %#v", inst)
+	}
+	if !inst.CreatedAt.Equal(now) || !inst.LastSeen.Equal(now) {
+		t.Fatalf("timestamps created=%v last=%v", inst.CreatedAt, inst.LastSeen)
+	}
+}
+
+func TestSanitizeHubStreamText(t *testing.T) {
+	t.Parallel()
+	if got := sanitizeHubStreamText(""); got != "" {
+		t.Fatalf("empty -> %q", got)
+	}
+	pathy := "working in D:/Code/TokenDance/AgentHub/README.md"
+	if got := sanitizeHubStreamText(pathy); got != pathy {
+		t.Fatalf("paths should remain: %q", got)
+	}
+	leaky := "token sk-abcdefghijklmnopqrstuvwxyz0123456789 and path D:/Code/TokenDance/x"
+	got := sanitizeHubStreamText(leaky)
+	if got == leaky {
+		t.Fatal("expected api key redaction")
+	}
+	if !strings.Contains(got, "[redacted:api-key]") {
+		t.Fatalf("missing redaction marker: %q", got)
+	}
+	if !strings.Contains(got, "D:/Code/TokenDance/x") {
+		t.Fatalf("path should remain in hub stream: %q", got)
 	}
 }
 

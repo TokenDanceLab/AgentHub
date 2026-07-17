@@ -92,6 +92,16 @@ func recursiveSanitizeString(s string) (string, string) {
 	return s, strings.Join(reasons, ",")
 }
 
+// sanitizeHubStreamText redacts API keys / tokens from Hub TaskStream text.
+// Unlike recursiveSanitizeString, it deliberately does not redact file paths
+// or stack traces so streamed workdir paths remain useful in Hub chat.
+func sanitizeHubStreamText(s string) string {
+	if s == "" || !reAPIKey.MatchString(s) {
+		return s
+	}
+	return reAPIKey.ReplaceAllString(s, "[redacted:api-key]")
+}
+
 // SanitizeSubAgentResult sanitizes a sub-agent result payload before it enters
 // the message queue. It applies the following transformations:
 //

@@ -43,6 +43,7 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 }
 
 func (e *ProcessExecutor) recordHubOutput(runID, text string) {
+	text = sanitizeHubStreamText(text)
 	if text == "" {
 		return
 	}
@@ -56,6 +57,7 @@ func (e *ProcessExecutor) recordHubOutput(runID, text string) {
 }
 
 func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
+	text = sanitizeHubStreamText(text)
 	if text == "" {
 		return
 	}
@@ -80,8 +82,14 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 
 // fireHubStream sends a TaskStream callback to Hub for visible runtime output.
 // Errors are logged but never block the run lifecycle.
+// Content is API-key-sanitized at this chokepoint so both raw stdout and
+// structured hub emitter paths share one sink without control-flow rewrites.
 func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 	if e.hubCallback == nil || content == "" {
+		return
+	}
+	content = sanitizeHubStreamText(content)
+	if content == "" {
 		return
 	}
 	taskID := e.hubTaskID(runID)
