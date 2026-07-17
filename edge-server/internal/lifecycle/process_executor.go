@@ -335,7 +335,15 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 }
 
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
-	defer e.finish(run.ID)
+	// terminalFinish is true unless this attempt hands off to a fault-escalation
+	// successor. The deferred finish must not tear down the concurrency slot the
+	// successor just re-registered (see #867).
+	terminalFinish := true
+	defer func() {
+		if terminalFinish {
+			e.finish(run.ID)
+		}
+	}()
 
 	// Store Hub task ID for Edge→Hub direct callback reporting
 	if runCtx.HubTaskID != "" {
@@ -411,6 +419,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// generate a fresh random session ID and retry once. This handles the case where
 	// a stale CC process from a previous Edge instance still holds the session lock.
 	var lastWaitErr error
+	var lastOutStore *runnerctx.RunOutputStore
 	for attempt := 0; attempt < maxSessionRetries; attempt++ {
 		var cmdPath string
 		var args, env []string
@@ -600,6 +609,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// transient "file already closed" read errors.
 		wg.Wait()
 		lastWaitErr = cmd.Wait()
+		lastOutStore = outStore
 		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
 
 		// Context budget compaction check: after the stream completes, evaluate
@@ -660,11 +670,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			continue
 		}
 
-		// Not retrying — process the final result.
+		// Wait error is not a session-conflict retry. Leave the session-retry
+		// loop so fault-escalation can re-launch the run when configured.
+		// Terminal publishFailed happens after the escalation check below.
 		if lastWaitErr != nil {
-			e.publishFailed(run, errorWithRunOutput(lastWaitErr, outStore))
-			e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
-			return
+			break
 		}
 		// #179: handle structured output parse errors with recoverability distinction.
 		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
@@ -716,23 +726,32 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 
-	// Exhausted retries — attempt fault escalation if configured.
+	// Exhausted session retries — attempt fault escalation if configured.
 	if lastWaitErr != nil && e.faultEscalationCfg.Enabled && e.faultEscalationCfg.MaxRetries > 0 {
 		r, ok := e.store.GetRun(run.ID)
 		if ok && r.RetryCount < e.faultEscalationCfg.MaxRetries {
 			newCount := r.RetryCount + 1
 			e.store.SetRunRetryCount(run.ID, newCount)
 			run.RetryCount = newCount
-			if _, ok2 := e.store.SetRunStatusIf(run.ID, "queued", "failed"); ok2 {
+			// Re-queue from started (normal wait failure) or failed (defensive).
+			if _, ok2 := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok2 {
 				run.Status = "queued"
 			}
-			// Clean up process tracking.
+			// Attempt-local cleanup only — leave concurrency slot / hub bookkeeping
+			// for the successor attempt. Terminal finish is owned by the successor.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
 			if s, ok3 := e.runOutputs[run.ID]; ok3 {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
+			// Re-register the cancel func before releasing the slot ownership so
+			// Cancel() and max-concurrent accounting stay consistent across handoff.
+			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
+			if oldCancel, ok4 := e.running[run.ID]; ok4 {
+				oldCancel()
+			}
+			e.running[run.ID] = cancel
 			e.mu.Unlock()
 			e.bus.Publish("run.fault_escalation.retry", runScope(run),
 				faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
@@ -741,14 +760,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 				"retryCount", newCount,
 				"maxRetries", e.faultEscalationCfg.MaxRetries,
 			)
-			// Create fresh context and retry from Start().
-			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
-			e.mu.Lock()
-			if oldCancel, ok4 := e.running[run.ID]; ok4 {
-				oldCancel()
-			}
-			e.running[run.ID] = cancel
-			e.mu.Unlock()
+			terminalFinish = false
 			go e.run(newCtx, run, runCtx)
 			return
 		}
@@ -757,9 +769,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
 		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
 	}
-	// Report the last error.
+	// Report the last error (terminal failure after retries exhausted or disabled).
 	if lastWaitErr != nil {
-		e.publishFailed(run, errorWithRunOutput(lastWaitErr, nil))
+		e.publishFailed(run, errorWithRunOutput(lastWaitErr, lastOutStore))
 		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 	}
 }
