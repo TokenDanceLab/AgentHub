@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/im"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
@@ -65,6 +65,9 @@ type WorkspaceThreadMessage struct {
 }
 
 // WorkspaceService exposes Web-owned project CRUD backed by Hub workspaces.
+// #639: pure thread-message content normalize helpers live in service/im;
+// WorkspaceService keeps thin aliases for same-package call sites. No bus/cache
+// ports yet (service is DB-only); typed package move remains deferred.
 type WorkspaceService struct {
 	db *gorm.DB
 }
@@ -226,7 +229,7 @@ func (s *WorkspaceService) CreateThreadMessage(ctx context.Context, projectID, t
 	if contentType == "" {
 		contentType = model.ContentTypeText
 	}
-	if !validContentTypes[contentType] {
+	if !im.IsValidContentType(contentType) {
 		return nil, errcode.ErrBadRequest
 	}
 	content, err := normalizeWorkspaceThreadMessageContent(contentType, req.Content)
@@ -342,34 +345,8 @@ func workspaceThreadMessageFromModel(msg model.Message, projectID, threadID stri
 	}
 }
 
+// normalizeWorkspaceThreadMessageContent is a thin alias to
+// im.NormalizeWorkspaceThreadMessageContent.
 func normalizeWorkspaceThreadMessageContent(contentType, content string) (string, error) {
-	if contentType != model.ContentTypeText {
-		return normalizeMessageContent(contentType, content)
-	}
-	if normalized, ok, err := normalizeStructuredTextContent(content); ok || err != nil {
-		return normalized, err
-	}
-	normalized, err := json.Marshal(map[string]string{"text": content})
-	if err != nil {
-		return "", err
-	}
-	return string(normalized), nil
-}
-
-func normalizeStructuredTextContent(content string) (string, bool, error) {
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(content), &payload); err != nil {
-		return "", false, nil
-	}
-	text, ok := payload["text"].(string)
-	if !ok || strings.TrimSpace(text) == "" {
-		return "", true, errcode.ErrBadRequest
-	}
-	if metadata, exists := payload["metadata"]; exists {
-		if _, ok := metadata.(map[string]any); !ok {
-			return "", true, errcode.ErrBadRequest
-		}
-	}
-	normalized, err := json.Marshal(payload)
-	return string(normalized), true, err
+	return im.NormalizeWorkspaceThreadMessageContent(contentType, content)
 }
