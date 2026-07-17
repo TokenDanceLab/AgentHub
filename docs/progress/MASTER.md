@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-18
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43 · [#882](https://github.com/TokenDanceLab/AgentHub/pull/882)–[#886](https://github.com/TokenDanceLab/AgentHub/pull/886) Phase 44
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 44 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 65 --state open`
-- **Labels**: `spec-driven` · `phase:44`
+- **Phase 45 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 66 --state open`
+- **Labels**: `spec-driven` · `phase:45`
 
 ## References
 
@@ -48,7 +48,8 @@
 | 41 | Residual polish continue | #62 | closed (PRs #844–#851) |
 | 42 | Security gates + residual polish | #63 | closed (PRs #858–#864) |
 | 43 | Delivery/executor stability + residual | #64 | closed (PRs #871–#875) |
-| 44 | Security residual + design system + mobile auth | #65 | active (#876–#881) |
+| 44 | Security residual + design system + mobile auth | #65 | closed (PRs #882–#886) |
+| 45 | Auth residual + residual polish | #66 | active (#887–#892) |
 
 ## Issue Mapping (summary)
 
@@ -63,13 +64,14 @@
 | #832–#843 Phase 41 residual polish continue | closed (PRs #844–#851; #837/#843 hygiene ops-only) |
 | #852–#857 Phase 42 security gates + residual polish | closed (PRs #858–#864; #857 hygiene ops-only) |
 | #865–#870 Phase 43 delivery/executor stability + residual | closed (PRs #871–#875; #870 hygiene ops-only) |
-| #876–#881 Phase 44 security residual + design + mobile auth | open (milestone 65) |
+| #876–#881 Phase 44 security residual + design + mobile auth | closed (PRs #882–#886; #881 hygiene ops-only) |
+| #887–#892 Phase 45 auth residual + residual polish | open (milestone 66) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=65) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 65 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=66) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 66 --state open
 git worktree list
 ```
 
@@ -84,25 +86,26 @@ git worktree list
 - [x] Phase 41 residual polish continue (#832–#843 / PRs #844–#851)
 - [x] Phase 42 security gates + residual polish (#852–#857 / PRs #858–#864)
 - [x] Phase 43 delivery/executor stability + residual (#865–#870 / PRs #871–#875)
-- [ ] Phase 44 security residual + design system + mobile auth (#876–#881)
+- [x] Phase 44 security residual + design system + mobile auth (#876–#881 / PRs #882–#886)
+- [ ] Phase 45 auth residual + residual polish (#887–#892)
 
 ## Current Status
 
-**Active Phase**: Phase 44 — Security residual + design system + mobile auth (milestone 65)
-**Active Tasks**: #876 MASTER · #877 Edge CORS capability header P1 · #878 ownership fail-closed P1 · #879 desktop design tokens P1 · #880 mobile WS token race P1 · #881 hygiene
+**Active Phase**: Phase 45 — Auth residual + residual polish (milestone 66)
+**Active Tasks**: #887 MASTER · #888 access JWT jti + logout blacklist P1 · #889 WS RequireHubSession gate P1 · #890 sqlite_store residual · #891 process_executor residual · #892 hygiene
 **Blockers**: None
-**Stability note**: Partial 16-agent review (security-auth / design-system / mobile-rn) — Edge CORS allow `X-AgentHub-Capability` (#877); ownership fail-closed when userID empty (#878); desktop FileExplorer + EntryGate token SSOT (#879); mobile RN WS `access_token` + hubClient token race (#880)
+**Stability note**: Partial 16-agent review (security-auth) — access JWT mint `jti` + logout blacklist (#888); WS upgrade apply RequireHubSession purpose/device gate (#889); residual pure peels sqlite_store (#890) + process_executor (#891)
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: c86b74c6 on `master` (Phase 43 PR #871–#875 line)
-**Residual after P43**: process_executor / store / hubClient / delivery_outbox / orchestrator_failure — P0s landed; next is security residual + design/mobile
-**Boundary map next residual**: Edge CORS capability / ownership fail-closed / desktop design tokens / mobile WS token race
+**Tip**: d94c8344 on `master` (Phase 44 PR #882–#886 line)
+**Residual after P44**: process_executor ~1235 · sqlite_store ~1178 · hubClient / delivery_outbox / orchestrator_failure — auth residual next
+**Boundary map next residual**: access JWT jti blacklist / WS hub-session gate / sqlite_store pure helpers / process_executor pure peel
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
 
-1. Land Phase 44 issues under milestone 65 (issue-bound Workflows)
+1. Land Phase 45 issues under milestone 66 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #877 CORS P1 · #878 ownership fail-closed P1 · #879 design tokens · #880 mobile token race
+3. Prefer #888 access jti blacklist P1 · #889 WS hub-session gate P1 · #890 sqlite_store residual · #891 PE residual
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -111,9 +114,9 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | Phase 42–43 closed; Phase 44 security/design/mobile active |
+| 2026-07-18 | lead | Phase 42–44 closed; Phase 45 auth residual active |
 
 ## Completion notes
 
-- Phase 43 closed via #871–#875 (MASTER / outbox redispatch→sent P0 / PE escalation-finish P0 / desktop done-fail-ack P1 / store residual; #870 hygiene ops-only). Tip ~c86b74c6.
-- Phase 44 targets: MASTER sync, Edge CORS capability header P1, ownership fail-closed P1, desktop design token SSOT, mobile WS access_token + hubClient race, hygiene.
+- Phase 44 closed via #882–#886 (MASTER / Edge CORS capability header P1 / ownership fail-closed P1 / desktop design tokens P1 / mobile WS token race P1; #881 hygiene ops-only). Tip ~d94c8344.
+- Phase 45 targets: MASTER sync, access JWT jti + logout blacklist P1, WS RequireHubSession gate P1, sqlite_store residual, process_executor residual, hygiene.
