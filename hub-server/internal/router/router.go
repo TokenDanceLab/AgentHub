@@ -71,7 +71,9 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	client := r.Group("/client")
 	{
-		client.GET("/ws", middleware.WSIPRateLimit(), middleware.WSAuthMiddleware(cfg), wsHandler.ServeWS)
+		// WS upgrade: IP rate limit + JWT parse + shared hub-session purpose/device gate
+		// (WSAuthMiddleware embeds RequireHubSession policy; chain is belt-and-suspenders).
+		client.GET("/ws", middleware.WSIPRateLimit(), middleware.WSAuthMiddleware(cfg), middleware.RequireHubSession(), wsHandler.ServeWS)
 
 		auth := client.Group("/auth")
 		{
@@ -342,11 +344,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", agentTeamHandler.FailAssignment)
 			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
-				// Compete summary (authenticated web endpoint).
-				web.GET("/team-runs/:id/compete-summary", agentTeamHandler.CompeteSummary)
-				// Human review gate (authenticated web endpoint).
-				web.POST("/team-runs/:id/review-decision", agentTeamHandler.ReviewDecision)
-			}
+			// Compete summary (authenticated web endpoint).
+			web.GET("/team-runs/:id/compete-summary", agentTeamHandler.CompeteSummary)
+			// Human review gate (authenticated web endpoint).
+			web.POST("/team-runs/:id/review-decision", agentTeamHandler.ReviewDecision)
 		}
+	}
 	return nil
 }
