@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -424,6 +425,208 @@ func collectRunEvidenceKeys(
 	artifactKeys = collectKeysByRunID(artifacts, runID, func(artifact Artifact) string { return artifact.RunID })
 	previewKeys = collectKeysByRunID(previews, runID, func(preview Preview) string { return preview.RunID })
 	return diffKeys, artifactKeys, previewKeys
+}
+
+// deleteMapKeys removes every key present in keys from items.
+func deleteMapKeys[T any](items map[string]T, keys map[string]struct{}) {
+	for id := range keys {
+		delete(items, id)
+	}
+}
+
+// collectMatchingPinKeys returns pin map keys for which match returns true.
+func collectMatchingPinKeys(pins map[string]ThreadPin, match func(ThreadPin) bool) map[string]struct{} {
+	keys := make(map[string]struct{})
+	for id, pin := range pins {
+		if match(pin) {
+			keys[id] = struct{}{}
+		}
+	}
+	return keys
+}
+
+// listThreadsForProject returns threads ordered by order, optionally scoped to projectID.
+func listThreadsForProject(order []string, threads map[string]Thread, projectID string) []Thread {
+	return filterOrdered(order, threads, func(thread Thread) bool {
+		return scopeEquals(projectID, thread.ProjectID)
+	})
+}
+
+// listRunsForThread returns runs ordered by order, optionally scoped to threadID.
+func listRunsForThread(order []string, runs map[string]Run, threadID string) []Run {
+	return filterOrdered(order, runs, func(run Run) bool {
+		return scopeEquals(threadID, run.ThreadID)
+	})
+}
+
+// listDiffsForRun returns diff files ordered by order, optionally scoped to runID.
+func listDiffsForRun(order []string, diffs map[string]RunDiffFile, runID string) []RunDiffFile {
+	return filterOrdered(order, diffs, func(file RunDiffFile) bool {
+		return scopeEquals(runID, file.RunID)
+	})
+}
+
+// listPreviewsForRun returns previews ordered by order, optionally scoped to runID.
+func listPreviewsForRun(order []string, previews map[string]Preview, runID string) []Preview {
+	return filterOrdered(order, previews, func(preview Preview) bool {
+		return scopeEquals(runID, preview.RunID)
+	})
+}
+
+// listAgentProfilesForAdapter returns agent profiles ordered by order, optionally scoped to adapterID.
+func listAgentProfilesForAdapter(order []string, profiles map[string]AgentProfile, adapterID string) []AgentProfile {
+	return filterOrdered(order, profiles, func(profile AgentProfile) bool {
+		return scopeEquals(adapterID, profile.AdapterID)
+	})
+}
+
+// listSortedThreadItems returns items for threadID sorted by CreatedAt ascending.
+// Empty threadID matches only items with empty ThreadID (not all items).
+func listSortedThreadItems(order []string, items map[string]Item, threadID string) []Item {
+	out := filterOrdered(order, items, func(item Item) bool {
+		return item.ThreadID == threadID
+	})
+	sortItemsByCreatedAtAsc(out)
+	return out
+}
+
+// listSortedThreadPins returns pins for threadID sorted by PinnedAt descending.
+func listSortedThreadPins(order []string, pins map[string]ThreadPin, threadID string) []ThreadPin {
+	out := filterOrdered(order, pins, func(pin ThreadPin) bool {
+		return pin.ThreadID == threadID
+	})
+	sortPinsByPinnedAtDesc(out)
+	return out
+}
+
+// resolveRunDiffFileUpsert merges an update or stamps a create. created is true on first insert.
+func resolveRunDiffFileUpsert(existing RunDiffFile, exists bool, file RunDiffFile, now string) (RunDiffFile, bool) {
+	if exists {
+		return mergeRunDiffFileUpdate(existing, file, now), false
+	}
+	return stampRunDiffFileCreate(file, now), true
+}
+
+// resolveArtifactUpsert stamps create/update timestamps for an artifact upsert.
+func resolveArtifactUpsert(artifact, existing Artifact, exists bool, now string) Artifact {
+	if exists {
+		return stampArtifactUpsert(artifact, existing.CreatedAt, true, now)
+	}
+	return stampArtifactUpsert(artifact, "", false, now)
+}
+
+// resolvePreviewUpsert stamps create/update timestamps for a preview upsert.
+func resolvePreviewUpsert(preview, existing Preview, exists bool, now string) Preview {
+	if exists {
+		return stampPreviewUpsert(preview, existing.CreatedAt, true, now)
+	}
+	return stampPreviewUpsert(preview, "", false, now)
+}
+
+// resolveThreadPinUpsert touches an existing pin or builds a new one. created is true on first insert.
+func resolveThreadPinUpsert(existing ThreadPin, exists bool, threadID, itemID, pinnedBy, now string) (ThreadPin, bool) {
+	if exists {
+		return touchThreadPin(existing, pinnedBy, now), false
+	}
+	return buildThreadPin(threadID, itemID, pinnedBy, now), true
+}
+
+// buildRunCleanupResult packages cleanup deletion counts.
+func buildRunCleanupResult(removedRuns, removedItems int) RunCleanupResult {
+	return RunCleanupResult{
+		RemovedRuns:  removedRuns,
+		RemovedItems: removedItems,
+	}
+}
+
+// errThreadExistsInProject is returned when CreateThread collides across projects.
+func errThreadExistsInProject(threadID, projectID string) error {
+	return fmt.Errorf("thread %q already exists in project %q", threadID, projectID)
+}
+
+// errAgentProfileExists is returned when CreateAgentProfile collides on id.
+func errAgentProfileExists(id string) error {
+	return fmt.Errorf("agent profile %q already exists", id)
+}
+
+// buildFileSnapshot deep-copies maps/orders into a durable snapshot value.
+func buildFileSnapshot(
+	projects map[string]Project,
+	threads map[string]Thread,
+	runs map[string]Run,
+	items map[string]Item,
+	pins map[string]ThreadPin,
+	diffs map[string]RunDiffFile,
+	artifacts map[string]Artifact,
+	previews map[string]Preview,
+	userProfiles map[string]UserProfile,
+	agentProfiles map[string]AgentProfile,
+	projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userProfileOrder, agentProfileOrder []string,
+	settings map[string]string,
+	settingsMtime string,
+) fileSnapshot {
+	return fileSnapshot{
+		Projects:          copyMap(projects),
+		Threads:           copyMap(threads),
+		Runs:              copyMap(runs),
+		Items:             copyMap(items),
+		Pins:              copyMap(pins),
+		Diffs:             copyMap(diffs),
+		Artifacts:         cloneArtifactMap(artifacts),
+		Previews:          copyMap(previews),
+		UserProfiles:      copyMap(userProfiles),
+		AgentProfiles:     copyMap(agentProfiles),
+		ProjectOrder:      append([]string(nil), projectOrder...),
+		ThreadOrder:       append([]string(nil), threadOrder...),
+		RunOrder:          append([]string(nil), runOrder...),
+		ItemOrder:         append([]string(nil), itemOrder...),
+		PinOrder:          append([]string(nil), pinOrder...),
+		DiffOrder:         append([]string(nil), diffOrder...),
+		ArtifactOrder:     append([]string(nil), artifactOrder...),
+		PreviewOrder:      append([]string(nil), previewOrder...),
+		UserProfileOrder:  append([]string(nil), userProfileOrder...),
+		AgentProfileOrder: append([]string(nil), agentProfileOrder...),
+		Settings:          copyMap(settings),
+		SettingsMtime:     settingsMtime,
+	}
+}
+
+// materializeFileSnapshot copies snapshot maps and normalizes order slices.
+// Caller assigns the returned values under the store mutex.
+func materializeFileSnapshot(snapshot fileSnapshot) (
+	projects map[string]Project,
+	threads map[string]Thread,
+	runs map[string]Run,
+	items map[string]Item,
+	pins map[string]ThreadPin,
+	diffs map[string]RunDiffFile,
+	artifacts map[string]Artifact,
+	previews map[string]Preview,
+	userProfiles map[string]UserProfile,
+	agentProfiles map[string]AgentProfile,
+	projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userProfileOrder, agentProfileOrder []string,
+) {
+	projects = copyMap(snapshot.Projects)
+	threads = copyMap(snapshot.Threads)
+	runs = copyMap(snapshot.Runs)
+	items = copyMap(snapshot.Items)
+	pins = copyMap(snapshot.Pins)
+	diffs = copyMap(snapshot.Diffs)
+	artifacts = cloneArtifactMap(snapshot.Artifacts)
+	previews = copyMap(snapshot.Previews)
+	userProfiles = copyMap(snapshot.UserProfiles)
+	agentProfiles = copyMap(snapshot.AgentProfiles)
+	projectOrder = normalizeOrder(snapshot.ProjectOrder, projects)
+	threadOrder = normalizeOrder(snapshot.ThreadOrder, threads)
+	runOrder = normalizeOrder(snapshot.RunOrder, runs)
+	itemOrder = normalizeOrder(snapshot.ItemOrder, items)
+	pinOrder = normalizeOrder(snapshot.PinOrder, pins)
+	diffOrder = normalizeOrder(snapshot.DiffOrder, diffs)
+	artifactOrder = normalizeOrder(snapshot.ArtifactOrder, artifacts)
+	previewOrder = normalizeOrder(snapshot.PreviewOrder, previews)
+	userProfileOrder = normalizeOrder(snapshot.UserProfileOrder, userProfiles)
+	agentProfileOrder = normalizeOrder(snapshot.AgentProfileOrder, agentProfiles)
+	return
 }
 
 // runCleanupCandidate is a pure view of a terminal run used by cleanup selection.
