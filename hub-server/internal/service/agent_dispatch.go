@@ -14,7 +14,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/config"
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -38,13 +37,13 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Pure residual continue (#946) after #902 assemble/target/redispatch-prep peel,
-// #823 close + #834 alias drop, #811/#800/#789/#779/#768/#756/#732 pure helpers,
-// thin first seam (#563), redispatch residual (#573), residual ports (#617).
-// Call dispatch.* directly; DTO type aliases retained for JSON/redispatch
-// stability. Pure surface lives in service/dispatch; orchestration + ports stay
-// flat here. Do not re-open outbox redispatch MarkDeliverySent semantics from
-// #866. No OpenAPI/handler/frontend; no typed DispatchService package move.
+// Pure residual continue (#977) after #946 edge-http/trigger/target-bound peel,
+// #902 assemble/target/redispatch-prep, #823 close + #834 alias drop, and the
+// #811/#800/#789/#779/#768/#756/#732 pure helpers. Call dispatch.* directly; DTO
+// type aliases retained for JSON/redispatch stability. Pure surface lives in
+// service/dispatch; orchestration + ports stay flat here. Do not re-open outbox
+// redispatch MarkDeliverySent semantics from #866. No OpenAPI/handler/frontend;
+// no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -84,7 +83,7 @@ type dispatchWS interface {
 // redispatch residual (payload unmarshal + route selection). DeliveryOutbox
 // retries call in through Redispatcher; Payload DTO lives in service/dispatch
 // with a thin same-package alias. Same-package extract (#563/#573/#617) + pure
-// helpers in service/dispatch (#732→#946) — typed package move still deferred.
+// helpers in service/dispatch (#732→#977) — typed package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -149,7 +148,7 @@ func (s *DispatchService) SetRelay(relay relayDispatcher) {
 
 // publish is a nil-safe wrapper over the bus port (cancel/regenerate events).
 func (s *DispatchService) publish(ctx context.Context, event Event) {
-	if s == nil || s.bus == nil {
+	if !dispatch.BusPortAvailable(s != nil, s != nil && s.bus != nil) {
 		return
 	}
 	s.bus.Publish(ctx, event)
@@ -165,7 +164,7 @@ func (s *DispatchService) cachePort() dispatchCache {
 
 // recordDelivery is a nil-safe wrapper over the outbox port.
 func (s *DispatchService) recordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
-	if s == nil || s.outbox == nil {
+	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
 		return "", dispatch.ErrOutboxUnavailable()
 	}
 	return s.outbox.RecordDelivery(ctx, taskID, payload, edgeDeviceID)
@@ -173,7 +172,7 @@ func (s *DispatchService) recordDelivery(ctx context.Context, taskID, payload, e
 
 // markDeliverySent is a nil-safe wrapper over the outbox port.
 func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID string) error {
-	if s == nil || s.outbox == nil {
+	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
 		return dispatch.ErrOutboxUnavailable()
 	}
 	return s.outbox.MarkDeliverySent(ctx, deliveryID)
@@ -181,7 +180,7 @@ func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID strin
 
 // moveDeliveryToDeadLetter is a nil-safe wrapper over the outbox port used by redispatch.
 func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, deliveryID, lastError string) {
-	if s == nil || s.outbox == nil {
+	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
 		return
 	}
 	_ = s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
@@ -207,17 +206,17 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	)
 	if insecure {
 		// AH-SR-053: non-loopback cleartext rejected.
-		slog.Error("edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext", "edge_url", parts.EdgeURL)
+		slog.Error(dispatch.EdgeHTTPLogInsecureCleartext, "edge_url", parts.EdgeURL)
 		return ""
 	}
 	if err != nil {
-		slog.Error("edge http dispatch: failed to marshal request", "task_id", task.ID, "error", err)
+		slog.Error(dispatch.EdgeHTTPLogMarshalFailed, "task_id", task.ID, "error", err)
 		return ""
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, parts.RunsURL, bytes.NewReader(parts.Body))
 	if err != nil {
-		slog.Error("edge http dispatch: failed to create request", "task_id", task.ID, "error", err)
+		slog.Error(dispatch.EdgeHTTPLogCreateReqFailed, "task_id", task.ID, "error", err)
 		return ""
 	}
 	httpReq.Header = parts.Headers
@@ -225,7 +224,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	client := &http.Client{Timeout: parts.Timeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		slog.Debug("edge http dispatch: edge server unreachable", "task_id", task.ID, "url", parts.RunsURL, "error", err)
+		slog.Debug(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", err)
 		return ""
 	}
 	defer resp.Body.Close()
@@ -233,28 +232,28 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, dispatch.EdgeHTTPResponseBodyLimit))
 	runID, nonSuccess, decodeErr := dispatch.EdgeHTTPDispatchResult(resp.StatusCode, respBody)
 	if nonSuccess {
-		slog.Warn("edge http dispatch: edge returned non-success", "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
+		slog.Warn(dispatch.EdgeHTTPLogNonSuccess, "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
 		return ""
 	}
 	if decodeErr != nil {
-		slog.Warn("edge http dispatch: failed to decode response", "task_id", task.ID, "error", decodeErr)
+		slog.Warn(dispatch.EdgeHTTPLogDecodeFailed, "task_id", task.ID, "error", decodeErr)
 		return ""
 	}
-	slog.Info("edge http dispatch: task dispatched to local Edge", "task_id", task.ID, "edge_run_id", runID, "url", parts.RunsURL)
+	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", task.ID, "edge_run_id", runID, "url", parts.RunsURL)
 	return runID
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
 func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
-	if err != nil {
-		return nil, errcode.MsgNotFound
+	if err := dispatch.MapTriggerMessageLookupError(err); err != nil {
+		return nil, err
 	}
 
 	// #116: reject new agent tasks for dissolved sessions
 	session, err := repository.GetSessionByID(s.db, msg.SessionID)
-	if err != nil {
-		return nil, errcode.SessionNotFound
+	if err := dispatch.MapSessionLookupError(err); err != nil {
+		return nil, err
 	}
 	if err := dispatch.TriggerSessionDissolvedError(session.Dissolved); err != nil {
 		return nil, err
@@ -294,9 +293,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 	var customAgent *model.CustomAgent
 	if dispatch.NeedsCustomAgentPreload(ai.CustomAgentID) {
 		ca, err := repository.GetCustomAgentByID(s.db, dispatch.CustomAgentIDValue(ai.CustomAgentID))
-		if err == nil {
-			customAgent = ca
-		}
+		customAgent = dispatch.CustomAgentPreloadOrNil(err, ca)
 	}
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
@@ -312,10 +309,7 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		return nil, nil
 	}
 	target, err := repository.GetExecutionTargetByID(s.db.WithContext(ctx), targetID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.TargetNotFound
-		}
+	if err := dispatch.MapTargetLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
 		return nil, err
 	}
 	// Pure ownership / type / health / binding checks (#768/#902) — order matches
@@ -329,10 +323,7 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		return nil, err
 	}
 	device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, dispatch.DeviceMissingNotRoutable()
-		}
+	if err := dispatch.MapBoundDeviceLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
 		return nil, err
 	}
 	if err := dispatch.PostDeviceTargetValidation(userID, device.UserID, device.DeviceType); err != nil {
@@ -394,7 +385,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		}
 		// HTTP miss: fall through to inviter desktop / offline.
 		connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, dispatch.DesktopDeviceType)
-		if dispatch.ClassifyUnboundFallbackRoute(connID, s.mgr != nil, err) == dispatch.RouteInviterDesktop {
+		if dispatch.ClassifyUnboundFallbackRoute(connID, dispatch.ManagerPortAvailable(s.mgr != nil), err) == dispatch.RouteInviterDesktop {
 			conn := s.mgr.FindByConnID(connID)
 			if conn == nil {
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
@@ -463,16 +454,24 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 }
 
 func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
-	if s == nil || s.db == nil || ai == nil || !dispatch.ShouldResolveTeamContext(ai.CustomAgentID) {
-		return dispatchTeamContext{}
+	var customAgentID *string
+	if ai != nil {
+		customAgentID = ai.CustomAgentID
+	}
+	if !dispatch.TeamContextResolutionReady(s != nil, s != nil && s.db != nil, ai != nil, customAgentID) {
+		return dispatch.EmptyTeamContext()
 	}
 	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
-	if err != nil || run == nil || !dispatch.TeamContextFromRun(run.ID) {
-		return dispatchTeamContext{}
+	runID := ""
+	if run != nil {
+		runID = run.ID
+	}
+	if !dispatch.TeamRunLoadable(err, run != nil, runID) {
+		return dispatch.EmptyTeamContext()
 	}
 	members, err := repository.ListTeamMembers(s.db, run.TeamID)
-	if err != nil {
-		return dispatchTeamContext{}
+	if !dispatch.TeamMembersPresent(err) {
+		return dispatch.EmptyTeamContext()
 	}
 	refs := dispatch.TeamMemberRefsFromMembers(members)
 	return dispatch.MatchTeamContext(run.TeamID, run.ID, dispatch.CustomAgentIDValue(ai.CustomAgentID), refs)
@@ -507,7 +506,7 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 	}
 	messageIDs := dispatch.PinMessageIDsFromModels(pins)
 	msgs, err := repository.GetMessagesByIDs(s.db, messageIDs)
-	if err != nil {
+	if !dispatch.PinMessagesLoadable(err) {
 		return nil
 	}
 	return dispatch.MapPinnedMessages(msgs)
@@ -525,7 +524,7 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 	}
 
 	connID, err := cacheClient.GetRouteForDevice(ctx, userID, dispatch.DesktopDeviceType, deviceID)
-	if dispatch.TargetBoundRouteUnavailable(err, connID, s.mgr != nil) {
+	if dispatch.TargetBoundRouteUnavailable(err, connID, dispatch.ManagerPortAvailable(s.mgr != nil)) {
 		queueTargetTask(dispatch.TargetBoundReasonRouteUnavailable, err)
 		return
 	}
@@ -549,10 +548,7 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 // CancelTask cancels a pending task by its ID.
 func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errcode.AgentTaskNotFound
-		}
+	if err := dispatch.MapPendingTaskLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
 		return err
 	}
 	if err := dispatch.TaskNotFoundIfNotOwner(task.TriggeredByUserID, userID); err != nil {
@@ -587,10 +583,7 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 // the same trigger message, agent instance, and target.
 func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
 	original, err := repository.GetPendingTaskByID(s.db, taskID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentTaskNotFound
-		}
+	if err := dispatch.MapPendingTaskLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
 		return nil, err
 	}
 	if err := dispatch.TaskNotFoundIfNotOwner(original.TriggeredByUserID, userID); err != nil {
@@ -625,32 +618,33 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	if dp == nil {
 		return ""
 	}
-	resolved := dispatch.ResolveCapabilityMint(dispatch.NewCapabilityMintInput(
+	resolved := dispatch.CapabilityMintFromEnv(
 		os.Getenv("AGENTHUB_JWT_SECRET"),
 		dp.EdgeDeviceID,
 		os.Getenv("AGENTHUB_EDGE_DEVICE_ID"),
 		dp.TriggerUserID,
 		dp.TargetID,
-	))
+	)
 	if !dispatch.ShouldIssueCapabilityToken(resolved) {
 		return ""
 	}
 	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
+	args := dispatch.CapabilityTokenArgs(resolved)
 	token, err := jwtutil.IssueCapabilityToken(
-		[]byte(resolved.Secret),
-		resolved.UserID,
-		resolved.DeviceID,
-		resolved.ProjectID,
-		resolved.Action,
-		resolved.TTL,
+		args.Secret,
+		args.UserID,
+		args.DeviceID,
+		args.ProjectID,
+		args.Action,
+		args.TTL,
 		jwtutil.CapabilityIssueOptions{
-			Action:   resolved.Action,
-			TargetID: resolved.TargetID,
-			ThreadID: resolved.ThreadID,
+			Action:   args.Action,
+			TargetID: args.TargetID,
+			ThreadID: args.ThreadID,
 		},
 	)
 	if err != nil {
-		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", resolved.DeviceID)
+		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", args.DeviceID)
 		return ""
 	}
 	return token
@@ -678,7 +672,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 	// Look up the task for dispatch routing.
 	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
 	if err != nil {
-		slog.Warn("redispatch: task lookup failed, marking dead-letter",
+		slog.Warn(dispatch.RedispatchLogTaskLookupFailed,
 			"delivery_id", rec.DeliveryID,
 			"task_id", rec.TaskID,
 			"error", err,
@@ -689,7 +683,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 
 	// Only retry if task is still in a retryable state.
 	if !dispatch.IsRetryableTaskStatus(task.Status) {
-		slog.Info("redispatch: task in terminal state, moving delivery to dead-letter",
+		slog.Info(dispatch.RedispatchLogTaskTerminal,
 			"delivery_id", rec.DeliveryID,
 			"task_id", rec.TaskID,
 			"task_status", task.Status,
@@ -744,7 +738,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 
 	if dispatch.ClassifyRedeliveryPrimaryRoute(task.TargetID, task.EdgeDeviceID) == dispatch.RouteHTTP {
 		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); dispatch.IsHTTPEdgeDispatchSuccess(edgeRunID) {
-			slog.Info("redispatch: HTTP dispatch succeeded",
+			slog.Info(dispatch.RedispatchLogHTTPSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "edge_run_id", edgeRunID)
 			return
 		}
@@ -760,35 +754,34 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 	}
 
 	facts := dispatch.RedeliveryConnFacts{}
-	if dispatch.CanPushInviterDesktop(connID, s.mgr != nil, routeErr) {
+	if dispatch.CanPushInviterDesktop(connID, dispatch.ManagerPortAvailable(s.mgr != nil), routeErr) {
 		if conn := s.mgr.FindByConnID(connID); conn != nil {
 			facts = dispatch.ObserveRedeliveryConn(true, conn.UserID, task.TriggeredByUserID)
 		}
 	}
 
-	switch dispatch.ClassifyRedeliveryRoute(preferDevice, connID, s.mgr != nil, routeErr, facts.ConnFound, facts.ConnUserMatch) {
+	switch dispatch.ClassifyRedeliveryRoute(preferDevice, connID, dispatch.ManagerPortAvailable(s.mgr != nil), routeErr, facts.ConnFound, facts.ConnUserMatch) {
 	case dispatch.RouteTargetBound:
 		result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload)))
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
-			slog.Info("redispatch: WS dispatch succeeded",
+			slog.Info(dispatch.RedispatchLogWSSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "device_id", task.EdgeDeviceID)
 			return
 		}
-		slog.Warn("redispatch: WS push not queued",
+		slog.Warn(dispatch.RedispatchLogWSNotQueued,
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID,
 			"delivery_status", result.Status, "error", result.Err)
 	case dispatch.RouteInviterDesktop:
 		result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload)))
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
-			slog.Info("redispatch: WS fallback dispatch succeeded",
+			slog.Info(dispatch.RedispatchLogWSFallbackSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID)
 			return
 		}
 	}
 
-	offlineKind := dispatch.RedeliveryOfflineLogKind(preferDevice)
 	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
-		slog.Error("redispatch: failed to push to "+offlineKind+" queue",
+		slog.Error(dispatch.RedispatchOfflinePushFailedLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
 	} else if dispatch.RedispatchOfflineSuccessIncludesUserID(preferDevice) {
 		slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),

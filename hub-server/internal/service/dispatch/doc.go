@@ -9,9 +9,10 @@
 // Pure residual continue chain: #732 → #756 → #768 → #779 → #789 → #800 →
 // #811 → #823 (docs close) → #834 (alias drop) → #902 (assemble / target /
 // redispatch-prep peel) → #946 (edge-http prep / trigger guards / target-bound
-// / redispatch log peel). Typed DispatchService package move remains deferred
-// and high risk. Do not re-open outbox redispatch MarkDeliverySent semantics
-// from #866 in this package.
+// / redispatch log peel) → #977 (lookup-error mappers / port predicates /
+// redispatch log constants / team+capability residual). Typed DispatchService
+// package move remains deferred and high risk. Do not re-open outbox redispatch
+// MarkDeliverySent semantics from #866 in this package.
 //
 // See docs/analysis/hub-service-boundary-map.md.
 package dispatch
