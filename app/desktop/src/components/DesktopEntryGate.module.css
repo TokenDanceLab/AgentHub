@@ -95,10 +95,10 @@
 }
 
 .primaryButton {
-  border: 1px solid rgba(0, 113, 188, 0.18);
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--e-1);
 }
 
 .identityLogo {
@@ -109,22 +109,8 @@
 }
 
 .primaryButton:hover {
-  background: #f8fbff;
-  border-color: rgba(0, 113, 188, 0.28);
-}
-
-[data-theme='dark'] .primaryButton {
-  border-color: rgba(41, 171, 226, 0.42);
-  background: #2b2d36;
-  color: #f4f7fb;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.18);
-}
-
-[data-theme='dark'] .primaryButton:hover {
-  background: #343743;
-  border-color: rgba(41, 171, 226, 0.62);
+  background: var(--primary-hover);
+  border-color: transparent;
 }
 
 .secondaryButton {
@@ -140,29 +126,15 @@
 }
 
 .edgeButton {
-  border: 1px solid rgba(0, 180, 120, 0.2);
-  background: #f0fdf7;
-  color: #065f46;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  border: 1px solid color-mix(in oklch, var(--success) 24%, transparent);
+  background: var(--success-bg);
+  color: var(--success);
+  box-shadow: var(--e-1);
 }
 
 .edgeButton:hover:not(:disabled) {
-  background: #ecfdf5;
-  border-color: rgba(0, 180, 120, 0.36);
-}
-
-[data-theme='dark'] .edgeButton {
-  border-color: rgba(52, 211, 153, 0.32);
-  background: #1a2e25;
-  color: #6ee7b7;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.18);
-}
-
-[data-theme='dark'] .edgeButton:hover:not(:disabled) {
-  background: #21362e;
-  border-color: rgba(52, 211, 153, 0.52);
+  background: color-mix(in oklch, var(--success) 12%, var(--success-bg));
+  border-color: color-mix(in oklch, var(--success) 40%, transparent);
 }
 
 .edgeButton:disabled {
