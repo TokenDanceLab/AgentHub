@@ -1,0 +1,315 @@
+import { describe, expect, it } from 'vitest';
+import {
+  boolValue,
+  compactRecord,
+  getFirstBoolean,
+  getFirstNumber,
+  getFirstString,
+  getString,
+  parseRecord,
+  parseStringArray,
+  parseStringRecord,
+} from './hubIntegrationParseHelpers';
+import {
+  bindDispatchPayload,
+  buildDispatchTargetBinding,
+  buildEdgeRunBody,
+  extractCreatedRunId,
+  extractRunOutputBatch,
+  getTeamRouteContext,
+  isTerminalBridgeTask,
+  normalizeRouteDecision,
+  normalizeRuntimeAgentId,
+  parsePermissionDecisionControl,
+  permissionDecisionControlKey,
+  routeDecisionFromRuntimePayload,
+  routeDecisionKey,
+  validateDispatchTarget,
+} from './hubIntegrationMappers';
+import type { AgentTask } from '@/stores/taskBridgeStore';
+
+describe('hubIntegrationParseHelpers', () => {
+  it('parseRecord accepts objects, JSON strings, and rejects invalid shapes', () => {
+    expect(parseRecord({ a: 1 })).toEqual({ a: 1 });
+    expect(parseRecord('{"b":2}')).toEqual({ b: 2 });
+    expect(parseRecord('[1]')).toEqual({});
+    expect(parseRecord('not-json')).toEqual({});
+    expect(parseRecord(null)).toEqual({});
+    expect(parseRecord(3)).toEqual({});
+  });
+
+  it('compactRecord drops undefined values only', () => {
+    expect(compactRecord<{ a?: number; b?: string }>({ a: 1, b: undefined })).toEqual({ a: 1 });
+  });
+
+  it('getString / getFirst* helpers coerce legacy payload shapes', () => {
+    expect(getString({ name: 'x' }, 'name')).toBe('x');
+    expect(getString({ name: 1 }, 'name')).toBe('');
+    expect(getFirstString('', '  ', 'ok')).toBe('ok');
+    expect(getFirstString(null, undefined)).toBeUndefined();
+    expect(getFirstBoolean(null, true, false)).toBe(true);
+    expect(getFirstNumber('1', Number.NaN, 2.5)).toBe(2.5);
+    expect(boolValue(false)).toBe(false);
+    expect(boolValue('true')).toBeUndefined();
+  });
+
+  it('parseStringArray and parseStringRecord filter empty values', () => {
+    expect(parseStringArray(['a', '', 'b'])).toEqual(['a', 'b']);
+    expect(parseStringArray('["x"," "]')).toEqual(['x']);
+    expect(parseStringArray('not-json')).toBeUndefined();
+    expect(parseStringRecord({ a: '1', b: 2 })).toEqual({ a: '1' });
+    expect(parseStringRecord({})).toBeUndefined();
+  });
+});
+
+describe('hubIntegrationMappers', () => {
+  const target = { targetId: 'tgt-1', deviceId: 'dev-1' };
+
+  function makeTask(overrides: Partial<AgentTask> = {}): AgentTask {
+    return {
+      taskId: 'task-1',
+      agentId: 'claude-code',
+      prompt: 'hello',
+      status: 'running',
+      dispatchPayload: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  it('normalizeRouteDecision accepts nested decision and finish shorthand', () => {
+    expect(
+      normalizeRouteDecision({
+        decision: {
+          action: 'Delegate',
+          nextWorker: 'worker-a',
+          correlationId: 'c1',
+        },
+      }),
+    ).toEqual({
+      action: 'delegate',
+      next_worker: 'worker-a',
+      correlation_id: 'c1',
+    });
+
+    expect(normalizeRouteDecision({ finish: true, summary: 'done' })).toEqual({
+      action: 'finish',
+      summary: 'done',
+    });
+    expect(normalizeRouteDecision({ action: 'nope' })).toBeNull();
+  });
+
+  it('routeDecisionFromRuntimePayload prefers structuredOutput over nested keys', () => {
+    const decision = routeDecisionFromRuntimePayload({
+      structuredOutput: { action: 'review', instructions: 'check' },
+      route_decision: { action: 'finish' },
+    });
+    expect(decision).toEqual({ action: 'review', instructions: 'check' });
+  });
+
+  it('getTeamRouteContext reads top-level and model_params nested team context', () => {
+    expect(
+      getTeamRouteContext(
+        makeTask({
+          dispatchPayload: {
+            team_id: 'team-1',
+            team_run_id: 'tr-1',
+            team_member_role: 'supervisor',
+          },
+        }),
+      ),
+    ).toEqual({ teamId: 'team-1', teamRunId: 'tr-1', teamMemberRole: 'supervisor' });
+
+    expect(
+      getTeamRouteContext(
+        makeTask({
+          dispatchPayload: {
+            model_params: {
+              agenthub_team_context: {
+                teamId: 'team-2',
+                teamRunId: 'tr-2',
+                teamMemberRole: 'worker',
+              },
+            },
+          },
+        }),
+      ),
+    ).toEqual({ teamId: 'team-2', teamRunId: 'tr-2', teamMemberRole: 'worker' });
+
+    expect(getTeamRouteContext(makeTask())).toBeNull();
+  });
+
+  it('routeDecisionKey and permissionDecisionControlKey are stable', () => {
+    const key = routeDecisionKey('task-1', {
+      action: 'delegate',
+      next_worker: 'w',
+      correlation_id: 'c',
+    });
+    expect(key.split('\u001f')).toEqual(['task-1', 'c', 'delegate', 'w', '', '', '']);
+
+    const controlKey = permissionDecisionControlKey({
+      runId: 'run-1',
+      requestId: 'req-1',
+      decision: 'allow',
+      reason: 'ok',
+    });
+    expect(controlKey).toBe(['run-1', 'req-1', 'allow', 'ok'].join('\u001f'));
+  });
+
+  it('parsePermissionDecisionControl accepts snake_case and camelCase edge controls', () => {
+    expect(
+      parsePermissionDecisionControl({
+        kind: 'permission.decide',
+        edge_control: {
+          run_id: 'run-1',
+          request_id: 'req-1',
+          decision: 'Allow',
+          reason: 'yes',
+        },
+      }),
+    ).toEqual({
+      runId: 'run-1',
+      requestId: 'req-1',
+      decision: 'allow',
+      reason: 'yes',
+    });
+
+    expect(
+      parsePermissionDecisionControl({
+        kind: 'permission.decide',
+        edgeControl: {
+          runId: 'run-2',
+          requestId: 'req-2',
+          decision: 'deny',
+        },
+      }),
+    ).toEqual({
+      runId: 'run-2',
+      requestId: 'req-2',
+      decision: 'deny',
+    });
+
+    expect(parsePermissionDecisionControl({ kind: 'other' })).toBeNull();
+    expect(
+      parsePermissionDecisionControl({
+        kind: 'permission.decide',
+        edge_control: { runId: 'run-1', decision: 'allow' },
+      }),
+    ).toBeNull();
+  });
+
+  it('validateDispatchTarget and binding helpers enforce target/device match', () => {
+    const matched = {
+      target_id: 'tgt-1',
+      edge_device_id: 'dev-1',
+    };
+    expect(validateDispatchTarget(matched, target)).toBeNull();
+    expect(validateDispatchTarget({ target_id: 'other', edge_device_id: 'dev-1' }, target)).toContain(
+      'Dispatch target mismatch',
+    );
+    expect(validateDispatchTarget(matched, null)).toBeNull();
+
+    const binding = buildDispatchTargetBinding(matched, target);
+    expect(binding).toEqual({
+      expectedTargetId: 'tgt-1',
+      observedTargetId: 'tgt-1',
+      expectedEdgeDeviceId: 'dev-1',
+      observedEdgeDeviceId: 'dev-1',
+      status: 'matched',
+    });
+    expect(buildDispatchTargetBinding({ targetId: 'x', edgeDeviceId: 'y' }, target)?.status).toBe(
+      'mismatch',
+    );
+    expect(buildDispatchTargetBinding(matched, undefined)).toBeNull();
+
+    const bound = bindDispatchPayload(matched, binding);
+    expect(bound.target_binding).toEqual({
+      expected_target_id: 'tgt-1',
+      observed_target_id: 'tgt-1',
+      expected_edge_device_id: 'dev-1',
+      observed_edge_device_id: 'dev-1',
+      status: 'matched',
+    });
+    expect(bindDispatchPayload(matched, null)).toBe(matched);
+  });
+
+  it('normalizeRuntimeAgentId maps common vendor aliases', () => {
+    expect(normalizeRuntimeAgentId('Claude')).toBe('claude-code');
+    expect(normalizeRuntimeAgentId('my-claude-code-runner')).toBe('claude-code');
+    expect(normalizeRuntimeAgentId('OpenCode')).toBe('opencode');
+    expect(normalizeRuntimeAgentId('gpt-4.1')).toBe('codex');
+    expect(normalizeRuntimeAgentId('  ')).toBe('');
+    expect(normalizeRuntimeAgentId('custom-agent')).toBe('custom-agent');
+  });
+
+  it('buildEdgeRunBody maps model_params and target evidence with exact optional fields', () => {
+    const body = buildEdgeRunBody(
+      {
+        task_id: 'task-1',
+        model_params: {
+          model: 'claude-sonnet',
+          reasoning_effort: 'high',
+          tool_allowlist: ['Read', ''],
+          config_overrides: { foo: 'bar' },
+          ephemeral: true,
+        },
+        system_prompt: 'sys',
+      },
+      'thread-1',
+      'prompt',
+      'claude-code',
+      {
+        expectedTargetId: 'tgt-1',
+        observedTargetId: 'tgt-1',
+        expectedEdgeDeviceId: 'dev-1',
+        observedEdgeDeviceId: 'dev-1',
+        status: 'matched',
+      },
+    );
+
+    expect(body).toMatchObject({
+      threadId: 'thread-1',
+      prompt: 'prompt',
+      agentId: 'claude-code',
+      model: 'claude-sonnet',
+      reasoningEffort: 'high',
+      allowedTools: ['Read'],
+      configOverrides: { foo: 'bar' },
+      ephemeral: true,
+      systemPrompt: 'sys',
+      hubTaskId: 'task-1',
+      targetId: 'tgt-1',
+      edgeDeviceId: 'dev-1',
+      dispatchTargetEvidence: {
+        expectedTargetId: 'tgt-1',
+        observedTargetId: 'tgt-1',
+        expectedEdgeDeviceId: 'dev-1',
+        observedEdgeDeviceId: 'dev-1',
+        targetStatus: 'matched',
+      },
+    });
+    expect(Object.values(body).every((v) => v !== undefined)).toBe(true);
+  });
+
+  it('extractRunOutputBatch only joins stdout chunk text', () => {
+    expect(
+      extractRunOutputBatch({
+        stream: 'stdout',
+        chunks: [{ text: 'a' }, { text: 'b' }, null, { text: 1 }],
+      }),
+    ).toBe('ab');
+    expect(extractRunOutputBatch({ stream: 'stderr', chunks: [{ text: 'x' }] })).toBe('');
+  });
+
+  it('extractCreatedRunId supports envelope and legacy raw run payloads', () => {
+    expect(extractCreatedRunId({ id: 'run-a' })).toBe('run-a');
+    expect(extractCreatedRunId({ code: 'ok', data: { runId: 'run-b' } })).toBe('run-b');
+    expect(() => extractCreatedRunId({ code: 'ok', data: {} })).toThrow(/no id\/runId/);
+  });
+
+  it('isTerminalBridgeTask detects done/failed only', () => {
+    expect(isTerminalBridgeTask(makeTask({ status: 'done' }))).toBe(true);
+    expect(isTerminalBridgeTask(makeTask({ status: 'failed' }))).toBe(true);
+    expect(isTerminalBridgeTask(makeTask({ status: 'running' }))).toBe(false);
+  });
+});
