@@ -230,6 +230,11 @@ type AccessTokenProvider = () => Promise<string | null | undefined> | string | n
 export interface CreateHubClientOptions {
   baseUrl: string;
   getAccessToken?: AccessTokenProvider;
+  /**
+   * Called on 401 from the shared client so the mobile session layer can
+   * refresh + persist tokens (e.g. SecureStore) and return the new access token.
+   */
+  onRefreshToken?: () => Promise<string | null>;
   fetchImpl?: typeof globalThis.fetch;
 }
 
@@ -412,8 +417,9 @@ export function createMockHubClient(delayMs = 80): HubClient {
 }
 
 export function createHubClient(options: CreateHubClientOptions): HubClient {
-  // The shared Hub client expects a synchronous getToken().
-  // We eagerly resolve the async token and cache it for sync access.
+  // Shared Hub client expects a synchronous getToken(). Mobile providers are
+  // often async (SecureStore), so we re-resolve into a cache before each
+  // authenticated call and single-flight concurrent resolvers.
   let cachedToken: string | null | undefined = null;
   let tokenPromise: Promise<string | null | undefined> | undefined;
 
@@ -430,20 +436,54 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     }
   };
 
-  const syncGetToken = (): string | null | undefined => {
-    return cachedToken;
+  const ensureToken = async (): Promise<string | null | undefined> => {
+    if (tokenPromise) {
+      return tokenPromise;
+    }
+
+    tokenPromise = resolveToken()
+      .then((token) => {
+        cachedToken = token;
+        return token;
+      })
+      .finally(() => {
+        tokenPromise = undefined;
+      });
+
+    return tokenPromise;
   };
 
-  // Kick off token resolution
-  tokenPromise = resolveToken().then((t) => {
-    cachedToken = t;
-    return t;
-  });
+  const withAuth = async <T>(fn: () => Promise<T>): Promise<T> => {
+    await ensureToken();
+    return fn();
+  };
+
+  const handleRefreshToken = async (): Promise<string | null> => {
+    if (!options.onRefreshToken) {
+      const token = await resolveToken();
+      cachedToken = token ?? null;
+      return token ?? null;
+    }
+
+    try {
+      const newToken = await options.onRefreshToken();
+      cachedToken = newToken;
+      return newToken;
+    } catch {
+      cachedToken = null;
+      return null;
+    }
+  };
 
   const sharedOpts: HubClientOptions = {
     baseUrl: options.baseUrl,
-    getToken: syncGetToken,
+    getToken: () => cachedToken,
     ...(options.fetchImpl ? { fetch: options.fetchImpl } : {}),
+    // Always wire refresh so 401 can re-resolve provider tokens; callers may
+    // also supply onRefreshToken to refresh + persist via session/SecureStore.
+    ...((options.getAccessToken || options.onRefreshToken)
+      ? { onRefreshToken: handleRefreshToken }
+      : {}),
   };
 
   const shared = createSharedHubClient(sharedOpts);
@@ -462,11 +502,7 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     shared,
 
     async getMobileSnapshot() {
-      // Ensure token is resolved before making API calls
-      if (tokenPromise) {
-        await tokenPromise;
-        tokenPromise = undefined;
-      }
+      await ensureToken();
 
       // Build a mobile snapshot from real Hub API data
       const [sessions, contacts] = await Promise.all([
@@ -477,105 +513,138 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
       return mapSessionsToMobileFixture(sessions, contacts);
     },
 
+    // Unauthenticated entry points — no token gate.
     oidcAuthorize: (body) => shared.oidcAuthorize(body),
     oidcCallback: (body) => shared.oidcCallback(body),
     register: (body) => shared.register(body),
     login: (body) => shared.login(body),
     refresh: (refreshToken) => shared.refresh(refreshToken),
-    logout: () => shared.logout(),
-    me: () => shared.me(),
-    updateProfile: (body) => shared.updateProfile(body),
-    changePassword: (body) => shared.changePassword(body),
-    listSessions: () => shared.listSessions(),
-    searchSessions: (q) => shared.searchSessions(q),
-    createPrivateSession: (body) => shared.createPrivateSession(body),
-    createGroupSession: (body) => shared.createGroupSession(body),
-    addSessionMembers: (sessionId, memberIds) => shared.addSessionMembers(sessionId, memberIds),
-    removeSessionMember: (sessionId, userId) => shared.removeSessionMember(sessionId, userId),
-    leaveSession: (sessionId) => shared.leaveSession(sessionId),
-    dissolveSession: (sessionId) => shared.dissolveSession(sessionId),
-    updateSessionInfo: (sessionId, body) => shared.updateSessionInfo(sessionId, body),
-    updateSessionSettings: (sessionId, body) => shared.updateSessionSettings(sessionId, body),
-    deleteSession: (sessionId) => shared.deleteSession(sessionId),
-    sendMessage: (sessionId, body) => shared.sendMessage(sessionId, body),
-    getMessages: (sessionId, params) => shared.getMessages(sessionId, params),
-    syncMessages: (sessionId, params) => shared.syncMessages(sessionId, params),
-    markRead: (sessionId, lastReadSeq) => shared.markRead(sessionId, lastReadSeq),
-    recallMessage: (messageId) => shared.recallMessage(messageId),
+    logout: async () => {
+      try {
+        await ensureToken();
+        await shared.logout();
+      } finally {
+        cachedToken = null;
+      }
+    },
+    me: () => withAuth(() => shared.me()),
+    updateProfile: (body) => withAuth(() => shared.updateProfile(body)),
+    changePassword: (body) => withAuth(() => shared.changePassword(body)),
+    listSessions: () => withAuth(() => shared.listSessions()),
+    searchSessions: (q) => withAuth(() => shared.searchSessions(q)),
+    createPrivateSession: (body) => withAuth(() => shared.createPrivateSession(body)),
+    createGroupSession: (body) => withAuth(() => shared.createGroupSession(body)),
+    addSessionMembers: (sessionId, memberIds) => withAuth(() => shared.addSessionMembers(sessionId, memberIds)),
+    removeSessionMember: (sessionId, userId) => withAuth(() => shared.removeSessionMember(sessionId, userId)),
+    leaveSession: (sessionId) => withAuth(() => shared.leaveSession(sessionId)),
+    dissolveSession: (sessionId) => withAuth(() => shared.dissolveSession(sessionId)),
+    updateSessionInfo: (sessionId, body) => withAuth(() => shared.updateSessionInfo(sessionId, body)),
+    updateSessionSettings: (sessionId, body) => withAuth(() => shared.updateSessionSettings(sessionId, body)),
+    deleteSession: (sessionId) => withAuth(() => shared.deleteSession(sessionId)),
+    sendMessage: (sessionId, body) => withAuth(() => shared.sendMessage(sessionId, body)),
+    getMessages: (sessionId, params) => withAuth(() => shared.getMessages(sessionId, params)),
+    syncMessages: (sessionId, params) => withAuth(() => shared.syncMessages(sessionId, params)),
+    markRead: (sessionId, lastReadSeq) => withAuth(() => shared.markRead(sessionId, lastReadSeq)),
+    recallMessage: (messageId) => withAuth(() => shared.recallMessage(messageId)),
     editMessage: (messageId, body) =>
-      shared.request<HubMessage>(`/client/messages/${encodeURIComponent(messageId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      }),
-    pinMessage: (messageId, sessionId) => shared.pinMessage(messageId, sessionId),
-    unpinMessage: (messageId, sessionId) => shared.unpinMessage(messageId, sessionId),
-    forwardMessage: (messageId, targetSessionIds) => shared.forwardMessage(messageId, targetSessionIds),
-    listPinnedMessages: (sessionId) => shared.listPinnedMessages(sessionId),
-    searchMessages: (params) => shared.searchMessages(params),
-    searchSessionMessages: (sessionId, params) => shared.searchSessionMessages(sessionId, params),
+      withAuth(() =>
+        shared.request<HubMessage>(`/client/messages/${encodeURIComponent(messageId)}`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        }),
+      ),
+    pinMessage: (messageId, sessionId) => withAuth(() => shared.pinMessage(messageId, sessionId)),
+    unpinMessage: (messageId, sessionId) => withAuth(() => shared.unpinMessage(messageId, sessionId)),
+    forwardMessage: (messageId, targetSessionIds) => withAuth(() => shared.forwardMessage(messageId, targetSessionIds)),
+    listPinnedMessages: (sessionId) => withAuth(() => shared.listPinnedMessages(sessionId)),
+    searchMessages: (params) => withAuth(() => shared.searchMessages(params)),
+    searchSessionMessages: (sessionId, params) => withAuth(() => shared.searchSessionMessages(sessionId, params)),
     addMessageReaction: (messageId, sessionId, reaction) =>
-    // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-      shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionId, ...reaction }),
-      }),
+      withAuth(() =>
+        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+        shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sessionId, ...reaction }),
+        }),
+      ),
     removeMessageReaction: (messageId, sessionId, reaction) =>
-      // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-      shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-        method: 'DELETE',
-        body: JSON.stringify({ session_id: sessionId, ...reaction }),
-      }),
+      withAuth(() =>
+        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+        shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+          method: 'DELETE',
+          body: JSON.stringify({ session_id: sessionId, ...reaction }),
+        }),
+      ),
     listMessageReactions: (messageId, sessionId) =>
-      shared.request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
-    searchUser: (targetUserId) => shared.searchUser(targetUserId),
-    listContacts: () => shared.listContacts(),
-    sendFriendRequest: (friendId, message) => shared.sendFriendRequest(friendId, message),
-    listFriendRequests: () => shared.listFriendRequests(),
-    acceptFriendRequest: (requestId) => shared.acceptFriendRequest(requestId),
-    rejectFriendRequest: (requestId) => shared.rejectFriendRequest(requestId),
-    blockContact: (targetUserId) => shared.blockContact(targetUserId),
-    unblockContact: (targetUserId) => shared.unblockContact(targetUserId),
-    updateContactRemark: (friendUserId, remark) => shared.updateContactRemark(friendUserId, remark),
-    removeContact: (friendUserId) => shared.removeContact(friendUserId),
-    listNotifications: (params) => shared.listNotifications(params),
-    markNotificationRead: (id) => shared.markNotificationRead(id),
-    readAllNotifications: () => shared.readAllNotifications(),
-    registerDevice: (body) => shared.registerDevice(body),
-    listCustomAgents: () => shared.listCustomAgents(),
-    createCustomAgent: (body) => shared.createCustomAgent(body),
-    updateCustomAgent: (id, body) => shared.updateCustomAgent(id, body),
-    deleteCustomAgent: (id) => shared.deleteCustomAgent(id),
-    addAgentToSession: (sessionId, body) => shared.addAgentToSession(sessionId, body),
-    triggerAgentTask: (triggerMessageId, options) => shared.triggerAgentTask(triggerMessageId, options),
-    cancelAgentTask: (taskId) => shared.cancelAgentTask(taskId),
-    regenerateAgentTask: (taskId) => shared.regenerateAgentTask(taskId),
+      withAuth(() =>
+        shared.request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
+      ),
+    searchUser: (targetUserId) => withAuth(() => shared.searchUser(targetUserId)),
+    listContacts: () => withAuth(() => shared.listContacts()),
+    sendFriendRequest: (friendId, message) => withAuth(() => shared.sendFriendRequest(friendId, message)),
+    listFriendRequests: () => withAuth(() => shared.listFriendRequests()),
+    acceptFriendRequest: (requestId) => withAuth(() => shared.acceptFriendRequest(requestId)),
+    rejectFriendRequest: (requestId) => withAuth(() => shared.rejectFriendRequest(requestId)),
+    blockContact: (targetUserId) => withAuth(() => shared.blockContact(targetUserId)),
+    unblockContact: (targetUserId) => withAuth(() => shared.unblockContact(targetUserId)),
+    updateContactRemark: (friendUserId, remark) => withAuth(() => shared.updateContactRemark(friendUserId, remark)),
+    removeContact: (friendUserId) => withAuth(() => shared.removeContact(friendUserId)),
+    listNotifications: (params) => withAuth(() => shared.listNotifications(params)),
+    markNotificationRead: (id) => withAuth(() => shared.markNotificationRead(id)),
+    readAllNotifications: () => withAuth(() => shared.readAllNotifications()),
+    registerDevice: (body) => withAuth(() => shared.registerDevice(body)),
+    listCustomAgents: () => withAuth(() => shared.listCustomAgents()),
+    createCustomAgent: (body) => withAuth(() => shared.createCustomAgent(body)),
+    updateCustomAgent: (id, body) => withAuth(() => shared.updateCustomAgent(id, body)),
+    deleteCustomAgent: (id) => withAuth(() => shared.deleteCustomAgent(id)),
+    addAgentToSession: (sessionId, body) =>
+      withAuth(async () => {
+        await shared.addAgentToSession(sessionId, body);
+      }),
+    triggerAgentTask: (triggerMessageId, taskOptions) => withAuth(() => shared.triggerAgentTask(triggerMessageId, taskOptions)),
+    cancelAgentTask: (taskId) => withAuth(() => shared.cancelAgentTask(taskId)),
+    regenerateAgentTask: (taskId) => withAuth(() => shared.regenerateAgentTask(taskId)),
     listTaskRunEvents: (taskId) =>
-      shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
+      withAuth(() =>
+        shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
+      ),
     listTaskRunEventsAfter: (taskId, afterSeq) =>
-      shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
+      withAuth(() =>
+        shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
+      ),
     getTaskRunEventSummary: (taskId) =>
-      shared.request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
+      withAuth(() =>
+        shared.request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
+      ),
     listTaskApprovals: (taskId) =>
-      shared.request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+      withAuth(() =>
+        shared.request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+      ),
     decideTaskApproval: (taskId, approvalId, decision) =>
-      shared.request<HubAgentTaskApproval>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
-        method: 'POST',
-        body: JSON.stringify(decision),
-      }),
+      withAuth(() =>
+        shared.request<HubAgentTaskApproval>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        }),
+      ),
     listTaskArtifacts: (taskId) =>
-      shared.request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
-    listExecutionTargets: () => shared.listExecutionTargets(),
-    listPublicSkills: (params) => shared.listPublicSkills(params),
-    listPublicMCPServers: (params) => shared.listPublicMCPServers(params),
-    ackTask: (taskId, runId) => shared.ackTask(taskId, runId),
-    streamTask: (taskId, content, runId) => shared.streamTask(taskId, content, runId),
-    doneTask: (taskId, finalContent, runId) => shared.doneTask(taskId, finalContent, runId),
-    failTask: (taskId, error, runId) => shared.failTask(taskId, error, runId),
+      withAuth(() =>
+        shared.request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
+      ),
+    listExecutionTargets: () => withAuth(() => shared.listExecutionTargets()),
+    listPublicSkills: (params) => withAuth(() => shared.listPublicSkills(params)),
+    listPublicMCPServers: (params) => withAuth(() => shared.listPublicMCPServers(params)),
+    ackTask: (taskId, runId) => withAuth(() => shared.ackTask(taskId, runId)),
+    streamTask: (taskId, content, runId) => withAuth(() => shared.streamTask(taskId, content, runId)),
+    doneTask: (taskId, finalContent, runId) => withAuth(() => shared.doneTask(taskId, finalContent, runId)),
+    failTask: (taskId, error, runId) => withAuth(() => shared.failTask(taskId, error, runId)),
     probeAttachment: (hash) =>
-      shared.request<HubProbeAttachmentResponse>('/client/attachments/probe', {
-        method: 'POST',
-        body: JSON.stringify({ hash }),
-      }),
+      withAuth(() =>
+        shared.request<HubProbeAttachmentResponse>('/client/attachments/probe', {
+          method: 'POST',
+          body: JSON.stringify({ hash }),
+        }),
+      ),
     downloadAttachmentUrl: (attachmentId) =>
       `${options.baseUrl.replace(/\/+$/, '')}/client/attachments/${encodeURIComponent(attachmentId)}`,
   };
@@ -593,9 +662,10 @@ export function createHubWsUrl(baseUrl: string, options: HubWsUrlOptions = {}): 
     url.searchParams.set('since', options.since);
   }
 
-  // Token goes in query for WS auth (server reads from query on upgrade)
+  // Token goes in query for WS auth. Hub WSAuthMiddleware accepts
+  // Authorization Bearer or the "access_token" query parameter (not "token").
   if (options.token) {
-    url.searchParams.set('token', options.token);
+    url.searchParams.set('access_token', options.token);
   }
 
   return url.toString();
