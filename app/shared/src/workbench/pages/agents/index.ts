@@ -31,6 +31,19 @@ export {
 } from './AgentOpsViews';
 
 export {
+  AuditEntriesSection,
+  AuditFilterBar,
+  CcSwitchStatusSection,
+  ModelCardsGrid,
+  ModelHealthSection,
+  ModelRoutingSection,
+  PolicyApprovalSection,
+  PolicyMatrixSection,
+  ToolPermissionLegend,
+  ToolPermissionMatrix,
+} from './AgentOpsParts';
+
+export {
   ConfigSummaryRow,
   formatList,
   permissionClass,
