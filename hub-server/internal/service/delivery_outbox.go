@@ -14,159 +14,13 @@ import (
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
-// ── Outbox status constants (aliases to pure deliveryoutbox package) ────────
-//
-// Residual pure-helper extract (#744) after pure backoff/truncate (#514), thin
-// type + Redispatcher (#540), and model ownership residual (#551). Status /
-// eligibility / last-error helpers live in service/deliveryoutbox; thin aliases
-// keep existing call sites stable. Full model package move remains deferred.
-
-const (
-	DeliveryStatusPending   = deliveryoutbox.StatusPending
-	DeliveryStatusSent      = deliveryoutbox.StatusSent
-	DeliveryStatusDelivered = deliveryoutbox.StatusDelivered
-	DeliveryStatusRetrying  = deliveryoutbox.StatusRetrying
-	DeliveryStatusDead      = deliveryoutbox.StatusDead
-)
-
-// ── Delivery outbox TTL constants (aliases to pure deliveryoutbox package) ──
-
-const (
-	// DefaultMaxDeliveryAttempts is the default retry budget before dead-letter.
-	DefaultMaxDeliveryAttempts = deliveryoutbox.DefaultMaxAttempts
-
-	// DeliveryRetryBaseInterval is the base backoff interval (multiplied by 2^attempt).
-	DeliveryRetryBaseInterval = deliveryoutbox.RetryBaseInterval
-
-	// DeliveryRetryMaxInterval caps the exponential backoff ceiling.
-	DeliveryRetryMaxInterval = deliveryoutbox.RetryMaxInterval
-
-	// DeliveryRetryScanInterval controls how often retryable deliveries are scanned.
-	DeliveryRetryScanInterval = deliveryoutbox.RetryScanInterval
-
-	// DeliveryPendingTimeout is the time after which a pending (never sent) delivery
-	// is eligible for retry.
-	DeliveryPendingTimeout = deliveryoutbox.PendingTimeout
-
-	// DeliverySentTimeout is the time after which a sent (unacked) delivery
-	// is eligible for retry.
-	DeliverySentTimeout = deliveryoutbox.SentTimeout
-
-	// DeliveryOutboxMaxBatch caps the number of deliveries scanned per retry cycle.
-	DeliveryOutboxMaxBatch = deliveryoutbox.MaxBatch
-)
-
-// ── Model (owned by DeliveryOutbox; not part of AgentService surface) ──────
-
-// deliveryOutboxRecord is the private GORM row for delivery_outbox.
-// Only DeliveryOutbox journal/repository helpers may construct or query it.
-// Callers outside the outbox surface use DeliveryOutboxEntry (read view) or
-// redispatchTarget (opaque redispatch fields). Full model/repository package
-// move remains deferred; this residual seals ownership inside DeliveryOutbox.
-type deliveryOutboxRecord struct {
-	ID           string     `gorm:"primaryKey;type:uuid"`
-	TaskID       string     `gorm:"type:uuid;not null;index:idx_delivery_outbox_task_id"`
-	DeliveryID   string     `gorm:"type:varchar(128);not null;uniqueIndex:idx_delivery_outbox_delivery_id"`
-	Payload      string     `gorm:"type:text;not null"`
-	Status       string     `gorm:"type:varchar(16);not null;default:pending;index:idx_delivery_outbox_status_nr,priority:1"`
-	AttemptCount int        `gorm:"type:smallint;not null;default:0"`
-	MaxAttempts  int        `gorm:"type:smallint;not null;default:3"`
-	NextRetryAt  *time.Time `gorm:"type:timestamptz;index:idx_delivery_outbox_status_nr,priority:2"`
-	LastError    string     `gorm:"type:text;default:''"`
-	EdgeDeviceID string     `gorm:"type:uuid;default:null"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt    time.Time  `gorm:"autoUpdateTime:false"`
-	DeliveredAt  *time.Time `gorm:"type:timestamptz"`
-}
-
-func (r *deliveryOutboxRecord) BeforeCreate(tx *gorm.DB) error {
-	id, err := uuidv7.New()
-	if err != nil {
-		return err
-	}
-	r.ID = id
-	return nil
-}
-
-func (r *deliveryOutboxRecord) BeforeUpdate(tx *gorm.DB) error {
-	r.UpdatedAt = time.Now()
-	return nil
-}
-
-// TableName overrides the default pluralized table name for GORM.
-func (deliveryOutboxRecord) TableName() string {
-	return "delivery_outbox"
-}
-
-// DeliveryOutboxEntry is a read-only journal view for scan/test callers.
-// It intentionally carries no GORM tags so AgentService / tests do not couple
-// to the private persistence shape of deliveryOutboxRecord.
-type DeliveryOutboxEntry struct {
-	ID           string
-	TaskID       string
-	DeliveryID   string
-	Payload      string
-	Status       string
-	AttemptCount int
-	MaxAttempts  int
-	NextRetryAt  *time.Time
-	LastError    string
-	EdgeDeviceID string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeliveredAt  *time.Time
-}
-
-func (r deliveryOutboxRecord) toEntry() DeliveryOutboxEntry {
-	return DeliveryOutboxEntry{
-		ID:           r.ID,
-		TaskID:       r.TaskID,
-		DeliveryID:   r.DeliveryID,
-		Payload:      r.Payload,
-		Status:       r.Status,
-		AttemptCount: r.AttemptCount,
-		MaxAttempts:  r.MaxAttempts,
-		NextRetryAt:  r.NextRetryAt,
-		LastError:    r.LastError,
-		EdgeDeviceID: r.EdgeDeviceID,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
-		DeliveredAt:  r.DeliveredAt,
-	}
-}
-
-// redispatchTarget carries only the opaque fields Redispatcher / DispatchService
-// need to re-send a stored payload. It is not a GORM model and must not grow
-// journal columns — that keeps redispatch free of deliveryOutboxRecord.
-type redispatchTarget struct {
-	TaskID       string
-	DeliveryID   string
-	Payload      string
-	EdgeDeviceID string
-}
-
-// ── DeliveryOutbox private repository helpers ──────────────────────────────
-
-// outboxModel is the GORM model handle for delivery_outbox mutations.
-func outboxModel() *deliveryOutboxRecord { return &deliveryOutboxRecord{} }
-
-// findOutboxByDeliveryID loads one private row by delivery_id.
-func (o *DeliveryOutbox) findOutboxByDeliveryID(ctx context.Context, deliveryID string) (deliveryOutboxRecord, error) {
-	var rec deliveryOutboxRecord
-	err := o.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
-	return rec, err
-}
-
-// updateOutboxByDeliveryID applies column updates for rows matching delivery_id
-// and (optional) status filter. statusIn may be nil to skip status constraint.
-func (o *DeliveryOutbox) updateOutboxByDeliveryID(ctx context.Context, deliveryID string, statusIn []string, fields map[string]interface{}) (int64, error) {
-	q := o.db.WithContext(ctx).Model(outboxModel()).Where("delivery_id = ?", deliveryID)
-	if len(statusIn) > 0 {
-		q = q.Where("status IN ?", statusIn)
-	}
-	result := q.Updates(fields)
-	return result.RowsAffected, result.Error
-}
+// Delivery outbox orchestration residual (#801 file split):
+//   - delivery_outbox.go — Redispatcher port, DeliveryOutbox type, journal ops,
+//     retry loop, redispatch adapters (this file)
+//   - delivery_outbox_model.go — GORM record, Entry DTO, redispatchTarget, repo
+//   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
+// Pure helpers remain in service/deliveryoutbox (#514 + #744). Ports stay;
+// full model package move deferred.
 
 // ── Redispatcher port + DeliveryOutbox type ────────────────────────────────
 
@@ -276,6 +130,11 @@ func (o *DeliveryOutbox) AckDelivery(ctx context.Context, deliveryID string) err
 // ScanRetryableDeliveries returns deliveries eligible for retry: pending records
 // past their pending timeout, and sent records past their sent timeout.
 // Returns DeliveryOutboxEntry views so callers never hold the private GORM row type.
+//
+// SQL cutoffs mirror pure helpers: PendingRetryCutoff / SentRetryCutoff; the
+// retrying branch matches IsRetryingDue (next_retry_at IS NOT NULL AND <= now)
+// expressed in SQL for batch efficiency (IsRetryingDue remains available for
+// in-memory filters; do not change cutoff semantics).
 func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]DeliveryOutboxEntry, error) {
 	now := time.Now()
 	var records []deliveryOutboxRecord
@@ -320,12 +179,6 @@ func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]Deliver
 		entries[i] = r.toEntry()
 	}
 	return entries, nil
-}
-
-// computeNextRetryAt calculates the next retry time using exponential backoff.
-// Thin wrapper around pure deliveryoutbox helpers (clock fixed at call time).
-func computeNextRetryAt(attempt int) time.Time {
-	return deliveryoutbox.NextRetryAt(attempt, time.Now())
 }
 
 // MarkDeliveryRetrying transitions a delivery to retrying status and increments
@@ -569,79 +422,4 @@ func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID
 		return fmt.Errorf("redispatch: nil agent service")
 	}
 	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
-}
-
-// truncateString is a thin alias kept for same-package tests.
-func truncateString(s string, maxLen int) string {
-	return deliveryoutbox.TruncateString(s, maxLen)
-}
-
-// ── AgentService facade (wiring/handler stability) ───────────────────────────
-
-// deliveryOutboxService returns the composed DeliveryOutbox, lazily constructing
-// one from AgentService deps when tests use struct literals without NewAgentService.
-// Lazy path uses lazyDispatchRedispatcher so construction does not recurse into
-// dispatchService(); redispatch still lands on DispatchService at call time.
-func (s *AgentService) deliveryOutboxService() *DeliveryOutbox {
-	if s.deliveryOutbox != nil {
-		return s.deliveryOutbox
-	}
-	return NewDeliveryOutbox(s.db, lazyDispatchRedispatcher{s})
-}
-
-// RecordDelivery inserts a delivery_outbox entry in status=pending before
-// the Hub dispatches a task to the Edge. Returns the generated delivery_id.
-func (s *AgentService) RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
-	return s.deliveryOutboxService().RecordDelivery(ctx, taskID, payload, edgeDeviceID)
-}
-
-// MarkDeliverySent transitions an outbox record from pending to sent after
-// the Hub has dispatched the task to the Edge.
-func (s *AgentService) MarkDeliverySent(ctx context.Context, deliveryID string) error {
-	return s.deliveryOutboxService().MarkDeliverySent(ctx, deliveryID)
-}
-
-// AckDelivery marks an outbox record as delivered when the Edge acknowledges
-// the dispatch with the matching delivery_id.
-func (s *AgentService) AckDelivery(ctx context.Context, deliveryID string) error {
-	return s.deliveryOutboxService().AckDelivery(ctx, deliveryID)
-}
-
-// ScanRetryableDeliveries returns deliveries eligible for retry as
-// DeliveryOutboxEntry views (no private GORM row type on the facade).
-func (s *AgentService) ScanRetryableDeliveries(ctx context.Context) ([]DeliveryOutboxEntry, error) {
-	return s.deliveryOutboxService().ScanRetryableDeliveries(ctx)
-}
-
-// MarkDeliveryRetrying transitions a delivery to retrying status and increments
-// the attempt counter.
-func (s *AgentService) MarkDeliveryRetrying(ctx context.Context, deliveryID string, lastError string) (shouldRetry bool, err error) {
-	return s.deliveryOutboxService().MarkDeliveryRetrying(ctx, deliveryID, lastError)
-}
-
-// MoveDeliveryToDeadLetter explicitly moves a delivery to dead-letter status.
-func (s *AgentService) MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error {
-	return s.deliveryOutboxService().MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
-}
-
-// GetDeliveryStatus returns the current status of a delivery record.
-func (s *AgentService) GetDeliveryStatus(ctx context.Context, deliveryID string) (string, error) {
-	return s.deliveryOutboxService().GetDeliveryStatus(ctx, deliveryID)
-}
-
-// StartDeliveryRetryLoop starts a background goroutine that periodically scans
-// for retryable deliveries and re-dispatches them.
-func (s *AgentService) StartDeliveryRetryLoop(ctx context.Context) {
-	s.deliveryOutboxService().StartDeliveryRetryLoop(ctx)
-}
-
-// CleanupOldDeliveries removes delivered and dead-letter records older than
-// the given duration.
-func (s *AgentService) CleanupOldDeliveries(ctx context.Context, olderThan time.Duration) (int64, error) {
-	return s.deliveryOutboxService().CleanupOldDeliveries(ctx, olderThan)
-}
-
-// GetDeliveryStats returns aggregate stats for the delivery outbox.
-func (s *AgentService) GetDeliveryStats(ctx context.Context) (map[string]int64, error) {
-	return s.deliveryOutboxService().GetDeliveryStats(ctx)
 }
