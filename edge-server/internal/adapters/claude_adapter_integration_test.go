@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -83,13 +84,27 @@ func TestClaudeCodeIntegrationToolUse(t *testing.T) {
 	ctx := context.Background()
 	run := store.Run{ID: "run_int_tool", ProjectID: "proj_int", ThreadID: "thread_int", Status: "started"}
 
+	// Explicit workDir required (#854); use repo root so AGENTS.md is readable.
+	repoRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, "AGENTS.md")); err != nil {
+		t.Skipf("AGENTS.md not found under %s: %v", repoRoot, err)
+	}
+
 	// Prompt that requires a tool call (Read a specific file)
-	cmdPath, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
-		Run:    run,
-		Prompt: "read the file AGENTS.md and tell me the first rule mentioned in it",
+	cmdPath, args, _, workDir := adapter.BuildCommand(runnerctx.RunProcessContext{
+		Run:     run,
+		Prompt:  "read the file AGENTS.md and tell me the first rule mentioned in it",
+		WorkDir: repoRoot,
 	})
+	if workDir != repoRoot {
+		t.Fatalf("BuildCommand workDir = %q, want %q", workDir, repoRoot)
+	}
 
 	cmd := exec.CommandContext(ctx, cmdPath, args...)
+	cmd.Dir = workDir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)

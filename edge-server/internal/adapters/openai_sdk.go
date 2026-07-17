@@ -105,14 +105,14 @@ func (a *OpenAISDKAdapter) CapabilityHealthMetadata() map[string]any {
 		healthState = "unavailable"
 	}
 	return map[string]any{
-		"adapterId":           openaiSDKAdapterID,
-		"runtimeKind":         "sdk-http",
-		"fixtureOnly":         false,
-		"noSpendDefault":      false,
-		"transport":           "https-sse",
-		"healthState":         healthState,
-		"provider":            "openai",
-		"model":               a.model,
+		"adapterId":      openaiSDKAdapterID,
+		"runtimeKind":    "sdk-http",
+		"fixtureOnly":    false,
+		"noSpendDefault": false,
+		"transport":      "https-sse",
+		"healthState":    healthState,
+		"provider":       "openai",
+		"model":          a.model,
 		"capabilities": map[string]bool{
 			"streaming":       true,
 			"toolCalls":       true,
@@ -129,10 +129,10 @@ func (a *OpenAISDKAdapter) CapabilityHealthMetadata() map[string]any {
 // BuildCommand returns a sentinel command. The OpenAI SDK adapter does NOT
 // spawn a CLI subprocess — it makes direct HTTP calls in ParseStream.
 func (a *OpenAISDKAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
-	workDir := ctx.WorkDir
-	if workDir == "" {
-		workDir = DefaultWorkDir()
-	}
+	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
+	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
+	// if a bypass path reaches BuildCommand.
+	workDir := strings.TrimSpace(ctx.WorkDir)
 	cmd, args := sdkNoopCommand()
 	return cmd, args, nil, workDir
 }
@@ -550,12 +550,12 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 // --- OpenAI API types ---
 
 type openaiChatRequest struct {
-	Model           string               `json:"model"`
-	Messages        []openaiChatMessage  `json:"messages"`
-	Stream          bool                 `json:"stream"`
-	StreamOptions   *openaiStreamOptions `json:"stream_options,omitempty"`
+	Model           string                `json:"model"`
+	Messages        []openaiChatMessage   `json:"messages"`
+	Stream          bool                  `json:"stream"`
+	StreamOptions   *openaiStreamOptions  `json:"stream_options,omitempty"`
 	ResponseFormat  *openaiResponseFormat `json:"response_format,omitempty"`
-	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
+	ReasoningEffort string                `json:"reasoning_effort,omitempty"`
 }
 
 type openaiStreamOptions struct {
@@ -573,29 +573,29 @@ type openaiResponseFormat struct {
 }
 
 type openaiChatChunk struct {
-	ID      string           `json:"id"`
-	Object  string           `json:"object"`
-	Choices []openaiChoice   `json:"choices"`
+	ID      string            `json:"id"`
+	Object  string            `json:"object"`
+	Choices []openaiChoice    `json:"choices"`
 	Usage   *openaiChunkUsage `json:"usage,omitempty"`
 }
 
 type openaiChoice struct {
-	Index        int            `json:"index"`
-	Delta        *openaiDelta   `json:"delta,omitempty"`
-	FinishReason string         `json:"finish_reason,omitempty"`
+	Index        int          `json:"index"`
+	Delta        *openaiDelta `json:"delta,omitempty"`
+	FinishReason string       `json:"finish_reason,omitempty"`
 }
 
 type openaiDelta struct {
-	Role             string         `json:"role,omitempty"`
-	Content          string         `json:"content,omitempty"`
-	ReasoningContent string         `json:"reasoning_content,omitempty"`
+	Role             string                `json:"role,omitempty"`
+	Content          string                `json:"content,omitempty"`
+	ReasoningContent string                `json:"reasoning_content,omitempty"`
 	ToolCalls        []openaiToolCallDelta `json:"tool_calls,omitempty"`
 }
 
 type openaiToolCallDelta struct {
-	Index    int                       `json:"index"`
-	ID       string                    `json:"id,omitempty"`
-	Type     string                    `json:"type,omitempty"`
+	Index    int                         `json:"index"`
+	ID       string                      `json:"id,omitempty"`
+	Type     string                      `json:"type,omitempty"`
 	Function openaiToolCallDeltaFunction `json:"function,omitempty"`
 }
 
@@ -611,7 +611,7 @@ type openaiChunkUsage struct {
 }
 
 type openaiToolCallAccumulator struct {
-	ID         string
-	Name       string
-	Arguments  strings.Builder
+	ID        string
+	Name      string
+	Arguments strings.Builder
 }

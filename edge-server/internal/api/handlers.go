@@ -115,7 +115,8 @@ func denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (h *Handler) validateWorkDirAllowed(workDir string) error {
-	// Empty workDir is allowed (no workspace path specified).
+	// Empty workDir is allowed for non-run endpoints (e.g. optional read paths).
+	// Run-start uses validateRunWorkDir, which rejects empty values (#854).
 	if workDir == "" {
 		return nil
 	}
@@ -143,6 +144,16 @@ func (h *Handler) validateWorkDirAllowed(workDir string) error {
 		}
 	}
 	return fmt.Errorf("workDir is outside the Edge workspace allowlist")
+}
+
+// validateRunWorkDir enforces a non-empty workDir for adapter-backed run starts,
+// then applies the workspace allowlist check. Callers should pass the trimmed
+// workDir value and use the returned error for HTTP mapping.
+func (h *Handler) validateRunWorkDir(workDir string) error {
+	if strings.TrimSpace(workDir) == "" {
+		return errcode.ErrWorkDirRequired
+	}
+	return h.validateWorkDirAllowed(workDir)
 }
 
 func ensureStore(h *Handler) store.Repository {
