@@ -3,7 +3,7 @@
 > last-updated: 2026-07-17
 > issue: #685 (third IM typed-service package move `service/contact`; prior #673 / #662 / #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
 > status: map current — pure helpers closed for runtime + **#628/#639/#651 IM pure package** (`service/im`) + **#662 first IM typed-service package** (`service/messagereaction`) + **#673 second IM typed-service package** (`service/workspace`, DB-only) + **#685 third IM typed-service package** (`service/contact`, bus+cache ports); Message/Session/Attachment thin ports still same-package; remaining IM typed-service package moves one-at-a-time; next residual = next IM typed package (Attachment recommended next) / optional outbox model package move
-> companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/messagereaction` / `service/workspace` / `service/contact` / `service/contact`
+> companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/messagereaction` / `service/workspace` / `service/contact`
 
 This document is the authoritative **read-only boundary map** for
 `hub-server/internal/service`. It records package shape, coupling risks,
