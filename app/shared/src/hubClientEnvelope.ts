@@ -100,6 +100,20 @@ export async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Shared success-path response peel for request/upload/retry.
+ * Throws parseHubError on non-OK; maps 204 → undefined; otherwise unwraps envelope.
+ */
+export async function parseHubSuccessResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw await parseHubError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  return unwrapHubResponse<T>(await readJson(response), response.status);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
