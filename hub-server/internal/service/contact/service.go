@@ -1,58 +1,53 @@
-package service
+package contact
 
 import (
 	"context"
 	"log/slog"
+	"reflect"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
-// ── ContactService ports + type ──────────────────────────────────────────────
-//
-// Same-package thin first seam (#594): ContactService already owns contact/
-// friendship orchestration (search/request/accept/reject/list/remove/block/
-// unblock/remark). This seam hardens replaceable ports (bus + cache) without a
-// package move — same pattern as MessageService (#585) / DispatchService /
-// EdgeCallbackService. Full service/im subpackage extract remains deferred.
-// SessionService is owned by #593 and is out of scope here.
-
-// contactBus publishes domain events from contact write paths.
-// Implemented by *Bus.
-type contactBus interface {
-	Publish(ctx context.Context, event Event)
+// Bus publishes domain events from contact write paths.
+// *service.Bus satisfies this port via Publish(ctx, service.Event).
+type Bus interface {
+	Publish(ctx context.Context, event service.Event)
 }
 
-// contactCache is the subset of *cache.Client methods used by ContactService.
+// Cache is the subset of *cache.Client methods used by Contact Service.
 // Implemented by *cache.Client and cache.NoOpCache.
-type contactCache interface {
+type Cache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	IsOnline(ctx context.Context, userID string) (bool, error)
 }
 
-// ContactService owns contact/friendship orchestration in the flat service
-// package: user search, friend request lifecycle, contact list/remove, block/
-// unblock, remark, and friend-ID projection. Friend-list invalidation and
-// presence use injected contactCache; domain events go through contactBus.
-// Not a package move (#594).
-type ContactService struct {
+// Service owns contact/friendship orchestration: user search, friend request
+// lifecycle, contact list/remove, block/unblock, remark, and friend-ID
+// projection. Friend-list invalidation and presence use injected Cache; domain
+// events go through Bus. This package is the third IM typed-service extract
+// (#685) after messagereaction (#662) and workspace (#673). Ports were
+// hardened in #594; package move only.
+type Service struct {
 	db          *gorm.DB
-	bus         contactBus
-	cacheClient contactCache
+	bus         Bus
+	cacheClient Cache
 }
 
-// NewContactService constructs a ContactService.
+// NewService constructs a contact service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
 // cacheClient may be nil and falls back to cache.NoOpCache.
-func NewContactService(db *gorm.DB, bus contactBus, cacheClient contactCache) *ContactService {
-	return &ContactService{db: db, bus: bus, cacheClient: resolveContactCache(cacheClient)}
+func NewService(db *gorm.DB, bus Bus, cacheClient Cache) *Service {
+	return &Service{db: db, bus: bus, cacheClient: resolveCache(cacheClient)}
 }
 
 // SetBus injects (or replaces) the event bus port.
-func (s *ContactService) SetBus(bus contactBus) {
+func (s *Service) SetBus(bus Bus) {
 	if s == nil {
 		return
 	}
@@ -60,21 +55,43 @@ func (s *ContactService) SetBus(bus contactBus) {
 }
 
 // SetCache injects (or replaces) the contact cache port.
-func (s *ContactService) SetCache(cacheClient contactCache) {
+func (s *Service) SetCache(cacheClient Cache) {
 	if s == nil {
 		return
 	}
-	s.cacheClient = resolveContactCache(cacheClient)
+	s.cacheClient = resolveCache(cacheClient)
 }
 
 // publish is a nil-safe wrapper over the bus port.
-func (s *ContactService) publish(ctx context.Context, event Event) {
+func (s *Service) publish(ctx context.Context, event service.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
 	s.bus.Publish(ctx, event)
 }
 
+func resolveCache(c Cache) Cache {
+	if isNilCache(c) {
+		return cache.NoOpCache{}
+	}
+	return c
+}
+
+func isNilCache(c any) bool {
+	if c == nil {
+		return true
+	}
+	v := reflect.ValueOf(c)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
+// SearchResult is the API/handler DTO for user search.
+// JSON field names are contract-stable.
 type SearchResult struct {
 	UserID       string `json:"user_id"`
 	Username     string `json:"username"`
@@ -83,6 +100,8 @@ type SearchResult struct {
 	Relationship string `json:"relationship"`
 }
 
+// RequestInfo is the API/handler DTO for a received friend request.
+// JSON field names are contract-stable.
 type RequestInfo struct {
 	RequestID string `json:"request_id"`
 	UserID    string `json:"user_id"`
@@ -93,6 +112,8 @@ type RequestInfo struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// ContactInfo is the API/handler DTO for one accepted contact.
+// JSON field names are contract-stable.
 type ContactInfo struct {
 	UserID    string `json:"user_id"`
 	Username  string `json:"username"`
@@ -103,7 +124,7 @@ type ContactInfo struct {
 	Type      string `json:"type"`
 }
 
-func (s *ContactService) SearchUser(ctx context.Context, currentUserID, targetID string) (*SearchResult, error) {
+func (s *Service) SearchUser(ctx context.Context, currentUserID, targetID string) (*SearchResult, error) {
 	if targetID == currentUserID {
 		return nil, errcode.UserInvalidParam
 	}
@@ -145,7 +166,7 @@ func (s *ContactService) SearchUser(ctx context.Context, currentUserID, targetID
 	}, nil
 }
 
-func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID, message string) error {
+func (s *Service) SendFriendRequest(ctx context.Context, userID, friendID, message string) error {
 	if friendID == userID {
 		return errcode.UserInvalidParam
 	}
@@ -183,8 +204,8 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 		return err
 	}
 
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
-	s.publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
+	s.publish(ctx, service.Event{Type: "friend.request", Payload: map[string]interface{}{
 		"request_id":   f.ID,
 		"from_user_id": userID,
 		"message":      message,
@@ -193,7 +214,7 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 	return nil
 }
 
-func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) ([]RequestInfo, error) {
+func (s *Service) ListFriendRequests(ctx context.Context, userID string) ([]RequestInfo, error) {
 	requests, err := repository.ListReceivedRequests(s.db, userID)
 	if err != nil {
 		return nil, err
@@ -234,7 +255,7 @@ func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) 
 	return result, nil
 }
 
-func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, requestID string) error {
+func (s *Service) AcceptFriendRequest(ctx context.Context, userID, requestID string) error {
 	r, err := repository.GetFriendshipByID(s.db, requestID)
 	if err != nil {
 		return errcode.FriendRequestNotFound
@@ -258,8 +279,8 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 		return err
 	}
 
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
-	s.publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	s.publish(ctx, service.Event{Type: "friend.accepted", Payload: map[string]interface{}{
 		"friendship_id": r.ID,
 		"user_id":       r.UserID,
 		"accepter_id":   userID,
@@ -267,7 +288,7 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 	return nil
 }
 
-func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, requestID string) error {
+func (s *Service) RejectFriendRequest(ctx context.Context, userID, requestID string) error {
 	r, err := repository.GetFriendshipByID(s.db, requestID)
 	if err != nil {
 		return errcode.FriendRequestNotFound
@@ -278,11 +299,11 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if err := repository.DeleteFriendship(s.db, r); err != nil {
 		return err
 	}
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
-func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]ContactInfo, error) {
+func (s *Service) ListContacts(ctx context.Context, userID string) ([]ContactInfo, error) {
 	friends, err := repository.ListAcceptedFriends(s.db, userID)
 	if err != nil {
 		return nil, err
@@ -309,7 +330,7 @@ func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]Con
 		if !ok {
 			continue
 		}
-		online, _ := resolveContactCache(s.cacheClient).IsOnline(ctx, friend.ID)
+		online, _ := resolveCache(s.cacheClient).IsOnline(ctx, friend.ID)
 		result = append(result, ContactInfo{
 			UserID:    friend.ID,
 			Username:  friend.Username,
@@ -323,7 +344,7 @@ func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]Con
 	return result, nil
 }
 
-func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, friendUserID string) error {
+func (s *Service) RemoveContact(ctx context.Context, currentUserID, friendUserID string) error {
 	_, err := repository.GetFriendship(s.db, currentUserID, friendUserID)
 	if err != nil {
 		return errcode.FriendRequestNotFound
@@ -331,11 +352,11 @@ func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, frien
 	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
 		return err
 	}
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
 	return nil
 }
 
-func (s *ContactService) BlockContact(ctx context.Context, currentUserID, targetUserID string) error {
+func (s *Service) BlockContact(ctx context.Context, currentUserID, targetUserID string) error {
 	if targetUserID == currentUserID {
 		return errcode.UserInvalidParam
 	}
@@ -353,11 +374,11 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 	}); err != nil {
 		return err
 	}
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
-func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targetUserID string) error {
+func (s *Service) UnblockContact(ctx context.Context, currentUserID, targetUserID string) error {
 	f, err := repository.GetFriendship(s.db, currentUserID, targetUserID)
 	if err != nil || f.Status != model.StatusBlocked {
 		return errcode.FriendRequestNotFound
@@ -365,11 +386,11 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err := repository.DeleteFriendship(s.db, f); err != nil {
 		return err
 	}
-	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
-func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
+func (s *Service) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
 	if err := repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark); err != nil {
 		return repository.WrapNotFound(err, errcode.FriendRemarkNoRow)
 	}
@@ -377,6 +398,6 @@ func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friend
 }
 
 // GetFriendIDs returns the IDs of all accepted friends of the given user. Thin wrapper over repository.GetFriendIDs.
-func (s *ContactService) GetFriendIDs(userID string) ([]string, error) {
+func (s *Service) GetFriendIDs(userID string) ([]string, error) {
 	return repository.GetFriendIDs(s.db, userID)
 }

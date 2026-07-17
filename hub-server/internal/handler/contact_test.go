@@ -8,29 +8,29 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/contact"
 )
 
 type mockContactService struct {
-	searchUserFn          func(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error)
+	searchUserFn          func(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error)
 	sendFriendRequestFn   func(ctx context.Context, userID, friendID, message string) error
-	listFriendRequestsFn  func(ctx context.Context, userID string) ([]service.RequestInfo, error)
+	listFriendRequestsFn  func(ctx context.Context, userID string) ([]contact.RequestInfo, error)
 	acceptFriendRequestFn func(ctx context.Context, userID, requestID string) error
 	rejectFriendRequestFn func(ctx context.Context, userID, requestID string) error
-	listContactsFn        func(ctx context.Context, userID string) ([]service.ContactInfo, error)
+	listContactsFn        func(ctx context.Context, userID string) ([]contact.ContactInfo, error)
 	removeContactFn       func(ctx context.Context, currentUserID, friendUserID string) error
 	blockContactFn        func(ctx context.Context, currentUserID, targetUserID string) error
 	unblockContactFn      func(ctx context.Context, currentUserID, targetUserID string) error
 	updateRemarkFn        func(ctx context.Context, currentUserID, friendUserID, remark string) error
 }
 
-func (m *mockContactService) SearchUser(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error) {
+func (m *mockContactService) SearchUser(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error) {
 	return m.searchUserFn(ctx, currentUserID, targetID)
 }
 func (m *mockContactService) SendFriendRequest(ctx context.Context, userID, friendID, message string) error {
 	return m.sendFriendRequestFn(ctx, userID, friendID, message)
 }
-func (m *mockContactService) ListFriendRequests(ctx context.Context, userID string) ([]service.RequestInfo, error) {
+func (m *mockContactService) ListFriendRequests(ctx context.Context, userID string) ([]contact.RequestInfo, error) {
 	return m.listFriendRequestsFn(ctx, userID)
 }
 func (m *mockContactService) AcceptFriendRequest(ctx context.Context, userID, requestID string) error {
@@ -39,7 +39,7 @@ func (m *mockContactService) AcceptFriendRequest(ctx context.Context, userID, re
 func (m *mockContactService) RejectFriendRequest(ctx context.Context, userID, requestID string) error {
 	return m.rejectFriendRequestFn(ctx, userID, requestID)
 }
-func (m *mockContactService) ListContacts(ctx context.Context, userID string) ([]service.ContactInfo, error) {
+func (m *mockContactService) ListContacts(ctx context.Context, userID string) ([]contact.ContactInfo, error) {
 	return m.listContactsFn(ctx, userID)
 }
 func (m *mockContactService) RemoveContact(ctx context.Context, currentUserID, friendUserID string) error {
@@ -59,8 +59,8 @@ func (m *mockContactService) UpdateRemark(ctx context.Context, currentUserID, fr
 
 func TestContactHandler_SearchUser_Success(t *testing.T) {
 	svc := &mockContactService{
-		searchUserFn: func(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error) {
-			return &service.SearchResult{UserID: "u2", Username: "friend", Nickname: "Friend", Relationship: "stranger"}, nil
+		searchUserFn: func(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error) {
+			return &contact.SearchResult{UserID: "u2", Username: "friend", Nickname: "Friend", Relationship: "stranger"}, nil
 		},
 	}
 	h := handler.NewContactHandler(svc)
@@ -88,7 +88,7 @@ func TestContactHandler_SearchUser_EmptyID(t *testing.T) {
 
 func TestContactHandler_SearchUser_NotFound(t *testing.T) {
 	svc := &mockContactService{
-		searchUserFn: func(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error) {
+		searchUserFn: func(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error) {
 			return nil, errcode.UserNotFound
 		},
 	}
@@ -156,8 +156,8 @@ func TestContactHandler_SendFriendRequest_AlreadyFriend(t *testing.T) {
 
 func TestContactHandler_ListFriendRequests_Success(t *testing.T) {
 	svc := &mockContactService{
-		listFriendRequestsFn: func(ctx context.Context, userID string) ([]service.RequestInfo, error) {
-			return []service.RequestInfo{
+		listFriendRequestsFn: func(ctx context.Context, userID string) ([]contact.RequestInfo, error) {
+			return []contact.RequestInfo{
 				{RequestID: "r1", UserID: "u2", Username: "friend", Nickname: "Friend", Message: "Hi", CreatedAt: "2026-01-01T00:00:00Z"},
 			}, nil
 		},
@@ -228,8 +228,8 @@ func TestContactHandler_RejectFriendRequest_Success(t *testing.T) {
 
 func TestContactHandler_ListContacts_Success(t *testing.T) {
 	svc := &mockContactService{
-		listContactsFn: func(ctx context.Context, userID string) ([]service.ContactInfo, error) {
-			return []service.ContactInfo{
+		listContactsFn: func(ctx context.Context, userID string) ([]contact.ContactInfo, error) {
+			return []contact.ContactInfo{
 				{UserID: "u2", Username: "friend", Nickname: "Friend", Online: true, Type: "user"},
 			}, nil
 		},

@@ -1,4 +1,4 @@
-package service
+package contact
 
 import (
 	"context"
@@ -9,16 +9,20 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
-// mockContactCache implements contactCache for testing.
+// mockContactCache implements Cache for testing.
 type mockContactCache struct {
 	invalidated []string
 	online      map[string]bool
@@ -36,30 +40,62 @@ func (m *mockContactCache) IsOnline(ctx context.Context, userID string) (bool, e
 	return m.online[userID], nil
 }
 
-// recordingContactBus is a contactBus test double that records Publish calls.
+// recordingContactBus is a Bus test double that records Publish calls.
 type recordingContactBus struct {
-	events []Event
+	events []service.Event
 }
 
-func (b *recordingContactBus) Publish(ctx context.Context, event Event) {
+func (b *recordingContactBus) Publish(ctx context.Context, event service.Event) {
 	b.events = append(b.events, event)
 }
 
-func TestContactService_NilBusPublishIsNoop(t *testing.T) {
-	svc := &ContactService{db: nil, bus: nil, cacheClient: &mockContactCache{}}
-	// Must not panic when bus port is unset (read-only/partial construction).
-	svc.publish(context.Background(), Event{Type: "friend.request", Payload: "x"})
+
+func newTestBus(t *testing.T) *service.Bus {
+	t.Helper()
+	b, err := service.NewBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(b.Close)
+	return b
 }
 
-func TestContactService_SetBusAndSetCachePorts(t *testing.T) {
+func testCacheClient(t *testing.T) *cache.Client {
+	t.Helper()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	return cache.NewClient(rdb)
+}
+
+func TestService_ResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
+	ctx := context.Background()
+	var typedNil *cache.Client
+
+	resolved := resolveCache(typedNil)
+	require.IsType(t, cache.NoOpCache{}, resolved)
+	online, err := resolved.IsOnline(ctx, "user-1")
+	require.NoError(t, err)
+	require.False(t, online)
+	require.NoError(t, resolved.Invalidate(ctx, "user:friends:user-1"))
+}
+
+func TestService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &Service{db: nil, bus: nil, cacheClient: &mockContactCache{}}
+	// Must not panic when bus port is unset (read-only/partial construction).
+	svc.publish(context.Background(), service.Event{Type: "friend.request", Payload: "x"})
+}
+
+func TestService_SetBusAndSetCachePorts(t *testing.T) {
 	bus := &recordingContactBus{}
 	cache := &mockContactCache{}
-	svc := NewContactService(nil, nil, nil)
+	svc := NewService(nil, nil, nil)
 	require.NotNil(t, svc)
 
 	svc.SetBus(bus)
 	svc.SetCache(cache)
-	svc.publish(context.Background(), Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
+	svc.publish(context.Background(), service.Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
 
 	require.Len(t, bus.events, 1)
 	assert.Equal(t, "friend.accepted", bus.events[0].Type)
@@ -105,7 +141,7 @@ func TestSearchUser_SelfSearch(t *testing.T) {
 	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	_, err := svc.SearchUser(context.Background(), "user-1", "user-1")
 	assert.ErrorIs(t, err, errcode.UserInvalidParam)
 }
@@ -118,7 +154,7 @@ func TestSearchUser_NotFound(t *testing.T) {
 		WithArgs("target-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	_, err := svc.SearchUser(context.Background(), "user-1", "target-99")
 	assert.ErrorIs(t, err, errcode.UserNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -137,7 +173,7 @@ func TestSearchUser_Stranger(t *testing.T) {
 		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	result, err := svc.SearchUser(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.Equal(t, "target-1", result.UserID)
@@ -160,7 +196,7 @@ func TestSearchUser_Friend(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
 			AddRow("f-1", "user-1", "target-1", model.StatusAccepted, "my friend"))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	result, err := svc.SearchUser(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.Equal(t, "friend", result.Relationship)
@@ -181,7 +217,7 @@ func TestSearchUser_PendingSent(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-2", "user-1", "target-1", model.StatusPending))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	result, err := svc.SearchUser(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.Equal(t, "pending_sent", result.Relationship)
@@ -202,7 +238,7 @@ func TestSearchUser_PendingReceived(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-3", "target-1", "user-1", model.StatusPending))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	result, err := svc.SearchUser(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.Equal(t, "pending_received", result.Relationship)
@@ -223,7 +259,7 @@ func TestSearchUser_Blocked(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-4", "target-1", "user-1", model.StatusBlocked))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	_, err := svc.SearchUser(context.Background(), "user-1", "target-1")
 	assert.ErrorIs(t, err, errcode.FriendBlocked)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -235,7 +271,7 @@ func TestSendFriendRequest_SelfRequest(t *testing.T) {
 	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "user-1", "please add me")
 	assert.ErrorIs(t, err, errcode.UserInvalidParam)
 }
@@ -248,7 +284,7 @@ func TestSendFriendRequest_TargetNotFound(t *testing.T) {
 		WithArgs("nonexistent", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "nonexistent", "hello")
 	assert.ErrorIs(t, err, errcode.UserNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -268,7 +304,7 @@ func TestSendFriendRequest_AlreadyFriends(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-1", "user-1", "target-1", model.StatusAccepted))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "hello")
 	assert.ErrorIs(t, err, errcode.FriendAlready)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -288,7 +324,7 @@ func TestSendFriendRequest_BlockedByTarget(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-block", "target-1", "user-1", model.StatusBlocked))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "hello")
 	assert.ErrorIs(t, err, errcode.FriendBlocked)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -310,7 +346,7 @@ func TestSendFriendRequest_Success(t *testing.T) {
 	mock.ExpectExec(sqlcInsertFriend).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "please add me")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -334,7 +370,7 @@ func TestSendFriendRequest_PublishesDocumentedEventPayload(t *testing.T) {
 
 	bus := newTestBus(t)
 	events := captureServiceEvents(bus, "friend.request")
-	svc := NewContactService(db, bus, nil)
+	svc := NewService(db, bus, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "please add me")
 	require.NoError(t, err)
 
@@ -361,7 +397,7 @@ func TestSendFriendRequest_PendingAlready(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-existing", "user-1", "target-1", model.StatusPending))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "hello")
 	assert.ErrorIs(t, err, errcode.FriendAlready)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -377,7 +413,7 @@ func TestAcceptFriendRequest_NotFound(t *testing.T) {
 		WithArgs("req-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-99")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -392,7 +428,7 @@ func TestAcceptFriendRequest_WrongReceiver(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message"}).
 			AddRow("req-1", "sender", "other-user", model.StatusPending, "add me"))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -407,7 +443,7 @@ func TestAcceptFriendRequest_AlreadyAccepted(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("req-1", "sender", "user-1", model.StatusAccepted))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -431,7 +467,7 @@ func TestAcceptFriendRequest_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -456,7 +492,7 @@ func TestAcceptFriendRequest_PublishesAcceptedEventAfterMutation(t *testing.T) {
 
 	bus := newTestBus(t)
 	events := captureServiceEvents(bus, "friend.accepted")
-	svc := NewContactService(db, bus, testCacheClient(t))
+	svc := NewService(db, bus, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	require.NoError(t, err)
 
@@ -484,7 +520,7 @@ func TestAcceptFriendRequest_NilCacheDoesNotPanic(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -500,7 +536,7 @@ func TestRejectFriendRequest_NotFound(t *testing.T) {
 		WithArgs("req-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.RejectFriendRequest(context.Background(), "user-1", "req-99")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -519,7 +555,7 @@ func TestRejectFriendRequest_Success(t *testing.T) {
 		WithArgs("req-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.RejectFriendRequest(context.Background(), "user-1", "req-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -535,7 +571,7 @@ func TestRemoveContact_NotFound(t *testing.T) {
 		WithArgs("user-1", "friend-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.RemoveContact(context.Background(), "user-1", "friend-1")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -557,7 +593,7 @@ func TestRemoveContact_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectCommit()
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.RemoveContact(context.Background(), "user-1", "friend-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -569,7 +605,7 @@ func TestBlockContact_SelfBlock(t *testing.T) {
 	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.BlockContact(context.Background(), "user-1", "user-1")
 	assert.ErrorIs(t, err, errcode.UserInvalidParam)
 }
@@ -582,7 +618,7 @@ func TestBlockContact_TargetNotFound(t *testing.T) {
 		WithArgs("nonexistent", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.BlockContact(context.Background(), "user-1", "nonexistent")
 	assert.ErrorIs(t, err, errcode.UserNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -601,7 +637,7 @@ func TestBlockContact_Success(t *testing.T) {
 	mock.ExpectExec(sqlcInsertFriend).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.BlockContact(context.Background(), "user-1", "target-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -617,7 +653,7 @@ func TestUnblockContact_NotFoundOrNotBlocked(t *testing.T) {
 		WithArgs("user-1", "target-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.UnblockContact(context.Background(), "user-1", "target-1")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -632,7 +668,7 @@ func TestUnblockContact_NotBlockedStatus(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
 			AddRow("f-1", "user-1", "target-1", model.StatusAccepted))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.UnblockContact(context.Background(), "user-1", "target-1")
 	assert.ErrorIs(t, err, errcode.FriendRequestNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -651,7 +687,7 @@ func TestUnblockContact_Success(t *testing.T) {
 		WithArgs("f-block").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	err := svc.UnblockContact(context.Background(), "user-1", "target-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -667,7 +703,7 @@ func TestListContacts_Empty(t *testing.T) {
 		WithArgs("user-1", model.StatusAccepted).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	contacts, err := svc.ListContacts(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Empty(t, contacts)
@@ -690,7 +726,7 @@ func TestListContacts_WithFriends(t *testing.T) {
 			AddRow("friend-a", "friendA", "hash1", "Friend A", "").
 			AddRow("friend-b", "friendB", "hash2", "Friend B", "https://img.url"))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	contacts, err := svc.ListContacts(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Len(t, contacts, 2)
@@ -718,7 +754,7 @@ func TestListContacts_NilCacheMarksOffline(t *testing.T) {
 			AddRow("friend-a", "friendA", "hash1", "Friend A", "").
 			AddRow("friend-b", "friendB", "hash2", "Friend B", "https://img.url"))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	contacts, err := svc.ListContacts(context.Background(), "user-1")
 	require.NoError(t, err)
 	require.Len(t, contacts, 2)
@@ -745,7 +781,7 @@ func TestListContacts_BatchesFriendUserLookup(t *testing.T) {
 			AddRow("friend-b", "friendB", "hash-b", "Friend B", "").
 			AddRow("friend-c", "friendC", "hash-c", "Friend C", ""))
 
-	svc := NewContactService(db, nil, testCacheClient(t))
+	svc := NewService(db, nil, testCacheClient(t))
 	contacts, err := svc.ListContacts(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Len(t, contacts, 3)
@@ -763,7 +799,7 @@ func TestUpdateRemark(t *testing.T) {
 		WithArgs("Best Friend", sqlmock.AnyArg(), "user-1", "friend-1", model.StatusAccepted).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	err := svc.UpdateRemark(context.Background(), "user-1", "friend-1", "Best Friend")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -779,7 +815,7 @@ func TestListFriendRequests_Empty(t *testing.T) {
 		WithArgs("user-1", model.StatusPending).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message", "created_at"}))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	requests, err := svc.ListFriendRequests(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Empty(t, requests)
@@ -801,7 +837,7 @@ func TestListFriendRequests_WithRequests(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
 			AddRow("sender-a", "senderA", "hash", "Sender A", "https://avatar.com/a.png"))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	requests, err := svc.ListFriendRequests(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Len(t, requests, 1)
@@ -830,7 +866,7 @@ func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.
 			AddRow("sender-a", "senderA", "hash-a", "Sender A", "").
 			AddRow("sender-b", "senderB", "hash-b", "Sender B", ""))
 
-	svc := NewContactService(db, nil, nil)
+	svc := NewService(db, nil, nil)
 	requests, err := svc.ListFriendRequests(context.Background(), "user-1")
 	require.NoError(t, err)
 	require.Len(t, requests, 2)
@@ -839,15 +875,15 @@ func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func captureServiceEvents(bus *Bus, eventType string) <-chan Event {
-	events := make(chan Event, 1)
-	bus.Subscribe(eventType, func(ctx context.Context, event Event) {
+func captureServiceEvents(bus *service.Bus, eventType string) <-chan service.Event {
+	events := make(chan service.Event, 1)
+	bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
 		events <- event
 	})
 	return events
 }
 
-func waitForServiceEventPayload(t *testing.T, events <-chan Event) map[string]interface{} {
+func waitForServiceEventPayload(t *testing.T, events <-chan service.Event) map[string]interface{} {
 	t.Helper()
 	select {
 	case event := <-events:
