@@ -3,8 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -36,15 +34,15 @@ type Thread struct {
 }
 
 type Run struct {
-	ID                  string `json:"runId"`
-	ProjectID           string `json:"projectId"`
-	ThreadID            string `json:"threadId"`
-	Status              string `json:"status"`
-	RetryCount          int    `json:"retryCount"`
-	CreatedAt           string `json:"createdAt"`
-	StartedAt           string `json:"startedAt,omitempty"`
-	FinishedAt          string `json:"finishedAt,omitempty"`
-	EvidenceGateResult  string `json:"evidenceGateResult,omitempty"`
+	ID                 string `json:"runId"`
+	ProjectID          string `json:"projectId"`
+	ThreadID           string `json:"threadId"`
+	Status             string `json:"status"`
+	RetryCount         int    `json:"retryCount"`
+	CreatedAt          string `json:"createdAt"`
+	StartedAt          string `json:"startedAt,omitempty"`
+	FinishedAt         string `json:"finishedAt,omitempty"`
+	EvidenceGateResult string `json:"evidenceGateResult,omitempty"`
 }
 
 type RunDiffFile struct {
@@ -220,18 +218,18 @@ type RunCleaner interface {
 type Store struct {
 	mu sync.RWMutex
 
-	projects       map[string]Project
-	threads        map[string]Thread
-	runs           map[string]Run
-	items          map[string]Item
-	pins           map[string]ThreadPin
-	diffs          map[string]RunDiffFile
-	artifacts      map[string]Artifact
-	previews       map[string]Preview
-	userProfiles   map[string]UserProfile
-	agentProfiles  map[string]AgentProfile
-	settings       map[string]string
-	settingsMtime  string
+	projects      map[string]Project
+	threads       map[string]Thread
+	runs          map[string]Run
+	items         map[string]Item
+	pins          map[string]ThreadPin
+	diffs         map[string]RunDiffFile
+	artifacts     map[string]Artifact
+	previews      map[string]Preview
+	userProfiles  map[string]UserProfile
+	agentProfiles map[string]AgentProfile
+	settings      map[string]string
+	settingsMtime string
 
 	projectOrder      []string
 	threadOrder       []string
@@ -315,55 +313,6 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.previewOrder = normalizeOrder(snapshot.PreviewOrder, s.previews)
 	s.userProfileOrder = normalizeOrder(snapshot.UserProfileOrder, s.userProfiles)
 	s.agentProfileOrder = normalizeOrder(snapshot.AgentProfileOrder, s.agentProfiles)
-}
-
-func copyMap[K comparable, V any](source map[K]V) map[K]V {
-	copied := make(map[K]V, len(source))
-	for key, value := range source {
-		copied[key] = value
-	}
-	return copied
-}
-
-func cloneArtifactMap(source map[string]Artifact) map[string]Artifact {
-	copied := make(map[string]Artifact, len(source))
-	for key, value := range source {
-		copied[key] = cloneArtifact(value)
-	}
-	return copied
-}
-
-func cloneArtifact(artifact Artifact) Artifact {
-	if artifact.ContentSource == nil {
-		return artifact
-	}
-	source := *artifact.ContentSource
-	artifact.ContentSource = &source
-	return artifact
-}
-
-func normalizeOrder[V any](order []string, items map[string]V) []string {
-	normalized := make([]string, 0, len(items))
-	seen := make(map[string]struct{}, len(items))
-	for _, id := range order {
-		if _, ok := items[id]; !ok {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		normalized = append(normalized, id)
-		seen[id] = struct{}{}
-	}
-
-	missing := make([]string, 0, len(items)-len(seen))
-	for id := range items {
-		if _, ok := seen[id]; !ok {
-			missing = append(missing, id)
-		}
-	}
-	sort.Strings(missing)
-	return append(normalized, missing...)
 }
 
 func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
@@ -821,39 +770,6 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	}
 }
 
-func filterIDs(ids []string, keep func(string) bool) []string {
-	filtered := ids[:0]
-	for _, id := range ids {
-		if keep(id) {
-			filtered = append(filtered, id)
-		}
-	}
-	return filtered
-}
-
-func isTerminalRunStatus(status string) bool {
-	switch status {
-	case "cancelled", "failed", "finished", "completed_with_issues":
-		return true
-	default:
-		return false
-	}
-}
-
-func runTerminalTime(run Run) (time.Time, bool) {
-	if run.FinishedAt != "" {
-		if t, err := time.Parse(time.RFC3339, run.FinishedAt); err == nil {
-			return t, true
-		}
-	}
-	if run.CreatedAt != "" {
-		if t, err := time.Parse(time.RFC3339, run.CreatedAt); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
-}
-
 func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1092,180 +1008,6 @@ func (s *Store) removePins(match func(ThreadPin) bool) {
 	})
 }
 
-func threadPinKey(threadID, itemID string) string {
-	return threadID + "\x00" + itemID
-}
-
-func runDiffFileKey(runID, path string) string {
-	return runID + "\x00" + path
-}
-
-const (
-	ArtifactContentSourceWorkspaceRelative = "workspace_relative"
-	ArtifactContentSourceBasename          = "basename"
-)
-
-func NewArtifactContentSource(workspaceRoot, sourcePath string) *ArtifactContentSource {
-	sourcePath = strings.TrimSpace(sourcePath)
-	if sourcePath == "" {
-		return nil
-	}
-
-	if isPathAbsolute(sourcePath) {
-		if relPath, ok := workspaceRelativeSourcePath(workspaceRoot, sourcePath); ok {
-			return &ArtifactContentSource{
-				Kind:     ArtifactContentSourceWorkspaceRelative,
-				Path:     relPath,
-				Readable: true,
-			}
-		}
-		base := artifactBaseName(sourcePath)
-		if base == "" {
-			return nil
-		}
-		return &ArtifactContentSource{
-			Kind:     ArtifactContentSourceBasename,
-			Path:     base,
-			Readable: false,
-		}
-	}
-
-	if relPath, ok := safeWorkspaceRelativePath(sourcePath); ok {
-		return &ArtifactContentSource{
-			Kind:     ArtifactContentSourceWorkspaceRelative,
-			Path:     relPath,
-			Readable: true,
-		}
-	}
-	base := artifactBaseName(sourcePath)
-	if base == "" {
-		return nil
-	}
-	return &ArtifactContentSource{
-		Kind:     ArtifactContentSourceBasename,
-		Path:     base,
-		Readable: false,
-	}
-}
-
-func normalizeArtifactContentSource(source *ArtifactContentSource) *ArtifactContentSource {
-	if source == nil {
-		return nil
-	}
-	sourcePath := strings.TrimSpace(source.Path)
-	if source.Kind == ArtifactContentSourceWorkspaceRelative {
-		if relPath, ok := safeWorkspaceRelativePath(sourcePath); ok {
-			return &ArtifactContentSource{
-				Kind:     ArtifactContentSourceWorkspaceRelative,
-				Path:     relPath,
-				Readable: true,
-			}
-		}
-	}
-
-	base := artifactBaseName(sourcePath)
-	if base == "" {
-		return nil
-	}
-	return &ArtifactContentSource{
-		Kind:     ArtifactContentSourceBasename,
-		Path:     base,
-		Readable: false,
-	}
-}
-
-func sanitizeArtifactDisplayPath(value string) string {
-	if relPath, ok := safeWorkspaceRelativePath(value); ok {
-		return relPath
-	}
-	return artifactBaseName(value)
-}
-
-func workspaceRelativeSourcePath(workspaceRoot, sourcePath string) (string, bool) {
-	workspaceRoot = strings.TrimSpace(workspaceRoot)
-	if workspaceRoot == "" {
-		return "", false
-	}
-	root, err := filepath.Abs(workspaceRoot)
-	if err != nil {
-		return "", false
-	}
-	source, err := filepath.Abs(sourcePath)
-	if err != nil {
-		return "", false
-	}
-	relPath, err := filepath.Rel(root, source)
-	if err != nil {
-		return "", false
-	}
-	return safeWorkspaceRelativePath(relPath)
-}
-
-func safeWorkspaceRelativePath(value string) (string, bool) {
-	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
-	if isWindowsDriveQualifiedPath(value) {
-		return "", false
-	}
-	value = path.Clean(value)
-	if value == "." || value == "" || isPathAbsolute(value) || value == ".." || strings.HasPrefix(value, "../") {
-		return "", false
-	}
-	return value, true
-}
-
-func artifactBaseName(value string) string {
-	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
-	if isWindowsDriveQualifiedPath(value) {
-		value = strings.TrimPrefix(value[2:], "/")
-	}
-	value = path.Clean(value)
-	if value == "." || value == "" {
-		return ""
-	}
-	base := path.Base(value)
-	if base == "." || base == "/" {
-		return ""
-	}
-	return base
-}
-
-func isPathAbsolute(value string) bool {
-	value = strings.TrimSpace(value)
-	return filepath.IsAbs(value) || isPortablePathAbsolute(value)
-}
-
-func isPortablePathAbsolute(value string) bool {
-	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
-	return path.IsAbs(value) || isWindowsDriveAbsolutePath(value) || isWindowsUNCPath(value)
-}
-
-func isWindowsDriveAbsolutePath(value string) bool {
-	return isWindowsDriveQualifiedPath(value) && len(value) >= 3 && value[2] == '/'
-}
-
-func isWindowsDriveQualifiedPath(value string) bool {
-	return len(value) >= 2 && isASCIIAlpha(value[0]) && value[1] == ':'
-}
-
-func isWindowsUNCPath(value string) bool {
-	return strings.HasPrefix(value, "//")
-}
-
-func isASCIIAlpha(value byte) bool {
-	return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z')
-}
-
-func normalizeEvidenceStatus(status string) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "added", "created", "add":
-		return "added"
-	case "deleted", "delete", "removed", "remove":
-		return "deleted"
-	default:
-		return "modified"
-	}
-}
-
 func (s *Store) removeRunEvidence(runID string) {
 	for id, file := range s.diffs {
 		if file.RunID == runID {
@@ -1294,20 +1036,6 @@ func (s *Store) removeRunEvidence(runID string) {
 		_, ok := s.previews[id]
 		return ok
 	})
-}
-
-func nowString() string {
-	return time.Now().UTC().Format(time.RFC3339)
-}
-
-func removeString(values []string, target string) []string {
-	out := values[:0]
-	for _, value := range values {
-		if value != target {
-			out = append(out, value)
-		}
-	}
-	return out
 }
 
 // ── UserProfile CRUD ──────────────────────────────────────
@@ -1368,14 +1096,11 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if profile.ID == "" {
-		return AgentProfile{}, fmt.Errorf("agent profile id is required")
+	if err := validateAgentProfileCreate(profile); err != nil {
+		return AgentProfile{}, err
 	}
 	if profile.Name == "" {
 		profile.Name = "Unnamed Agent"
-	}
-	if profile.AdapterID == "" {
-		return AgentProfile{}, fmt.Errorf("agent profile adapterId is required")
 	}
 	if _, exists := s.agentProfiles[profile.ID]; exists {
 		return AgentProfile{}, fmt.Errorf("agent profile %q already exists", profile.ID)
@@ -1419,91 +1144,7 @@ func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfil
 	if !ok {
 		return AgentProfile{}, ErrNotFound
 	}
-	if v, found := patch["name"]; found {
-		if sv, valid := v.(string); valid {
-			profile.Name = sv
-		}
-	}
-	if v, found := patch["description"]; found {
-		if sv, valid := v.(string); valid {
-			profile.Description = sv
-		}
-	}
-	if v, found := patch["adapterId"]; found {
-		if sv, valid := v.(string); valid {
-			profile.AdapterID = sv
-		}
-	}
-	if v, found := patch["model"]; found {
-		if sv, valid := v.(string); valid {
-			profile.Model = sv
-		}
-	}
-	if v, found := patch["provider"]; found {
-		if sv, valid := v.(string); valid {
-			profile.Provider = sv
-		}
-	}
-	if v, found := patch["reasoningEffort"]; found {
-		if sv, valid := v.(string); valid {
-			profile.ReasoningEffort = sv
-		}
-	}
-	if v, found := patch["thinkingMode"]; found {
-		if sv, valid := v.(string); valid {
-			profile.ThinkingMode = sv
-		}
-	}
-	if v, found := patch["maxThinkingTokens"]; found {
-		switch n := v.(type) {
-		case float64:
-			profile.MaxThinkingTokens = int(n)
-		case int:
-			profile.MaxThinkingTokens = n
-		}
-	}
-	if v, found := patch["permissionMode"]; found {
-		if sv, valid := v.(string); valid {
-			profile.PermissionMode = sv
-		}
-	}
-	if v, found := patch["systemPrompt"]; found {
-		if sv, valid := v.(string); valid {
-			profile.SystemPrompt = sv
-		}
-	}
-	if v, found := patch["allowedTools"]; found {
-		if arr, valid := v.([]any); valid {
-			tools := make([]string, 0, len(arr))
-			for _, item := range arr {
-				if sv, ok := item.(string); ok {
-					tools = append(tools, sv)
-				}
-			}
-			profile.AllowedTools = tools
-		}
-	}
-	if v, found := patch["mcpConfig"]; found {
-		if sv, valid := v.(string); valid {
-			profile.MCPConfig = sv
-		}
-	}
-	if v, found := patch["skills"]; found {
-		if arr, valid := v.([]any); valid {
-			skills := make([]string, 0, len(arr))
-			for _, item := range arr {
-				if sv, ok := item.(string); ok {
-					skills = append(skills, sv)
-				}
-			}
-			profile.Skills = skills
-		}
-	}
-	if v, found := patch["avatarRef"]; found {
-		if sv, valid := v.(string); valid {
-			profile.AvatarRef = sv
-		}
-	}
+	profile = applyAgentProfilePatch(profile, patch)
 	profile.UpdatedAt = nowString()
 	s.agentProfiles[id] = profile
 	return profile, nil
