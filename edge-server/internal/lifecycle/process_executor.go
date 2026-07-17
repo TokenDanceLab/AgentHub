@@ -1005,16 +1005,12 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// tampered with, the raw persisted output does not leak API keys,
 	// file paths, or stack traces.
 	if e.resultAgg != nil {
-		sanitizedOutput := payload
-		if sanitizeReason != "" {
-			sanitizedOutput = sanitizedResult
-		}
 		e.resultAgg.StoreSubAgentResult(inst.ParentID, SubAgentResult{
 			AgentID:     agentID,
 			AgentName:   inst.Name,
 			RunID:       runID,
 			Status:      status,
-			Output:      sanitizedOutput,
+			Output:      aggregatorOutput(payload, sanitizedResult, sanitizeReason),
 			CompletedAt: time.Now().UTC(),
 		})
 	}
@@ -1147,20 +1143,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// independently routed via the message queue.
 	registered := false
 	if e.agentRegistry != nil {
-		inst := &agents.AgentInstance{
-			ID:        agentInstanceID,
-			Name:      task.AgentID,
-			AdapterID: task.AgentID,
-			Role:      "sub-agent",
-			Status:    agents.StatusIdle,
-			RunID:     runID,
-			ThreadID:  threadID,
-			ParentID:  parentRun.ID,
-			Depth:     task.Depth,
-			AgentPath: subAgentPath(parentRun.ID, agentInstanceID),
-			CreatedAt: time.Now(),
-			LastSeen:  time.Now(),
-		}
+		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
 		if regErr := e.agentRegistry.Register(inst); regErr != nil {
 			slog.Warn("failed to register sub-agent instance in registry",
 				"agentInstanceId", agentInstanceID,
