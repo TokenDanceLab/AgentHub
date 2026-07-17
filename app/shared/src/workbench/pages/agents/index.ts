@@ -27,6 +27,32 @@ export {
 export type { AgentEditPanelProps } from './AgentEditPanel';
 
 export {
+  AgentCapabilityStrip,
+  AgentConfigSummary,
+  AgentDetailHead,
+  AgentEditActions,
+  AgentEditGrid,
+  AgentMcpMemorySection,
+  AgentMiniLog,
+  AgentRuntimeLine,
+  AgentSkillChipGrid,
+  AgentSpecFixturePanel,
+  AgentToolPermissions,
+} from './AgentEditItemParts';
+
+export {
+  EDIT_ENGINE_OPTIONS,
+  EDIT_MODEL_OPTIONS,
+  EDIT_MODE_OPTIONS,
+  EDIT_STATE_OPTIONS,
+  TOOL_PERMISSION_LABELS,
+  buildStatusNoticeClassName,
+  defaultToolPermission,
+  getEditFieldConfigs,
+} from './AgentEditHelpers';
+export type { EditFieldConfig } from './AgentEditHelpers';
+
+export {
   AgentAvatar,
   AgentStat,
   CapabilityBadge,
