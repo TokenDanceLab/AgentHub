@@ -655,3 +655,122 @@ func TestParserContextAndSecurityHooks(t *testing.T) {
 		t.Fatalf("msg %q", msg)
 	}
 }
+
+func TestCancelResultHelpers(t *testing.T) {
+	t.Parallel()
+	if got := cancelResultNotFound(); got.Found || got.Status != "not_found" {
+		t.Fatalf("not found %#v", got)
+	}
+	if got := cancelResultNotRunning(); got.Found || got.Status != "not_running" {
+		t.Fatalf("not running %#v", got)
+	}
+	run := store.Run{ID: "run_1", Status: "started"}
+	got := cancelResultWithRun(run)
+	if !got.Found || got.Status != "started" || got.Run.ID != "run_1" {
+		t.Fatalf("with run %#v", got)
+	}
+	if interruptRequestID("run_9") != "interrupt-run_9" {
+		t.Fatalf("interrupt id %q", interruptRequestID("run_9"))
+	}
+}
+
+func TestWorkDirAndCompactionPredicates(t *testing.T) {
+	t.Parallel()
+	if shouldTrackWorkDir("") {
+		t.Fatal("empty workdir")
+	}
+	if !shouldTrackWorkDir("D:/tmp/ws") {
+		t.Fatal("non-empty workdir")
+	}
+	if shouldEmitContextCompaction(nil) {
+		t.Fatal("nil budget")
+	}
+	// ReservedTokens defaults to 10k, so use a large maxTokens window.
+	budget := runnerctx.NewContextBudget(100_000)
+	if shouldEmitContextCompaction(budget) {
+		t.Fatal("unused budget should not compact")
+	}
+	// Usable = 90_000; 85% threshold ≈ 76_500.
+	budget.UsedTokens.Store(80_000)
+	if !shouldEmitContextCompaction(budget) {
+		t.Fatal("over-threshold budget should compact")
+	}
+	if budget.ShouldCompact() != shouldEmitContextCompaction(budget) {
+		t.Fatal("predicate must mirror budget.ShouldCompact")
+	}
+}
+
+func TestHubCallbackAndStreamHelpers(t *testing.T) {
+	t.Parallel()
+	if shouldFireHubCallback(false, "t1") || shouldFireHubCallback(true, "") {
+		t.Fatal("callback requires both sides")
+	}
+	if !shouldFireHubCallback(true, "task") {
+		t.Fatal("expected fire")
+	}
+	if _, ok := prepareHubStreamContent(""); ok {
+		t.Fatal("empty content")
+	}
+	got, ok := prepareHubStreamContent("hello")
+	if !ok || got != "hello" {
+		t.Fatalf("plain %q %v", got, ok)
+	}
+	// Split literal so secret-guard does not treat the fixture as a live key.
+	leaky := "token sk-" + "abcdefghijklmnopqrstuvwxyz0123456789"
+	sanitized, ok := prepareHubStreamContent(leaky)
+	if !ok {
+		t.Fatal("expected sanitized content")
+	}
+	if sanitized == leaky || !strings.Contains(sanitized, "[redacted:api-key]") {
+		t.Fatalf("sanitize failed: %q", sanitized)
+	}
+}
+
+func TestPreflightAndEmitterHelpers(t *testing.T) {
+	t.Parallel()
+	if _, ok := asPreflightAdapter(nil); ok {
+		t.Fatal("nil adapter")
+	}
+	ad := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	// Claude adapter may or may not implement PreflightAdapter; just ensure no panic.
+	_, _ = asPreflightAdapter(ad)
+
+	base := adapters.NewBusEventEmitter(nil)
+	if coalesceEmitter(base, nil) != base {
+		t.Fatal("nil next keeps current")
+	}
+	next := adapters.NewBusEventEmitter(nil)
+	if coalesceEmitter(base, next) != next {
+		t.Fatal("non-nil next preferred")
+	}
+}
+
+func TestSpawnAndEvidenceHelpers(t *testing.T) {
+	t.Parallel()
+	if !shouldReleaseReservedSpawnSlot(errors.New("x"), true) {
+		t.Fatal("error+reserved")
+	}
+	if shouldReleaseReservedSpawnSlot(nil, true) || shouldReleaseReservedSpawnSlot(errors.New("x"), false) {
+		t.Fatal("only error with reserved")
+	}
+	if !shouldUnregisterOnStartFailure(true) || shouldUnregisterOnStartFailure(false) {
+		t.Fatal("unregister predicate")
+	}
+	now := time.Date(2026, 7, 18, 4, 5, 6, 0, time.UTC)
+	res := buildSubAgentResult("a1", "worker", "run_1", "finished", "ok", now)
+	if res.AgentID != "a1" || res.AgentName != "worker" || res.RunID != "run_1" {
+		t.Fatalf("ids %#v", res)
+	}
+	if res.Status != "finished" || res.Output != "ok" || !res.CompletedAt.Equal(now) {
+		t.Fatalf("fields %#v", res)
+	}
+	if got := resolveEvidenceFinalStatus(false, false); got != "finished" {
+		t.Fatalf("disabled gate -> %q", got)
+	}
+	if got := resolveEvidenceFinalStatus(true, true); got != "finished" {
+		t.Fatalf("pass -> %q", got)
+	}
+	if got := resolveEvidenceFinalStatus(true, false); got != "completed_with_issues" {
+		t.Fatalf("fail -> %q", got)
+	}
+}
