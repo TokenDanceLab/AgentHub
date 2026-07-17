@@ -18,7 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
@@ -140,16 +140,16 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 
 type routerMessageServiceStub struct{}
 
-func (routerMessageServiceStub) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
+func (routerMessageServiceStub) SendMessage(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error) {
+func (routerMessageServiceStub) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error) {
+func (routerMessageServiceStub) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]message.MessageResponse, error) {
 	return nil, nil
 }
-func (routerMessageServiceStub) EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+func (routerMessageServiceStub) EditMessage(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 	return nil, nil
 }
 func (routerMessageServiceStub) RecallMessage(ctx context.Context, msgID, userID string) error {
@@ -161,7 +161,7 @@ func (routerMessageServiceStub) PinMessage(ctx context.Context, userID, sessionI
 func (routerMessageServiceStub) UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error {
 	return nil
 }
-func (routerMessageServiceStub) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error) {
+func (routerMessageServiceStub) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error) {
 	return nil, nil
 }
 func (routerMessageServiceStub) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
@@ -170,7 +170,7 @@ func (routerMessageServiceStub) ForwardMessage(ctx context.Context, userID, msgI
 func (routerMessageServiceStub) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
 	return nil
 }
-func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
 	return nil, nil
 }
 func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {

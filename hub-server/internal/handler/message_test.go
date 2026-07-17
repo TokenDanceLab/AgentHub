@@ -9,34 +9,34 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 type mockMessageService struct {
-	sendMsgFn        func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
-	getMsgsFn        func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
-	getMsgsIncrFn    func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	sendMsgFn        func(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error)
+	getMsgsFn        func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error)
+	getMsgsIncrFn    func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]message.MessageResponse, error)
 	recallFn         func(ctx context.Context, msgID, userID string) error
 	pinFn            func(ctx context.Context, userID, sessionID, msgID string) error
 	unpinFn          func(ctx context.Context, userID, sessionID, msgID string) error
-	listPinsFn       func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	listPinsFn       func(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error)
 	forwardFn        func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	markReadFn       func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
-	editFn           func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
+	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error)
+	editFn           func(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error)
 	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	listReactionsFn  func(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error)
 }
 
-func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
+func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error) {
 	return m.sendMsgFn(ctx, sessionID, senderUserID, req)
 }
-func (m *mockMessageService) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error) {
+func (m *mockMessageService) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error) {
 	return m.getMsgsFn(ctx, sessionID, userID, beforeSeq, limit)
 }
-func (m *mockMessageService) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error) {
+func (m *mockMessageService) GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]message.MessageResponse, error) {
 	return m.getMsgsIncrFn(ctx, sessionID, userID, afterSeq, limit)
 }
 func (m *mockMessageService) RecallMessage(ctx context.Context, msgID, userID string) error {
@@ -48,7 +48,7 @@ func (m *mockMessageService) PinMessage(ctx context.Context, userID, sessionID, 
 func (m *mockMessageService) UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error {
 	return m.unpinFn(ctx, userID, sessionID, msgID)
 }
-func (m *mockMessageService) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error) {
+func (m *mockMessageService) ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error) {
 	return m.listPinsFn(ctx, userID, sessionID)
 }
 func (m *mockMessageService) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
@@ -57,10 +57,10 @@ func (m *mockMessageService) ForwardMessage(ctx context.Context, userID, msgID s
 func (m *mockMessageService) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
 	return m.markReadFn(ctx, userID, sessionID, lastReadSeq)
 }
-func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
 	return m.searchFn(ctx, userID, q, sessionID, contentType, from, to)
 }
-func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 	return m.editFn(ctx, msgID, userID, req)
 }
 func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
@@ -77,8 +77,8 @@ func (m *mockMessageService) ListMessageReactions(ctx context.Context, userID, s
 
 func TestMessageHandler_SendMessage_Success(t *testing.T) {
 	svc := &mockMessageService{
-		sendMsgFn: func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
-			return &service.SendMessageResponse{MessageID: "m1", SeqID: 1, CreatedAt: "2026-01-01T00:00:00Z"}, nil
+		sendMsgFn: func(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error) {
+			return &message.SendMessageResponse{MessageID: "m1", SeqID: 1, CreatedAt: "2026-01-01T00:00:00Z"}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -98,7 +98,7 @@ func TestMessageHandler_SendMessage_Success(t *testing.T) {
 
 func TestMessageHandler_SendMessage_NotMember(t *testing.T) {
 	svc := &mockMessageService{
-		sendMsgFn: func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
+		sendMsgFn: func(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error) {
 			return nil, errcode.SessionNotMember
 		},
 	}
@@ -134,8 +134,8 @@ func TestMessageHandler_SendMessage_BadRequest(t *testing.T) {
 
 func TestMessageHandler_GetMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		getMsgsFn: func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error) {
-			return []service.MessageResponse{
+		getMsgsFn: func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error) {
+			return []message.MessageResponse{
 				{ID: "m1", SessionID: sessionID, SeqID: 1, ContentType: "text", Content: "Hello"},
 			}, nil
 		},
@@ -153,11 +153,11 @@ func TestMessageHandler_GetMessages_Success(t *testing.T) {
 
 func TestMessageHandler_GetMessages_WithParams(t *testing.T) {
 	svc := &mockMessageService{
-		getMsgsFn: func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error) {
+		getMsgsFn: func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error) {
 			if beforeSeq != 100 || limit != 20 {
 				t.Errorf("expected beforeSeq=100, limit=20, got %d, %d", beforeSeq, limit)
 			}
-			return []service.MessageResponse{}, nil
+			return []message.MessageResponse{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -190,8 +190,8 @@ func TestMessageHandler_GetMessages_InvalidBeforeSeq(t *testing.T) {
 
 func TestMessageHandler_GetIncrementalMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		getMsgsIncrFn: func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error) {
-			return []service.MessageResponse{}, nil
+		getMsgsIncrFn: func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]message.MessageResponse, error) {
+			return []message.MessageResponse{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -244,14 +244,14 @@ func TestMessageHandler_RecallMessage_NotFound(t *testing.T) {
 
 func TestMessageHandler_EditMessage_Success(t *testing.T) {
 	svc := &mockMessageService{
-		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+		editFn: func(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 			if msgID != "m1" || userID != "u1" {
 				t.Fatalf("unexpected ids: msgID=%s userID=%s", msgID, userID)
 			}
 			if req.ContentType != "text" || req.Content != "edited text" {
 				t.Fatalf("unexpected edit request: %+v", req)
 			}
-			return &service.EditMessageResponse{MessageID: "m1", EditedAt: "2026-01-01T12:00:00Z"}, nil
+			return &message.EditMessageResponse{MessageID: "m1", EditedAt: "2026-01-01T12:00:00Z"}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -270,7 +270,7 @@ func TestMessageHandler_EditMessage_Success(t *testing.T) {
 
 func TestMessageHandler_EditMessage_NotFound(t *testing.T) {
 	svc := &mockMessageService{
-		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+		editFn: func(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 			return nil, errcode.MsgNotFound
 		},
 	}
@@ -290,7 +290,7 @@ func TestMessageHandler_EditMessage_NotFound(t *testing.T) {
 
 func TestMessageHandler_EditMessage_Timeout(t *testing.T) {
 	svc := &mockMessageService{
-		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+		editFn: func(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 			return nil, errcode.MsgEditTimeout
 		},
 	}
@@ -376,8 +376,8 @@ func TestMessageHandler_UnpinMessage_Success(t *testing.T) {
 
 func TestMessageHandler_ListPins_Success(t *testing.T) {
 	svc := &mockMessageService{
-		listPinsFn: func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error) {
-			return []service.MessageResponse{
+		listPinsFn: func(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error) {
+			return []message.MessageResponse{
 				{ID: "m1", SessionID: sessionID, SeqID: 1, ContentType: "text", Content: "Pinned"},
 			}, nil
 		},
@@ -461,8 +461,8 @@ func TestMessageHandler_MarkRead_BadRequest(t *testing.T) {
 
 func TestMessageHandler_SearchMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
-			return []service.MessageResponse{}, nil
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
+			return []message.MessageResponse{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -492,8 +492,8 @@ func TestMessageHandler_SearchMessages_EmptyQuery(t *testing.T) {
 
 func TestMessageHandler_SearchSessionMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
-			return []service.MessageResponse{
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
+			return []message.MessageResponse{
 				{ID: "m1", SessionID: sessionID, ContentType: "text", Content: "hello"},
 			}, nil
 		},
@@ -525,7 +525,7 @@ func TestMessageHandler_SearchSessionMessages_EmptyQuery(t *testing.T) {
 
 func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
 			if contentType != "image" {
 				t.Errorf("expected content_type=image, got %s", contentType)
 			}
@@ -535,7 +535,7 @@ func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 			if to != "2026-06-01" {
 				t.Errorf("expected to=2026-06-01, got %s", to)
 			}
-			return []service.MessageResponse{}, nil
+			return []message.MessageResponse{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -551,11 +551,11 @@ func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 
 func TestMessageHandler_SearchSessionMessages_WithFilters(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
 			if sessionID != "s1" {
 				t.Errorf("expected sessionID=s1, got %s", sessionID)
 			}
-			return []service.MessageResponse{}, nil
+			return []message.MessageResponse{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)

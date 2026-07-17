@@ -22,13 +22,14 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
 
 type messageServiceWithReactions struct {
-	*service.MessageService
+	*message.Service
 	reactions *messagereaction.Service
 }
 
@@ -106,7 +107,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.AttachmentService = attachment.NewService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = contact.NewService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = session.NewService(a.DB, a.CacheClient, a.bus)
-	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
+	a.MessageService = message.NewService(a.DB, a.bus, a.CacheClient)
 	a.MessageReactionService = messagereaction.NewService(a.DB, a.bus)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 
@@ -189,7 +190,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{
-		MessageService: a.MessageService,
+		Service: a.MessageService,
 		reactions:      a.MessageReactionService,
 	})
 	a.AgentHandler = handler.NewAgentHandler(a.AgentService)
