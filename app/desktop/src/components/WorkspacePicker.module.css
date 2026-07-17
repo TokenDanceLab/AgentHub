@@ -42,8 +42,8 @@
 }
 
 .clearBtn:hover {
-  color: var(--color-danger);
-  background: color-mix(in oklch, var(--color-danger) 8%, transparent);
+  color: var(--danger);
+  background: color-mix(in oklch, var(--danger) 8%, transparent);
 }
 
 .clearBtn:disabled {
@@ -201,8 +201,8 @@
 }
 
 .cardRemove:hover {
-  background: color-mix(in oklch, var(--color-danger) 14%, transparent);
-  color: var(--color-danger);
+  background: color-mix(in oklch, var(--danger) 14%, transparent);
+  color: var(--danger);
 }
 
 .cardRemove:disabled {

@@ -65,7 +65,7 @@
 }
 
 .charCountOver {
-  color: var(--color-danger, #ef4444);
+  color: var(--danger);
   opacity: 1;
 }
 

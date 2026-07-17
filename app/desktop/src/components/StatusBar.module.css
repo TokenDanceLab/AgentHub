@@ -27,7 +27,7 @@
 }
 
 .latencyGood {
-  color: var(--color-success);
+  color: var(--success);
 }
 
 .latencyWarn {
@@ -35,7 +35,7 @@
 }
 
 .latencyBad {
-  color: var(--color-danger);
+  color: var(--danger);
 }
 
 .latencyNone {
@@ -51,7 +51,7 @@
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: var(--color-danger);
+  background: var(--danger);
   color: var(--destructive-foreground);
   font-size: 11px;
   font-weight: 700;

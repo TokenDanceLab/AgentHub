@@ -115,7 +115,7 @@
 }
 
 .commitPreviewIcon {
-  color: var(--color-success);
+  color: var(--success);
   flex-shrink: 0;
 }
 
