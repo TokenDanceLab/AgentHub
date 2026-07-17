@@ -138,14 +138,15 @@ func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapte
 func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	e.inner.Emit(eventType, scope, payload)
 	text, effect := hubCallbackTextForEvent(eventType, payload)
-	if text == "" {
+	if !shouldApplyHubCallbackSideEffect(text, effect) {
 		return
 	}
-	switch effect {
-	case hubCallbackStream:
+	if isHubCallbackStreamEffect(effect) {
 		e.executor.recordHubOutput(e.runID, text)
 		e.executor.fireHubStream(e.runID, text)
-	case hubCallbackFallback:
+		return
+	}
+	if isHubCallbackFallbackEffect(effect) {
 		e.executor.recordHubFinalFallback(e.runID, text)
 	}
 }
