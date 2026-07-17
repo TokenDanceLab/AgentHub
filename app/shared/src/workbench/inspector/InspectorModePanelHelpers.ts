@@ -121,10 +121,10 @@ export function isContextUsageDanger(usagePercent: number | null): boolean {
 
 export function contextBarVariantClass(
   usagePercent: number | null,
-  styles: { contextBarDanger: string; contextBarWarning: string },
+  styles: Record<string, string>,
 ): string {
-  if (isContextUsageDanger(usagePercent)) return styles.contextBarDanger;
-  if (isContextUsageWarning(usagePercent)) return styles.contextBarWarning;
+  if (isContextUsageDanger(usagePercent)) return styles.contextBarDanger ?? '';
+  if (isContextUsageWarning(usagePercent)) return styles.contextBarWarning ?? '';
   return '';
 }
 
