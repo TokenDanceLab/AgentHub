@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest';
+import { AppError } from './errors';
+import {
+  isRouteFallbackError,
+  normalizeRegisterDeviceRequest,
+  qs,
+} from './hubClientRequestUtils';
+
+describe('hubClientRequestUtils (#799)', () => {
+  it('builds query strings and skips null/undefined values', () => {
+    expect(qs({})).toBe('');
+    expect(qs({ a: null, b: undefined })).toBe('');
+    expect(qs({ limit: 20, unread_only: true, cursor: null })).toBe(
+      '?limit=20&unread_only=true',
+    );
+  });
+
+  it('classifies 404/405 AppError as route fallback errors', () => {
+    expect(isRouteFallbackError(new AppError({ error: { code: 'x', message: 'm' } }, 404))).toBe(
+      true,
+    );
+    expect(isRouteFallbackError(new AppError({ error: { code: 'x', message: 'm' } }, 405))).toBe(
+      true,
+    );
+    expect(isRouteFallbackError(new AppError({ error: { code: 'x', message: 'm' } }, 500))).toBe(
+      false,
+    );
+    expect(isRouteFallbackError(new Error('boom'))).toBe(false);
+  });
+
+  it('normalizes register-device defaults and capabilities arrays', () => {
+    expect(
+      normalizeRegisterDeviceRequest({
+        device_id: 'dev1',
+        capabilities: ['run', 'stream'],
+      }),
+    ).toEqual({
+      device_id: 'dev1',
+      device_name: 'dev1',
+      device_type: 'desktop',
+      capabilities: { run: true, stream: true },
+    });
+
+    expect(
+      normalizeRegisterDeviceRequest({
+        device_id: 'dev2',
+        device_name: 'My Phone',
+        device_type: 'mobile',
+        capabilities: { voice: true },
+      }),
+    ).toEqual({
+      device_id: 'dev2',
+      device_name: 'My Phone',
+      device_type: 'mobile',
+      capabilities: { voice: true },
+    });
+  });
+});
