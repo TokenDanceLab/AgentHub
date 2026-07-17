@@ -6,6 +6,7 @@ const instances: MockWebSocket[] = [];
 
 class MockWebSocket {
   url: string;
+  protocols?: string | string[];
   onopen: (() => void) | null = null;
   onclose: ((ev?: CloseEvent) => void) | null = null;
   onmessage: ((ev: MessageEvent) => void) | null = null;
@@ -16,8 +17,9 @@ class MockWebSocket {
   static CLOSING = 2;
   static CLOSED = 3;
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols;
     instances.push(this);
     this.readyState = MockWebSocket.CONNECTING;
   }
@@ -55,7 +57,14 @@ describe('WebSocketTransport', () => {
     vi.useRealTimers();
   });
 
-  function createTransport(opts?: Partial<{ url: string; maxRetries: number; baseDelay: number; maxDelay: number; offlineQueue: boolean }>) {
+  function createTransport(opts?: Partial<{
+    url: string;
+    protocols: string[] | (() => string[] | undefined);
+    maxRetries: number;
+    baseDelay: number;
+    maxDelay: number;
+    offlineQueue: boolean;
+  }>) {
     return new WebSocketTransport({
       url: 'ws://127.0.0.1:3210/v1/events',
       ...opts,
@@ -138,6 +147,42 @@ describe('WebSocketTransport', () => {
 
       t.connect(); // second call
       expect(instances).toHaveLength(1); // no new instance
+    });
+
+    it('passes static protocols to WebSocket constructor', () => {
+      const t = createTransport({
+        protocols: ['agenthub.bearer.v1', 'hub-jwt-token'],
+      });
+      t.connect();
+      expect(lastWs().protocols).toEqual(['agenthub.bearer.v1', 'hub-jwt-token']);
+    });
+
+    it('evaluates protocol getter on each connect', () => {
+      let token = 'first-token';
+      const t = createTransport({
+        protocols: () => ['agenthub.bearer.v1', token],
+        maxRetries: 0,
+      });
+      t.connect();
+      expect(lastWs().protocols).toEqual(['agenthub.bearer.v1', 'first-token']);
+      simulateOpen(lastWs());
+      t.close();
+
+      // New transport-style reconnect path: create another connect after reopen.
+      const t2 = createTransport({
+        protocols: () => ['agenthub.bearer.v1', token],
+      });
+      token = 'second-token';
+      t2.connect();
+      expect(lastWs().protocols).toEqual(['agenthub.bearer.v1', 'second-token']);
+    });
+
+    it('omits protocols when getter returns undefined', () => {
+      const t = createTransport({
+        protocols: () => undefined,
+      });
+      t.connect();
+      expect(lastWs().protocols).toBeUndefined();
     });
   });
 
