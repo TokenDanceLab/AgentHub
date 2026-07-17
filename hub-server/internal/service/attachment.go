@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/im"
 )
 
 // ── AttachmentService ports + type ───────────────────────────────────────────
@@ -26,7 +26,10 @@ import (
 // metadata + blob orchestration (probe/save/store/get/delete/presign/access-check
 // + mime allowlist). This seam hardens replaceable storage port ownership without
 // a package move — same pattern as MessageService (#585) / SessionService (#593) /
-// ContactService (#594). Full service/im subpackage extract remains deferred.
+// ContactService (#594).
+// #628: pure hash/path/metadata helpers live in service/im; AttachmentService
+// keeps thin aliases (and exported PathFromHash / IsValidAttachmentHash) for
+// handler/test call sites. Full typed-service package move remains deferred.
 // Optional deliveryOutboxRecord model/repository package move remains high-risk
 // after #551 private ownership and is not chosen here.
 //
@@ -270,25 +273,9 @@ func (s *AttachmentService) SaveAttachmentWithMetadata(ctx context.Context, uplo
 	return a, nil
 }
 
+// NormalizeAttachmentMetadataJSON is a thin alias to im.NormalizeAttachmentMetadataJSON.
 func NormalizeAttachmentMetadataJSON(metadata string) (string, error) {
-	metadata = strings.TrimSpace(metadata)
-	if metadata == "" {
-		return "{}", nil
-	}
-
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(metadata), &payload); err != nil {
-		return "", fmt.Errorf("metadata must be valid JSON: %w", err)
-	}
-	if payload == nil {
-		return "", fmt.Errorf("metadata must be a JSON object")
-	}
-
-	normalized, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-	return string(normalized), nil
+	return im.NormalizeAttachmentMetadataJSON(metadata)
 }
 
 // StoreBlob writes attachment content to the configured object storage.
@@ -386,26 +373,16 @@ func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id st
 	return a, nil
 }
 
+// IsValidAttachmentHash is a thin alias to im.IsValidAttachmentHash.
+// Exported for handler/test call sites that already import service.
 func IsValidAttachmentHash(hash string) bool {
-	if len(hash) != 64 {
-		return false
-	}
-	if strings.ToLower(hash) != hash {
-		return false
-	}
-	for _, r := range hash {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
-			return false
-		}
-	}
-	return true
+	return im.IsValidAttachmentHash(hash)
 }
 
+// PathFromHash is a thin alias to im.PathFromHash.
+// Exported for handler/test call sites that already import service.
 func PathFromHash(hash string) string {
-	if !IsValidAttachmentHash(hash) {
-		return ""
-	}
-	return fmt.Sprintf("uploads/%s/%s/%s", hash[:2], hash[2:4], hash)
+	return im.PathFromHash(hash)
 }
 
 func (s *AttachmentService) MaxUploadSize() int64 {
