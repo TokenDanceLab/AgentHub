@@ -685,3 +685,253 @@ func TestCollectRunEvidenceKeys(t *testing.T) {
 		t.Fatalf("missing p1: %#v", previewKeys)
 	}
 }
+
+func TestDeleteMapKeysAndMatchingPins(t *testing.T) {
+	t.Parallel()
+	items := map[string]int{"a": 1, "b": 2, "c": 3}
+	deleteMapKeys(items, map[string]struct{}{"a": {}, "c": {}, "z": {}})
+	if len(items) != 1 || items["b"] != 2 {
+		t.Fatalf("deleteMapKeys = %#v", items)
+	}
+
+	pins := map[string]ThreadPin{
+		"p1": {ThreadID: "t1", ItemID: "i1"},
+		"p2": {ThreadID: "t2", ItemID: "i2"},
+		"p3": {ThreadID: "t1", ItemID: "i3"},
+	}
+	keys := collectMatchingPinKeys(pins, func(pin ThreadPin) bool {
+		return pin.ThreadID == "t1"
+	})
+	if len(keys) != 2 {
+		t.Fatalf("collectMatchingPinKeys = %#v", keys)
+	}
+	if _, ok := keys["p1"]; !ok {
+		t.Fatalf("missing p1 in %#v", keys)
+	}
+	if _, ok := keys["p3"]; !ok {
+		t.Fatalf("missing p3 in %#v", keys)
+	}
+}
+
+func TestScopedListHelpers(t *testing.T) {
+	t.Parallel()
+	threadOrder := []string{"t1", "t2", "t3"}
+	threads := map[string]Thread{
+		"t1": {ID: "t1", ProjectID: "p1"},
+		"t2": {ID: "t2", ProjectID: "p2"},
+		"t3": {ID: "t3", ProjectID: "p1"},
+	}
+	gotThreads := listThreadsForProject(threadOrder, threads, "p1")
+	if len(gotThreads) != 2 || gotThreads[0].ID != "t1" || gotThreads[1].ID != "t3" {
+		t.Fatalf("listThreadsForProject = %#v", gotThreads)
+	}
+	if all := listThreadsForProject(threadOrder, threads, ""); len(all) != 3 {
+		t.Fatalf("listThreadsForProject empty scope = %#v", all)
+	}
+
+	runOrder := []string{"r1", "r2"}
+	runs := map[string]Run{
+		"r1": {ID: "r1", ThreadID: "t1"},
+		"r2": {ID: "r2", ThreadID: "t2"},
+	}
+	gotRuns := listRunsForThread(runOrder, runs, "t1")
+	if len(gotRuns) != 1 || gotRuns[0].ID != "r1" {
+		t.Fatalf("listRunsForThread = %#v", gotRuns)
+	}
+
+	diffOrder := []string{"d1", "d2"}
+	diffs := map[string]RunDiffFile{
+		"d1": {RunID: "r1", Path: "a.go"},
+		"d2": {RunID: "r2", Path: "b.go"},
+	}
+	gotDiffs := listDiffsForRun(diffOrder, diffs, "r1")
+	if len(gotDiffs) != 1 || gotDiffs[0].Path != "a.go" {
+		t.Fatalf("listDiffsForRun = %#v", gotDiffs)
+	}
+
+	previewOrder := []string{"pv1", "pv2"}
+	previews := map[string]Preview{
+		"pv1": {ID: "pv1", RunID: "r1"},
+		"pv2": {ID: "pv2", RunID: "r9"},
+	}
+	gotPreviews := listPreviewsForRun(previewOrder, previews, "r1")
+	if len(gotPreviews) != 1 || gotPreviews[0].ID != "pv1" {
+		t.Fatalf("listPreviewsForRun = %#v", gotPreviews)
+	}
+
+	profileOrder := []string{"a1", "a2"}
+	profiles := map[string]AgentProfile{
+		"a1": {ID: "a1", AdapterID: "claude"},
+		"a2": {ID: "a2", AdapterID: "codex"},
+	}
+	gotProfiles := listAgentProfilesForAdapter(profileOrder, profiles, "claude")
+	if len(gotProfiles) != 1 || gotProfiles[0].ID != "a1" {
+		t.Fatalf("listAgentProfilesForAdapter = %#v", gotProfiles)
+	}
+}
+
+func TestListSortedThreadItemsAndPins(t *testing.T) {
+	t.Parallel()
+	itemOrder := []string{"i1", "i2", "i3"}
+	items := map[string]Item{
+		"i1": {ID: "i1", ThreadID: "t1", CreatedAt: "2026-01-02T00:00:00Z"},
+		"i2": {ID: "i2", ThreadID: "t2", CreatedAt: "2026-01-01T00:00:00Z"},
+		"i3": {ID: "i3", ThreadID: "t1", CreatedAt: "2026-01-01T00:00:00Z"},
+	}
+	gotItems := listSortedThreadItems(itemOrder, items, "t1")
+	if len(gotItems) != 2 || gotItems[0].ID != "i3" || gotItems[1].ID != "i1" {
+		t.Fatalf("listSortedThreadItems = %#v", gotItems)
+	}
+
+	pinOrder := []string{"p1", "p2", "p3"}
+	pins := map[string]ThreadPin{
+		"p1": {ThreadID: "t1", ItemID: "i1", PinnedAt: "2026-01-01T00:00:00Z"},
+		"p2": {ThreadID: "t1", ItemID: "i2", PinnedAt: "2026-01-03T00:00:00Z"},
+		"p3": {ThreadID: "t2", ItemID: "i9", PinnedAt: "2026-01-04T00:00:00Z"},
+	}
+	gotPins := listSortedThreadPins(pinOrder, pins, "t1")
+	if len(gotPins) != 2 || gotPins[0].ItemID != "i2" || gotPins[1].ItemID != "i1" {
+		t.Fatalf("listSortedThreadPins = %#v", gotPins)
+	}
+}
+
+func TestResolveUpsertHelpers(t *testing.T) {
+	t.Parallel()
+	now := "2026-07-18T00:00:00Z"
+
+	created, isNew := resolveRunDiffFileUpsert(RunDiffFile{}, false, RunDiffFile{RunID: "r1", Path: "a.go", Diff: "+x", Status: "added"}, now)
+	if !isNew || created.CreatedAt != now || created.UpdatedAt != now || created.Diff != "+x" {
+		t.Fatalf("resolveRunDiffFileUpsert create = %#v isNew=%v", created, isNew)
+	}
+	updated, isNew := resolveRunDiffFileUpsert(
+		RunDiffFile{RunID: "r1", Path: "a.go", Diff: "old", Status: "added", CreatedAt: "old", UpdatedAt: "old"},
+		true,
+		RunDiffFile{Diff: "new", Status: "modified"},
+		now,
+	)
+	if isNew || updated.CreatedAt != "old" || updated.UpdatedAt != now || updated.Diff != "new" || updated.Status != "modified" {
+		t.Fatalf("resolveRunDiffFileUpsert update = %#v isNew=%v", updated, isNew)
+	}
+
+	art := resolveArtifactUpsert(Artifact{ID: "a1", Path: "out.txt"}, Artifact{}, false, now)
+	if art.CreatedAt != now || art.UpdatedAt != now {
+		t.Fatalf("resolveArtifactUpsert create = %#v", art)
+	}
+	art = resolveArtifactUpsert(Artifact{ID: "a1", Path: "out2.txt"}, Artifact{ID: "a1", CreatedAt: "old"}, true, now)
+	if art.CreatedAt != "old" || art.UpdatedAt != now || art.Path != "out2.txt" {
+		t.Fatalf("resolveArtifactUpsert update = %#v", art)
+	}
+
+	pv := resolvePreviewUpsert(Preview{ID: "p1", URL: "http://x"}, Preview{}, false, now)
+	if pv.CreatedAt != now || pv.UpdatedAt != now {
+		t.Fatalf("resolvePreviewUpsert create = %#v", pv)
+	}
+	pv = resolvePreviewUpsert(Preview{ID: "p1", URL: "http://y"}, Preview{ID: "p1", CreatedAt: "old"}, true, now)
+	if pv.CreatedAt != "old" || pv.UpdatedAt != now || pv.URL != "http://y" {
+		t.Fatalf("resolvePreviewUpsert update = %#v", pv)
+	}
+
+	pin, createdPin := resolveThreadPinUpsert(ThreadPin{}, false, "t1", "i1", " alice ", now)
+	if !createdPin || pin.PinnedBy != "alice" || pin.CreatedAt != now || pin.PinnedAt != now {
+		t.Fatalf("resolveThreadPinUpsert create = %#v created=%v", pin, createdPin)
+	}
+	pin, createdPin = resolveThreadPinUpsert(
+		ThreadPin{ThreadID: "t1", ItemID: "i1", PinnedBy: "old", CreatedAt: "old", PinnedAt: "old", UpdatedAt: "old"},
+		true,
+		"t1",
+		"i1",
+		" bob ",
+		now,
+	)
+	if createdPin || pin.PinnedBy != "bob" || pin.CreatedAt != "old" || pin.PinnedAt != now || pin.UpdatedAt != now {
+		t.Fatalf("resolveThreadPinUpsert update = %#v created=%v", pin, createdPin)
+	}
+}
+
+func TestBuildRunCleanupResultAndErrorHelpers(t *testing.T) {
+	t.Parallel()
+	got := buildRunCleanupResult(2, 5)
+	if got.RemovedRuns != 2 || got.RemovedItems != 5 {
+		t.Fatalf("buildRunCleanupResult = %#v", got)
+	}
+
+	err := errThreadExistsInProject("t1", "p9")
+	if err == nil || err.Error() != "thread \"t1\" already exists in project \"p9\"" {
+		t.Fatalf("errThreadExistsInProject = %v", err)
+	}
+	err = errAgentProfileExists("agent-1")
+	if err == nil || err.Error() != "agent profile \"agent-1\" already exists" {
+		t.Fatalf("errAgentProfileExists = %v", err)
+	}
+}
+
+func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
+	t.Parallel()
+	projects := map[string]Project{"p1": {ID: "p1", Name: "Local"}}
+	threads := map[string]Thread{"t1": {ID: "t1", ProjectID: "p1"}}
+	runs := map[string]Run{"r1": {ID: "r1", ThreadID: "t1"}}
+	items := map[string]Item{"i1": {ID: "i1", ThreadID: "t1"}}
+	pins := map[string]ThreadPin{"pin": {ThreadID: "t1", ItemID: "i1"}}
+	diffs := map[string]RunDiffFile{"d1": {RunID: "r1", Path: "a.go"}}
+	artifacts := map[string]Artifact{
+		"a1": {
+			ID:            "a1",
+			RunID:         "r1",
+			ContentSource: &ArtifactContentSource{Kind: "path", Path: "out.txt", Readable: true},
+		},
+	}
+	previews := map[string]Preview{"pv1": {ID: "pv1", RunID: "r1"}}
+	userProfiles := map[string]UserProfile{"u1": {ID: "u1", DisplayName: "Owner"}}
+	agentProfiles := map[string]AgentProfile{"ag1": {ID: "ag1", Name: "Coder"}}
+	settings := map[string]string{"theme": "dark"}
+
+	snap := buildFileSnapshot(
+		projects, threads, runs, items, pins, diffs, artifacts, previews, userProfiles, agentProfiles,
+		[]string{"p1"}, []string{"t1"}, []string{"r1"}, []string{"i1"}, []string{"pin"},
+		[]string{"d1"}, []string{"a1"}, []string{"pv1"}, []string{"u1"}, []string{"ag1"},
+		settings, "mtime",
+	)
+	if snap.SettingsMtime != "mtime" || snap.Settings["theme"] != "dark" {
+		t.Fatalf("buildFileSnapshot settings = %#v", snap)
+	}
+	// Isolation: mutating source maps/settings must not affect snapshot.
+	projects["p1"] = Project{ID: "p1", Name: "mutated"}
+	settings["theme"] = "light"
+	artifacts["a1"].ContentSource.Path = "mutated.txt"
+	if snap.Projects["p1"].Name != "Local" || snap.Settings["theme"] != "dark" {
+		t.Fatalf("buildFileSnapshot failed to isolate maps: %#v", snap)
+	}
+	if snap.Artifacts["a1"].ContentSource == nil || snap.Artifacts["a1"].ContentSource.Path != "out.txt" {
+		t.Fatalf("buildFileSnapshot failed to clone artifact content source: %#v", snap.Artifacts["a1"])
+	}
+
+	// materialize should normalize orders (drop missing, append unseen sorted).
+	snap.ProjectOrder = []string{"missing", "p1"}
+	snap.Projects["p2"] = Project{ID: "p2", Name: "Extra"}
+	gotProjects, gotThreads, gotRuns, gotItems, gotPins, gotDiffs, gotArtifacts, gotPreviews, gotUsers, gotAgents,
+		projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userOrder, agentOrder :=
+		materializeFileSnapshot(snap)
+	if len(gotProjects) != 2 || gotProjects["p1"].Name != "Local" || gotProjects["p2"].Name != "Extra" {
+		t.Fatalf("materialize projects = %#v", gotProjects)
+	}
+	if !reflect.DeepEqual(projectOrder, []string{"p1", "p2"}) {
+		t.Fatalf("materialize projectOrder = %#v", projectOrder)
+	}
+	if len(gotThreads) != 1 || len(gotRuns) != 1 || len(gotItems) != 1 || len(gotPins) != 1 {
+		t.Fatalf("materialize entity counts unexpected")
+	}
+	if len(gotDiffs) != 1 || len(gotArtifacts) != 1 || len(gotPreviews) != 1 || len(gotUsers) != 1 || len(gotAgents) != 1 {
+		t.Fatalf("materialize evidence/profile counts unexpected")
+	}
+	if len(threadOrder) != 1 || len(runOrder) != 1 || len(itemOrder) != 1 || len(pinOrder) != 1 {
+		t.Fatalf("materialize core orders unexpected")
+	}
+	if len(diffOrder) != 1 || len(artifactOrder) != 1 || len(previewOrder) != 1 || len(userOrder) != 1 || len(agentOrder) != 1 {
+		t.Fatalf("materialize residual orders unexpected")
+	}
+	// Artifact content source isolation on materialize.
+	snap.Artifacts["a1"].ContentSource.Path = "again.txt"
+	if gotArtifacts["a1"].ContentSource.Path != "out.txt" {
+		t.Fatalf("materializeFileSnapshot failed to clone artifact: %#v", gotArtifacts["a1"])
+	}
+}

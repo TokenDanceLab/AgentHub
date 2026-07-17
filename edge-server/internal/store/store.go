@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -261,56 +260,39 @@ func (s *Store) snapshot() fileSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return fileSnapshot{
-		Projects:          copyMap(s.projects),
-		Threads:           copyMap(s.threads),
-		Runs:              copyMap(s.runs),
-		Items:             copyMap(s.items),
-		Pins:              copyMap(s.pins),
-		Diffs:             copyMap(s.diffs),
-		Artifacts:         cloneArtifactMap(s.artifacts),
-		Previews:          copyMap(s.previews),
-		UserProfiles:      copyMap(s.userProfiles),
-		AgentProfiles:     copyMap(s.agentProfiles),
-		ProjectOrder:      append([]string(nil), s.projectOrder...),
-		ThreadOrder:       append([]string(nil), s.threadOrder...),
-		RunOrder:          append([]string(nil), s.runOrder...),
-		ItemOrder:         append([]string(nil), s.itemOrder...),
-		PinOrder:          append([]string(nil), s.pinOrder...),
-		DiffOrder:         append([]string(nil), s.diffOrder...),
-		ArtifactOrder:     append([]string(nil), s.artifactOrder...),
-		PreviewOrder:      append([]string(nil), s.previewOrder...),
-		UserProfileOrder:  append([]string(nil), s.userProfileOrder...),
-		AgentProfileOrder: append([]string(nil), s.agentProfileOrder...),
-		Settings:          copyMap(s.settings),
-		SettingsMtime:     s.settingsMtime,
-	}
+	return buildFileSnapshot(
+		s.projects,
+		s.threads,
+		s.runs,
+		s.items,
+		s.pins,
+		s.diffs,
+		s.artifacts,
+		s.previews,
+		s.userProfiles,
+		s.agentProfiles,
+		s.projectOrder,
+		s.threadOrder,
+		s.runOrder,
+		s.itemOrder,
+		s.pinOrder,
+		s.diffOrder,
+		s.artifactOrder,
+		s.previewOrder,
+		s.userProfileOrder,
+		s.agentProfileOrder,
+		s.settings,
+		s.settingsMtime,
+	)
 }
 
 func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.projects = copyMap(snapshot.Projects)
-	s.threads = copyMap(snapshot.Threads)
-	s.runs = copyMap(snapshot.Runs)
-	s.items = copyMap(snapshot.Items)
-	s.pins = copyMap(snapshot.Pins)
-	s.diffs = copyMap(snapshot.Diffs)
-	s.artifacts = cloneArtifactMap(snapshot.Artifacts)
-	s.previews = copyMap(snapshot.Previews)
-	s.userProfiles = copyMap(snapshot.UserProfiles)
-	s.agentProfiles = copyMap(snapshot.AgentProfiles)
-	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
-	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
-	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
-	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
-	s.pinOrder = normalizeOrder(snapshot.PinOrder, s.pins)
-	s.diffOrder = normalizeOrder(snapshot.DiffOrder, s.diffs)
-	s.artifactOrder = normalizeOrder(snapshot.ArtifactOrder, s.artifacts)
-	s.previewOrder = normalizeOrder(snapshot.PreviewOrder, s.previews)
-	s.userProfileOrder = normalizeOrder(snapshot.UserProfileOrder, s.userProfiles)
-	s.agentProfileOrder = normalizeOrder(snapshot.AgentProfileOrder, s.agentProfiles)
+	s.projects, s.threads, s.runs, s.items, s.pins, s.diffs, s.artifacts, s.previews, s.userProfiles, s.agentProfiles,
+		s.projectOrder, s.threadOrder, s.runOrder, s.itemOrder, s.pinOrder, s.diffOrder, s.artifactOrder, s.previewOrder, s.userProfileOrder, s.agentProfileOrder =
+		materializeFileSnapshot(snapshot)
 }
 
 func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
@@ -348,7 +330,7 @@ func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabe
 	}
 	if existing, ok := s.threads[id]; ok {
 		if existingThreadConflict(existing, projectID) {
-			return Thread{}, fmt.Errorf("thread %q already exists in project %q", id, existing.ProjectID)
+			return Thread{}, errThreadExistsInProject(id, existing.ProjectID)
 		}
 		return existing, nil
 	}
@@ -390,15 +372,13 @@ func (s *Store) DeleteThread(id string) bool {
 
 	runIDs := collectKeysByThreadID(s.runs, id, func(run Run) string { return run.ThreadID })
 	for runID := range runIDs {
-		delete(s.runs, runID)
 		s.removeRunEvidence(runID)
 	}
+	deleteMapKeys(s.runs, runIDs)
 	s.runOrder = orderWithoutRemoved(s.runOrder, runIDs)
 
 	itemIDs := collectKeysByThreadID(s.items, id, func(item Item) string { return item.ThreadID })
-	for itemID := range itemIDs {
-		delete(s.items, itemID)
-	}
+	deleteMapKeys(s.items, itemIDs)
 	s.itemOrder = orderWithoutRemoved(s.itemOrder, itemIDs)
 
 	s.removePins(func(pin ThreadPin) bool {
@@ -410,9 +390,7 @@ func (s *Store) DeleteThread(id string) bool {
 func (s *Store) ListThreads(projectID string) []Thread {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return filterOrdered(s.threadOrder, s.threads, func(thread Thread) bool {
-		return scopeEquals(projectID, thread.ProjectID)
-	})
+	return listThreadsForProject(s.threadOrder, s.threads, projectID)
 }
 
 func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
@@ -444,9 +422,7 @@ func (s *Store) GetRun(id string) (Run, bool) {
 func (s *Store) ListRuns(threadID string) []Run {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return filterOrdered(s.runOrder, s.runs, func(run Run) bool {
-		return scopeEquals(threadID, run.ThreadID)
-	})
+	return listRunsForThread(s.runOrder, s.runs, threadID)
 }
 
 func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
@@ -462,23 +438,19 @@ func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 	}
 	key := runDiffFileKey(file.RunID, file.Path)
 	now := nowString()
-	if existing, ok := s.diffs[key]; ok {
-		existing = mergeRunDiffFileUpdate(existing, file, now)
-		s.diffs[key] = existing
-		return existing, nil
-	}
-	file = stampRunDiffFileCreate(file, now)
+	existing, exists := s.diffs[key]
+	file, created := resolveRunDiffFileUpsert(existing, exists, file, now)
 	s.diffs[key] = file
-	s.diffOrder = append(s.diffOrder, key)
+	if created {
+		s.diffOrder = append(s.diffOrder, key)
+	}
 	return file, nil
 }
 
 func (s *Store) ListRunDiffFiles(runID string) []RunDiffFile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return filterOrdered(s.diffOrder, s.diffs, func(file RunDiffFile) bool {
-		return scopeEquals(runID, file.RunID)
-	})
+	return listDiffsForRun(s.diffOrder, s.diffs, runID)
 }
 
 func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
@@ -495,14 +467,11 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	}
 	now := nowString()
 	existing, exists := s.artifacts[artifact.ID]
-	if exists {
-		artifact = stampArtifactUpsert(artifact, existing.CreatedAt, true, now)
-		s.artifacts[artifact.ID] = cloneArtifact(artifact)
-		return cloneArtifact(artifact), nil
-	}
-	artifact = stampArtifactUpsert(artifact, "", false, now)
+	artifact = resolveArtifactUpsert(artifact, existing, exists, now)
 	s.artifacts[artifact.ID] = cloneArtifact(artifact)
-	s.artifactOrder = append(s.artifactOrder, artifact.ID)
+	if !exists {
+		s.artifactOrder = append(s.artifactOrder, artifact.ID)
+	}
 	return cloneArtifact(artifact), nil
 }
 
@@ -534,23 +503,18 @@ func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 	}
 	now := nowString()
 	existing, exists := s.previews[preview.ID]
-	if exists {
-		preview = stampPreviewUpsert(preview, existing.CreatedAt, true, now)
-		s.previews[preview.ID] = preview
-		return preview, nil
-	}
-	preview = stampPreviewUpsert(preview, "", false, now)
+	preview = resolvePreviewUpsert(preview, existing, exists, now)
 	s.previews[preview.ID] = preview
-	s.previewOrder = append(s.previewOrder, preview.ID)
+	if !exists {
+		s.previewOrder = append(s.previewOrder, preview.ID)
+	}
 	return preview, nil
 }
 
 func (s *Store) ListPreviews(runID string) []Preview {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return filterOrdered(s.previewOrder, s.previews, func(preview Preview) bool {
-		return scopeEquals(runID, preview.RunID)
-	})
+	return listPreviewsForRun(s.previewOrder, s.previews, runID)
 }
 
 func (s *Store) GetPreview(id string) (Preview, bool) {
@@ -575,15 +539,13 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	}
 
 	for id := range removeRuns {
-		delete(s.runs, id)
 		s.removeRunEvidence(id)
 	}
+	deleteMapKeys(s.runs, removeRuns)
 	s.runOrder = orderWithoutRemoved(s.runOrder, removeRuns)
 
 	removedItemIDs := collectItemIDsForRemovedRuns(s.items, removeRuns)
-	for id := range removedItemIDs {
-		delete(s.items, id)
-	}
+	deleteMapKeys(s.items, removedItemIDs)
 	removedItems := len(removedItemIDs)
 	if removedItems > 0 {
 		s.itemOrder = orderKeepPresent(s.itemOrder, s.items)
@@ -593,10 +555,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 		})
 	}
 
-	return RunCleanupResult{
-		RemovedRuns:  len(removeRuns),
-		RemovedItems: removedItems,
-	}
+	return buildRunCleanupResult(len(removeRuns), removedItems)
 }
 
 func (s *Store) SetRunStatus(id, status string) (Run, bool) {
@@ -702,12 +661,7 @@ func (s *Store) GetItem(id string) (Item, bool) {
 func (s *Store) ListThreadItems(threadID string) []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	items := filterOrdered(s.itemOrder, s.items, func(item Item) bool {
-		return item.ThreadID == threadID
-	})
-	sortItemsByCreatedAtAsc(items)
-	return items
+	return listSortedThreadItems(s.itemOrder, s.items, threadID)
 }
 
 func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error) {
@@ -723,15 +677,12 @@ func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, err
 
 	now := nowString()
 	key := threadPinKey(threadID, itemID)
-	if existing, ok := s.pins[key]; ok {
-		existing = touchThreadPin(existing, pinnedBy, now)
-		s.pins[key] = existing
-		return existing, nil
-	}
-
-	pin := buildThreadPin(threadID, itemID, pinnedBy, now)
+	existing, exists := s.pins[key]
+	pin, created := resolveThreadPinUpsert(existing, exists, threadID, itemID, pinnedBy, now)
 	s.pins[key] = pin
-	s.pinOrder = append(s.pinOrder, key)
+	if created {
+		s.pinOrder = append(s.pinOrder, key)
+	}
 	return pin, nil
 }
 
@@ -751,39 +702,24 @@ func (s *Store) DeleteThreadPin(threadID, itemID string) bool {
 func (s *Store) ListThreadPins(threadID string) []ThreadPin {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	pins := filterOrdered(s.pinOrder, s.pins, func(pin ThreadPin) bool {
-		return pin.ThreadID == threadID
-	})
-	sortPinsByPinnedAtDesc(pins)
-	return pins
+	return listSortedThreadPins(s.pinOrder, s.pins, threadID)
 }
 
 func (s *Store) removePins(match func(ThreadPin) bool) {
 	if len(s.pins) == 0 {
 		return
 	}
-	for id, pin := range s.pins {
-		if match(pin) {
-			delete(s.pins, id)
-		}
-	}
+	deleteMapKeys(s.pins, collectMatchingPinKeys(s.pins, match))
 	s.pinOrder = orderKeepPresent(s.pinOrder, s.pins)
 }
 
 func (s *Store) removeRunEvidence(runID string) {
 	diffKeys, artifactKeys, previewKeys := collectRunEvidenceKeys(s.diffs, s.artifacts, s.previews, runID)
-	for id := range diffKeys {
-		delete(s.diffs, id)
-	}
+	deleteMapKeys(s.diffs, diffKeys)
 	s.diffOrder = orderKeepPresent(s.diffOrder, s.diffs)
-	for id := range artifactKeys {
-		delete(s.artifacts, id)
-	}
+	deleteMapKeys(s.artifacts, artifactKeys)
 	s.artifactOrder = orderKeepPresent(s.artifactOrder, s.artifacts)
-	for id := range previewKeys {
-		delete(s.previews, id)
-	}
+	deleteMapKeys(s.previews, previewKeys)
 	s.previewOrder = orderKeepPresent(s.previewOrder, s.previews)
 }
 
@@ -833,7 +769,7 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 		return AgentProfile{}, err
 	}
 	if _, exists := s.agentProfiles[profile.ID]; exists {
-		return AgentProfile{}, fmt.Errorf("agent profile %q already exists", profile.ID)
+		return AgentProfile{}, errAgentProfileExists(profile.ID)
 	}
 	profile = prepareAgentProfileCreate(profile, nowString())
 	s.agentProfiles[profile.ID] = profile
@@ -851,9 +787,7 @@ func (s *Store) GetAgentProfile(id string) (AgentProfile, bool) {
 func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return filterOrdered(s.agentProfileOrder, s.agentProfiles, func(profile AgentProfile) bool {
-		return scopeEquals(adapterID, profile.AdapterID)
-	})
+	return listAgentProfilesForAdapter(s.agentProfileOrder, s.agentProfiles, adapterID)
 }
 
 func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
