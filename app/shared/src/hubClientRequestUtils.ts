@@ -39,6 +39,25 @@ export function unresolvedRouteFallbackError(fallbackError: unknown): unknown {
   return fallbackError;
 }
 
+/**
+ * Pure residual of requestWithFallback catch branch (#978):
+ * continue with this error as fallback, or rethrow it.
+ */
+export type RouteFallbackStep =
+  | { action: 'continue'; fallbackError: unknown }
+  | { action: 'throw'; error: unknown };
+
+export function resolveRouteFallbackStep(
+  index: number,
+  pathCount: number,
+  error: unknown,
+): RouteFallbackStep {
+  if (shouldContinueRouteFallback(index, pathCount, error)) {
+    return { action: 'continue', fallbackError: error };
+  }
+  return { action: 'throw', error };
+}
+
 export function normalizeRegisterDeviceRequest(
   body: HubRegisterDeviceRequest,
 ): HubRegisterDeviceRequest & {

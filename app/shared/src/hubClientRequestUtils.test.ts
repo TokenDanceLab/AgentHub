@@ -4,12 +4,13 @@ import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
   qs,
+  resolveRouteFallbackStep,
   shouldContinueRouteFallback,
   shouldUseChangePasswordFallback,
   unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799 / #935 / #957)', () => {
+describe('hubClientRequestUtils (#799 / #935 / #957 / #978)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -51,6 +52,23 @@ describe('hubClientRequestUtils (#799 / #935 / #957)', () => {
 
     expect(unresolvedRouteFallbackError(notFound)).toBe(notFound);
     expect(unresolvedRouteFallbackError(undefined)).toBeUndefined();
+  });
+
+  it('peels route-fallback continue/throw step residual (#978)', () => {
+    const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
+    const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
+    expect(resolveRouteFallbackStep(0, 2, notFound)).toEqual({
+      action: 'continue',
+      fallbackError: notFound,
+    });
+    expect(resolveRouteFallbackStep(1, 2, notFound)).toEqual({
+      action: 'throw',
+      error: notFound,
+    });
+    expect(resolveRouteFallbackStep(0, 2, server)).toEqual({
+      action: 'throw',
+      error: server,
+    });
   });
 
   it('normalizes register-device defaults and capabilities arrays', () => {
