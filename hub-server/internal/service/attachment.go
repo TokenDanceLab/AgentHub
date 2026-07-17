@@ -26,7 +26,7 @@ import (
 // metadata + blob orchestration (probe/save/store/get/delete/presign/access-check
 // + mime allowlist). This seam hardens replaceable storage port ownership without
 // a package move — same pattern as MessageService (#585) / SessionService (#593) /
-// ContactService (#594).
+// ContactService thin seam (#594; package-moved in #685).
 // #628: pure hash/path/metadata helpers live in service/im; AttachmentService
 // keeps thin aliases (and exported PathFromHash / IsValidAttachmentHash) for
 // handler/test call sites. Full typed-service package move remains deferred.

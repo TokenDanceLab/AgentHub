@@ -17,19 +17,13 @@ func TestResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
 	require.IsType(t, cache.NoOpCache{}, auth)
 	require.NoError(t, auth.Invalidate(ctx, "user:profile:user-1"))
 
-	contact := resolveContactCache(typedNil)
-	require.IsType(t, cache.NoOpCache{}, contact)
-	online, err := contact.IsOnline(ctx, "user-1")
-	require.NoError(t, err)
-	require.False(t, online)
-
 	session := resolveSessionCache(typedNil)
 	require.IsType(t, cache.NoOpCache{}, session)
 	require.NoError(t, session.InitSeqIfAbsent(ctx, "session-1", 0))
 
 	message := resolveMessageCache(typedNil)
 	require.IsType(t, cache.NoOpCache{}, message)
-	_, err = message.AllocateSeq(ctx, "session-1")
+	_, err := message.AllocateSeq(ctx, "session-1")
 	require.ErrorIs(t, err, cache.ErrCacheUnavailable)
 
 	agent := resolveAgentCache(typedNil)
