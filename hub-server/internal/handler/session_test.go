@@ -9,13 +9,13 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/session"
 )
 
 type mockSessionService struct {
-	createPrivateFn        func(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error)
-	createGroupFn          func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error)
-	listFn                 func(ctx context.Context, userID string) ([]service.SessionListItem, error)
+	createPrivateFn        func(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error)
+	createGroupFn          func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error)
+	listFn                 func(ctx context.Context, userID string) ([]session.SessionListItem, error)
 	addMembersFn           func(ctx context.Context, currentUserID, sessionID string, memberIDs []string) error
 	removeMemberFn         func(ctx context.Context, currentUserID, sessionID, targetUserID string) error
 	leaveFn                func(ctx context.Context, currentUserID, sessionID string) error
@@ -24,16 +24,16 @@ type mockSessionService struct {
 	updateGroupInfoFn      func(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error
 	updateMemberSettingsFn func(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error
 	deleteForMeFn          func(ctx context.Context, currentUserID, sessionID string) error
-	searchFn               func(ctx context.Context, userID, q string) ([]service.SessionListItem, error)
+	searchFn               func(ctx context.Context, userID, q string) ([]session.SessionListItem, error)
 }
 
-func (m *mockSessionService) CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error) {
+func (m *mockSessionService) CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error) {
 	return m.createPrivateFn(ctx, currentUserID, targetUserID)
 }
-func (m *mockSessionService) CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error) {
+func (m *mockSessionService) CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error) {
 	return m.createGroupFn(ctx, ownerUserID, name, memberIDs)
 }
-func (m *mockSessionService) ListSessions(ctx context.Context, userID string) ([]service.SessionListItem, error) {
+func (m *mockSessionService) ListSessions(ctx context.Context, userID string) ([]session.SessionListItem, error) {
 	return m.listFn(ctx, userID)
 }
 func (m *mockSessionService) AddGroupMembers(ctx context.Context, currentUserID, sessionID string, memberIDs []string) error {
@@ -60,7 +60,7 @@ func (m *mockSessionService) UpdateMemberSettings(ctx context.Context, currentUs
 func (m *mockSessionService) DeleteForMe(ctx context.Context, currentUserID, sessionID string) error {
 	return m.deleteForMeFn(ctx, currentUserID, sessionID)
 }
-func (m *mockSessionService) SearchSessions(ctx context.Context, userID, q string) ([]service.SessionListItem, error) {
+func (m *mockSessionService) SearchSessions(ctx context.Context, userID, q string) ([]session.SessionListItem, error) {
 	return m.searchFn(ctx, userID, q)
 }
 
@@ -70,8 +70,8 @@ func ptr[T any](v T) *T { return &v }
 
 func TestSessionHandler_CreatePrivate_Success(t *testing.T) {
 	svc := &mockSessionService{
-		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error) {
-			return &service.CreateSessionResponse{SessionID: "s1", Type: "private", Created: true}, nil
+		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error) {
+			return &session.CreateSessionResponse{SessionID: "s1", Type: "private", Created: true}, nil
 		},
 	}
 	h := handler.NewSessionHandler(svc)
@@ -103,7 +103,7 @@ func TestSessionHandler_CreatePrivate_BadRequest(t *testing.T) {
 
 func TestSessionHandler_CreatePrivate_NotFriend(t *testing.T) {
 	svc := &mockSessionService{
-		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error) {
+		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error) {
 			return nil, errcode.FriendNotFriend
 		},
 	}
@@ -121,8 +121,8 @@ func TestSessionHandler_CreatePrivate_NotFriend(t *testing.T) {
 
 func TestSessionHandler_CreateGroup_Success(t *testing.T) {
 	svc := &mockSessionService{
-		createGroupFn: func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error) {
-			return &service.CreateSessionResponse{SessionID: "g1", Type: "group", Created: true}, nil
+		createGroupFn: func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error) {
+			return &session.CreateSessionResponse{SessionID: "g1", Type: "group", Created: true}, nil
 		},
 	}
 	h := handler.NewSessionHandler(svc)
@@ -140,11 +140,11 @@ func TestSessionHandler_CreateGroup_Success(t *testing.T) {
 
 func TestSessionHandler_CreateGroup_EmptyMembersAllowed(t *testing.T) {
 	svc := &mockSessionService{
-		createGroupFn: func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error) {
+		createGroupFn: func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error) {
 			if len(memberIDs) != 0 {
 				t.Fatalf("expected empty memberIDs, got %v", memberIDs)
 			}
-			return &service.CreateSessionResponse{SessionID: "g1", Type: "group", Created: true}, nil
+			return &session.CreateSessionResponse{SessionID: "g1", Type: "group", Created: true}, nil
 		},
 	}
 	h := handler.NewSessionHandler(svc)
@@ -176,8 +176,8 @@ func TestSessionHandler_CreateGroup_BadRequest(t *testing.T) {
 
 func TestSessionHandler_List_Success(t *testing.T) {
 	svc := &mockSessionService{
-		listFn: func(ctx context.Context, userID string) ([]service.SessionListItem, error) {
-			return []service.SessionListItem{
+		listFn: func(ctx context.Context, userID string) ([]session.SessionListItem, error) {
+			return []session.SessionListItem{
 				{SessionID: "s1", Type: "private"},
 			}, nil
 		},
@@ -397,8 +397,8 @@ func TestSessionHandler_DeleteForMe_Success(t *testing.T) {
 
 func TestSessionHandler_SearchSessions_Success(t *testing.T) {
 	svc := &mockSessionService{
-		searchFn: func(ctx context.Context, userID, q string) ([]service.SessionListItem, error) {
-			return []service.SessionListItem{
+		searchFn: func(ctx context.Context, userID, q string) ([]session.SessionListItem, error) {
+			return []session.SessionListItem{
 				{SessionID: "s1", Type: "group", Name: "Test"},
 			}, nil
 		},
