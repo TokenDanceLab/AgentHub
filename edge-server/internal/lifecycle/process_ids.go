@@ -1,5 +1,12 @@
 package lifecycle
 
+import (
+	"time"
+
+	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
+)
+
 // subAgentRunID builds the stable run ID for a dispatched sub-agent task.
 func subAgentRunID(taskID string) string {
 	return "run_" + taskID
@@ -39,4 +46,23 @@ func appendSystemPromptPrefix(existing, prefix string) string {
 		return prefix + "\n\n" + existing
 	}
 	return prefix
+}
+
+// newSubAgentInstance fills a registry AgentInstance for a child spawn.
+// now is injected so the helper stays pure (no time.Now side effect).
+func newSubAgentInstance(parentRunID, agentInstanceID, runID, threadID string, task adapters.SubAgentTask, now time.Time) *agents.AgentInstance {
+	return &agents.AgentInstance{
+		ID:        agentInstanceID,
+		Name:      task.AgentID,
+		AdapterID: task.AgentID,
+		Role:      "sub-agent",
+		Status:    agents.StatusIdle,
+		RunID:     runID,
+		ThreadID:  threadID,
+		ParentID:  parentRunID,
+		Depth:     task.Depth,
+		AgentPath: subAgentPath(parentRunID, agentInstanceID),
+		CreatedAt: now,
+		LastSeen:  now,
+	}
 }
