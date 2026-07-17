@@ -293,3 +293,110 @@ export function resolveHubRequestCatch(
   }
   return { kind: 'other', error: classified.error };
 }
+
+/** Pure residual: assemble headers/timeout/method/url for one JSON Hub request. */
+export type HubRequestContext = {
+  headers: Headers;
+  timeoutMs: number;
+  method: string;
+  url: string;
+};
+
+export function prepareHubRequestContext(args: {
+  baseUrl: string;
+  path: string;
+  options: RequestInit;
+  token?: string | null;
+  timeoutMs?: number;
+}): HubRequestContext {
+  return {
+    headers: createJsonAuthHeaders(args.options.headers, args.token),
+    timeoutMs: resolveHubTimeoutMs(args.timeoutMs),
+    method: requestMethodOf(args.options),
+    url: buildHubUrl(args.baseUrl, args.path),
+  };
+}
+
+/** Pure residual: assemble auth-only headers/timeout/url for multipart upload. */
+export type HubMultipartUploadContext = {
+  headers: Headers;
+  timeoutMs: number;
+  url: string;
+};
+
+export function prepareMultipartUploadContext(args: {
+  baseUrl: string;
+  path: string;
+  token?: string | null;
+  timeoutMs?: number;
+}): HubMultipartUploadContext {
+  return {
+    headers: createAuthOnlyHeaders(args.token),
+    timeoutMs: resolveHubTimeoutMs(args.timeoutMs),
+    url: buildHubUrl(args.baseUrl, args.path),
+  };
+}
+
+/** Pure residual: opts.onRefreshToken presence predicate. */
+export function hasTokenRefreshHandler(
+  onRefreshToken?: (() => Promise<string | null>) | null | undefined,
+): boolean {
+  return Boolean(onRefreshToken);
+}
+
+/**
+ * Pure residual of request catch side-effect planning (#978).
+ * logMessage/report are omitted (exactOptional-safe) when not needed.
+ */
+export type HubRequestCatchEffects =
+  | {
+      error: AppError;
+      logMessage: string;
+      report: {
+        error: AppError;
+        context: { path: string; method: string; timeoutMs: number };
+      };
+    }
+  | {
+      error: AppError;
+      report: {
+        error: AppError;
+        context: { path: string; method: string };
+      };
+    }
+  | {
+      error: unknown;
+    };
+
+export function planHubRequestCatchEffects(
+  error: unknown,
+  ctx: HubRequestCatchContext,
+): HubRequestCatchEffects {
+  const resolved = resolveHubRequestCatch(error, ctx);
+  if (resolved.kind === 'timeout') {
+    return {
+      error: resolved.error,
+      logMessage: resolved.logMessage,
+      report: { error: resolved.error, context: resolved.reportContext },
+    };
+  }
+  if (resolved.kind === 'network') {
+    return {
+      error: resolved.error,
+      logMessage: resolved.logMessage,
+      report: { error: resolved.error, context: resolved.reportContext },
+    };
+  }
+  if (resolved.kind === 'app') {
+    return {
+      error: resolved.error,
+      report: { error: resolved.error, context: resolved.reportContext },
+    };
+  }
+  return { error: resolved.error };
+}
+
+/** Token-refresh failure log line (console.error residual). */
+export function buildTokenRefreshFailedLogPrefix(): string {
+  return '[HubClient] Token refresh failed';
+}

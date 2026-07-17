@@ -90,23 +90,22 @@ import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
   normalizeRegisterDeviceRequest,
-  shouldContinueRouteFallback,
+  resolveRouteFallbackStep,
   shouldUseChangePasswordFallback,
   unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 import {
   applyRefreshedBearerAuth,
   buildHubFetchInit,
-  buildHubUrl,
   buildMultipartFetchInit,
+  buildTokenRefreshFailedLogPrefix,
   buildTokenRefreshReportContext,
-  createAuthOnlyHeaders,
-  createJsonAuthHeaders,
+  hasTokenRefreshHandler,
   normalizeHubBaseUrl,
-  requestMethodOf,
+  planHubRequestCatchEffects,
+  prepareHubRequestContext,
+  prepareMultipartUploadContext,
   resolveHubFetch,
-  resolveHubRequestCatch,
-  resolveHubTimeoutMs,
   shouldAttemptTokenRefresh,
   shouldRetryWithRefreshedToken,
   toReportableError,
@@ -124,10 +123,25 @@ export function createHubClient(opts: HubClientOptions = {}) {
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const headers = createJsonAuthHeaders(options.headers, opts.getToken?.());
-    const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
-    const method = requestMethodOf(options);
-    const url = buildHubUrl(baseUrl, path);
+    const requestCtx: {
+      baseUrl: string;
+      path: string;
+      options: RequestInit;
+      token?: string | null;
+      timeoutMs?: number;
+    } = {
+      baseUrl,
+      path,
+      options,
+    };
+    const token = opts.getToken?.();
+    if (token !== undefined) {
+      requestCtx.token = token;
+    }
+    if (opts.timeoutMs !== undefined) {
+      requestCtx.timeoutMs = opts.timeoutMs;
+    }
+    const { headers, timeoutMs, method, url } = prepareHubRequestContext(requestCtx);
 
     try {
       const response = await withHubAbortTimeout(timeoutMs, (signal) =>
@@ -135,7 +149,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       );
 
       // ── Token refresh recovery on 401 ──────────────────
-      if (shouldAttemptTokenRefresh(response.status, Boolean(opts.onRefreshToken))) {
+      if (shouldAttemptTokenRefresh(response.status, hasTokenRefreshHandler(opts.onRefreshToken))) {
         try {
           const newToken = await opts.onRefreshToken!();
           if (shouldRetryWithRefreshedToken(newToken)) {
@@ -147,7 +161,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
             return await parseHubSuccessResponse<T>(retryResponse);
           }
         } catch (refreshErr) {
-          console.error('[HubClient] Token refresh failed', refreshErr);
+          console.error(buildTokenRefreshFailedLogPrefix(), refreshErr);
           reportApiError(
             toReportableError(refreshErr),
             buildTokenRefreshReportContext(path),
@@ -157,22 +171,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
       return await parseHubSuccessResponse<T>(response);
     } catch (error) {
-      const resolved = resolveHubRequestCatch(error, { timeoutMs, method, path });
-      if (resolved.kind === 'timeout') {
-        console.error(resolved.logMessage);
-        reportApiError(resolved.error, resolved.reportContext);
-        throw resolved.error;
+      const effects = planHubRequestCatchEffects(error, { timeoutMs, method, path });
+      if ('logMessage' in effects) {
+        console.error(effects.logMessage);
       }
-      if (resolved.kind === 'app') {
-        reportApiError(resolved.error, resolved.reportContext);
-        throw resolved.error;
+      if ('report' in effects) {
+        reportApiError(effects.report.error, effects.report.context);
       }
-      if (resolved.kind === 'network') {
-        console.error(resolved.logMessage);
-        reportApiError(resolved.error, resolved.reportContext);
-        throw resolved.error;
-      }
-      throw resolved.error;
+      throw effects.error;
     }
   }
 
@@ -187,11 +193,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
       try {
         return await request<T>(path, options);
       } catch (error) {
-        if (shouldContinueRouteFallback(index, paths.length, error)) {
-          fallbackError = error;
+        const step = resolveRouteFallbackStep(index, paths.length, error);
+        if (step.action === 'continue') {
+          fallbackError = step.fallbackError;
           continue;
         }
-        throw error;
+        throw step.error;
       }
     }
 
@@ -200,13 +207,25 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    const headers = createAuthOnlyHeaders(opts.getToken?.());
-    const timeoutMs = resolveHubTimeoutMs(opts.timeoutMs);
+    const multipartCtx: {
+      baseUrl: string;
+      path: string;
+      token?: string | null;
+      timeoutMs?: number;
+    } = {
+      baseUrl,
+      path,
+    };
+    const multipartToken = opts.getToken?.();
+    if (multipartToken !== undefined) {
+      multipartCtx.token = multipartToken;
+    }
+    if (opts.timeoutMs !== undefined) {
+      multipartCtx.timeoutMs = opts.timeoutMs;
+    }
+    const { headers, timeoutMs, url } = prepareMultipartUploadContext(multipartCtx);
     const response = await withHubAbortTimeout(timeoutMs, (signal) =>
-      fetchImpl(
-        buildHubUrl(baseUrl, path),
-        buildMultipartFetchInit(headers, formData, signal),
-      ),
+      fetchImpl(url, buildMultipartFetchInit(headers, formData, signal)),
     );
     return parseHubSuccessResponse<T>(response);
   }
@@ -218,11 +237,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<{ user_id: string }>(hubPayload.buildRegisterPath(), hubPayload.buildJsonPostInit(body)),
     login: (body: HubLoginRequest) =>
       request<HubAuthResponse>(hubPayload.buildLoginPath(), hubPayload.buildJsonPostInit(body)),
-    refresh: (refreshToken: string) =>
-      request<HubAuthResponse>(
-        hubPayload.buildRefreshPath(),
-        hubPayload.buildJsonPostInit(hubPayload.buildRefreshBody(refreshToken)),
-      ),
+    refresh: (refreshToken: string) => {
+      const req = hubPayload.buildRefreshRequest(refreshToken);
+      return request<HubAuthResponse>(req.path, req.init);
+    },
     logout: () => request<void>(hubPayload.buildLogoutPath(), hubPayload.buildPostInit()),
     me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
@@ -239,11 +257,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         throw error;
       }
     },
-    oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
-      request<HubOidcAuthorizeResponse>(
-        hubPayload.buildOidcAuthorizePath(),
-        hubPayload.buildJsonPostInit(hubPayload.buildOidcAuthorizeBody(body)),
-      ),
+    oidcAuthorize: (body: HubOidcAuthorizeRequest) => {
+      const req = hubPayload.buildOidcAuthorizeRequest(body);
+      return request<HubOidcAuthorizeResponse>(req.path, req.init);
+    },
     oidcCallback: (body: HubOidcCallbackRequest) =>
       request<HubOidcCallbackResponse>(
         hubPayload.buildOidcCallbackPath(),
@@ -253,11 +270,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
     listContacts: () => request<HubContactInfo[]>(hubPayload.buildListContactsPath()),
-    sendFriendRequest: (friendId: string, message?: string) =>
-      request<void>(
-        hubPayload.buildFriendRequestsPath(),
-        hubPayload.buildJsonPostInit(hubPayload.buildFriendRequestBody(friendId, message)),
-      ),
+    sendFriendRequest: (friendId: string, message?: string) => {
+      const req = hubPayload.buildSendFriendRequest(friendId, message);
+      return request<void>(req.path, req.init);
+    },
     listFriendRequests: () =>
       request<HubFriendRequest[]>(hubPayload.buildFriendRequestsPath()),
     acceptFriendRequest: (requestId: string) =>
@@ -279,11 +295,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<void>(hubPayload.buildBlockContactPath(targetUserId), hubPayload.buildPostInit()),
     unblockContact: (targetUserId: string) =>
       request<void>(hubPayload.buildUnblockContactPath(targetUserId), hubPayload.buildPostInit()),
-    updateContactRemark: (friendUserId: string, remark: string) =>
-      request<void>(
-        hubPayload.buildContactRemarkPath(friendUserId),
-        hubPayload.buildJsonPutInit(hubPayload.buildRemarkBody(remark)),
-      ),
+    updateContactRemark: (friendUserId: string, remark: string) => {
+      const req = hubPayload.buildUpdateContactRemarkRequest(friendUserId, remark);
+      return request<void>(req.path, req.init);
+    },
 
     listSessions: () => request<HubSession[]>(hubPayload.buildListSessionsPath()),
     searchSessions: (q: string) =>
@@ -298,11 +313,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildCreateGroupSessionPath(),
         hubPayload.buildJsonPostInit(body),
       ),
-    addSessionMembers: (sessionId: string, memberIds: string[]) =>
-      request<void>(
-        hubPayload.buildSessionMembersPath(sessionId),
-        hubPayload.buildJsonPostInit(hubPayload.buildMemberIdsBody(memberIds)),
-      ),
+    addSessionMembers: (sessionId: string, memberIds: string[]) => {
+      const req = hubPayload.buildAddSessionMembersRequest(sessionId, memberIds);
+      return request<void>(req.path, req.init);
+    },
     removeSessionMember: (sessionId: string, userId: string) =>
       request<void>(
         hubPayload.buildRemoveSessionMemberPath(sessionId, userId),
@@ -310,11 +324,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
     leaveSession: (sessionId: string) =>
       request<void>(hubPayload.buildLeaveSessionPath(sessionId), hubPayload.buildPostInit()),
-    transferSessionOwnership: (sessionId: string, newOwnerId: string) =>
-      request<void>(
-        hubPayload.buildTransferSessionOwnerPath(sessionId),
-        hubPayload.buildJsonPostInit(hubPayload.buildTransferOwnerBody(newOwnerId)),
-      ),
+    transferSessionOwnership: (sessionId: string, newOwnerId: string) => {
+      const req = hubPayload.buildTransferSessionOwnershipRequest(sessionId, newOwnerId);
+      return request<void>(req.path, req.init);
+    },
     dissolveSession: (sessionId: string) =>
       request<void>(hubPayload.buildDissolveSessionPath(sessionId), hubPayload.buildPostInit()),
     updateSessionInfo: (
@@ -349,28 +362,24 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       params?: { after_seq?: number; limit?: number },
     ) => request<HubMessage[]>(hubPayload.buildSyncMessagesPath(sessionId, params)),
-    markRead: (sessionId: string, lastReadSeq: number) =>
-      request<void>(
-        hubPayload.buildMarkReadPath(sessionId),
-        hubPayload.buildJsonPostInit(hubPayload.buildMarkReadBody(lastReadSeq)),
-      ),
+    markRead: (sessionId: string, lastReadSeq: number) => {
+      const req = hubPayload.buildMarkReadRequest(sessionId, lastReadSeq);
+      return request<void>(req.path, req.init);
+    },
     recallMessage: (messageId: string) =>
       request<void>(hubPayload.buildRecallMessagePath(messageId), hubPayload.buildPostInit()),
-    pinMessage: (messageId: string, sessionId: string) =>
-      request<void>(
-        hubPayload.buildPinMessagePath(messageId),
-        hubPayload.buildJsonPostInit(hubPayload.buildSessionIdBody(sessionId)),
-      ),
-    unpinMessage: (messageId: string, sessionId: string) =>
-      request<void>(
-        hubPayload.buildPinMessagePath(messageId),
-        hubPayload.buildJsonDeleteInit(hubPayload.buildSessionIdBody(sessionId)),
-      ),
-    forwardMessage: (messageId: string, targetSessionIds: string[]) =>
-      request<void>(
-        hubPayload.buildForwardMessagePath(messageId),
-        hubPayload.buildJsonPostInit(hubPayload.buildForwardMessageBody(targetSessionIds)),
-      ),
+    pinMessage: (messageId: string, sessionId: string) => {
+      const req = hubPayload.buildPinMessageRequest(messageId, sessionId);
+      return request<void>(req.path, req.init);
+    },
+    unpinMessage: (messageId: string, sessionId: string) => {
+      const req = hubPayload.buildUnpinMessageRequest(messageId, sessionId);
+      return request<void>(req.path, req.init);
+    },
+    forwardMessage: (messageId: string, targetSessionIds: string[]) => {
+      const req = hubPayload.buildForwardMessageRequest(messageId, targetSessionIds);
+      return request<void>(req.path, req.init);
+    },
     listPinnedMessages: (sessionId: string) =>
       request<HubMessage[]>(hubPayload.buildSessionPinsPath(sessionId)),
     searchMessages: (params: {
@@ -407,26 +416,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildRegisterDevicePaths(),
         hubPayload.buildJsonPostInit(normalizeRegisterDeviceRequest(body)),
       ),
-    ackTask: (taskId: string, runId?: string) =>
-      request<void>(
-        hubPayload.buildAckTaskPath(taskId),
-        hubPayload.buildPostWithOptionalJsonBody(hubPayload.buildTaskAckBody(runId)),
-      ),
-    streamTask: (taskId: string, content: string, runId?: string) =>
-      request<void>(
-        hubPayload.buildStreamTaskPath(taskId),
-        hubPayload.buildJsonPostInit(hubPayload.buildTaskStreamBody(content, runId)),
-      ),
-    doneTask: (taskId: string, finalContent?: string, runId?: string) =>
-      request<void>(
-        hubPayload.buildDoneTaskPath(taskId),
-        hubPayload.buildJsonPostInit(hubPayload.buildTaskDoneBody(finalContent, runId)),
-      ),
-    failTask: (taskId: string, error: string, runId?: string) =>
-      request<void>(
-        hubPayload.buildFailTaskPath(taskId),
-        hubPayload.buildJsonPostInit(hubPayload.buildTaskFailBody(error, runId)),
-      ),
+    ackTask: (taskId: string, runId?: string) => {
+      const req = hubPayload.buildAckTaskRequest(taskId, runId);
+      return request<void>(req.path, req.init);
+    },
+    streamTask: (taskId: string, content: string, runId?: string) => {
+      const req = hubPayload.buildStreamTaskRequest(taskId, content, runId);
+      return request<void>(req.path, req.init);
+    },
+    doneTask: (taskId: string, finalContent?: string, runId?: string) => {
+      const req = hubPayload.buildDoneTaskRequest(taskId, finalContent, runId);
+      return request<void>(req.path, req.init);
+    },
+    failTask: (taskId: string, error: string, runId?: string) => {
+      const req = hubPayload.buildFailTaskRequest(taskId, error, runId);
+      return request<void>(req.path, req.init);
+    },
 
     addAgentToSession: (
       sessionId: string,
@@ -436,13 +441,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildSessionAgentsPath(sessionId),
         hubPayload.buildJsonPostInit(body),
       ),
-    triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
-      request<HubAgentTask>(
-        hubPayload.buildAgentTasksPath(),
-        hubPayload.buildJsonPostInit(
-          hubPayload.buildTriggerAgentTaskBody(triggerMessageId, options),
-        ),
-      ),
+    triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) => {
+      const req = hubPayload.buildTriggerAgentTaskRequest(triggerMessageId, options);
+      return request<HubAgentTask>(req.path, req.init);
+    },
     cancelAgentTask: (taskId: string) =>
       requestWithFallback<void>(
         hubPayload.buildCancelAgentTaskPaths(taskId),
@@ -578,17 +580,19 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildJsonPutInit(body),
       ),
 
-    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
-      request<undefined>(
-        hubPayload.buildMessageReactionsPath(messageId),
-        hubPayload.buildJsonPostInit(hubPayload.buildReactionBody(sessionId, reaction)),
-      ),
+    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) => {
+      const req = hubPayload.buildAddMessageReactionRequest(messageId, sessionId, reaction);
+      return request<undefined>(req.path, req.init);
+    },
 
-    removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
-      request<undefined>(
-        hubPayload.buildMessageReactionsPath(messageId),
-        hubPayload.buildJsonDeleteInit(hubPayload.buildReactionBody(sessionId, reaction)),
-      ),
+    removeMessageReaction: (
+      messageId: string,
+      sessionId: string,
+      reaction: { emoji: string },
+    ) => {
+      const req = hubPayload.buildRemoveMessageReactionRequest(messageId, sessionId, reaction);
+      return request<undefined>(req.path, req.init);
+    },
 
     listMessageReactions: (messageId: string, sessionId: string) =>
       request<Record<string, unknown>[]>(
@@ -694,25 +698,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     fetchSettings: () => request<Record<string, string>>(hubPayload.buildSettingsPath()),
 
-    patchSettings: (values: Record<string, string>) =>
-      request<Record<string, string>>(
-        hubPayload.buildSettingsPath(),
-        hubPayload.buildJsonPatchInit(hubPayload.buildPatchSettingsBody(values)),
-      ),
+    patchSettings: (values: Record<string, string>) => {
+      const req = hubPayload.buildPatchSettingsRequest(values);
+      return request<Record<string, string>>(req.path, req.init);
+    },
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
-    probeAttachment: (hash: string) =>
-      request<HubProbeAttachmentResponse>(
-        hubPayload.buildProbeAttachmentPath(),
-        hubPayload.buildJsonPostInit(hubPayload.buildProbeAttachmentBody(hash)),
-      ),
+    probeAttachment: (hash: string) => {
+      const req = hubPayload.buildProbeAttachmentRequest(hash);
+      return request<HubProbeAttachmentResponse>(req.path, req.init);
+    },
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
-    uploadAttachment: (file: File, hash: string) =>
-      uploadMultipart<HubAttachmentRef>(
-        hubPayload.buildAttachmentsPath(),
-        hubPayload.buildAttachmentFormData(file, hash),
-      ),
+    uploadAttachment: (file: File, hash: string) => {
+      const req = hubPayload.buildUploadAttachmentRequest(file, hash);
+      return uploadMultipart<HubAttachmentRef>(req.path, req.formData);
+    },
 
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
@@ -762,13 +763,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       eventType: string,
       payload: unknown,
       options: HubAgentTaskStreamEventOptions = {},
-    ) =>
-      request<undefined>(
-        hubPayload.buildStreamTaskPath(taskId),
-        hubPayload.buildJsonPostInit(
-          hubPayload.buildStreamTaskEventBody(eventType, payload, options),
-        ),
-      ),
+    ) => {
+      const req = hubPayload.buildStreamTaskEventRequest(taskId, eventType, payload, options);
+      return request<undefined>(req.path, req.init);
+    },
 
     // ── T3.4 web task approvals/artifacts ──
     listTaskApprovals: (taskId: string) =>
