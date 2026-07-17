@@ -47,8 +47,8 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 func (h *Handler) GetAgentProfiles(w http.ResponseWriter, r *http.Request) {
-	// Agent profiles are Edge-local shared config (no OwnerID). Fail closed under Hub JWT.
-	if denyRemoteHubSharedConfig(w, r) {
+	// Agent profiles are Edge-local shared config (no OwnerID). Fail closed under Hub JWT / multi-user.
+	if h.denyRemoteHubSharedConfig(w, r) {
 		return
 	}
 	adapterID := r.URL.Query().Get("adapterId")
@@ -103,7 +103,7 @@ func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAgentProfile(w http.ResponseWriter, r *http.Request, profileID string) {
-	if denyRemoteHubSharedConfig(w, r) {
+	if h.denyRemoteHubSharedConfig(w, r) {
 		return
 	}
 	profile, ok := ensureStore(h).GetAgentProfile(profileID)

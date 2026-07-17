@@ -34,9 +34,10 @@ func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 		instances = h.AgentRegistry.List()
 	}
 
-	// Under Hub JWT, only expose instances bound to an owned run/thread.
-	userID := hubUserFromRequest(r)
-	if userID != "" {
+	// Multi-user / Hub JWT: only expose instances bound to an owned run/thread.
+	// Empty userID fails closed; local single-tenant bypass sees all.
+	userID := h.ownerUserID(r)
+	if !isLocalSingleTenant(userID) {
 		repo := ensureStore(h)
 		filtered := make([]agents.AgentInstance, 0, len(instances))
 		for _, inst := range instances {
@@ -65,8 +66,8 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
 		return
 	}
-	userID := hubUserFromRequest(r)
-	if userID != "" && !agentInstanceVisibleToUser(ensureStore(h), *inst, userID) {
+	userID := h.ownerUserID(r)
+	if !agentInstanceVisibleToUser(ensureStore(h), *inst, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
 		return
 	}
@@ -74,10 +75,14 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 }
 
 // agentInstanceVisibleToUser reports whether a runtime instance is owned by userID.
+// Local single-tenant bypass allows; empty userID fails closed.
 // Instances without run/thread anchors are fail-closed under Hub JWT.
 func agentInstanceVisibleToUser(repo store.Reader, inst agents.AgentInstance, userID string) bool {
-	if userID == "" {
+	if isLocalSingleTenant(userID) {
 		return true
+	}
+	if userID == "" {
+		return false
 	}
 	if inst.RunID != "" {
 		return isRunOwnedBy(repo, inst.RunID, userID)
