@@ -121,16 +121,10 @@ func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 		return
 	}
 	content := e.hubFinalContent(runID)
-	if content == "" {
-		content = "Run finished"
-	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
-		result := hub.TaskResult{
-			RunID:        runID,
-			FinalContent: content,
-		}
+		result := hubTaskDoneResult(runID, content)
 		if err := e.hubCallback.TaskDone(ctx, taskID, result); err != nil {
 			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "error", err)
 		}

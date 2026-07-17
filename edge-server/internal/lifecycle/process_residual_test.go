@@ -1,13 +1,16 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -287,4 +290,191 @@ func TestRunFailedAndPersistencePayloads(t *testing.T) {
 	if scope["runId"] != "run_1" || payload["error"] != "disk full" {
 		t.Fatalf("%#v %#v", scope, payload)
 	}
+}
+
+func TestRunStatusHelpers(t *testing.T) {
+	t.Parallel()
+	if !isQueuedRunStatus("queued") {
+		t.Fatal("queued should be startable")
+	}
+	if isQueuedRunStatus("started") {
+		t.Fatal("started should not be queued")
+	}
+	for _, st := range []string{"queued", "started", "cancelling"} {
+		if !isCancellableRunStatus(st) {
+			t.Fatalf("%s should be cancellable", st)
+		}
+	}
+	if isCancellableRunStatus("finished") {
+		t.Fatal("finished should not be cancellable")
+	}
+}
+
+func TestShouldCloseStdinEagerly(t *testing.T) {
+	t.Parallel()
+	if !shouldCloseStdinEagerly(false, false) {
+		t.Fatal("neither needs stdin nor decision loop -> close")
+	}
+	if shouldCloseStdinEagerly(true, false) {
+		t.Fatal("adapter needs stdin -> keep open")
+	}
+	if shouldCloseStdinEagerly(false, true) {
+		t.Fatal("decision loop -> keep open")
+	}
+}
+
+func TestShouldRetrySessionConflict(t *testing.T) {
+	t.Parallel()
+	err := errors.New("Session ID abc is already in use")
+	if !shouldRetrySessionConflict(err, "", 0, time.Second) {
+		t.Fatal("expected retry")
+	}
+	if shouldRetrySessionConflict(err, "", 1, time.Second) {
+		t.Fatal("attempt 1 should not retry")
+	}
+	if shouldRetrySessionConflict(err, "", 0, sessionRetryWindow) {
+		t.Fatal("elapsed at window should not retry")
+	}
+	if shouldRetrySessionConflict(nil, "is already in use", 0, time.Second) {
+		t.Fatal("nil err should not retry")
+	}
+	if !shouldRetrySessionConflict(errors.New("exit status 1"), "No conversation found with session ID", 0, time.Second) {
+		t.Fatal("stderr conflict should retry")
+	}
+}
+
+func TestRecoverableParseStreamError(t *testing.T) {
+	t.Parallel()
+	if _, ok := recoverableParseStreamError(nil); ok {
+		t.Fatal("nil not recoverable")
+	}
+	if _, ok := recoverableParseStreamError(errors.New("plain")); ok {
+		t.Fatal("plain error not recoverable")
+	}
+	if _, ok := recoverableParseStreamError(adapters.NewNonRecoverableParseError(errors.New("pipe"))); ok {
+		t.Fatal("non-recoverable parse should fail closed")
+	}
+	ps, ok := recoverableParseStreamError(adapters.NewRecoverableParseError(errors.New("malformed")))
+	if !ok || ps == nil {
+		t.Fatal("expected recoverable parse error")
+	}
+	if ps.Unwrap().Error() != "malformed" {
+		t.Fatalf("unwrap %v", ps.Unwrap())
+	}
+}
+
+func TestFaultEscalationHelpers(t *testing.T) {
+	t.Parallel()
+	if faultEscalationActive(FaultEscalationConfig{Enabled: false, MaxRetries: 3}) {
+		t.Fatal("disabled should be inactive")
+	}
+	if faultEscalationActive(FaultEscalationConfig{Enabled: true, MaxRetries: 0}) {
+		t.Fatal("zero max should be inactive")
+	}
+	cfg := FaultEscalationConfig{Enabled: true, MaxRetries: 2}
+	if !faultEscalationActive(cfg) {
+		t.Fatal("expected active")
+	}
+	if !shouldFaultEscalateRetry(cfg, 0) || !shouldFaultEscalateRetry(cfg, 1) {
+		t.Fatal("retry under max")
+	}
+	if shouldFaultEscalateRetry(cfg, 2) {
+		t.Fatal("at max should not retry")
+	}
+}
+
+func TestWithParserContextValues(t *testing.T) {
+	t.Parallel()
+	budget := runnerctx.NewContextBudget(1000)
+	runCtx := RunProcessContext{
+		Run:     store.Run{ID: "run_1"},
+		Prompt:  "hi",
+		WorkDir: "D:/tmp/ws",
+		Budget:  budget,
+		Model:   "m",
+		AgentID: "claude",
+	}
+	ctx := withParserContextValues(context.Background(), runCtx)
+	if got, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); !ok || got != budget {
+		t.Fatalf("budget missing: %v %v", got, ok)
+	}
+	if got, ok := ctx.Value(adapters.CtxWorkDir).(string); !ok || got != "D:/tmp/ws" {
+		t.Fatalf("workdir missing: %v %v", got, ok)
+	}
+	rc, ok := adapters.RunProcessContextFromContext(ctx)
+	if !ok {
+		t.Fatal("SDK run context missing")
+	}
+	if rc.Prompt != "hi" || rc.Model != "m" || rc.AgentID != "claude" {
+		t.Fatalf("sdk ctx %#v", rc)
+	}
+}
+
+func TestNewSubAgentRunContext(t *testing.T) {
+	t.Parallel()
+	run := store.Run{ID: "run_c", ProjectID: "p", ThreadID: "th_c"}
+	parentBudget := runnerctx.NewContextBudget(10000)
+	task := adapters.SubAgentTask{
+		AgentID: "worker",
+		Prompt:  "do work",
+		Depth:   1,
+		Model:   "sonnet",
+		Budget:  parentBudget,
+	}
+	got := newSubAgentRunContext(run, task, "th_c")
+	if got.Run.ID != "run_c" || got.Prompt != "do work" || got.AgentID != "worker" || got.Model != "sonnet" {
+		t.Fatalf("fields %#v", got)
+	}
+	if got.SessionID != "th_c" {
+		t.Fatalf("session %q", got.SessionID)
+	}
+	if got.Budget == nil || got.Budget == parentBudget {
+		t.Fatal("expected isolated child budget")
+	}
+}
+
+func TestWithSiblingSystemPrompt(t *testing.T) {
+	t.Parallel()
+	if got := withSiblingSystemPrompt("base", nil); got != "base" {
+		t.Fatalf("nil siblings %q", got)
+	}
+	siblings := []adapters.SiblingInfo{{AgentName: "codex", TaskDesc: "write tests", TargetFiles: []string{"a.go"}}}
+	got := withSiblingSystemPrompt("base", siblings)
+	if !strings.Contains(got, "codex") || !strings.Contains(got, "base") {
+		t.Fatalf("got %q", got)
+	}
+	if !strings.HasPrefix(got, adapters.BuildSiblingContextPrompt(siblings)) {
+		t.Fatalf("prefix missing: %q", got)
+	}
+}
+
+func TestHubDoneResultHelpers(t *testing.T) {
+	t.Parallel()
+	if got := hubDoneFinalContent(""); got != "Run finished" {
+		t.Fatalf("empty -> %q", got)
+	}
+	if got := hubDoneFinalContent("hello"); got != "hello" {
+		t.Fatalf("content -> %q", got)
+	}
+	res := hubTaskDoneResult("run_1", "")
+	if res.RunID != "run_1" || res.FinalContent != "Run finished" {
+		t.Fatalf("%#v", res)
+	}
+	_ = hub.TaskResult{}
+}
+
+func TestNeedsAdapterStdinAndMetricsLabel(t *testing.T) {
+	t.Parallel()
+	if needsAdapterStdin(nil) {
+		t.Fatal("nil adapter")
+	}
+	if got := resolveAdapterMetricsLabel(nil); got != "none" {
+		t.Fatalf("nil label %q", got)
+	}
+	ad := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	if got := resolveAdapterMetricsLabel(ad); got == "" || got == "none" {
+		t.Fatalf("adapter label %q", got)
+	}
+	_ = needsAdapterStdin(ad)
+	_ = fmt.Sprintf("%v", ad != nil)
 }
