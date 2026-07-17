@@ -14,6 +14,14 @@ export {
 export { ContactMain } from './ContactMainViews';
 export type { ContactMainProps } from './ContactMainViews';
 
+export {
+  ContactListPage,
+  ContactNewPane,
+  ContactGroupsPane,
+  ContactServicePane,
+  ContactProfilePopover,
+} from './ContactMainParts';
+
 export { ContactNav } from './ContactNav';
 export type { ContactNavProps } from './ContactNav';
 
