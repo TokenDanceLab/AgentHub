@@ -663,8 +663,9 @@ func (s *AgentService) retryDispatchToTarget(ctx context.Context, task *pendingT
 	}
 
 	// Try HTTP dispatch first for unbound tasks.
+	// HTTP path lives on DispatchService (same-package thin extract #563).
 	if task.TargetID == "" && task.EdgeDeviceID == "" {
-		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); edgeRunID != "" {
+		if edgeRunID := s.dispatchService().dispatchToEdgeHTTP(ctx, minimalTask, &dp); edgeRunID != "" {
 			slog.Info("redispatch: HTTP dispatch succeeded",
 				"delivery_id", rec.DeliveryID,
 				"task_id", rec.TaskID,
