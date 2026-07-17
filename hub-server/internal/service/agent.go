@@ -44,23 +44,22 @@ type AgentService struct {
 	edgeCallbacks *EdgeCallbackService
 	// deliveryOutbox owns journal + retry-loop orchestration.
 	// Constructed in NewAgentService; tests using struct literals fall back to
-	// a lazy facade via deliveryOutboxService(). Redispatch stays on AgentService
-	// behind the Redispatcher port.
+	// a lazy facade via deliveryOutboxService(). Redispatch implementation lives
+	// on DispatchService and is injected via the Redispatcher port.
 	deliveryOutbox *DeliveryOutbox
-	// dispatch owns trigger/dispatch/cancel/regenerate orchestration.
+	// dispatch owns trigger/dispatch/cancel/regenerate + redispatch residual.
 	// Constructed in NewAgentService; tests using struct literals fall back to
-	// a lazy facade via dispatchService(). Redispatch path reuses
-	// DispatchService.dispatchToEdgeHTTP for the HTTP route.
+	// a lazy facade via dispatchService(). DeliveryOutbox retries call into
+	// DispatchService through Redispatcher (dispatchPayload stays private).
 	dispatch *DispatchService
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
 	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
-	// Construct outbox first (nil redispatcher), then inject adapter after s exists
-	// to avoid init cycles with agentRedispatcher{s}.
+	// Construct outbox first (nil redispatcher), then inject DispatchService
+	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
 	s.deliveryOutbox = NewDeliveryOutbox(db, nil)
-	s.deliveryOutbox.SetRedispatcher(agentRedispatcher{s})
 	s.edgeCallbacks = NewEdgeCallbackService(
 		db,
 		bus,
@@ -69,6 +68,7 @@ func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.
 	)
 	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
 	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox)
+	s.deliveryOutbox.SetRedispatcher(dispatchRedispatcher{s.dispatch})
 	return s
 }
 

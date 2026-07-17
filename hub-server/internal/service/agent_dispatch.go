@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -98,11 +99,13 @@ type edgeRunResponse struct {
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 
-// dispatchOutbox records and marks delivery journal rows during dispatch.
-// Implemented by *DeliveryOutbox (facades on AgentService also satisfy it).
+// dispatchOutbox records, marks, and dead-letters delivery journal rows during
+// dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
+// also satisfy it for tests that pass *AgentService as outbox).
 type dispatchOutbox interface {
 	RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error)
 	MarkDeliverySent(ctx context.Context, deliveryID string) error
+	MoveDeliveryToDeadLetter(ctx context.Context, deliveryID string, lastError string) error
 }
 
 // dispatchBus publishes cancel/regenerate domain events from dispatch lifecycle.
@@ -112,10 +115,10 @@ type dispatchBus interface {
 }
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
-// edge HTTP / WS / offline routing, capability minting, and history/pins loading.
-// Redispatch remains on AgentService behind Redispatcher and reuses
-// DispatchService.dispatchToEdgeHTTP for the HTTP path. Same-package thin type
-// extract (#563) — not a package move.
+// edge HTTP / WS / offline routing, capability minting, history/pins loading, and
+// redispatch residual (payload unmarshal + route selection). DeliveryOutbox
+// retries call in through Redispatcher; dispatchPayload stays package-private.
+// Same-package extract (#563 thin seam + #573 redispatch residual) — not a package move.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -168,6 +171,14 @@ func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID strin
 		return errors.New("dispatch outbox unavailable")
 	}
 	return s.outbox.MarkDeliverySent(ctx, deliveryID)
+}
+
+// moveDeliveryToDeadLetter is a nil-safe wrapper over the outbox port used by redispatch.
+func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, deliveryID, lastError string) {
+	if s == nil || s.outbox == nil {
+		return
+	}
+	_ = s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
 }
 
 // dispatchToEdgeHTTP attempts to dispatch a task directly via HTTP POST to a
@@ -890,6 +901,201 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 		return ""
 	}
 	return token
+}
+
+// ── Redispatch residual (moved from AgentService in #573) ────────────────────
+
+// pendingTaskSnapshot is the minimal task row used for redelivery routing.
+type pendingTaskSnapshot struct {
+	ID                string
+	AgentInstanceID   string
+	TriggeredByUserID string
+	Status            string
+	EdgeDeviceID      string
+	EdgeRunID         string
+	TargetID          string
+}
+
+// redispatchDelivery re-dispatches a delivery by parsing the stored payload
+// and routing it to the target Edge device. Owns dispatchPayload unmarshal.
+// Accepts redispatchTarget only — never the private GORM row type.
+func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) {
+	// Parse the payload to get dispatch info.
+	var dp dispatchPayload
+	if err := json.Unmarshal([]byte(rec.Payload), &dp); err != nil {
+		slog.Error("failed to unmarshal delivery payload for redispatch",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+			"error", err,
+		)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload unmarshal: %v", err))
+		return
+	}
+
+	// Update the delivery_id in the payload so the Edge can ack the new attempt.
+	dp.DeliveryID = rec.DeliveryID
+
+	newPayload, err := json.Marshal(dp)
+	if err != nil {
+		slog.Error("failed to marshal redispatch payload",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+			"error", err,
+		)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("payload marshal: %v", err))
+		return
+	}
+
+	// Look up the task for dispatch routing.
+	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
+	if err != nil {
+		slog.Warn("redispatch: task lookup failed, marking dead-letter",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+			"error", err,
+		)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task lookup: %v", err))
+		return
+	}
+
+	// Only retry if task is still in a retryable state.
+	if task.Status != "queued" && task.Status != "dispatched" && task.Status != "running" {
+		slog.Info("redispatch: task in terminal state, moving delivery to dead-letter",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+			"task_status", task.Status,
+		)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, fmt.Sprintf("task status is %s", task.Status))
+		return
+	}
+
+	// Re-dispatch via HTTP (if local Edge) or WebSocket.
+	s.retryDispatchToTarget(ctx, task, dp, newPayload, rec)
+}
+
+// getPendingTaskForRedelivery looks up a task for redelivery purposes.
+func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskID string) (*pendingTaskSnapshot, error) {
+	var task struct {
+		ID                string
+		AgentInstanceID   string
+		TriggeredByUserID string
+		Status            string
+		EdgeDeviceID      string
+		EdgeRunID         string
+		TargetID          string
+	}
+	err := s.db.WithContext(ctx).
+		Table("pending_agent_tasks").
+		Select("id, agent_instance_id, triggered_by_user_id, status, edge_device_id, edge_run_id, target_id").
+		Where("id = ?", taskID).
+		First(&task).Error
+	if err != nil {
+		return nil, err
+	}
+	return &pendingTaskSnapshot{
+		ID:                task.ID,
+		AgentInstanceID:   task.AgentInstanceID,
+		TriggeredByUserID: task.TriggeredByUserID,
+		Status:            task.Status,
+		EdgeDeviceID:      task.EdgeDeviceID,
+		EdgeRunID:         task.EdgeRunID,
+		TargetID:          task.TargetID,
+	}, nil
+}
+
+// retryDispatchToTarget re-dispatches a delivery to the target Edge device.
+// rec is a redispatchTarget (opaque payload fields only), not the GORM model.
+func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) {
+	// Build a minimal PendingAgentTask for dispatchToEdgeHTTP which needs task.ID.
+	minimalTask := &model.PendingAgentTask{
+		ID:           task.ID,
+		TargetID:     task.TargetID,
+		EdgeDeviceID: task.EdgeDeviceID,
+	}
+
+	// Try HTTP dispatch first for unbound tasks.
+	if task.TargetID == "" && task.EdgeDeviceID == "" {
+		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); edgeRunID != "" {
+			slog.Info("redispatch: HTTP dispatch succeeded",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+				"edge_run_id", edgeRunID,
+			)
+			return
+		}
+	}
+
+	// Route by device: push to WebSocket or offline queue.
+	cacheClient := resolveAgentCache(s.cacheClient)
+	if task.EdgeDeviceID != "" {
+		connID, err := cacheClient.GetRouteForDevice(ctx, task.TriggeredByUserID, "desktop", task.EdgeDeviceID)
+		if err == nil && connID != "" && s.mgr != nil {
+			conn := s.mgr.FindByConnID(connID)
+			if conn != nil && conn.UserID == task.TriggeredByUserID {
+				frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload))
+				result := s.mgr.PushToConn(connID, frame)
+				if result.Queued {
+					slog.Info("redispatch: WS dispatch succeeded",
+						"delivery_id", rec.DeliveryID,
+						"task_id", rec.TaskID,
+						"device_id", task.EdgeDeviceID,
+					)
+					return
+				}
+				slog.Warn("redispatch: WS push not queued",
+					"delivery_id", rec.DeliveryID,
+					"task_id", rec.TaskID,
+					"delivery_status", result.Status,
+					"error", result.Err,
+				)
+			}
+		}
+		// Offline: push to Redis queue.
+		if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
+			slog.Error("redispatch: failed to push to offline queue",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+				"error", err,
+			)
+		} else {
+			slog.Info("redispatch: queued to offline queue",
+				"delivery_id", rec.DeliveryID,
+				"task_id", rec.TaskID,
+				"user_id", task.TriggeredByUserID,
+			)
+		}
+		return
+	}
+
+	// Fallback: push to inviter's desktop queue.
+	connID, err := cacheClient.GetRoute(ctx, task.TriggeredByUserID, "desktop")
+	if err == nil && connID != "" && s.mgr != nil {
+		conn := s.mgr.FindByConnID(connID)
+		if conn != nil {
+			frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload))
+			result := s.mgr.PushToConn(connID, frame)
+			if result.Queued {
+				slog.Info("redispatch: WS fallback dispatch succeeded",
+					"delivery_id", rec.DeliveryID,
+					"task_id", rec.TaskID,
+				)
+				return
+			}
+		}
+	}
+
+	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
+		slog.Error("redispatch: failed to push to fallback queue",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+			"error", err,
+		)
+	} else {
+		slog.Info("redispatch: queued to fallback queue",
+			"delivery_id", rec.DeliveryID,
+			"task_id", rec.TaskID,
+		)
+	}
 }
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────
