@@ -103,11 +103,12 @@ const (
 	CloseCodeEventGap = 4001
 )
 
-// denyRemoteHubSharedConfig blocks Hub JWT callers from reading Edge-local shared
-// configuration surfaces that have no per-user owner binding (AH-SR-045).
-// Local auth / unauthenticated local-dev (userID=="") remains allowed.
-func denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Request) bool {
-	if hubUserFromRequest(r) == "" {
+// denyRemoteHubSharedConfig blocks multi-user / Hub JWT callers from reading
+// Edge-local shared configuration surfaces that have no per-user owner binding
+// (AH-SR-045 / #878). Local single-tenant mode (no Hub JWT secret configured)
+// remains allowed; empty userID under multi-user mode fails closed.
+func (h *Handler) denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Request) bool {
+	if isLocalSingleTenant(h.ownerUserID(r)) {
 		return false
 	}
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("not found")))
@@ -356,7 +357,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 			repo := ensureStore(h)
-			userID := hubUserFromRequest(r)
+			userID := h.ownerUserID(r)
 			if run, ok := repo.GetRun(runID); ok {
 				if !isRunOwnedBy(repo, run.ID, userID) {
 					writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))

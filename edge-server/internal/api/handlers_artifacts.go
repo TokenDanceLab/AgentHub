@@ -13,9 +13,9 @@ import (
 func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	// When a specific run is requested under Hub JWT, fail closed if not owned.
-	if runID != "" && userID != "" && !isRunOwnedBy(repo, runID, userID) {
+	if runID != "" && !isRunOwnedBy(repo, runID, userID) {
 		writeSuccess(w, http.StatusOK, listResponse([]store.Artifact{}))
 		return
 	}
@@ -29,7 +29,7 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID
 		return
 	}
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if artifact, ok := repo.GetArtifact(artifactID); ok {
 		if !isArtifactOwnedBy(repo, artifact.ID, userID) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
@@ -44,8 +44,8 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID
 func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
 	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
-	if runID != "" && userID != "" && !isRunOwnedBy(repo, runID, userID) {
+	userID := h.ownerUserID(r)
+	if runID != "" && !isRunOwnedBy(repo, runID, userID) {
 		writeSuccess(w, http.StatusOK, listResponse([]store.Preview{}))
 		return
 	}
@@ -91,7 +91,7 @@ func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID s
 		return
 	}
 	repo := ensureStore(h)
-	userID := hubUserFromRequest(r)
+	userID := h.ownerUserID(r)
 	if preview, ok := repo.GetPreview(previewID); ok {
 		if !isPreviewOwnedBy(repo, preview.ID, userID) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))

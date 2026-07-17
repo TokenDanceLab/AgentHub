@@ -35,9 +35,9 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Capture Hub JWT ownership scope before the long-lived WS loop.
-	// Local auth (empty userID) keeps full event stream access.
-	userID := hubUserFromRequest(r)
+	// Capture ownership principal before the long-lived WS loop.
+	// Local single-tenant bypass keeps full stream; empty userID fails closed (#878).
+	userID := h.ownerUserID(r)
 	repo := ensureStore(h)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
