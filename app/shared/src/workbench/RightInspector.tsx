@@ -2,62 +2,38 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../i18n';
 import { buildInspectorEvidenceModel } from '../inspector';
-import type { RuntimeEvidenceSnapshot } from '../inspector';
-import type { EvidenceRef, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, SubtaskTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { FileDiff } from '../types/chat';
 import {
-  type TaskItem,
   type FileItem,
-  type RunResultInfo,
   type PreviewFile,
-  BrowserModeBody,
-  FilesModeBody,
   InspectorMonitorHead,
-  OverviewModeBody,
   defaultVisibleTabs,
-  evidenceOverviewFiles,
-  evidenceOverviewTasks,
   getInspectorTabs,
-  runtimeDiffPreviewFile,
-  runtimeEvidenceOverviewFiles,
-  runtimeEvidenceOverviewTasks,
   type InspectorMode,
 } from './inspector';
-import type { DagNode } from '../ui/DagTree';
-import { buildDagNodesFromTranscript } from '../ui/DagTree';
 import styles from './AgentHubWorkbench.module.css';
+import { RightInspectorModePanel } from './RightInspectorModePanel';
+import { RightInspectorResizer } from './RightInspectorResizer';
+import {
+  createInspectorResizerKeyDownHandler,
+  createInspectorResizerPointerDownHandler,
+  inspectorDataPreviewAttr,
+  planOpenDiffPreview,
+  resolveBrowserPreviewUrl,
+  resolveDagNodesFromRouteBlocks,
+  resolveFallbackInspectorMode,
+  resolveFileClickTarget,
+  resolveOverviewFiles,
+  resolveOverviewTasks,
+  withInspectorTab,
+  withoutInspectorTab,
+} from './rightInspectorHelpers';
+import type { RightInspectorProps } from './rightInspectorTypes';
 
 export type { RuntimeEvidenceSnapshot } from '../inspector';
+export type { RightInspectorProps } from './rightInspectorTypes';
 
 /* ═══ Component ═══ */
-
-export interface RightInspectorProps {
-  defaultBrowserUrl: string;
-  evidence: EvidenceRef[];
-  browserPreviewEnabled: boolean;
-  canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
-  collapsed: boolean;
-  maxWidth: number;
-  minWidth: number;
-  onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
-  reviewFileRequest?: FileItem | null | undefined;
-  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
-  /** Workspace directory for the active run — required for diff apply write-back. */
-  workDir?: string | undefined;
-  /** Context usage blocks from the transcript, used for the compact context bar in Overview. */
-  contextBlocks?: ContextUsageTranscriptBlock[] | undefined;
-  /** Route decision / sub-agent blocks for DagTree visualization. */
-  routeBlocks?: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock> | undefined;
-  /** Deploy preview URL to auto-load in the browser tab. When set, switches to browser. */
-  deployPreviewUrl?: string | undefined;
-  /** Deploy status indicator for the browser tab. */
-  deployStatus?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
-  /** Run result from the transcript, displayed as a banner in the overview tab. */
-  runResult?: RunResultInfo | undefined;
-  onResizeBy: (delta: number) => void;
-  onResizeStart: (clientX: number) => void;
-  width: number;
-}
 
 export function RightInspector({
   defaultBrowserUrl,
@@ -89,14 +65,7 @@ export function RightInspector({
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
   const model = buildInspectorEvidenceModel(evidence);
-
-  // ── DagTree nodes from route decision blocks ──
-  const dagNodes = useMemo<DagNode[]>(() => {
-    if (!routeBlocks || routeBlocks.length === 0) return [];
-    return buildDagNodesFromTranscript(routeBlocks);
-  }, [routeBlocks]);
-
-  // ── Deploy auto-switch: when a deploy preview URL appears, switch to browser tab ──
+  const dagNodes = useMemo(() => resolveDagNodesFromRouteBlocks(routeBlocks), [routeBlocks]);
   const lastAutoSwitchedUrl = useRef<string | null>(null);
 
   useEffect(() => {
@@ -104,47 +73,30 @@ export function RightInspector({
     // Only auto-switch on NEW deploy URLs (not on re-renders of the same URL)
     if (lastAutoSwitchedUrl.current === deployPreviewUrl) return;
     lastAutoSwitchedUrl.current = deployPreviewUrl;
-
-    setVisibleTabs((current) => {
-      const next = new Set(current);
-      next.add('browser');
-      return next;
-    });
+    setVisibleTabs((current) => withInspectorTab(current, 'browser'));
     setBrowserUrl(deployPreviewUrl);
     setActiveMode('browser');
   }, [deployPreviewUrl, browserPreviewEnabled]);
 
   useEffect(() => {
     if (!reviewFileRequest) return;
-    setVisibleTabs((current) => {
-      const next = new Set(current);
-      next.add('files');
-      return next;
-    });
+    setVisibleTabs((current) => withInspectorTab(current, 'files'));
     setPreviewFile(reviewFileRequest);
     setActiveMode('files');
   }, [reviewFileRequest]);
 
-  const overviewTasks = useMemo<TaskItem[]>(() => {
-    if (runtimeEvidence) return runtimeEvidenceOverviewTasks(runtimeEvidence);
-    return evidenceOverviewTasks(evidence);
-  }, [evidence, runtimeEvidence]);
+  const overviewTasks = useMemo(
+    () => resolveOverviewTasks(evidence, runtimeEvidence),
+    [evidence, runtimeEvidence],
+  );
 
-  const overviewFiles = useMemo<PreviewFile[]>(() => {
-    const files = runtimeEvidence
-      ? runtimeEvidenceOverviewFiles(runtimeEvidence)
-      : evidenceOverviewFiles(evidence);
-    return files.map((file) => ({
-      ...file,
-      isOpen: previewFile?.name === file.name,
-    }));
-  }, [evidence, previewFile?.name, runtimeEvidence]);
+  const overviewFiles = useMemo(
+    () => resolveOverviewFiles(evidence, runtimeEvidence, previewFile?.name),
+    [evidence, previewFile?.name, runtimeEvidence],
+  );
 
   const handleFileClick = useCallback((file: FileItem) => {
-    // Look up the full PreviewFile (with content/URL data) from overviewFiles,
-    // since FileItem from the OverviewPanel only has name/type/isPrimary/isOpen.
-    const richFile = overviewFiles.find((f) => f.name === file.name);
-    setPreviewFile(richFile ?? file);
+    setPreviewFile(resolveFileClickTarget(overviewFiles, file));
     setActiveMode('files');
   }, [overviewFiles]);
 
@@ -154,32 +106,17 @@ export function RightInspector({
     setActiveMode('overview');
   }, []);
 
-  const runtimePreviewUrl = runtimeEvidence?.previews.find((preview) => (
-    preview.status === 'ready' && Boolean(preview.url)
-  ))?.url;
-  const browserPreviewUrl = browserUrl ?? runtimePreviewUrl ?? defaultBrowserUrl;
+  const browserPreviewUrl = resolveBrowserPreviewUrl(browserUrl, runtimeEvidence, defaultBrowserUrl);
 
   const closeInspectorTab = useCallback((mode: InspectorMode) => {
-    setVisibleTabs((current) => {
-      const next = new Set(current);
-      next.delete(mode);
-      return next;
-    });
+    setVisibleTabs((current) => withoutInspectorTab(current, mode));
     setPreviewFile((current) => (mode === 'files' ? null : current));
     setBrowserUrl((current) => (mode === 'browser' ? null : current));
-    setActiveMode((current) => {
-      if (current !== mode) return current;
-      const fallback = inspectorTabs.find((tab) => tab.mode !== mode && visibleTabs.has(tab.mode));
-      return fallback?.mode ?? 'overview';
-    });
-  }, [visibleTabs]);
+    setActiveMode((current) => resolveFallbackInspectorMode(current, mode, inspectorTabs, visibleTabs));
+  }, [inspectorTabs, visibleTabs]);
 
   const restoreInspectorTab = useCallback((mode: InspectorMode) => {
-    setVisibleTabs((current) => {
-      const next = new Set(current);
-      next.add(mode);
-      return next;
-    });
+    setVisibleTabs((current) => withInspectorTab(current, mode));
     setActiveMode(mode);
     setQuickOpenVisible(false);
   }, []);
@@ -189,48 +126,39 @@ export function RightInspector({
   }, []);
 
   const handleOpenDiff = useCallback((file: FileDiff) => {
-    setPreviewFile(runtimeDiffPreviewFile(file, runtimeEvidence?.runId, workDir));
+    setPreviewFile(planOpenDiffPreview(file, runtimeEvidence?.runId, workDir));
     setActiveMode('files');
   }, [runtimeEvidence?.runId, workDir]);
 
   const handleOpenPreviewUrl = useCallback((url: string) => {
-    setVisibleTabs((current) => {
-      const next = new Set(current);
-      next.add('browser');
-      return next;
-    });
+    setVisibleTabs((current) => withInspectorTab(current, 'browser'));
     setBrowserUrl(url);
     setActiveMode('browser');
   }, []);
+
+  const onResizerKeyDown = useMemo(
+    () => createInspectorResizerKeyDownHandler(onResizeBy),
+    [onResizeBy],
+  );
+  const onResizerPointerDown = useMemo(
+    () => createInspectorResizerPointerDownHandler(collapsed, onResizeStart),
+    [collapsed, onResizeStart],
+  );
 
   return (
     <aside
       aria-hidden={collapsed}
       aria-label="Right inspector"
       className={styles.inspector}
-      data-preview={activeMode === 'overview' ? 'false' : 'true'}
+      data-preview={inspectorDataPreviewAttr(activeMode)}
     >
-      <div
-        aria-label="调整右侧栏宽度"
-        aria-orientation="vertical"
-        aria-valuemax={maxWidth}
-        aria-valuemin={minWidth}
-        aria-valuenow={width}
-        className={styles.inspectorResizer}
-        onKeyDown={(event) => {
-          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-          event.preventDefault();
-          const step = event.shiftKey ? 40 : 16;
-          onResizeBy(event.key === 'ArrowLeft' ? step : -step);
-        }}
-        onPointerDown={(event) => {
-          if (collapsed) return;
-          event.preventDefault();
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          onResizeStart(event.clientX);
-        }}
-        role="separator"
-        tabIndex={collapsed ? -1 : 0}
+      <RightInspectorResizer
+        collapsed={collapsed}
+        maxWidth={maxWidth}
+        minWidth={minWidth}
+        width={width}
+        onKeyDown={onResizerKeyDown}
+        onPointerDown={onResizerPointerDown}
       />
 
       <InspectorMonitorHead
@@ -245,52 +173,30 @@ export function RightInspector({
         t={t}
       />
 
-      <div className={styles.inspectorPanel} role="tabpanel">
-        {visibleTabs.size === 0 && (
-          <p className={styles.inspectorEmpty}>右侧窗口已关闭。使用 + 重新打开概览、浏览器或文件。</p>
-        )}
-
-        {activeMode === 'overview' && visibleTabs.has('overview') && (
-          <OverviewModeBody
-            contextBlocks={contextBlocks}
-            dagNodes={dagNodes}
-            overviewFiles={overviewFiles}
-            overviewTasks={overviewTasks}
-            runResult={runResult}
-            runtimeEvidence={runtimeEvidence}
-            onFileClick={handleFileClick}
-          />
-        )}
-
-        {activeMode === 'browser' && visibleTabs.has('browser') && (
-          <BrowserModeBody
-            artifacts={model.artifacts}
-            browserPreviewEnabled={browserPreviewEnabled}
-            browserPreviewUrl={browserPreviewUrl}
-            canOpenPreview={canOpenPreview}
-            deployPreviewUrl={deployPreviewUrl}
-            deployStatus={deployStatus}
-            onClose={closePreview}
-            onOpenPreview={onOpenPreview}
-            onOpenUrl={setBrowserUrl}
-          />
-        )}
-
-        {activeMode === 'files' && visibleTabs.has('files') && (
-          <FilesModeBody
-            canOpenPreview={canOpenPreview}
-            files={model.files}
-            overviewFiles={overviewFiles}
-            previewFile={previewFile}
-            runtimeEvidence={runtimeEvidence}
-            onClose={closePreview}
-            onFallbackFileClick={handleFileClick}
-            onOpenDiff={handleOpenDiff}
-            onOpenPreview={onOpenPreview}
-            onOpenPreviewUrl={handleOpenPreviewUrl}
-          />
-        )}
-      </div>
+      <RightInspectorModePanel
+        activeMode={activeMode}
+        artifacts={model.artifacts}
+        browserPreviewEnabled={browserPreviewEnabled}
+        browserPreviewUrl={browserPreviewUrl}
+        canOpenPreview={canOpenPreview}
+        contextBlocks={contextBlocks}
+        dagNodes={dagNodes}
+        deployPreviewUrl={deployPreviewUrl}
+        deployStatus={deployStatus}
+        files={model.files}
+        overviewFiles={overviewFiles}
+        overviewTasks={overviewTasks}
+        previewFile={previewFile}
+        runResult={runResult}
+        runtimeEvidence={runtimeEvidence}
+        visibleTabs={visibleTabs}
+        onClosePreview={closePreview}
+        onFileClick={handleFileClick}
+        onOpenDiff={handleOpenDiff}
+        onOpenPreview={onOpenPreview}
+        onOpenPreviewUrl={handleOpenPreviewUrl}
+        onOpenUrl={setBrowserUrl}
+      />
     </aside>
   );
 }
