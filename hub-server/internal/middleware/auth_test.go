@@ -242,14 +242,38 @@ func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
+// TestWSAuthMiddlewareRejectsHubLocalQueryToken is the #954 fail-closed gate:
+// query-only access_token must no longer authenticate Hub WS upgrades.
+func TestWSAuthMiddlewareRejectsHubLocalQueryToken(t *testing.T) {
 	token := makeToken("user-ws", "web", "device-ws")
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
 
 	WSAuthMiddleware(testConfig())(c)
 
+	if !c.IsAborted() {
+		t.Fatal("expected query-only access_token to be rejected on Hub WS upgrade")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
+	}
+	if got := c.GetString("user_id"); got != "" {
+		t.Fatalf("user_id = %q, want empty", got)
+	}
+}
+
+// TestWSAuthMiddlewareAcceptsHubLocalBearerToken covers native clients that set
+// Authorization: Bearer on the WS upgrade request.
+func TestWSAuthMiddlewareAcceptsHubLocalBearerToken(t *testing.T) {
+	token := makeToken("user-ws", "desktop", "device-ws")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
+
+	WSAuthMiddleware(testConfig())(c)
+
 	if c.IsAborted() {
-		t.Fatalf("expected Hub-local WebSocket token to authenticate, status=%d body=%s", w.Code, w.Body.String())
+		t.Fatalf("expected Hub-local Bearer token to authenticate, status=%d body=%s", w.Code, w.Body.String())
 	}
 	if got := c.GetString("auth_source"); got != "hub_local" {
 		t.Fatalf("auth_source = %q, want hub_local", got)
@@ -257,8 +281,8 @@ func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
 	if got := c.GetString("user_id"); got != "user-ws" {
 		t.Fatalf("user_id = %q, want user-ws", got)
 	}
-	if got := c.GetString("device_type"); got != "web" {
-		t.Fatalf("device_type = %q, want web", got)
+	if got := c.GetString("device_type"); got != "desktop" {
+		t.Fatalf("device_type = %q, want desktop", got)
 	}
 	if got := c.GetString("purpose"); got != "" {
 		t.Fatalf("purpose = %q, want empty product session purpose", got)
@@ -309,7 +333,9 @@ func TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewarePrefersSubprotocolOverQuery(t *testing.T) {
+// TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent ensures a query
+// access_token cannot override (or supply) auth when a subprotocol JWT is present.
+func TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
 	protoToken := makeToken("user-proto", "web", "device-proto")
 	queryToken := makeToken("user-query", "web", "device-query")
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+queryToken, "")
@@ -318,10 +344,10 @@ func TestWSAuthMiddlewarePrefersSubprotocolOverQuery(t *testing.T) {
 	WSAuthMiddleware(testConfig())(c)
 
 	if c.IsAborted() {
-		t.Fatalf("expected subprotocol token to win over query, status=%d body=%s", w.Code, w.Body.String())
+		t.Fatalf("expected subprotocol token to authenticate, status=%d body=%s", w.Code, w.Body.String())
 	}
 	if got := c.GetString("user_id"); got != "user-proto" {
-		t.Fatalf("user_id = %q, want user-proto (subprotocol preferred over query)", got)
+		t.Fatalf("user_id = %q, want user-proto (query token must be ignored)", got)
 	}
 }
 
@@ -565,7 +591,7 @@ func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IssueCapabilityToken: %v", err)
 	}
-	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
 	WSAuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
@@ -655,7 +681,7 @@ func TestWSAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
 	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}})
 	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
 
-	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
 	WSAuthMiddleware(testConfig())(c)
 	if !c.IsAborted() {
 		t.Fatal("expected blacklisted access jti to be rejected on WS")
