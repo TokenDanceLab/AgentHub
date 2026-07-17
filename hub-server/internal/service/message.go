@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/im"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
@@ -25,8 +24,9 @@ import (
 // Same-package thin first seam (#585): MessageService already owns IM message
 // orchestration (send/edit/recall/pin/forward/search/read). This seam hardens
 // replaceable ports (bus + cache) without a package move — same pattern as
-// DispatchService / EdgeCallbackService / DeliveryOutbox. Full service/im
-// subpackage extract remains deferred.
+// DispatchService / EdgeCallbackService / DeliveryOutbox.
+// #628: pure content normalize/attachment-id helpers live in service/im;
+// MessageService keeps thin aliases for same-package call sites.
 
 // messageBus publishes domain events from message write/lifecycle paths.
 // Implemented by *Bus.
@@ -151,79 +151,26 @@ type EditMessageResponse struct {
 	EditedAt  string `json:"edited_at"`
 }
 
+// ── Pure IM helpers (aliases to service/im; #628) ────────────────────────────
+
+// validContentTypes is retained for same-package lookups; source of truth is im.
 var validContentTypes = map[string]bool{
 	"text": true, "code": true, "diff": true, "image": true,
 	"file": true, "link_card": true, "deploy_card": true,
 }
 
-// normalizeMessageContent returns the JSONB string persisted for a message.
-// #173: every content type is normalized before DB write so PostgreSQL jsonb
-// never sees raw, unvalidated client strings.
+// normalizeMessageContent is a thin alias to im.NormalizeMessageContent.
 func normalizeMessageContent(contentType, content string) (string, error) {
-	if contentType == model.ContentTypeText {
-		contentBytes, err := json.Marshal(map[string]string{"text": content})
-		if err != nil {
-			return "", err
-		}
-		return string(contentBytes), nil
-	}
-
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(content), &payload); err != nil {
-		return "", fmt.Errorf("invalid JSON for content type %s: %w", contentType, err)
-	}
-	if payload == nil {
-		return "", fmt.Errorf("content type %s must be a JSON object", contentType)
-	}
-
-	if err := validateContentPayload(contentType, payload); err != nil {
-		return "", err
-	}
-
-	normalized, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-	return string(normalized), nil
+	return im.NormalizeMessageContent(contentType, content)
 }
 
-func validateContentPayload(contentType string, payload map[string]interface{}) error {
-	switch contentType {
-	case model.ContentTypeCode, model.ContentTypeDiff:
-		return requireContentString(payload, "text", contentType)
-	case model.ContentTypeFile:
-		return requireContentString(payload, "attachment_id", contentType)
-	case model.ContentTypeLinkCard:
-		return requireContentString(payload, "url", contentType)
-	case model.ContentTypeImage:
-		if hasContentString(payload, "attachment_id") {
-			return nil
-		}
-		return requireContentString(payload, "url", contentType)
-	case model.ContentTypeDeployCard:
-		return nil
-	}
-	return nil
-}
-
-func requireContentString(payload map[string]interface{}, field, contentType string) error {
-	if hasContentString(payload, field) {
-		return nil
-	}
-	return fmt.Errorf("required field %q must be a non-empty string for content type %s", field, contentType)
-}
-
-func hasContentString(payload map[string]interface{}, field string) bool {
-	value, exists := payload[field]
-	if !exists {
-		return false
-	}
-	s, ok := value.(string)
-	return ok && strings.TrimSpace(s) != ""
+// attachmentIDsFromContent is a thin alias to im.AttachmentIDsFromContent.
+func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
+	return im.AttachmentIDsFromContent(contentType, content)
 }
 
 func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
-	if !validContentTypes[req.ContentType] {
+	if !im.IsValidContentType(req.ContentType) {
 		return nil, errcode.ErrBadRequest
 	}
 
@@ -349,70 +296,6 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		SeqID:     msg.SeqID,
 		CreatedAt: msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
-}
-
-func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
-	if contentType != model.ContentTypeFile && contentType != model.ContentTypeImage {
-		return nil, true
-	}
-
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(content), &payload); err != nil {
-		return nil, true
-	}
-
-	seen := make(map[string]struct{})
-	ids := make([]string, 0, 1)
-	add := func(value interface{}) bool {
-		id, ok := value.(string)
-		if !ok {
-			return true
-		}
-		id = strings.TrimSpace(id)
-		if id == "" {
-			return true
-		}
-		parsed, err := uuid.Parse(id)
-		if err != nil {
-			return false
-		}
-		id = parsed.String()
-		if _, exists := seen[id]; exists {
-			return true
-		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-		return true
-	}
-
-	if !add(payload["attachment_id"]) {
-		return nil, false
-	}
-
-	if rawIDs, ok := payload["attachment_ids"].([]interface{}); ok {
-		for _, rawID := range rawIDs {
-			if !add(rawID) {
-				return nil, false
-			}
-		}
-	}
-
-	if rawAttachments, ok := payload["attachments"].([]interface{}); ok {
-		for _, rawAttachment := range rawAttachments {
-			attachment, ok := rawAttachment.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if !add(attachment["attachment_id"]) {
-				return nil, false
-			}
-			if !add(attachment["id"]) {
-				return nil, false
-			}
-		}
-	}
-
-	return ids, true
 }
 
 func (s *MessageService) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
@@ -621,7 +504,7 @@ func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, 
 	if config.MessageEditWindow > 0 && time.Since(msg.CreatedAt) > config.MessageEditWindow {
 		return nil, errcode.MsgEditTimeout
 	}
-	if !validContentTypes[req.ContentType] {
+	if !im.IsValidContentType(req.ContentType) {
 		return nil, errcode.ErrBadRequest
 	}
 
