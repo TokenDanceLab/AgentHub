@@ -1,8 +1,8 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-17
-> issue: #594 (ContactService thin first seam; prior #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
-> status: map current — pure helpers closed; runtime typed services landed; **#585 MessageService** + **#593 SessionService** + **#594 ContactService thin first seams** (ports on existing typed services) landed same-package; full package moves deferred; next residual = IM subpackages / optional outbox model package move
+> issue: #606 (AttachmentService thin first seam; prior #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
+> status: map current — pure helpers closed; runtime typed services landed; **#585 MessageService** + **#593 SessionService** + **#594 ContactService** + **#606 AttachmentService thin first seams** (ports on existing typed services) landed same-package; full package moves deferred; next residual = IM subpackages / optional outbox model package move
 > companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014)
 
 This document is the authoritative **read-only boundary map** for
@@ -25,11 +25,13 @@ an acceptance sketch.
 | Same-package type extract `MessageService` | **landed #585 thin first seam** | existing `message_test` / `message_edit_test` + port no-op tests | still in flat `service` | injected `messageBus` / `messageCache`; send/edit/pin/forward/search ownership clarified; no package move |
 | Same-package type extract `SessionService` | **landed #593 thin first seam** | existing `session_test` / behavior tests + port no-op tests | still in flat `service` | injected `sessionBus` / `sessionCache`; private/group lifecycle ownership clarified; no package move |
 | Same-package type extract `ContactService` | **landed #594 thin first seam** | existing `contact_test` + port no-op tests | still in flat `service` | injected `contactBus` / `contactCache`; search/request/list/block ownership clarified; no package move |
+| Same-package type extract `AttachmentService` | **landed #606 thin first seam** | existing `attachment_test` + storage port no-op tests | still in flat `service` | injected `ObjectStorage` ownership hardened + `SetStorage`; probe/save/blob/presign ownership clarified; no package move |
 
 **Shape note:** not one god struct — **25+ `*Service` types** already exist
 (including `RunEventService`, `EdgeCallbackService`, `DeliveryOutbox`,
-`DispatchService`, `MessageService`, `SessionService`, `ContactService`). Concentration remains **package flatness + residual
-`AgentService` facade sprawl + remaining IM services still on concrete `*Bus`** (Contact). Outbox journal + retry-loop orchestration
+`DispatchService`, `MessageService`, `SessionService`, `ContactService`,
+`AttachmentService`). Concentration remains **package flatness + residual
+`AgentService` facade sprawl + remaining IM surfaces** (reactions/workspace). Outbox journal + retry-loop orchestration
 are on `DeliveryOutbox`; trigger/dispatch/cancel/regenerate **and redispatch**
 are on `DispatchService` behind facades. Redispatch
 (`redispatchDelivery` / `retryDispatchToTarget`) lives on `*DispatchService`
@@ -39,6 +41,7 @@ behind `Redispatcher` (`dispatchRedispatcher` / lazy adapter) using
 (same-package thin seam; methods already lived on the typed service).
 **#593:** `SessionService` hardens replaceable `sessionBus` / `sessionCache` ports
 **#594:** `ContactService` hardens replaceable `contactBus` / `contactCache` ports
+**#606:** `AttachmentService` hardens replaceable `ObjectStorage` port ownership
 (same-package thin seam; methods already lived on the typed service).
 
 Precedent: `service/agentteam` uses **local interfaces**
@@ -51,13 +54,14 @@ Precedent: `service/agentteam` uses **local interfaces**
 `MessageService` injects `messageBus` / `messageCache` (**#585**).
 `SessionService` injects `sessionBus` / `sessionCache` (**#593**).
 `ContactService` injects `contactBus` / `contactCache` (**#594**).
+`AttachmentService` injects `ObjectStorage` (**#606**).
 
 ## 1. File inventory by domain
 
 | Domain | Prod LOC | Files (prod) | Role |
 |--------|---------:|--------------|------|
 | **agent_runtime** | ~2,9xx | `agent.go`, `agent_custom.go`, `agent_dispatch.go` (`DispatchService` + facade, ~930), `agent_run_event.go` (`RunEventService` + facade), `agent_edge_callback.go` (`EdgeCallbackService` + facade), `delivery_outbox.go` (~820), `agent_control.go`, `agent_team_helpers.go` (compat wrappers), `relay.go` | Task dispatch, edge callback, outbox retry, run-event projection |
-| **im_messaging** | ~3,1xx | `message.go` (~900; `MessageService` + ports), `session.go` (~760; `SessionService` + ports), `contact.go` (~380; `ContactService` + ports), `attachment.go`, `message_reaction.go`, `workspace.go`, `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments |
+| **im_messaging** | ~3,1xx | `message.go` (~900; `MessageService` + ports), `session.go` (~760; `SessionService` + ports), `contact.go` (~380; `ContactService` + ports), `attachment.go` (~400; `AttachmentService` + `ObjectStorage` port), `message_reaction.go`, `workspace.go`, `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments |
 | **agent_catalog** | ~1,133 | `agent_profile.go`, `document.go`, `skill.go`, `mcp_server.go`, `provider_binding.go` | Profiles/docs/market installables |
 | **identity_auth** | ~829 | `auth.go`, `oidc.go`, `device.go`, `user_settings.go` | Login/OIDC/device/settings |
 | **execution_target** | ~516 | `execution_target.go` | Local-edge targets + health |
@@ -75,6 +79,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | `message.go` | ~900 | `MessageService` + ports: send/edit/recall/pin/forward/search/read | injected `messageBus` / `messageCache` (**#585**); attachments |
 | `session.go` | ~760 | `SessionService` + ports: private/group lifecycle, members, dissolve, settings | injected `sessionBus` / `sessionCache` (**#593**); agent cleanup helpers |
 | `contact.go` | ~380 | `ContactService` + ports: search/request/accept/reject/list/remove/block/unblock/remark | injected `contactBus` / `contactCache` (**#594**) |
+| `attachment.go` | ~400 | `AttachmentService` + `ObjectStorage` port: probe/save/store/get/delete/presign/access + mime policy | injected `ObjectStorage` + `SetStorage` (**#606**); LocalStorage / S3Storage implementers |
 | `agent_edge_callback.go` | ~520 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**); outbox rebind via `DeliveryOutbox` (**#540**) |
 | `agent_run_event.go` | 237 | `RunEventService` + `AgentService` facade | repo; `agentevent` project; injected `runEventControl` (**#478 done**) |
 
@@ -102,6 +107,10 @@ Precedent: `service/agentteam` uses **local interfaces**
   `#594`: `ContactService` is already a top-level typed service; wiring stays
   `NewContactService(db, bus, cache)` with bus/cache as ports. Handler interface
   in `handler/contact.go` unchanged.
+  `#606`: `AttachmentService` is already a top-level typed service; wiring stays
+  `NewAttachmentService(db, uploadCfg, storage)` with `ObjectStorage` as the
+  blob port (+ `SetStorage` for tests). Handler interface in `handler/attachment.go`
+  unchanged.
 
 ## 2. Coupling risks
 
@@ -117,8 +126,8 @@ Precedent: `service/agentteam` uses **local interfaces**
 10. **Handler interfaces already thin the edge** — package extract without service-side ports still leaves fat concrete type for tests/wiring.
 
 Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
-`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** / **`ContactService` thin first seam (#594)** → IM subpackages or optional delivery model package move → im/catalog agentteam-style subpackages.
-**“先接口后搬家；一次一个 seam.”** — runtime + message + session typed ports done thin; **do not big-bang package moves.**
+`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** / **`ContactService` thin first seam (#594)** / **`AttachmentService` thin first seam (#606)** → IM subpackages or optional delivery model package move → im/catalog agentteam-style subpackages.
+**“先接口后搬家；一次一个 seam.”** — runtime + message + session + contact + attachment typed ports done thin; **do not big-bang package moves.**
 
 ## 3. Extract candidates ranked (lowest risk first)
 
@@ -137,7 +146,9 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | **8b** | **`MessageService` thin first seam** (ports on existing typed service) | Low–med | High (IM concentration) | **DONE #585** — `messageBus` / `messageCache` + ownership docs; no package move |
 | **8c** | **`SessionService` thin first seam** (ports on existing typed service) | Low–med | Med | **DONE #593** — `sessionBus` / `sessionCache` + ownership docs; no package move |
 | **8d** | **`ContactService` thin first seam** (ports on existing typed service) | Low–med | Med | **DONE #594** — `contactBus` / `contactCache` + ownership docs; no package move |
-| 10 | IM subpackages (`service/im` or message/session/contact) | Med | High | After port hardening; agentteam-style |
+| **8e** | **`AttachmentService` thin first seam** (`ObjectStorage` port ownership) | Low | Med | **DONE #606** — `ObjectStorage` + `SetStorage` + ownership docs; no package move |
+| 9 | Optional outbox model package move (`deliveryOutboxRecord` → model/repo) | High | Med | Deferred after #551 private ownership; higher risk than IM port seams |
+| 10 | IM subpackages (`service/im` or message/session/contact/attachment) | Med | High | After port hardening; agentteam-style |
 
 ## 4. Landed extracts
 
@@ -281,7 +292,11 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] `ContactService` thin first seam: `contactBus` / `contactCache` ports + nil-safe publish (#594)
 - [x] Session ownership clarified (private/group lifecycle, members, dissolve, settings); no OpenAPI/handler/frontend
 - [x] Existing `session_*` tests + short suite green; port no-op unit tests
-- [x] Boundary map residual next = IM subpackages / optional model package move
+- [x] Boundary map residual next = AttachmentService ports or IM subpackages / optional model package move
+- [x] `AttachmentService` thin first seam: `ObjectStorage` ownership + `SetStorage` + nil-safe blob paths (#606)
+- [x] Attachment ownership clarified (probe/save/store/get/delete/presign/access + mime policy); no OpenAPI/handler/frontend
+- [x] Existing `attachment_*` tests + short suite green; storage port unit tests
+- [x] Boundary map residual next = IM subpackages / optional outbox model package move
 
 ## 6. Suggested follow-up extract order
 
@@ -296,10 +311,10 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 9. ~~**`MessageService` thin first seam**~~ — **DONE #585** (`messageBus` / `messageCache` ports; ownership on existing typed service)
 10. ~~**`SessionService` thin first seam**~~ — **DONE #593** (`sessionBus` / `sessionCache` ports; ownership on existing typed service)
 11. ~~**`ContactService` thin first seam**~~ — **DONE #594** (`contactBus` / `contactCache` ports; ownership on existing typed service)
-12. **IM subpackages** (`service/im` or message/session/contact) and/or optional outbox model package move.
-12. **IM subpackages** (`service/im` or message/session/contact) — agentteam-style after port hardening.
-13. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
-14. **Optional outbox model package move** — deferred; not required before IM ports.
+12. ~~**`AttachmentService` thin first seam**~~ — **DONE #606** (`ObjectStorage` port ownership + `SetStorage`; no package move)
+13. **IM subpackages** (`service/im` or message/session/contact/attachment) — agentteam-style after port hardening.
+14. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
+15. **Optional outbox model package move** — deferred/high-risk; not required before IM subpackages.
 
 ### 6a. DeliveryOutbox + Redispatcher (#528 sketch → #540 thin type landed)
 
@@ -582,24 +597,76 @@ type ContactService struct {
 - [x] Ownership docs: search/request/accept/reject/list/remove/block/unblock/remark
 - [x] **No** package move; **no** OpenAPI/handler/frontend; **no** session.go freestyle
 - [x] Existing contact tests green; port unit tests added
-- [x] Boundary map residual next = SessionService ports (#593) or IM subpackages
+- [x] Boundary map residual next = AttachmentService ports or IM subpackages
+
+### 6e. AttachmentService thin first seam (#606)
+
+#### Decision: Option B over Option A
+
+| Option | Risk | Verdict for #606 |
+|--------|------|------------------|
+| **A. Optional outbox model package move** (`deliveryOutboxRecord` → `model`/`repository`) | High — crosses package boundaries, touches GORM hooks/repo helpers/tests, still optional after #551 private ownership | **Deferred** — not lower risk |
+| **B. AttachmentService thin first seam** (`ObjectStorage` ownership) | Low — same-package port pattern as Message/Session/Contact; storage already interface-shaped | **Chosen** |
+
+#### File ownership (current, post-#606)
+
+| Path | Owns | Notes |
+|------|------|-------|
+| `service/attachment.go` (~400) | `AttachmentService` + `ObjectStorage` port; LocalStorage / S3Storage implementers; probe/save/store/get/delete/presign/access; mime/size policy | **#606 thin first seam** — methods already on typed service; port ownership hardened |
+| `service/attachment_test.go` | storage + metadata + mime coverage + port no-op / SetStorage tests | Handler interface tests remain in `handler/` |
+| `handler/attachment.go` | thin handler interface over `AttachmentService` methods | **Unchanged** |
+| `app/wiring.go` | `NewAttachmentService(db, uploadCfg, storage)` | Signature still accepts `ObjectStorage` via port |
+
+#### Landed thin shape (#606)
+
+```go
+type ObjectStorage interface {
+    Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error)
+    Get(ctx context.Context, key string) (io.ReadCloser, error)
+    Delete(ctx context.Context, key string) error
+    LocalPath(key string) string
+    PresignURL(ctx context.Context, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error)
+}
+
+type AttachmentService struct {
+    db        *gorm.DB
+    uploadCfg config.UploadConfig
+    storage   ObjectStorage
+}
+
+// NewAttachmentService(db, uploadCfg, storage)
+// SetStorage for tests; storagePort() nil-safe on blob paths
+```
+
+- Methods stay on `*AttachmentService` (already extracted historically; #606 is port ownership, not method relocation).
+- No package move; no OpenAPI / handler / frontend changes.
+- Optional outbox model package move remains deferred/high-risk.
+
+#### Acceptance checklist — AttachmentService thin first seam (#606 this PR)
+
+- [x] `ObjectStorage` port ownership docs on `AttachmentService` (same package)
+- [x] Nil-safe blob paths; `SetStorage` injector
+- [x] Ownership docs: probe/save/store/get/delete/presign/access + mime policy
+- [x] **No** package move; **no** OpenAPI/handler/frontend; **no** outbox model move
+- [x] Existing attachment tests green; storage port unit tests added
+- [x] Boundary map residual next = IM subpackages / optional outbox model package move
 
 ### Follow-up issue ready
 
 | Field | Value |
 |-------|-------|
-| Suggested title | `[P20.x] Hub ContactService ports (mirror Session/Message) then IM subpackages` |
-| Depends on | #593 SessionService thin first seam |
-| Scope | Port-harden `ContactService` (bus/cache interfaces), then optional agentteam-style `service/im` subpackages and/or optional `deliveryOutboxRecord` model/repository move |
+| Suggested title | `[P21.x] Hub IM subpackages after Attachment/Message/Session/Contact ports` |
+| Depends on | #606 AttachmentService thin first seam |
+| Scope | Optional agentteam-style `service/im` subpackages and/or optional `deliveryOutboxRecord` model/repository move |
 | Non-goals | Big-bang package move of all IM; OpenAPI/frontend redesign |
-| Primary files | `contact.go` / `message_reaction.go` or outbox model helpers |
-| Risk note | Message + Session ports closed; Contact still concrete `*Bus`; IM independent of runtime |
+| Primary files | `message.go` / `session.go` / `contact.go` / `attachment.go` / `message_reaction.go` or outbox model helpers |
+| Risk note | Message + Session + Contact + Attachment ports closed; outbox model package move still high-risk/deferred |
 
 ## 7. Bottom line
 
-- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** are pure seams; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, **`DispatchService`**, **`MessageService`**, and **`SessionService`** are orchestration type extracts (message/session were pre-typed; #585/#593 ports).
-- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; Contact still concrete bus; runtime redispatch residual **closed** on `DispatchService`.
-- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam**.
+- **Map:** six domains in flat package; **agent_runtime + im_messaging** dominate; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** are pure seams; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, **`DispatchService`**, **`MessageService`**, **`SessionService`**, **`ContactService`**, and **`AttachmentService`** are orchestration type extracts (IM services were pre-typed; #585/#593/#594/#606 ports).
+- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; runtime redispatch residual **closed** on `DispatchService`; optional outbox model package move still high-risk.
+- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam** + **#594 ContactService thin first seam** + **#606 AttachmentService thin first seam**.
 - **Pure residual:** **closed**.
 - **#540 decision:** thin same-package extract **landed**. Redispatch initially stayed on `AgentService` behind port; no DispatchService big-bang.
 - **#551 decision:** model ownership residual **landed** (option A). Private GORM record + repo helpers on `DeliveryOutbox`; `DeliveryOutboxEntry` scan view; redispatch `redispatchTarget`; edge-callback acker removed. Full package move deferred.
@@ -607,7 +674,9 @@ type ContactService struct {
 - **#573 decision:** redispatch residual **landed** on `DispatchService`. `dispatchRedispatcher` injects DispatchService into `DeliveryOutbox`; lazy adapter avoids test-literal construction recursion; payload remains private.
 - **#585 decision:** MessageService thin first seam **landed**. Ports `messageBus` / `messageCache` + nil-safe publish; methods already on typed service; no package move.
 - **#593 decision:** SessionService thin first seam **landed**. Ports `sessionBus` / `sessionCache` + nil-safe publishEvent; methods already on typed service; no package move.
-- **Next code step:** **ContactService ports** (mirror #585/#593), then **IM subpackages** and/or **optional outbox model package move**.
+- **#594 decision:** ContactService thin first seam **landed**. Ports `contactBus` / `contactCache` + nil-safe publish; methods already on typed service; no package move.
+- **#606 decision:** AttachmentService thin first seam **landed** (Option B). `ObjectStorage` ownership + `SetStorage` + nil-safe blob paths; methods already on typed service; Option A outbox model package move deferred as higher risk.
+- **Next code step:** **IM subpackages** and/or **optional outbox model package move** (still deferred/high-risk).
 
 ## Key paths
 
@@ -621,5 +690,7 @@ type ContactService struct {
 - `hub-server/internal/service/agent_dispatch.go` (`DispatchService` + redispatch residual + facades; private `dispatchPayload`)
 - `hub-server/internal/service/message.go` (`MessageService` + `messageBus` / `messageCache` ports)
 - `hub-server/internal/service/session.go` (`SessionService` + `sessionBus` / `sessionCache` ports)
-- `hub-server/internal/app/wiring.go` (`StartDeliveryRetryLoop`, `NewMessageService`, `NewSessionService`)
+- `hub-server/internal/service/contact.go` (`ContactService` + `contactBus` / `contactCache` ports)
+- `hub-server/internal/service/attachment.go` (`AttachmentService` + `ObjectStorage` port)
+- `hub-server/internal/app/wiring.go` (`StartDeliveryRetryLoop`, `NewMessageService`, `NewSessionService`, `NewContactService`, `NewAttachmentService`)
 - `docs/analysis/cleanup-strategy.md`
