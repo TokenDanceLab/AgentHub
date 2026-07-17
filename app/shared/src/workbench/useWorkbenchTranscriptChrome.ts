@@ -12,16 +12,25 @@ import type { ComposerAction } from '../composer';
 import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
+import {
+  SELECTION_HOLD_CANCEL_DISTANCE,
+  SELECTION_HOLD_DELAY_MS,
+  blockTitle,
+  buildTranscriptContextMenuGroups,
+  buildTranscriptMultiSelectActions,
+  cardActionLabel,
+  isNestedInteractiveTarget,
+  multiActionLabel,
+  type WorkbenchContextMenuState,
+} from './workbenchTranscriptChromeHelpers';
 
-export const SELECTION_HOLD_DELAY_MS = 520;
-export const SELECTION_HOLD_CANCEL_DISTANCE = 36;
-
-export interface WorkbenchContextMenuState {
-  blockId: string;
-  title: string;
-  x: number;
-  y: number;
-}
+export {
+  SELECTION_HOLD_CANCEL_DISTANCE,
+  SELECTION_HOLD_DELAY_MS,
+  blockTitle,
+  isNestedInteractiveTarget,
+  type WorkbenchContextMenuState,
+} from './workbenchTranscriptChromeHelpers';
 
 export interface UseWorkbenchTranscriptChromeOptions {
   transcript: TranscriptBlock[];
@@ -61,56 +70,6 @@ export interface WorkbenchTranscriptChrome {
   copyText: (text: string) => void;
   resetSelection: () => void;
   selectionModeRef: MutableRefObject<boolean>;
-}
-
-export function isNestedInteractiveTarget(target: EventTarget | null, card: HTMLElement): boolean {
-  if (!(target instanceof Element)) return false;
-  const interactive = target.closest('button, a, input, textarea, select, label, [contenteditable="true"]');
-  return Boolean(interactive && interactive !== card && !interactive.hasAttribute('data-selectable-card'));
-}
-
-export function blockTitle(
-  block: TranscriptBlock,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): string {
-  switch (block.kind) {
-    case 'text':
-      return block.text.slice(0, 28) || block.author.name;
-    case 'tool_call':
-      return block.toolName;
-    case 'tool_result':
-      return `${block.toolName} result`;
-    case 'file_change':
-      return block.path;
-    case 'permission_request':
-    case 'permission_result':
-    case 'failure':
-    case 'finished':
-      return block.title;
-    case 'preview':
-      return block.url ?? block.previewId;
-    case 'diff':
-    case 'approval':
-    case 'artifact':
-    case 'subagent':
-    case 'subtask':
-    case 'child_agent':
-    case 'run_session':
-    case 'run_step_group':
-      return block.title;
-    case 'agent_timeline':
-      return block.title ?? t('mainchain.timeline');
-    case 'result':
-      return block.summary || (block.success ? t('mainchain.result') : t('mainchain.fail'));
-    case 'thinking':
-      return t('mainchain.thinking');
-    case 'route_decision':
-      return block.targetAgent || block.action;
-    case 'context_usage':
-      return block.modelLabel || '上下文用量';
-    default:
-      return '消息卡片';
-  }
 }
 
 export function useWorkbenchTranscriptChrome({
@@ -247,35 +206,6 @@ export function useWorkbenchTranscriptChrome({
     const block = transcript.find((item) => item.id === blockId);
     return block ? blockTitle(block, t) : t('mainchain.selectedCard');
   }, [t, transcript]);
-
-  const cardActionLabel = useCallback((action: string, title: string): string => {
-    const labels: Record<string, string> = {
-      copy: t('toast.cardCopied'),
-      react: t('toast.reactOpened'),
-      reply: `${t('context.reply')} ${title}`,
-      forward: t('toast.forwardQueued'),
-      topic: t('toast.topicDraft'),
-      pin: t('toast.pinUpdated'),
-      link: t('toast.linkCopied'),
-      translate: t('toast.translateQueued'),
-      task: t('toast.taskDraft'),
-      export: t('toast.exportDraft'),
-      apps: t('toast.appsOpened'),
-      delete: t('toast.deleteQueued'),
-    };
-    return labels[action] ?? t('toast.actionRecorded');
-  }, [t]);
-
-  const multiActionLabel = useCallback((action: string, count: number): string => {
-    const labels: Record<string, string> = {
-      copy: t('toast.multiCopy', { count }),
-      forward: t('toast.multiForward', { count }),
-      task: t('toast.multiTaskDraft', { count }),
-      export: t('toast.multiExport', { count }),
-      delete: t('toast.multiDelete', { count }),
-    };
-    return labels[action] ?? t('toast.multiProcessed', { count });
-  }, [t]);
 
   const openBlockContextMenu = useCallback((
     block: TranscriptBlock,
@@ -441,20 +371,20 @@ export function useWorkbenchTranscriptChrome({
       });
       onRegenerate?.(blockId);
       pulseBlock(blockId);
-      showWorkbenchToast(cardActionLabel(action, title));
+      showWorkbenchToast(cardActionLabel(action, title, t));
       return;
     }
     pulseBlock(blockId);
-    showWorkbenchToast(cardActionLabel(action, title));
+    showWorkbenchToast(cardActionLabel(action, title, t));
   }, [
     blockTitleById,
-    cardActionLabel,
     composerInputRef,
     copyText,
     dispatchComposer,
     onRegenerate,
     pulseBlock,
     showWorkbenchToast,
+    t,
     transcript,
   ]);
 
@@ -503,10 +433,9 @@ export function useWorkbenchTranscriptChrome({
       const title = (metadata?.text as string) || blockTitle(block, t);
       copyText(title);
       pulseBlock(blockId);
-      showWorkbenchToast(cardActionLabel('copy', title));
+      showWorkbenchToast(cardActionLabel('copy', title, t));
     }
   }, [
-    cardActionLabel,
     copyText,
     onApprovalDecision,
     onRegenerate,
@@ -534,66 +463,33 @@ export function useWorkbenchTranscriptChrome({
       setSelectionMode(false);
       setSelectedBlockIds([]);
     }
-    showWorkbenchToast(multiActionLabel(action, count));
-  }, [blockTitleById, copyText, multiActionLabel, selectedBlockIds, showWorkbenchToast, t]);
+    showWorkbenchToast(multiActionLabel(action, count, t));
+  }, [blockTitleById, copyText, selectedBlockIds, showWorkbenchToast, t]);
 
   runMultiActionRef.current = runMultiAction;
 
-  const contextMenuGroups = useCallback((blockId: string): Array<Array<ContextMenuItem>> => {
-    const block = transcript.find((item) => item.id === blockId);
-    const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
-    const isTextBlock = block?.kind === 'text';
-    return [
-      [
-        { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
-        { label: t('context.react'), icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
-        { label: t('context.reply'), icon: 'notes', onClick: () => runContextAction('reply', blockId) },
-        ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
-        { label: t('context.forward'), icon: 'external', onClick: () => runContextAction('forward', blockId) },
-      ],
-      [
-        { label: t('context.createTopic'), icon: 'groups', onClick: () => runContextAction('topic', blockId) },
-        { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
-        { label: t('context.pinMessage'), icon: 'bell', onClick: () => runContextAction('pin', blockId) },
-        { label: t('context.copyLink'), icon: 'external', onClick: () => runContextAction('link', blockId) },
-        { label: t('context.translate'), icon: 'library', onClick: () => runContextAction('translate', blockId) },
-      ],
-      [
-        ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
-        { label: t('context.addTask'), icon: 'running', onClick: () => runContextAction('task', blockId) },
-        { label: t('context.exportDoc'), icon: 'download', onClick: () => runContextAction('export', blockId) },
-        { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
-        { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
-      ],
-    ];
-  }, [enterSelection, runContextAction, t, transcript]);
+  const contextMenuGroups = useCallback((blockId: string): Array<Array<ContextMenuItem>> => (
+    buildTranscriptContextMenuGroups({
+      blockId,
+      transcript,
+      t,
+      onAction: runContextAction,
+      onEnterSelection: enterSelection,
+    })
+  ), [enterSelection, runContextAction, t, transcript]);
 
-  const multiSelectActions = useMemo<Array<MultiSelectBarAction>>(() => [
-    {
-      label: t('bar.selectAll'),
-      icon: 'done',
-      onClick: () => setSelectedBlockIds(transcript.map((block) => block.id)),
-    },
-    {
-      label: t('bar.clear'),
-      icon: 'filter',
-      onClick: () => setSelectedBlockIds([]),
-    },
-    { label: t('context.copy'), icon: 'fileText', onClick: () => runMultiAction('copy') },
-    { label: t('context.forward'), icon: 'external', onClick: () => runMultiAction('forward') },
-    { label: t('context.addTask'), icon: 'running', onClick: () => runMultiAction('task') },
-    { label: t('context.exportDoc'), icon: 'download', onClick: () => runMultiAction('export') },
-    { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
-    {
-      label: t('bar.exit'),
-      icon: 'close',
-      ghost: true,
-      onClick: () => {
+  const multiSelectActions = useMemo<Array<MultiSelectBarAction>>(() => (
+    buildTranscriptMultiSelectActions({
+      t,
+      onSelectAll: () => setSelectedBlockIds(transcript.map((block) => block.id)),
+      onClear: () => setSelectedBlockIds([]),
+      onMultiAction: runMultiAction,
+      onExit: () => {
         setSelectionMode(false);
         setSelectedBlockIds([]);
       },
-    },
-  ], [runMultiAction, t, transcript]);
+    })
+  ), [runMultiAction, t, transcript]);
 
   return {
     selectionMode,
