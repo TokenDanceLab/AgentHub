@@ -4,10 +4,11 @@ import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchTranscriptChromeHelpers — pure residual slices from
-   useWorkbenchTranscriptChrome (#615, #627).
+   useWorkbenchTranscriptChrome (#615, #627, #650).
 
-   Constants, title/label resolution, menu builders, selection math, and
-   action planners. No React hooks / no intentional UX change.
+   Constants, title/label resolution, menu builders, selection math,
+   action planners, timer/hold disposers, and pointer/hotkey residual
+   planners. No React hooks / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const SELECTION_HOLD_DELAY_MS = 520;
@@ -525,12 +526,19 @@ export function applyTranscriptChromeSideEffects(
   }
 }
 
+export interface SelectionHoldState {
+  blockId: string;
+  timer: number | null;
+  x: number;
+  y: number;
+}
+
 export function createSelectionHoldState(
   blockId: string,
   clientX: number,
   clientY: number,
   timer: number | null,
-): { blockId: string; timer: number | null; x: number; y: number } {
+): SelectionHoldState {
   return {
     blockId,
     timer,
@@ -541,6 +549,252 @@ export function createSelectionHoldState(
 
 export function transcriptBlockIds(transcript: TranscriptBlock[]): string[] {
   return transcript.map((block) => block.id);
+}
+
+/* ── residual pure planners / timer helpers (#650) ───────────────────── */
+
+export interface SelectBarRect {
+  left: number;
+  width: number;
+}
+
+export interface ExitSelectionSnapshot {
+  selectionMode: false;
+  selectedBlockIds: string[];
+}
+
+export interface EnterSelectionSnapshot {
+  selectionMode: true;
+  selectedBlockIds: string[];
+}
+
+export interface ResetSelectionSnapshot {
+  contextMenu: null;
+  selectionMode: false;
+  selectedBlockIds: string[];
+  actionedBlockIds: string[];
+  softHiddenBlockIds: string[];
+}
+
+export function createExitSelectionSnapshot(): ExitSelectionSnapshot {
+  return {
+    selectionMode: false,
+    selectedBlockIds: [],
+  };
+}
+
+export function createEnterSelectionSnapshot(blockId: string): EnterSelectionSnapshot {
+  return {
+    selectionMode: true,
+    selectedBlockIds: [blockId],
+  };
+}
+
+export function createResetSelectionSnapshot(): ResetSelectionSnapshot {
+  return {
+    contextMenu: null,
+    selectionMode: false,
+    selectedBlockIds: [],
+    actionedBlockIds: [],
+    softHiddenBlockIds: [],
+  };
+}
+
+export function writeClipboardText(text: string): void {
+  try {
+    navigator.clipboard?.writeText?.(text)?.catch?.(() => {});
+  } catch {
+    // Clipboard is optional in local preview and test environments.
+  }
+}
+
+export function clearTimeoutIfSet(timerId: number | null | undefined): void {
+  if (timerId === null || timerId === undefined) return;
+  window.clearTimeout(timerId);
+}
+
+export function clearSelectionHoldTimer(hold: SelectionHoldState | null | undefined): void {
+  clearTimeoutIfSet(hold?.timer ?? null);
+}
+
+export function clearPulseTimers(timers: Map<string, number>): void {
+  timers.forEach((id) => window.clearTimeout(id));
+  timers.clear();
+}
+
+export function disposeSelectionHoldRef(
+  holdRef: { current: SelectionHoldState | null },
+): void {
+  clearSelectionHoldTimer(holdRef.current);
+  holdRef.current = null;
+}
+
+export function disposeToastAndPulseTimers(
+  toastTimerRef: { current: number | null },
+  pulseTimersRef: { current: Map<string, number> },
+): void {
+  clearTimeoutIfSet(toastTimerRef.current);
+  toastTimerRef.current = null;
+  clearPulseTimers(pulseTimersRef.current);
+}
+
+export function scheduleWorkbenchToastTimer(
+  toastTimerRef: { current: number | null },
+  onHide: () => void,
+  durationMs: number = WORKBENCH_TOAST_MS,
+): void {
+  clearTimeoutIfSet(toastTimerRef.current);
+  toastTimerRef.current = window.setTimeout(onHide, durationMs);
+}
+
+export function schedulePulseTimer(
+  pulseTimers: Map<string, number>,
+  blockId: string,
+  onEnd: () => void,
+  durationMs: number = WORKBENCH_PULSE_MS,
+): void {
+  const existing = pulseTimers.get(blockId);
+  clearTimeoutIfSet(existing);
+  const timerId = window.setTimeout(() => {
+    onEnd();
+    pulseTimers.delete(blockId);
+  }, durationMs);
+  pulseTimers.set(blockId, timerId);
+}
+
+export type BeginHoldSelectionPlan =
+  | { type: 'ignore' }
+  | {
+    type: 'begin';
+    blockId: string;
+    clientX: number;
+    clientY: number;
+    delayMs: number;
+  };
+
+export function planBeginHoldSelection(
+  blockId: string,
+  event: TranscriptPointerLike,
+): BeginHoldSelectionPlan {
+  if (!shouldBeginHoldSelection(event)) {
+    return { type: 'ignore' };
+  }
+  return {
+    type: 'begin',
+    blockId,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    delayMs: SELECTION_HOLD_DELAY_MS,
+  };
+}
+
+export function beginSelectionHold(
+  holdRef: { current: SelectionHoldState | null },
+  plan: Extract<BeginHoldSelectionPlan, { type: 'begin' }>,
+  onHold: () => void,
+): void {
+  disposeSelectionHoldRef(holdRef);
+  holdRef.current = createSelectionHoldState(
+    plan.blockId,
+    plan.clientX,
+    plan.clientY,
+    window.setTimeout(() => {
+      onHold();
+      holdRef.current = null;
+    }, plan.delayMs),
+  );
+}
+
+export type UpdateHoldSelectionPlan =
+  | { type: 'noop' }
+  | { type: 'cancel' };
+
+export function planUpdateHoldSelection(
+  hold: Pick<SelectionHoldState, 'x' | 'y'> | null | undefined,
+  clientX: number,
+  clientY: number,
+): UpdateHoldSelectionPlan {
+  if (!hold) return { type: 'noop' };
+  return shouldCancelSelectionHold(hold, clientX, clientY)
+    ? { type: 'cancel' }
+    : { type: 'noop' };
+}
+
+export type BlockPointerUpPlan =
+  | { type: 'noop' }
+  | { type: 'consumeSuppress' }
+  | { type: 'select'; blockId: string; shiftKey: boolean };
+
+export function planBlockPointerUp(
+  blockId: string,
+  options: {
+    suppressPointerUp: boolean;
+    selectionMode: boolean;
+    event: TranscriptPointerLike;
+  },
+): BlockPointerUpPlan {
+  if (options.suppressPointerUp) {
+    return { type: 'consumeSuppress' };
+  }
+  if (!shouldHandleSelectionPointerUp(options.selectionMode, options.event)) {
+    return { type: 'noop' };
+  }
+  return {
+    type: 'select',
+    blockId,
+    shiftKey: options.event.shiftKey,
+  };
+}
+
+export type BlockSelectPlan =
+  | { type: 'toggle'; blockId: string }
+  | { type: 'range'; rangeIds: string[] };
+
+export function planBlockSelect(
+  blockId: string,
+  shiftKey: boolean | undefined,
+  transcript: TranscriptBlock[],
+  selectedBlockIds: string[],
+): BlockSelectPlan {
+  if (!shiftKey) {
+    return { type: 'toggle', blockId };
+  }
+  const plan = resolveShiftSelectRange(transcript, selectedBlockIds, blockId);
+  if (plan.mode === 'toggle') {
+    return { type: 'toggle', blockId: plan.blockId };
+  }
+  return { type: 'range', rangeIds: plan.rangeIds };
+}
+
+export function applySelectionHotkeyPlan(
+  plan: SelectionHotkeyPlan,
+  handlers: {
+    clearSelection: () => void;
+    selectAll: (selectedBlockIds: string[]) => void;
+    runMultiAction: (action: 'copy' | 'delete') => void;
+  },
+): void {
+  if (plan.type === 'clearSelection') {
+    handlers.clearSelection();
+    return;
+  }
+  if (plan.type === 'selectAll') {
+    handlers.selectAll(plan.selectedBlockIds);
+    return;
+  }
+  handlers.runMultiAction(plan.action);
+}
+
+export function focusComposerInput(
+  composerInputRef: { current: { focus: () => void } | null },
+): void {
+  deferFocus(() => composerInputRef.current?.focus());
+}
+
+export function resolveSelectBarRectFromElement(
+  element: { getBoundingClientRect: () => DOMRect } | null | undefined,
+): SelectBarRect | null {
+  return selectBarRectFromWorkspace(element?.getBoundingClientRect());
 }
 
 export type SelectionHotkeyPlan =
@@ -704,4 +958,301 @@ export function buildTranscriptMultiSelectActions({
       onClick: onExit,
     },
   ];
+}
+
+/* ── residual controller factory (#650) ──────────────────────────────── */
+
+export interface TranscriptChromeMutableRefs {
+  selectionModeRef: { current: boolean };
+  selectionHoldRef: { current: SelectionHoldState | null };
+  suppressSelectionPointerUpRef: { current: boolean };
+  runMultiActionRef: { current: ((action: string) => void) | null };
+  toastTimerRef: { current: number | null };
+  pulseTimersRef: { current: Map<string, number> };
+}
+
+export interface TranscriptChromeStateWriters {
+  setContextMenu: (value: WorkbenchContextMenuState | null) => void;
+  setSelectionMode: (value: boolean) => void;
+  setSelectedBlockIds: (
+    value: string[] | ((current: string[]) => string[]),
+  ) => void;
+  setActionedBlockIds: (
+    value: string[] | ((current: string[]) => string[]),
+  ) => void;
+  setSoftHiddenBlockIds: (
+    value: string[] | ((current: string[]) => string[]),
+  ) => void;
+  setSelectBarRect: (value: SelectBarRect | null) => void;
+  setToastMessage: (value: string) => void;
+  setToastVisible: (value: boolean) => void;
+}
+
+export interface TranscriptChromeControllerDeps {
+  refs: TranscriptChromeMutableRefs;
+  writers: TranscriptChromeStateWriters;
+  getTranscript: () => TranscriptBlock[];
+  getSelectedBlockIds: () => string[];
+  t: TranscriptChromeTranslate;
+  dispatchComposer: (action: ComposerAction) => void;
+  composerInputRef: { current: { focus: () => void } | null };
+  onRegenerate?: ((blockId: string) => void) | undefined;
+  onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+}
+
+export interface TranscriptChromeController {
+  showWorkbenchToast: (message: string) => void;
+  copyText: (text: string) => void;
+  pulseBlock: (blockId: string) => void;
+  softHideBlocks: (blockIds: string[]) => void;
+  exitSelection: () => void;
+  enterSelection: (blockId: string) => void;
+  resetSelection: () => void;
+  openBlockContextMenu: (
+    block: TranscriptBlock,
+    event: { preventDefault: () => void; clientX: number; clientY: number },
+  ) => void;
+  handleBlockSelect: (blockId: string, event?: { shiftKey?: boolean }) => void;
+  beginBlockHoldSelection: (block: TranscriptBlock, event: TranscriptPointerLike) => void;
+  updateBlockHoldSelection: (event: TranscriptPointerLike) => void;
+  handleBlockPointerUp: (block: TranscriptBlock, event: TranscriptPointerLike) => void;
+  handleTranscriptBlockAction: (
+    action: string,
+    blockId: string,
+    metadata?: Record<string, unknown>,
+  ) => void;
+  runContextAction: (action: string, blockId: string) => void;
+  runMultiAction: (action: string) => void;
+  handleSelectionHotkey: (event: {
+    key: string;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    preventDefault: () => void;
+  }) => void;
+  updateSelectBarRect: (
+    element: { getBoundingClientRect: () => DOMRect } | null | undefined,
+  ) => void;
+  disposeSelectionHold: () => void;
+  disposeTimers: () => void;
+  contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
+  multiSelectActions: () => Array<MultiSelectBarAction>;
+  effectHandlers: () => TranscriptChromeEffectHandlers;
+}
+
+export function createTranscriptChromeController(
+  deps: TranscriptChromeControllerDeps,
+): TranscriptChromeController {
+  const { refs, writers, getTranscript, getSelectedBlockIds, t } = deps;
+
+  const showWorkbenchToast = (message: string): void => {
+    writers.setToastMessage(message);
+    writers.setToastVisible(true);
+    scheduleWorkbenchToastTimer(refs.toastTimerRef, () => writers.setToastVisible(false));
+  };
+
+  const copyText = (text: string): void => {
+    writeClipboardText(text);
+  };
+
+  const pulseBlock = (blockId: string): void => {
+    writers.setActionedBlockIds((current) => nextActionedBlockIdsOnPulseStart(current, blockId));
+    schedulePulseTimer(refs.pulseTimersRef.current, blockId, () => {
+      writers.setActionedBlockIds((current) => nextActionedBlockIdsOnPulseEnd(current, blockId));
+    });
+  };
+
+  const softHideBlocks = (blockIds: string[]): void => {
+    writers.setSoftHiddenBlockIds((current) => mergeSoftHiddenBlockIds(current, blockIds));
+  };
+
+  const exitSelection = (): void => {
+    const snapshot = createExitSelectionSnapshot();
+    writers.setSelectionMode(snapshot.selectionMode);
+    writers.setSelectedBlockIds(snapshot.selectedBlockIds);
+  };
+
+  const enterSelection = (blockId: string): void => {
+    const snapshot = createEnterSelectionSnapshot(blockId);
+    refs.selectionModeRef.current = snapshot.selectionMode;
+    writers.setSelectionMode(snapshot.selectionMode);
+    writers.setSelectedBlockIds(snapshot.selectedBlockIds);
+  };
+
+  const resetSelection = (): void => {
+    const snapshot = createResetSelectionSnapshot();
+    writers.setContextMenu(snapshot.contextMenu);
+    writers.setSelectionMode(snapshot.selectionMode);
+    writers.setSelectedBlockIds(snapshot.selectedBlockIds);
+    writers.setActionedBlockIds(snapshot.actionedBlockIds);
+    writers.setSoftHiddenBlockIds(snapshot.softHiddenBlockIds);
+  };
+
+  const effectHandlers = (): TranscriptChromeEffectHandlers => createTranscriptChromeEffectHandlers({
+    copyText,
+    softHideBlocks,
+    dispatchComposer: deps.dispatchComposer,
+    focusComposer: () => focusComposerInput(deps.composerInputRef),
+    onRegenerate: deps.onRegenerate,
+    onApprovalDecision: deps.onApprovalDecision,
+    pulseBlock,
+    showWorkbenchToast,
+    exitSelection,
+  });
+
+  const openBlockContextMenu = (
+    block: TranscriptBlock,
+    event: { preventDefault: () => void; clientX: number; clientY: number },
+  ): void => {
+    event.preventDefault();
+    writers.setContextMenu(buildContextMenuState(block, event.clientX, event.clientY, t));
+  };
+
+  const handleBlockSelect = (blockId: string, event?: { shiftKey?: boolean }): void => {
+    const plan = planBlockSelect(
+      blockId,
+      event?.shiftKey,
+      getTranscript(),
+      getSelectedBlockIds(),
+    );
+    if (plan.type === 'toggle') {
+      writers.setSelectedBlockIds((current) => nextSelectedBlockIdsOnToggle(current, plan.blockId));
+      return;
+    }
+    writers.setSelectionMode(true);
+    writers.setSelectedBlockIds((current) => nextSelectedBlockIdsOnRange(current, plan.rangeIds));
+  };
+
+  const beginBlockHoldSelection = (
+    block: TranscriptBlock,
+    event: TranscriptPointerLike,
+  ): void => {
+    const plan = planBeginHoldSelection(block.id, event);
+    if (plan.type === 'ignore') return;
+    beginSelectionHold(refs.selectionHoldRef, plan, () => {
+      enterSelection(block.id);
+      refs.suppressSelectionPointerUpRef.current = true;
+    });
+  };
+
+  const updateBlockHoldSelection = (event: TranscriptPointerLike): void => {
+    const plan = planUpdateHoldSelection(
+      refs.selectionHoldRef.current,
+      event.clientX,
+      event.clientY,
+    );
+    if (plan.type === 'cancel') disposeSelectionHoldRef(refs.selectionHoldRef);
+  };
+
+  const handleBlockPointerUp = (
+    block: TranscriptBlock,
+    event: TranscriptPointerLike,
+  ): void => {
+    disposeSelectionHoldRef(refs.selectionHoldRef);
+    const plan = planBlockPointerUp(block.id, {
+      suppressPointerUp: refs.suppressSelectionPointerUpRef.current,
+      selectionMode: refs.selectionModeRef.current,
+      event,
+    });
+    if (plan.type === 'consumeSuppress') {
+      refs.suppressSelectionPointerUpRef.current = false;
+      return;
+    }
+    if (plan.type === 'select') {
+      handleBlockSelect(plan.blockId, { shiftKey: plan.shiftKey });
+    }
+  };
+
+  const runContextAction = (action: string, blockId: string): void => {
+    applyTranscriptChromeSideEffects(planContextAction({
+      action,
+      blockId,
+      transcript: getTranscript(),
+      t,
+      selectedText: window.getSelection()?.toString() ?? null,
+    }), effectHandlers());
+  };
+
+  const handleTranscriptBlockAction = (
+    action: string,
+    blockId: string,
+    metadata?: Record<string, unknown>,
+  ): void => {
+    applyTranscriptChromeSideEffects(planTranscriptBlockAction({
+      action,
+      blockId,
+      transcript: getTranscript(),
+      t,
+      ...(metadata !== undefined ? { metadata } : {}),
+    }), effectHandlers());
+  };
+
+  const runMultiAction = (action: string): void => {
+    applyTranscriptChromeSideEffects(planMultiAction({
+      action,
+      selectedBlockIds: getSelectedBlockIds(),
+      transcript: getTranscript(),
+      t,
+    }), effectHandlers());
+  };
+
+  const handleSelectionHotkey = (event: {
+    key: string;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    preventDefault: () => void;
+  }): void => {
+    const plan = planSelectionHotkeyEffect(event, getTranscript());
+    if (!plan) return;
+    if (plan.preventDefault) event.preventDefault();
+    applySelectionHotkeyPlan(plan, {
+      clearSelection: exitSelection,
+      selectAll: (ids) => writers.setSelectedBlockIds(ids),
+      runMultiAction: (action) => refs.runMultiActionRef.current?.(action),
+    });
+  };
+
+  const updateSelectBarRect = (
+    element: { getBoundingClientRect: () => DOMRect } | null | undefined,
+  ): void => {
+    const next = resolveSelectBarRectFromElement(element);
+    if (!next) return;
+    writers.setSelectBarRect(next);
+  };
+
+  return {
+    showWorkbenchToast,
+    copyText,
+    pulseBlock,
+    softHideBlocks,
+    exitSelection,
+    enterSelection,
+    resetSelection,
+    openBlockContextMenu,
+    handleBlockSelect,
+    beginBlockHoldSelection,
+    updateBlockHoldSelection,
+    handleBlockPointerUp,
+    handleTranscriptBlockAction,
+    runContextAction,
+    runMultiAction,
+    handleSelectionHotkey,
+    updateSelectBarRect,
+    disposeSelectionHold: () => disposeSelectionHoldRef(refs.selectionHoldRef),
+    disposeTimers: () => disposeToastAndPulseTimers(refs.toastTimerRef, refs.pulseTimersRef),
+    contextMenuGroups: (blockId: string) => buildTranscriptContextMenuGroups({
+      blockId,
+      transcript: getTranscript(),
+      t,
+      onAction: runContextAction,
+      onEnterSelection: enterSelection,
+    }),
+    multiSelectActions: () => buildTranscriptMultiSelectActions({
+      t,
+      onSelectAll: () => writers.setSelectedBlockIds(transcriptBlockIds(getTranscript())),
+      onClear: () => writers.setSelectedBlockIds([]),
+      onMultiAction: runMultiAction,
+      onExit: exitSelection,
+    }),
+    effectHandlers,
+  };
 }
