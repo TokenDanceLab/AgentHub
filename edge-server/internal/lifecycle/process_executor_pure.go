@@ -1008,3 +1008,106 @@ func shouldHaveHubOutputCollector(hasCollector bool) bool {
 func shouldLogHubCallbackFailure(err error) bool {
 	return err != nil
 }
+
+// cancelTransitionResult maps a successful "cancelling" status transition to a
+// CancelResult. needLookup is true when the transition lost a race and the
+// caller must re-read the current run status.
+func cancelTransitionResult(transitioned store.Run, transitionOK bool) (result CancelResult, needLookup bool) {
+	if transitionOK {
+		return cancelResultWithRun(transitioned), false
+	}
+	return CancelResult{}, true
+}
+
+// applyPermissionModeSanitization rejects forbidden permission modes (SEC-02)
+// and returns the sanitized run context. logged is true when a fallback was
+// applied so the caller can emit a warning.
+func applyPermissionModeSanitization(runCtx RunProcessContext) (RunProcessContext, bool) {
+	mode, forbidden := sanitizePermissionMode(runCtx.PermissionMode)
+	if !forbidden {
+		return runCtx, false
+	}
+	runCtx.PermissionMode = mode
+	return runCtx, true
+}
+
+// shouldFailNewRunnerProfile reports whether NewGenericRunnerProfile failed.
+func shouldFailNewRunnerProfile(err error) bool {
+	return err != nil
+}
+
+// shouldPublishAdapterResolveFailure reports whether adapter registry Resolve
+// failed and the run should be published as failed.
+func shouldPublishAdapterResolveFailure(err error) bool {
+	return err != nil
+}
+
+// shouldPublishPreflightFailure reports whether PreflightCheck failed.
+func shouldPublishPreflightFailure(err error) bool {
+	return err != nil
+}
+
+// shouldPublishCommandBuildFailure reports whether profile/template expansion
+// (args, env, extraEnv) failed before the child process could start.
+func shouldPublishCommandBuildFailure(err error) bool {
+	return err != nil
+}
+
+// shouldPublishPipeFailure reports whether opening a child stdio pipe failed.
+func shouldPublishPipeFailure(err error) bool {
+	return err != nil
+}
+
+// shouldPersistAgentFailureContent reports whether trimmed failure content may
+// be persisted as an agent_message.
+func shouldPersistAgentFailureContent(ok bool) bool {
+	return ok
+}
+
+// shouldUseAgentFailureRepository reports whether the store exposes the dual
+// Reader+Writer surface needed for failure message persistence.
+func shouldUseAgentFailureRepository(ok bool) bool {
+	return ok
+}
+
+// shouldSkipExistingAgentFailureMessage reports whether a failure agent_message
+// already exists for the run and CreateItem should be skipped.
+func shouldSkipExistingAgentFailureMessage(exists bool) bool {
+	return exists
+}
+
+// shouldCheckPersistErrorSource reports whether the store exposes
+// LastPersistError and checkPersistError should continue.
+func shouldCheckPersistErrorSource(ok bool) bool {
+	return ok
+}
+
+// shouldSurfaceWithWriter reports whether auto-surface may persist via a
+// store.Writer implementation.
+func shouldSurfaceWithWriter(ok bool) bool {
+	return ok
+}
+
+// shouldRecordStructuredParseError reports whether adapter.ParseStream failed
+// and the error should be recorded for the session-retry loop.
+func shouldRecordStructuredParseError(err error) bool {
+	return err != nil
+}
+
+// shouldMarkSubAgentRegistered reports whether registry Register succeeded so
+// start-failure cleanup must Unregister the child.
+func shouldMarkSubAgentRegistered(err error) bool {
+	return err == nil
+}
+
+// classifyPublishedFailure builds the classified RunError used by publishFailed
+// event payloads and Hub fail callbacks.
+func classifyPublishedFailure(err error) *RunError {
+	return ClassifyError(err, ExitCodeFromErr(err))
+}
+
+// shouldLogForbiddenPermissionMode reports whether a forbidden permission mode
+// fallback should be warned (SEC-02 defense-in-depth).
+func shouldLogForbiddenPermissionMode(forbidden bool) bool {
+	return forbidden
+}
