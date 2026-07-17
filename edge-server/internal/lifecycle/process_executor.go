@@ -500,9 +500,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// causes the CLI to fail immediately. Instead, merge adapter env
 			// into extraEnv so SanitizedEnv provides the full OS base plus the
 			// adapter's auth passthrough.
-			cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
+			cmd.Env = envForRun(run, nil, append(extraEnv, env...))
 		} else {
-			cmd.Env = e.envForRun(run, env, extraEnv)
+			cmd.Env = envForRun(run, env, extraEnv)
 		}
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
@@ -864,43 +864,6 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 			return
 		}
 	}
-}
-
-// envForRun builds the environment for a child process.
-// When profileEnv is nil the child receives a minimal sanitized environment
-// (only whitelisted parent vars + extraEnv + AGENTHUB_* runtime vars).
-// A non-nil profileEnv is used verbatim as the base (administrator-configured).
-func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
-	var env []string
-	if profileEnv == nil {
-		var audit EnvFilterAudit
-		env, audit = SanitizedEnv(nil, extraEnv)
-		// Log run-scoped audit context when vars were filtered.
-		if audit.SensitiveVars > 0 || audit.NotWhitelisted > 0 {
-			slog.Info("env sanitized for run",
-				"runId", run.ID,
-				"total", audit.TotalVars,
-				"passed", audit.PassedVars,
-				"sensitive", audit.SensitiveVars,
-				"not_whitelisted", audit.NotWhitelisted,
-			)
-		}
-	} else {
-		// Administrator explicitly configured the environment, respect it,
-		// but still warn about any sensitive-looking variables it includes.
-		for _, kv := range profileEnv {
-			key, _, _ := strings.Cut(kv, "=")
-			if IsSensitiveEnvKey(key) {
-				slog.Warn("sensitive env var present in explicitly configured agent environment", "key", key)
-			}
-		}
-		env = append(append([]string(nil), profileEnv...), extraEnv...)
-	}
-	return append(env,
-		"AGENTHUB_RUN_ID="+run.ID,
-		"AGENTHUB_PROJECT_ID="+run.ProjectID,
-		"AGENTHUB_THREAD_ID="+run.ThreadID,
-	)
 }
 
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
@@ -1378,75 +1341,3 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	return agentInstanceID, runID, nil
 }
 
-// ── Hub callback fire-and-forget helpers ─────────────────────────────────
-
-// hubTaskID returns the Hub task ID for the given run, or empty string if not tracked.
-type threadTranscriptEmitter struct {
-	writer    store.Writer
-	run       store.Run
-	inner     adapters.EventEmitter
-	collector *hubOutputCollector
-	mu        sync.Mutex
-	persisted bool
-}
-
-func newThreadTranscriptEmitter(repository store.RunLifecycleStore, run store.Run, inner adapters.EventEmitter) *threadTranscriptEmitter {
-	writer, ok := repository.(store.Writer)
-	if !ok || inner == nil {
-		return nil
-	}
-	return &threadTranscriptEmitter{
-		writer:    writer,
-		run:       run,
-		inner:     inner,
-		collector: newHubOutputCollector(persistedAssistantMessageMaxBytes),
-	}
-}
-
-func (e *threadTranscriptEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.inner.Emit(eventType, scope, payload)
-	switch eventType {
-	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.collector.Append(text)
-		}
-	case adapters.BusEventResult:
-		if text := extractHubCallbackText(payload); text != "" {
-			e.collector.SetFallback(text)
-		}
-	}
-}
-
-func (e *threadTranscriptEmitter) Flush() {
-	e.mu.Lock()
-	if e.persisted {
-		e.mu.Unlock()
-		return
-	}
-	e.persisted = true
-	e.mu.Unlock()
-
-	content := e.collector.Final()
-	if strings.TrimSpace(content) == "" {
-		return
-	}
-	item, err := e.writer.CreateItem(store.Item{
-		ID:        transcriptItemID(e.run.ID),
-		ProjectID: e.run.ProjectID,
-		ThreadID:  e.run.ThreadID,
-		RunID:     e.run.ID,
-		Type:      "agent_message",
-		Role:      "agent",
-		Status:    "created",
-		Content:   content,
-	})
-	if err != nil {
-		slog.Warn("process: failed to persist assistant transcript", "runId", e.run.ID, "error", err)
-		return
-	}
-	_ = item
-}
-
-func transcriptItemID(runID string) string {
-	return fmt.Sprintf("item_%s_agent_%d", strings.TrimPrefix(runID, "run_"), time.Now().UnixNano())
-}
