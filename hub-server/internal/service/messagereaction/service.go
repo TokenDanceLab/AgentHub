@@ -1,4 +1,4 @@
-package service
+package messagereaction
 
 import (
 	"context"
@@ -8,40 +8,33 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/im"
 )
 
-// ── MessageReactionService ports + type ──────────────────────────────────────
-//
-// Same-package thin residual seam (#639/#651): MessageReactionService already
-// owns reaction add/remove/list orchestration. This seam hardens a replaceable
-// bus port (messageReactionBus) and moves pure reaction normalize + summary
-// projection helpers into service/im, matching MessageService (#585) /
-// service/im pure helpers (#628/#639/#651). Not a package move;
-// OpenAPI/handler/frontend unchanged.
-
-// messageReactionBus publishes domain events from reaction write paths.
-// Implemented by *Bus.
-type messageReactionBus interface {
-	Publish(ctx context.Context, event Event)
+// Bus publishes domain events from reaction write paths.
+// *service.Bus satisfies this port via Publish(ctx, service.Event).
+type Bus interface {
+	Publish(ctx context.Context, event service.Event)
 }
 
-// MessageReactionService owns IM message reaction orchestration in the flat
-// service package: add/remove/list summaries + access checks. Domain events go
-// through messageReactionBus. Not a package move (#639/#651).
-type MessageReactionService struct {
+// Service owns IM message reaction orchestration: add/remove/list summaries +
+// access checks. Domain events go through Bus. Pure reaction normalize/summary
+// helpers remain in service/im (#628/#639/#651); this package is the first IM
+// typed-service extract (#662).
+type Service struct {
 	db  *gorm.DB
-	bus messageReactionBus
+	bus Bus
 }
 
-// NewMessageReactionService constructs a MessageReactionService.
+// NewService constructs a message-reaction service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
-func NewMessageReactionService(db *gorm.DB, bus messageReactionBus) *MessageReactionService {
-	return &MessageReactionService{db: db, bus: bus}
+func NewService(db *gorm.DB, bus Bus) *Service {
+	return &Service{db: db, bus: bus}
 }
 
 // SetBus injects (or replaces) the event bus port.
-func (s *MessageReactionService) SetBus(bus messageReactionBus) {
+func (s *Service) SetBus(bus Bus) {
 	if s == nil {
 		return
 	}
@@ -49,13 +42,15 @@ func (s *MessageReactionService) SetBus(bus messageReactionBus) {
 }
 
 // publish is a nil-safe wrapper over the bus port.
-func (s *MessageReactionService) publish(ctx context.Context, event Event) {
+func (s *Service) publish(ctx context.Context, event service.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
 	s.bus.Publish(ctx, event)
 }
 
+// MessageReactionResponse is the API/handler summary DTO for one reaction key.
+// JSON field names are contract-stable (OpenAPI MessageReactionResponse).
 type MessageReactionResponse struct {
 	MessageID   string `json:"message_id"`
 	SessionID   string `json:"session_id"`
@@ -64,6 +59,8 @@ type MessageReactionResponse struct {
 	ReactedByMe bool   `json:"reacted_by_me"`
 }
 
+// MessageReactionEventPayload is the bus/WS payload for reaction add/remove.
+// JSON field names are contract-stable for frame payloads.
 type MessageReactionEventPayload struct {
 	Action    string `json:"action"`
 	UserID    string `json:"user_id"`
@@ -73,7 +70,9 @@ type MessageReactionEventPayload struct {
 	Count     int    `json:"count"`
 }
 
-func (s *MessageReactionService) AddMessageReaction(ctx context.Context, userID, sessionID, messageID, reaction string) (*MessageReactionResponse, error) {
+// AddMessageReaction adds (or idempotently re-adds) a user reaction and returns
+// the updated summary. Publishes message.reaction_added only on first add.
+func (s *Service) AddMessageReaction(ctx context.Context, userID, sessionID, messageID, reaction string) (*MessageReactionResponse, error) {
 	reaction, err := normalizeMessageReaction(reaction)
 	if err != nil {
 		return nil, err
@@ -106,7 +105,9 @@ func (s *MessageReactionService) AddMessageReaction(ctx context.Context, userID,
 	return resp, nil
 }
 
-func (s *MessageReactionService) RemoveMessageReaction(ctx context.Context, userID, sessionID, messageID, reaction string) (*MessageReactionResponse, error) {
+// RemoveMessageReaction removes a user reaction (idempotent) and returns the
+// updated summary. Publishes message.reaction_removed only when a row existed.
+func (s *Service) RemoveMessageReaction(ctx context.Context, userID, sessionID, messageID, reaction string) (*MessageReactionResponse, error) {
 	reaction, err := normalizeMessageReaction(reaction)
 	if err != nil {
 		return nil, err
@@ -134,7 +135,8 @@ func (s *MessageReactionService) RemoveMessageReaction(ctx context.Context, user
 	return resp, nil
 }
 
-func (s *MessageReactionService) ListMessageReactions(ctx context.Context, userID, sessionID, messageID string) ([]MessageReactionResponse, error) {
+// ListMessageReactions returns grouped reaction summaries for a message.
+func (s *Service) ListMessageReactions(ctx context.Context, userID, sessionID, messageID string) ([]MessageReactionResponse, error) {
 	if err := s.ensureMessageReactionAccess(sessionID, messageID, userID); err != nil {
 		return nil, err
 	}
@@ -157,8 +159,7 @@ func (s *MessageReactionService) ListMessageReactions(ctx context.Context, userI
 	return resp, nil
 }
 
-// normalizeMessageReaction is a thin alias to im.NormalizeMessageReaction that
-// maps pure-helper errors to the package domain error.
+// normalizeMessageReaction maps pure-helper errors to the package domain error.
 func normalizeMessageReaction(reaction string) (string, error) {
 	normalized, err := im.NormalizeMessageReaction(reaction)
 	if err != nil {
@@ -167,7 +168,7 @@ func normalizeMessageReaction(reaction string) (string, error) {
 	return normalized, nil
 }
 
-func (s *MessageReactionService) ensureMessageReactionAccess(sessionID, messageID, userID string) error {
+func (s *Service) ensureMessageReactionAccess(sessionID, messageID, userID string) error {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
 		return err
@@ -182,7 +183,7 @@ func (s *MessageReactionService) ensureMessageReactionAccess(sessionID, messageI
 	return nil
 }
 
-func (s *MessageReactionService) messageReactionSnapshot(sessionID, messageID, userID, reaction string) (*MessageReactionResponse, error) {
+func (s *Service) messageReactionSnapshot(sessionID, messageID, userID, reaction string) (*MessageReactionResponse, error) {
 	summaries, err := repository.ReactionSummariesByMessage(s.db, sessionID, messageID)
 	if err != nil {
 		return nil, err
@@ -198,11 +199,11 @@ func (s *MessageReactionService) messageReactionSnapshot(sessionID, messageID, u
 	}, nil
 }
 
-func (s *MessageReactionService) publishMessageReactionEvent(ctx context.Context, eventType, action, userID string, resp *MessageReactionResponse) {
+func (s *Service) publishMessageReactionEvent(ctx context.Context, eventType, action, userID string, resp *MessageReactionResponse) {
 	if resp == nil {
 		return
 	}
-	s.publish(ctx, Event{
+	s.publish(ctx, service.Event{
 		Type: eventType,
 		Payload: MessageReactionEventPayload{
 			Action:    action,

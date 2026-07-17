@@ -9,16 +9,16 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 func TestMessageHandler_AddMessageReaction_Success(t *testing.T) {
 	svc := &mockMessageService{
-		addReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+		addReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 			if userID != "u1" || sessionID != "s1" || msgID != "m1" || reaction != "heart" {
 				t.Fatalf("unexpected add reaction args: userID=%s sessionID=%s msgID=%s reaction=%s", userID, sessionID, msgID, reaction)
 			}
-			return &service.MessageReactionResponse{
+			return &messagereaction.MessageReactionResponse{
 				MessageID:   msgID,
 				SessionID:   sessionID,
 				Reaction:    reaction,
@@ -41,7 +41,7 @@ func TestMessageHandler_AddMessageReaction_Success(t *testing.T) {
 	}
 	var body struct {
 		Code string                          `json:"code"`
-		Data service.MessageReactionResponse `json:"data"`
+		Data messagereaction.MessageReactionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
@@ -66,11 +66,11 @@ func TestMessageHandler_AddMessageReaction_BadRequest(t *testing.T) {
 
 func TestMessageHandler_RemoveMessageReaction_Success(t *testing.T) {
 	svc := &mockMessageService{
-		removeReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+		removeReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 			if userID != "u1" || sessionID != "s1" || msgID != "m1" || reaction != "heart" {
 				t.Fatalf("unexpected remove reaction args: userID=%s sessionID=%s msgID=%s reaction=%s", userID, sessionID, msgID, reaction)
 			}
-			return &service.MessageReactionResponse{
+			return &messagereaction.MessageReactionResponse{
 				MessageID:   msgID,
 				SessionID:   sessionID,
 				Reaction:    reaction,
@@ -95,7 +95,7 @@ func TestMessageHandler_RemoveMessageReaction_Success(t *testing.T) {
 
 func TestMessageHandler_RemoveMessageReaction_NotMember(t *testing.T) {
 	svc := &mockMessageService{
-		removeReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+		removeReactionFn: func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 			return nil, errcode.SessionNotMember
 		},
 	}
@@ -115,11 +115,11 @@ func TestMessageHandler_RemoveMessageReaction_NotMember(t *testing.T) {
 
 func TestMessageHandler_ListMessageReactions_Success(t *testing.T) {
 	svc := &mockMessageService{
-		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 			if userID != "u1" || sessionID != "s1" || msgID != "m1" {
 				t.Fatalf("unexpected list reaction args: userID=%s sessionID=%s msgID=%s", userID, sessionID, msgID)
 			}
-			return []service.MessageReactionResponse{
+			return []messagereaction.MessageReactionResponse{
 				{MessageID: msgID, SessionID: sessionID, Reaction: "heart", Count: 2, ReactedByMe: true},
 				{MessageID: msgID, SessionID: sessionID, Reaction: "thumbs_up", Count: 1, ReactedByMe: false},
 			}, nil
@@ -137,7 +137,7 @@ func TestMessageHandler_ListMessageReactions_Success(t *testing.T) {
 	}
 	var body struct {
 		Code string                            `json:"code"`
-		Data []service.MessageReactionResponse `json:"data"`
+		Data []messagereaction.MessageReactionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
@@ -162,7 +162,7 @@ func TestMessageHandler_ListMessageReactions_RequiresSessionID(t *testing.T) {
 
 func TestMessageHandler_ListMessageReactions_NotMember(t *testing.T) {
 	svc := &mockMessageService{
-		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 			return nil, errcode.SessionNotMember
 		},
 	}
