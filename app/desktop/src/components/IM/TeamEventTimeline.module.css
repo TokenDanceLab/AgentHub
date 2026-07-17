@@ -7,19 +7,19 @@
 /* ── Status messages ─────────────────────────────────── */
 .loading {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
 .error {
   padding: var(--space-lg);
-  color: var(--td-danger);
+  color: var(--danger);
   font-size: var(--font-size-xs);
 }
 
 .empty {
   padding: var(--space-lg);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   font-size: var(--font-size-xs);
 }
 
@@ -44,8 +44,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--surface-raised);
-  border: 2px solid var(--td-plum);
+  background: var(--surface-high);
+  border: 2px solid var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -53,13 +53,13 @@
 }
 
 .dotIcon {
-  color: var(--td-plum);
+  color: var(--primary);
 }
 
 .line {
   width: 2px;
   flex: 1;
-  background: var(--td-line);
+  background: var(--bdr);
   margin-top: -2px;
 }
 
@@ -89,22 +89,22 @@
 .eventType {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--td-ink);
+  color: var(--text-1);
 }
 
 .eventSeq {
   font-size: var(--font-size-2xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 .eventTime {
   font-size: var(--font-size-2xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
 }
 
 .eventSummary {
   margin: 0;
   font-size: var(--font-size-xs);
-  color: var(--td-ink-muted);
+  color: var(--text-2);
   line-height: var(--line-height-tight);
 }
