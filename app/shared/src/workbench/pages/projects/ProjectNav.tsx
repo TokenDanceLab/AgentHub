@@ -11,7 +11,7 @@ import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { StatusNotice } from '../../../ui';
 import { DesignNavIcon } from '../../designIcons';
 import styles from '../ProjectsPage.module.css';
-import { FilterList, ProjectNavRow } from './ProjectDetailViews';
+import { FilterList, ProjectNavRow } from './ProjectChromeViews';
 import type { ProjectFilter, ProjectInfo } from './types';
 
 export type ProjectNavProps = {
