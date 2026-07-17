@@ -114,6 +114,16 @@ func subAgentResultQueuePayload(runID, status, agentID, agentName string, saniti
 	}
 }
 
+// aggregatorOutput chooses the value stored in the result aggregator: when
+// sanitization changed the payload, the redacted copy is persisted; otherwise
+// the original payload is kept.
+func aggregatorOutput(raw, sanitized any, sanitizeReason string) any {
+	if sanitizeReason != "" {
+		return sanitized
+	}
+	return raw
+}
+
 // agentFailureItem builds the store.Item used to persist a failed agent message.
 // itemID must be supplied by the caller (typically via transcriptItemID).
 func agentFailureItem(run store.Run, itemID, content string) store.Item {
