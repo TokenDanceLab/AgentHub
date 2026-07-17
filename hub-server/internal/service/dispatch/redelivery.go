@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -31,3 +32,23 @@ func ParseEdgeRunID(respBody []byte) (string, error) {
 	}
 	return edgeResp.Data.RunID, nil
 }
+
+// Dead-letter reason prefixes for redispatchDelivery (historical format strings).
+const (
+	DeadLetterKindPayloadUnmarshal = "payload unmarshal"
+	DeadLetterKindPayloadMarshal   = "payload marshal"
+	DeadLetterKindTaskLookup       = "task lookup"
+)
+
+// DeadLetterReason formats "kind: err" dead-letter lastError strings.
+func DeadLetterReason(kind string, err error) string {
+	return fmt.Sprintf("%s: %v", kind, err)
+}
+
+// DeadLetterTaskStatus formats the terminal-status dead-letter reason.
+func DeadLetterTaskStatus(status string) string {
+	return fmt.Sprintf("task status is %s", status)
+}
+
+// PendingTaskRedeliverySelect is the column list for getPendingTaskForRedelivery.
+const PendingTaskRedeliverySelect = "id, agent_instance_id, triggered_by_user_id, status, edge_device_id, edge_run_id, target_id"
