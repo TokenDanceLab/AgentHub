@@ -1,0 +1,208 @@
+import React, { useCallback, useState } from 'react';
+import { DesignNavIcon } from '../../designIcons';
+import { Select } from '../../../ui';
+import styles from '../ContactsPage.module.css';
+import { MODAL_TABS } from './shared';
+import type { ContactModalTab } from './types';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Add-contact modal + invite panels.
+   Extracted from ContactsPage as Phase 17 strangler slice #561.
+   CSS remains on shared ContactsPage.module.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function QRPanel() {
+  // Generate a pseudo-QR pattern (purely decorative)
+  const cells = Array.from({ length: 81 }, (_, i) =>
+    (i * 7 + i) % 5 < 2,
+  );
+
+  return (
+    <div className={styles.qrPanel}>
+      <div className={styles.qrCard}>
+        <div className={styles.qrGrid} aria-label="企业二维码">
+          {cells.map((on, i) => (
+            <span
+              key={i}
+              className={on ? styles.qrCellOn : styles.qrCell}
+            />
+          ))}
+          <b className={styles.qrCenter}>TD</b>
+        </div>
+      </div>
+      <h3 className={styles.qrTitle}>TokenDance 企业二维码</h3>
+      <p className={styles.qrCopy}>
+        对方扫码后可申请加入企业，管理员确认后出现在组织内联系人。
+      </p>
+      <span className={styles.qrExpire}>有效期至 2026年7月18日</span>
+    </div>
+  );
+}
+
+function LinkPanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
+  return (
+    <div className={styles.linkPanel}>
+      <label className={styles.linkLabel}>邀请链接</label>
+      <div className={styles.linkCopyRow}>
+        <input
+          className={styles.linkInput}
+          readOnly
+          value="https://agenthub.tokendance.local/invite/TD-2026"
+        />
+        <button type="button" className={styles.linkCopyBtn} onClick={onCopy}>
+          复制链接
+        </button>
+      </div>
+      <p className={styles.linkHint}>
+        适合发给已在 TokenDance 协作空间内的同事。
+      </p>
+    </div>
+  );
+}
+
+function CodePanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
+  return (
+    <div className={styles.codePanel}>
+      <span className={styles.codeValue}>TD-86K2-2026</span>
+      <p className={styles.linkHint}>
+        企业邀请码 24 小时内有效，可通过 IM 或邮件发送。
+      </p>
+      <button type="button" className={styles.codeBtn} onClick={onCopy}>
+        复制邀请码
+      </button>
+    </div>
+  );
+}
+
+function PhonePanel({
+  onSend,
+}: {
+  onSend?: ((countryCode: string, phone: string, note: string) => void) | undefined;
+}) {
+  const [countryCode, setCountryCode] = useState('+86');
+  const [phone, setPhone] = useState('');
+  const [note, setNote] = useState('');
+
+  const handleSend = useCallback(() => {
+    onSend?.(countryCode, phone, note);
+  }, [countryCode, phone, note, onSend]);
+
+  return (
+    <form
+      className={styles.phonePanel}
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSend();
+      }}
+    >
+      <label className={styles.phoneLabel}>手机号</label>
+      <div className={styles.phoneRow}>
+        <Select
+          ariaLabel="区号"
+          className={styles.phoneSelect ?? ''}
+          value={countryCode}
+          options={['+86', '+852', '+1'].map((code) => [code, code])}
+          onChange={setCountryCode}
+        />
+        <input
+          className={styles.phoneInput}
+          placeholder="输入手机号"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </div>
+      <label className={styles.phoneLabel}>备注</label>
+      <input
+        className={styles.phoneInput}
+        placeholder="例如：合作方 PM / 新同事"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <button type="button" className={styles.phoneSendBtn} onClick={handleSend}>
+        发送邀请
+      </button>
+    </form>
+  );
+}
+
+// ── Add Contact Modal ──
+
+export function AddContactModal({
+  onClose,
+  onCopyInvite,
+  onSendPhoneInvite,
+}: {
+  onClose?: (() => void) | undefined;
+  onCopyInvite?: (() => void) | undefined;
+  onSendPhoneInvite?: ((countryCode: string, phone: string, note: string) => void) | undefined;
+}) {
+  const [activeTab, setActiveTab] = useState<ContactModalTab>('qr');
+
+  const renderPanel = () => {
+    switch (activeTab) {
+      case 'qr':
+        return <QRPanel />;
+      case 'link':
+        return <LinkPanel onCopy={onCopyInvite} />;
+      case 'code':
+        return <CodePanel onCopy={onCopyInvite} />;
+      case 'phone':
+        return <PhonePanel onSend={onSendPhoneInvite} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div
+      className={styles.modalBackdrop}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <section
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="addContactTitle"
+      >
+        <button
+          type="button"
+          className={styles.modalClose}
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          <DesignNavIcon name="close" size={18} />
+        </button>
+
+        <div className={styles.modalHead}>
+          <h2 className={styles.modalTitle} id="addContactTitle">
+            添加联系人
+          </h2>
+          <p className={styles.modalDesc}>
+            邀请企业成员加入 TokenDance，或添加外部联系人用于项目协作。
+          </p>
+        </div>
+
+        <div className={styles.modalTabs} role="tablist">
+          {MODAL_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              className={`${styles.modalTab} ${
+                activeTab === tab.id ? styles.modalTabActive : ''
+              }`}
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.modalBody}>{renderPanel()}</div>
+      </section>
+    </div>
+  );
+}
