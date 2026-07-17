@@ -5,6 +5,7 @@ import {
   isHubResponseEnvelope,
   isHubSuccessCode,
   parseHubError,
+  parseHubSuccessResponse,
   readJson,
   unwrapHubResponse,
 } from './hubClientEnvelope';
@@ -76,5 +77,27 @@ describe('hubClientEnvelope (#799)', () => {
       headers: { 'Content-Type': 'text/plain' },
     });
     await expect(readJson(response)).resolves.toBeUndefined();
+  });
+
+  it('parseHubSuccessResponse peels 204 / envelope / error paths (#901)', async () => {
+    await expect(
+      parseHubSuccessResponse(new Response(null, { status: 204 })),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      parseHubSuccessResponse<{ id: string }>(
+        jsonResponse({ code: 'OK', data: { id: 'ok-1' } }),
+      ),
+    ).resolves.toEqual({ id: 'ok-1' });
+
+    await expect(
+      parseHubSuccessResponse(
+        jsonResponse({ code: 'AGENT_TASK_NOT_FOUND', message: 'missing' }, { status: 404 }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'AGENT_TASK_NOT_FOUND',
+      message: 'missing',
+      status: 404,
+    });
   });
 });

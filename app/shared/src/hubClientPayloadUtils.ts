@@ -317,3 +317,263 @@ export function buildRemoveAgentTeamMemberPath(teamId: string, memberId: string)
 export function buildDecideTaskApprovalPath(taskId: string, approvalId: string): string {
   return `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`;
 }
+
+// ── Pure path residual (#901) ────────────────────────────────────────────────
+
+export function buildRemoveContactPath(friendUserId: string): string {
+  return `/client/contacts/${encodeURIComponent(friendUserId)}`;
+}
+
+export function buildSessionMembersPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/members`;
+}
+
+export function buildLeaveSessionPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/leave`;
+}
+
+export function buildTransferSessionOwnerPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/transfer-owner`;
+}
+
+export function buildDissolveSessionPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/dissolve`;
+}
+
+export function buildSessionInfoPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/info`;
+}
+
+export function buildSessionSettingsPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/settings`;
+}
+
+export function buildSessionPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}`;
+}
+
+export function buildMarkReadPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/read`;
+}
+
+export function buildSessionPinsPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/pins`;
+}
+
+export function buildSessionAgentsPath(sessionId: string): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/agents`;
+}
+
+export function buildRecallMessagePath(messageId: string): string {
+  return `/client/messages/${encodeURIComponent(messageId)}/recall`;
+}
+
+export function buildPinMessagePath(messageId: string): string {
+  return `/client/messages/${encodeURIComponent(messageId)}/pin`;
+}
+
+export function buildForwardMessagePath(messageId: string): string {
+  return `/client/messages/${encodeURIComponent(messageId)}/forward`;
+}
+
+export function buildEditMessagePath(messageId: string): string {
+  return `/client/messages/${encodeURIComponent(messageId)}`;
+}
+
+export function buildMessageReactionsPath(messageId: string): string {
+  return `/client/messages/${encodeURIComponent(messageId)}/reactions`;
+}
+
+export function buildSearchMessagesPath(params: {
+  q: string;
+  session_id?: string;
+  content_type?: string;
+  from?: string;
+  to?: string;
+}): string {
+  return `/client/messages/search${qs(params)}`;
+}
+
+export function buildListNotificationsPath(params?: {
+  unread_only?: boolean;
+  limit?: number;
+  offset?: number;
+}): string {
+  return `/client/notifications${qs(params ?? {})}`;
+}
+
+export function buildAckTaskPath(taskId: string): string {
+  return `/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`;
+}
+
+export function buildStreamTaskPath(taskId: string): string {
+  return `/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`;
+}
+
+export function buildDoneTaskPath(taskId: string): string {
+  return `/edge/agent-tasks/${encodeURIComponent(taskId)}/done`;
+}
+
+export function buildFailTaskPath(taskId: string): string {
+  return `/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`;
+}
+
+export function buildRegenerateAgentTaskPath(taskId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/regenerate`;
+}
+
+export function buildListExecutionTargetsPath(params?: {
+  pageSize?: number;
+  pageCursor?: string;
+  target_type?: string;
+}): string {
+  return `/web/execution-targets${qs(params ?? {})}`;
+}
+
+export function buildExecutionTargetPath(id: string): string {
+  return `/web/execution-targets/${encodeURIComponent(id)}`;
+}
+
+export function buildPingExecutionTargetPath(id: string): string {
+  return `/web/execution-targets/${encodeURIComponent(id)}:ping`;
+}
+
+export function buildListAuditEventsPath(params?: {
+  pageSize?: number;
+  pageCursor?: string;
+}): string {
+  return `/web/audit-events${qs(params ?? {})}`;
+}
+
+export function buildRelayCommandPath(id: string): string {
+  return `/web/relay/commands/${encodeURIComponent(id)}`;
+}
+
+export function buildAckRelayCommandPath(id: string): string {
+  return `/web/relay/commands/${encodeURIComponent(id)}:ack`;
+}
+
+export function buildCustomAgentPath(id: string): string {
+  return `/web/custom-agents/${encodeURIComponent(id)}`;
+}
+
+export function buildListPublicSkillsPath(params?: {
+  skill_type?: string;
+  q?: string;
+  is_public?: string;
+  pageCursor?: string;
+  pageSize?: number;
+}): string {
+  return `/web/skills${qs(withPublicCatalogParams(params ?? {}))}`;
+}
+
+export function buildListPublicMCPServersPath(params?: {
+  transport?: string;
+  q?: string;
+  is_public?: string;
+  pageCursor?: string;
+  pageSize?: number;
+}): string {
+  return `/web/mcp-servers${qs(withPublicCatalogParams(params ?? {}))}`;
+}
+
+export function buildListWorkspaceProjectsPath(params?: {
+  pageSize?: number;
+  pageCursor?: string;
+  q?: string;
+}): string {
+  return `/web/projects${qs(params ?? {})}`;
+}
+
+export function buildWorkspaceProjectPath(id: string): string {
+  return `/web/projects/${encodeURIComponent(id)}`;
+}
+
+export function buildWorkspaceProjectThreadsPath(projectId: string): string {
+  return `/web/projects/${encodeURIComponent(projectId)}/threads`;
+}
+
+export function buildTaskRunEventSummaryPath(taskId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/events/summary`;
+}
+
+export function buildListTaskRunEventsPath(taskId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/events`;
+}
+
+export function buildAgentTeamPath(teamId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}`;
+}
+
+export function buildAgentTeamMembersPath(teamId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/members`;
+}
+
+export function buildAgentTeamRunsPath(teamId: string): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs`;
+}
+
+export function buildListAgentProfilesPath(params?: {
+  runtime_id?: string;
+  q?: string;
+  pageCursor?: string;
+  pageSize?: number;
+}): string {
+  return `/web/agent-profiles${qs(params ?? {})}`;
+}
+
+export function buildAgentProfilePath(id: string): string {
+  return `/web/agent-profiles/${encodeURIComponent(id)}`;
+}
+
+export function buildListDocumentsPath(params?: {
+  status?: string;
+  source?: string;
+  tag?: string;
+  pageCursor?: string;
+  pageSize?: number;
+}): string {
+  return `/web/documents${qs(params ?? {})}`;
+}
+
+export function buildDocumentPath(id: string): string {
+  return `/web/documents/${encodeURIComponent(id)}`;
+}
+
+export function buildListTaskApprovalsPath(taskId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`;
+}
+
+export function buildListTaskArtifactsPath(taskId: string): string {
+  return `/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`;
+}
+
+// ── Pure JSON RequestInit builders (#901) ────────────────────────────────────
+
+export function buildJsonPostInit(body: unknown): { method: 'POST'; body: string } {
+  return { method: 'POST', body: JSON.stringify(body) };
+}
+
+export function buildJsonPutInit(body: unknown): { method: 'PUT'; body: string } {
+  return { method: 'PUT', body: JSON.stringify(body) };
+}
+
+export function buildJsonPatchInit(body: unknown): { method: 'PATCH'; body: string } {
+  return { method: 'PATCH', body: JSON.stringify(body) };
+}
+
+export function buildJsonDeleteInit(body: unknown): { method: 'DELETE'; body: string } {
+  return { method: 'DELETE', body: JSON.stringify(body) };
+}
+
+export function buildPostInit(): { method: 'POST' } {
+  return { method: 'POST' };
+}
+
+export function buildDeleteInit(): { method: 'DELETE' } {
+  return { method: 'DELETE' };
+}
+
+export function buildPutInit(): { method: 'PUT' } {
+  return { method: 'PUT' };
+}

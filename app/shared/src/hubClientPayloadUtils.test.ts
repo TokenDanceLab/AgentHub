@@ -1,59 +1,112 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAcceptFriendRequestPath,
+  buildAckRelayCommandPath,
+  buildAckTaskPath,
+  buildAgentProfilePath,
+  buildAgentTeamMembersPath,
+  buildAgentTeamPath,
+  buildAgentTeamRunsPath,
   buildAttachmentDownloadUrl,
   buildAttachmentFormData,
   buildBlockContactPath,
   buildCancelAgentTaskPaths,
   buildContactRemarkPath,
+  buildCustomAgentPath,
   buildDecideTaskApprovalPath,
   buildDecideTeamApprovalPath,
+  buildDeleteInit,
+  buildDissolveSessionPath,
+  buildDocumentPath,
+  buildDoneTaskPath,
+  buildEditMessagePath,
+  buildExecutionTargetPath,
+  buildFailTaskPath,
   buildForwardMessageBody,
+  buildForwardMessagePath,
   buildFriendRequestBody,
   buildGetMessagesPath,
   buildGetTeamRunPath,
   buildGetTeamRunStatePath,
+  buildJsonDeleteInit,
+  buildJsonPatchInit,
+  buildJsonPostInit,
+  buildJsonPutInit,
+  buildLeaveSessionPath,
+  buildListAgentProfilesPath,
+  buildListAuditEventsPath,
+  buildListDocumentsPath,
+  buildListExecutionTargetsPath,
   buildListMessageReactionsPath,
+  buildListNotificationsPath,
+  buildListPublicMCPServersPath,
+  buildListPublicSkillsPath,
+  buildListTaskApprovalsPath,
+  buildListTaskArtifactsPath,
   buildListTaskRunEventsAfterPath,
+  buildListTaskRunEventsPath,
   buildListTeamEventsPath,
   buildListTeamTasksPath,
   buildListWorkspaceProjectThreadMessagesPath,
+  buildListWorkspaceProjectsPath,
   buildMarkNotificationReadPaths,
   buildMarkReadBody,
+  buildMarkReadPath,
   buildMemberIdsBody,
+  buildMessageReactionsPath,
   buildOidcAuthorizeBody,
   buildOptionalJsonBody,
   buildPatchSettingsBody,
+  buildPinMessagePath,
+  buildPingExecutionTargetPath,
+  buildPostInit,
   buildPostTeamRouteDecisionPath,
   buildProbeAttachmentBody,
+  buildPutInit,
   buildReactionBody,
   buildReadAllNotificationsPaths,
+  buildRecallMessagePath,
   buildRefreshBody,
+  buildRegenerateAgentTaskPath,
   buildRegisterDevicePaths,
   buildRejectFriendRequestPath,
+  buildRelayCommandPath,
   buildRemarkBody,
   buildRemoveAgentTeamMemberPath,
+  buildRemoveContactPath,
   buildRemoveSessionMemberPath,
   buildResolveTeamConflictPath,
+  buildSearchMessagesPath,
   buildSearchSessionMessagesPath,
   buildSearchSessionsPath,
   buildSearchUserPath,
   buildSendWorkspaceProjectThreadMessagePath,
+  buildSessionAgentsPath,
   buildSessionIdBody,
+  buildSessionInfoPath,
+  buildSessionMembersPath,
+  buildSessionPath,
+  buildSessionPinsPath,
+  buildSessionSettingsPath,
   buildStreamTaskEventBody,
+  buildStreamTaskPath,
   buildSyncMessagesPath,
   buildTaskAckBody,
   buildTaskDoneBody,
   buildTaskFailBody,
+  buildTaskRunEventSummaryPath,
   buildTaskStreamBody,
   buildTransferOwnerBody,
+  buildTransferSessionOwnerPath,
   buildTriggerAgentTaskBody,
   buildUnblockContactPath,
+  buildWorkspaceProjectPath,
+  buildWorkspaceProjectThreadsPath,
   normalizeExecutionTargetsResponse,
   withPublicCatalogParams,
 } from './hubClientPayloadUtils';
 
-describe('hubClientPayloadUtils (#810 / #822 / #833)', () => {
+describe('hubClientPayloadUtils (#810 / #822 / #833 / #901)', () => {
   it('normalizes execution-target array vs {items,page} responses', () => {
     expect(
       normalizeExecutionTargetsResponse([
@@ -297,5 +350,99 @@ describe('hubClientPayloadUtils (#810 / #822 / #833)', () => {
     expect(formData.get('hash')).toBe('hash-1');
     expect(formData.get('original_name')).toBe('note.txt');
     expect(formData.get('file')).toBeInstanceOf(File);
+  });
+
+  it('builds residual single-id / query path helpers (#901)', () => {
+    expect(buildRemoveContactPath('user/1')).toBe('/client/contacts/user%2F1');
+    expect(buildSessionMembersPath('sess/1')).toBe('/client/sessions/sess%2F1/members');
+    expect(buildLeaveSessionPath('sess/1')).toBe('/client/sessions/sess%2F1/leave');
+    expect(buildTransferSessionOwnerPath('sess/1')).toBe(
+      '/client/sessions/sess%2F1/transfer-owner',
+    );
+    expect(buildDissolveSessionPath('sess/1')).toBe('/client/sessions/sess%2F1/dissolve');
+    expect(buildSessionInfoPath('sess/1')).toBe('/client/sessions/sess%2F1/info');
+    expect(buildSessionSettingsPath('sess/1')).toBe('/client/sessions/sess%2F1/settings');
+    expect(buildSessionPath('sess/1')).toBe('/client/sessions/sess%2F1');
+    expect(buildMarkReadPath('sess/1')).toBe('/client/sessions/sess%2F1/read');
+    expect(buildSessionPinsPath('sess/1')).toBe('/client/sessions/sess%2F1/pins');
+    expect(buildSessionAgentsPath('sess/1')).toBe('/client/sessions/sess%2F1/agents');
+
+    expect(buildRecallMessagePath('msg/1')).toBe('/client/messages/msg%2F1/recall');
+    expect(buildPinMessagePath('msg/1')).toBe('/client/messages/msg%2F1/pin');
+    expect(buildForwardMessagePath('msg/1')).toBe('/client/messages/msg%2F1/forward');
+    expect(buildEditMessagePath('msg/1')).toBe('/client/messages/msg%2F1');
+    expect(buildMessageReactionsPath('msg/1')).toBe('/client/messages/msg%2F1/reactions');
+    expect(buildSearchMessagesPath({ q: 'a b', session_id: 's/1' })).toBe(
+      '/client/messages/search?q=a+b&session_id=s%2F1',
+    );
+    expect(buildListNotificationsPath({ unread_only: true, limit: 10 })).toBe(
+      '/client/notifications?unread_only=true&limit=10',
+    );
+
+    expect(buildAckTaskPath('task/1')).toBe('/edge/agent-tasks/task%2F1/ack');
+    expect(buildStreamTaskPath('task/1')).toBe('/edge/agent-tasks/task%2F1/stream');
+    expect(buildDoneTaskPath('task/1')).toBe('/edge/agent-tasks/task%2F1/done');
+    expect(buildFailTaskPath('task/1')).toBe('/edge/agent-tasks/task%2F1/fail');
+    expect(buildRegenerateAgentTaskPath('task/1')).toBe(
+      '/web/agent-tasks/task%2F1/regenerate',
+    );
+
+    expect(buildListExecutionTargetsPath({ pageSize: 5, target_type: 'edge' })).toBe(
+      '/web/execution-targets?pageSize=5&target_type=edge',
+    );
+    expect(buildExecutionTargetPath('t/1')).toBe('/web/execution-targets/t%2F1');
+    expect(buildPingExecutionTargetPath('t/1')).toBe('/web/execution-targets/t%2F1:ping');
+    expect(buildListAuditEventsPath({ pageCursor: 'c/1' })).toBe(
+      '/web/audit-events?pageCursor=c%2F1',
+    );
+    expect(buildRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1');
+    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1:ack');
+    expect(buildCustomAgentPath('agent/1')).toBe('/web/custom-agents/agent%2F1');
+
+    expect(buildListPublicSkillsPath({ q: 'x' })).toBe('/web/skills?is_public=true&q=x');
+    expect(buildListPublicMCPServersPath({ transport: 'stdio' })).toBe(
+      '/web/mcp-servers?is_public=true&transport=stdio',
+    );
+    expect(buildListWorkspaceProjectsPath({ q: 'p' })).toBe('/web/projects?q=p');
+    expect(buildWorkspaceProjectPath('p/1')).toBe('/web/projects/p%2F1');
+    expect(buildWorkspaceProjectThreadsPath('p/1')).toBe('/web/projects/p%2F1/threads');
+
+    expect(buildTaskRunEventSummaryPath('task/1')).toBe(
+      '/web/agent-tasks/task%2F1/events/summary',
+    );
+    expect(buildListTaskRunEventsPath('task/1')).toBe('/web/agent-tasks/task%2F1/events');
+    expect(buildAgentTeamPath('t/1')).toBe('/web/agent-teams/t%2F1');
+    expect(buildAgentTeamMembersPath('t/1')).toBe('/web/agent-teams/t%2F1/members');
+    expect(buildAgentTeamRunsPath('t/1')).toBe('/web/agent-teams/t%2F1/runs');
+    expect(buildListAgentProfilesPath({ runtime_id: 'rt/1' })).toBe(
+      '/web/agent-profiles?runtime_id=rt%2F1',
+    );
+    expect(buildAgentProfilePath('ap/1')).toBe('/web/agent-profiles/ap%2F1');
+    expect(buildListDocumentsPath({ tag: 'notes' })).toBe('/web/documents?tag=notes');
+    expect(buildDocumentPath('doc/1')).toBe('/web/documents/doc%2F1');
+    expect(buildListTaskApprovalsPath('task/1')).toBe('/web/agent-tasks/task%2F1/approvals');
+    expect(buildListTaskArtifactsPath('task/1')).toBe('/web/agent-tasks/task%2F1/artifacts');
+  });
+
+  it('builds pure JSON RequestInit helpers (#901)', () => {
+    expect(buildJsonPostInit({ a: 1 })).toEqual({
+      method: 'POST',
+      body: JSON.stringify({ a: 1 }),
+    });
+    expect(buildJsonPutInit({ b: 2 })).toEqual({
+      method: 'PUT',
+      body: JSON.stringify({ b: 2 }),
+    });
+    expect(buildJsonPatchInit({ c: 3 })).toEqual({
+      method: 'PATCH',
+      body: JSON.stringify({ c: 3 }),
+    });
+    expect(buildJsonDeleteInit({ d: 4 })).toEqual({
+      method: 'DELETE',
+      body: JSON.stringify({ d: 4 }),
+    });
+    expect(buildPostInit()).toEqual({ method: 'POST' });
+    expect(buildPutInit()).toEqual({ method: 'PUT' });
+    expect(buildDeleteInit()).toEqual({ method: 'DELETE' });
   });
 });

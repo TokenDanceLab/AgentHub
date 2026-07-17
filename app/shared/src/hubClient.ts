@@ -158,16 +158,11 @@ import type {
   HubRelayCommand,
 } from './hubClientDomainTypes';
 
-import {
-  parseHubError,
-  readJson,
-  unwrapHubResponse,
-} from './hubClientEnvelope';
+import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
-  qs,
 } from './hubClientRequestUtils';
 import {
   DEFAULT_HUB_TIMEOUT_MS,
@@ -224,13 +219,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
                 signal: retryController.signal,
               });
               clearTimeout(retryTimeoutId);
-              if (!retryResponse.ok) {
-                throw await parseHubError(retryResponse);
-              }
-              if (retryResponse.status === 204) {
-                return undefined as T;
-              }
-              return unwrapHubResponse<T>(await readJson(retryResponse), retryResponse.status);
+              return await parseHubSuccessResponse<T>(retryResponse);
             } catch (retryErr) {
               clearTimeout(retryTimeoutId);
               throw retryErr;
@@ -245,14 +234,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         }
       }
 
-      if (!response.ok) {
-        throw await parseHubError(response);
-      }
-      if (response.status === 204) {
-        return undefined as T;
-      }
-
-      return unwrapHubResponse<T>(await readJson(response), response.status);
+      return await parseHubSuccessResponse<T>(response);
     } catch (error) {
       clearTimeout(timeoutId);
 
@@ -303,7 +285,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
     throw fallbackError;
   }
 
-
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
     const token = opts.getToken?.();
     const headers = new Headers();
@@ -320,176 +301,143 @@ export function createHubClient(opts: HubClientOptions = {}) {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw await parseHubError(response);
-      }
-      if (response.status === 204) {
-        return undefined as T;
-      }
-      return unwrapHubResponse<T>(await readJson(response), response.status);
+      return await parseHubSuccessResponse<T>(response);
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
     }
   }
 
-
   return {
     request,
 
     register: (body: HubRegisterRequest) =>
-      request<{ user_id: string }>('/client/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<{ user_id: string }>('/client/auth/register', hubPayload.buildJsonPostInit(body)),
     login: (body: HubLoginRequest) =>
-      request<HubAuthResponse>('/client/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubAuthResponse>('/client/auth/login', hubPayload.buildJsonPostInit(body)),
     refresh: (refreshToken: string) =>
-      request<HubAuthResponse>('/client/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildRefreshBody(refreshToken)),
-      }),
-    logout: () => request<void>('/client/auth/logout', { method: 'POST' }),
+      request<HubAuthResponse>(
+        '/client/auth/refresh',
+        hubPayload.buildJsonPostInit(hubPayload.buildRefreshBody(refreshToken)),
+      ),
+    logout: () => request<void>('/client/auth/logout', hubPayload.buildPostInit()),
     me: () => request<HubUserProfile>('/client/auth/me'),
     updateProfile: (body: HubUpdateProfileRequest) =>
-      request<HubUserProfile>('/client/auth/profile', {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      }),
+      request<HubUserProfile>('/client/auth/profile', hubPayload.buildJsonPutInit(body)),
     changePassword: async (body: HubChangePasswordRequest) => {
-      const payload = JSON.stringify(body);
       try {
-        return await request<void>('/client/auth/change-password', {
-          method: 'POST',
-          body: payload,
-        });
+        return await request<void>(
+          '/client/auth/change-password',
+          hubPayload.buildJsonPostInit(body),
+        );
       } catch (error) {
         if (isRouteFallbackError(error)) {
-          return request<void>('/client/auth/password', {
-            method: 'PUT',
-            body: payload,
-          });
+          return request<void>('/client/auth/password', hubPayload.buildJsonPutInit(body));
         }
         throw error;
       }
     },
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
-      request<HubOidcAuthorizeResponse>('/client/auth/oidc/authorize', {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildOidcAuthorizeBody(body)),
-      }),
+      request<HubOidcAuthorizeResponse>(
+        '/client/auth/oidc/authorize',
+        hubPayload.buildJsonPostInit(hubPayload.buildOidcAuthorizeBody(body)),
+      ),
     oidcCallback: (body: HubOidcCallbackRequest) =>
-      request<HubOidcCallbackResponse>('/client/auth/oidc/callback', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubOidcCallbackResponse>(
+        '/client/auth/oidc/callback',
+        hubPayload.buildJsonPostInit(body),
+      ),
 
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
     listContacts: () => request<HubContactInfo[]>('/client/contacts'),
     sendFriendRequest: (friendId: string, message?: string) =>
-      request<void>('/client/contacts/friend-requests', {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildFriendRequestBody(friendId, message)),
-      }),
+      request<void>(
+        '/client/contacts/friend-requests',
+        hubPayload.buildJsonPostInit(hubPayload.buildFriendRequestBody(friendId, message)),
+      ),
     listFriendRequests: () =>
       request<HubFriendRequest[]>('/client/contacts/friend-requests'),
     acceptFriendRequest: (requestId: string) =>
-      request<void>(hubPayload.buildAcceptFriendRequestPath(requestId), {
-        method: 'POST',
-      }),
+      request<void>(
+        hubPayload.buildAcceptFriendRequestPath(requestId),
+        hubPayload.buildPostInit(),
+      ),
     rejectFriendRequest: (requestId: string) =>
-      request<void>(hubPayload.buildRejectFriendRequestPath(requestId), {
-        method: 'POST',
-      }),
+      request<void>(
+        hubPayload.buildRejectFriendRequestPath(requestId),
+        hubPayload.buildPostInit(),
+      ),
     removeContact: (friendUserId: string) =>
-      request<void>(`/client/contacts/${encodeURIComponent(friendUserId)}`, {
-        method: 'DELETE',
-      }),
+      request<void>(
+        hubPayload.buildRemoveContactPath(friendUserId),
+        hubPayload.buildDeleteInit(),
+      ),
     blockContact: (targetUserId: string) =>
-      request<void>(hubPayload.buildBlockContactPath(targetUserId), {
-        method: 'POST',
-      }),
+      request<void>(hubPayload.buildBlockContactPath(targetUserId), hubPayload.buildPostInit()),
     unblockContact: (targetUserId: string) =>
-      request<void>(hubPayload.buildUnblockContactPath(targetUserId), {
-        method: 'POST',
-      }),
+      request<void>(hubPayload.buildUnblockContactPath(targetUserId), hubPayload.buildPostInit()),
     updateContactRemark: (friendUserId: string, remark: string) =>
-      request<void>(hubPayload.buildContactRemarkPath(friendUserId), {
-        method: 'PUT',
-        body: JSON.stringify(hubPayload.buildRemarkBody(remark)),
-      }),
+      request<void>(
+        hubPayload.buildContactRemarkPath(friendUserId),
+        hubPayload.buildJsonPutInit(hubPayload.buildRemarkBody(remark)),
+      ),
 
     listSessions: () => request<HubSession[]>('/client/sessions'),
     searchSessions: (q: string) =>
       request<HubSession[]>(hubPayload.buildSearchSessionsPath(q)),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
-      request<HubCreateSessionResponse>('/client/sessions/private', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubCreateSessionResponse>(
+        '/client/sessions/private',
+        hubPayload.buildJsonPostInit(body),
+      ),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
-      request<HubCreateSessionResponse>('/client/sessions/group', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubCreateSessionResponse>(
+        '/client/sessions/group',
+        hubPayload.buildJsonPostInit(body),
+      ),
     addSessionMembers: (sessionId: string, memberIds: string[]) =>
-      request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/members`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildMemberIdsBody(memberIds)),
-      }),
+      request<void>(
+        hubPayload.buildSessionMembersPath(sessionId),
+        hubPayload.buildJsonPostInit(hubPayload.buildMemberIdsBody(memberIds)),
+      ),
     removeSessionMember: (sessionId: string, userId: string) =>
-      request<void>(hubPayload.buildRemoveSessionMemberPath(sessionId, userId), {
-        method: 'DELETE',
-      }),
+      request<void>(
+        hubPayload.buildRemoveSessionMemberPath(sessionId, userId),
+        hubPayload.buildDeleteInit(),
+      ),
     leaveSession: (sessionId: string) =>
-      request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/leave`, {
-        method: 'POST',
-      }),
+      request<void>(hubPayload.buildLeaveSessionPath(sessionId), hubPayload.buildPostInit()),
     transferSessionOwnership: (sessionId: string, newOwnerId: string) =>
       request<void>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/transfer-owner`,
-        {
-          method: 'POST',
-          body: JSON.stringify(hubPayload.buildTransferOwnerBody(newOwnerId)),
-        },
+        hubPayload.buildTransferSessionOwnerPath(sessionId),
+        hubPayload.buildJsonPostInit(hubPayload.buildTransferOwnerBody(newOwnerId)),
       ),
     dissolveSession: (sessionId: string) =>
-      request<void>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/dissolve`,
-        { method: 'POST' },
-      ),
+      request<void>(hubPayload.buildDissolveSessionPath(sessionId), hubPayload.buildPostInit()),
     updateSessionInfo: (
       sessionId: string,
       body: HubUpdateSessionInfoRequest,
     ) =>
-      request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/info`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      }),
+      request<void>(
+        hubPayload.buildSessionInfoPath(sessionId),
+        hubPayload.buildJsonPutInit(body),
+      ),
     updateSessionSettings: (
       sessionId: string,
       body: HubUpdateSessionSettingsRequest,
     ) =>
       request<void>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/settings`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(body),
-        },
+        hubPayload.buildSessionSettingsPath(sessionId),
+        hubPayload.buildJsonPutInit(body),
       ),
     deleteSession: (sessionId: string) =>
-      request<void>(`/client/sessions/${encodeURIComponent(sessionId)}`, {
-        method: 'DELETE',
-      }),
+      request<void>(hubPayload.buildSessionPath(sessionId), hubPayload.buildDeleteInit()),
 
     sendMessage: (sessionId: string, body: HubSendMessageRequest) =>
       request<HubSendMessageResponse>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/messages`,
-        { method: 'POST', body: JSON.stringify(body) },
+        hubPayload.buildGetMessagesPath(sessionId),
+        hubPayload.buildJsonPostInit(body),
       ),
     getMessages: (
       sessionId: string,
@@ -500,43 +448,36 @@ export function createHubClient(opts: HubClientOptions = {}) {
       params?: { after_seq?: number; limit?: number },
     ) => request<HubMessage[]>(hubPayload.buildSyncMessagesPath(sessionId, params)),
     markRead: (sessionId: string, lastReadSeq: number) =>
-      request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/read`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildMarkReadBody(lastReadSeq)),
-      }),
+      request<void>(
+        hubPayload.buildMarkReadPath(sessionId),
+        hubPayload.buildJsonPostInit(hubPayload.buildMarkReadBody(lastReadSeq)),
+      ),
     recallMessage: (messageId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/recall`, {
-        method: 'POST',
-      }),
+      request<void>(hubPayload.buildRecallMessagePath(messageId), hubPayload.buildPostInit()),
     pinMessage: (messageId: string, sessionId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildSessionIdBody(sessionId)),
-      }),
+      request<void>(
+        hubPayload.buildPinMessagePath(messageId),
+        hubPayload.buildJsonPostInit(hubPayload.buildSessionIdBody(sessionId)),
+      ),
     unpinMessage: (messageId: string, sessionId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
-        method: 'DELETE',
-        body: JSON.stringify(hubPayload.buildSessionIdBody(sessionId)),
-      }),
+      request<void>(
+        hubPayload.buildPinMessagePath(messageId),
+        hubPayload.buildJsonDeleteInit(hubPayload.buildSessionIdBody(sessionId)),
+      ),
     forwardMessage: (messageId: string, targetSessionIds: string[]) =>
       request<void>(
-        `/client/messages/${encodeURIComponent(messageId)}/forward`,
-        {
-          method: 'POST',
-          body: JSON.stringify(hubPayload.buildForwardMessageBody(targetSessionIds)),
-        },
+        hubPayload.buildForwardMessagePath(messageId),
+        hubPayload.buildJsonPostInit(hubPayload.buildForwardMessageBody(targetSessionIds)),
       ),
     listPinnedMessages: (sessionId: string) =>
-      request<HubMessage[]>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/pins`,
-      ),
+      request<HubMessage[]>(hubPayload.buildSessionPinsPath(sessionId)),
     searchMessages: (params: {
       q: string;
       session_id?: string;
       content_type?: string;
       from?: string;
       to?: string;
-    }) => request<HubMessage[]>(`/client/messages/search${qs(params)}`),
+    }) => request<HubMessage[]>(hubPayload.buildSearchMessagesPath(params)),
     searchSessionMessages: (
       sessionId: string,
       params: { q: string; content_type?: string; from?: string; to?: string },
@@ -547,70 +488,70 @@ export function createHubClient(opts: HubClientOptions = {}) {
       unread_only?: boolean;
       limit?: number;
       offset?: number;
-    }) =>
-      request<HubNotification[]>(
-        `/client/notifications${qs(params ?? {})}`,
-      ),
+    }) => request<HubNotification[]>(hubPayload.buildListNotificationsPath(params)),
     markNotificationRead: (id: string) =>
-      requestWithFallback<void>(hubPayload.buildMarkNotificationReadPaths(id), {
-        method: 'POST',
-      }),
+      requestWithFallback<void>(
+        hubPayload.buildMarkNotificationReadPaths(id),
+        hubPayload.buildPostInit(),
+      ),
     readAllNotifications: () =>
-      requestWithFallback<void>(hubPayload.buildReadAllNotificationsPaths(), {
-        method: 'POST',
-      }),
+      requestWithFallback<void>(
+        hubPayload.buildReadAllNotificationsPaths(),
+        hubPayload.buildPostInit(),
+      ),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
-      requestWithFallback<HubDevice>(hubPayload.buildRegisterDevicePaths(), {
-        method: 'POST',
-        body: JSON.stringify(normalizeRegisterDeviceRequest(body)),
-      }),
+      requestWithFallback<HubDevice>(
+        hubPayload.buildRegisterDevicePaths(),
+        hubPayload.buildJsonPostInit(normalizeRegisterDeviceRequest(body)),
+      ),
     ackTask: (taskId: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
-        method: 'POST',
+      request<void>(hubPayload.buildAckTaskPath(taskId), {
+        ...hubPayload.buildPostInit(),
         ...hubPayload.buildOptionalJsonBody(hubPayload.buildTaskAckBody(runId)),
       }),
     streamTask: (taskId: string, content: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildTaskStreamBody(content, runId)),
-      }),
+      request<void>(
+        hubPayload.buildStreamTaskPath(taskId),
+        hubPayload.buildJsonPostInit(hubPayload.buildTaskStreamBody(content, runId)),
+      ),
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildTaskDoneBody(finalContent, runId)),
-      }),
+      request<void>(
+        hubPayload.buildDoneTaskPath(taskId),
+        hubPayload.buildJsonPostInit(hubPayload.buildTaskDoneBody(finalContent, runId)),
+      ),
     failTask: (taskId: string, error: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildTaskFailBody(error, runId)),
-      }),
+      request<void>(
+        hubPayload.buildFailTaskPath(taskId),
+        hubPayload.buildJsonPostInit(hubPayload.buildTaskFailBody(error, runId)),
+      ),
 
     addAgentToSession: (
       sessionId: string,
       body: HubAddAgentToSessionRequest,
     ) =>
       request<HubAgentInstance>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/agents`,
-        {
-          method: 'POST',
-          body: JSON.stringify(body),
-        },
+        hubPayload.buildSessionAgentsPath(sessionId),
+        hubPayload.buildJsonPostInit(body),
       ),
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
-      request<HubAgentTask>('/web/agent-tasks', {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildTriggerAgentTaskBody(triggerMessageId, options)),
-      }),
+      request<HubAgentTask>(
+        '/web/agent-tasks',
+        hubPayload.buildJsonPostInit(
+          hubPayload.buildTriggerAgentTaskBody(triggerMessageId, options),
+        ),
+      ),
     cancelAgentTask: (taskId: string) =>
-      requestWithFallback<void>(hubPayload.buildCancelAgentTaskPaths(taskId), {
-        method: 'POST',
-      }),
+      requestWithFallback<void>(
+        hubPayload.buildCancelAgentTaskPaths(taskId),
+        hubPayload.buildPostInit(),
+      ),
 
     regenerateAgentTask: (taskId: string) =>
-      request<HubAgentTask>(`/web/agent-tasks/${encodeURIComponent(taskId)}/regenerate`, {
-        method: 'POST',
-      }),
+      request<HubAgentTask>(
+        hubPayload.buildRegenerateAgentTaskPath(taskId),
+        hubPayload.buildPostInit(),
+      ),
 
     listExecutionTargets: async (params?: {
       pageSize?: number;
@@ -618,71 +559,48 @@ export function createHubClient(opts: HubClientOptions = {}) {
       target_type?: string;
     }) => {
       const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
-        `/web/execution-targets${qs(params ?? {})}`,
+        hubPayload.buildListExecutionTargetsPath(params),
       );
       return hubPayload.normalizeExecutionTargetsResponse(data);
     },
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
-      request<HubExecutionTarget>('/web/execution-targets', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
-    getExecutionTarget: (id: string) =>
       request<HubExecutionTarget>(
-        `/web/execution-targets/${encodeURIComponent(id)}`,
+        '/web/execution-targets',
+        hubPayload.buildJsonPostInit(body),
       ),
+    getExecutionTarget: (id: string) =>
+      request<HubExecutionTarget>(hubPayload.buildExecutionTargetPath(id)),
     updateExecutionTarget: (
       id: string,
       body: Partial<HubExecutionTargetRequest>,
     ) =>
       request<HubExecutionTarget>(
-        `/web/execution-targets/${encodeURIComponent(id)}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(body),
-        },
+        hubPayload.buildExecutionTargetPath(id),
+        hubPayload.buildJsonPatchInit(body),
       ),
     deleteExecutionTarget: (id: string) =>
-      request<void>(`/web/execution-targets/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      }),
+      request<void>(hubPayload.buildExecutionTargetPath(id), hubPayload.buildDeleteInit()),
     pingExecutionTarget: (id: string) =>
       request<HubExecutionTarget>(
-        `/web/execution-targets/${encodeURIComponent(id)}:ping`,
-        { method: 'POST' },
+        hubPayload.buildPingExecutionTargetPath(id),
+        hubPayload.buildPostInit(),
       ),
     listAuditEvents: (params?: { pageSize?: number; pageCursor?: string }) =>
-      request<HubListResponse<HubAuditEvent>>(
-        `/web/audit-events${qs(params ?? {})}`,
-      ),
+      request<HubListResponse<HubAuditEvent>>(hubPayload.buildListAuditEventsPath(params)),
     createRelayCommand: (body: HubRelayCommandRequest) =>
-      request<HubRelayCommand>('/web/relay/commands', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubRelayCommand>('/web/relay/commands', hubPayload.buildJsonPostInit(body)),
     getRelayCommand: (id: string) =>
-      request<HubRelayCommand>(`/web/relay/commands/${encodeURIComponent(id)}`),
+      request<HubRelayCommand>(hubPayload.buildRelayCommandPath(id)),
     ackRelayCommand: (id: string) =>
-      request<void>(`/web/relay/commands/${encodeURIComponent(id)}:ack`, {
-        method: 'POST',
-      }),
+      request<void>(hubPayload.buildAckRelayCommandPath(id), hubPayload.buildPostInit()),
 
-    listCustomAgents: () =>
-      request<HubCustomAgent[]>('/web/custom-agents'),
+    listCustomAgents: () => request<HubCustomAgent[]>('/web/custom-agents'),
     createCustomAgent: (body: HubCustomAgentRequest) =>
-      request<HubCustomAgent>('/web/custom-agents', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<HubCustomAgent>('/web/custom-agents', hubPayload.buildJsonPostInit(body)),
     updateCustomAgent: (id: string, body: HubCustomAgentRequest) =>
-      request<void>(`/web/custom-agents/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      }),
+      request<void>(hubPayload.buildCustomAgentPath(id), hubPayload.buildJsonPutInit(body)),
     deleteCustomAgent: (id: string) =>
-      request<void>(`/web/custom-agents/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      }),
+      request<void>(hubPayload.buildCustomAgentPath(id), hubPayload.buildDeleteInit()),
 
     listPublicSkills: (params?: {
       skill_type?: string;
@@ -691,9 +609,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageCursor?: string;
       pageSize?: number;
     }) =>
-      request<HubListResponse<HubSkill>>(
-        `/web/skills${qs(hubPayload.withPublicCatalogParams(params ?? {}))}`,
-      ),
+      request<HubListResponse<HubSkill>>(hubPayload.buildListPublicSkillsPath(params)),
 
     listPublicMCPServers: (params?: {
       transport?: string;
@@ -702,32 +618,30 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageCursor?: string;
       pageSize?: number;
     }) =>
-      request<HubListResponse<HubMCPServer>>(
-        `/web/mcp-servers${qs(hubPayload.withPublicCatalogParams(params ?? {}))}`,
-      ),
+      request<HubListResponse<HubMCPServer>>(hubPayload.buildListPublicMCPServersPath(params)),
 
     // ── Workspace Projects ──────────────────────────────────────────
     listWorkspaceProjects: (params?: { pageSize?: number; pageCursor?: string; q?: string }) =>
-      request<HubWorkspaceProjectListResponse>(`/web/projects${qs(params ?? {})}`),
+      request<HubWorkspaceProjectListResponse>(hubPayload.buildListWorkspaceProjectsPath(params)),
     getWorkspaceProject: (id: string) =>
-      request<HubWorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`),
+      request<HubWorkspaceProject>(hubPayload.buildWorkspaceProjectPath(id)),
     createWorkspaceProject: (data: HubCreateWorkspaceProjectRequest) =>
-      request<HubWorkspaceProject>('/web/projects', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubWorkspaceProject>('/web/projects', hubPayload.buildJsonPostInit(data)),
     updateWorkspaceProject: (id: string, data: HubUpdateWorkspaceProjectRequest) =>
-      request<HubWorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
+      request<HubWorkspaceProject>(
+        hubPayload.buildWorkspaceProjectPath(id),
+        hubPayload.buildJsonPatchInit(data),
+      ),
     listWorkspaceProjectThreads: (projectId: string) =>
-      request<HubWorkspaceProjectThread[]>(`/web/projects/${encodeURIComponent(projectId)}/threads`),
-    createWorkspaceProjectThread: (projectId: string, data: HubCreateWorkspaceProjectThreadRequest) =>
-      request<HubWorkspaceProjectThread>(`/web/projects/${encodeURIComponent(projectId)}/threads`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubWorkspaceProjectThread[]>(hubPayload.buildWorkspaceProjectThreadsPath(projectId)),
+    createWorkspaceProjectThread: (
+      projectId: string,
+      data: HubCreateWorkspaceProjectThreadRequest,
+    ) =>
+      request<HubWorkspaceProjectThread>(
+        hubPayload.buildWorkspaceProjectThreadsPath(projectId),
+        hubPayload.buildJsonPostInit(data),
+      ),
     listWorkspaceProjectThreadMessages: (
       projectId: string,
       threadId: string,
@@ -743,80 +657,72 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ) =>
       request<HubWorkspaceProjectThreadMessage>(
         hubPayload.buildSendWorkspaceProjectThreadMessagePath(projectId, threadId),
-        {
-          method: 'POST',
-          body: JSON.stringify(data),
-        },
+        hubPayload.buildJsonPostInit(data),
       ),
 
     // ── T3.2 parity: team/settings/attachments/message extras (desktop∩web) ──
     editMessage: (messageId: string, body: { content: string }) =>
-      request<HubMessage>(`/client/messages/${encodeURIComponent(messageId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      }),
+      request<HubMessage>(
+        hubPayload.buildEditMessagePath(messageId),
+        hubPayload.buildJsonPutInit(body),
+      ),
 
     addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
-      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildReactionBody(sessionId, reaction)),
-      }),
+      request<undefined>(
+        hubPayload.buildMessageReactionsPath(messageId),
+        hubPayload.buildJsonPostInit(hubPayload.buildReactionBody(sessionId, reaction)),
+      ),
 
     removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
-      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-        method: 'DELETE',
-        body: JSON.stringify(hubPayload.buildReactionBody(sessionId, reaction)),
-      }),
+      request<undefined>(
+        hubPayload.buildMessageReactionsPath(messageId),
+        hubPayload.buildJsonDeleteInit(hubPayload.buildReactionBody(sessionId, reaction)),
+      ),
 
     listMessageReactions: (messageId: string, sessionId: string) =>
-      request<Record<string, unknown>[]>(hubPayload.buildListMessageReactionsPath(messageId, sessionId)),
+      request<Record<string, unknown>[]>(
+        hubPayload.buildListMessageReactionsPath(messageId, sessionId),
+      ),
 
     getTaskRunEventSummary: (taskId: string) =>
-      request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events/summary`),
+      request<HubAgentRunEventSummary>(hubPayload.buildTaskRunEventSummaryPath(taskId)),
 
     /** List all run events for a task (used for initial load / full replay). */
     listTaskRunEvents: (taskId: string) =>
-      request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
+      request<HubAgentRunEvent[]>(hubPayload.buildListTaskRunEventsPath(taskId)),
 
     /** Fetch task run events with event_seq strictly after the given value (for replay gap fill). */
     listTaskRunEventsAfter: (taskId: string, afterSeq: number) =>
       request<HubAgentRunEvent[]>(hubPayload.buildListTaskRunEventsAfterPath(taskId, afterSeq)),
 
     createAgentTeam: (data: HubCreateAgentTeamRequest) =>
-      request<HubAgentTeam>('/web/agent-teams', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubAgentTeam>('/web/agent-teams', hubPayload.buildJsonPostInit(data)),
 
-    listAgentTeams: () =>
-      request<HubAgentTeam[]>('/web/agent-teams'),
+    listAgentTeams: () => request<HubAgentTeam[]>('/web/agent-teams'),
 
     getAgentTeam: (teamId: string) =>
-      request<HubAgentTeamDetail>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+      request<HubAgentTeamDetail>(hubPayload.buildAgentTeamPath(teamId)),
 
     updateAgentTeam: (teamId: string, data: HubUpdateAgentTeamRequest) =>
-      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
+      request<void>(hubPayload.buildAgentTeamPath(teamId), hubPayload.buildJsonPutInit(data)),
 
     deleteAgentTeam: (teamId: string) =>
-      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' }),
+      request<void>(hubPayload.buildAgentTeamPath(teamId), hubPayload.buildDeleteInit()),
 
     addAgentTeamMember: (teamId: string, data: HubAddAgentTeamMemberRequest) =>
-      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<void>(
+        hubPayload.buildAgentTeamMembersPath(teamId),
+        hubPayload.buildJsonPostInit(data),
+      ),
 
     startTeamRun: (teamId: string, data: HubStartAgentTeamRunRequest) =>
-      request<HubAgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubAgentTeamRun>(
+        hubPayload.buildAgentTeamRunsPath(teamId),
+        hubPayload.buildJsonPostInit(data),
+      ),
 
     listTeamRuns: (teamId: string) =>
-      request<HubAgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
+      request<HubAgentTeamRun[]>(hubPayload.buildAgentTeamRunsPath(teamId)),
 
     getTeamRun: (teamId: string, runId: string) =>
       request<HubAgentTeamRun>(hubPayload.buildGetTeamRunPath(teamId, runId)),
@@ -836,10 +742,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       approvalId: string,
       decision: HubTeamApprovalDecisionRequest,
     ) =>
-      request<HubTeamApprovalState>(hubPayload.buildDecideTeamApprovalPath(teamId, runId, approvalId), {
-        method: 'POST',
-        body: JSON.stringify(decision),
-      }),
+      request<HubTeamApprovalState>(
+        hubPayload.buildDecideTeamApprovalPath(teamId, runId, approvalId),
+        hubPayload.buildJsonPostInit(decision),
+      ),
 
     resolveTeamConflict: (
       teamId: string,
@@ -847,10 +753,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
       conflictId: string,
       resolution: HubTeamConflictResolutionRequest,
     ) =>
-      request<HubTeamConflictState>(hubPayload.buildResolveTeamConflictPath(teamId, runId, conflictId), {
-        method: 'POST',
-        body: JSON.stringify(resolution),
-      }),
+      request<HubTeamConflictState>(
+        hubPayload.buildResolveTeamConflictPath(teamId, runId, conflictId),
+        hubPayload.buildJsonPostInit(resolution),
+      ),
 
     listAgentProfiles: (params?: {
       runtime_id?: string;
@@ -858,52 +764,45 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageCursor?: string;
       pageSize?: number;
     }) =>
-      request<HubAgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
+      request<HubAgentProfileListResponse>(hubPayload.buildListAgentProfilesPath(params)),
 
     createAgentProfile: (data: HubCreateAgentProfileRequest) =>
-      request<HubAgentProfile>('/web/agent-profiles', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubAgentProfile>('/web/agent-profiles', hubPayload.buildJsonPostInit(data)),
 
     updateAgentProfile: (id: string, data: HubUpdateAgentProfileRequest) =>
-      request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
+      request<HubAgentProfile>(
+        hubPayload.buildAgentProfilePath(id),
+        hubPayload.buildJsonPatchInit(data),
+      ),
 
     deleteAgentProfile: (id: string) =>
-      request<undefined>(`/web/agent-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      request<undefined>(hubPayload.buildAgentProfilePath(id), hubPayload.buildDeleteInit()),
 
-    fetchSettings: () =>
-      request<Record<string, string>>('/client/settings'),
+    fetchSettings: () => request<Record<string, string>>('/client/settings'),
 
     patchSettings: (values: Record<string, string>) =>
-      request<Record<string, string>>('/client/settings', {
-        method: 'PATCH',
-        body: JSON.stringify(hubPayload.buildPatchSettingsBody(values)),
-      }),
+      request<Record<string, string>>(
+        '/client/settings',
+        hubPayload.buildJsonPatchInit(hubPayload.buildPatchSettingsBody(values)),
+      ),
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
     probeAttachment: (hash: string) =>
-      request<HubProbeAttachmentResponse>('/client/attachments/probe', {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildProbeAttachmentBody(hash)),
-      }),
+      request<HubProbeAttachmentResponse>(
+        '/client/attachments/probe',
+        hubPayload.buildJsonPostInit(hubPayload.buildProbeAttachmentBody(hash)),
+      ),
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
-    uploadAttachment: (file: File, hash: string) => {
-      return uploadMultipart<HubAttachmentRef>(
+    uploadAttachment: (file: File, hash: string) =>
+      uploadMultipart<HubAttachmentRef>(
         '/client/attachments',
         hubPayload.buildAttachmentFormData(file, hash),
-      );
-    },
+      ),
 
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
       hubPayload.buildAttachmentDownloadUrl(baseUrl, attachmentId),
-
-
 
     // ── T3.3 desktop remainder methods ──
     listDocuments: (params?: {
@@ -912,40 +811,37 @@ export function createHubClient(opts: HubClientOptions = {}) {
       tag?: string;
       pageCursor?: string;
       pageSize?: number;
-    }) =>
-      request<HubDocumentListResponse>(`/web/documents${qs(params ?? {})}`),
+    }) => request<HubDocumentListResponse>(hubPayload.buildListDocumentsPath(params)),
 
-    getDocument: (id: string) =>
-      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`),
+    getDocument: (id: string) => request<HubDocument>(hubPayload.buildDocumentPath(id)),
 
     createDocument: (data: HubCreateDocumentRequest) =>
-      request<HubDocument>('/web/documents', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      request<HubDocument>('/web/documents', hubPayload.buildJsonPostInit(data)),
 
     updateDocument: (id: string, data: HubUpdateDocumentRequest) =>
-      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
+      request<HubDocument>(hubPayload.buildDocumentPath(id), hubPayload.buildJsonPatchInit(data)),
 
     deleteDocument: (id: string) =>
-      request<undefined>(`/web/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      request<undefined>(hubPayload.buildDocumentPath(id), hubPayload.buildDeleteInit()),
 
     getAgentProfile: (id: string) =>
-      request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`),
+      request<HubAgentProfile>(hubPayload.buildAgentProfilePath(id)),
 
     removeAgentTeamMember: (teamId: string, memberId: string) =>
-      request<undefined>(hubPayload.buildRemoveAgentTeamMemberPath(teamId, memberId), {
-        method: 'DELETE',
-      }),
+      request<undefined>(
+        hubPayload.buildRemoveAgentTeamMemberPath(teamId, memberId),
+        hubPayload.buildDeleteInit(),
+      ),
 
-    postTeamRouteDecision: (teamId: string, runId: string, decision: HubCoordinatorRouteDecision) =>
-      request<Record<string, unknown>>(hubPayload.buildPostTeamRouteDecisionPath(teamId, runId), {
-        method: 'POST',
-        body: JSON.stringify(decision),
-      }),
+    postTeamRouteDecision: (
+      teamId: string,
+      runId: string,
+      decision: HubCoordinatorRouteDecision,
+    ) =>
+      request<Record<string, unknown>>(
+        hubPayload.buildPostTeamRouteDecisionPath(teamId, runId),
+        hubPayload.buildJsonPostInit(decision),
+      ),
 
     streamTaskEvent: (
       taskId: string,
@@ -953,28 +849,29 @@ export function createHubClient(opts: HubClientOptions = {}) {
       payload: unknown,
       options: HubAgentTaskStreamEventOptions = {},
     ) =>
-      request<undefined>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
-        method: 'POST',
-        body: JSON.stringify(hubPayload.buildStreamTaskEventBody(eventType, payload, options)),
-      }),
-
+      request<undefined>(
+        hubPayload.buildStreamTaskPath(taskId),
+        hubPayload.buildJsonPostInit(
+          hubPayload.buildStreamTaskEventBody(eventType, payload, options),
+        ),
+      ),
 
     // ── T3.4 web task approvals/artifacts ──
     listTaskApprovals: (taskId: string) =>
-      request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+      request<HubAgentTaskApprovalList>(hubPayload.buildListTaskApprovalsPath(taskId)),
 
-    decideTaskApproval: (taskId: string, approvalId: string, decision: HubTaskApprovalDecisionRequest) =>
+    decideTaskApproval: (
+      taskId: string,
+      approvalId: string,
+      decision: HubTaskApprovalDecisionRequest,
+    ) =>
       request<HubAgentTaskApproval>(
         hubPayload.buildDecideTaskApprovalPath(taskId, approvalId),
-        {
-          method: 'POST',
-          body: JSON.stringify(decision),
-        },
+        hubPayload.buildJsonPostInit(decision),
       ),
 
     listTaskArtifacts: (taskId: string) =>
-      request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
-
+      request<HubAgentTaskArtifactList>(hubPayload.buildListTaskArtifactsPath(taskId)),
   };
 }
 
