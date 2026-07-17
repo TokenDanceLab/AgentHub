@@ -9,6 +9,8 @@ export {
   DataModeStatus,
   LocalCliDiscoveryStatus,
   StatePanel,
+  StatePreviewSection,
+  AgentConfigLink,
   PANE_RENDERERS,
 } from './SettingsPanes';
 
