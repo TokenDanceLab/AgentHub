@@ -398,37 +398,30 @@ export function createHubClient(opts: HubClientOptions = {}) {
     listFriendRequests: () =>
       request<HubFriendRequest[]>('/client/contacts/friend-requests'),
     acceptFriendRequest: (requestId: string) =>
-      request<void>(
-        `/client/contacts/friend-requests/${encodeURIComponent(requestId)}/accept`,
-        { method: 'POST' },
-      ),
+      request<void>(hubPayload.buildAcceptFriendRequestPath(requestId), {
+        method: 'POST',
+      }),
     rejectFriendRequest: (requestId: string) =>
-      request<void>(
-        `/client/contacts/friend-requests/${encodeURIComponent(requestId)}/reject`,
-        { method: 'POST' },
-      ),
+      request<void>(hubPayload.buildRejectFriendRequestPath(requestId), {
+        method: 'POST',
+      }),
     removeContact: (friendUserId: string) =>
       request<void>(`/client/contacts/${encodeURIComponent(friendUserId)}`, {
         method: 'DELETE',
       }),
     blockContact: (targetUserId: string) =>
-      request<void>(
-        `/client/contacts/${encodeURIComponent(targetUserId)}/block`,
-        { method: 'POST' },
-      ),
+      request<void>(hubPayload.buildBlockContactPath(targetUserId), {
+        method: 'POST',
+      }),
     unblockContact: (targetUserId: string) =>
-      request<void>(
-        `/client/contacts/${encodeURIComponent(targetUserId)}/unblock`,
-        { method: 'POST' },
-      ),
+      request<void>(hubPayload.buildUnblockContactPath(targetUserId), {
+        method: 'POST',
+      }),
     updateContactRemark: (friendUserId: string, remark: string) =>
-      request<void>(
-        `/client/contacts/${encodeURIComponent(friendUserId)}/remark`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(hubPayload.buildRemarkBody(remark)),
-        },
-      ),
+      request<void>(hubPayload.buildContactRemarkPath(friendUserId), {
+        method: 'PUT',
+        body: JSON.stringify(hubPayload.buildRemarkBody(remark)),
+      }),
 
     listSessions: () => request<HubSession[]>('/client/sessions'),
     searchSessions: (q: string) =>
@@ -449,10 +442,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(hubPayload.buildMemberIdsBody(memberIds)),
       }),
     removeSessionMember: (sessionId: string, userId: string) =>
-      request<void>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/members/${encodeURIComponent(userId)}`,
-        { method: 'DELETE' },
-      ),
+      request<void>(hubPayload.buildRemoveSessionMemberPath(sessionId, userId), {
+        method: 'DELETE',
+      }),
     leaveSession: (sessionId: string) =>
       request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/leave`, {
         method: 'POST',
@@ -502,17 +494,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getMessages: (
       sessionId: string,
       params?: { before_seq?: number; limit?: number },
-    ) =>
-      request<HubMessage[]>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/messages${qs(params ?? {})}`,
-      ),
+    ) => request<HubMessage[]>(hubPayload.buildGetMessagesPath(sessionId, params)),
     syncMessages: (
       sessionId: string,
       params?: { after_seq?: number; limit?: number },
-    ) =>
-      request<HubMessage[]>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/messages/sync${qs(params ?? {})}`,
-      ),
+    ) => request<HubMessage[]>(hubPayload.buildSyncMessagesPath(sessionId, params)),
     markRead: (sessionId: string, lastReadSeq: number) =>
       request<void>(`/client/sessions/${encodeURIComponent(sessionId)}/read`, {
         method: 'POST',
@@ -555,9 +541,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       params: { q: string; content_type?: string; from?: string; to?: string },
     ) =>
-      request<HubMessage[]>(
-        `/client/sessions/${encodeURIComponent(sessionId)}/messages/search${qs(params)}`,
-      ),
+      request<HubMessage[]>(hubPayload.buildSearchSessionMessagesPath(sessionId, params)),
 
     listNotifications: (params?: {
       unread_only?: boolean;
@@ -577,14 +561,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
-      requestWithFallback<HubDevice>(['/edge/devices:register', '/edge/devices/register'], {
+      requestWithFallback<HubDevice>(hubPayload.buildRegisterDevicePaths(), {
         method: 'POST',
         body: JSON.stringify(normalizeRegisterDeviceRequest(body)),
       }),
     ackTask: (taskId: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
         method: 'POST',
-        ...(runId ? { body: JSON.stringify(hubPayload.buildTaskAckBody(runId)) } : {}),
+        ...hubPayload.buildOptionalJsonBody(hubPayload.buildTaskAckBody(runId)),
       }),
     streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
@@ -750,7 +734,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       params?: { limit?: number },
     ) =>
       request<HubWorkspaceProjectThreadMessage[]>(
-        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`,
+        hubPayload.buildListWorkspaceProjectThreadMessagesPath(projectId, threadId, params),
       ),
     sendWorkspaceProjectThreadMessage: (
       projectId: string,
@@ -758,7 +742,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       data: HubSendWorkspaceProjectThreadMessageRequest,
     ) =>
       request<HubWorkspaceProjectThreadMessage>(
-        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
+        hubPayload.buildSendWorkspaceProjectThreadMessagePath(projectId, threadId),
         {
           method: 'POST',
           body: JSON.stringify(data),
@@ -835,24 +819,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
 
     getTeamRun: (teamId: string, runId: string) =>
-      request<HubAgentTeamRun>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`,
-      ),
+      request<HubAgentTeamRun>(hubPayload.buildGetTeamRunPath(teamId, runId)),
 
     getTeamRunState: (teamId: string, runId: string) =>
-      request<HubTeamRunState>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`,
-      ),
+      request<HubTeamRunState>(hubPayload.buildGetTeamRunStatePath(teamId, runId)),
 
     listTeamEvents: (teamId: string, runId: string) =>
-      request<HubAgentTeamEvent[]>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
-      ),
+      request<HubAgentTeamEvent[]>(hubPayload.buildListTeamEventsPath(teamId, runId)),
 
     listTeamTasks: (teamId: string, runId: string) =>
-      request<HubAgentTeamTask[]>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`,
-      ),
+      request<HubAgentTeamTask[]>(hubPayload.buildListTeamTasksPath(teamId, runId)),
 
     decideTeamApproval: (
       teamId: string,
@@ -961,10 +937,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`),
 
     removeAgentTeamMember: (teamId: string, memberId: string) =>
-      request<undefined>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
-        { method: 'DELETE' },
-      ),
+      request<undefined>(hubPayload.buildRemoveAgentTeamMemberPath(teamId, memberId), {
+        method: 'DELETE',
+      }),
 
     postTeamRouteDecision: (teamId: string, runId: string, decision: HubCoordinatorRouteDecision) =>
       request<Record<string, unknown>>(hubPayload.buildPostTeamRouteDecisionPath(teamId, runId), {
@@ -990,7 +965,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     decideTaskApproval: (taskId: string, approvalId: string, decision: HubTaskApprovalDecisionRequest) =>
       request<HubAgentTaskApproval>(
-        `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        hubPayload.buildDecideTaskApprovalPath(taskId, approvalId),
         {
           method: 'POST',
           body: JSON.stringify(decision),
