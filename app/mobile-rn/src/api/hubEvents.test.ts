@@ -50,7 +50,7 @@ describe('Mobile Hub event stream', () => {
     expect(statuses).toEqual(['connecting', 'open']);
   });
 
-  it('includes token in WS URL query parameter', () => {
+  it('includes access_token in WS URL query parameter', () => {
     const createWebSocket = vi.fn((_url: string) => new FakeSocket());
 
     createHubEventStream({
@@ -60,7 +60,7 @@ describe('Mobile Hub event stream', () => {
     });
 
     const url = createWebSocket.mock.calls[0]?.[0] as string;
-    expect(url).toContain('token=test-jwt');
+    expect(new URL(url).searchParams.get('access_token')).toBe('test-jwt');
   });
 
   it('parses known Hub server event types (message.new, session.created, etc.)', () => {

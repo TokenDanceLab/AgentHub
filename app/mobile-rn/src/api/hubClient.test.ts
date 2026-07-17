@@ -18,16 +18,114 @@ describe('Mobile Hub client facade', () => {
     );
   });
 
-  it('supports token-based WS auth via query parameter', () => {
+  it('supports token-based WS auth via access_token query parameter', () => {
     const url = createHubWsUrl('https://hub.example.test', { token: 'test-jwt-token' });
-    expect(url).toContain('token=test-jwt-token');
+    const parsed = new URL(url);
+    // Hub WSAuthMiddleware accepts access_token (or Authorization Bearer), not "token".
+    expect(parsed.searchParams.get('access_token')).toBe('test-jwt-token');
+    expect(parsed.searchParams.has('token')).toBe(false);
   });
 
-  it('keeps Hub WebSocket URLs free of bearer tokens in the path', () => {
+  it('keeps Hub WebSocket URLs free of bearer tokens when no token is provided', () => {
     const url = createHubWsUrl('https://hub.example.test', { since: '123' });
+    const parsed = new URL(url);
 
-    expect(url).not.toContain('access_token');
+    expect(parsed.searchParams.has('access_token')).toBe(false);
     expect(url).not.toContain('Bearer');
+  });
+
+  it('awaits token resolution before authenticated API calls (no one-shot race)', async () => {
+    let resolveToken!: (value: string) => void;
+    const delayedToken = new Promise<string>((resolve) => {
+      resolveToken = resolve;
+    });
+    const authHeaders: Array<string | null> = [];
+    const fetchImpl = vi.fn(async (_url: string | Request | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      authHeaders.push(headers.get('Authorization'));
+      return new Response(JSON.stringify({ code: 'OK', data: [] }), { status: 200 });
+    });
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8080',
+      getAccessToken: () => delayedToken,
+      fetchImpl,
+    });
+
+    const sessionsPromise = client.listSessions();
+    // Give the client a chance to race if it does not await token resolution.
+    await Promise.resolve();
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    resolveToken('resolved-token');
+    await sessionsPromise;
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(authHeaders[0]).toBe('Bearer resolved-token');
+  });
+
+  it('refreshes token via onRefreshToken on 401 and retries once', async () => {
+    const refresh = vi.fn(async () => 'refreshed-token');
+    let calls = 0;
+    const fetchImpl = vi.fn(async (_url: string | Request | URL, init?: RequestInit) => {
+      calls += 1;
+      const headers = new Headers(init?.headers);
+      if (calls === 1) {
+        expect(headers.get('Authorization')).toBe('Bearer stale-token');
+        return new Response(
+          JSON.stringify({ error: { code: 'AUTH_INVALID_TOKEN', message: 'expired' } }),
+          { status: 401 },
+        );
+      }
+      expect(headers.get('Authorization')).toBe('Bearer refreshed-token');
+      return new Response(
+        JSON.stringify({
+          code: 'OK',
+          data: { id: 'u1', username: 'alice', nickname: 'Alice' },
+        }),
+        { status: 200 },
+      );
+    });
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8080',
+      getAccessToken: async () => 'stale-token',
+      onRefreshToken: refresh,
+      fetchImpl,
+    });
+
+    const profile = await client.me();
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(profile.id).toBe('u1');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears cached token on logout', async () => {
+    let token: string | null = 'active-token';
+    const authHeaders: Array<string | null> = [];
+    const fetchImpl = vi.fn(async (url: string | Request | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      authHeaders.push(headers.get('Authorization'));
+      const urlStr = String(url);
+      if (urlStr.includes('/client/auth/logout')) {
+        return new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ code: 'OK', data: [] }), { status: 200 });
+    });
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8080',
+      getAccessToken: async () => token,
+      fetchImpl,
+    });
+
+    await client.listSessions();
+    expect(authHeaders[0]).toBe('Bearer active-token');
+
+    token = null;
+    await client.logout();
+    await client.listSessions();
+
+    // After logout cache clear + provider returning null, no Authorization header.
+    expect(authHeaders[authHeaders.length - 1]).toBeNull();
   });
 
   it('returns realistic mobile workflow snapshot data from the mock client', async () => {
