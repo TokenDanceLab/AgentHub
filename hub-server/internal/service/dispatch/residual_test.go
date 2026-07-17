@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -156,4 +157,112 @@ func TestPinMessageIDs(t *testing.T) {
 	src := []string{"a", "b"}
 	_ = PinMessageIDs(src)
 	assert.Equal(t, "a", src[0])
+}
+
+func TestCustomAgentFieldsFromModel(t *testing.T) {
+	assert.Nil(t, CustomAgentFieldsFromModel(nil))
+
+	schema := json.RawMessage(`{"type":"object"}`)
+	ca := &model.CustomAgent{
+		SystemPrompt:  "sys",
+		ModelParams:   `{"model":"x"}`,
+		ToolWhitelist: `["bash"]`,
+		OutputSchema:  &schema,
+	}
+	fields := CustomAgentFieldsFromModel(ca)
+	require.NotNil(t, fields)
+	assert.Equal(t, "sys", fields.SystemPrompt)
+	assert.Equal(t, `{"model":"x"}`, fields.ModelParams)
+	assert.Equal(t, `["bash"]`, fields.ToolWhitelist)
+	require.NotNil(t, fields.OutputSchema)
+	assert.Equal(t, schema, *fields.OutputSchema)
+	// pointer identity preserved for OutputSchema
+	assert.Same(t, ca.OutputSchema, fields.OutputSchema)
+}
+
+func TestTeamMemberRefsFromMembers(t *testing.T) {
+	assert.Nil(t, TeamMemberRefsFromMembers(nil))
+	assert.Nil(t, TeamMemberRefsFromMembers([]model.AgentTeamMember{}))
+
+	p := "ca-1"
+	members := []model.AgentTeamMember{
+		{ID: "m1", Role: "lead", AgentProfileID: &p},
+		{ID: "m2", Role: "worker", AgentProfileID: nil},
+	}
+	refs := TeamMemberRefsFromMembers(members)
+	require.Len(t, refs, 2)
+	assert.Equal(t, "m1", refs[0].ID)
+	assert.Equal(t, "lead", refs[0].Role)
+	require.NotNil(t, refs[0].AgentProfileID)
+	assert.Equal(t, "ca-1", *refs[0].AgentProfileID)
+	assert.Equal(t, "m2", refs[1].ID)
+	assert.Nil(t, refs[1].AgentProfileID)
+}
+
+func TestPinMessageIDsFromModels(t *testing.T) {
+	assert.Nil(t, PinMessageIDsFromModels(nil))
+	assert.Nil(t, PinMessageIDsFromModels([]model.MessagePin{}))
+	got := PinMessageIDsFromModels([]model.MessagePin{
+		{MessageID: "a"},
+		{MessageID: "b"},
+	})
+	assert.Equal(t, []string{"a", "b"}, got)
+}
+
+func TestNewQueuedPendingTask(t *testing.T) {
+	expire := time.Unix(1_700_000_000, 0).UTC()
+	task := NewQueuedPendingTask("ai", "u", "msg", "t1", "d1", expire)
+	require.NotNil(t, task)
+	assert.Equal(t, "ai", task.AgentInstanceID)
+	assert.Equal(t, "u", task.TriggeredByUserID)
+	assert.Equal(t, "msg", task.TriggerMessageID)
+	assert.Equal(t, "t1", task.TargetID)
+	assert.Equal(t, "d1", task.EdgeDeviceID)
+	assert.Equal(t, model.TaskStatusQueued, task.Status)
+	assert.True(t, task.ExpireAt.Equal(expire))
+}
+
+func TestClassifyPrimaryDispatchRoute(t *testing.T) {
+	assert.Equal(t, RouteHTTP, ClassifyPrimaryDispatchRoute("", "", "", false))
+	assert.Equal(t, RouteMissingEdge, ClassifyPrimaryDispatchRoute("t1", HubRelayTargetType, "", true))
+	assert.Equal(t, RouteHubRelay, ClassifyPrimaryDispatchRoute("t1", HubRelayTargetType, "d1", true))
+	assert.Equal(t, RouteTargetBound, ClassifyPrimaryDispatchRoute("t1", HubRelayTargetType, "d1", false))
+	assert.Equal(t, RouteTargetBound, ClassifyPrimaryDispatchRoute("t1", "local_edge", "d1", true))
+
+	assert.Equal(t, RouteInviterDesktop, ClassifyUnboundFallbackRoute("c1", true, nil))
+	assert.Equal(t, RouteOffline, ClassifyUnboundFallbackRoute("", true, nil))
+	assert.Equal(t, RouteOffline, ClassifyUnboundFallbackRoute("c1", false, nil))
+	assert.Equal(t, RouteOffline, ClassifyUnboundFallbackRoute("c1", true, assert.AnError))
+}
+
+func TestPrepareRedispatchPayload(t *testing.T) {
+	_, _, err := PrepareRedispatchPayload("{", "del-1")
+	require.Error(t, err)
+	var prep *PayloadPrepError
+	require.ErrorAs(t, err, &prep)
+	assert.Equal(t, DeadLetterKindPayloadUnmarshal, prep.Kind)
+
+	p := NewPayload("task", "ai", "claude-code", "", "", "s", "m", "u", "prompt", "n")
+	raw, err := json.Marshal(p)
+	require.NoError(t, err)
+
+	dp, body, err := PrepareRedispatchPayload(string(raw), "del-9")
+	require.NoError(t, err)
+	assert.Equal(t, "del-9", dp.DeliveryID)
+
+	want, err := MarshalWithDeliveryID(p, "del-9")
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(body))
+}
+
+func TestEdgeHTTPHeaders(t *testing.T) {
+	h := EdgeHTTPHeaders("", "")
+	assert.Equal(t, "application/json", h.Get("Content-Type"))
+	assert.Equal(t, "", h.Get("Authorization"))
+	assert.Equal(t, "", h.Get(CapabilityTokenHeader))
+
+	h = EdgeHTTPHeaders("secret", "cap-token")
+	assert.Equal(t, "application/json", h.Get("Content-Type"))
+	assert.Equal(t, "Bearer secret", h.Get("Authorization"))
+	assert.Equal(t, "cap-token", h.Get(CapabilityTokenHeader))
 }

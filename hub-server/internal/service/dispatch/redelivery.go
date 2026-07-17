@@ -40,6 +40,43 @@ const (
 	DeadLetterKindTaskLookup       = "task lookup"
 )
 
+// PayloadPrepError is a pure redispatch payload prep failure with a dead-letter kind.
+type PayloadPrepError struct {
+	Kind string
+	Err  error
+}
+
+func (e *PayloadPrepError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return DeadLetterReason(e.Kind, e.Err)
+}
+
+func (e *PayloadPrepError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+// PrepareRedispatchPayload unmarshals a stored outbox payload, attaches deliveryID,
+// and marshals the redispatch body. Pure JSON only — dead-letter moves stay
+// orchestration-side. On failure returns *PayloadPrepError with Kind set to
+// DeadLetterKindPayloadUnmarshal or DeadLetterKindPayloadMarshal.
+func PrepareRedispatchPayload(raw, deliveryID string) (Payload, []byte, error) {
+	var dp Payload
+	if err := json.Unmarshal([]byte(raw), &dp); err != nil {
+		return Payload{}, nil, &PayloadPrepError{Kind: DeadLetterKindPayloadUnmarshal, Err: err}
+	}
+	newPayload, err := MarshalWithDeliveryID(dp, deliveryID)
+	if err != nil {
+		return Payload{}, nil, &PayloadPrepError{Kind: DeadLetterKindPayloadMarshal, Err: err}
+	}
+	AttachDeliveryID(&dp, deliveryID)
+	return dp, newPayload, nil
+}
+
 // DeadLetterReason formats "kind: err" dead-letter lastError strings.
 func DeadLetterReason(kind string, err error) string {
 	return fmt.Sprintf("%s: %v", kind, err)
