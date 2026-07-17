@@ -1340,4 +1340,3 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 
 	return agentInstanceID, runID, nil
 }
-
