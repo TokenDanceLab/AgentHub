@@ -2,21 +2,15 @@ package lifecycle
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
@@ -30,35 +24,6 @@ var ErrProcessBusRequired = errors.New("process event bus is required")
 var ErrProcessCommandRequired = errors.New("process command is required")
 var ErrProcessStoreRequired = errors.New("process store is required")
 var ErrTooManyConcurrentRuns = errors.New("too many concurrent runs")
-
-// Pre-compiled regex patterns for SanitizeSubAgentResult.
-// These are compiled at package init time and are safe for concurrent use.
-var (
-	// reStackTrace matches lines containing stack trace markers:
-	//   - "\tat " prefixed lines (Java/Python/Go traces)
-	//   - "goroutine" prefixed lines (Go runtime traces)
-	//   - "...path/file.go:line" file references in traces
-	reStackTrace = regexp.MustCompile(`(?m)^\s*(?:\t+at\s.*|goroutine\s+\d+.*|\.\.\.[/\w.\-]+\.go:\d+(?:\s+.*)?)$`)
-
-	// reFilePath matches absolute file paths that reveal project directory
-	// structure, e.g. "D:/Code/TokenDance/..." or "/home/user/...".
-	// The trailing character class includes backslash for Windows paths.
-	// Directory set includes common project roots: Code, Users, home, tmp,
-	// Projects, Work, Data, Documents, Desktop.
-	reFilePath = regexp.MustCompile(`[A-Za-z]:[/\\](?:Code|Users|home|tmp|Projects|Work|Data|Documents|Desktop)[/\\\w.\-]*|/(?:home|Users|tmp)/[\w.\-/]*`)
-
-	// reAPIKey matches common API key patterns:
-	//   - "sk-" prefix (OpenAI, Anthropic, etc.)
-	//   - "api-key-" prefix (various providers)
-	//   - Google API keys (AIza...)
-	//   - GitHub personal access tokens (ghp_..., github_pat_...)
-	//   - GitLab tokens (glpat-...)
-	//   - HuggingFace tokens (hf_...)
-	//   - JWT tokens (eyJ... base64url with dots)
-	//   - AWS access keys (AKIA...)
-	//   - Bearer token headers
-	reAPIKey = regexp.MustCompile(`(?:sk-[a-zA-Z0-9_\-\^=]{20,}|api-key-[a-zA-Z0-9_\-]{16,}|AIza[0-9A-Za-z\-_]{35}|ghp_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{22,}|glpat-[0-9A-Za-z\-_]{20,}|hf_[0-9A-Za-z]{34}|eyJ[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}|AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9_\-\\.=]{20,})`)
-)
 
 type ProcessExecutorConfig struct {
 	Command  string
@@ -219,8 +184,6 @@ const (
 	defaultMaxConcurrentRuns          = 5
 	defaultReadBufferSize             = 32 * 1024
 	defaultRunOutputMaxBytes          = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
-	hubCallbackFinalMaxBytes          = 32 * 1024
-	hubCallbackChunkMaxBytes          = 16 * 1024
 	hubCallbackTimeout                = 15 * time.Second
 	persistedAssistantMessageMaxBytes = 200 * 1024
 	persistedFailureMessageMaxBytes   = 8 * 1024
@@ -230,47 +193,6 @@ const (
 	// found" error triggers an automatic retry with a fresh session ID.
 	sessionRetryWindow = 10 * time.Second
 )
-
-type runOutputLimiter struct {
-	mu        sync.Mutex
-	maxBytes  int64
-	written   int64
-	truncated bool
-}
-
-func newRunOutputLimiter(maxBytes int64) *runOutputLimiter {
-	if maxBytes <= 0 {
-		maxBytes = defaultRunOutputMaxBytes
-	}
-	return &runOutputLimiter{maxBytes: maxBytes}
-}
-
-func (l *runOutputLimiter) allow(data []byte) (allowed []byte, truncatedNow bool, written int64, maxBytes int64) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	maxBytes = l.maxBytes
-	remaining := maxBytes - l.written
-	if remaining <= 0 {
-		if !l.truncated {
-			l.truncated = true
-			return nil, true, l.written, maxBytes
-		}
-		return nil, false, l.written, maxBytes
-	}
-	if int64(len(data)) <= remaining {
-		l.written += int64(len(data))
-		return data, false, l.written, maxBytes
-	}
-
-	allowed = data[:int(remaining)]
-	l.written = maxBytes
-	if !l.truncated {
-		l.truncated = true
-		truncatedNow = true
-	}
-	return allowed, truncatedNow, l.written, maxBytes
-}
 
 // SetMetrics attaches Prometheus instrumentation to this executor.
 // It is safe to call with nil to disable metrics.
@@ -456,7 +378,6 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if runCtx.HubTaskID != "" {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
-		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
 		e.mu.Unlock()
 	}
 
@@ -945,196 +866,6 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 	}
 }
 
-type processArgLogSummary struct {
-	ArgFlags               []string
-	ConfigKeys             []string
-	PositionalArgCount     int
-	UnknownFlagCount       int
-	RedactedConfigKeyCount int
-}
-
-func summarizeProcessArgsForLog(args []string) processArgLogSummary {
-	var summary processArgLogSummary
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "" {
-			continue
-		}
-		if arg == "--" {
-			summary.PositionalArgCount += len(args) - i - 1
-			break
-		}
-		if !strings.HasPrefix(arg, "-") || arg == "-" {
-			summary.PositionalArgCount++
-			continue
-		}
-
-		flag, value, hasInlineValue := strings.Cut(arg, "=")
-		if !isSafeProcessArgFlag(flag) {
-			summary.UnknownFlagCount++
-			continue
-		}
-		summary.ArgFlags = appendUniqueString(summary.ArgFlags, flag)
-		if flag == "-c" {
-			if hasInlineValue {
-				summary.ConfigKeys, summary.RedactedConfigKeyCount = appendConfigKeyName(summary.ConfigKeys, summary.RedactedConfigKeyCount, value)
-			} else if i+1 < len(args) {
-				summary.ConfigKeys, summary.RedactedConfigKeyCount = appendConfigKeyName(summary.ConfigKeys, summary.RedactedConfigKeyCount, args[i+1])
-				i++
-			}
-			continue
-		}
-		if shouldConsumeNextProcessArgValue(flag, args, i) {
-			i++
-		}
-	}
-	return summary
-}
-
-func appendConfigKeyName(configKeys []string, redactedCount int, value string) ([]string, int) {
-	key, _, _ := strings.Cut(value, "=")
-	if key == "" || key == value || !isSafeProcessConfigKey(key) {
-		return configKeys, redactedCount + 1
-	}
-	return appendUniqueString(configKeys, key), redactedCount
-}
-
-func processCommandNameForLog(cmdPath string) string {
-	name := filepath.Base(cmdPath)
-	if name == "." || name == string(filepath.Separator) {
-		return ""
-	}
-	return name
-}
-
-func isSafeProcessArgFlag(flag string) bool {
-	switch flag {
-	case "-c",
-		"-i",
-		"-m",
-		"-p",
-		"-test.run",
-		"--add-dir",
-		"--agent",
-		"--agents",
-		"--allowedTools",
-		"--append-system-prompt",
-		"--cd",
-		"--command",
-		"--continue",
-		"--dangerously-skip-permissions",
-		"--dir",
-		"--effort",
-		"--ephemeral",
-		"--fast",
-		"--file",
-		"--fork",
-		"--fork-session",
-		"--format",
-		"--image",
-		"--include-partial-messages",
-		"--json",
-		"--json-schema",
-		"--max-budget-usd",
-		"--max-turns",
-		"--mcp-config",
-		"--model",
-		"--output-format",
-		"--permission-mode",
-		"--resume",
-		"--sandbox",
-		"--session",
-		"--session-id",
-		"--skip-git-repo-check",
-		"--system-prompt",
-		"--thinking",
-		"--title",
-		"--variant",
-		"--verbose":
-		return true
-	default:
-		return false
-	}
-}
-
-func isSafeProcessConfigKey(key string) bool {
-	for i, r := range key {
-		switch {
-		case r >= 'a' && r <= 'z':
-		case r >= 'A' && r <= 'Z':
-		case r >= '0' && r <= '9':
-			if i == 0 {
-				return false
-			}
-		case r == '_' || r == '-' || r == '.':
-			if i == 0 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return key != ""
-}
-
-func processArgFlagTakesValue(flag string) bool {
-	switch flag {
-	case "-p",
-		"-m",
-		"-i",
-		"--add-dir",
-		"--agent",
-		"--agents",
-		"--allowedTools",
-		"--append-system-prompt",
-		"--cd",
-		"--command",
-		"--dir",
-		"--effort",
-		"--file",
-		"--format",
-		"--image",
-		"--json-schema",
-		"--max-budget-usd",
-		"--mcp-config",
-		"--model",
-		"--output-format",
-		"--permission-mode",
-		"--resume",
-		"--sandbox",
-		"--session",
-		"--session-id",
-		"--thinking",
-		"--system-prompt",
-		"--title",
-		"--variant":
-		return true
-	default:
-		return false
-	}
-}
-
-func shouldConsumeNextProcessArgValue(flag string, args []string, index int) bool {
-	if !processArgFlagTakesValue(flag) || index+1 >= len(args) {
-		return false
-	}
-	next := args[index+1]
-	if next == "" || next == "--" || !strings.HasPrefix(next, "-") || next == "-" {
-		return true
-	}
-	nextFlag, _, _ := strings.Cut(next, "=")
-	return !isSafeProcessArgFlag(nextFlag)
-}
-
-func appendUniqueString(values []string, value string) []string {
-	for _, existing := range values {
-		if existing == value {
-			return values
-		}
-	}
-	return append(values, value)
-}
-
 // envForRun builds the environment for a child process.
 // When profileEnv is nil the child receives a minimal sanitized environment
 // (only whitelisted parent vars + extraEnv + AGENTHUB_* runtime vars).
@@ -1190,26 +921,6 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 		e.fireHubFail(failed.ID, classified.Message)
 	}
 	e.checkPersistError(run.ID)
-}
-
-func errorWithRunOutput(err error, outStore *runnerctx.RunOutputStore) error {
-	if err == nil || outStore == nil {
-		return err
-	}
-	output, readErr := outStore.ReadAll()
-	output = strings.TrimSpace(output)
-	if readErr != nil || output == "" {
-		return err
-	}
-	chunks := splitHubCallbackText(output, persistedFailureMessageMaxBytes)
-	if len(chunks) == 0 {
-		return err
-	}
-	message := chunks[0]
-	if len(chunks) > 1 || len(output) > len(message) {
-		message += "\n[output truncated]"
-	}
-	return fmt.Errorf("%w: %s", err, message)
 }
 
 func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
@@ -1350,208 +1061,6 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	}
 
 	adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
-}
-
-// ── Sub-Agent Result Sanitization Layer ─────────────────────────────────
-//
-// ARCHITECTURE NOTE (2026-06): This sanitization layer was added as a safety
-// gate between sub-agent completion and the message queue / result aggregator.
-// Before this layer, raw sub-agent output (including stack traces, absolute
-// file paths, and API keys) could enter the message queue unredacted.
-//
-// The layer operates at exactly one chokepoint — sendSubAgentResult — and
-// applies three transformations:
-//   1. Regex-based redaction of stack traces, file paths, and API keys
-//      (via pre-compiled regex patterns: reStackTrace, reFilePath, reAPIKey).
-//   2. Recursive structured-data scanning (maps and slices are walked depth-first
-//      so attackers cannot evade sanitization by nesting sensitive data).
-//   3. UTF-8-safe truncation at 32KB to bound message queue payload sizes.
-//
-// The same sanitized payload is written to both the message queue (for parent
-// orchestrator consumption) and the result aggregator (for persisted synthesis),
-// ensuring no bypass path exists. The _sanitized / _sanitized_reason metadata
-// fields on the message payload allow the parent orchestrator to detect when
-// output has been modified.
-
-// maxSanitizedResultBytes is the maximum size of a sub-agent result string
-// before truncation is applied. Strings longer than this are truncated to
-// keep message queue payloads bounded and prevent memory bloat from runaway
-// agent outputs.
-const maxSanitizedResultBytes = 32 * 1024 // 32KB
-
-// recursiveSanitizeString applies all regex-based sanitization to a string
-// and returns the sanitized result plus a comma-separated list of what was
-// modified (empty means no changes). This is the core sanitization logic
-// shared by both string and structured payload paths.
-func recursiveSanitizeString(s string) (string, string) {
-	if len(s) == 0 {
-		return s, ""
-	}
-	var reasons []string
-
-	if reStackTrace.MatchString(s) {
-		s = reStackTrace.ReplaceAllString(s, "[redacted:stack-trace]")
-		reasons = append(reasons, "stack-trace-redacted")
-	}
-
-	if reFilePath.MatchString(s) {
-		s = reFilePath.ReplaceAllString(s, "[redacted:file-path]")
-		reasons = append(reasons, "file-paths-redacted")
-	}
-
-	if reAPIKey.MatchString(s) {
-		s = reAPIKey.ReplaceAllString(s, "[redacted:api-key]")
-		reasons = append(reasons, "api-keys-redacted")
-	}
-
-	return s, strings.Join(reasons, ",")
-}
-
-// SanitizeSubAgentResult sanitizes a sub-agent result payload before it enters
-// the message queue. It applies the following transformations:
-//
-//  1. For string payloads: redacts stack traces, file paths, API keys, and
-//     truncates oversized output at a UTF-8-safe boundary.
-//  2. For structured payloads (map[string]any, []any): recursively walks the
-//     structure and sanitizes all string values using the same regex pipeline.
-//     This prevents attackers from evading sanitization by wrapping sensitive
-//     data in a map or slice.
-//  3. For all payloads: truncates the result if it exceeds maxSanitizedResultBytes
-//     when serializable as a string, keeping the head and appending a truncation
-//     marker.
-//
-// The function is designed to be safe (never panics) and fast (<1ms for
-// typical payloads). It returns the sanitized payload and a reason string
-// describing what was modified (empty string means no changes were made).
-// Design note: absolute file paths are redacted for security, which may reduce synthesis fidelity.
-// Structured file change data is available via BusEventFileChange on a separate event bus channel.
-// Relative paths and _sanitized metadata flags provide escape hatches for downstream consumers.
-func SanitizeSubAgentResult(payload any) (any, string) {
-	if payload == nil {
-		return nil, ""
-	}
-
-	switch v := payload.(type) {
-	case string:
-		s, reason := recursiveSanitizeString(v)
-		// Truncate if the result exceeds the maximum allowed size.
-		s, truncReason := truncateUTF8Safe(s)
-		if truncReason != "" {
-			if reason != "" {
-				reason = reason + "," + truncReason
-			} else {
-				reason = truncReason
-			}
-		}
-		return s, reason
-
-	case map[string]any:
-		// Recursively sanitize all string values and keys in the map.
-		sanitized := make(map[string]any, len(v))
-		combinedReason := ""
-		for k, val := range v {
-			sanVal, r := SanitizeSubAgentResult(val)
-			sanitizedKey, keyReason := recursiveSanitizeString(k)
-			sanitized[sanitizedKey] = sanVal
-			if keyReason != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + keyReason
-				} else {
-					combinedReason = keyReason
-				}
-			}
-			if r != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + r
-				} else {
-					combinedReason = r
-				}
-			}
-		}
-		return sanitized, combinedReason
-
-	case []any:
-		// Recursively sanitize all string values in the slice.
-		sanitized := make([]any, len(v))
-		combinedReason := ""
-		for i, val := range v {
-			sanVal, r := SanitizeSubAgentResult(val)
-			sanitized[i] = sanVal
-			if r != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + r
-				} else {
-					combinedReason = r
-				}
-			}
-		}
-		return sanitized, combinedReason
-
-	case json.RawMessage:
-		var m map[string]any
-		if err := json.Unmarshal(v, &m); err == nil {
-			return SanitizeSubAgentResult(m)
-		}
-		return v, ""
-
-	case []byte:
-		s, reason := recursiveSanitizeString(string(v))
-		s, truncReason := truncateUTF8Safe(s)
-		if truncReason != "" {
-			if reason != "" {
-				reason = reason + "," + truncReason
-			} else {
-				reason = truncReason
-			}
-		}
-		return s, reason
-
-	default:
-		// Non-string, non-map, non-slice payloads (e.g. numbers, bools)
-		// are passed through unchanged.
-		return payload, ""
-	}
-}
-
-// truncateUTF8Safe truncates s to maxSanitizedResultBytes at a UTF-8
-// character boundary to avoid slicing multi-byte code points. Returns the
-// (possibly truncated) string and a reason string (empty if no truncation).
-func truncateUTF8Safe(s string) (string, string) {
-	if len(s) <= maxSanitizedResultBytes {
-		return s, ""
-	}
-
-	headSize := maxSanitizedResultBytes - 2*1024 // reserve 2KB for tail
-	if headSize < 1024 {
-		headSize = 1024 // safety floor
-	}
-
-	// Walk backward from headSize to the start of a UTF-8 character.
-	// This prevents slicing in the middle of a multi-byte code point (e.g.
-	// CJK characters at 3 bytes each).
-	for headSize > 0 && headSize < len(s) {
-		if utf8.RuneStart(s[headSize]) {
-			break
-		}
-		headSize--
-	}
-
-	tailSize := len(s) - headSize
-	if tailSize > 2048 {
-		tailSize = 2048
-	}
-	// Also align tail start to UTF-8 boundary.
-	tailStart := len(s) - tailSize
-	for tailStart > 0 && tailStart < len(s) {
-		if utf8.RuneStart(s[tailStart]) {
-			break
-		}
-		tailStart++
-	}
-	tailSize = len(s) - tailStart
-
-	truncated := s[:headSize] + "\n... [truncated " + strconv.Itoa(len(s)-maxSanitizedResultBytes) + " bytes] ...\n" + s[tailStart:]
-	return truncated, "truncated-32kb"
 }
 
 // sendSubAgentResult delivers a result message from a completed sub-agent run
@@ -1869,72 +1378,6 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	return agentInstanceID, runID, nil
 }
 
-// childBudget creates an isolated context budget for a sub-agent from the parent
-// budget via ContextBudget.AllocateChild. Deeper delegation levels get a smaller
-// fraction of remaining tokens to prevent budget exhaustion at the root. The child
-// budget is fully independent — it does NOT reference the parent's UsedTokens
-// counter, so the child's token consumption cannot pollute the parent's tracking.
-func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextBudget {
-	if parent == nil {
-		return runnerctx.NewContextBudget(0)
-	}
-	// Fraction reduces with depth: depth 1 gets 1/2, depth 2 gets 1/4, etc.
-	// AllocateChild clamps to min 10K tokens and properly scales ReservedTokens.
-	fraction := int64(1 << depth) // 2, 4, 8, ...
-	ratio := 1.0 / float64(fraction)
-	return parent.AllocateChild(ratio)
-}
-
-// isSessionConflictError returns true when the error message or the process
-// stderr indicates a Claude Code session conflict — either "Session ID ... is
-// already in use" or "No conversation found with session ID". In both cases,
-// retrying with a fresh random session ID (and ContinueLast=false) is the
-// correct recovery.
-//
-// On Windows, exec.ExitError.Error() returns only "exit status N" without
-// stderr content (stderr is read via StderrPipe in a separate goroutine).
-// The caller should pass the captured stderr output as the second argument
-// so the check can inspect it.
-func isSessionConflictError(err error, stderrOutput string) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "is already in use") ||
-		strings.Contains(msg, "No conversation found with session ID") {
-		return true
-	}
-	// On Windows, stderr is not included in the ExitError message.
-	// Check the captured stderr output from the pipe goroutine.
-	if stderrOutput != "" {
-		if strings.Contains(stderrOutput, "is already in use") ||
-			strings.Contains(stderrOutput, "No conversation found with session ID") {
-			return true
-		}
-	}
-	// Also check ExitError.Stderr (populated when StderrPipe is NOT used).
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
-		stderrStr := string(exitErr.Stderr)
-		if strings.Contains(stderrStr, "is already in use") ||
-			strings.Contains(stderrStr, "No conversation found with session ID") {
-			return true
-		}
-	}
-	return false
-}
-
-// newRandomSessionID generates a random UUID v4 string for retrying CC
-// sessions when the deterministic session ID conflicts with a stale process.
-func newRandomSessionID() string {
-	var uuid [16]byte
-	_, _ = rand.Read(uuid[:])
-	uuid[6] = (uuid[6] & 0x0f) | 0x40 // version 4
-	uuid[8] = (uuid[8] & 0x3f) | 0x80 // variant 2
-	return fmt.Sprintf("%x-%x-%x-%x-%x",
-		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
-}
-
 // ── Hub callback fire-and-forget helpers ─────────────────────────────────
 
 // hubTaskID returns the Hub task ID for the given run, or empty string if not tracked.
@@ -2007,116 +1450,3 @@ func (e *threadTranscriptEmitter) Flush() {
 func transcriptItemID(runID string) string {
 	return fmt.Sprintf("item_%s_agent_%d", strings.TrimPrefix(runID, "run_"), time.Now().UnixNano())
 }
-
-type hubOutputCollector struct {
-	mu        sync.Mutex
-	builder   strings.Builder
-	fallback  string
-	maxBytes  int
-	truncated bool
-}
-
-func newHubOutputCollector(maxBytes int) *hubOutputCollector {
-	if maxBytes <= 0 {
-		maxBytes = hubCallbackFinalMaxBytes
-	}
-	return &hubOutputCollector{maxBytes: maxBytes}
-}
-
-func (c *hubOutputCollector) Append(text string) {
-	if text == "" {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.builder.Len() >= c.maxBytes {
-		c.truncated = true
-		return
-	}
-	remaining := c.maxBytes - c.builder.Len()
-	if len(text) > remaining {
-		text = strings.ToValidUTF8(text[:remaining], "")
-		c.truncated = true
-	}
-	c.builder.WriteString(text)
-}
-
-func (c *hubOutputCollector) SetFallback(text string) {
-	if text == "" {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.fallback == "" {
-		c.fallback = strings.TrimSpace(text)
-	}
-}
-
-func (c *hubOutputCollector) Final() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	content := strings.TrimSpace(c.builder.String())
-	if content == "" {
-		content = c.fallback
-	}
-	if content == "" {
-		return ""
-	}
-	if c.truncated {
-		return content + "\n[output truncated]"
-	}
-	return content
-}
-
-func extractHubCallbackText(payload any) string {
-	payloadMap, ok := payload.(map[string]any)
-	if !ok {
-		return ""
-	}
-	for _, key := range []string{"content", "text", "delta", "output", "result"} {
-		if value, ok := payloadMap[key].(string); ok && value != "" {
-			return value
-		}
-	}
-	if message, ok := payloadMap["message"].(map[string]any); ok {
-		for _, key := range []string{"content", "text"} {
-			if value, ok := message[key].(string); ok && value != "" {
-				return value
-			}
-		}
-	}
-	return ""
-}
-
-func splitHubCallbackText(text string, maxBytes int) []string {
-	if text == "" {
-		return nil
-	}
-	if maxBytes <= 0 || len(text) <= maxBytes {
-		return []string{text}
-	}
-	chunks := make([]string, 0, len(text)/maxBytes+1)
-	for len(text) > 0 {
-		if len(text) <= maxBytes {
-			chunks = append(chunks, text)
-			break
-		}
-		cut := maxBytes
-		for cut > 0 && !utf8.ValidString(text[:cut]) {
-			cut--
-		}
-		if cut == 0 {
-			_, size := utf8.DecodeRuneInString(text)
-			if size <= 0 {
-				size = 1
-			}
-			cut = size
-		}
-		chunks = append(chunks, text[:cut])
-		text = text[cut:]
-	}
-	return chunks
-}
-
-// fireHubFail sends a TaskFail callback to Hub. Called when the run fails or is cancelled.
-// Errors are logged but never block the run lifecycle.
