@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -21,19 +20,65 @@ import (
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
+// ── MessageService ports + type ──────────────────────────────────────────────
+//
+// Same-package thin first seam (#585): MessageService already owns IM message
+// orchestration (send/edit/recall/pin/forward/search/read). This seam hardens
+// replaceable ports (bus + cache) without a package move — same pattern as
+// DispatchService / EdgeCallbackService / DeliveryOutbox. Full service/im
+// subpackage extract remains deferred.
+
+// messageBus publishes domain events from message write/lifecycle paths.
+// Implemented by *Bus.
+type messageBus interface {
+	Publish(ctx context.Context, event Event)
+}
+
 // messageCache is the subset of *cache.Client methods used by MessageService.
+// Implemented by *cache.Client and cache.NoOpCache.
 type messageCache interface {
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
+// MessageService owns IM message orchestration in the flat service package:
+// send/edit/recall, pin/unpin/list-pins, forward, mark-read, search, and
+// history projection. Seq allocation uses injected messageCache with DB
+// fallback; domain events go through messageBus. Not a package move (#585).
 type MessageService struct {
 	db          *gorm.DB
-	bus         *Bus
+	bus         messageBus
 	cacheClient messageCache
 }
 
-func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *MessageService {
+// NewMessageService constructs a MessageService.
+// bus may be nil for read-only/partial tests; write paths that publish no-op.
+// cacheClient may be nil and falls back to cache.NoOpCache (DB seq path).
+func NewMessageService(db *gorm.DB, bus messageBus, cacheClient messageCache) *MessageService {
 	return &MessageService{db: db, bus: bus, cacheClient: resolveMessageCache(cacheClient)}
+}
+
+// SetBus injects (or replaces) the event bus port.
+func (s *MessageService) SetBus(bus messageBus) {
+	if s == nil {
+		return
+	}
+	s.bus = bus
+}
+
+// SetCache injects (or replaces) the sequence cache port.
+func (s *MessageService) SetCache(cacheClient messageCache) {
+	if s == nil {
+		return
+	}
+	s.cacheClient = resolveMessageCache(cacheClient)
+}
+
+// publish is a nil-safe wrapper over the bus port.
+func (s *MessageService) publish(ctx context.Context, event Event) {
+	if s == nil || s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, event)
 }
 
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
@@ -297,7 +342,7 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		return nil, err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
+	s.publish(ctx, Event{Type: "message.new", Payload: msg})
 
 	return &SendMessageResponse{
 		MessageID: msg.ID,
@@ -550,7 +595,7 @@ func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string
 		return err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "message.recall", Payload: msg})
+	s.publish(ctx, Event{Type: "message.recall", Payload: msg})
 
 	return nil
 }
@@ -606,7 +651,7 @@ func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, 
 	if err != nil {
 		return nil, err
 	}
-	s.bus.Publish(ctx, Event{Type: "message.edited", Payload: updated})
+	s.publish(ctx, Event{Type: "message.edited", Payload: updated})
 
 	editedAt := ""
 	if updated.EditedAt != nil {
@@ -643,7 +688,7 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 		return err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "message.pin", Payload: pin})
+	s.publish(ctx, Event{Type: "message.pin", Payload: pin})
 
 	return nil
 }
@@ -661,7 +706,7 @@ func (s *MessageService) UnpinMessage(ctx context.Context, userID, sessionID, ms
 		return err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "message.unpin", Payload: map[string]string{
+	s.publish(ctx, Event{Type: "message.unpin", Payload: map[string]string{
 		"session_id": sessionID,
 		"message_id": msgID,
 	}})
@@ -805,7 +850,7 @@ func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *mod
 	}
 
 	// Publish event
-	s.bus.Publish(ctx, Event{Type: "message.new", Payload: forwarded})
+	s.publish(ctx, Event{Type: "message.new", Payload: forwarded})
 
 	return nil
 }
@@ -830,7 +875,7 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 		return err
 	}
 
-	s.bus.Publish(ctx, Event{Type: "message.read", Payload: map[string]interface{}{
+	s.publish(ctx, Event{Type: "message.read", Payload: map[string]interface{}{
 		"session_id":    sessionID,
 		"user_id":       userID,
 		"last_read_seq": lastReadSeq,
