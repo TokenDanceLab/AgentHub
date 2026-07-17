@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-17
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11 · [#507](https://github.com/TokenDanceLab/AgentHub/pull/507)–[#512](https://github.com/TokenDanceLab/AgentHub/pull/512) Phase 12 · [#519](https://github.com/TokenDanceLab/AgentHub/pull/519)–[#524](https://github.com/TokenDanceLab/AgentHub/pull/524) Phase 13 · [#531](https://github.com/TokenDanceLab/AgentHub/pull/531)–[#536](https://github.com/TokenDanceLab/AgentHub/pull/536) Phase 14 · [#543](https://github.com/TokenDanceLab/AgentHub/pull/543)–[#547](https://github.com/TokenDanceLab/AgentHub/pull/547) Phase 15 · [#554](https://github.com/TokenDanceLab/AgentHub/pull/554)–[#558](https://github.com/TokenDanceLab/AgentHub/pull/558) Phase 16 · [#565](https://github.com/TokenDanceLab/AgentHub/pull/565)–[#569](https://github.com/TokenDanceLab/AgentHub/pull/569) Phase 17 · [#576](https://github.com/TokenDanceLab/AgentHub/pull/576)–[#580](https://github.com/TokenDanceLab/AgentHub/pull/580) Phase 18 · [#587](https://github.com/TokenDanceLab/AgentHub/pull/587)–[#591](https://github.com/TokenDanceLab/AgentHub/pull/591) Phase 19 · [#598](https://github.com/TokenDanceLab/AgentHub/pull/598)–[#602](https://github.com/TokenDanceLab/AgentHub/pull/602) Phase 20 · [#609](https://github.com/TokenDanceLab/AgentHub/pull/609)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#624](https://github.com/TokenDanceLab/AgentHub/pull/624) Phase 22 · [#631](https://github.com/TokenDanceLab/AgentHub/pull/631)–[#635](https://github.com/TokenDanceLab/AgentHub/pull/635) Phase 23 · [#642](https://github.com/TokenDanceLab/AgentHub/pull/642)–[#646](https://github.com/TokenDanceLab/AgentHub/pull/646) Phase 24 · [#654](https://github.com/TokenDanceLab/AgentHub/pull/654)–[#658](https://github.com/TokenDanceLab/AgentHub/pull/658) Phase 25 · [#665](https://github.com/TokenDanceLab/AgentHub/pull/665)–[#669](https://github.com/TokenDanceLab/AgentHub/pull/669) Phase 26 · [#676](https://github.com/TokenDanceLab/AgentHub/pull/676)–[#681](https://github.com/TokenDanceLab/AgentHub/pull/681) Phase 27 · [#688](https://github.com/TokenDanceLab/AgentHub/pull/688)–[#692](https://github.com/TokenDanceLab/AgentHub/pull/692) Phase 28 · [#700](https://github.com/TokenDanceLab/AgentHub/pull/700)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#716](https://github.com/TokenDanceLab/AgentHub/pull/716) Phase 30 · [#723](https://github.com/TokenDanceLab/AgentHub/pull/723)–[#728](https://github.com/TokenDanceLab/AgentHub/pull/728) Phase 31 · [#735](https://github.com/TokenDanceLab/AgentHub/pull/735)–[#740](https://github.com/TokenDanceLab/AgentHub/pull/740) Phase 32
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#476](https://github.com/TokenDanceLab/AgentHub/pull/476) Phase 9 · [#483](https://github.com/TokenDanceLab/AgentHub/pull/483)–[#488](https://github.com/TokenDanceLab/AgentHub/pull/488) Phase 10 · [#495](https://github.com/TokenDanceLab/AgentHub/pull/495)–[#500](https://github.com/TokenDanceLab/AgentHub/pull/500) Phase 11 · [#507](https://github.com/TokenDanceLab/AgentHub/pull/507)–[#512](https://github.com/TokenDanceLab/AgentHub/pull/512) Phase 12 · [#519](https://github.com/TokenDanceLab/AgentHub/pull/519)–[#524](https://github.com/TokenDanceLab/AgentHub/pull/524) Phase 13 · [#531](https://github.com/TokenDanceLab/AgentHub/pull/531)–[#536](https://github.com/TokenDanceLab/AgentHub/pull/536) Phase 14 · [#543](https://github.com/TokenDanceLab/AgentHub/pull/543)–[#547](https://github.com/TokenDanceLab/AgentHub/pull/547) Phase 15 · [#554](https://github.com/TokenDanceLab/AgentHub/pull/554)–[#558](https://github.com/TokenDanceLab/AgentHub/pull/558) Phase 16 · [#565](https://github.com/TokenDanceLab/AgentHub/pull/565)–[#569](https://github.com/TokenDanceLab/AgentHub/pull/569) Phase 17 · [#576](https://github.com/TokenDanceLab/AgentHub/pull/576)–[#580](https://github.com/TokenDanceLab/AgentHub/pull/580) Phase 18 · [#587](https://github.com/TokenDanceLab/AgentHub/pull/587)–[#591](https://github.com/TokenDanceLab/AgentHub/pull/591) Phase 19 · [#598](https://github.com/TokenDanceLab/AgentHub/pull/598)–[#602](https://github.com/TokenDanceLab/AgentHub/pull/602) Phase 20 · [#609](https://github.com/TokenDanceLab/AgentHub/pull/609)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#624](https://github.com/TokenDanceLab/AgentHub/pull/624) Phase 22 · [#631](https://github.com/TokenDanceLab/AgentHub/pull/631)–[#635](https://github.com/TokenDanceLab/AgentHub/pull/635) Phase 23 · [#642](https://github.com/TokenDanceLab/AgentHub/pull/642)–[#646](https://github.com/TokenDanceLab/AgentHub/pull/646) Phase 24 · [#654](https://github.com/TokenDanceLab/AgentHub/pull/654)–[#658](https://github.com/TokenDanceLab/AgentHub/pull/658) Phase 25 · [#665](https://github.com/TokenDanceLab/AgentHub/pull/665)–[#669](https://github.com/TokenDanceLab/AgentHub/pull/669) Phase 26 · [#676](https://github.com/TokenDanceLab/AgentHub/pull/676)–[#681](https://github.com/TokenDanceLab/AgentHub/pull/681) Phase 27 · [#688](https://github.com/TokenDanceLab/AgentHub/pull/688)–[#692](https://github.com/TokenDanceLab/AgentHub/pull/692) Phase 28 · [#700](https://github.com/TokenDanceLab/AgentHub/pull/700)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#716](https://github.com/TokenDanceLab/AgentHub/pull/716) Phase 30 · [#723](https://github.com/TokenDanceLab/AgentHub/pull/723)–[#728](https://github.com/TokenDanceLab/AgentHub/pull/728) Phase 31 · [#735](https://github.com/TokenDanceLab/AgentHub/pull/735)–[#740](https://github.com/TokenDanceLab/AgentHub/pull/740) Phase 32 · [#747](https://github.com/TokenDanceLab/AgentHub/pull/747)–[#752](https://github.com/TokenDanceLab/AgentHub/pull/752) Phase 33
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 33 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 54 --state open`
-- **Labels**: `spec-driven` · `phase:33`
+- **Phase 34 Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 55 --state open`
+- **Labels**: `spec-driven` · `phase:34`
 
 ## References
 
@@ -46,7 +46,8 @@
 | 30 | Residual polish continue | #51 | closed (PRs #711–#716) |
 | 31 | Residual polish continue | #52 | closed (PRs #723–#728) |
 | 32 | Residual polish continue | #53 | closed (PRs #735–#740) |
-| 33 | Residual polish continue | #54 | active (#741–#746) |
+| 33 | Residual polish continue | #54 | closed (PRs #747–#752) |
+| 34 | Residual polish continue | #55 | active (#753–#758) |
 
 ## Issue Mapping (summary)
 
@@ -59,13 +60,14 @@
 | #705–#710 Phase 30 residual polish continue | closed (PRs #711–#716) |
 | #717–#722 Phase 31 residual polish continue | closed (PRs #723–#728) |
 | #729–#734 Phase 32 residual polish continue | closed (PRs #735–#740) |
-| #741–#746 Phase 33 residual polish continue | open (milestone 54) |
+| #741–#746 Phase 33 residual polish continue | closed (PRs #747–#752) |
+| #753–#758 Phase 34 residual polish continue | open (milestone 55) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=54) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 54 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=55) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 55 --state open
 git worktree list
 ```
 
@@ -78,25 +80,25 @@ git worktree list
 - [x] Phase 30 residual polish continue (#705–#710 / PRs #711–#716)
 - [x] Phase 31 residual polish continue (#717–#722 / PRs #723–#728)
 - [x] Phase 32 residual polish continue (#729–#734 / PRs #735–#740)
-- [ ] Phase 33 residual polish continue (#741–#746)
+- [x] Phase 33 residual polish continue (#741–#746 / PRs #747–#752)
+- [ ] Phase 34 residual polish continue (#753–#758)
 
 ## Current Status
 
-**Active Phase**: Phase 33 — Residual polish continue (milestone 54)
-**Active Tasks**: #741 MASTER · #742 WorkbenchFrameParts · #743 ProfilePopover · #744 Outbox residual · #745 TaskTableViews · #746 hygiene
+**Active Phase**: Phase 34 — Residual polish continue (milestone 55)
+**Active Tasks**: #753 MASTER · #754 designIcons · #755 workbenchTranscriptChromeHelpers · #756 agent_dispatch · #757 normalizeEdgeEvents · #758 hygiene
 **Blockers**: None
 **Production fact**: hk3 LIVE（server `projects/agenthub` external ops SSOT）
-**Tip**: 68ee54ed on `master` (Phase 32 PR #735–#740 line)
-**Residual after P32**: FrameParts ~311 · ProfilePopover ~311 · TaskTableViews ~311 · designIcons ~1038 · agent_dispatch ~1085 · dispatch helpers ~158 · delivery_outbox ~644 · message pkg ~805 · session pkg ~793 · AgentsRoute ~121 · ModePanels ~22 · RuntimeEvidence ~97
-**Boundary map next residual**: optional outbox model package move / optional typed DispatchService package move
-**Primary IM typed packages closed; Dispatch pure residual landed (#732)**
+**Tip**: b126fe6e on `master` (Phase 33 PR #747–#752 line; TaskTableViews #752)
+**Residual after P33**: designIcons ~1038 · workbenchTranscriptChromeHelpers ~1258 · agent_dispatch ~1085 · normalizeEdgeEvents ~1117 · useWebWorkbenchModel ~1195 · delivery_outbox ~647 · hubClient large (~2489 shared)
+**Boundary map next residual**: design system icons / transcript chrome helpers / dispatch typed seam / edge-event normalize
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/project.md` 过时，不得当 SSOT（#428）
 
 ## Next Steps
 
-1. Land Phase 33 issues under milestone 54 (issue-bound Workflows)
+1. Land Phase 34 issues under milestone 55 (issue-bound Workflows)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
-3. Prefer #742 WorkbenchFrameParts · #743 ProfilePopover · #744 Outbox residual · #745 TaskTableViews
+3. Prefer #754 designIcons · #755 workbenchTranscriptChromeHelpers · #756 agent_dispatch · #757 normalizeEdgeEvents
 4. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
 ## Session Log
@@ -104,11 +106,11 @@ git worktree list
 | Date | Session | Summary |
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
-| 2026-07-17 | lead | Phase 9–29 closed via #471–#704; Phase 30–31 advanced |
-| 2026-07-17 | lead | Phase 31 closed via #723–#728; Phase 32 #729–#734 active |
+| 2026-07-17 | lead | Phase 9–31 closed; Phase 32–33 advanced |
 | 2026-07-17 | lead | Phase 32 closed via #735–#740; Phase 33 #741–#746 active |
+| 2026-07-17 | lead | Phase 33 closed via #747–#752; Phase 34 #753–#758 active |
 
 ## Completion notes
 
-- Phase 32 closed via #735–#740 (MASTER / AgentsRoute / InspectorModePanels / Dispatch residual / RuntimeEvidencePanel; #734 hygiene ops-only).
-- Phase 33 targets: MASTER sync, WorkbenchFrameParts residual, ProfilePopover residual, Outbox residual, TaskTableViews residual, hygiene.
+- Phase 33 closed via #747–#752 (MASTER / WorkbenchFrameParts / ProfilePopover / DeliveryOutbox residual / TaskTableViews; #746 hygiene ops-only).
+- Phase 34 targets: MASTER sync, designIcons residual, workbenchTranscriptChromeHelpers residual, agent_dispatch residual, normalizeEdgeEvents residual, hygiene.
