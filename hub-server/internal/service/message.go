@@ -151,13 +151,8 @@ type EditMessageResponse struct {
 	EditedAt  string `json:"edited_at"`
 }
 
-// ── Pure IM helpers (aliases to service/im; #628) ────────────────────────────
-
-// validContentTypes is retained for same-package lookups; source of truth is im.
-var validContentTypes = map[string]bool{
-	"text": true, "code": true, "diff": true, "image": true,
-	"file": true, "link_card": true, "deploy_card": true,
-}
+// ── Pure IM helpers (aliases to service/im; #628/#639) ───────────────────────
+// Content-type allowlist source of truth is im.IsValidContentType.
 
 // normalizeMessageContent is a thin alias to im.NormalizeMessageContent.
 func normalizeMessageContent(contentType, content string) (string, error) {

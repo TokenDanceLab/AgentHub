@@ -14,6 +14,33 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 )
 
+// recordingReactionBus is a messageReactionBus test double that records Publish calls.
+type recordingReactionBus struct {
+	events []Event
+}
+
+func (b *recordingReactionBus) Publish(ctx context.Context, event Event) {
+	b.events = append(b.events, event)
+}
+
+func TestMessageReactionService_NilBusPublishIsNoop(t *testing.T) {
+	svc := &MessageReactionService{db: nil, bus: nil}
+	// Must not panic when bus port is unset (read-only/partial construction).
+	svc.publish(context.Background(), Event{Type: "message.reaction_added", Payload: "x"})
+}
+
+func TestMessageReactionService_SetBusPort(t *testing.T) {
+	bus := &recordingReactionBus{}
+	svc := NewMessageReactionService(nil, nil)
+	require.NotNil(t, svc)
+
+	svc.SetBus(bus)
+	svc.publish(context.Background(), Event{Type: "message.reaction_removed", Payload: map[string]string{"k": "v"}})
+
+	require.Len(t, bus.events, 1)
+	assert.Equal(t, "message.reaction_removed", bus.events[0].Type)
+}
+
 func TestMessageReactionService_AddReactionReturnsSummaryAndPublishesEvent(t *testing.T) {
 	db := newMessageReactionTestDB(t)
 	seedMessageReactionSession(t, db, "sess-react", "user-1", "user-2")
@@ -24,7 +51,7 @@ func TestMessageReactionService_AddReactionReturnsSummaryAndPublishesEvent(t *te
 	bus.Subscribe("message.reaction_added", func(ctx context.Context, event Event) {
 		eventCh <- event
 	})
-	svc := &MessageReactionService{db: db, bus: bus}
+	svc := NewMessageReactionService(db, bus)
 
 	resp, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-react", "msg-react", " heart ")
 	require.NoError(t, err)
@@ -56,7 +83,7 @@ func TestMessageReactionService_RemoveReactionIsIdempotent(t *testing.T) {
 	seedMessageReactionSession(t, db, "sess-remove", "user-1", "user-2")
 	seedMessageReactionMessage(t, db, "sess-remove", "msg-remove")
 
-	svc := &MessageReactionService{db: db, bus: newTestBus(t)}
+	svc := NewMessageReactionService(db, newTestBus(t))
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-remove", "msg-remove", "thumbs_up")
 	require.NoError(t, err)
@@ -82,7 +109,7 @@ func TestMessageReactionService_ListMessageReactionsReturnsGroupedSummaries(t *t
 	seedMessageReactionSession(t, db, "sess-list", "user-1", "user-2", "user-3")
 	seedMessageReactionMessage(t, db, "sess-list", "msg-list")
 
-	svc := &MessageReactionService{db: db, bus: newTestBus(t)}
+	svc := NewMessageReactionService(db, newTestBus(t))
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-list", "msg-list", "heart")
 	require.NoError(t, err)
@@ -103,7 +130,7 @@ func TestMessageReactionService_RejectsInvalidReaction(t *testing.T) {
 	seedMessageReactionSession(t, db, "sess-invalid", "user-1")
 	seedMessageReactionMessage(t, db, "sess-invalid", "msg-invalid")
 
-	svc := &MessageReactionService{db: db}
+	svc := NewMessageReactionService(db, nil)
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-invalid", "msg-invalid", "   ")
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -117,7 +144,7 @@ func TestMessageReactionService_RequiresSessionMembership(t *testing.T) {
 	seedMessageReactionSession(t, db, "sess-member", "user-1")
 	seedMessageReactionMessage(t, db, "sess-member", "msg-member")
 
-	svc := &MessageReactionService{db: db}
+	svc := NewMessageReactionService(db, nil)
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-2", "sess-member", "msg-member", "heart")
 	require.ErrorIs(t, err, errcode.SessionNotMember)
@@ -128,7 +155,7 @@ func TestMessageReactionService_ListMessageReactionsRequiresSessionMembership(t 
 	seedMessageReactionSession(t, db, "sess-list-member", "user-1")
 	seedMessageReactionMessage(t, db, "sess-list-member", "msg-list-member")
 
-	svc := &MessageReactionService{db: db}
+	svc := NewMessageReactionService(db, nil)
 
 	_, err := svc.ListMessageReactions(context.Background(), "user-2", "sess-list-member", "msg-list-member")
 	require.ErrorIs(t, err, errcode.SessionNotMember)
@@ -140,7 +167,7 @@ func TestMessageReactionService_RejectsMessageOutsideSession(t *testing.T) {
 	seedMessageReactionSession(t, db, "sess-b", "user-1")
 	seedMessageReactionMessage(t, db, "sess-b", "msg-other")
 
-	svc := &MessageReactionService{db: db}
+	svc := NewMessageReactionService(db, nil)
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-a", "msg-other", "heart")
 	require.ErrorIs(t, err, errcode.MsgNotFound)
@@ -152,7 +179,7 @@ func TestMessageReactionService_ListMessageReactionsRejectsMessageOutsideSession
 	seedMessageReactionSession(t, db, "sess-list-b", "user-1")
 	seedMessageReactionMessage(t, db, "sess-list-b", "msg-list-other")
 
-	svc := &MessageReactionService{db: db}
+	svc := NewMessageReactionService(db, nil)
 
 	_, err := svc.ListMessageReactions(context.Background(), "user-1", "sess-list-a", "msg-list-other")
 	require.ErrorIs(t, err, errcode.MsgNotFound)
