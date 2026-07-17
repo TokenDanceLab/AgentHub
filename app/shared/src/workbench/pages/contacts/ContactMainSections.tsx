@@ -197,20 +197,41 @@ export function ContactFriendRequestSection({
     <>
       <div className={styles.sectionTitle}>{title}</div>
       <div className={styles.requestList}>
-        {requests.map((req) => (
-          <FriendRequestCard
-            key={req.request_id}
-            request={req}
-            direction={direction}
-            {...(direction === 'received'
-              ? {
-                  onAccept: onAcceptRequest,
-                  onReject: onRejectRequest,
-                  loading: actionLoading,
-                }
-              : {})}
-          />
-        ))}
+        {requests.map((req) => {
+          if (direction !== 'received') {
+            return (
+              <FriendRequestCard
+                key={req.request_id}
+                request={req}
+                direction={direction}
+              />
+            );
+          }
+          // exactOptionalPropertyTypes: only pass defined optionals; wrap async
+          // handlers to void-return to match FriendRequestCard props.
+          const accept =
+            onAcceptRequest === undefined
+              ? undefined
+              : (requestId: string) => {
+                  void onAcceptRequest(requestId);
+                };
+          const reject =
+            onRejectRequest === undefined
+              ? undefined
+              : (requestId: string) => {
+                  void onRejectRequest(requestId);
+                };
+          return (
+            <FriendRequestCard
+              key={req.request_id}
+              request={req}
+              direction={direction}
+              {...(accept ? { onAccept: accept } : {})}
+              {...(reject ? { onReject: reject } : {})}
+              {...(actionLoading !== undefined ? { loading: actionLoading } : {})}
+            />
+          );
+        })}
       </div>
     </>
   );
