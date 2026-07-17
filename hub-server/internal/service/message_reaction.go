@@ -13,11 +13,12 @@ import (
 
 // ── MessageReactionService ports + type ──────────────────────────────────────
 //
-// Same-package thin residual seam (#639): MessageReactionService already owns
-// reaction add/remove/list orchestration. This seam hardens a replaceable bus
-// port (messageReactionBus) and moves pure reaction normalize into service/im,
-// matching MessageService (#585) / service/im pure helpers (#628). Not a
-// package move; OpenAPI/handler/frontend unchanged.
+// Same-package thin residual seam (#639/#651): MessageReactionService already
+// owns reaction add/remove/list orchestration. This seam hardens a replaceable
+// bus port (messageReactionBus) and moves pure reaction normalize + summary
+// projection helpers into service/im, matching MessageService (#585) /
+// service/im pure helpers (#628/#639/#651). Not a package move;
+// OpenAPI/handler/frontend unchanged.
 
 // messageReactionBus publishes domain events from reaction write paths.
 // Implemented by *Bus.
@@ -27,7 +28,7 @@ type messageReactionBus interface {
 
 // MessageReactionService owns IM message reaction orchestration in the flat
 // service package: add/remove/list summaries + access checks. Domain events go
-// through messageReactionBus. Not a package move (#639).
+// through messageReactionBus. Not a package move (#639/#651).
 type MessageReactionService struct {
 	db  *gorm.DB
 	bus messageReactionBus
@@ -145,19 +146,13 @@ func (s *MessageReactionService) ListMessageReactions(ctx context.Context, userI
 
 	resp := make([]MessageReactionResponse, 0, len(summaries))
 	for _, summary := range summaries {
-		item := MessageReactionResponse{
-			MessageID: messageID,
-			SessionID: sessionID,
-			Reaction:  summary.Reaction,
-			Count:     summary.Count,
-		}
-		for _, reactedUserID := range summary.UserIDs {
-			if reactedUserID == userID {
-				item.ReactedByMe = true
-				break
-			}
-		}
-		resp = append(resp, item)
+		resp = append(resp, MessageReactionResponse{
+			MessageID:   messageID,
+			SessionID:   sessionID,
+			Reaction:    summary.Reaction,
+			Count:       summary.Count,
+			ReactedByMe: im.UserReacted(summary.UserIDs, userID),
+		})
 	}
 	return resp, nil
 }
@@ -193,25 +188,14 @@ func (s *MessageReactionService) messageReactionSnapshot(sessionID, messageID, u
 		return nil, err
 	}
 
-	resp := &MessageReactionResponse{
-		MessageID: messageID,
-		SessionID: sessionID,
-		Reaction:  reaction,
-	}
-	for _, summary := range summaries {
-		if summary.Reaction != reaction {
-			continue
-		}
-		resp.Count = summary.Count
-		for _, reactedUserID := range summary.UserIDs {
-			if reactedUserID == userID {
-				resp.ReactedByMe = true
-				break
-			}
-		}
-		break
-	}
-	return resp, nil
+	count, reactedByMe := im.ReactionCountFor(summaries, reaction, userID)
+	return &MessageReactionResponse{
+		MessageID:   messageID,
+		SessionID:   sessionID,
+		Reaction:    reaction,
+		Count:       count,
+		ReactedByMe: reactedByMe,
+	}, nil
 }
 
 func (s *MessageReactionService) publishMessageReactionEvent(ctx context.Context, eventType, action, userID string, resp *MessageReactionResponse) {
