@@ -5,5 +5,6 @@
 // without pulling orchestration code. Orchestration, ports, and private
 // payload types remain in the flat service package (agent_dispatch.go).
 //
-// See docs/analysis/hub-service-boundary-map.md (#732; ports residual #617).
+// See docs/analysis/hub-service-boundary-map.md (#756; pure residual #732;
+// ports residual #617).
 package dispatch
