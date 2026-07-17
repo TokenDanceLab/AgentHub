@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import React, { useCallback, useEffect, useRef, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   ComposerAction,
@@ -6,16 +6,35 @@ import type {
   ComposerMention,
   ComposerState,
 } from '../composer';
-import { browserFilesToComposerAttachments, canSubmitComposer, formatComposerAttachmentSize } from '../composer';
-import { DesignNavIcon } from './designIcons';
+import { browserFilesToComposerAttachments } from '../composer';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
+import {
+  ComposerAgentPicker,
+  ComposerAttachButton,
+  ComposerAttachmentBar,
+  ComposerMainchainStrip,
+  ComposerMentionChips,
+  ComposerQuoteBar,
+  ComposerReplyBar,
+  ComposerSendButton,
+  ComposerStatusStrip,
+  ComposerTargetPicker,
+} from './UnifiedComposerParts';
+import {
+  COMPOSER_FILE_ACCEPT,
+  buildTextWithNewline,
+  canSubmitFromKeyDown,
+  deriveUnifiedComposerState,
+  findMentionById,
+  isExecutionTargetStillValid,
+  shouldSubmitComposerKey,
+  type AttachmentUploadState,
+  type ComposerStatusHints,
+} from './unifiedComposerHelpers';
 
-export interface AttachmentUploadState {
-  percent: number;
-  phase: 'hashing' | 'uploading' | 'done';
-}
+export type { AttachmentUploadState, ComposerStatusHints };
 
 export interface UnifiedComposerProps {
   composer: ComposerState;
@@ -54,73 +73,81 @@ export function UnifiedComposer({
   uploadProgresses,
 }: UnifiedComposerProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const isSubmitting = composer.submitState === 'submitting';
-  const targetSelectionRequired = Boolean(executionTargets) && composer.mentions.length > 0;
-  const targetSelected = !targetSelectionRequired || executionTargetId.trim().length > 0;
-  const submitDisabled = !canSubmitComposer(composer) || isSubmitting || !targetSelected;
-  const selectedTargetLabel = executionTargets?.find((target) => target.id === executionTargetId)?.label;
-  const selectedAgentLabel = composer.mentions.map((mention) => `@${mention.label}`).join(', ');
-  const targetStatus = targetSelectionRequired && !executionTargetId
-    ? executionTargets && executionTargets.length > 0
-      ? 'Select a Desktop/Edge target before starting.'
-      : 'No online Desktop/Edge target is available.'
-    : undefined;
-  const selectedMentionIds = new Set(composer.mentions.map((mention) => mention.id));
-  const availableMentionOptions = mentionableAgents.filter((agent) => !selectedMentionIds.has(agent.id));
-  const statusItems = [
-    status?.dataMode ? `Data: ${status.dataMode}` : undefined,
-    status?.targetState ? `Target: ${status.targetState}${status.targetLabel ? ` - ${status.targetLabel}` : ''}` : undefined,
-    status?.replayLabel,
-    targetStatus,
-  ].filter((item): item is string => Boolean(item));
+  const derived = deriveUnifiedComposerState({
+    composer,
+    executionTargets,
+    executionTargetId,
+    mentionableAgents,
+    status,
+  });
+  const {
+    isSubmitting,
+    targetSelectionRequired,
+    targetSelected,
+    submitDisabled,
+    selectedTargetLabel,
+    selectedAgentLabel,
+    availableMentionOptions,
+    statusItems,
+    mainchainTask,
+  } = derived;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!executionTargets || !executionTargetId) return;
-    if (!executionTargets.some((target) => target.id === executionTargetId)) {
-      onExecutionTargetChange?.('');
-    }
+    if (isExecutionTargetStillValid(executionTargets, executionTargetId)) return;
+    onExecutionTargetChange?.('');
   }, [executionTargetId, executionTargets, onExecutionTargetChange]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key !== 'Enter' || event.altKey || event.shiftKey || event.nativeEvent.isComposing) return;
+    const plan = shouldSubmitComposerKey({
+      key: event.key,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      isComposing: event.nativeEvent.isComposing,
+      submitBehavior,
+    });
 
-    const modifierPressed = event.ctrlKey || event.metaKey;
-    const shouldSubmit = submitBehavior === 'enter-send' ? !modifierPressed : modifierPressed;
-    if (!shouldSubmit && submitBehavior === 'enter-send' && modifierPressed) {
+    if (plan.insertNewline) {
       event.preventDefault();
       insertComposerNewline(event.currentTarget);
       return;
     }
-    if (!shouldSubmit) return;
+    if (!plan.shouldSubmit) return;
 
     event.preventDefault();
     // Use the textarea's current DOM value instead of composer.text to avoid
     // stale-state issues: React batches state updates, so the latest onChange
     // dispatch may not have re-rendered yet when Enter fires immediately after.
     const currentText = event.currentTarget.value ?? '';
-    const hasText = currentText.trim().length > 0;
-    const canSubmit = hasText || composer.attachments.length > 0;
-    const targetOk = !targetSelectionRequired || executionTargetId.trim().length > 0;
-    if (canSubmit && !isSubmitting && targetOk) {
+    if (canSubmitFromKeyDown({
+      currentText,
+      attachments: composer.attachments,
+      isSubmitting,
+      targetSelectionRequired,
+      executionTargetId,
+    })) {
       event.currentTarget.form?.requestSubmit();
     }
   }
 
   function insertComposerNewline(input: HTMLTextAreaElement): void {
-    const start = input.selectionStart ?? composer.text.length;
-    const end = input.selectionEnd ?? start;
-    const nextText = `${composer.text.slice(0, start)}\n${composer.text.slice(end)}`;
+    const { nextText, caret } = buildTextWithNewline({
+      text: composer.text,
+      selectionStart: input.selectionStart,
+      selectionEnd: input.selectionEnd,
+    });
     dispatchComposer({ type: 'setText', text: nextText });
     window.requestAnimationFrame(() => {
-      input.selectionStart = start + 1;
-      input.selectionEnd = start + 1;
+      input.selectionStart = caret;
+      input.selectionEnd = caret;
     });
   }
 
   function selectMention(agentId: string): void {
-    const mention = mentionableAgents.find((agent) => agent.id === agentId);
+    const mention = findMentionById(mentionableAgents, agentId);
     if (!mention) return;
     dispatchComposer({ type: 'addMention', mention });
   }
@@ -173,79 +200,41 @@ export function UnifiedComposer({
   return (
     <form className={styles.composer} onSubmit={onSubmit}>
       {composer.replyTo && (
-        <div className={styles.replyToBar}>
-          <span className={styles.replyToLabel}>
-            回复至 {composer.replyTo.author}: {composer.replyTo.preview}
-          </span>
-          <button
-            aria-label={t('aria.cancelReply')}
-            className={styles.replyToCancel}
-            disabled={isSubmitting}
-            onClick={() => dispatchComposer({ type: 'setReplyTo', replyTo: null })}
-            type="button"
-          >
-            x
-          </button>
-        </div>
+        <ComposerReplyBar
+          isSubmitting={isSubmitting}
+          onCancel={() => dispatchComposer({ type: 'setReplyTo', replyTo: null })}
+          replyTo={composer.replyTo}
+        />
       )}
       {composer.quote && (
-        <div className={styles.quoteBar}>
-          <span className={styles.quoteBarLabel}>
-            {composer.quote.author ? `${composer.quote.author}: ` : ''}{composer.quote.text.slice(0, 60)}
-          </span>
-          <button
-            aria-label={t('aria.cancelQuote')}
-            className={styles.quoteBarCancel}
-            disabled={isSubmitting}
-            onClick={() => dispatchComposer({ type: 'setQuote', quote: null })}
-            type="button"
-          >
-            x
-          </button>
-        </div>
+        <ComposerQuoteBar
+          isSubmitting={isSubmitting}
+          onCancel={() => dispatchComposer({ type: 'setQuote', quote: null })}
+          quote={composer.quote}
+        />
       )}
       {composer.mentions.length > 0 && (
-        <div className={styles.composerMentions} aria-label={t('aria.selectedAgents')}>
-          {composer.mentions.map((mention) => (
-            <button
-              aria-label={t('action.removeMention', { label: mention.label })}
-              className={styles.composerMentionChip}
-              disabled={isSubmitting}
-              key={mention.id}
-              onClick={() => dispatchComposer({ type: 'removeMention', mentionId: mention.id })}
-              type="button"
-            >
-              @{mention.label}
-            </button>
-          ))}
-        </div>
+        <ComposerMentionChips
+          isSubmitting={isSubmitting}
+          mentions={composer.mentions}
+          onRemove={(mentionId) => dispatchComposer({ type: 'removeMention', mentionId })}
+        />
       )}
       {composer.mentions.length > 0 && (
-        <div className={styles.composerMainchain} aria-label={t('aria.agentMainChain')}>
-          <span data-state="selected">Agent {selectedAgentLabel}</span>
-          <span data-state={targetSelected ? 'selected' : 'missing'}>
-            Target {selectedTargetLabel ?? 'missing'}
-          </span>
-          <span data-state={canSubmitComposer(composer) && targetSelected ? 'selected' : 'missing'}>
-            Task {canSubmitComposer(composer) && targetSelected ? 'ready' : 'draft required'}
-          </span>
-        </div>
+        <ComposerMainchainStrip
+          mainchainTask={mainchainTask}
+          selectedAgentLabel={selectedAgentLabel}
+          selectedTargetLabel={selectedTargetLabel}
+          targetSelected={targetSelected}
+        />
       )}
       {composer.attachments.length > 0 && (
-        <div className={styles.composerAttachmentBar} aria-label={t('aria.attachments')}>
-          {composer.attachments.map((attachment) => {
-            const progress = uploadProgresses?.[attachment.id];
-            return (
-              <ComposerAttachmentChip
-                attachment={attachment}
-                isSubmitting={isSubmitting}
-                key={attachment.id}
-                onRemove={() => dispatchComposer({ type: 'removeAttachment', attachmentId: attachment.id })}
-                {...(progress ? { uploadProgress: progress } : {})}
-              />
-            );
-          })}
-        </div>
+        <ComposerAttachmentBar
+          attachments={composer.attachments}
+          isSubmitting={isSubmitting}
+          onRemove={(attachmentId) => dispatchComposer({ type: 'removeAttachment', attachmentId })}
+          uploadProgresses={uploadProgresses}
+        />
       )}
       <div className={styles.composerRow}>
         <textarea
@@ -261,7 +250,7 @@ export function UnifiedComposer({
         />
 
         <input
-          accept="image/*,.pdf,.txt,.md,.json,.csv,.yaml,.yml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.go,.rs,.java,.c,.cpp,.h,.hpp,.log,.zip,.tar,.gz"
+          accept={COMPOSER_FILE_ACCEPT}
           aria-hidden="true"
           hidden
           onChange={handleFilePick}
@@ -271,127 +260,33 @@ export function UnifiedComposer({
           type="file"
         />
 
-        <button
-          aria-label={t('aria.addAttachment')}
-          className={styles.attachmentButton}
-          disabled={isSubmitting}
-          onClick={openFilePicker}
-          type="button"
-        >
-          <DesignNavIcon name="paperclip" />
-        </button>
+        <ComposerAttachButton isSubmitting={isSubmitting} onClick={openFilePicker} />
 
         {mentionableAgents.length > 0 && (
-          <label className={styles.composerAgentPicker}>
-            <span>@Agent</span>
-            <select
-              aria-label={t('aria.atAgent')}
-              className={styles.composerAgentSelect}
-              disabled={isSubmitting || availableMentionOptions.length === 0}
-              onChange={(event) => selectMention(event.target.value)}
-              value=""
-            >
-              <option value="">
-                {availableMentionOptions.length > 0 ? 'Mention agent' : 'All agents mentioned'}
-              </option>
-              {availableMentionOptions.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.label}
-                  {agent.runtimeId ? ` (${agent.runtimeId})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ComposerAgentPicker
+            availableMentionOptions={availableMentionOptions}
+            isSubmitting={isSubmitting}
+            onSelect={selectMention}
+          />
         )}
 
         {executionTargets && (
-          <label className={styles.composerTargetPicker}>
-            <span>Desktop/Edge target</span>
-            <select
-              aria-label={t('aria.target')}
-              className={styles.composerTargetSelect}
-              disabled={isSubmitting || executionTargets.length === 0}
-              onChange={(event) => onExecutionTargetChange?.(event.target.value)}
-              value={executionTargetId}
-            >
-              <option value="">
-                {executionTargets.length > 0 ? 'Select target' : 'No online target'}
-              </option>
-              {executionTargets.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ComposerTargetPicker
+            executionTargetId={executionTargetId}
+            executionTargets={executionTargets}
+            isSubmitting={isSubmitting}
+            onChange={(nextTargetId) => onExecutionTargetChange?.(nextTargetId)}
+          />
         )}
 
-        <button
-          aria-label={composer.mentions.length > 0 ? t('action.startAgentTask') : t('profile.sendMessage')}
-          className={styles.sendButton}
-          disabled={submitDisabled}
-          type="submit"
-        >
-          <DesignNavIcon name="send" />
-        </button>
+        <ComposerSendButton
+          hasMentions={composer.mentions.length > 0}
+          submitDisabled={submitDisabled}
+        />
       </div>
       {statusItems.length > 0 && (
-        <div className={styles.composerStatus} role="status">
-          {statusItems.map((item) => (
-            <span key={item}>{item}</span>
-          ))}
-        </div>
+        <ComposerStatusStrip statusItems={statusItems} />
       )}
     </form>
-  );
-}
-
-/* ── Attachment chip ── */
-
-function ComposerAttachmentChip({
-  attachment,
-  isSubmitting,
-  onRemove,
-  uploadProgress,
-}: {
-  attachment: ComposerAttachment;
-  isSubmitting: boolean;
-  onRemove: () => void;
-  uploadProgress?: AttachmentUploadState;
-}): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const isImage = attachment.mime?.startsWith('image/');
-  const sizeLabel = attachment.size ? formatComposerAttachmentSize(attachment.size) : undefined;
-  const isUploading = uploadProgress && uploadProgress.phase !== 'done' && !attachment.attachmentRef;
-
-  return (
-    <div className={styles.attachmentChip} {...(isUploading ? { 'data-uploading': 'true' } : {})}>
-      {isImage && attachment.contentPreview && (
-        <span className={styles.attachmentChipThumb} aria-hidden="true">
-          {attachment.contentPreview.slice(0, 2)}
-        </span>
-      )}
-      <span className={styles.attachmentChipName}>
-        {attachment.name}
-      </span>
-      {sizeLabel && (
-        <span className={styles.attachmentChipSize}>{sizeLabel}</span>
-      )}
-      {isUploading ? (
-        <span className={styles.attachmentUploadBar}>
-          <span className={styles.attachmentUploadFill} style={{ width: `${uploadProgress.percent}%` }} />
-        </span>
-      ) : (
-        <button
-          aria-label={t('action.removeAttachment', { name: attachment.name })}
-          className={styles.attachmentChipRemove}
-          disabled={isSubmitting}
-          onClick={onRemove}
-          type="button"
-        >
-          &times;
-        </button>
-      )}
-    </div>
   );
 }
