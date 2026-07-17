@@ -93,3 +93,12 @@ func MarshalWithDeliveryID(p Payload, deliveryID string) ([]byte, error) {
 	p.DeliveryID = deliveryID
 	return json.Marshal(p)
 }
+
+// FinalizePayloadWithDelivery attaches deliveryID on a payload copy and returns
+// the updated value plus marshaled bytes. Used after outbox RecordDelivery so
+// orchestration can swap the wire body without duplicating attach+marshal.
+func FinalizePayloadWithDelivery(dp Payload, deliveryID string) (Payload, []byte, error) {
+	AttachDeliveryID(&dp, deliveryID)
+	body, err := json.Marshal(dp)
+	return dp, body, err
+}
