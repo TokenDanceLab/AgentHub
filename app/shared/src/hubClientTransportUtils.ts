@@ -173,3 +173,123 @@ export function classifyHubRequestCatch(
   }
   return { kind: 'other', error };
 }
+
+/** AbortController + auto-abort timer for one Hub fetch attempt. */
+export type HubAbortTimeout = {
+  signal: AbortSignal;
+  clear: () => void;
+};
+
+/** Create a timeout-bound AbortSignal; caller must clear after settle. */
+export function createHubAbortTimeout(timeoutMs: number): HubAbortTimeout {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId),
+  };
+}
+
+/**
+ * Run a Hub fetch under a timeout abort signal.
+ * Clears the timer on both success and failure (exactOptional-safe residual).
+ */
+export async function withHubAbortTimeout<T>(
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const abort = createHubAbortTimeout(timeoutMs);
+  try {
+    const result = await run(abort.signal);
+    abort.clear();
+    return result;
+  } catch (error) {
+    abort.clear();
+    throw error;
+  }
+}
+
+/** Non-empty refresh token → proceed with single retry. */
+export function shouldRetryWithRefreshedToken(
+  newToken: string | null | undefined,
+): newToken is string {
+  return Boolean(newToken);
+}
+
+/** reportApiError context for failed onRefreshToken handlers. */
+export function buildTokenRefreshReportContext(path: string): {
+  path: string;
+  context: 'token_refresh';
+} {
+  return { path, context: 'token_refresh' };
+}
+
+export type HubRequestCatchContext = {
+  timeoutMs: number;
+  method: string;
+  path: string;
+};
+
+/**
+ * Map a request catch into throw/report payloads.
+ * Side effects (console / reportApiError) stay in createHubClient.
+ */
+export type HubRequestCatchResolution =
+  | {
+      kind: 'timeout';
+      error: AppError;
+      logMessage: string;
+      reportContext: { path: string; method: string; timeoutMs: number };
+    }
+  | {
+      kind: 'app';
+      error: AppError;
+      reportContext: { path: string; method: string };
+    }
+  | {
+      kind: 'network';
+      error: AppError;
+      logMessage: string;
+      reportContext: { path: string; method: string };
+    }
+  | {
+      kind: 'other';
+      error: unknown;
+    };
+
+export function resolveHubRequestCatch(
+  error: unknown,
+  ctx: HubRequestCatchContext,
+): HubRequestCatchResolution {
+  const classified = classifyHubRequestCatch(error);
+  if (classified.kind === 'timeout') {
+    const timeoutError = createTimeoutAppError(ctx);
+    return {
+      kind: 'timeout',
+      error: timeoutError,
+      logMessage: `[HubClient] ${timeoutError.message}`,
+      reportContext: {
+        path: ctx.path,
+        method: ctx.method,
+        timeoutMs: ctx.timeoutMs,
+      },
+    };
+  }
+  if (classified.kind === 'app') {
+    return {
+      kind: 'app',
+      error: classified.error,
+      reportContext: { path: ctx.path, method: ctx.method },
+    };
+  }
+  if (classified.kind === 'network') {
+    const netError = createNetworkAppError(classified.message);
+    return {
+      kind: 'network',
+      error: netError,
+      logMessage: `[HubClient] ${netError.message}`,
+      reportContext: { path: ctx.path, method: ctx.method },
+    };
+  }
+  return { kind: 'other', error: classified.error };
+}

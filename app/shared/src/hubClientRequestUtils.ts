@@ -23,6 +23,22 @@ export function shouldContinueRouteFallback(
   return index < pathCount - 1 && isRouteFallbackError(error);
 }
 
+/**
+ * Change-password dual-route: primary POST may 404/405 on older hubs → PUT fallback.
+ * Pure residual of the changePassword peel (methods differ, so not requestWithFallback).
+ */
+export function shouldUseChangePasswordFallback(error: unknown): boolean {
+  return isRouteFallbackError(error);
+}
+
+/**
+ * Final unresolved error after requestWithFallback exhausts paths.
+ * Pure residual so the loop body stays a thin orchestration peel.
+ */
+export function unresolvedRouteFallbackError(fallbackError: unknown): unknown {
+  return fallbackError;
+}
+
 export function normalizeRegisterDeviceRequest(
   body: HubRegisterDeviceRequest,
 ): HubRegisterDeviceRequest & {
