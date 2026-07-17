@@ -16,8 +16,34 @@ export function buildWorkbenchProfileSources(
   agentConfigs: AgentConfig[],
   members: WorkbenchProfileMemberSource[],
 ): WorkbenchProfileSource[] {
-  return [
-    ...agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
-    ...members.map((member) => ({ ...member, kind: 'user' as const })),
-  ];
+  const agents: WorkbenchProfileSource[] = agentConfigs.map((agent) => {
+    const source: WorkbenchProfileSource = {
+      kind: 'agent',
+      id: agent.id,
+      name: agent.name,
+      role: agent.role,
+      engine: agent.engine,
+      model: agent.model,
+      state: agent.state,
+    };
+    return source;
+  });
+
+  const users: WorkbenchProfileSource[] = members.map((member) => {
+    // Build without spreading `?: T | undefined` fields — exactOptionalPropertyTypes
+    // rejects assigning `string | undefined` into `id?: string`.
+    const source: WorkbenchProfileSource = {
+      kind: 'user',
+      name: member.name,
+    };
+    if (member.id !== undefined) source.id = member.id;
+    if (member.initials !== undefined) source.initials = member.initials;
+    if (member.role !== undefined) source.role = member.role;
+    if (member.engine !== undefined) source.engine = member.engine;
+    if (member.model !== undefined) source.model = member.model;
+    if (member.state !== undefined) source.state = member.state;
+    return source;
+  });
+
+  return [...agents, ...users];
 }
