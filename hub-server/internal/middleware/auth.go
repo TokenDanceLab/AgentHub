@@ -55,22 +55,41 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// WSBearerSubprotocol is the fixed WebSocket subprotocol negotiated for
+// browser clients that carry a Hub JWT in Sec-WebSocket-Protocol.
+//
+// Convention (preferred browser path):
+//
+//	Sec-WebSocket-Protocol: agenthub.bearer.v1, <hub-jwt>
+//
+// The client requests both the fixed marker and the raw Hub JWT. Middleware
+// extracts the JWT from the upgrade request header. The Accept layer should
+// negotiate only the fixed marker (never the JWT) so the token is not echoed
+// back in the response.
+//
+// Alternate single-token form (also accepted):
+//
+//	Sec-WebSocket-Protocol: access_token.<hub-jwt>
+//
+// Auth source priority for WS upgrades:
+//  1. Authorization: Bearer <jwt> (native clients that can set headers)
+//  2. Sec-WebSocket-Protocol token carriage (preferred browser path)
+//  3. Query access_token (legacy / mobile fallback; avoid for new browser code)
+const WSBearerSubprotocol = "agenthub.bearer.v1"
+
 // WSAuthMiddleware returns a Gin middleware that validates JWT tokens for
-// WebSocket upgrade requests. It checks the Authorization header first (for
-// native clients), then falls back to the "access_token" query parameter
-// (for browser WebSocket clients which cannot set custom headers).
+// WebSocket upgrade requests.
+//
+// Token resolution order:
+//  1. Authorization Bearer header (native clients)
+//  2. Sec-WebSocket-Protocol subprotocol token (preferred browser carriage)
+//  3. Query "access_token" (legacy fallback for mobile / older clients)
 //
 // After ParseToken it applies the same hub-session purpose/device gate as
 // RequireHubSession so non-product tokens cannot upgrade WebSocket.
 func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var tokenStr string
-		header := c.GetHeader("Authorization")
-		if header != "" && strings.HasPrefix(header, "Bearer ") {
-			tokenStr = strings.TrimPrefix(header, "Bearer ")
-		} else {
-			tokenStr = c.Query("access_token")
-		}
+		tokenStr := extractWSToken(c)
 		if tokenStr == "" {
 			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
@@ -95,6 +114,61 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// extractWSToken resolves the Hub JWT for a WebSocket upgrade request.
+// See WSAuthMiddleware for the full priority list and protocol convention.
+func extractWSToken(c *gin.Context) string {
+	header := c.GetHeader("Authorization")
+	if header != "" && strings.HasPrefix(header, "Bearer ") {
+		return strings.TrimPrefix(header, "Bearer ")
+	}
+	if token := tokenFromWSSubprotocols(c.Request.Header.Values("Sec-WebSocket-Protocol")); token != "" {
+		return token
+	}
+	return c.Query("access_token")
+}
+
+// tokenFromWSSubprotocols extracts a Hub JWT from Sec-WebSocket-Protocol values.
+//
+// Accepted forms:
+//   - "agenthub.bearer.v1, <jwt>" (preferred; marker is ignored)
+//   - "access_token.<jwt>" (single-token alternate)
+//
+// Multiple header values and comma-separated lists are both handled.
+func tokenFromWSSubprotocols(values []string) string {
+	var protos []string
+	for _, v := range values {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				protos = append(protos, part)
+			}
+		}
+	}
+	if len(protos) == 0 {
+		return ""
+	}
+
+	// Prefer explicit access_token.<jwt> form when present.
+	for _, p := range protos {
+		if strings.HasPrefix(p, "access_token.") {
+			tok := strings.TrimPrefix(p, "access_token.")
+			if tok != "" {
+				return tok
+			}
+		}
+	}
+
+	// Preferred two-token form: fixed marker + raw JWT.
+	// Return the first non-marker protocol token (the JWT).
+	for _, p := range protos {
+		if p == WSBearerSubprotocol || p == "agenthub" {
+			continue
+		}
+		return p
+	}
+	return ""
 }
 
 // validateToken is a shared helper that validates a JWT token string and sets
