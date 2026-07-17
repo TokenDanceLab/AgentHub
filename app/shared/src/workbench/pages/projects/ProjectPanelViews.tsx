@@ -4,6 +4,8 @@
    Residual extract from ProjectDetailViews for Phase 22 #618.
    Residual thin (Phase 23 #626): panels / tab bodies live in sibling
    modules (ProjectPanelParts, ProjectTabViews).
+   Residual thin (#696): imports refactored — Announcement / FeedPanel
+   moved to own files.
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -11,10 +13,10 @@ import React from 'react';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 import styles from '../ProjectsPage.module.css';
+import { ProjectAnnouncement } from './ProjectAnnouncement';
+import { ProjectFeedPanel } from './ProjectFeedPanel';
 import {
-  Announcement,
   ArtifactsPanel,
-  FeedPanel,
   MembersCard,
   ProjectPreviewPanel,
   RunsPanel,
@@ -74,7 +76,7 @@ export function ProjectDetail({
 
   return (
     <div className={styles.detailLayout}>
-      <Announcement
+      <ProjectAnnouncement
         text={project.announcement}
         onEdit={() => onEditAnnouncement?.(project.id)}
       />
@@ -89,7 +91,7 @@ export function ProjectDetail({
         artifacts={project.artifacts}
         onArtifactClick={(a) => onArtifactClick?.(project.id, a)}
       />
-      <FeedPanel feed={project.feed} />
+      <ProjectFeedPanel feed={project.feed} />
       <ProjectPreviewPanel preview={activePreview} onClosePreview={onClosePreview} />
     </div>
   );
