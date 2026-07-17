@@ -1,29 +1,16 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
-  AgentHubPlatform,
-  WorkbenchAgent,
-  WorkbenchConversation,
-} from '../platform';
-import type { TranscriptBlock } from '../transcript';
+  ChatConversationHostFrameProps,
+  ChatInspectorFrameProps,
+  ChatSidebarFrameProps,
+  WorkbenchRoutesFrameProps,
+  WorkspaceLoadingStateProps,
+} from './workbenchFrameTypes';
 import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
-import type { ConnectionStatusKind, GlobalRailPage } from './GlobalRail';
-import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import {
-  WorkbenchRoutes,
-  type WorkbenchAgentProfilesStatus,
-  type WorkbenchContactsActions,
-  type WorkbenchContactsData,
-  type WorkbenchDocumentsActions,
-} from './WorkbenchRoutes';
-import type { HubClient } from '../hubClient';
-import type { AgentConfig, DocRow, ProjectDraft } from './pages';
-import type { MCPMarketItem, SkillMarketItem } from './pages/AgentsPage';
-import type { ProjectInfo } from './pages/ProjectsPage';
-import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
-import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
-import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
+import { RightInspector } from './RightInspector';
+import { WorkbenchRoutes } from './WorkbenchRoutes';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import {
   INSPECTOR_MAX_WIDTH,
@@ -42,24 +29,11 @@ import {
 } from './workbenchFrameHelpers';
 import styles from './AgentHubWorkbench.module.css';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   WorkbenchFrameParts — presentational residual slices from WorkbenchFrame
-   (#637). CSS stays on AgentHubWorkbench.module.css. No intentional UX
+/* ==========================================================================
+   WorkbenchFrameParts -- presentational residual slices from WorkbenchFrame
+   (#637). Prop contracts in workbenchFrameTypes (#698). No intentional UX
    change.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-export interface ChatSidebarFrameProps {
-  conversations: WorkbenchConversation[];
-  currentConversationId: string;
-  onSelectConversation: (conversationId: string) => void;
-  onAvatarClick: (conversation: WorkbenchConversation, anchor: HTMLElement) => void;
-  onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
-  onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
-  sidebarWidth: number;
-  sidebarCollapsed: boolean;
-  resizeSidebarBy: (delta: number) => void;
-  beginSidebarResize: (clientX: number) => void;
-}
+   ========================================================================== */
 
 /** Conversation list + vertical sidebar resizer for chat page. */
 export function ChatSidebarFrame({
@@ -107,10 +81,6 @@ export function ChatSidebarFrame({
   );
 }
 
-export interface WorkspaceLoadingStateProps {
-  label: string;
-}
-
 export function WorkspaceLoadingState({
   label,
 }: WorkspaceLoadingStateProps): React.ReactElement {
@@ -122,32 +92,7 @@ export function WorkspaceLoadingState({
   );
 }
 
-export interface ChatConversationHostFrameProps {
-  platform: AgentHubPlatform;
-  session: WorkbenchSessionChrome;
-  transcriptChrome: WorkbenchTranscriptChrome;
-  profile: WorkbenchProfileChrome;
-  transcript: TranscriptBlock[];
-  connectionStatus?: ConnectionStatusKind | undefined;
-  inspectorCollapsed: boolean;
-  toggleInspector: () => void;
-  showMainchainStatus: boolean;
-  workbenchStatus?: {
-    dataMode?: string;
-    replayLabel?: string;
-    targetLabel?: string;
-    targetState?: string;
-    initialLoading?: boolean;
-    loadError?: string;
-  } | undefined;
-  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
-  showComposerAgentPicker: boolean;
-  showComposerStatus: boolean;
-  highlightedBlockId?: string | undefined;
-  onHighlightEnd?: (() => void) | undefined;
-}
-
-/** ConversationHost wiring for chat page — pure prop mapping. */
+/** ConversationHost wiring for chat page -- pure prop mapping. */
 export function ChatConversationHostFrame({
   platform,
   session,
@@ -240,60 +185,6 @@ export function ChatConversationHostFrame({
   );
 }
 
-export interface WorkbenchRoutesFrameProps {
-  activePage: Exclude<GlobalRailPage, 'chat'>;
-  agents?: WorkbenchAgent[] | undefined;
-  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
-  dataMode?: string | undefined;
-  contacts?: WorkbenchContactsData | undefined;
-  documents?: DocRow[] | undefined;
-  focusedAgentId?: string | undefined;
-  projects?: ProjectInfo[] | undefined;
-  activeProjectId?: string | undefined;
-  projectsStatus?: {
-    loading?: boolean | undefined;
-    error?: string | undefined;
-    actionError?: string | undefined;
-    saving?: boolean | undefined;
-  } | undefined;
-  onActiveProjectChange?: ((projectId: string) => void) | undefined;
-  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  onProjectUpdate?: ((
-    projectId: string,
-    draft: ProjectDraft,
-  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  hubClient?: HubClient | undefined;
-  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
-  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
-  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
-  onAgentsRetry?: (() => void) | undefined;
-  onAgentProfileOpen: WorkbenchProfileChrome['openAgentProfileFromConfig'];
-  onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
-  contactsActions?: WorkbenchContactsActions | undefined;
-  documentsActions?: WorkbenchDocumentsActions | undefined;
-  localCliDiscovery: WorkbenchSessionChrome['localCliDiscovery'];
-  modelCatalog?: Array<{
-    id: string;
-    label: string;
-    value: string;
-    provider?: string;
-    status: string;
-    description?: string;
-    default?: boolean;
-    tags?: string[];
-  }> | undefined;
-  ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
-  ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
-  settingsService: WorkbenchSessionChrome['settingsService'];
-  skillMarketItems?: SkillMarketItem[] | undefined;
-  skillMarketLoading?: boolean | undefined;
-  mcpMarketItems?: MCPMarketItem[] | undefined;
-  mcpMarketLoading?: boolean | undefined;
-  onNavigatePage: (page: GlobalRailPage) => void;
-  currentUserId?: string | undefined;
-  userDisplayName?: string | undefined;
-}
-
 /** Non-chat page host wrapping WorkbenchRoutes. */
 export function WorkbenchRoutesFrame({
   activePage,
@@ -373,16 +264,6 @@ export function WorkbenchRoutesFrame({
       />
     </section>
   );
-}
-
-export interface ChatInspectorFrameProps {
-  platform: AgentHubPlatform;
-  session: WorkbenchSessionChrome;
-  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
-  inspectorCollapsed: boolean;
-  inspectorWidth: number;
-  resizeInspectorBy: (delta: number) => void;
-  beginInspectorResize: (clientX: number) => void;
 }
 
 /** RightInspector host for chat page. */

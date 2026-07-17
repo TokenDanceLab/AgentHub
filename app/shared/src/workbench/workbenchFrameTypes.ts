@@ -15,17 +15,22 @@ import type {
 } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
 import type { AgentConfig, DocRow, ProjectDraft } from './pages';
-import type { MCPMarketItem, SkillMarketItem } from './pages/AgentsPage';
+import type {
+  CCSwitchStatusInfo,
+  CCSwitchProviderInfo,
+  MCPMarketItem,
+  SkillMarketItem,
+} from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   WorkbenchFrame prop contract — residual extract from WorkbenchFrame
-   (#637). Pure types only.
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   WorkbenchFrame prop contract -- residual extract from WorkbenchFrame
+   (#637) + WorkbenchFrameParts prop contracts (#698). Pure types only.
+   ========================================================================== */
 
 export interface WorkbenchFrameWorkbenchStatus {
   dataMode?: string;
@@ -91,8 +96,8 @@ export interface WorkbenchFrameProps {
   documents?: DocRow[] | undefined;
   documentsActions?: WorkbenchDocumentsActions | undefined;
   modelCatalog?: WorkbenchFrameModelCatalogItem[] | undefined;
-  ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
-  ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
+  ccSwitchStatus?: CCSwitchStatusInfo | undefined;
+  ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker: boolean;
   showComposerStatus: boolean;
@@ -110,4 +115,93 @@ export interface WorkbenchFrameProps {
   connectionStatus?: ConnectionStatusKind | undefined;
   setActivePage: (page: GlobalRailPage) => void;
   children?: React.ReactNode;
+}
+
+/* ==========================================================================
+   WorkbenchFrameParts prop contracts (#698)
+   ========================================================================== */
+
+export interface ChatSidebarFrameProps {
+  conversations: WorkbenchConversation[];
+  currentConversationId: string;
+  onSelectConversation: (conversationId: string) => void;
+  onAvatarClick: (conversation: WorkbenchConversation, anchor: HTMLElement) => void;
+  onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
+  onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
+  sidebarWidth: number;
+  sidebarCollapsed: boolean;
+  resizeSidebarBy: (delta: number) => void;
+  beginSidebarResize: (clientX: number) => void;
+}
+
+export interface WorkspaceLoadingStateProps {
+  label: string;
+}
+
+export interface ChatConversationHostFrameProps {
+  platform: AgentHubPlatform;
+  session: WorkbenchSessionChrome;
+  transcriptChrome: WorkbenchTranscriptChrome;
+  profile: WorkbenchProfileChrome;
+  transcript: TranscriptBlock[];
+  connectionStatus?: ConnectionStatusKind | undefined;
+  inspectorCollapsed: boolean;
+  toggleInspector: () => void;
+  showMainchainStatus: boolean;
+  workbenchStatus?: WorkbenchFrameWorkbenchStatus | undefined;
+  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  showComposerAgentPicker: boolean;
+  showComposerStatus: boolean;
+  highlightedBlockId?: string | undefined;
+  onHighlightEnd?: (() => void) | undefined;
+}
+
+export interface WorkbenchRoutesFrameProps {
+  activePage: Exclude<GlobalRailPage, 'chat'>;
+  agents?: WorkbenchAgent[] | undefined;
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
+  dataMode?: string | undefined;
+  contacts?: WorkbenchContactsData | undefined;
+  documents?: DocRow[] | undefined;
+  focusedAgentId?: string | undefined;
+  projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
+  projectsStatus?: WorkbenchFrameProjectsStatus | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  hubClient?: HubClient | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
+  onAgentProfileOpen: WorkbenchProfileChrome['openAgentProfileFromConfig'];
+  onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  contactsActions?: WorkbenchContactsActions | undefined;
+  documentsActions?: WorkbenchDocumentsActions | undefined;
+  localCliDiscovery: WorkbenchSessionChrome['localCliDiscovery'];
+  modelCatalog?: WorkbenchFrameModelCatalogItem[] | undefined;
+  ccSwitchStatus?: CCSwitchStatusInfo | undefined;
+  ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;
+  settingsService: WorkbenchSessionChrome['settingsService'];
+  skillMarketItems?: SkillMarketItem[] | undefined;
+  skillMarketLoading?: boolean | undefined;
+  mcpMarketItems?: MCPMarketItem[] | undefined;
+  mcpMarketLoading?: boolean | undefined;
+  onNavigatePage: (page: GlobalRailPage) => void;
+  currentUserId?: string | undefined;
+  userDisplayName?: string | undefined;
+}
+
+export interface ChatInspectorFrameProps {
+  platform: AgentHubPlatform;
+  session: WorkbenchSessionChrome;
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  inspectorCollapsed: boolean;
+  inspectorWidth: number;
+  resizeInspectorBy: (delta: number) => void;
+  beginInspectorResize: (clientX: number) => void;
 }
