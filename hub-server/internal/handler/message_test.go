@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
 
 type mockMessageService struct {
@@ -24,9 +25,9 @@ type mockMessageService struct {
 	markReadFn       func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
 	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
 	editFn           func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
-	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
-	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
-	listReactionsFn  func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
+	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
+	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
+	listReactionsFn  func(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error)
 }
 
 func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
@@ -62,13 +63,13 @@ func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sess
 func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
 	return m.editFn(ctx, msgID, userID, req)
 }
-func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return m.addReactionFn(ctx, userID, sessionID, msgID, reaction)
 }
-func (m *mockMessageService) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+func (m *mockMessageService) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {
 	return m.removeReactionFn(ctx, userID, sessionID, msgID, reaction)
 }
-func (m *mockMessageService) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+func (m *mockMessageService) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error) {
 	return m.listReactionsFn(ctx, userID, sessionID, msgID)
 }
 
