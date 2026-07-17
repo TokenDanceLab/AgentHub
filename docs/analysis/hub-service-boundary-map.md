@@ -1,8 +1,8 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-17
-> issue: #593 (SessionService thin first seam; prior #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
-> status: map current — pure helpers closed; runtime typed services landed; **#585 MessageService** + **#593 SessionService thin first seam** (ports on existing typed services) landed same-package; full package moves deferred; next residual = ContactService ports or IM subpackages / optional outbox model package move
+> issue: #594 (ContactService thin first seam; prior #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
+> status: map current — pure helpers closed; runtime typed services landed; **#585 MessageService** + **#593 SessionService** + **#594 ContactService thin first seams** (ports on existing typed services) landed same-package; full package moves deferred; next residual = IM subpackages / optional outbox model package move
 > companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014)
 
 This document is the authoritative **read-only boundary map** for
@@ -24,10 +24,11 @@ an acceptance sketch.
 | Same-package type extract `DispatchService` | **landed #563 thin first seam + #573 redispatch residual** | existing `agent_test` dispatchTask + `TestOutbox_*` | still in flat `service` | injected bus/cache/relay/outbox ports; `dispatchPayload` stays package-private; redispatch owned by `DispatchService` via `dispatchRedispatcher` |
 | Same-package type extract `MessageService` | **landed #585 thin first seam** | existing `message_test` / `message_edit_test` + port no-op tests | still in flat `service` | injected `messageBus` / `messageCache`; send/edit/pin/forward/search ownership clarified; no package move |
 | Same-package type extract `SessionService` | **landed #593 thin first seam** | existing `session_test` / behavior tests + port no-op tests | still in flat `service` | injected `sessionBus` / `sessionCache`; private/group lifecycle ownership clarified; no package move |
+| Same-package type extract `ContactService` | **landed #594 thin first seam** | existing `contact_test` + port no-op tests | still in flat `service` | injected `contactBus` / `contactCache`; search/request/list/block ownership clarified; no package move |
 
 **Shape note:** not one god struct — **25+ `*Service` types** already exist
 (including `RunEventService`, `EdgeCallbackService`, `DeliveryOutbox`,
-`DispatchService`, `MessageService`, `SessionService`). Concentration remains **package flatness + residual
+`DispatchService`, `MessageService`, `SessionService`, `ContactService`). Concentration remains **package flatness + residual
 `AgentService` facade sprawl + remaining IM services still on concrete `*Bus`** (Contact). Outbox journal + retry-loop orchestration
 are on `DeliveryOutbox`; trigger/dispatch/cancel/regenerate **and redispatch**
 are on `DispatchService` behind facades. Redispatch
@@ -37,6 +38,7 @@ behind `Redispatcher` (`dispatchRedispatcher` / lazy adapter) using
 **#585:** `MessageService` hardens replaceable `messageBus` / `messageCache` ports
 (same-package thin seam; methods already lived on the typed service).
 **#593:** `SessionService` hardens replaceable `sessionBus` / `sessionCache` ports
+**#594:** `ContactService` hardens replaceable `contactBus` / `contactCache` ports
 (same-package thin seam; methods already lived on the typed service).
 
 Precedent: `service/agentteam` uses **local interfaces**
@@ -48,13 +50,14 @@ Precedent: `service/agentteam` uses **local interfaces**
 `dispatchOutbox` + shared `agentCache` / `relayDispatcher` / `*ws.Manager`.
 `MessageService` injects `messageBus` / `messageCache` (**#585**).
 `SessionService` injects `sessionBus` / `sessionCache` (**#593**).
+`ContactService` injects `contactBus` / `contactCache` (**#594**).
 
 ## 1. File inventory by domain
 
 | Domain | Prod LOC | Files (prod) | Role |
 |--------|---------:|--------------|------|
 | **agent_runtime** | ~2,9xx | `agent.go`, `agent_custom.go`, `agent_dispatch.go` (`DispatchService` + facade, ~930), `agent_run_event.go` (`RunEventService` + facade), `agent_edge_callback.go` (`EdgeCallbackService` + facade), `delivery_outbox.go` (~820), `agent_control.go`, `agent_team_helpers.go` (compat wrappers), `relay.go` | Task dispatch, edge callback, outbox retry, run-event projection |
-| **im_messaging** | ~3,1xx | `message.go` (~900; `MessageService` + ports), `session.go` (~760; `SessionService` + ports), `contact.go`, `attachment.go`, `message_reaction.go`, `workspace.go`, `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments |
+| **im_messaging** | ~3,1xx | `message.go` (~900; `MessageService` + ports), `session.go` (~760; `SessionService` + ports), `contact.go` (~380; `ContactService` + ports), `attachment.go`, `message_reaction.go`, `workspace.go`, `notification.go`, `image_meta.go`, `s3_client.go` | IM/session/contact/attachments |
 | **agent_catalog** | ~1,133 | `agent_profile.go`, `document.go`, `skill.go`, `mcp_server.go`, `provider_binding.go` | Profiles/docs/market installables |
 | **identity_auth** | ~829 | `auth.go`, `oidc.go`, `device.go`, `user_settings.go` | Login/OIDC/device/settings |
 | **execution_target** | ~516 | `execution_target.go` | Local-edge targets + health |
@@ -71,6 +74,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | `delivery_outbox.go` | ~6xx | `DeliveryOutbox` owns private model + repo helpers + journal/retry + `Redispatcher` adapter; facades on `AgentService` | pure helpers → `deliveryoutbox` (#514); thin type + `Redispatcher` (**#540**); model ownership residual (**#551**); redispatch impl moved off this file onto `DispatchService` (**#573**) |
 | `message.go` | ~900 | `MessageService` + ports: send/edit/recall/pin/forward/search/read | injected `messageBus` / `messageCache` (**#585**); attachments |
 | `session.go` | ~760 | `SessionService` + ports: private/group lifecycle, members, dissolve, settings | injected `sessionBus` / `sessionCache` (**#593**); agent cleanup helpers |
+| `contact.go` | ~380 | `ContactService` + ports: search/request/accept/reject/list/remove/block/unblock/remark | injected `contactBus` / `contactCache` (**#594**) |
 | `agent_edge_callback.go` | ~520 | `EdgeCallbackService` + `AgentService` facade | repo; `agentevent` normalize/validate; injected bus/seq/outbox (**#505 done**); outbox rebind via `DeliveryOutbox` (**#540**) |
 | `agent_run_event.go` | 237 | `RunEventService` + `AgentService` facade | repo; `agentevent` project; injected `runEventControl` (**#478 done**) |
 
@@ -95,6 +99,9 @@ Precedent: `service/agentteam` uses **local interfaces**
   `#593`: `SessionService` is already a top-level typed service; wiring stays
   `NewSessionService(db, cache, bus)` with bus/cache as ports (variadic bus
   preserved). Handler interface in `handler/session.go` unchanged.
+  `#594`: `ContactService` is already a top-level typed service; wiring stays
+  `NewContactService(db, bus, cache)` with bus/cache as ports. Handler interface
+  in `handler/contact.go` unchanged.
 
 ## 2. Coupling risks
 
@@ -110,7 +117,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 10. **Handler interfaces already thin the edge** — package extract without service-side ports still leaves fat concrete type for tests/wiring.
 
 Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
-`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** → Contact port hardening or optional delivery model package move → im/catalog agentteam-style subpackages.
+`RunEventService` / `EdgeCallbackService` / `DeliveryOutbox` / **`DispatchService` thin first seam + redispatch residual** / **`MessageService` thin first seam (#585)** / **`SessionService` thin first seam (#593)** / **`ContactService` thin first seam (#594)** → IM subpackages or optional delivery model package move → im/catalog agentteam-style subpackages.
 **“先接口后搬家；一次一个 seam.”** — runtime + message + session typed ports done thin; **do not big-bang package moves.**
 
 ## 3. Extract candidates ranked (lowest risk first)
@@ -129,7 +136,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | 8 | Full `DispatchService` extract | **Highest** | Highest | **#563 thin first seam + #573 redispatch residual landed** — optional deeper ports / package move still deferred |
 | **8b** | **`MessageService` thin first seam** (ports on existing typed service) | Low–med | High (IM concentration) | **DONE #585** — `messageBus` / `messageCache` + ownership docs; no package move |
 | **8c** | **`SessionService` thin first seam** (ports on existing typed service) | Low–med | Med | **DONE #593** — `sessionBus` / `sessionCache` + ownership docs; no package move |
-| 9 | `ContactService` ports (mirror #585/#593) | Low–med | Med | Next IM residual before subpackage move |
+| **8d** | **`ContactService` thin first seam** (ports on existing typed service) | Low–med | Med | **DONE #594** — `contactBus` / `contactCache` + ownership docs; no package move |
 | 10 | IM subpackages (`service/im` or message/session/contact) | Med | High | After port hardening; agentteam-style |
 
 ## 4. Landed extracts
@@ -271,9 +278,10 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] Existing `message_*` tests + short suite green; port no-op unit tests
 - [x] Boundary map residual next = Session/Contact ports or IM subpackages / optional model package move
 - [x] `SessionService` thin first seam: `sessionBus` / `sessionCache` ports + nil-safe publish (#593)
+- [x] `ContactService` thin first seam: `contactBus` / `contactCache` ports + nil-safe publish (#594)
 - [x] Session ownership clarified (private/group lifecycle, members, dissolve, settings); no OpenAPI/handler/frontend
 - [x] Existing `session_*` tests + short suite green; port no-op unit tests
-- [x] Boundary map residual next = ContactService ports or IM subpackages / optional model package move
+- [x] Boundary map residual next = IM subpackages / optional model package move
 
 ## 6. Suggested follow-up extract order
 
@@ -287,7 +295,8 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 8. ~~**Redispatch residual**~~ — **DONE #573** (`redispatchDelivery` / `retryDispatchToTarget` on `DispatchService`; `dispatchPayload` private)
 9. ~~**`MessageService` thin first seam**~~ — **DONE #585** (`messageBus` / `messageCache` ports; ownership on existing typed service)
 10. ~~**`SessionService` thin first seam**~~ — **DONE #593** (`sessionBus` / `sessionCache` ports; ownership on existing typed service)
-11. **`ContactService` ports** (mirror #585/#593) — still use concrete `*Bus` / cache types.
+11. ~~**`ContactService` thin first seam**~~ — **DONE #594** (`contactBus` / `contactCache` ports; ownership on existing typed service)
+12. **IM subpackages** (`service/im` or message/session/contact) and/or optional outbox model package move.
 12. **IM subpackages** (`service/im` or message/session/contact) — agentteam-style after port hardening.
 13. **Optional dedupe:** import `agentevent` helpers from `agentteam` to remove duplicated approval predicates; finish remaining call sites to prefer `agentevent.*` over wrappers.
 14. **Optional outbox model package move** — deferred; not required before IM ports.
@@ -527,6 +536,53 @@ type SessionService struct {
 - [x] **No** package move; **no** OpenAPI/handler/frontend; **no** freestyle ContactService
 - [x] Existing session tests green; port unit tests added
 - [x] Boundary map residual next = ContactService ports or IM subpackages
+
+
+### 6d. ContactService thin first seam (#594)
+
+#### File ownership (current, post-#594)
+
+| Path | Owns | Notes |
+|------|------|-------|
+| `service/contact.go` (~380) | `ContactService` + `contactBus` / `contactCache` ports; search/request/accept/reject/list/remove/block/unblock/remark; GetFriendIDs | **#594 thin first seam** — methods already on typed service; ports hardened |
+| `service/contact_test.go` | search/request/list/block coverage + port no-op tests | Handler interface tests remain in `handler/` |
+| `handler/contact.go` | thin handler interface over `ContactService` methods | **Unchanged** |
+| `app/wiring.go` | `NewContactService(db, bus, cache)` | Signature still accepts `*Bus` / `*cache.Client` via ports |
+
+#### Landed thin shape (#594)
+
+```go
+type contactBus interface {
+    Publish(ctx context.Context, event Event)
+}
+
+type contactCache interface {
+    Invalidate(ctx context.Context, keys ...string) error
+    IsOnline(ctx context.Context, userID string) (bool, error)
+}
+
+type ContactService struct {
+    db          *gorm.DB
+    bus         contactBus
+    cacheClient contactCache
+}
+
+// NewContactService(db, bus, cacheClient)
+// SetBus / SetCache for tests; publish() nil-safe
+```
+
+- Methods stay on `*ContactService` (already extracted historically; #594 is port ownership, not method relocation).
+- No package move; no OpenAPI / handler / frontend changes.
+- SessionService remains out of scope (#593).
+
+#### Acceptance checklist — ContactService thin first seam (#594 this PR)
+
+- [x] `contactBus` / `contactCache` ports on `ContactService` (same package)
+- [x] Nil-safe `publish`; `SetBus` / `SetCache` injectors
+- [x] Ownership docs: search/request/accept/reject/list/remove/block/unblock/remark
+- [x] **No** package move; **no** OpenAPI/handler/frontend; **no** session.go freestyle
+- [x] Existing contact tests green; port unit tests added
+- [x] Boundary map residual next = SessionService ports (#593) or IM subpackages
 
 ### Follow-up issue ready
 

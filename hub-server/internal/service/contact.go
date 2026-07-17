@@ -6,26 +6,73 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
+// ── ContactService ports + type ──────────────────────────────────────────────
+//
+// Same-package thin first seam (#594): ContactService already owns contact/
+// friendship orchestration (search/request/accept/reject/list/remove/block/
+// unblock/remark). This seam hardens replaceable ports (bus + cache) without a
+// package move — same pattern as MessageService (#585) / DispatchService /
+// EdgeCallbackService. Full service/im subpackage extract remains deferred.
+// SessionService is owned by #593 and is out of scope here.
+
+// contactBus publishes domain events from contact write paths.
+// Implemented by *Bus.
+type contactBus interface {
+	Publish(ctx context.Context, event Event)
+}
+
 // contactCache is the subset of *cache.Client methods used by ContactService.
+// Implemented by *cache.Client and cache.NoOpCache.
 type contactCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	IsOnline(ctx context.Context, userID string) (bool, error)
 }
 
+// ContactService owns contact/friendship orchestration in the flat service
+// package: user search, friend request lifecycle, contact list/remove, block/
+// unblock, remark, and friend-ID projection. Friend-list invalidation and
+// presence use injected contactCache; domain events go through contactBus.
+// Not a package move (#594).
 type ContactService struct {
 	db          *gorm.DB
-	bus         *Bus
+	bus         contactBus
 	cacheClient contactCache
 }
 
-func NewContactService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *ContactService {
+// NewContactService constructs a ContactService.
+// bus may be nil for read-only/partial tests; write paths that publish no-op.
+// cacheClient may be nil and falls back to cache.NoOpCache.
+func NewContactService(db *gorm.DB, bus contactBus, cacheClient contactCache) *ContactService {
 	return &ContactService{db: db, bus: bus, cacheClient: resolveContactCache(cacheClient)}
+}
+
+// SetBus injects (or replaces) the event bus port.
+func (s *ContactService) SetBus(bus contactBus) {
+	if s == nil {
+		return
+	}
+	s.bus = bus
+}
+
+// SetCache injects (or replaces) the contact cache port.
+func (s *ContactService) SetCache(cacheClient contactCache) {
+	if s == nil {
+		return
+	}
+	s.cacheClient = resolveContactCache(cacheClient)
+}
+
+// publish is a nil-safe wrapper over the bus port.
+func (s *ContactService) publish(ctx context.Context, event Event) {
+	if s == nil || s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, event)
 }
 
 type SearchResult struct {
@@ -137,13 +184,11 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 	}
 
 	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
-	if s.bus != nil {
-		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
-			"request_id":   f.ID,
-			"from_user_id": userID,
-			"message":      message,
-		}})
-	}
+	s.publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
+		"request_id":   f.ID,
+		"from_user_id": userID,
+		"message":      message,
+	}})
 
 	return nil
 }
@@ -214,13 +259,11 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 	}
 
 	_ = resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
-	if s.bus != nil {
-		s.bus.Publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
-			"friendship_id": r.ID,
-			"user_id":       r.UserID,
-			"accepter_id":   userID,
-		}})
-	}
+	s.publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
+		"friendship_id": r.ID,
+		"user_id":       r.UserID,
+		"accepter_id":   userID,
+	}})
 	return nil
 }
 
