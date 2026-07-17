@@ -2,16 +2,20 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { ProfilePopover } from '../../floating';
-import { EmptyState } from '../../../ui';
 import styles from '../ContactsPage.module.css';
+import { QuickActionGrid } from './ContactRows';
 import {
-  FriendRequestCard,
-  GroupRow,
-  MemberRow,
-  QuickActionGrid,
-  SearchUserCard,
-  ServiceCardRow,
-} from './ContactRows';
+  contactProfileActions,
+  contactProfileAvatarColor,
+  contactProfileVariant,
+} from './ContactMainHelpers';
+import {
+  ContactGroupListSection,
+  ContactMainHead,
+  ContactMemberListSection,
+  ContactNewBodySections,
+  ContactServiceGridSection,
+} from './ContactMainSections';
 import type {
   ContactGroup,
   ContactMember,
@@ -25,7 +29,8 @@ import type {
    Contacts main-pane presentational subviews.
 
    Residual thin from ContactMainViews (Phase 24 #640).
-   CSS remains on shared ContactsPage.module.css.
+   Residual thin #2 (Phase 27 #672): chrome/helpers in ContactMainSections
+   + ContactMainHelpers. CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ContactListPage({
@@ -53,32 +58,20 @@ export function ContactListPage({
 }): React.ReactElement {
   return (
     <main className={`${styles.main} workbench-main`}>
-      <div className={`${styles.head} workbench-head`}>
-        <div>
-          <h1 className={styles.headTitle}>{title}</h1>
-          <p className={styles.headSubcopy}>{subtitle}</p>
-        </div>
-        <button
-          type="button"
-          className={`${styles.addBtn} outline-action`}
-          onClick={onAddContact}
-        >
-          {actionLabel}
-        </button>
-      </div>
+      <ContactMainHead
+        title={title}
+        subtitle={subtitle}
+        actionLabel={actionLabel}
+        onAction={onAddContact}
+      />
       {showQuickGrid && <QuickActionGrid onAddContact={onAddContact} />}
       <div className={styles.sectionTitle}>{sectionTitle}</div>
-      <div className={styles.memberList}>
-        {rows.map((m) => (
-          <MemberRow
-            avatarExpanded={activeMemberId === m.id}
-            key={m.id}
-            member={m}
-            onAvatarClick={onAvatarClick}
-            onClick={onMemberClick}
-          />
-        ))}
-      </div>
+      <ContactMemberListSection
+        rows={rows}
+        activeMemberId={activeMemberId}
+        onMemberClick={onMemberClick}
+        onAvatarClick={onAvatarClick}
+      />
     </main>
   );
 }
@@ -118,116 +111,27 @@ export function ContactNewPane({
 
   return (
     <main className={`${styles.main} workbench-main`}>
-      <div className={`${styles.head} workbench-head`}>
-        <div>
-          <h1 className={styles.headTitle}>{t('contacts.new.title', '新的联系人')}</h1>
-          <p className={styles.headSubcopy}>
-            {t('contacts.new.subtitle', '搜索用户、发送好友请求、处理收到的请求。')}
-          </p>
-        </div>
-        <button
-          type="button"
-          className={`${styles.addBtn} outline-action`}
-          onClick={onAddContact}
-        >
-          {t('contacts.add', '添加联系人')}
-        </button>
-      </div>
-
-      {/* Search user */}
-      {onSearchUser && (
-        <div className={styles.searchSection}>
-          <input
-            className={styles.userSearchInput}
-            placeholder={t('contacts.search.userPlaceholder', '输入用户 ID 或用户名搜索')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const value = (e.target as HTMLInputElement).value.trim();
-                if (value) onSearchUser(value);
-              }
-            }}
-          />
-          {searchLoading && <span className={styles.searchLoading}>{t('contacts.search.loading', '搜索中...')}</span>}
-          {searchResult && (
-            <div className={styles.searchResults}>
-              <SearchUserCard
-                result={searchResult}
-                onSendRequest={onSendFriendRequest}
-                loading={actionLoading}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Received friend requests */}
-      {friendRequests && friendRequests.length > 0 && (
-        <>
-          <div className={styles.sectionTitle}>{t('contacts.requests.received', '收到的好友请求')}</div>
-          <div className={styles.requestList}>
-            {friendRequests.map((req) => (
-              <FriendRequestCard
-                key={req.request_id}
-                request={req}
-                direction="received"
-                onAccept={onAcceptRequest}
-                onReject={onRejectRequest}
-                loading={actionLoading}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Sent friend requests */}
-      {sentRequests && sentRequests.length > 0 && (
-        <>
-          <div className={styles.sectionTitle}>{t('contacts.requests.sent', '已发送的请求')}</div>
-          <div className={styles.requestList}>
-            {sentRequests.map((req) => (
-              <FriendRequestCard
-                key={req.request_id}
-                request={req}
-                direction="sent"
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Legacy pending contacts (mock fallback) */}
-      {pendingContacts.length > 0 && (
-        <>
-          <div className={styles.sectionTitle}>{t('contacts.pending', '待处理')}</div>
-          <div className={styles.memberList}>
-            {pendingContacts.map((m) => (
-              <MemberRow
-                avatarExpanded={activeMemberId === m.id}
-                key={m.id}
-                member={m}
-                onAvatarClick={onAvatarClick}
-                onClick={onMemberClick}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {(!friendRequests || friendRequests.length === 0) && pendingContacts.length === 0 && (
-        <EmptyState
-          title={t('contacts.empty', '暂无待处理的好友请求')}
-          titleLevel={3}
-          {...(styles['contacts-empty-compact']
-            ? { className: styles['contacts-empty-compact'] }
-            : {})}
-          {...(styles['contacts-empty-compact-content']
-            ? { contentClassName: styles['contacts-empty-compact-content'] }
-            : {})}
-          {...(styles['contacts-empty-compact-title']
-            ? { titleClassName: styles['contacts-empty-compact-title'] }
-            : {})}
-        />
-      )}
+      <ContactMainHead
+        title={t('contacts.new.title', '新的联系人')}
+        subtitle={t('contacts.new.subtitle', '搜索用户、发送好友请求、处理收到的请求。')}
+        actionLabel={t('contacts.add', '添加联系人')}
+        onAction={onAddContact}
+      />
+      <ContactNewBodySections
+        pendingContacts={pendingContacts}
+        friendRequests={friendRequests}
+        sentRequests={sentRequests}
+        searchResult={searchResult}
+        searchLoading={searchLoading}
+        actionLoading={actionLoading}
+        activeMemberId={activeMemberId}
+        onMemberClick={onMemberClick}
+        onAvatarClick={onAvatarClick}
+        onSearchUser={onSearchUser}
+        onSendFriendRequest={onSendFriendRequest}
+        onAcceptRequest={onAcceptRequest}
+        onRejectRequest={onRejectRequest}
+      />
     </main>
   );
 }
@@ -247,33 +151,19 @@ export function ContactGroupsPane({
 }): React.ReactElement {
   return (
     <main className={`${styles.main} workbench-main`}>
-      <div className={`${styles.head} workbench-head`}>
-        <div>
-          <h1 className={styles.headTitle}>我的群组</h1>
-          <p className={styles.headSubcopy}>
-            项目群、评审群和协作群统一管理，按最新消息排序。
-          </p>
-        </div>
-        <button
-          type="button"
-          className={`${styles.addBtn} outline-action`}
-          onClick={onCreateGroup}
-        >
-          创建群组
-        </button>
-      </div>
+      <ContactMainHead
+        title="我的群组"
+        subtitle="项目群、评审群和协作群统一管理，按最新消息排序。"
+        actionLabel="创建群组"
+        onAction={onCreateGroup}
+      />
       <div className={styles.sectionTitle}>TokenDance 群组</div>
-      <div className={styles.memberList}>
-        {groups.map((g) => (
-          <GroupRow
-            avatarExpanded={activeGroupId === g.id}
-            group={g}
-            key={g.id}
-            onAvatarClick={onAvatarClick}
-            onClick={onGroupClick}
-          />
-        ))}
-      </div>
+      <ContactGroupListSection
+        groups={groups}
+        activeGroupId={activeGroupId}
+        onGroupClick={onGroupClick}
+        onAvatarClick={onAvatarClick}
+      />
     </main>
   );
 }
@@ -293,32 +183,18 @@ export function ContactServicePane({
 }): React.ReactElement {
   return (
     <main className={`${styles.main} workbench-main`}>
-      <div className={`${styles.head} workbench-head`}>
-        <div>
-          <h1 className={styles.headTitle}>服务台</h1>
-          <p className={styles.headSubcopy}>
-            把账号、Agent 运行和云文档问题转给对应支持入口。
-          </p>
-        </div>
-        <button
-          type="button"
-          className={`${styles.addBtn} outline-action`}
-          onClick={onNewTicket}
-        >
-          新建工单
-        </button>
-      </div>
-      <div className={styles.serviceGrid}>
-        {serviceDesks.map((desk) => (
-          <ServiceCardRow
-            avatarExpanded={activeServiceId === desk.id}
-            key={desk.id}
-            desk={desk}
-            onAvatarClick={onAvatarClick}
-            onClick={onServiceClick}
-          />
-        ))}
-      </div>
+      <ContactMainHead
+        title="服务台"
+        subtitle="把账号、Agent 运行和云文档问题转给对应支持入口。"
+        actionLabel="新建工单"
+        onAction={onNewTicket}
+      />
+      <ContactServiceGridSection
+        serviceDesks={serviceDesks}
+        activeServiceId={activeServiceId}
+        onServiceClick={onServiceClick}
+        onAvatarClick={onAvatarClick}
+      />
     </main>
   );
 }
@@ -332,18 +208,9 @@ export function ContactProfilePopover({
 }): React.ReactElement {
   return (
     <ProfilePopover
-      actions={[
-        { label: profile.kind === 'group' ? '进入项目' : '发送消息' },
-        { label: profile.kind === 'service' ? '帮助与客服' : '复制链接' },
-      ]}
+      actions={contactProfileActions(profile)}
       anchorElement={profile.anchor}
-      avatarColor={
-        profile.kind === 'group'
-          ? 'var(--role-researcher)'
-          : profile.kind === 'service'
-            ? 'var(--role-deployer)'
-            : 'linear-gradient(135deg, var(--primary), var(--success))'
-      }
+      avatarColor={contactProfileAvatarColor(profile)}
       isOpen
       name={profile.name}
       onClose={onClose}
@@ -351,7 +218,7 @@ export function ContactProfilePopover({
       {...(profile.initials ? { avatar: profile.initials } : {})}
       {...(profile.meta ? { meta: profile.meta } : {})}
       {...(profile.subtitle ? { subtitle: profile.subtitle } : {})}
-      variant={profile.kind === 'group' ? 'group' : 'default'}
+      variant={contactProfileVariant(profile)}
     />
   );
 }
