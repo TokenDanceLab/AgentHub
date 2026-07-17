@@ -41,7 +41,9 @@ export function buildFriendRequestBody(
   friendId: string,
   message?: string,
 ): { friend_id: string; message?: string } {
-  return { friend_id: friendId, message };
+  return message === undefined
+    ? { friend_id: friendId }
+    : { friend_id: friendId, message };
 }
 
 export function buildRemarkBody(remark: string): { remark: string } {
