@@ -11,6 +11,12 @@ export {
   QuickActionGrid,
 } from './ContactRows';
 
+export { ContactMain } from './ContactMainViews';
+export type { ContactMainProps } from './ContactMainViews';
+
+export { ContactNav } from './ContactNav';
+export type { ContactNavProps } from './ContactNav';
+
 export {
   capabilityColor,
   NavGlyph,
@@ -28,5 +34,6 @@ export type {
   ServiceDesk,
   ContactsPane,
   ContactModalTab,
+  ContactProfile,
   ContactsPageProps,
 } from './types';
