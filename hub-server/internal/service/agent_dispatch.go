@@ -32,24 +32,18 @@ type dispatchPayload = dispatch.Payload
 type dispatchMessage = dispatch.Message
 
 // Same-package aliases for pure dispatch DTOs (#768 residual).
+// Kept for signatures + redispatch unmarshal surface (#834).
 type dispatchTeamContext = dispatch.TeamContext
 type dispatchTargetSnapshot = dispatch.TargetSnapshot
 type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
-type edgeRunResponse = dispatch.EdgeRunResponse
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
 // Pure residual closed (#823) after #811/#800/#789/#779/#768/#756/#732 pure
 // helpers, thin first seam (#563), redispatch residual (#573), and residual
-// ports (#617). Pure surface lives in service/dispatch (~1.2k prod LOC:
-// loopback / runtime type / select / merge / prompt+history text / task-status
-// / edge constants / Message DTO / Edge run request builder /
-// team+target+capability+redelivery / routing / task-access / payload assembly
-// / event payloads / Payload DTO + builders / capability mint resolve /
-// trigger target mapping / model->DTO mappers / route classify / redispatch
-// prep / Edge HTTP headers / redelivery route classify / target-bound
-// availability / finalize delivery payload / Edge request marshal) with thin
-// same-package aliases below. Orchestration + ports stay flat (~903 LOC here);
+// ports (#617). #834: thin free-func aliases removed — call dispatch.* directly;
+// DTO type aliases retained for JSON/redispatch stability. Pure surface lives
+// in service/dispatch (~1.2k prod LOC). Orchestration + ports stay flat here;
 // no OpenAPI/handler/frontend; no typed DispatchService package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
@@ -259,28 +253,6 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	return runID
 }
 
-// Thin aliases to service/dispatch pure helpers (#732/#756). Keep same-package
-// call sites and existing tests stable without re-embedding helper bodies here.
-func isLoopback(rawURL string) bool {
-	return dispatch.IsLoopback(rawURL)
-}
-
-func normalizeRuntimeAgentType(agentType string) string {
-	return dispatch.NormalizeRuntimeAgentType(agentType)
-}
-
-func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, targetAgentType, targetCustomAgentID string) (*model.AgentInstance, error) {
-	return dispatch.SelectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
-}
-
-func mergeModelParams(base, override string) string {
-	return dispatch.MergeModelParams(base, override)
-}
-
-func isRetryableTaskStatus(status string) bool {
-	return dispatch.IsRetryableTaskStatus(status)
-}
-
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
 func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
@@ -302,7 +274,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 	if err != nil || len(agents) == 0 {
 		return nil, errcode.AgentNotFound
 	}
-	ai, err := selectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
+	ai, err := dispatch.SelectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +310,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams, targetType, customAgent)
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, dispatch.PromptFromMessage(msg), modelParams, targetType, customAgent)
 
 	return task, nil
 }
@@ -382,10 +354,6 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		return nil, err
 	}
 	return dispatch.NewTargetSnapshot(target.ID, target.TargetType, deviceID), nil
-}
-
-func promptFromMessage(msg *model.Message) string {
-	return dispatch.PromptFromMessage(msg)
 }
 
 func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
@@ -563,15 +531,6 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 		return nil
 	}
 	return dispatch.MapPinnedMessages(msgs)
-}
-
-// Thin aliases to service/dispatch pure helpers (#732/#756).
-func extractMessageText(msg *model.Message) string {
-	return dispatch.ExtractMessageText(msg)
-}
-
-func mapSenderType(t string) string {
-	return dispatch.MapSenderType(t)
 }
 
 func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
@@ -762,7 +721,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 	}
 
 	// Only retry if task is still in a retryable state.
-	if !isRetryableTaskStatus(task.Status) {
+	if !dispatch.IsRetryableTaskStatus(task.Status) {
 		slog.Info("redispatch: task in terminal state, moving delivery to dead-letter",
 			"delivery_id", rec.DeliveryID,
 			"task_id", rec.TaskID,
