@@ -18,6 +18,12 @@ export interface Transport {
 
 export interface TransportOptions {
   url: string;
+  /**
+   * Optional WebSocket subprotocols, or a getter evaluated on each connect.
+   * Used to carry Hub JWT via Sec-WebSocket-Protocol without putting the
+   * token in the URL (see hubWS agenthub.bearer.v1 convention).
+   */
+  protocols?: string[] | (() => string[] | undefined);
   maxRetries?: number;       // default 5
   baseDelay?: number;         // default 1000ms
   maxDelay?: number;          // default 30000ms
@@ -67,7 +73,10 @@ export class WebSocketTransport implements Transport {
     this.setStatus(wasDisconnected ? 'connecting' : 'reconnecting');
 
     try {
-      this.ws = new WebSocket(targetUrl);
+      const protocols = resolveProtocols(this.opts.protocols);
+      this.ws = protocols && protocols.length > 0
+        ? new WebSocket(targetUrl, protocols)
+        : new WebSocket(targetUrl);
 
       this.ws.onopen = () => {
         this.retryCount = 0;
@@ -261,6 +270,17 @@ export class WebSocketTransport implements Transport {
 }
 
 // ── Factory ────────────────────────────────────────────────────────
+
+function resolveProtocols(
+  protocols: TransportOptions['protocols'],
+): string[] | undefined {
+  if (!protocols) return undefined;
+  if (typeof protocols === 'function') {
+    const value = protocols();
+    return value && value.length > 0 ? value : undefined;
+  }
+  return protocols.length > 0 ? protocols : undefined;
+}
 
 /**
  * Create a production-ready Transport instance.
