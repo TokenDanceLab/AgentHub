@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -13,31 +12,9 @@ import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 import {
-  SELECTION_HOLD_DELAY_MS,
-  WORKBENCH_PULSE_MS,
-  WORKBENCH_TOAST_MS,
-  applyTranscriptChromeSideEffects,
-  buildContextMenuState,
-  buildTranscriptContextMenuGroups,
-  buildTranscriptMultiSelectActions,
-  createSelectionHoldState,
-  createTranscriptChromeEffectHandlers,
-  deferFocus,
-  mergeSoftHiddenBlockIds,
-  nextActionedBlockIdsOnPulseEnd,
-  nextActionedBlockIdsOnPulseStart,
-  nextSelectedBlockIdsOnRange,
-  nextSelectedBlockIdsOnToggle,
-  planContextAction,
-  planMultiAction,
-  planSelectionHotkeyEffect,
-  planTranscriptBlockAction,
-  resolveShiftSelectRange,
-  selectBarRectFromWorkspace,
-  shouldBeginHoldSelection,
-  shouldCancelSelectionHold,
-  shouldHandleSelectionPointerUp,
-  transcriptBlockIds,
+  createTranscriptChromeController,
+  type SelectionHoldState,
+  type TranscriptChromeController,
   type WorkbenchContextMenuState,
 } from './workbenchTranscriptChromeHelpers';
 
@@ -110,67 +87,84 @@ export function useWorkbenchTranscriptChrome({
   const [toastVisible, setToastVisible] = useState(false);
 
   const selectionModeRef = useRef(false);
-  const selectionHoldRef = useRef<{
-    blockId: string;
-    timer: number | null;
-    x: number;
-    y: number;
-  } | null>(null);
+  const selectionHoldRef = useRef<SelectionHoldState | null>(null);
   const suppressSelectionPointerUpRef = useRef(false);
   const runMultiActionRef = useRef<((action: string) => void) | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const pulseTimersRef = useRef<Map<string, number>>(new Map());
+  const transcriptRef = useRef(transcript);
+  const selectedBlockIdsRef = useRef(selectedBlockIds);
+  const controllerRef = useRef<TranscriptChromeController | null>(null);
+
+  transcriptRef.current = transcript;
+  selectedBlockIdsRef.current = selectedBlockIds;
 
   useEffect(() => {
     selectionModeRef.current = selectionMode;
   }, [selectionMode]);
 
+  const controller = useMemo(() => createTranscriptChromeController({
+    refs: {
+      selectionModeRef,
+      selectionHoldRef,
+      suppressSelectionPointerUpRef,
+      runMultiActionRef,
+      toastTimerRef,
+      pulseTimersRef,
+    },
+    writers: {
+      setContextMenu,
+      setSelectionMode,
+      setSelectedBlockIds,
+      setActionedBlockIds,
+      setSoftHiddenBlockIds,
+      setSelectBarRect,
+      setToastMessage,
+      setToastVisible,
+    },
+    getTranscript: () => transcriptRef.current,
+    getSelectedBlockIds: () => selectedBlockIdsRef.current,
+    t,
+    dispatchComposer,
+    composerInputRef,
+    onRegenerate,
+    onApprovalDecision,
+  }), [
+    composerInputRef,
+    dispatchComposer,
+    onApprovalDecision,
+    onRegenerate,
+    t,
+  ]);
+
+  controllerRef.current = controller;
+  runMultiActionRef.current = controller.runMultiAction;
+
   useEffect(() => {
     if (!selectionMode) return;
 
     function handleSelectionKey(event: KeyboardEvent): void {
-      const plan = planSelectionHotkeyEffect(event, transcript);
-      if (!plan) return;
-      if (plan.preventDefault) event.preventDefault();
-      if (plan.type === 'clearSelection') {
-        setSelectionMode(false);
-        setSelectedBlockIds([]);
-        return;
-      }
-      if (plan.type === 'selectAll') {
-        setSelectedBlockIds(plan.selectedBlockIds);
-        return;
-      }
-      runMultiActionRef.current?.(plan.action);
+      controllerRef.current?.handleSelectionHotkey(event);
     }
 
     document.addEventListener('keydown', handleSelectionKey);
     return () => document.removeEventListener('keydown', handleSelectionKey);
   }, [selectedBlockIds, selectionMode, transcript]);
 
+  // Match prior unmount-only dispose semantics (empty deps).
   useEffect(() => () => {
-    if (selectionHoldRef.current?.timer) {
-      window.clearTimeout(selectionHoldRef.current.timer);
-    }
-    selectionHoldRef.current = null;
+    controllerRef.current?.disposeSelectionHold();
   }, []);
 
   useEffect(() => () => {
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    pulseTimersRef.current.forEach((id) => window.clearTimeout(id));
-    pulseTimersRef.current.clear();
+    controllerRef.current?.disposeTimers();
   }, []);
 
   useEffect(() => {
     if (!selectionMode) return;
 
     function updateSelectBarRect(): void {
-      const next = selectBarRectFromWorkspace(workspaceRef.current?.getBoundingClientRect());
-      if (!next) return;
-      setSelectBarRect(next);
+      controllerRef.current?.updateSelectBarRect(workspaceRef.current);
     }
 
     updateSelectBarRect();
@@ -178,207 +172,10 @@ export function useWorkbenchTranscriptChrome({
     return () => window.removeEventListener('resize', updateSelectBarRect);
   }, [selectionMode, inspectorCollapsed, inspectorWidth, workspaceRef]);
 
-  const showWorkbenchToast = useCallback((message: string): void => {
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-    setToastMessage(message);
-    setToastVisible(true);
-    toastTimerRef.current = window.setTimeout(() => setToastVisible(false), WORKBENCH_TOAST_MS);
-  }, []);
-
-  const copyText = useCallback((text: string): void => {
-    try {
-      navigator.clipboard?.writeText?.(text)?.catch?.(() => {});
-    } catch {
-      // Clipboard is optional in local preview and test environments.
-    }
-  }, []);
-
-  const pulseBlock = useCallback((blockId: string): void => {
-    const existing = pulseTimersRef.current.get(blockId);
-    if (existing !== undefined) window.clearTimeout(existing);
-    setActionedBlockIds((current) => nextActionedBlockIdsOnPulseStart(current, blockId));
-    const timerId = window.setTimeout(() => {
-      setActionedBlockIds((current) => nextActionedBlockIdsOnPulseEnd(current, blockId));
-      pulseTimersRef.current.delete(blockId);
-    }, WORKBENCH_PULSE_MS);
-    pulseTimersRef.current.set(blockId, timerId);
-  }, []);
-
-  const softHideBlocks = useCallback((blockIds: string[]): void => {
-    setSoftHiddenBlockIds((current) => mergeSoftHiddenBlockIds(current, blockIds));
-  }, []);
-
-  const exitSelection = useCallback((): void => {
-    setSelectionMode(false);
-    setSelectedBlockIds([]);
-  }, []);
-
-  const effectHandlers = useMemo(() => createTranscriptChromeEffectHandlers({
-    copyText,
-    softHideBlocks,
-    dispatchComposer,
-    focusComposer: () => deferFocus(() => composerInputRef.current?.focus()),
-    onRegenerate,
-    onApprovalDecision,
-    pulseBlock,
-    showWorkbenchToast,
-    exitSelection,
-  }), [
-    composerInputRef,
-    copyText,
-    dispatchComposer,
-    exitSelection,
-    onApprovalDecision,
-    onRegenerate,
-    pulseBlock,
-    showWorkbenchToast,
-    softHideBlocks,
-  ]);
-
-  const openBlockContextMenu = useCallback((
-    block: TranscriptBlock,
-    event: TranscriptContextMenuEvent,
-  ): void => {
-    event.preventDefault();
-    setContextMenu(buildContextMenuState(block, event.clientX, event.clientY, t));
-  }, [t]);
-
-  const selectBlock = useCallback((blockId: string): void => {
-    setSelectedBlockIds((current) => nextSelectedBlockIdsOnToggle(current, blockId));
-  }, []);
-
-  const selectRangeTo = useCallback((blockId: string): void => {
-    const plan = resolveShiftSelectRange(transcript, selectedBlockIds, blockId);
-    if (plan.mode === 'toggle') {
-      selectBlock(plan.blockId);
-      return;
-    }
-    setSelectionMode(true);
-    setSelectedBlockIds((current) => nextSelectedBlockIdsOnRange(current, plan.rangeIds));
-  }, [selectBlock, selectedBlockIds, transcript]);
-
-  const handleBlockSelect = useCallback((blockId: string, event?: { shiftKey?: boolean }): void => {
-    if (event?.shiftKey) {
-      selectRangeTo(blockId);
-      return;
-    }
-    selectBlock(blockId);
-  }, [selectBlock, selectRangeTo]);
-
-  const resetSelection = useCallback((): void => {
-    setContextMenu(null);
-    setSelectionMode(false);
-    setSelectedBlockIds([]);
-    setActionedBlockIds([]);
-    setSoftHiddenBlockIds([]);
-  }, []);
-
-  const enterSelection = useCallback((blockId: string): void => {
-    selectionModeRef.current = true;
-    setSelectionMode(true);
-    setSelectedBlockIds([blockId]);
-  }, []);
-
-  const clearSelectionHold = useCallback((): void => {
-    if (selectionHoldRef.current?.timer) {
-      window.clearTimeout(selectionHoldRef.current.timer);
-    }
-    selectionHoldRef.current = null;
-  }, []);
-
-  const beginBlockHoldSelection = useCallback((
-    block: TranscriptBlock,
-    event: TranscriptPointerEvent,
-  ): void => {
-    if (!shouldBeginHoldSelection(event)) return;
-    clearSelectionHold();
-    selectionHoldRef.current = createSelectionHoldState(
-      block.id,
-      event.clientX,
-      event.clientY,
-      window.setTimeout(() => {
-        enterSelection(block.id);
-        suppressSelectionPointerUpRef.current = true;
-        selectionHoldRef.current = null;
-      }, SELECTION_HOLD_DELAY_MS),
-    );
-  }, [clearSelectionHold, enterSelection]);
-
-  const updateBlockHoldSelection = useCallback((event: TranscriptPointerEvent): void => {
-    const hold = selectionHoldRef.current;
-    if (!hold) return;
-    if (shouldCancelSelectionHold(hold, event.clientX, event.clientY)) clearSelectionHold();
-  }, [clearSelectionHold]);
-
-  const handleBlockPointerUp = useCallback((
-    block: TranscriptBlock,
-    event: TranscriptPointerEvent,
-  ): void => {
-    clearSelectionHold();
-    if (suppressSelectionPointerUpRef.current) {
-      suppressSelectionPointerUpRef.current = false;
-      return;
-    }
-    if (!shouldHandleSelectionPointerUp(selectionModeRef.current, event)) return;
-    handleBlockSelect(block.id, { shiftKey: event.shiftKey });
-  }, [clearSelectionHold, handleBlockSelect]);
-
-  const runContextAction = useCallback((action: string, blockId: string): void => {
-    applyTranscriptChromeSideEffects(planContextAction({
-      action,
-      blockId,
-      transcript,
-      t,
-      selectedText: window.getSelection()?.toString() ?? null,
-    }), effectHandlers);
-  }, [effectHandlers, t, transcript]);
-
-  const handleTranscriptBlockAction = useCallback((
-    action: string,
-    blockId: string,
-    metadata?: Record<string, unknown>,
-  ): void => {
-    applyTranscriptChromeSideEffects(planTranscriptBlockAction({
-      action,
-      blockId,
-      transcript,
-      t,
-      ...(metadata !== undefined ? { metadata } : {}),
-    }), effectHandlers);
-  }, [effectHandlers, t, transcript]);
-
-  const runMultiAction = useCallback((action: string): void => {
-    applyTranscriptChromeSideEffects(planMultiAction({
-      action,
-      selectedBlockIds,
-      transcript,
-      t,
-    }), effectHandlers);
-  }, [effectHandlers, selectedBlockIds, t, transcript]);
-
-  runMultiActionRef.current = runMultiAction;
-
-  const contextMenuGroups = useCallback((blockId: string): Array<Array<ContextMenuItem>> => (
-    buildTranscriptContextMenuGroups({
-      blockId,
-      transcript,
-      t,
-      onAction: runContextAction,
-      onEnterSelection: enterSelection,
-    })
-  ), [enterSelection, runContextAction, t, transcript]);
-
-  const multiSelectActions = useMemo<Array<MultiSelectBarAction>>(() => (
-    buildTranscriptMultiSelectActions({
-      t,
-      onSelectAll: () => setSelectedBlockIds(transcriptBlockIds(transcript)),
-      onClear: () => setSelectedBlockIds([]),
-      onMultiAction: runMultiAction,
-      onExit: exitSelection,
-    })
-  ), [exitSelection, runMultiAction, t, transcript]);
+  const multiSelectActions = useMemo(
+    () => controller.multiSelectActions(),
+    [controller, t, transcript],
+  );
 
   return {
     selectionMode,
@@ -391,16 +188,16 @@ export function useWorkbenchTranscriptChrome({
     toastVisible,
     selectBarRect,
     multiSelectActions,
-    contextMenuGroups,
-    showWorkbenchToast,
-    openBlockContextMenu,
-    handleBlockSelect,
-    handleTranscriptBlockAction,
-    beginBlockHoldSelection,
-    updateBlockHoldSelection,
-    handleBlockPointerUp,
-    copyText,
-    resetSelection,
+    contextMenuGroups: controller.contextMenuGroups,
+    showWorkbenchToast: controller.showWorkbenchToast,
+    openBlockContextMenu: controller.openBlockContextMenu,
+    handleBlockSelect: controller.handleBlockSelect,
+    handleTranscriptBlockAction: controller.handleTranscriptBlockAction,
+    beginBlockHoldSelection: controller.beginBlockHoldSelection,
+    updateBlockHoldSelection: controller.updateBlockHoldSelection,
+    handleBlockPointerUp: controller.handleBlockPointerUp,
+    copyText: controller.copyText,
+    resetSelection: controller.resetSelection,
     selectionModeRef,
   };
 }
