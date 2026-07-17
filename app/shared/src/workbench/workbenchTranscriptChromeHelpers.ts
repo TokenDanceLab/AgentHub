@@ -1,16 +1,20 @@
-import type { TranscriptBlock } from '../transcript';
+import type { ComposerAction } from '../composer';
+import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTranscriptChromeHelpers — pure residual slice from
-   useWorkbenchTranscriptChrome (#615).
+   workbenchTranscriptChromeHelpers — pure residual slices from
+   useWorkbenchTranscriptChrome (#615, #627).
 
-   Constants, title resolution, toast labels, and menu/action builders.
-   No React hooks / no intentional UX change.
+   Constants, title/label resolution, menu builders, selection math, and
+   action planners. No React hooks / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const SELECTION_HOLD_DELAY_MS = 520;
 export const SELECTION_HOLD_CANCEL_DISTANCE = 36;
+export const WORKBENCH_TOAST_MS = 1700;
+export const WORKBENCH_PULSE_MS = 900;
+export const QUOTE_PREVIEW_MAX_CHARS = 80;
 
 export interface WorkbenchContextMenuState {
   blockId: string;
@@ -23,6 +27,25 @@ export type TranscriptChromeTranslate = (
   key: string,
   options?: Record<string, unknown>,
 ) => string;
+
+export type SelectionHotkeyCommand =
+  | { type: 'escape' }
+  | { type: 'selectAll'; preventDefault: true }
+  | { type: 'multiAction'; action: 'copy' | 'delete'; preventDefault: true };
+
+export type TranscriptChromeSideEffect =
+  | { type: 'copy'; text: string }
+  | { type: 'softHide'; blockIds: string[] }
+  | {
+    type: 'composer';
+    actions: ComposerAction[];
+    focusComposer?: true;
+  }
+  | { type: 'regenerate'; blockId: string }
+  | { type: 'approval'; decision: ApprovalDecisionAction }
+  | { type: 'pulse'; blockId: string }
+  | { type: 'toast'; message: string }
+  | { type: 'exitSelection' };
 
 export function isNestedInteractiveTarget(target: EventTarget | null, card: HTMLElement): boolean {
   if (!(target instanceof Element)) return false;
@@ -74,6 +97,15 @@ export function blockTitle(
   }
 }
 
+export function resolveBlockTitleById(
+  transcript: TranscriptBlock[],
+  blockId: string,
+  t: TranscriptChromeTranslate,
+): string {
+  const block = transcript.find((item) => item.id === blockId);
+  return block ? blockTitle(block, t) : t('mainchain.selectedCard');
+}
+
 export function cardActionLabel(
   action: string,
   title: string,
@@ -109,6 +141,486 @@ export function multiActionLabel(
     delete: t('toast.multiDelete', { count }),
   };
   return labels[action] ?? t('toast.multiProcessed', { count });
+}
+
+export function cardLinkForBlock(blockId: string): string {
+  return `agenthub://card/${blockId}`;
+}
+
+export function toggleIdInList(current: string[], id: string): string[] {
+  return current.includes(id)
+    ? current.filter((item) => item !== id)
+    : [...current, id];
+}
+
+export function addIdIfMissing(current: string[], id: string): string[] {
+  return current.includes(id) ? current : [...current, id];
+}
+
+export function mergeUniqueIds(current: string[], next: string[]): string[] {
+  return Array.from(new Set([...current, ...next]));
+}
+
+export function removeIdFromList(current: string[], id: string): string[] {
+  return current.filter((item) => item !== id);
+}
+
+export function resolveSelectionRangeIds(
+  transcript: TranscriptBlock[],
+  selectedBlockIds: string[],
+  targetBlockId: string,
+): string[] | null {
+  const selectedIndexes = selectedBlockIds
+    .map((id) => transcript.findIndex((block) => block.id === id))
+    .filter((index) => index >= 0);
+  const anchorIndex = selectedIndexes.length
+    ? selectedIndexes[selectedIndexes.length - 1]!
+    : transcript.findIndex((block) => block.id === targetBlockId);
+  const targetIndex = transcript.findIndex((block) => block.id === targetBlockId);
+
+  if (anchorIndex < 0 || targetIndex < 0) {
+    return null;
+  }
+
+  const [from, to] = anchorIndex < targetIndex
+    ? [anchorIndex, targetIndex]
+    : [targetIndex, anchorIndex];
+  return transcript.slice(from, to + 1).map((block) => block.id);
+}
+
+export function shouldCancelSelectionHold(
+  hold: { x: number; y: number },
+  clientX: number,
+  clientY: number,
+  cancelDistance: number = SELECTION_HOLD_CANCEL_DISTANCE,
+): boolean {
+  const dx = Math.abs(clientX - hold.x);
+  const dy = Math.abs(clientY - hold.y);
+  return dx > cancelDistance || dy > cancelDistance;
+}
+
+export function buildContextMenuState(
+  block: TranscriptBlock,
+  clientX: number,
+  clientY: number,
+  t: TranscriptChromeTranslate,
+): WorkbenchContextMenuState {
+  return {
+    blockId: block.id,
+    title: blockTitle(block, t),
+    x: clientX,
+    y: clientY,
+  };
+}
+
+export function selectBarRectFromWorkspace(
+  rect: Pick<DOMRect, 'left' | 'width'> | null | undefined,
+): { left: number; width: number } | null {
+  if (!rect) return null;
+  return {
+    left: rect.left,
+    width: rect.width,
+  };
+}
+
+export function resolveSelectionHotkey(event: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+}): SelectionHotkeyCommand | null {
+  if (event.key === 'Escape') {
+    return { type: 'escape' };
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+    return { type: 'selectAll', preventDefault: true };
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+    return { type: 'multiAction', action: 'copy', preventDefault: true };
+  }
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    return { type: 'multiAction', action: 'delete', preventDefault: true };
+  }
+  return null;
+}
+
+export function resolveQuoteText(
+  blockText: string,
+  selectedText?: string | null,
+  maxChars: number = QUOTE_PREVIEW_MAX_CHARS,
+): string {
+  const trimmed = selectedText?.trim();
+  return trimmed || blockText.slice(0, maxChars);
+}
+
+export function buildQuoteComposerText(quoteText: string): string {
+  return `> ${quoteText.split('\n').join('\n> ')}\n\n`;
+}
+
+export function buildPermissionApprovalDecision(
+  block: Extract<TranscriptBlock, { kind: 'permission_request' }>,
+  action: 'approve' | 'deny',
+): ApprovalDecisionAction {
+  // exactOptionalPropertyTypes-safe: only assign defined optional fields.
+  const decision: ApprovalDecisionAction = {
+    approvalId: block.requestId,
+    decision: action === 'approve' ? 'allow' : 'deny',
+  };
+  if (block.teamId !== undefined) decision.teamId = block.teamId;
+  if (block.teamRunId !== undefined) decision.teamRunId = block.teamRunId;
+  if (block.agentTaskId !== undefined) decision.agentTaskId = block.agentTaskId;
+  if (block.targetId !== undefined) decision.targetId = block.targetId;
+  if (block.edgeDeviceId !== undefined) decision.edgeDeviceId = block.edgeDeviceId;
+  if (block.correlationId !== undefined) decision.correlationId = block.correlationId;
+  return decision;
+}
+
+export function planContextAction(options: {
+  action: string;
+  blockId: string;
+  transcript: TranscriptBlock[];
+  t: TranscriptChromeTranslate;
+  selectedText?: string | null;
+}): TranscriptChromeSideEffect[] {
+  const { action, blockId, transcript, t, selectedText } = options;
+  const title = resolveBlockTitleById(transcript, blockId, t);
+  const block = transcript.find((item) => item.id === blockId);
+  const effects: TranscriptChromeSideEffect[] = [];
+
+  if (action === 'copy') {
+    effects.push({ type: 'copy', text: title });
+  }
+  if (action === 'link') {
+    effects.push({ type: 'copy', text: cardLinkForBlock(blockId) });
+  }
+  if (action === 'delete') {
+    effects.push({ type: 'softHide', blockIds: [blockId] });
+  }
+  if (action === 'reply' && block) {
+    effects.push({
+      type: 'composer',
+      actions: [{
+        type: 'setReplyTo',
+        replyTo: {
+          messageId: blockId,
+          author: block.author.name,
+          preview: title,
+        },
+      }],
+      focusComposer: true,
+    });
+  }
+  if (action === 'quote' && block && block.kind === 'text') {
+    const quoteText = resolveQuoteText(block.text, selectedText);
+    effects.push({
+      type: 'composer',
+      actions: [
+        { type: 'setText', text: buildQuoteComposerText(quoteText) },
+        {
+          type: 'setQuote',
+          quote: {
+            text: quoteText,
+            author: block.author.name,
+            messageId: block.id,
+          },
+        },
+      ],
+      focusComposer: true,
+    });
+  }
+  if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
+    effects.push(
+      { type: 'softHide', blockIds: [block.id] },
+      { type: 'regenerate', blockId },
+      { type: 'pulse', blockId },
+      { type: 'toast', message: cardActionLabel(action, title, t) },
+    );
+    return effects;
+  }
+
+  effects.push(
+    { type: 'pulse', blockId },
+    { type: 'toast', message: cardActionLabel(action, title, t) },
+  );
+  return effects;
+}
+
+export function planTranscriptBlockAction(options: {
+  action: string;
+  blockId: string;
+  transcript: TranscriptBlock[];
+  t: TranscriptChromeTranslate;
+  metadata?: Record<string, unknown>;
+}): TranscriptChromeSideEffect[] {
+  const { action, blockId, transcript, t, metadata } = options;
+  const block = transcript.find((item) => item.id === blockId);
+  if (!block) return [];
+
+  const effects: TranscriptChromeSideEffect[] = [];
+
+  if (action === 'approve' || action === 'deny') {
+    if (block.kind === 'permission_request') {
+      effects.push(
+        { type: 'approval', decision: buildPermissionApprovalDecision(block, action) },
+        { type: 'pulse', blockId },
+        {
+          type: 'toast',
+          message: action === 'approve' ? t('action.approved') : t('action.denied'),
+        },
+      );
+    }
+  }
+
+  if (action === 'retry' || action === 'regenerate') {
+    if (block.kind === 'text' && block.author.role === 'agent') {
+      effects.push(
+        { type: 'softHide', blockIds: [block.id] },
+        { type: 'regenerate', blockId },
+        { type: 'pulse', blockId },
+        { type: 'toast', message: t('action.regenerating') },
+      );
+    }
+  }
+
+  if (action === 'copy') {
+    const title = (metadata?.text as string) || blockTitle(block, t);
+    effects.push(
+      { type: 'copy', text: title },
+      { type: 'pulse', blockId },
+      { type: 'toast', message: cardActionLabel('copy', title, t) },
+    );
+  }
+
+  return effects;
+}
+
+export function planMultiAction(options: {
+  action: string;
+  selectedBlockIds: string[];
+  transcript: TranscriptBlock[];
+  t: TranscriptChromeTranslate;
+}): TranscriptChromeSideEffect[] {
+  const { action, selectedBlockIds, transcript, t } = options;
+  const count = selectedBlockIds.length;
+  if (!count) {
+    return [{ type: 'toast', message: t('toast.noCardSelected') }];
+  }
+
+  const effects: TranscriptChromeSideEffect[] = [];
+  if (action === 'copy') {
+    effects.push({
+      type: 'copy',
+      text: selectedBlockIds
+        .map((blockId) => resolveBlockTitleById(transcript, blockId, t))
+        .join('\n'),
+    });
+  }
+  if (action === 'delete') {
+    effects.push(
+      { type: 'softHide', blockIds: selectedBlockIds },
+      { type: 'exitSelection' },
+    );
+  }
+  effects.push({ type: 'toast', message: multiActionLabel(action, count, t) });
+  return effects;
+}
+
+export interface TranscriptPointerLike {
+  button: number;
+  target: EventTarget | null;
+  currentTarget: HTMLElement;
+  shiftKey: boolean;
+  clientX: number;
+  clientY: number;
+}
+
+export function shouldBeginHoldSelection(event: TranscriptPointerLike): boolean {
+  return event.button === 0 && !isNestedInteractiveTarget(event.target, event.currentTarget);
+}
+
+export function shouldHandleSelectionPointerUp(
+  selectionMode: boolean,
+  event: TranscriptPointerLike,
+): boolean {
+  return (
+    selectionMode
+    && event.button === 0
+    && !isNestedInteractiveTarget(event.target, event.currentTarget)
+  );
+}
+
+export function selectionHotkeyPreventsDefault(
+  command: SelectionHotkeyCommand,
+): command is Exclude<SelectionHotkeyCommand, { type: 'escape' }> {
+  return command.type !== 'escape';
+}
+
+export interface TranscriptChromeEffectHandlers {
+  copyText: (text: string) => void;
+  softHideBlocks: (blockIds: string[]) => void;
+  dispatchComposer: (action: ComposerAction) => void;
+  focusComposer: () => void;
+  onRegenerate?: ((blockId: string) => void) | undefined;
+  onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+  pulseBlock: (blockId: string) => void;
+  showWorkbenchToast: (message: string) => void;
+  exitSelection: () => void;
+}
+
+export function createTranscriptChromeEffectHandlers(
+  handlers: TranscriptChromeEffectHandlers,
+): TranscriptChromeEffectHandlers {
+  // Identity factory keeps hook wiring declarative and exactOptional-safe.
+  const next: TranscriptChromeEffectHandlers = {
+    copyText: handlers.copyText,
+    softHideBlocks: handlers.softHideBlocks,
+    dispatchComposer: handlers.dispatchComposer,
+    focusComposer: handlers.focusComposer,
+    pulseBlock: handlers.pulseBlock,
+    showWorkbenchToast: handlers.showWorkbenchToast,
+    exitSelection: handlers.exitSelection,
+  };
+  if (handlers.onRegenerate !== undefined) next.onRegenerate = handlers.onRegenerate;
+  if (handlers.onApprovalDecision !== undefined) {
+    next.onApprovalDecision = handlers.onApprovalDecision;
+  }
+  return next;
+}
+
+export function applyTranscriptChromeSideEffects(
+  effects: TranscriptChromeSideEffect[],
+  handlers: TranscriptChromeEffectHandlers,
+): void {
+  for (const effect of effects) {
+    switch (effect.type) {
+      case 'copy':
+        handlers.copyText(effect.text);
+        break;
+      case 'softHide':
+        handlers.softHideBlocks(effect.blockIds);
+        break;
+      case 'composer':
+        effect.actions.forEach((action) => handlers.dispatchComposer(action));
+        if (effect.focusComposer) {
+          handlers.focusComposer();
+        }
+        break;
+      case 'regenerate':
+        handlers.onRegenerate?.(effect.blockId);
+        break;
+      case 'approval':
+        handlers.onApprovalDecision?.(effect.decision);
+        break;
+      case 'pulse':
+        handlers.pulseBlock(effect.blockId);
+        break;
+      case 'toast':
+        handlers.showWorkbenchToast(effect.message);
+        break;
+      case 'exitSelection':
+        handlers.exitSelection();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+export function createSelectionHoldState(
+  blockId: string,
+  clientX: number,
+  clientY: number,
+  timer: number | null,
+): { blockId: string; timer: number | null; x: number; y: number } {
+  return {
+    blockId,
+    timer,
+    x: clientX,
+    y: clientY,
+  };
+}
+
+export function transcriptBlockIds(transcript: TranscriptBlock[]): string[] {
+  return transcript.map((block) => block.id);
+}
+
+export type SelectionHotkeyPlan =
+  | { type: 'clearSelection'; preventDefault: false }
+  | { type: 'selectAll'; preventDefault: true; selectedBlockIds: string[] }
+  | { type: 'multiAction'; preventDefault: true; action: 'copy' | 'delete' };
+
+export function planSelectionHotkeyEffect(
+  event: { key: string; ctrlKey: boolean; metaKey: boolean },
+  transcript: TranscriptBlock[],
+): SelectionHotkeyPlan | null {
+  const command = resolveSelectionHotkey(event);
+  if (!command) return null;
+  if (command.type === 'escape') {
+    return { type: 'clearSelection', preventDefault: false };
+  }
+  if (command.type === 'selectAll') {
+    return {
+      type: 'selectAll',
+      preventDefault: true,
+      selectedBlockIds: transcriptBlockIds(transcript),
+    };
+  }
+  return {
+    type: 'multiAction',
+    preventDefault: true,
+    action: command.action,
+  };
+}
+
+export function mergeSoftHiddenBlockIds(
+  current: string[],
+  blockIds: string[],
+): string[] {
+  return mergeUniqueIds(current, blockIds);
+}
+
+export function nextActionedBlockIdsOnPulseStart(
+  current: string[],
+  blockId: string,
+): string[] {
+  return addIdIfMissing(current, blockId);
+}
+
+export function nextActionedBlockIdsOnPulseEnd(
+  current: string[],
+  blockId: string,
+): string[] {
+  return removeIdFromList(current, blockId);
+}
+
+export function nextSelectedBlockIdsOnToggle(
+  current: string[],
+  blockId: string,
+): string[] {
+  return toggleIdInList(current, blockId);
+}
+
+export function nextSelectedBlockIdsOnRange(
+  current: string[],
+  rangeIds: string[],
+): string[] {
+  return mergeUniqueIds(current, rangeIds);
+}
+
+export function resolveShiftSelectRange(
+  transcript: TranscriptBlock[],
+  selectedBlockIds: string[],
+  blockId: string,
+): { mode: 'toggle'; blockId: string } | { mode: 'range'; rangeIds: string[] } {
+  const rangeIds = resolveSelectionRangeIds(transcript, selectedBlockIds, blockId);
+  if (!rangeIds) {
+    return { mode: 'toggle', blockId };
+  }
+  return { mode: 'range', rangeIds };
+}
+
+export function deferFocus(focus: () => void): void {
+  // Mirrors the prior window.setTimeout(..., 0) composer focus behavior.
+  window.setTimeout(focus, 0);
 }
 
 export interface BuildTranscriptContextMenuGroupsOptions {
