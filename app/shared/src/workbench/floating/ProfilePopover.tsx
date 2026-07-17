@@ -1,33 +1,29 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { DesignNavIcon, profileActionIconName } from '../designIcons';
+import type {
+  AccountMenuRow,
+  AccountSpace,
+  ProfileAction,
+  ProfileMetaRow,
+  ProfileVariant,
+} from './ProfilePopoverHelpers';
+import {
+  applyProfilePopoverPosition,
+  computeProfilePopoverPosition,
+  PROFILE_POPOVER_WIDTH,
+  profileDialogAriaLabel,
+  profileVariantClass,
+  shouldCloseProfilePopoverOnOutsideClick,
+} from './ProfilePopoverHelpers';
+import { AccountProfileBody, DefaultProfileBody } from './ProfilePopoverParts';
 import styles from './ProfilePopover.module.css';
 
-type ProfileVariant = 'default' | 'agent' | 'group' | 'account';
+/* ═══════════════════════════════════════════════════════════════════════
+   ProfilePopover — floating profile / account menu host.
 
-interface ProfileAction {
-  label: string;
-  onClick?: () => void;
-}
-
-interface ProfileMetaRow {
-  label: string;
-  value: string;
-}
-
-type AccountMenuRow =
-  | { divider: true }
-  | {
-    label: string;
-    style?: 'normal' | 'danger';
-    trail?: 'external' | null;
-    divider?: false;
-    onClick?: () => void;
-  };
-
-interface AccountSpace {
-  name: string;
-  description: string;
-}
+   Residual helpers/parts live in ProfilePopoverHelpers /
+   ProfilePopoverParts (#743). CSS remains on ProfilePopover.module.css.
+   No intentional UX change.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 interface ProfilePopoverProps {
   name: string;
@@ -71,13 +67,10 @@ export function ProfilePopover({
   meta,
   org,
   status,
-  signature,
   accountMenu,
-  spaces,
   onAction,
   onAccountMenu,
   onStatusToggle,
-  onSignatureEdit,
 }: ProfilePopoverProps) {
   const popoverRef = useRef<HTMLElement>(null);
 
@@ -86,30 +79,15 @@ export function ProfilePopover({
     const anchor = anchorElement ?? anchorRef?.current;
     if (!popover || !anchor) return;
 
-    const gap = 10;
-    const rect = anchor.getBoundingClientRect();
-    const popWidth = 352;
-    popover.style.width = `${popWidth}px`;
-
-    const measuredHeight = Math.min(
-      popover.getBoundingClientRect().height || 360,
-      window.innerHeight - 28,
-    );
-
-    let left = rect.right + gap;
-    if (left + popWidth > window.innerWidth - 12) {
-      left = rect.left - popWidth - gap;
-    }
-    left = Math.max(12, Math.min(left, window.innerWidth - popWidth - 12));
-
-    let top = rect.top - 10;
-    if (top + measuredHeight > window.innerHeight - 12) {
-      top = window.innerHeight - measuredHeight - 12;
-    }
-    top = Math.max(12, top);
-
-    popover.style.left = `${Math.round(left)}px`;
-    popover.style.top = `${Math.round(top)}px`;
+    // Width first so height measurement matches the previous host layout.
+    popover.style.width = `${PROFILE_POPOVER_WIDTH}px`;
+    const next = computeProfilePopoverPosition({
+      anchorRect: anchor.getBoundingClientRect(),
+      popoverHeight: popover.getBoundingClientRect().height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    });
+    applyProfilePopoverPosition(popover, next);
   }, [anchorElement, anchorRef, variant]);
 
   /* ── Position on open ── */
@@ -132,8 +110,7 @@ export function ProfilePopover({
   useEffect(() => {
     if (!isOpen) return;
     function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement;
-      if (popoverRef.current && !popoverRef.current.contains(target)) {
+      if (shouldCloseProfilePopoverOnOutsideClick(popoverRef.current, e.target)) {
         onClose();
       }
     }
@@ -149,163 +126,55 @@ export function ProfilePopover({
 
   if (!isOpen) return null;
 
-  const variantClass =
-    variant === 'agent' ? styles.agent
-    : variant === 'group' ? styles.group
-    : variant === 'account' ? styles.account
-    : '';
+  const variantClass = profileVariantClass(variant, styles);
+  const shellClassName = `${styles.popover} ${variantClass} ${isOpen ? styles.open : ''}`;
+  const ariaLabel = profileDialogAriaLabel(name, variant);
 
-  const initials = avatar || name.slice(0, 1).toUpperCase();
-  const avatarBg = avatarColor || 'var(--primary)';
-
-  const avatarContent = avatarUrl ? (
-    <img alt="" src={avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
-  ) : initials;
-
-  /* ── Account variant ── */
   if (variant === 'account') {
     return (
       <section
         ref={popoverRef}
-        className={`${styles.popover} ${variantClass} ${isOpen ? styles.open : ''}`}
+        className={shellClassName}
         role="dialog"
-        aria-label={`${name} 账号菜单`}
+        aria-label={ariaLabel}
         tabIndex={-1}
       >
-        {/* Account head */}
-        <div className={styles.accountHead}>
-          <div
-            className={`${styles.avatar} ${styles.accountAvatar}`}
-            style={{ background: avatarUrl ? undefined : avatarBg }}
-          >
-            {avatarContent}
-          </div>
-          <div className={styles.identity}>
-            <div className={styles.titleRow}>
-              <h3>{name}</h3>
-              {badge && <span className={styles.badge}>{badge}</span>}
-            </div>
-            <p>
-              {org}
-              {org && status ? ' · ' : ''}
-              {status}
-            </p>
-          </div>
-          <button
-            className={styles.accountStatus}
-            type="button"
-            onClick={onStatusToggle}
-          >
-            <DesignNavIcon name="check" size={13} />
-            {status || '在线'}
-          </button>
-        </div>
-
-        {/* Account actions */}
-        {actions && actions.length > 0 && (
-          <div className={`${styles.actions} ${styles.accountActions}`}>
-            {actions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={() => onAction?.(action.label)}
-              >
-                <DesignNavIcon name={profileActionIconName(action.label)} size={15} />
-                {action.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Account menu */}
-        {accountMenu && accountMenu.length > 0 && (
-          <div className={styles.accountMenu}>
-            {accountMenu.map((row, i) => {
-              if (row.divider) {
-                return (
-                  <div
-                    key={`sep-${i}`}
-                    className={styles.menuSep}
-                    role="separator"
-                  />
-                );
-              }
-              return (
-                <button
-                  key={row.label}
-                  className={`${styles.accountMenuRow} ${row.style === 'danger' ? styles.danger : ''}`}
-                  type="button"
-                  onClick={() => onAccountMenu?.(row.label)}
-                >
-                  <span className={styles.menuIcon}>
-                    <DesignNavIcon name={profileActionIconName(row.label)} size={16} />
-                  </span>
-                  <span>{row.label}</span>
-                  {row.trail === 'external' && (
-                    <span className={styles.menuTail}>
-                      <DesignNavIcon name="external" size={16} />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
+        <AccountProfileBody
+          accountMenu={accountMenu}
+          actions={actions}
+          avatar={avatar}
+          avatarColor={avatarColor}
+          avatarUrl={avatarUrl}
+          badge={badge}
+          name={name}
+          onAccountMenu={onAccountMenu}
+          onAction={onAction}
+          onStatusToggle={onStatusToggle}
+          org={org}
+          status={status}
+        />
       </section>
     );
   }
 
-  /* ── Default / Agent / Group variant ── */
   return (
     <section
       ref={popoverRef}
-      className={`${styles.popover} ${variantClass} ${isOpen ? styles.open : ''}`}
+      className={shellClassName}
       role="dialog"
-      aria-label={`${name} 资料卡`}
+      aria-label={ariaLabel}
       tabIndex={-1}
     >
-      {/* Head */}
-      <div className={styles.head}>
-        <div className={styles.avatar} style={{ background: avatarBg }}>
-          {initials}
-        </div>
-        <div className={styles.identity}>
-          <div className={styles.titleRow}>
-            <h3>{name}</h3>
-            {badge && <span className={styles.badge}>{badge}</span>}
-          </div>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-      </div>
-
-      {/* Actions */}
-      {actions && actions.length > 0 && (
-        <div className={styles.actions}>
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              onClick={() => onAction?.(action.label)}
-            >
-              <DesignNavIcon name={profileActionIconName(action.label)} size={15} />
-              {action.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Meta */}
-      {meta && meta.length > 0 && (
-        <div className={styles.meta}>
-          {meta.map((row) => (
-            <div key={row.label} className={styles.metaRow}>
-              <span>{row.label}</span>
-              <strong>{row.value}</strong>
-            </div>
-          ))}
-        </div>
-      )}
+      <DefaultProfileBody
+        actions={actions}
+        avatar={avatar}
+        avatarColor={avatarColor}
+        badge={badge}
+        meta={meta}
+        name={name}
+        onAction={onAction}
+        subtitle={subtitle}
+      />
     </section>
   );
 }
