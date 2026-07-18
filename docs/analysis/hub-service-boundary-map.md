@@ -1,9 +1,9 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-18
-> tip: origin/master — live residual/open peels in `docs/progress/MASTER.md` (Phase 63 / ms 84; open #1093–#1096). Product tip: last product code = peels #1084–#1087 (PRs #1089–#1092); latest: `git rev-parse --short origin/master`
-> issue: #823 closed · Phase 61–62 peels closed (#1067–#1069 / #1084–#1087) · **live open: Phase 63 #1093–#1096** (store query / payload utils / adapter failure + hygiene)
-> status: header thin-refresh — `agent_dispatch.go` **384** · `delivery_outbox.go` **360** (+ companions); pure `service/dispatch` residual; next residual peels align MASTER Phase 63 open set
+> tip: origin/master — live residual/open peels in `docs/progress/MASTER.md` (Phase 64 / ms 85; open #1101–#1105). Product tip: last product code = peels #1084–#1087 (PRs #1089–#1092); latest: `git rev-parse --short origin/master`
+> issue: #823 closed · Phase 61–62 peels closed (#1067–#1069 / #1084–#1087) · **live open: Phase 64 #1101–#1105** (payload requests / transport utils / codex / mcp tools + hygiene)
+> status: header thin-refresh — `agent_dispatch.go` **384** · `delivery_outbox.go` **360** (+ companions); pure `service/dispatch` residual; next residual peels align MASTER Phase 64 open set
 > companion: `cleanup-strategy.md` (archived program pointer) · live progress `docs/progress/MASTER.md` · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/dispatch` / `service/messagereaction` / `service/workspace` / `service/contact` / `service/attachment` / `service/session` / `service/message`
 
 This document is the authoritative **read-only boundary map** for
