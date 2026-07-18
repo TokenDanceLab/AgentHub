@@ -2487,3 +2487,15 @@
   min-height: 0;
   padding: var(--sp-lg);
 }
+
+.terminalDock {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 180px;
+  max-height: 280px;
+  height: 220px;
+  min-width: 0;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  z-index: 2;
+  background: var(--surface-base, #0b0d12);
+}
