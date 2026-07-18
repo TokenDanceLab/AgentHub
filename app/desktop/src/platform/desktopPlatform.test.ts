@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
+  it('declares local terminal capability for the Desktop host surface', () => {
+    const platform = createDesktopPlatform();
+
+    expect(platform.capabilities.localTerminal).toBe(true);
+    // Real PTY adapter is out of scope for #1174 — host port is capability-gated only.
+    expect(platform.terminal).toBeUndefined();
+  });
+
   it('does not fall back to the demo runtime unless explicitly allowed', async () => {
     const platform = createDesktopPlatform();
 
