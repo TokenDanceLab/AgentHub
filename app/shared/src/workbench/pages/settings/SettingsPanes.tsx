@@ -21,6 +21,7 @@ import {
   LocalCliDiscoveryStatus,
   StatePreviewSection,
 } from './SettingsPaneParts';
+import { SessionImportList } from '../../sessionImport';
 import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';
@@ -181,6 +182,34 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
           <SettingValue value={props.designSystemValidation} />
         </SettingsRow>
       </SettingsSection>
+
+      {props.sessionImportVisible ? (
+        <SettingsSection title="本地会话导入">
+          <SettingsRow
+            label="运行时会话"
+            description="只读导入本机 Agent Runtime 会话摘要（导入/观察模式，不修改外部存储）。"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+              {props.onRefreshSessionImport ? (
+                <button type="button" onClick={props.onRefreshSessionImport}>
+                  {props.sessionImportLoading ? '刷新中…' : '刷新列表'}
+                </button>
+              ) : null}
+              {props.sessionImportError ? (
+                <div role="alert">{props.sessionImportError}</div>
+              ) : null}
+              <SessionImportList
+                items={props.sessionImportItems ?? []}
+                emptyLabel={
+                  props.sessionImportLoading
+                    ? '正在加载本地会话…'
+                    : '暂无本地可导入会话'
+                }
+              />
+            </div>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
 
       {props.localCliDiscovery ? <LocalCliDiscoveryStatus discovery={props.localCliDiscovery} /> : null}
     </>

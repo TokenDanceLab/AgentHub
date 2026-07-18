@@ -191,6 +191,11 @@ export interface WorkbenchRoutesFrameProps {
   contactsActions?: WorkbenchContactsActions | undefined;
   documentsActions?: WorkbenchDocumentsActions | undefined;
   localCliDiscovery: WorkbenchSessionChrome['localCliDiscovery'];
+  sessionImportItems: WorkbenchSessionChrome['sessionImportItems'];
+  sessionImportLoading: WorkbenchSessionChrome['sessionImportLoading'];
+  sessionImportError: WorkbenchSessionChrome['sessionImportError'];
+  sessionImportVisible: WorkbenchSessionChrome['sessionImportVisible'];
+  onRefreshSessionImport: WorkbenchSessionChrome['refreshSessionImport'];
   modelCatalog?: WorkbenchFrameModelCatalogItem[] | undefined;
   ccSwitchStatus?: CCSwitchStatusInfo | undefined;
   ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;

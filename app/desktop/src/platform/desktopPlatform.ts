@@ -12,6 +12,7 @@ import {
   createMockTerminalPort,
   type AgentHubPlatform,
   type LocalCliDiscoveryManifest,
+  type RuntimeSessionSummary,
   type WorkbenchAgent,
   type WorkbenchConversation,
 } from '@shared/platform';
@@ -19,7 +20,10 @@ import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 import { createHubClient } from '@/api/hubClient';
+import { edgeAuthHeaders } from '@/api/edgeAuth';
 import { getAccessToken } from '@/hooks/useAuth';
+import { getEdgeBaseUrl } from '@/config';
+import { fetchRuntimeSessions } from '@shared/workbench';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
 import { canOpenDesktopEvidencePreview, openDesktopEvidencePreview } from './desktopPreview';
 import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
@@ -115,6 +119,7 @@ export interface DesktopHostPort {
   edgeHostReadiness(): Promise<DesktopEdgeHostReadiness>;
   localEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics>;
   localCliDiscovery(): Promise<LocalCliDiscoveryManifest>;
+  listRuntimeSessions(limit?: number): Promise<RuntimeSessionSummary[]>;
 }
 
 export interface DesktopPlatform extends AgentHubPlatform {
@@ -141,6 +146,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
       localEdgeDiagnostics: options.getLocalEdgeDiagnostics ?? readLocalEdgeDiagnostics,
       localCliDiscovery: options.getLocalCliDiscovery ?? readLocalCliDiscovery,
+      listRuntimeSessions: readRuntimeSessions,
       executionTargetPreference: resolveDesktopTargetPreference,
     },
     conversations: {
@@ -214,6 +220,21 @@ export function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics>
 
 export function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
   return invoke<LocalCliDiscoveryManifest>('get_local_cli_discovery');
+}
+
+/** Desktop host: Edge GET /v1/runtime-sessions via typed fetch (no foreign store). */
+export async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSummary[]> {
+  return fetchRuntimeSessions({
+    edgeBaseUrl: getEdgeBaseUrl(),
+    limit,
+    fetchImpl: async (input, init) => {
+      const headers = edgeAuthHeaders(init?.headers);
+      return fetch(input, {
+        ...init,
+        ...(headers ? { headers } : {}),
+      });
+    },
+  });
 }
 
 function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {

@@ -60,6 +60,12 @@ export interface WorkbenchRoutesProps {
   /** Document mutation actions — wired to Hub Documents API. */
   documentsActions?: WorkbenchDocumentsActions | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  /** Desktop settings: local runtime session import list (#1192). */
+  sessionImportItems?: import('../platform').RuntimeSessionSummary[] | undefined;
+  sessionImportLoading?: boolean | undefined;
+  sessionImportError?: string | null | undefined;
+  sessionImportVisible?: boolean | undefined;
+  onRefreshSessionImport?: (() => void) | undefined;
   /** Model catalog items from Edge API. When provided, the Agents page
    *  Models tab shows real model data instead of mock fixtures. */
   modelCatalog?: Array<{

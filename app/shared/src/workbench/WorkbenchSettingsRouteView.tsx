@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { LocalCliDiscoveryManifest } from '../platform';
+import type { LocalCliDiscoveryManifest, RuntimeSessionSummary } from '../platform';
 import { SettingsPage } from './pages/SettingsPage';
 import type { WorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
 import { buildSettingsPageProps } from './workbenchRoutesHelpers';
@@ -7,6 +7,11 @@ import { buildSettingsPageProps } from './workbenchRoutesHelpers';
 export interface WorkbenchSettingsRouteViewProps {
   settingsRoute: WorkbenchSettingsRoute;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  sessionImportItems?: RuntimeSessionSummary[] | undefined;
+  sessionImportLoading?: boolean | undefined;
+  sessionImportError?: string | null | undefined;
+  sessionImportVisible?: boolean | undefined;
+  onRefreshSessionImport?: (() => void) | undefined;
   userDisplayName?: string | undefined;
   onOpenAgentConfig: () => void;
 }
@@ -15,6 +20,11 @@ export interface WorkbenchSettingsRouteViewProps {
 export function WorkbenchSettingsRouteView({
   settingsRoute,
   localCliDiscovery,
+  sessionImportItems,
+  sessionImportLoading,
+  sessionImportError,
+  sessionImportVisible,
+  onRefreshSessionImport,
   userDisplayName,
   onOpenAgentConfig,
 }: WorkbenchSettingsRouteViewProps): React.ReactElement {
@@ -22,10 +32,25 @@ export function WorkbenchSettingsRouteView({
     () => buildSettingsPageProps({
       settingsRoute,
       localCliDiscovery,
+      sessionImportItems,
+      sessionImportLoading,
+      sessionImportError,
+      sessionImportVisible,
+      onRefreshSessionImport,
       userDisplayName,
       onOpenAgentConfig,
     }),
-    [localCliDiscovery, onOpenAgentConfig, settingsRoute, userDisplayName],
+    [
+      localCliDiscovery,
+      onOpenAgentConfig,
+      onRefreshSessionImport,
+      sessionImportError,
+      sessionImportItems,
+      sessionImportLoading,
+      sessionImportVisible,
+      settingsRoute,
+      userDisplayName,
+    ],
   );
 
   return <SettingsPage {...props} />;
