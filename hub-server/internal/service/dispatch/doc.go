@@ -13,7 +13,9 @@
 // redispatch log constants / team+capability residual) → #1012 (dispatch log
 // constants / redispatch task gate / offline success attrs / relay port /
 // capability payload guard) → #1033 (delivery-mark plans / assemble input core /
-// team identity extractors / redispatch status + target-bound conn residual).
+// team identity extractors / redispatch status + target-bound conn residual) →
+// #1056 (repo/offline success predicates / capability mint result /
+// redispatch prep gate / team-run identity / unbound inviter WS residual).
 // Typed DispatchService package move remains deferred and high risk. Do not
 // re-open outbox redispatch MarkDeliverySent semantics from #866; preserve #999
 // soft-fail errors, #1000 running-not-retryable, #1009 atomic claim, and #1031
