@@ -43,4 +43,8 @@ Format:
 
 - Phase 64 closed (ms 85; PRs #1106–#1110): payloadRequests/transport/codex/mcp peels + hygiene.
 - Phase 65 open (ms 86; #1111–#1115): orchestrator / surfacing / parser_ndjson / httpserver + MASTER hygiene.
+## 2026-07-19 (P66)
+
+- Phase 65 closed (ms 86; PRs #1116–#1120): orchestrator/surfacing/parser_ndjson/httpserver peels + hygiene.
+- Phase 66 open (ms 87; #1121–#1125): process_executor_pure / sdk_fixture_mapper / cache client / edgeEventMappers + MASTER hygiene.
 
