@@ -1,8 +1,8 @@
 .popover {
   position: fixed;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(0, 0, 0, 0.075);
+  background: var(--glass-panel);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   box-sizing: border-box;
   width: min(320px, calc(100vw - 32px));
@@ -11,15 +11,15 @@
   max-height: 240px;
   overflow-y: auto;
   padding: var(--space-xs, 4px);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 14px 36px var(--glass-shadow-subtle);
   backdrop-filter: blur(22px) saturate(1.08);
   -webkit-backdrop-filter: blur(22px) saturate(1.08);
 }
 
 [data-theme='dark'] .popover {
-  background: rgba(32, 32, 39, 0.94);
-  border-color: rgba(255, 255, 255, 0.075);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  background: var(--glass-panel-strong);
+  border-color: var(--glass-border);
+  box-shadow: 0 18px 44px var(--glass-shadow);
 }
 
 .list {
@@ -48,12 +48,12 @@
 
 .item:hover,
 .itemSelected {
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .item:hover,
 [data-theme='dark'] .itemSelected {
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--glass-bg-strong);
 }
 
 .statusDot {
