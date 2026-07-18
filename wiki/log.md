@@ -72,4 +72,8 @@ Format:
 
 - Phase 71 closed (ms 92; PRs #1176–#1180).
 - Phase 72 open (ms 93; #1181–#1184): Desktop wiring for aux panel / terminal / session import.
+## 2026-07-19 (P73)
+
+- Phase 72 closed (ms 93; PRs #1185–#1190).
+- Phase 73 open (ms 94; #1191–#1194): host ports + session import entry + mock terminal host.
 
