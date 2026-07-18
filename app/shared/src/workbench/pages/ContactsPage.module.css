@@ -638,7 +638,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--sp-xl);
-  background: rgba(18, 18, 28, 0.42);
+  background: var(--glass-shadow);
   backdrop-filter: blur(2px);
   animation: modalBackdropIn var(--dur-medium) var(--ease) both;
 }
