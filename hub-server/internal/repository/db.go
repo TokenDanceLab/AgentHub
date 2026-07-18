@@ -132,16 +132,23 @@ func InitDB(cfg *config.DBConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
 
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	slog.Info("database connected", "host", cfg.Host, "port", cfg.Port, "name", cfg.Name)
+	slog.Info("database connected",
+		"host", cfg.Host,
+		"port", cfg.Port,
+		"name", cfg.Name,
+		"application_name", cfg.ApplicationName,
+		"max_open_conns", cfg.MaxOpenConns,
+		"max_idle_conns", cfg.MaxIdleConns,
+	)
 	return db, nil
 }
 

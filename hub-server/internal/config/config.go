@@ -64,12 +64,17 @@ type ServerConfig struct {
 }
 
 type DBConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	Name     string `mapstructure:"name"`
-	SSLMode  string `mapstructure:"sslmode"`
+	Host            string        `mapstructure:"host"`
+	Port            int           `mapstructure:"port"`
+	User            string        `mapstructure:"user"`
+	Password        string        `mapstructure:"password"`
+	Name            string        `mapstructure:"name"`
+	SSLMode         string        `mapstructure:"sslmode"`
+	ApplicationName string        `mapstructure:"application_name"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
+	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
 }
 
 func (d DBConfig) DSN() string {
@@ -77,8 +82,12 @@ func (d DBConfig) DSN() string {
 	if sslmode == "" {
 		sslmode = "disable"
 	}
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.Name, sslmode)
+	if d.ApplicationName != "" {
+		dsn += " application_name=" + d.ApplicationName
+	}
+	return dsn
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -90,6 +99,11 @@ func (d DBConfig) LogValue() slog.Value {
 		slog.String("password", "[REDACTED]"),
 		slog.String("name", d.Name),
 		slog.String("sslmode", d.SSLMode),
+		slog.String("application_name", d.ApplicationName),
+		slog.Int("max_open_conns", d.MaxOpenConns),
+		slog.Int("max_idle_conns", d.MaxIdleConns),
+		slog.Duration("conn_max_lifetime", d.ConnMaxLifetime),
+		slog.Duration("conn_max_idle_time", d.ConnMaxIdleTime),
 	)
 }
 
@@ -306,6 +320,11 @@ func Load(configPath string) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 	v.SetDefault("db.sslmode", "disable")
+	v.SetDefault("db.application_name", "agenthub")
+	v.SetDefault("db.max_open_conns", 2)
+	v.SetDefault("db.max_idle_conns", 1)
+	v.SetDefault("db.conn_max_lifetime", 30*time.Minute)
+	v.SetDefault("db.conn_max_idle_time", 5*time.Minute)
 	v.SetDefault("upload.allowed_mime_types", DefaultAllowedUploadMimeTypes)
 	setAgentTeamDefaults(v)
 
@@ -543,6 +562,21 @@ func (c *Config) Validate() error {
 	}
 	if c.DB.Name == "" {
 		return errors.New("db.name is required")
+	}
+	if c.DB.MaxOpenConns < 1 {
+		return fmt.Errorf("db.max_open_conns must be positive; got %d", c.DB.MaxOpenConns)
+	}
+	if c.DB.MaxIdleConns < 0 || c.DB.MaxIdleConns > c.DB.MaxOpenConns {
+		return fmt.Errorf("db.max_idle_conns must be between 0 and max_open_conns; got %d", c.DB.MaxIdleConns)
+	}
+	if c.DB.ConnMaxLifetime <= 0 {
+		return fmt.Errorf("db.conn_max_lifetime must be positive; got %s", c.DB.ConnMaxLifetime)
+	}
+	if c.DB.ConnMaxIdleTime <= 0 {
+		return fmt.Errorf("db.conn_max_idle_time must be positive; got %s", c.DB.ConnMaxIdleTime)
+	}
+	if strings.ContainsAny(c.DB.ApplicationName, " \t\r\n'\\") {
+		return fmt.Errorf("db.application_name contains unsupported characters")
 	}
 	validSSL := map[string]bool{"disable": true, "require": true, "verify-ca": true, "verify-full": true}
 	if c.DB.SSLMode != "" && !validSSL[c.DB.SSLMode] {
