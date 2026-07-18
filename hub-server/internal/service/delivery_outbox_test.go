@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
 // newOutboxDB creates an in-memory SQLite database with the delivery_outbox
@@ -691,8 +692,10 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, payload.DeliveryID, rec.DeliveryID)
 	assert.Equal(t, task.ID, rec.TaskID)
-	assert.Equal(t, DeliveryStatusSent, rec.Status,
-		"outbox record should be in 'sent' status after dispatch")
+	// Offline-only dispatch leaves outbox pending (#1031) so reconnect + outbox
+	// redispatch do not dual-fire the same delivery_id.
+	assert.Equal(t, DeliveryStatusPending, rec.Status,
+		"offline queue acceptance must not MarkDeliverySent (#1031)")
 }
 
 // ==================== TestOutbox_RetryLoopInvokesRedispatcher ====================
@@ -1303,4 +1306,59 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 
 	snap := cache.snapshot()
 	assert.Empty(t, snap.pushed, "must not push a second delivery while task is running")
+}
+
+// ==================== #1031 offline vs outbox dual redelivery ownership ====================
+
+func TestOutbox_OfflineDispatchDoesNotMarkSent(t *testing.T) {
+	db := newOutboxDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO sessions (id, type, dissolved, owner_user_id) VALUES (?, ?, ?, ?)`,
+		"sess-off", model.SessionTypeGroup, false, "user-1").Error)
+	require.NoError(t, db.Exec(`INSERT INTO messages (id, session_id, sender_type, sender_id, content_type, content, seq_id, client_msg_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-off", "sess-off", model.SenderTypeUser, "user-1", model.ContentTypeText, `{"text":"run"}`, int64(1), "client-off", time.Now()).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-off", "claude-code", "sess-off", "user-1", "Claude").Error)
+	require.NoError(t, db.Exec(`INSERT INTO session_members (id, session_id, member_type, member_id, role) VALUES (?, ?, ?, ?, ?)`,
+		"member-off", "sess-off", model.MemberTypeUser, "user-1", model.MemberRoleMember).Error)
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
+
+	task := &model.PendingAgentTask{
+		ID:                "task-off",
+		AgentInstanceID:   "agent-off",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-off",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	agent := &model.AgentInstance{
+		ID: "agent-off", AgentType: "claude-code", SessionID: "sess-off",
+		InviterUserID: "user-1", DisplayName: "Claude",
+	}
+	svc.dispatchService().dispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
+
+	snap := cache.snapshot()
+	require.Len(t, snap.pushed, 1)
+
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(snap.pushed[0]), &payload))
+	require.NotEmpty(t, payload.DeliveryID)
+
+	status, err := svc.GetDeliveryStatus(context.Background(), payload.DeliveryID)
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusPending, status, "must not mark sent solely because offline accepted")
+}
+
+func TestOutbox_ShouldReplayOfflinePayloadCoordination(t *testing.T) {
+	// Pure ownership matrix for reconnect offline push vs outbox status (#1031).
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusPending, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusRetrying, true))
+	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, true))
+	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDelivered, true))
+	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDead, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("", DeliveryStatusSent, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, false))
 }

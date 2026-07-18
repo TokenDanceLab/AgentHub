@@ -21,6 +21,10 @@ func RedispatchOfflineQueueError(err error) error {
 	return fmt.Errorf("redispatch offline queue: %w", err)
 }
 
+// Note: offline-queue *acceptance* on outbox-owned redispatch still returns nil
+// so retryDeliveries may MarkDeliverySent (#866). Initial dispatch must not mark
+// sent solely because offline accepted (#1031); reconnect consults outbox status.
+
 // RedispatchOfflineSuccessLogAttrs builds structured slog attrs for offline-queue
 // success logs (device-bound path historically includes user_id).
 func RedispatchOfflineSuccessLogAttrs(preferDevice bool, deliveryID, taskID, userID string) []any {
