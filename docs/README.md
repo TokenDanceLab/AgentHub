@@ -44,7 +44,7 @@ docs/
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
 | cleanup-baseline 历史 plan | [plan/](plan/)（historical banner）· [archives/cleanup-baseline/](archives/cleanup-baseline/) |
-| 分析 / boundary map | [analysis/](analysis/) · [analysis/root-layout.md](analysis/root-layout.md) (P59 root retain/move) |
+| 分析 / boundary map | [analysis/](analysis/) · [analysis/root-layout.md](analysis/root-layout.md) · [analysis/engineering-loop-capability-map.md](analysis/engineering-loop-capability-map.md) (P71) |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
