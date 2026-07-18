@@ -85,16 +85,16 @@
 }
 
 /* Dot colors */
-.eventAssignment { background: rgba(0, 113, 188, 0.2); color: var(--primary); }
-.eventDone { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-.eventFailed { background: rgba(239, 68, 68, 0.2); color: var(--destructive); }
-.eventTask { background: rgba(59, 130, 246, 0.2); color: var(--info); }
-.eventRoute { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.eventStart { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-.eventMessage { background: rgba(156, 163, 175, 0.2); color: var(--muted-foreground); }
-.eventApproval { background: rgba(0, 113, 188, 0.2); color: var(--skill); }
-.eventConflict { background: rgba(239, 68, 68, 0.2); color: var(--destructive); }
-.eventUnknown { background: rgba(156, 163, 175, 0.2); color: var(--muted-foreground); }
+.eventAssignment { background: color-mix(in oklch, var(--primary) 20%, transparent); color: var(--primary); }
+.eventDone { background: color-mix(in oklch, var(--success) 20%, transparent); color: var(--success); }
+.eventFailed { background: color-mix(in oklch, var(--destructive) 20%, transparent); color: var(--destructive); }
+.eventTask { background: color-mix(in oklch, var(--info) 20%, transparent); color: var(--info); }
+.eventRoute { background: color-mix(in oklch, var(--warning) 20%, transparent); color: var(--warning); }
+.eventStart { background: color-mix(in oklch, var(--success) 20%, transparent); color: var(--success); }
+.eventMessage { background: color-mix(in oklch, var(--muted-foreground) 20%, transparent); color: var(--muted-foreground); }
+.eventApproval { background: color-mix(in oklch, var(--skill) 20%, transparent); color: var(--skill); }
+.eventConflict { background: color-mix(in oklch, var(--destructive) 20%, transparent); color: var(--destructive); }
+.eventUnknown { background: color-mix(in oklch, var(--muted-foreground) 20%, transparent); color: var(--muted-foreground); }
 
 .hint,
 .empty,
