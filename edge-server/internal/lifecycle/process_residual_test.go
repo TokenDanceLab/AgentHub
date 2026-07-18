@@ -2009,3 +2009,70 @@ func TestResidualPlanPureHelpers1043(t *testing.T) {
 		t.Fatalf("workdir %#v", ctx.WorkDir)
 	}
 }
+
+func TestResidualPlanPureHelpers1054(t *testing.T) {
+	t.Parallel()
+
+	// Start admission composes lookup/status + concurrency
+	if err := planStartAdmission(false, "queued", 0, 5, false); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("missing run: %v", err)
+	}
+	if err := planStartAdmission(true, "started", 0, 5, false); !errors.Is(err, ErrRunAlreadyStarted) {
+		t.Fatalf("non-queued: %v", err)
+	}
+	if err := planStartAdmission(true, "queued", 5, 5, false); !errors.Is(err, ErrTooManyConcurrentRuns) {
+		t.Fatalf("capacity: %v", err)
+	}
+	if err := planStartAdmission(true, "queued", 0, 5, true); !errors.Is(err, ErrRunAlreadyStarted) {
+		t.Fatalf("already running: %v", err)
+	}
+	if err := planStartAdmission(true, "queued", 0, 5, false); err != nil {
+		t.Fatalf("admit: %v", err)
+	}
+
+	// bindRunProcessContext
+	run := store.Run{ID: "r-bind", ProjectID: "p", ThreadID: "t"}
+	ctx := bindRunProcessContext(RunProcessContext{Prompt: "hi"}, run)
+	if ctx.Run.ID != "r-bind" || ctx.Prompt != "hi" {
+		t.Fatalf("bind %#v", ctx)
+	}
+
+	// tracked close gate
+	if shouldApplyTrackedClose(false, true) || shouldApplyTrackedClose(true, false) {
+		t.Fatal("tracked close closed")
+	}
+	if !shouldApplyTrackedClose(true, true) {
+		t.Fatal("tracked close open")
+	}
+
+	// evidence attempt / result
+	attempt := planEvidenceGateAttempt(false)
+	if attempt.RunGate || attempt.FinalStatus != "finished" {
+		t.Fatalf("disabled gate %#v", attempt)
+	}
+	attempt = planEvidenceGateAttempt(true)
+	if !attempt.RunGate || attempt.FinalStatus != "finished" {
+		t.Fatalf("enabled default pass %#v", attempt)
+	}
+	fail := planEvidenceGateResult(false)
+	if fail.FinalStatus == "finished" || !fail.LogFailure {
+		t.Fatalf("fail result %#v", fail)
+	}
+	pass := planEvidenceGateResult(true)
+	if pass.FinalStatus != "finished" || pass.LogFailure {
+		t.Fatalf("pass result %#v", pass)
+	}
+
+	// outbound prep keeps status/message fields
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	msg, agg := prepareSubAgentResultOutbound(
+		map[string]any{"ok": true},
+		"run-x", "agent-x", "Worker", "parent-x", "finished", now,
+	)
+	if msg.FromAgentID != "agent-x" || msg.ToAgentID != "parent-x" {
+		t.Fatalf("msg agents %#v", msg)
+	}
+	if agg.AgentID != "agent-x" || agg.RunID != "run-x" || agg.Status != "finished" {
+		t.Fatalf("agg %#v", agg)
+	}
+}
