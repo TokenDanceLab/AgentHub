@@ -17,11 +17,11 @@
 
 .toolbar {
   min-height: 40px;
-  padding: var(--sp-xxs) var(--sp-sm);
+  padding: var(--wb-gap-2xs, var(--sp-xxs)) var(--wb-gap-xs, var(--sp-sm));
   border-bottom: 1px solid var(--bdr);
   display: flex;
   align-items: center;
-  gap: var(--sp-xxs);
+  gap: var(--wb-gap-2xs, var(--sp-xxs));
   background: var(--surface);
 }
 
@@ -30,7 +30,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--wb-gap-2xs, 2px);
   overflow-x: auto;
 }
 
@@ -38,21 +38,29 @@
 .tabActive {
   max-width: 180px;
   min-height: 28px;
-  padding: 0 var(--sp-sm);
+  padding: 0 var(--wb-gap-xs, var(--sp-sm));
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--wb-gap-2xs, 6px);
   cursor: pointer;
   flex-shrink: 0;
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    color var(--motion-hover, 90ms ease),
+    transform var(--motion-press, 90ms ease);
 }
 
 .tab:hover {
   background: var(--surface-high);
   color: var(--text-1);
+}
+
+.tab:active {
+  transform: scale(var(--glass-press-scale, 0.985));
 }
 
 .tabActive {
@@ -138,8 +146,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-sm);
-  padding: var(--sp-lg);
+  gap: var(--wb-gap-xs, var(--sp-sm));
+  padding: var(--wb-gap-md, var(--sp-lg));
   text-align: center;
 }
 
@@ -159,17 +167,25 @@
 
 .primaryBtn {
   min-height: 30px;
-  padding: 0 var(--sp-md);
+  padding: 0 var(--wb-gap-md, var(--sp-md));
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text-1);
   cursor: pointer;
   font-size: var(--fs-sm, 12px);
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    transform var(--motion-press, 90ms ease),
+    border-color var(--motion-hover, 90ms ease);
 }
 
 .primaryBtn:hover:not(:disabled) {
   background: var(--surface-high);
+}
+
+.primaryBtn:active:not(:disabled) {
+  transform: scale(var(--glass-press-scale, 0.985));
 }
 
 .primaryBtn:disabled {
@@ -232,4 +248,15 @@
 
 .statusItem {
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .tabActive,
+  .tab:active,
+  .primaryBtn,
+  .primaryBtn:active:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
 }
