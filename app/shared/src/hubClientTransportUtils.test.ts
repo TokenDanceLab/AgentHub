@@ -4,6 +4,7 @@ import {
   DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,
   applyDefaultJsonContentType,
+  applyHubRequestCatchEffects,
   applyRefreshedBearerAuth,
   buildHubFetchInit,
   buildHubUrl,
@@ -21,19 +22,24 @@ import {
   isNetworkFetchTypeError,
   normalizeHubBaseUrl,
   planHubRequestCatchEffects,
+  planRefreshedTokenRetry,
+  planTokenRefreshFailureReport,
   prepareHubRequestContext,
+  prepareHubRequestContextFromClient,
   prepareMultipartUploadContext,
+  prepareMultipartUploadContextFromClient,
   requestMethodOf,
   resolveHubFetch,
   resolveHubRequestCatch,
   resolveHubTimeoutMs,
   shouldAttemptTokenRefresh,
+  shouldEnterTokenRefreshRecovery,
   shouldRetryWithRefreshedToken,
   toReportableError,
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -280,5 +286,80 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978)', () => {
 
     applyBearerAuth(headers, 'tok-2');
     expect(headers.get('Authorization')).toBe('Bearer tok-1');
+  });
+
+  it('peels exactOptional client context + refresh residual (#990)', () => {
+    // Explicit undefined from optional getters must not materialize as keys.
+    const prepared = prepareHubRequestContextFromClient({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      options: { method: 'GET' },
+      token: undefined,
+      timeoutMs: undefined,
+    });
+    expect(prepared.timeoutMs).toBe(DEFAULT_HUB_TIMEOUT_MS);
+    expect(prepared.headers.has('Authorization')).toBe(false);
+    expect(prepared.url).toBe('https://hub.example.com/client/auth/me');
+
+    const preparedWith = prepareHubRequestContextFromClient({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      options: {},
+      token: 'tok-x',
+      timeoutMs: 4_000,
+    });
+    expect(preparedWith.timeoutMs).toBe(4_000);
+    expect(preparedWith.headers.get('Authorization')).toBe('Bearer tok-x');
+
+    const multipart = prepareMultipartUploadContextFromClient({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/attachments',
+      token: undefined,
+      timeoutMs: undefined,
+    });
+    expect(multipart.timeoutMs).toBe(DEFAULT_HUB_TIMEOUT_MS);
+    expect(multipart.headers.has('Authorization')).toBe(false);
+
+    expect(shouldEnterTokenRefreshRecovery(401, async () => 'tok')).toBe(true);
+    expect(shouldEnterTokenRefreshRecovery(401, undefined)).toBe(false);
+    expect(shouldEnterTokenRefreshRecovery(403, async () => 'tok')).toBe(false);
+
+    expect(planRefreshedTokenRetry('tok-2')).toEqual({ action: 'retry', token: 'tok-2' });
+    expect(planRefreshedTokenRetry(null)).toEqual({ action: 'abort' });
+    expect(planRefreshedTokenRetry(undefined)).toEqual({ action: 'abort' });
+    expect(planRefreshedTokenRetry('')).toEqual({ action: 'abort' });
+
+    const failure = planTokenRefreshFailureReport('/client/auth/me', 'refresh-boom');
+    expect(failure.logPrefix).toBe('[HubClient] Token refresh failed');
+    expect(failure.error).toMatchObject({ message: 'refresh-boom' });
+    expect(failure.context).toEqual({ path: '/client/auth/me', context: 'token_refresh' });
+
+    const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 403);
+    const logs: string[] = [];
+    const reports: Array<{ error: AppError; context: Record<string, unknown> }> = [];
+    expect(() =>
+      applyHubRequestCatchEffects(
+        { error: appErr, report: { error: appErr, context: { path: '/p', method: 'GET' } } },
+        {
+          logError: (message) => logs.push(message),
+          report: (error, context) => reports.push({ error, context }),
+        },
+      ),
+    ).toThrow(appErr);
+    expect(logs).toEqual([]);
+    expect(reports).toEqual([{ error: appErr, context: { path: '/p', method: 'GET' } }]);
+
+    const timeoutEffects = planHubRequestCatchEffects(new DOMException('Aborted', 'AbortError'), {
+      timeoutMs: 1_000,
+      method: 'POST',
+      path: '/x',
+    });
+    expect(() =>
+      applyHubRequestCatchEffects(timeoutEffects, {
+        logError: (message) => logs.push(message),
+        report: (error, context) => reports.push({ error, context }),
+      }),
+    ).toThrow();
+    expect(logs.some((line) => line.includes('[HubClient]'))).toBe(true);
   });
 });
