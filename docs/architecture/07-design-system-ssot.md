@@ -96,3 +96,16 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | Alias registry | `designTokens.ts` `--td-glass-blur/card/elev` | Cross-surface naming; CSS remains value SSOT |
 
 Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; do not invent local `backdrop-filter` or rgba glass fills.
+
+## 8. Workbench density + micro-motion (#1198)
+
+| Token | Value | Use |
+|---|---|---|
+| `--wb-gap-2xs` | 4px | tab strip / hairline gaps |
+| `--wb-gap-xs` | 8px | chrome padding |
+| `--wb-gap-sm` | 12px | panel body / section |
+| `--wb-gap-md` | 16px | card / empty-state |
+| `--motion-hover/press/panel` | duration+ease recipes | chrome transitions |
+| `.ah-glass-press` | soft hover lift + press scale | optional utility class |
+
+Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.

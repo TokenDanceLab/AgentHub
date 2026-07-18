@@ -164,6 +164,19 @@
   --ease-standard:   var(--ease);
   --ease-emphasized: var(--ease-spring);
 
+  /* Workbench density map (#1198): 4 / 8 / 12 / 16 */
+  --wb-gap-2xs: var(--sp-xs);     /* 4px  — hairline gaps / tab strip */
+  --wb-gap-xs:  var(--sp-sm);     /* 8px  — chrome padding */
+  --wb-gap-sm:  var(--space-md);  /* 12px — panel body / section */
+  --wb-gap-md:  var(--sp-md);     /* 16px — card / empty-state */
+
+  /* Glass micro-motion recipes (CSS-only; respect reduced-motion) */
+  --motion-hover: var(--dur-fast) var(--ease);
+  --motion-press: var(--dur-fast) var(--ease-press);
+  --motion-panel: var(--dur-normal) var(--ease-panel);
+  --glass-press-scale: 0.985;
+  --glass-hover-lift: translateY(-1px);
+
   /* ═══════════════════════════════════════════════════════════════════════
      v4 State Colors
      ═══════════════════════════════════════════════════════════════════════ */
@@ -300,6 +313,32 @@
 
   /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
   --touch-target-min: 44px;
+}
+
+/* Glass micro-interaction utilities (#1198) */
+.ah-glass-press {
+  transition:
+    transform var(--motion-press),
+    box-shadow var(--motion-hover),
+    background-color var(--motion-hover),
+    border-color var(--motion-hover);
+}
+
+.ah-glass-press:hover {
+  transform: var(--glass-hover-lift);
+}
+
+.ah-glass-press:active {
+  transform: scale(var(--glass-press-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ah-glass-press,
+  .ah-glass-press:hover,
+  .ah-glass-press:active {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ── Global Reset ──────────────────────────────────────────────────── */
