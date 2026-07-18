@@ -104,12 +104,15 @@ export function ChatInspectorFrame(
   if (!localFiles) {
     return inspector;
   }
-  const hasWorkspace = Boolean(resolveComposerWorkDir(props.session.composer?.workDir));
+  const workDir = resolveComposerWorkDir(props.session.composer?.workDir);
+  const hasWorkspace = Boolean(workDir);
   return (
     <ChatEngineeringColumn
       inspector={inspector}
       hasWorkspace={hasWorkspace}
       localFiles={localFiles}
+      platform={props.platform}
+      {...(workDir ? { workDir } : {})}
     />
   );
 }

@@ -5,6 +5,11 @@ import type {
   AgentHubSurface,
   SurfaceCapabilities,
   TerminalPort,
+  WorkspaceFileEntry,
+  WorkspaceFilesPort,
+  WorkspaceGitChange,
+  WorkspaceGitCommit,
+  WorkspaceGitPort,
   TerminalResizePayload,
   TerminalSession,
   TerminalSessionId,
@@ -25,6 +30,8 @@ export interface MockPlatformSeed {
    * Web defaults keep `localTerminal` false and omit the port.
    */
   terminal?: TerminalPort;
+  workspaceFiles?: WorkspaceFilesPort;
+  workspaceGit?: WorkspaceGitPort;
 }
 
 export interface MockTerminalPort extends TerminalPort {
@@ -113,6 +120,33 @@ export function createMockTerminalPort(seedSessions: TerminalSession[] = []): Mo
   };
 }
 
+
+export function createMockWorkspaceFilesPort(
+  entries: WorkspaceFileEntry[] = [],
+): WorkspaceFilesPort {
+  return {
+    async list() {
+      return entries.map((e) => ({ ...e }));
+    },
+  };
+}
+
+export function createMockWorkspaceGitPort(seed?: {
+  changes?: WorkspaceGitChange[];
+  commits?: WorkspaceGitCommit[];
+}): WorkspaceGitPort {
+  const changes = seed?.changes ?? [];
+  const commits = seed?.commits ?? [];
+  return {
+    async listChanges() {
+      return changes.map((c) => ({ ...c }));
+    },
+    async listLog(_root?: string, limit = 20) {
+      return commits.slice(0, limit).map((c) => ({ ...c }));
+    },
+  };
+}
+
 export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
   const conversations = seed.conversations ?? [];
   const openedEvidence: EvidenceRef[] = [];
@@ -166,6 +200,8 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
         }
       : {}),
     ...(terminal ? { terminal } : {}),
+    ...(seed.workspaceFiles ? { workspaceFiles: seed.workspaceFiles } : {}),
+    ...(seed.workspaceGit ? { workspaceGit: seed.workspaceGit } : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         submittedIntents.push(intent);
