@@ -36,6 +36,8 @@ import {
   resolveHubFetch,
   resolveHubRequestCatch,
   resolveHubTimeoutMs,
+  runHubJsonRequest,
+  runHubMultipartUploadRequest,
   runUnauthorizedTokenRefreshRecovery,
   shouldAttemptTokenRefresh,
   shouldEnterTokenRefreshRecovery,
@@ -44,7 +46,7 @@ import {
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #1023)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #1023 / #1044)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -490,5 +492,92 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
         path: '/client/auth/me',
       }),
     ).toThrow(defaultErr);
+  });
+
+  it('peels full JSON request + multipart upload residual (#1044)', async () => {
+    const jsonCalls: Array<{ url: string; auth: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      jsonCalls.push({
+        url: String(input),
+        auth: headers.get('Authorization'),
+      });
+      const status =
+        headers.get('Authorization') === 'Bearer fresh' ? 200 : 401;
+      return new Response(JSON.stringify({ ok: true, data: { id: 'u1' } }), {
+        status,
+      });
+    };
+
+    // 401 → refresh → retry_result path
+    const refreshed = await runHubJsonRequest({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      options: { method: 'GET' },
+      token: 'stale',
+      timeoutMs: 5_000,
+      fetchImpl,
+      onRefreshToken: async () => 'fresh',
+      parseSuccess: async (response) => {
+        expect(response.status).toBe(200);
+        return (await response.json()) as { ok: boolean };
+      },
+    });
+    expect(refreshed).toEqual({ ok: true, data: { id: 'u1' } });
+    expect(jsonCalls.length).toBeGreaterThanOrEqual(2);
+    expect(jsonCalls[0]?.auth).toBe('Bearer stale');
+    expect(jsonCalls.some((c) => c.auth === 'Bearer fresh')).toBe(true);
+
+    // non-401 primary success
+    const okFetch: typeof fetch = async () =>
+      new Response(JSON.stringify({ ok: true }), { status: 200 });
+    const ok = await runHubJsonRequest({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      fetchImpl: okFetch,
+      parseSuccess: async (response) => {
+        expect(response.status).toBe(200);
+        return 'ok' as const;
+      },
+    });
+    expect(ok).toBe('ok');
+
+    // app error catch residual rethrows
+    const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 500);
+    const boomFetch: typeof fetch = async () => {
+      throw appErr;
+    };
+    await expect(
+      runHubJsonRequest({
+        baseUrl: 'https://hub.example.com',
+        path: '/client/auth/me',
+        fetchImpl: boomFetch,
+        parseSuccess: async () => 'never',
+      }),
+    ).rejects.toBe(appErr);
+
+    // multipart peel
+    const form = new FormData();
+    form.set('hash', 'h1');
+    const multiCalls: Array<{ url: string; method?: string }> = [];
+    const multiFetch: typeof fetch = async (input, init) => {
+      multiCalls.push({ url: String(input), method: init?.method });
+      return new Response(JSON.stringify({ ok: true, data: { id: 'a1' } }), {
+        status: 200,
+      });
+    };
+    const uploaded = await runHubMultipartUploadRequest({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/attachments',
+      formData: form,
+      token: 'tok',
+      timeoutMs: 5_000,
+      fetchImpl: multiFetch,
+      parseSuccess: async () => ({ id: 'a1' }) as const,
+    });
+    expect(uploaded).toEqual({ id: 'a1' });
+    expect(multiCalls).toEqual([
+      { url: 'https://hub.example.com/client/attachments', method: 'POST' },
+    ]);
   });
 });

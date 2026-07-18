@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from './errors';
 import {
+  invokeNormalizedRegisterDeviceRequest,
   invokePathFormDataUpload,
   invokePathInitRequest,
   invokePathsInitRequest,
@@ -9,13 +10,14 @@ import {
   qs,
   resolveRouteFallbackStep,
   runChangePasswordWithFallback,
+  runNormalizedExecutionTargetsListRequest,
   runRequestWithRouteFallback,
   shouldContinueRouteFallback,
   shouldUseChangePasswordFallback,
   unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023)', () => {
+describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #1044)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -229,5 +231,46 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023)', () 
       paths: ['/a:route', '/a/route'],
       hasOptions: true,
     });
+  });
+
+  it('peels register-device normalize + execution-target normalize residual (#1044)', async () => {
+    const calls: Array<{ paths: readonly string[]; body?: string }> = [];
+    const device = await invokeNormalizedRegisterDeviceRequest(
+      async (paths, options) => {
+        calls.push({
+          paths,
+          body: typeof options?.body === 'string' ? options.body : undefined,
+        });
+        return { id: 'dev-1' } as const;
+      },
+      { device_id: 'dev1', capabilities: ['run'] },
+      () => ['/edge/devices:register', '/edge/devices/register'] as const,
+      (normalized) => ({
+        method: 'POST' as const,
+        body: JSON.stringify(normalized),
+      }),
+    );
+    expect(device).toEqual({ id: 'dev-1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.paths).toEqual(['/edge/devices:register', '/edge/devices/register']);
+    expect(JSON.parse(calls[0]?.body ?? '{}')).toEqual({
+      device_id: 'dev1',
+      device_name: 'dev1',
+      device_type: 'desktop',
+      capabilities: { run: true },
+    });
+
+    const normalized = await runNormalizedExecutionTargetsListRequest(
+      async (path) => {
+        expect(path).toBe('/web/execution-targets');
+        return [{ id: 't1' }] as Array<{ id: string }>;
+      },
+      '/web/execution-targets',
+      (data) =>
+        Array.isArray(data)
+          ? { items: data as Array<{ id: string }>, page: { hasMore: false } }
+          : { items: [], page: { hasMore: false } },
+    );
+    expect(normalized).toEqual({ items: [{ id: 't1' }], page: { hasMore: false } });
   });
 });
