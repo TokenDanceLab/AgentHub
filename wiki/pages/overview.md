@@ -1,6 +1,6 @@
 ---
 title: AgentHub 产品总览
-summary: AgentHub 是 IM 形态的多 Agent 协作工作台，采用 Hub/Edge 双层架构；活进度以 docs/progress/MASTER.md 为准（Phase 61）
+summary: AgentHub 是 IM 形态的多 Agent 协作工作台，采用 Hub/Edge 双层架构；活进度以 docs/progress/MASTER.md 为准（Phase 63）
 tags:
   - overview
   - product
@@ -93,7 +93,7 @@ wiki 是编译知识层，**不覆盖** `AGENTS.md` / architecture / api / risk 
 | 表面 | 权威位置 |
 |---|---|
 | 规则 | `AGENTS.md` |
-| 活进度 | `docs/progress/MASTER.md`（Phase 61 / milestone 82，2026-07-18） |
+| 活进度 | `docs/progress/MASTER.md`（Phase 63 / milestone 84，2026-07-18） |
 | 总进度入口 | `docs/roadmap.md` |
 | 安全门禁 | `docs/governance/security-risk-register.md` |
 
