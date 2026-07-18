@@ -94,7 +94,7 @@ type ProcessExecutor struct {
 	workDirs    map[string]string                    // runID to workDir (for post-finish surfacing)
 	surfacers   map[string]*adapters.WorkdirSnapshot // runID to pre-run snapshot (for auto-surface detection)
 	cancelDone  map[string]chan struct{}             // runID to done channel for graceful shutdown goroutines
-	callbackSem chan struct{}                        // bounds concurrent hub callbacks (max 10); prevents goroutine explosion
+	callbackSem chan struct{}                        // bounds concurrent hub callbacks (max 10); stream acquires non-blocking, terminal blocks
 }
 
 // NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.
