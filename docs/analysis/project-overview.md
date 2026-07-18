@@ -1,8 +1,9 @@
 # AgentHub 项目总览（Cleanup Baseline）
 
-> last-updated: 2026-07-16
+> last-updated: 2026-07-18
 > scope: cleanup baseline synthesis（Architecture / Hub / Edge / Frontend / Risks + 主会话卫生债）
-> authority: 综合 discovery lanes；**不替代** `AGENTS.md` / `docs/architecture.md` / server STATE
+> authority: 综合 discovery lanes；**不替代** `AGENTS.md` / `docs/architecture.md` / `docs/progress/MASTER.md` / server STATE
+> note: completion cells use absolute dates or history pointers only; live progress is MASTER Phase 58
 
 ## Preliminary Direction
 
@@ -18,12 +19,12 @@ AgentHub 已具备正确且大体落地的双平面骨架：
 
 当前清理对象不是“缺架构”，而是：
 
-1. **生产叙事漂移**：hk3 已 LIVE，CI / 部分模板仍残留 decommissioned 叙述
-2. **安全半落地**：AH-SR-046 / 049 / 045 / 037 / 043 有代码痕迹但端到端未关
-3. **巨石与分叉**：Edge handlers / ProcessExecutor、Hub flat service、三份 `hubClient`、孤儿 Settings / TeamRun
-4. **卫生债**：`reference/` ~3.7G ignored 克隆、`.worktrees` ~4.6G、scripts ~80 家族（大量 readiness-only）、本地 dirty noise
+1. **生产叙事漂移**：CI / 部分模板可能残留 decommissioned 叙述；live 事实只读 external server STATE
+2. **安全半落地**：AH-SR-* 以 `docs/governance/security-risk-register.md` 为准；本 overview 不复述 Open 状态
+3. **巨石与分叉**：Edge handlers / ProcessExecutor、Hub flat service residual peels、前端分叉
+4. **卫生债**：`reference/` ignored 克隆、`.worktrees`、scripts readiness 面、本地 dirty noise
 
-权威程序见 `cleanup-strategy.md`：绞杀式切片 + 轻量 `wiki/` 编译知识层（非第二 SSOT）。
+权威程序指针：`cleanup-strategy.md`（归档）+ 活进度 `docs/progress/MASTER.md`；轻量 `wiki/` 为编译知识层（非第二 SSOT）。
 
 ## Current Architecture
 
@@ -134,9 +135,9 @@ shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
 | 入口 | 路径 | 说明 |
 |---|---|---|
 | 项目规则 | `AGENTS.md` | 唯一规则 SSOT |
-| 架构 | `docs/architecture.md` + `docs/architecture/*` | 01–06 子文档 |
-| 总进度 | `docs/roadmap.md` | 2026-06-28：无 active SPEC |
-| 专项进度 | `docs/progress/MASTER.md` | cleanup 应重建 |
+| 架构 | `docs/architecture.md` + `docs/architecture/*` | 01–07 子文档 |
+| 总进度入口 | `docs/roadmap.md` | 指针；活状态不写在本表 |
+| 专项进度 | `docs/progress/MASTER.md` | **活进度 SSOT**（Phase 58 / milestone 79，2026-07-18） |
 | 安全 | `docs/governance/security-risk-register.md` | 发布门禁 |
 | Hub 进程 | `hub-server/cmd/server-hub` | 本地 `:8080` |
 | Edge 进程 | `edge-server/cmd/agenthub-edge` | 本地 `127.0.0.1:3210` |
@@ -145,7 +146,7 @@ shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
 | Mobile Expo Web | `app/mobile-rn` `:5177` | boundary |
 | REST | `api/openapi.yaml` | 运行时路径以 router 为准 |
 | WS | `api/events.md` | Edge envelope vs Hub flat frame |
-| 生产 live | server `projects/agenthub` external ops SSOT | **hk3 LIVE** |
+| 生产 live | external server STATE（`projects/agenthub`） | **in-repo 不嵌入 host 事实** |
 | 本基线 | `docs/analysis/*` | overview / inventory / risk / strategy |
 
 ## Build & Run
@@ -156,20 +157,22 @@ shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
 docker compose up -d postgres redis
 
 cd hub-server && go run ./cmd/server-hub          # :8080/health
-cd edge-server && go run ./cmd/agenthub-edge      # :3210/health
+cd edge-server && go run ./cmd/agenthub-edge      # :3210/v1/health
 
-cd app/web && corepack pnpm install && corepack pnpm dev          # :5174
-cd app/desktop && corepack pnpm install && corepack pnpm dev      # :5173
-cd app/desktop && corepack pnpm tauri dev                          # native
+cd app && corepack pnpm install                   # monorepo once
+cd app/web && corepack pnpm dev                   # :5174
+cd app/desktop && corepack pnpm dev               # :5173
+cd app/desktop && corepack pnpm tauri dev         # native
+# optional: make fe-install / make fe-dev
 ```
 
 固定端口 SSOT（`AGENTS.md`）：Desktop 5173、Web 5174、Mobile Expo Web 5177、Hub 8080、Local Edge 3210。
 
 生产形状：
 
-- 仓库内最近似：`deployments/production/docker-compose.yml`（Azure PG + redis + 8090）
-- live：hk3 `/opt/agenthub`，容器 `agenthub-hub`，health `http://127.0.0.1:8090/health`
-- 镜像名仍漂移：`agenthub-hub` vs `agenthub-hub-server`（P0 对齐）
+- 仓库内模板：`deployments/production/docker-compose.yml`（非 live ops SSOT）
+- live 事实：external server STATE only（`projects/agenthub`）；**不在源仓嵌入 host 标签**
+- 镜像名仍可能漂移：`agenthub-hub` vs `agenthub-hub-server`（对齐任务见 progress，不在此复述）
 
 ## Testing Baseline
 
@@ -191,13 +194,13 @@ cd app/desktop && corepack pnpm tauri dev                          # native
 | 主题 | SSOT | 说明 |
 |---|---|---|
 | 规则 | `AGENTS.md` | 无第二套根级规则文件 |
-| 总进度 | `docs/roadmap.md` | Repo Structure Cleanup 已完成 |
-| 专项 | `docs/progress/MASTER.md` | cleanup 大型任务需重建 |
+| 总进度入口 | `docs/roadmap.md` | 指针到 history / MASTER |
+| 专项 | `docs/progress/MASTER.md` | Phase 58 活进度（2026-07-18） |
 | 架构 / 决策 | `docs/architecture*`、`docs/decisions.md` | 旧 ADR 外迁 |
-| 安全 | `docs/governance/*` | High Open 阻断公开发布 |
+| 安全 | `docs/governance/*` | Critical/High Open 阻断公开发布 |
 | Skill 白名单 | `.agents/skills/*` + verify 脚本 | 过期 skill 不得 active |
 | 分支 | `feat/*|docs/*` → `dev/delicious233` → `master` | worktree 在 `.worktrees/` |
-| 历史 | `docs/history.md` → 外部归档 | 源仓不保留 `docs/archive/` |
+| 历史 | `docs/history.md` + `docs/archives/` | cleanup-baseline 归档于 archives |
 | 脚本布局 | `scripts/{verify,dev,smoke,release,lib}` | **禁止**新根级 wrapper |
 
 ## External Integrations
@@ -208,30 +211,25 @@ cd app/desktop && corepack pnpm tauri dev                          # native
 | TokenDance Gateway | 模型 / API 路由 | API key 不进浏览器 |
 | Feishu / Lark | 协作入口 / 卡片 | 非第二登录；回调 3s 内 |
 | Azure PostgreSQL | Hub 生产库 | role `agenthub`（2026-07-15 切流） |
-| Redis | session / cache / 部分 relay | hk3 本地 redis |
+| Redis | session / cache / 部分 relay | 生产拓扑见 external server STATE |
 | Runtime CLI/SDK | Claude Code / Codex / OpenCode / Anthropic / OpenAI | 仅 Edge adapters |
 | GHCR / GitHub Actions | 镜像与 CI | 部分 CD 仍 dry-run / 文档式 |
 
-## Production Reality（hk3 LIVE）
+## Production Reality
 
-**当前权威状态（2026-07-15 起）：生产在 hk3 LIVE，不是 decommissioned。**
+**生产 live 事实不在源仓维护。** 权威：external server STATE（`projects/agenthub`）+ `deployments/production/` 模板 + `docs/architecture/05-deployment.md` 短指针。
 
-| 项 | 当前事实 |
+| 项 | 说明 |
 |---|---|
-| 角色 | 🟢 hk3 生产运行 |
-| Compose | `/opt/agenthub/docker-compose.yml` |
-| 容器 | `agenthub-hub`（healthy） |
-| 健康检查 | `http://127.0.0.1:8090/health` |
-| 数据库 | Azure PG `agenthub`，用户 / role **`agenthub`** |
-| DNS | service CNAME → `primary.vectorcontrol.tech` → current edge |
+| Live role / host / compose path | external server STATE only |
+| 仓库模板 | `deployments/production/`（非 live SSOT） |
+| 健康探针形状 | Hub 本地开发 `:8080/health`；生产路径以 ops STATE 为准 |
 
 ### 必须同时记住的漂移
 
-1. `.github/workflows/checks.yml` 等仍写 **decommissioned** —— 叙事漂移，待修，**不是**生产真相。
-2. server STATE 的 Verification Commands / nginx 段落仍夹杂 hk2/us1 历史 —— 勿覆盖 Current Role。
-3. 镜像名、旧 `hub-server/deployments/docker-compose.prod.yml` 本地 PG 形状、默认 `tdadmin` 可能过时。
-
-**生产叙事 SSOT 三件套：** server STATE + `deployments/production/` + `docs/architecture/05-deployment.md` 短指针。
+1. 部分 CI / 旧模板可能残留 decommissioned 叙述 —— 叙事漂移，待修，**不是**生产真相。
+2. server STATE 的历史段落可能夹杂旧拓扑 —— 勿覆盖 Current Role。
+3. 镜像名、旧 `hub-server/deployments/docker-compose.prod.yml` 本地 PG 形状可能过时。
 
 ### 卫生债（主会话补充，lanes 未全覆盖）
 
@@ -248,8 +246,8 @@ cd app/desktop && corepack pnpm tauri dev                          # native
 |---|---|
 | `module-inventory.md` | 模块 Files/LOC、复杂度、S.U.P.E.R 灯号 |
 | `risk-assessment.md` | 矛盾、Open High、PARTIAL 046/049、测试与卫生风险 |
-| `cleanup-strategy.md` | 程序决策、Phase 0–5、并行 Workflow 队、非目标 |
+| `cleanup-strategy.md` | 归档程序指针；活进度 `docs/progress/MASTER.md` |
 
 ## 一句话结论
 
-边界与分层已正确；清理对象是 **叙事漂移、安全半成品接线、god-file 浓度、前端分叉与仓库卫生**。路径是 **strangler + 轻量 wiki 编译层**，永不宣称生产 offline。
+边界与分层已正确；清理对象是 **叙事漂移、安全半成品接线、god-file 浓度、前端分叉与仓库卫生**。路径是 **strangler + 轻量 wiki 编译层**；生产状态只读 external ops，不在源仓嵌入 host 事实。

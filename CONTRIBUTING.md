@@ -1,6 +1,6 @@
 # Contributing to AgentHub
 
-最后更新：2026-06-27
+最后更新：2026-07-18
 
 本文件是唯一贡献入口。旧详细贡献指南见 [docs/history.md](docs/history.md)。
 
@@ -16,7 +16,7 @@
 type(scope): 中文摘要
 ```
 
-Allowed types: `init|feat|fix|docs|refactor|chore|test|perf|ci|revert`.
+Allowed types (SSOT in AGENTS.md): `feat|fix|docs|refactor|chore|test|perf|ci|revert`.
 
 Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 

@@ -1,8 +1,8 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-06-28
+最后更新：2026-07-18
 
-本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md`、当前 `docs/progress/MASTER.md`（仅当存在时）、`docs/roadmap.md` 和 `.agents/skills/real-e2e-acceptance/SKILL.md` 为准。
+本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 与 `docs/progress/MASTER.md` 为准；总入口见 `docs/roadmap.md` 与 `.agents/skills/real-e2e-acceptance/SKILL.md`。
 
 ## 前置条件
 
@@ -21,7 +21,7 @@
 ```bash
 git clone https://github.com/TokenDanceLab/AgentHub.git
 cd AgentHub
-git checkout dev/delicious233
+git checkout master
 git pull --ff-only
 ```
 
@@ -37,12 +37,12 @@ git worktree add .worktrees/my-topic -b feat/my-topic
 cp .env.example .env
 ```
 
-至少确认：
+至少确认（名称以仓库根 `.env.example` 为准）：
 
 - `AGENTHUB_DB_HOST`, `AGENTHUB_DB_PORT`, `AGENTHUB_DB_USER`, `AGENTHUB_DB_PASSWORD`
 - `AGENTHUB_REDIS_HOST`, `AGENTHUB_REDIS_PORT`
-- `HUB_JWT_SECRET` 或项目当前配置使用的 Hub JWT secret 变量，开发环境也使用足够长度的随机值
-- TokenDance ID OIDC 变量仅在测试真实登录时配置
+- `AGENTHUB_JWT_SECRET`（开发环境也使用足够长度的随机值，至少 32 字符）
+- TokenDance ID OIDC 仅在测试真实登录时配置：`AGENTHUB_TOKENDANCE_ID_ISSUER_URL`、`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`、`AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET`
 
 本地依赖可以用 Docker Compose：
 
@@ -65,14 +65,23 @@ Edge Server：
 ```bash
 cd edge-server
 go run ./cmd/agenthub-edge
-curl http://127.0.0.1:3210/health
+curl http://127.0.0.1:3210/v1/health
 ```
+
+前端依赖在 monorepo 根装一次（推荐）：
+
+```bash
+cd app
+corepack enable
+corepack pnpm install
+```
+
+可选 Makefile 入口（从仓库根）：`make fe-install`、`make fe-dev`（desktop Vite `:5173`）。
 
 Web：
 
 ```bash
 cd app/web
-corepack pnpm install
 corepack pnpm dev
 ```
 
@@ -82,7 +91,6 @@ Desktop renderer：
 
 ```bash
 cd app/desktop
-corepack pnpm install
 corepack pnpm dev
 ```
 
@@ -101,12 +109,12 @@ Mobile RN 当前只保持 required gate 边界清楚；不要在 Desktop/Web 任
 
 开发默认可以使用 demo/mock 或 fixture 数据。真实 Hub 登录必须走 TokenDance ID OIDC，并按 real E2E 证据等级说明是否真的跑了浏览器授权码流、Hub session、Desktop/Web token storage 和 WebSocket reconnect。
 
-常用 OIDC 变量：
+常用 OIDC 变量（与 `.env.example` 一致）：
 
 ```bash
 AGENTHUB_TOKENDANCE_ID_CLIENT_ID=<client-id>
 AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=<client-secret>
-AGENTHUB_TOKENDANCE_ID_ISSUER=http://127.0.0.1:3000
+AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://127.0.0.1:3000
 ```
 
 不要把 third-party provider token、TokenDance API key、callback code、session token 或真实日志写入仓库文档。

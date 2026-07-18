@@ -1,8 +1,9 @@
 # Frontend Dedupe Plan (Strangler Cleanup)
 
-最后更新：2026-07-16
+最后更新：2026-07-18
 范围：`app/desktop` / `app/web` / `app/shared`（mobile 仅边界相关）
 原则：只做小切片绞杀；不先大合并 orphan UI；先 SSOT 再删 fork。
+注意：本计划为 strangler 历史切片记录；活进度见 `docs/progress/MASTER.md`。
 
 ## 0. Goal
 
@@ -30,7 +31,7 @@
 
 ### C1. hubClient 三份实现（+ mobile thin wrap）
 
-| Path | LOC (approx) | Role today |
+| Path | LOC (approx) | Role (2026-07-16 inventory) |
 |---|---:|---|
 | `app/shared/src/hubClient.ts` | ~1533 | 意图中的 SSOT；mobile 已消费；含 request 超时/401 refresh/route fallback |
 | `app/desktop/src/api/hubClient.ts` | ~1854 | Desktop 产品真实客户端；类型与方法最全（team/docs/streamTaskEvent 等） |
@@ -511,25 +512,26 @@ cd app/web; corepack pnpm typecheck
 
 ## 8. 与既有分析对齐
 
-本计划与 `docs/analysis/_lane_digest.md` Frontend 段一致：
+本计划对齐 frontend strangler 顺序（原 `_lane_digest.md` Frontend 段已删除；以本文件与 MASTER 为准）：
 1. inventory orphans
 2. hubClient SSOT
 3. AH-SR-043 gates
 4. platform contract honesty
 5. 再处理 Settings/TeamRun forks
 
-## 9. 路径速查（绝对路径）
+## 9. 路径速查（仓库相对路径）
 
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/shared/src/hubClient.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/desktop/src/api/hubClient.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/web/src/api/hubClient.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/shared/src/workbench/pages/SettingsPage.tsx`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/desktop/src/components/SettingsPage.tsx`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/web/src/components/SettingsPage.tsx`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/desktop/src/views/TeamRunConsole.tsx`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/web/src/views/TeamRunConsole.tsx`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/shared/src/platform/types.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/desktop/src/platform/desktopPlatform.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/web/src/platform/webPlatform.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/app/shared/src/demo/dataMode.ts`
-- `D:/Code/TokenDance/AgentHub/.worktrees/cleanup-baseline/docs/governance/security-risk-register.md` (AH-SR-043)
+- `app/shared/src/hubClient.ts`
+- `app/desktop/src/api/hubClient.ts`
+- `app/web/src/api/hubClient.ts`
+- `app/shared/src/workbench/pages/SettingsPage.tsx`
+- `app/desktop/src/components/SettingsPage.tsx`
+- `app/web/src/components/SettingsPage.tsx`
+- `app/desktop/src/views/TeamRunConsole.tsx`
+- `app/web/src/views/TeamRunConsole.tsx`
+- `app/shared/src/platform/types.ts`
+- `app/desktop/src/platform/desktopPlatform.ts`
+- `app/web/src/platform/webPlatform.ts`
+- `app/shared/src/demo/dataMode.ts`
+- `docs/governance/security-risk-register.md` (AH-SR-043)
+- `docs/progress/MASTER.md` (live progress)
