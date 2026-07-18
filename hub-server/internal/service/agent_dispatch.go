@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -38,13 +37,10 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Pure residual continue (#977) after #946 edge-http/trigger/target-bound peel,
-// #902 assemble/target/redispatch-prep, #823 close + #834 alias drop, and the
-// #811/#800/#789/#779/#768/#756/#732 pure helpers. Call dispatch.* directly; DTO
-// type aliases retained for JSON/redispatch stability. Pure surface lives in
-// service/dispatch; orchestration + ports stay flat here. Do not re-open outbox
-// redispatch MarkDeliverySent semantics from #866. No OpenAPI/handler/frontend;
-// no typed DispatchService package move.
+// Pure residual continue (#1012) after #977/#946/#902 and the #732→#834 chain.
+// Call dispatch.* directly; DTO aliases kept for JSON/redispatch stability.
+// Orchestration + ports stay flat here. Preserve #866/#999/#1000 outbox
+// redispatch semantics. No OpenAPI/handler/frontend; no typed package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -81,10 +77,9 @@ type dispatchWS interface {
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
-// redispatch residual (payload unmarshal + route selection). DeliveryOutbox
-// retries call in through Redispatcher; Payload DTO lives in service/dispatch
-// with a thin same-package alias. Same-package extract (#563/#573/#617) + pure
-// helpers in service/dispatch (#732→#977) — typed package move still deferred.
+// redispatch residual. DeliveryOutbox retries enter via Redispatcher; Payload DTO
+// lives in service/dispatch with a thin same-package alias. Same-package extract
+// (#563/#573/#617) + pure helpers (#732→#1012) — typed package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -109,7 +104,7 @@ func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClien
 
 // SetOutbox injects (or replaces) the delivery outbox port.
 func (s *DispatchService) SetOutbox(outbox dispatchOutbox) {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
 	s.outbox = outbox
@@ -117,7 +112,7 @@ func (s *DispatchService) SetOutbox(outbox dispatchOutbox) {
 
 // SetBus injects (or replaces) the event bus port.
 func (s *DispatchService) SetBus(bus dispatchBus) {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
 	s.bus = bus
@@ -125,7 +120,7 @@ func (s *DispatchService) SetBus(bus dispatchBus) {
 
 // SetCache injects (or replaces) the route / offline-queue cache port.
 func (s *DispatchService) SetCache(cacheClient dispatchCache) {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
 	s.cacheClient = resolveDispatchCache(cacheClient)
@@ -133,7 +128,7 @@ func (s *DispatchService) SetCache(cacheClient dispatchCache) {
 
 // SetManager injects (or replaces) the WebSocket manager port.
 func (s *DispatchService) SetManager(mgr dispatchWS) {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
 	s.mgr = mgr
@@ -141,7 +136,7 @@ func (s *DispatchService) SetManager(mgr dispatchWS) {
 
 // SetRelay injects (or replaces) the hub_relay command dispatcher port.
 func (s *DispatchService) SetRelay(relay relayDispatcher) {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
 	s.relay = relay
@@ -157,7 +152,7 @@ func (s *DispatchService) publish(ctx context.Context, event Event) {
 
 // cachePort is a nil-safe accessor for the route / offline-queue cache port.
 func (s *DispatchService) cachePort() dispatchCache {
-	if s == nil {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return resolveDispatchCache(nil)
 	}
 	return resolveDispatchCache(s.cacheClient)
@@ -187,22 +182,15 @@ func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, delivery
 	_ = s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
 }
 
-// dispatchToEdgeHTTP attempts to dispatch a task directly via HTTP POST to a
-// local Edge server. Returns the Edge run ID on success, or empty string if
-// the Edge server is unreachable or returns an error.
+// dispatchToEdgeHTTP POSTs a task to local Edge /v1/runs. Returns Edge run ID on
+// success, or empty string when unreachable / rejected / decode fails.
 func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
 	// Pure Edge HTTP prep (#946); client/request side-effects stay here.
 	parts, insecure, err := dispatch.PrepareEdgeHTTPRequest(
 		os.Getenv("AGENTHUB_EDGE_URL"),
 		os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN"),
-		dp.Prompt,
-		dp.AgentType,
-		dp.SystemPrompt,
-		task.ID,
-		dp.DeliveryID,
-		dp.Messages,
-		dp.PinnedMessages,
-		dp.OutputSchema,
+		dp.Prompt, dp.AgentType, dp.SystemPrompt, task.ID, dp.DeliveryID,
+		dp.Messages, dp.PinnedMessages, dp.OutputSchema,
 		s.issueRunStartCapability(dp),
 	)
 	if insecure {
@@ -359,7 +347,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 	deliveryID, err := s.recordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
 	if err != nil {
 		// Still dispatch for availability, but durability is degraded until outbox is healthy.
-		slog.Error("AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking",
+		slog.Error(dispatch.DispatchLogOutboxRecordFailed,
 			"task_id", task.ID, "edge_device_id", task.EdgeDeviceID, "error", err)
 	} else {
 		// Re-serialize with delivery_id included (pure finalize #811/#902).
@@ -368,7 +356,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 
 	// Primary route classification is pure (#800); side-effects stay here.
 	route := dispatch.ClassifyPrimaryDispatchRoute(
-		task.TargetID, targetType, task.EdgeDeviceID, s.relay != nil,
+		task.TargetID, targetType, task.EdgeDeviceID, dispatch.RelayPortAvailable(s.relay != nil),
 	)
 	cacheClient := s.cachePort()
 
@@ -377,7 +365,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		// Try HTTP direct dispatch to local Edge first for unbound tasks.
 		if dispatch.IsHTTPEdgeDispatchSuccess(s.dispatchToEdgeHTTP(ctx, task, &dp)) {
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); err != nil {
-				slog.Error("failed to mark http-dispatched task", "task_id", task.ID, "error", err)
+				slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
 			}
 			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
 				_ = s.markDeliverySent(ctx, deliveryID)
@@ -388,9 +376,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, dispatch.DesktopDeviceType)
 		if dispatch.ClassifyUnboundFallbackRoute(connID, dispatch.ManagerPortAvailable(s.mgr != nil), err) == dispatch.RouteInviterDesktop {
 			conn := s.mgr.FindByConnID(connID)
-			if conn == nil {
+			if !dispatch.InviterDesktopConnPresent(conn != nil) {
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
-					slog.Error("failed to push agent task to offline queue (conn nil)", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+					slog.Error(dispatch.DispatchLogOfflinePushConnNil, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 				}
 				if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
 					_ = s.markDeliverySent(ctx, deliveryID)
@@ -399,14 +387,14 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			}
 			frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID); err != nil {
-				slog.Error("failed to mark agent task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
+				slog.Error(dispatch.DispatchLogMarkAgentDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
 				return
 			}
 			result := s.mgr.PushToConn(connID, frame)
 			if !result.Queued {
-				slog.Warn("agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				slog.Warn(dispatch.DispatchLogWSNotQueuedPreserve, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
-					slog.Error("failed to preserve agent task after websocket dispatch failure", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
+					slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
 				}
 			}
 			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
@@ -415,7 +403,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			return
 		}
 		if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
-			slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			slog.Error(dispatch.DispatchLogOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
 		if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
@@ -423,21 +411,21 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		return
 
 	case dispatch.RouteMissingEdge:
-		slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
+		slog.Error(dispatch.DispatchLogMissingTargetEdgeDevice, "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
 		return
 
 	case dispatch.RouteHubRelay:
 		// hub_relay uses the relay service; failures fall back to offline target queue.
 		_, err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
 		if err != nil {
-			slog.Error("failed to create relay command for hub_relay dispatch", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); pushErr != nil {
-				slog.Error("failed to push hub_relay task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
+				slog.Error(dispatch.DispatchLogRelayOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
 			}
 			return
 		}
 		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); err != nil {
-			slog.Error("failed to mark hub_relay task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			slog.Error(dispatch.DispatchLogMarkHubRelayDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
 		if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
@@ -516,11 +504,11 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
 	queueTargetTask := func(reason string, err error) {
 		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
-			slog.Error("failed to push target-bound agent task to offline queue", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
+			slog.Error(dispatch.DispatchLogTargetBoundOfflinePushFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
 			return
 		}
 		if err != nil {
-			slog.Info("queued target-bound agent task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", err)
+			slog.Info(dispatch.DispatchLogTargetBoundQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", err)
 		}
 	}
 
@@ -536,12 +524,12 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 	}
 	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); err != nil {
-		slog.Error("failed to mark target-bound agent task dispatched", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
+		slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
 		return
 	}
 	result := s.mgr.PushToConn(connID, frame)
 	if !result.Queued {
-		slog.Warn("target-bound agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		slog.Warn(dispatch.DispatchLogTargetBoundWSNotQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
 		queueTargetTask(dispatch.TargetBoundReasonWSNotQueued, result.Err)
 	}
 }
@@ -614,9 +602,9 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 }
 
 // issueRunStartCapability mints a short-lived capability token for Edge dual-token auth.
-// Returns empty string when secret/device are unavailable so local/dev dispatch still works.
+// Empty when secret/device unavailable so local/dev dispatch still works.
 func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
-	if dp == nil {
+	if !dispatch.CapabilityPayloadPresent(dp != nil) {
 		return ""
 	}
 	resolved := dispatch.CapabilityMintFromEnv(
@@ -629,23 +617,13 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	if !dispatch.ShouldIssueCapabilityToken(resolved) {
 		return ""
 	}
-	// Edge HTTP dispatch currently uses LocalProjectID / LocalThreadID; keep capability bindings aligned.
 	args := dispatch.CapabilityTokenArgs(resolved)
 	token, err := jwtutil.IssueCapabilityToken(
-		args.Secret,
-		args.UserID,
-		args.DeviceID,
-		args.ProjectID,
-		args.Action,
-		args.TTL,
-		jwtutil.CapabilityIssueOptions{
-			Action:   args.Action,
-			TargetID: args.TargetID,
-			ThreadID: args.ThreadID,
-		},
+		args.Secret, args.UserID, args.DeviceID, args.ProjectID, args.Action, args.TTL,
+		jwtutil.CapabilityIssueOptions{Action: args.Action, TargetID: args.TargetID, ThreadID: args.ThreadID},
 	)
 	if err != nil {
-		slog.Warn("AH-SR-046 failed to issue capability token", "error", err, "device_id", args.DeviceID)
+		slog.Warn(dispatch.CapabilityMintFailedLog, "error", err, "device_id", args.DeviceID)
 		return ""
 	}
 	return token
@@ -653,65 +631,46 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 
 // ── Redispatch residual (moved from AgentService in #573) ────────────────────
 
-// redispatchDelivery re-dispatches a delivery by parsing the stored payload
-// and routing it to the target Edge device. Pure JSON prep is in dispatch
-// (#800); dead-letter + routing stay here. Accepts redispatchTarget only —
-// never the private GORM row type.
+// redispatchDelivery re-dispatches a delivery by parsing the stored payload and
+// routing it to the target Edge device. Pure JSON prep is in dispatch; dead-letter
+// + routing stay here. Accepts redispatchTarget only — never the private GORM row.
 //
-// Returns nil on successful route (HTTP / WS / offline queue) and on
-// intentional dead-letter (already terminal). Soft route failures return
-// an error so DeliveryOutbox.retryDeliveries does not MarkDeliverySent (#999).
+// Returns nil on successful route (HTTP / WS / offline queue) and on intentional
+// dead-letter. Soft route failures return an error so retryDeliveries does not
+// MarkDeliverySent (#999). Running is non-retryable (#1000).
 func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) error {
 	dp, newPayload, err := dispatch.PrepareRedispatchPayload(rec.Payload, rec.DeliveryID)
 	if err != nil {
 		kind, unwrap := dispatch.RedispatchPrepFailure(err)
 		slog.Error(dispatch.RedispatchPrepLogMessage(kind),
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
+			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
 		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(kind, unwrap))
 		return nil
 	}
 
-	// Look up the task for dispatch routing.
 	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
-	if err != nil {
-		slog.Warn(dispatch.RedispatchLogTaskLookupFailed,
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"error", err,
-		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(dispatch.DeadLetterKindTaskLookup, err))
+	status := ""
+	if task != nil {
+		status = task.Status
+	}
+	gate := dispatch.PlanRedispatchTaskGate(err, status)
+	switch gate.Kind {
+	case dispatch.RedispatchGateDeadLetterLookup:
+		slog.Warn(gate.LogMessage, "delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, gate.DeadLetterReason)
+		return nil
+	case dispatch.RedispatchGateDeadLetterStatus:
+		slog.Info(gate.LogMessage, "delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "task_status", status)
+		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, gate.DeadLetterReason)
 		return nil
 	}
-
-	// Only retry if task is still in a retryable state (queued/dispatched).
-	// Running is intentionally non-retryable (#1000) so Edge execution is not duplicated.
-	if !dispatch.IsRetryableTaskStatus(task.Status) {
-		slog.Info(dispatch.RedispatchLogTaskTerminal,
-			"delivery_id", rec.DeliveryID,
-			"task_id", rec.TaskID,
-			"task_status", task.Status,
-		)
-		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterTaskStatus(task.Status))
-		return nil
-	}
-
-	// Re-dispatch via HTTP (if local Edge) or WebSocket / offline queue.
 	return s.retryDispatchToTarget(ctx, task, dp, newPayload, rec)
 }
 
 // getPendingTaskForRedelivery looks up a task for redelivery purposes.
 func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskID string) (*pendingTaskSnapshot, error) {
 	var task struct {
-		ID                string
-		AgentInstanceID   string
-		TriggeredByUserID string
-		Status            string
-		EdgeDeviceID      string
-		EdgeRunID         string
-		TargetID          string
+		ID, AgentInstanceID, TriggeredByUserID, Status, EdgeDeviceID, EdgeRunID, TargetID string
 	}
 	err := s.db.WithContext(ctx).
 		Table("pending_agent_tasks").
@@ -721,24 +680,18 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 	if err != nil {
 		return nil, err
 	}
-	snap := dispatch.NewPendingTaskSnapshot(
-		task.ID,
-		task.AgentInstanceID,
-		task.TriggeredByUserID,
-		task.Status,
-		task.EdgeDeviceID,
-		task.EdgeRunID,
-		task.TargetID,
+	snap := dispatch.MapPendingTaskRedeliveryRow(
+		task.ID, task.AgentInstanceID, task.TriggeredByUserID, task.Status,
+		task.EdgeDeviceID, task.EdgeRunID, task.TargetID,
 	)
 	return &snap, nil
 }
 
 // retryDispatchToTarget re-dispatches a delivery to the target Edge device.
 // rec is a redispatchTarget (opaque payload fields only), not the GORM model.
-// Primary / connection route classification is pure (#811/#902); WS/HTTP/offline
-// side-effects stay here. Outbox MarkDeliverySent after success remains on the
-// DeliveryOutbox RedispatchDelivery path (#866) — not reopened here.
-// Soft offline-queue failures return an error so callers do not false-mark sent (#999).
+// Route classification is pure; WS/HTTP/offline side-effects stay here. Soft
+// offline-queue failures return an error so callers do not false-mark sent (#999).
+// Outbox MarkDeliverySent after success remains on DeliveryOutbox RedispatchDelivery.
 func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) error {
 	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
 	preferDevice := dispatch.PreferDeviceBoundRedelivery(task.EdgeDeviceID)
@@ -790,15 +743,11 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
 		slog.Error(dispatch.RedispatchOfflinePushFailedLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
-		return fmt.Errorf("redispatch offline queue: %w", err)
+		// Soft offline-queue failure: return error so callers do not false-mark sent (#999).
+		return dispatch.RedispatchOfflineQueueError(err)
 	}
-	if dispatch.RedispatchOfflineSuccessIncludesUserID(preferDevice) {
-		slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
-			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "user_id", task.TriggeredByUserID)
-	} else {
-		slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
-			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID)
-	}
+	slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
+		dispatch.RedispatchOfflineSuccessLogAttrs(preferDevice, rec.DeliveryID, rec.TaskID, task.TriggeredByUserID)...)
 	return nil
 }
 
@@ -807,7 +756,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 // dispatchService returns the composed DispatchService, lazily constructing one
 // from AgentService deps when tests use struct literals without NewAgentService.
 func (s *AgentService) dispatchService() *DispatchService {
-	if s.dispatch != nil {
+	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
 		return s.dispatch
 	}
 	return NewDispatchService(s.db, s.bus, s.mgr, s.cacheClient, s.relay, s.deliveryOutboxService())
