@@ -78,6 +78,25 @@ function sessionStatusLabel(
   }
 }
 
+function resolveTerminalPanelLabels(
+  labelsProp?: TerminalPanelLabels | undefined,
+): Required<TerminalPanelLabels> {
+  return {
+    ariaLabel: labelsProp?.ariaLabel ?? defaultLabels.ariaLabel,
+    emptyTitle: labelsProp?.emptyTitle ?? defaultLabels.emptyTitle,
+    emptyDescription: labelsProp?.emptyDescription ?? defaultLabels.emptyDescription,
+    newSession: labelsProp?.newSession ?? defaultLabels.newSession,
+    closeSession: labelsProp?.closeSession ?? defaultLabels.closeSession,
+    closePanel: labelsProp?.closePanel ?? defaultLabels.closePanel,
+    unavailable: labelsProp?.unavailable ?? defaultLabels.unavailable,
+    shellHint: labelsProp?.shellHint ?? defaultLabels.shellHint,
+    statusStarting: labelsProp?.statusStarting ?? defaultLabels.statusStarting,
+    statusRunning: labelsProp?.statusRunning ?? defaultLabels.statusRunning,
+    statusExited: labelsProp?.statusExited ?? defaultLabels.statusExited,
+    statusError: labelsProp?.statusError ?? defaultLabels.statusError,
+  };
+}
+
 export function isLocalTerminalEnabled(localTerminal?: boolean | undefined): boolean {
   return localTerminal === true;
 }
@@ -93,7 +112,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   labels: labelsProp,
 }) => {
   const labels = useMemo(
-    () => ({ ...defaultLabels, ...labelsProp }),
+    () => resolveTerminalPanelLabels(labelsProp),
     [labelsProp],
   );
 

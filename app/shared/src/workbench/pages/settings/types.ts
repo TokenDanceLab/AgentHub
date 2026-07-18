@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { DesignNavIconName } from '../../designIcons';
-import type { LocalCliDiscoveryManifest } from '../../../platform';
+import type { LocalCliDiscoveryManifest, RuntimeSessionSummary } from '../../../platform';
 
 export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states';
 
@@ -71,13 +71,7 @@ export interface SettingsPageProps {
   /** Optional Desktop host CLI discovery status. */
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
   /** Desktop-only local runtime session import list (#1192). */
-  sessionImportItems?: Array<{
-    runtime: string;
-    id: string;
-    title?: string;
-    updatedAt?: string;
-    sourceMode?: string;
-  }> | undefined;
+  sessionImportItems?: RuntimeSessionSummary[] | undefined;
   sessionImportLoading?: boolean | undefined;
   sessionImportError?: string | undefined;
   sessionImportVisible?: boolean | undefined;
