@@ -25,10 +25,12 @@ func CanRegenerateTaskStatus(status string) bool {
 }
 
 // IsRetryableTaskStatus reports whether redispatch may retry a delivery for
-// this pending-task status (queued / dispatched / running).
+// this pending-task status (queued / dispatched only).
+// Running is excluded (#1000): Edge is already executing — redispatch would
+// duplicate work. Stream/done auto-ack the outbox; this is the safety net.
 func IsRetryableTaskStatus(status string) bool {
 	switch status {
-	case model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning:
+	case model.TaskStatusQueued, model.TaskStatusDispatched:
 		return true
 	default:
 		return false

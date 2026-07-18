@@ -982,3 +982,123 @@ func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) 
 	require.Len(t, snap.pushed, 1)
 	assert.Equal(t, "user-1", snap.pushedUser)
 }
+
+// ==================== #1000 stream/done auto-ack + running not redispatchable ====================
+
+func ensureOutboxStreamTables(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	// Stream callbacks need run-event + session seq columns beyond the base outbox fixture.
+	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS agent_run_events (
+		id TEXT PRIMARY KEY,
+		task_id TEXT NOT NULL,
+		edge_run_id TEXT,
+		session_id TEXT NOT NULL,
+		agent_instance_id TEXT NOT NULL,
+		event_seq INTEGER NOT NULL,
+		event_type TEXT NOT NULL,
+		payload TEXT NOT NULL,
+		created_at DATETIME
+	)`).Error)
+	// SQLite allows adding columns only once; ignore if already present in schema variants.
+	_ = db.Exec(`ALTER TABLE sessions ADD COLUMN next_seq INTEGER NOT NULL DEFAULT 0`).Error
+	_ = db.Exec(`ALTER TABLE sessions ADD COLUMN last_message_at DATETIME`).Error
+}
+
+func TestOutbox_AutoAckOnTaskStream(t *testing.T) {
+	db := newOutboxDB(t)
+	ensureOutboxStreamTables(t, db)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	ctx := context.Background()
+
+	now := time.Now()
+	require.NoError(t, db.Exec(`INSERT INTO sessions (id, type, dissolved, owner_user_id) VALUES (?, ?, ?, ?)`,
+		"sess-stream-ack", model.SessionTypeGroup, false, "user-1").Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-stream", "codex", "sess-stream-ack", "user-1", "TestAgent").Error)
+	// Dispatched → stream transitions to running and must ack outbox (#1000).
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_device_id, expire_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-stream-ack", "agent-stream", "user-1", "msg-1", model.TaskStatusDispatched, "dev-1", now.Add(time.Hour), now).Error)
+
+	deliveryID, err := svc.RecordDelivery(ctx, "task-stream-ack", `{"test":true}`, "dev-1")
+	require.NoError(t, err)
+	require.NoError(t, svc.MarkDeliverySent(ctx, deliveryID))
+
+	err = svc.HandleTaskStream(ctx, "user-1", "dev-1", "task-stream-ack", "run-stream", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+	})
+	require.NoError(t, err)
+
+	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusDelivered, status, "first authorized stream must auto-ack outbox")
+
+	var task model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-stream-ack").First(&task).Error)
+	assert.Equal(t, model.TaskStatusRunning, task.Status)
+}
+
+func TestOutbox_AutoAckOnTaskDone(t *testing.T) {
+	db := newOutboxDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	ctx := context.Background()
+
+	now := time.Now()
+	require.NoError(t, db.Exec(`INSERT INTO sessions (id, type, dissolved, owner_user_id) VALUES (?, ?, ?, ?)`,
+		"sess-done-ack", model.SessionTypeGroup, false, "user-1").Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-done", "codex", "sess-done-ack", "user-1", "TestAgent").Error)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_device_id, edge_run_id, expire_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-done-ack", "agent-done", "user-1", "msg-1", model.TaskStatusRunning, "dev-1", "run-done", now.Add(time.Hour), now).Error)
+
+	deliveryID, err := svc.RecordDelivery(ctx, "task-done-ack", `{"test":true}`, "dev-1")
+	require.NoError(t, err)
+	require.NoError(t, svc.MarkDeliverySent(ctx, deliveryID))
+
+	// Empty final content avoids message insert / seq allocation.
+	err = svc.HandleTaskDone(ctx, "user-1", "dev-1", "task-done-ack", "run-done", "")
+	require.NoError(t, err)
+
+	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusDelivered, status, "done must auto-ack outbox when stream/ack were skipped")
+}
+
+func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+
+	now := time.Now()
+	payload := `{"task_id":"task-running","agent_type":"claude-code","prompt":"hi"}`
+	// Due retrying row + running task: redispatch must dead-letter, never resend.
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+	_, err = rawDB.Exec(
+		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_run_id, edge_device_id, error_message, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-running", "agent-1", "user-1", "msg-1", "", model.TaskStatusRunning, "run-1", "dev-1", "", now.Add(time.Hour),
+	)
+	require.NoError(t, err)
+	pastRetry := now.Add(-time.Second)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, edge_device_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"id-del-running", "task-running", "del-running", payload, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, pastRetry, "dev-1", "prior", now, now,
+	)
+	require.NoError(t, err)
+
+	cache := &mockAgentCache{}
+	outbox := NewDeliveryOutbox(db, nil)
+	ds := NewDispatchService(db, nil, nil, cache, nil, outbox)
+	outbox.SetRedispatcher(dispatchRedispatcher{d: ds})
+
+	outbox.retryDeliveries(ctx)
+
+	status, err := outbox.GetDeliveryStatus(ctx, "del-running")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusDead, status, "running task deliveries must not be redispatched (#1000)")
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-running").First(&rec).Error)
+	assert.Contains(t, rec.LastError, "running")
+
+	snap := cache.snapshot()
+	assert.Empty(t, snap.pushed, "must not push a second delivery while task is running")
+}
