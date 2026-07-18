@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–70 · [#1176](https://github.com/TokenDanceLab/AgentHub/pull/1176)–[#1180](https://github.com/TokenDanceLab/AgentHub/pull/1180) Phase 71 · [#1185](https://github.com/TokenDanceLab/AgentHub/pull/1185)–[#1190](https://github.com/TokenDanceLab/AgentHub/pull/1190) Phase 72
+> **Merged program PRs**: Phases 1–72 · Phase 73 host ports (#1201–#1203) · Phase 74 visual system open
 
 ## Two task surfaces (do not mix)
 
@@ -18,74 +18,76 @@
 
 ## Management model
 
-1. **SPEC in-repo**：`docs/analysis/*` + 本文件
-2. **GitHub Project board**：活状态 / WIP
-3. **Milestones = Phases** · **Issues = 原子任务**
-4. **PR closes Issue**
+1. SPEC in-repo + MASTER
+2. GitHub Project board
+3. Milestones = Phases · Issues = 原子任务
+4. PR closes Issue
 5. wiki 非第二 SSOT
 
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 73 open Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 94 --state open`
-- **Labels**: `spec-driven` · `phase:73`
+- **Phase 73**: `gh issue list -R TokenDanceLab/AgentHub --milestone 94 --state open`
+- **Phase 74**: `gh issue list -R TokenDanceLab/AgentHub --milestone 95 --state open`
 
 ## References
 
 - [engineering-loop-capability-map](../analysis/engineering-loop-capability-map.md)
-- Platform · auxPanel · terminal · sessionImport · `edge-server/internal/sessionindex`
+- [07-design-system-ssot](../architecture/07-design-system-ssot.md)
+- Platform · auxPanel · terminal · sessionImport
 
 ## Milestones
 
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
-| 1–71 | Baseline + residual + loop foundations | #22–#92 | closed |
-| 72 | Engineering loop Desktop wiring | #93 | closed (PRs #1185–#1190; 4/4) |
-| 73 | Host ports + import entry | #94 | active (open #1191–#1194) |
+| 1–72 | Baseline + residual + loop foundations + wiring | #22–#93 | closed |
+| 73 | Host ports + import entry | #94 | closed (#1191–#1193; PRs #1201–#1203) |
+| 74 | Light frosted glass + Visual QA | #95 | active (#1197–#1200) |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
-| #1171–#1175 Phase 71 | closed |
 | #1181–#1184 Phase 72 | closed |
-| #1191–#1194 Phase 73 | open |
+| #1191–#1194 Phase 73 | closed (product residual landed) |
+| #1197–#1200 Phase 74 | open visual system |
 
 ## Quick Status Commands
 
 ```bash
-gh issue list -R TokenDanceLab/AgentHub --milestone 94 --state open
+gh issue list -R TokenDanceLab/AgentHub --milestone 95 --state open
 git rev-parse --short origin/master
 ```
 
 ## Phase Checklist
 
 - [x] Phase 0–72
-- [ ] Phase 73 host ports + import entry (ms 94)
+- [x] Phase 73 host ports + import entry
+- [ ] Phase 74 light frosted glass + Visual QA
 
 ## Current Status
 
-**Active Phase**: Phase 73 — Host ports + import entry (milestone 94; open=4)
-**Active Tasks**: #1191 FS/Git ports · #1192 session import entry · #1193 mock TerminalPort host · #1194 MASTER hygiene
+**Active Phase**: 74 (visual system)
+**Active Tasks**: #1197 glass tokens · #1198 motion/spacing · #1199 visual QA scorecard · #1200 hygiene
 **Blockers**: None
-**Stability note**: P72 wired AuxPanel column, Terminal dock, SessionImportList, runtime-sessions API
-**Product tip**: last product = P72 wiring; latest: `git rev-parse --short origin/master`
+**Product tip**: `145bcc2d` — session import + workspace host ports + mock terminal
+**Visual north star**: light frosted glass (blur/elev/card), dense spacing, micro-motion, screenshot scorecard iteration
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Workspace FS/Git host ports + AuxPanel slot data (#1191)
-2. Desktop session import entry (#1192)
-3. Desktop mock TerminalPort host (#1193)
-4. Hygiene #1194
-5. Keep `super-governance-baseline` held
+1. Land P74 glass token layer (#1197 / PR #1204)
+2. Motion + spacing density (#1198)
+3. Visual QA capture matrix + scorecard loop (#1199)
+4. Keep issue-bound worktrees; main session gates only
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-16–19 | lead | Phases 1–72 closed; P73 open (host ports + import entry) |
+| 2026-07-19 | lead | P73 closed (#1201–#1203); P74 dual-track frosted glass visual system open |
 
 ## Completion notes
 
-- Phase 72 closed: AuxPanel wire · Terminal dock (+harden) · session import UI · runtime-sessions.
+- Phase 73: WorkspaceFiles/Git ports · Desktop session import entry · mock TerminalPort.
+- Phase 72: AuxPanel wire · Terminal dock · SessionImportList · runtime-sessions.

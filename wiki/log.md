@@ -76,4 +76,8 @@ Format:
 
 - Phase 72 closed (ms 93; PRs #1185–#1190).
 - Phase 73 open (ms 94; #1191–#1194): host ports + session import entry + mock terminal host.
+## 2026-07-19 (P74)
+
+- Phase 73 closed: host ports + session import entry + mock terminal (#1201–#1203).
+- Phase 74 active: light frosted glass tokens, motion/spacing, Visual QA scorecard.
 
