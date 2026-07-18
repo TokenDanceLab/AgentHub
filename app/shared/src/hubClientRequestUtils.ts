@@ -5,7 +5,11 @@
  */
 
 import { AppError } from './errors';
-import type { HubRegisterDeviceRequest } from './hubClientDomainTypes';
+import type {
+  HubExecutionTarget,
+  HubExecutionTargetListResponse,
+  HubRegisterDeviceRequest,
+} from './hubClientDomainTypes';
 
 export function isRouteFallbackError(error: unknown): boolean {
   return error instanceof AppError && (error.status === 404 || error.status === 405);
@@ -144,6 +148,43 @@ export function invokePathsInitRequest<T>(
     return requestWithFallback(paths);
   }
   return requestWithFallback(paths, init);
+}
+
+// ── Residual pure peels (#1044) ───────────────────────────────────────────────
+
+/**
+ * Residual register-device peel: normalize body then dual-route JSON POST.
+ * exactOptional-safe via invokePathsInitRequest.
+ */
+export function invokeNormalizedRegisterDeviceRequest<T>(
+  requestWithFallback: (
+    paths: readonly string[],
+    options?: RequestInit,
+  ) => Promise<T>,
+  body: HubRegisterDeviceRequest,
+  buildPaths: () => readonly string[],
+  buildInit: (normalized: ReturnType<typeof normalizeRegisterDeviceRequest>) => RequestInit,
+): Promise<T> {
+  return invokePathsInitRequest(
+    requestWithFallback,
+    buildPaths(),
+    buildInit(normalizeRegisterDeviceRequest(body)),
+  );
+}
+
+/**
+ * Residual listExecutionTargets peel: request raw list/envelope then normalize.
+ */
+export async function runNormalizedExecutionTargetsListRequest(
+  request: (
+    path: string,
+  ) => Promise<HubExecutionTarget[] | HubExecutionTargetListResponse>,
+  path: string,
+  normalize: (
+    data: HubExecutionTarget[] | HubExecutionTargetListResponse,
+  ) => HubExecutionTargetListResponse,
+): Promise<HubExecutionTargetListResponse> {
+  return normalize(await request(path));
 }
 
 export function normalizeRegisterDeviceRequest(
