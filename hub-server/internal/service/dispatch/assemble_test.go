@@ -332,3 +332,77 @@ func TestPortAndTeamResidualHelpers(t *testing.T) {
 	assert.Equal(t, EdgeHTTPLogDecodeFailed, "edge http dispatch: failed to decode response")
 	assert.Equal(t, EdgeHTTPLogDispatched, "edge http dispatch: task dispatched to local Edge")
 }
+
+func TestDispatchLogConstantsAndPorts(t *testing.T) {
+	assert.Equal(t, DispatchLogOutboxRecordFailed, "AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking")
+	assert.Equal(t, DispatchLogHTTPMarkFailed, "failed to mark http-dispatched task")
+	assert.Equal(t, DispatchLogOfflinePushConnNil, "failed to push agent task to offline queue (conn nil)")
+	assert.Equal(t, DispatchLogMarkAgentDispatched, "failed to mark agent task dispatched")
+	assert.Equal(t, DispatchLogWSNotQueuedPreserve, "agent task websocket dispatch not queued; preserving pending task")
+	assert.Equal(t, DispatchLogPreserveAfterWSFailure, "failed to preserve agent task after websocket dispatch failure")
+	assert.Equal(t, DispatchLogOfflinePushFailed, "failed to push agent task to offline queue")
+	assert.Equal(t, DispatchLogMissingTargetEdgeDevice, "target-bound agent task missing edge device id")
+	assert.Equal(t, DispatchLogRelayCreateFailed, "failed to create relay command for hub_relay dispatch")
+	assert.Equal(t, DispatchLogRelayOfflinePushFailed, "failed to push hub_relay task to offline queue")
+	assert.Equal(t, DispatchLogMarkHubRelayDispatched, "failed to mark hub_relay task dispatched")
+	assert.Equal(t, DispatchLogTargetBoundOfflinePushFailed, "failed to push target-bound agent task to offline queue")
+	assert.Equal(t, DispatchLogTargetBoundQueued, "queued target-bound agent task")
+	assert.Equal(t, DispatchLogTargetBoundMarkFailed, "failed to mark target-bound agent task dispatched")
+	assert.Equal(t, DispatchLogTargetBoundWSNotQueued, "target-bound agent task websocket dispatch not queued; preserving pending task")
+	assert.Equal(t, CapabilityMintFailedLog, "AH-SR-046 failed to issue capability token")
+
+	assert.True(t, RelayPortAvailable(true))
+	assert.False(t, RelayPortAvailable(false))
+	assert.True(t, ServiceReceiverAvailable(true))
+	assert.False(t, ServiceReceiverAvailable(false))
+	assert.True(t, InviterDesktopConnPresent(true))
+	assert.False(t, InviterDesktopConnPresent(false))
+	assert.True(t, CapabilityPayloadPresent(true))
+	assert.False(t, CapabilityPayloadPresent(false))
+	assert.True(t, ComposedDispatchReady(true))
+	assert.False(t, ComposedDispatchReady(false))
+
+	snap := MapPendingTaskRedeliveryRow("id", "ai", "u", "queued", "d", "r", "t")
+	assert.Equal(t, "id", snap.ID)
+	assert.Equal(t, "queued", snap.Status)
+	assert.Equal(t, "t", snap.TargetID)
+}
+
+func TestPlanRedispatchTaskGate(t *testing.T) {
+	// Lookup failure → intentional dead-letter (#999 path remains soft-fail elsewhere).
+	lookupErr := errors.New("missing")
+	gate := PlanRedispatchTaskGate(lookupErr, "")
+	assert.Equal(t, RedispatchGateDeadLetterLookup, gate.Kind)
+	assert.Equal(t, RedispatchLogTaskLookupFailed, gate.LogMessage)
+	assert.Equal(t, DeadLetterReason(DeadLetterKindTaskLookup, lookupErr), gate.DeadLetterReason)
+
+	// Running is not retryable (#1000 safety net).
+	gate = PlanRedispatchTaskGate(nil, model.TaskStatusRunning)
+	assert.Equal(t, RedispatchGateDeadLetterStatus, gate.Kind)
+	assert.Equal(t, RedispatchLogTaskTerminal, gate.LogMessage)
+	assert.Equal(t, DeadLetterTaskStatus(model.TaskStatusRunning), gate.DeadLetterReason)
+
+	// Terminal status → dead-letter.
+	gate = PlanRedispatchTaskGate(nil, model.TaskStatusDone)
+	assert.Equal(t, RedispatchGateDeadLetterStatus, gate.Kind)
+
+	// Queued / dispatched remain retryable.
+	gate = PlanRedispatchTaskGate(nil, model.TaskStatusQueued)
+	assert.Equal(t, RedispatchGateRetry, gate.Kind)
+	assert.Empty(t, gate.LogMessage)
+	gate = PlanRedispatchTaskGate(nil, model.TaskStatusDispatched)
+	assert.Equal(t, RedispatchGateRetry, gate.Kind)
+
+	// Offline soft-fail error wrapper preserves #999 wording.
+	base := errors.New("redis down")
+	wrapped := RedispatchOfflineQueueError(base)
+	require.Error(t, wrapped)
+	assert.Contains(t, wrapped.Error(), "redispatch offline queue")
+	require.ErrorIs(t, wrapped, base)
+	require.ErrorContains(t, wrapped, "redis down")
+
+	attrs := RedispatchOfflineSuccessLogAttrs(true, "d1", "t1", "u1")
+	assert.Equal(t, []any{"delivery_id", "d1", "task_id", "t1", "user_id", "u1"}, attrs)
+	attrs = RedispatchOfflineSuccessLogAttrs(false, "d1", "t1", "u1")
+	assert.Equal(t, []any{"delivery_id", "d1", "task_id", "t1"}, attrs)
+}
