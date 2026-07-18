@@ -12,10 +12,12 @@
 // / redispatch log peel) → #977 (lookup-error mappers / port predicates /
 // redispatch log constants / team+capability residual) → #1012 (dispatch log
 // constants / redispatch task gate / offline success attrs / relay port /
-// capability payload guard). Typed DispatchService package move remains deferred
-// and high risk. Do not re-open outbox redispatch MarkDeliverySent semantics from
-// #866; preserve #999 soft-fail errors, #1000 running-not-retryable, #1009 atomic
-// claim, and #1031 offline vs outbox dual-redelivery ownership.
+// capability payload guard) → #1033 (delivery-mark plans / assemble input core /
+// team identity extractors / redispatch status + target-bound conn residual).
+// Typed DispatchService package move remains deferred and high risk. Do not
+// re-open outbox redispatch MarkDeliverySent semantics from #866; preserve #999
+// soft-fail errors, #1000 running-not-retryable, #1009 atomic claim, and #1031
+// offline vs outbox dual-redelivery ownership.
 //
 // See docs/analysis/hub-service-boundary-map.md.
 package dispatch
