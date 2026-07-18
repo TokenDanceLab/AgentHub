@@ -1,7 +1,7 @@
 # Milestones
 
 > **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
-> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 58 / milestone 79).
+> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 61 / milestone 82).
 > Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
 
 | # | Milestone | Target Phase | Criteria | Status |
@@ -31,5 +31,5 @@
 
 ## Reality sync (2026-07-18)
 - Cleanup-baseline program Phases 1–7 closed: issues `#424`–`#451` via PR #446 (2026-07-16).
-- Live tracker SSOT: `docs/progress/MASTER.md` + Project board (Phase 58 / milestone 79).
+- Live tracker SSOT: `docs/progress/MASTER.md` + Project board (Phase 61 / milestone 82).
 - Do not reopen `#447`–`#451` as open work.
