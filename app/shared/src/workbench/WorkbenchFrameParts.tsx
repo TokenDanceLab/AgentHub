@@ -22,6 +22,7 @@ import {
   buildConversationSidebarProps,
   buildWorkbenchRoutesProps,
 } from './workbenchFramePartsHelpers';
+import { resolveComposerWorkDir } from './workbenchFrameHelpers';
 import styles from './AgentHubWorkbench.module.css';
 
 export {
@@ -89,20 +90,25 @@ export function WorkbenchRoutesFrame(
   );
 }
 
-/** RightInspector host for chat page; stacks AuxPanel when localFiles. */
+/**
+ * RightInspector host for chat page.
+ * When `platform.capabilities.localFiles` (Desktop), stacks AuxPanel below
+ * the inspector for the local engineering-loop chrome (#1181).
+ * Web keeps RightInspector only.
+ */
 export function ChatInspectorFrame(
   props: ChatInspectorFrameProps,
 ): React.ReactElement {
   const inspector = <RightInspector {...buildChatInspectorProps(props)} />;
-  const localFiles = props.platform.capabilities.localFiles;
+  const localFiles = Boolean(props.platform.capabilities.localFiles);
   if (!localFiles) {
     return inspector;
   }
-  const workDir = props.session.composer?.workDir;
+  const hasWorkspace = Boolean(resolveComposerWorkDir(props.session.composer?.workDir));
   return (
     <ChatEngineeringColumn
       inspector={inspector}
-      hasWorkspace={Boolean(workDir && String(workDir).trim())}
+      hasWorkspace={hasWorkspace}
       localFiles={localFiles}
     />
   );
