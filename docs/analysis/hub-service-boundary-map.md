@@ -1,7 +1,7 @@
 # Hub `internal/service` Boundary Map
 
 > last-updated: 2026-07-18
-> tip: origin/master `96588ea1` (Phase 61; #1070 design-token closed via #1073)
+> tip: origin/master `a26a2828` (Phase 61 progress baseline clean; open peels #1067–#1069)
 > issue: #823 (Dispatch pure residual closed / boundary-map refresh; prior #811 / #800 / #789 / #779 / #768 / #756 / #744 / #732 / #720 / #708 / #697 / #685 / #673 / #662 / #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468) · later residual peels closed through Phase 60 (#1033→#1056 chains) + Phase 61 design-token #1070; **live open peels: Phase 61 #1067–#1069** — see `docs/progress/MASTER.md`
 > status: header thin-refresh only — `agent_dispatch.go` **786** · `delivery_outbox.go` **469** (+ companions); pure `service/dispatch` ~1963; next residual peels align MASTER Phase 61 open peels only (#1067–#1069)
 > companion: `cleanup-strategy.md` (archived program pointer) · live progress `docs/progress/MASTER.md` · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/dispatch` / `service/messagereaction` / `service/workspace` / `service/contact` / `service/attachment` / `service/session` / `service/message`
@@ -1209,7 +1209,7 @@ type Service struct {
 - **#720 decision:** sixth IM typed-service package move **landed** as `service/message` (agentteam-style). Bus+Cache ports + DTOs + methods moved; pure helpers remain in `service/im`; wiring/app/handler/tests updated; flat `message.go` removed. One service only; no OpenAPI/handler/frontend redesign.
 - **#732→#811 decision:** Dispatch pure residual **continued** into `service/dispatch` (Message/Payload DTOs, Edge request, team/target/capability/redelivery, routing classifiers, task-access/events, mint resolve, model→DTO mappers, redispatch prep). Pure package tip ~1963 prod LOC; thin aliases retained; typed package move deferred.
 - **#823 decision:** Dispatch pure residual **closed**. Boundary map + ownership comments refreshed to match code (#756–#811 chain). No further pure-only extract (remaining free funcs are thin aliases; redispatch body is WS/cache/DB orchestration). Next real seam = optional typed `DispatchService` package move (high risk) or leave flat. No OpenAPI/handler/frontend; no payload JSON redesign.
-- **Phase 61 tip recount (2026-07-18):** tip `96588ea1` (#1070/#1073); `agent_dispatch.go` **786**; `delivery_outbox.go` **469** (+ facade/model companions); pure `dispatch/` ~1963. Open residual peels: **#1067** process_executor · **#1068** agent_dispatch · **#1069** sqlite_store (see `docs/progress/MASTER.md`).
+- **Phase 61 tip recount (2026-07-18):** tip `a26a2828` (progress baseline clean via #1072–#1076); `agent_dispatch.go` **786**; `delivery_outbox.go` **469** (+ facade/model companions); pure `dispatch/` ~1963. Open residual peels: **#1067** process_executor · **#1068** agent_dispatch · **#1069** sqlite_store (see `docs/progress/MASTER.md`).
 - **Next code step:** Phase 61 open peels only (#1067–#1069); optional outbox model package move / optional `DispatchService` package move remain deferred/high-risk.
 
 ## Key paths
