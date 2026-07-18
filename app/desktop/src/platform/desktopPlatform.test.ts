@@ -2,12 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
-  it('declares local terminal capability for the Desktop host surface', () => {
+  it('declares local terminal capability and attaches an in-memory TerminalPort', async () => {
     const platform = createDesktopPlatform();
 
     expect(platform.capabilities.localTerminal).toBe(true);
-    // Real PTY adapter is out of scope for #1174 — host port is capability-gated only.
-    expect(platform.terminal).toBeUndefined();
+    expect(platform.terminal).toBeDefined();
+
+    // In-memory mock only (#1193) — no Tauri PTY / process spawn.
+    const session = await platform.terminal!.spawn({ title: 'Desktop mock' });
+    expect(session.id).toMatch(/^mock-term-/);
+    expect(session.title).toBe('Desktop mock');
+    expect(session.status).toBe('running');
+
+    await expect(platform.terminal!.list()).resolves.toEqual([
+      expect.objectContaining({ id: session.id }),
+    ]);
   });
 
   it('does not fall back to the demo runtime unless explicitly allowed', async () => {
