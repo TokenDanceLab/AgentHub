@@ -174,6 +174,16 @@ export type {
   BrowserPreviewProps,
 } from './inspector';
 
+/* ═══ Terminal host shell (#1174) ═══ */
+export {
+  TerminalPanel,
+  isLocalTerminalEnabled,
+} from './terminal';
+export type {
+  TerminalPanelLabels,
+  TerminalPanelProps,
+} from './terminal';
+
 /* ═══ Floating components ═══ */
 export {
   ContextMenu,

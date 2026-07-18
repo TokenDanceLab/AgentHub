@@ -1,0 +1,235 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   TerminalPanel — local terminal host shell (tabs + empty state)
+   Uses ONLY design-system CSS custom properties.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--e-1);
+}
+
+.toolbar {
+  min-height: 40px;
+  padding: var(--sp-xxs) var(--sp-sm);
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  background: var(--surface);
+}
+
+.tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.tab,
+.tabActive {
+  max-width: 180px;
+  min-height: 28px;
+  padding: 0 var(--sp-sm);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.tabActive {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.tabTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm, 12px);
+}
+
+.tabStatus {
+  font-size: 10px;
+  color: var(--text-3, var(--text-2));
+  flex-shrink: 0;
+}
+
+.tabClose {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3, var(--text-2));
+  flex-shrink: 0;
+}
+
+.tabClose:hover {
+  background: var(--surface-highest, var(--surface-high));
+  color: var(--text-1);
+}
+
+.toolBtn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toolBtn:hover:not(:disabled) {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.toolBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolBtn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-low, var(--surface));
+}
+
+.empty {
+  flex: 1;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-lg);
+  text-align: center;
+}
+
+.emptyTitle {
+  color: var(--text-1);
+  font-size: var(--fs-md, 14px);
+  font-weight: 600;
+}
+
+.emptyDescription {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm, 12px);
+  line-height: 1.5;
+}
+
+.primaryBtn {
+  min-height: 30px;
+  padding: 0 var(--sp-md);
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  cursor: pointer;
+  font-size: var(--fs-sm, 12px);
+}
+
+.primaryBtn:hover:not(:disabled) {
+  background: var(--surface-high);
+}
+
+.primaryBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-sm);
+  outline: none;
+}
+
+.viewportMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-sm);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.viewportHint {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  padding: var(--sp-sm);
+  border-radius: var(--r-sm);
+  background: var(--surface-lowest, #0d1117);
+  color: var(--text-2);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.error {
+  padding: var(--sp-xs) var(--sp-sm);
+  border-top: 1px solid var(--bdr);
+  background: color-mix(in oklch, var(--danger, #c0392b) 12%, var(--surface));
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.status {
+  min-height: 28px;
+  padding: 0 var(--sp-sm);
+  border-top: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.statusItem {
+  white-space: nowrap;
+}
