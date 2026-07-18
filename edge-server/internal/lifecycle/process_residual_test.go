@@ -1793,3 +1793,121 @@ func TestResidualPlanPureHelpers1011b(t *testing.T) {
 		t.Fatal("preflight")
 	}
 }
+
+func TestResidualPlanPureHelpers1022(t *testing.T) {
+	t.Parallel()
+
+	// Constructor plan
+	ctor := planNewProcessExecutor(errors.New("x"), "")
+	if !ctor.FailProfile || ctor.StatWorkDir {
+		t.Fatalf("profile err %#v", ctor)
+	}
+	ctor = planNewProcessExecutor(nil, "D:/tmp")
+	if ctor.FailProfile || !ctor.StatWorkDir {
+		t.Fatalf("workdir %#v", ctor)
+	}
+	ctor = planNewProcessExecutor(nil, "")
+	if ctor.FailProfile || ctor.StatWorkDir {
+		t.Fatalf("empty workdir %#v", ctor)
+	}
+
+	// Cancel / terminal finish
+	if planWriteInterruptStdin(false).Write || !planWriteInterruptStdin(true).Write {
+		t.Fatal("write interrupt")
+	}
+	if planTerminalFinish(false).Finish || !planTerminalFinish(true).Finish {
+		t.Fatal("terminal finish")
+	}
+
+	// Resolve / command / pipe failure gates
+	if planAdapterResolveFailure(nil).Fail || !planAdapterResolveFailure(errors.New("x")).Fail {
+		t.Fatal("adapter resolve failure")
+	}
+	if planCommandBuildFailure(nil).Fail || !planCommandBuildFailure(errors.New("x")).Fail {
+		t.Fatal("command build failure")
+	}
+	if planPipeFailure(nil).Fail || !planPipeFailure(errors.New("x")).Fail {
+		t.Fatal("pipe failure")
+	}
+
+	// Post-wait plans
+	if planCancelledRun(nil, "started").Cancelled {
+		t.Fatal("not cancelled")
+	}
+	if !planCancelledRun(context.Canceled, "started").Cancelled {
+		t.Fatal("ctx cancelled")
+	}
+	if !planCancelledRun(nil, "cancelling").Cancelled {
+		t.Fatal("status cancelling")
+	}
+	if planOutputStoreCapture(false).Read || !planOutputStoreCapture(true).Read {
+		t.Fatal("output store capture")
+	}
+	if planSessionRetryBreak(nil).Break || !planSessionRetryBreak(errors.New("x")).Break {
+		t.Fatal("session retry break")
+	}
+
+	// Fault escalation attempt + cleanup (#867)
+	cfg := FaultEscalationConfig{Enabled: true, MaxRetries: 2}
+	if planFaultEscalationAttempt(nil, cfg).Attempt {
+		t.Fatal("no wait err")
+	}
+	if !planFaultEscalationAttempt(errors.New("x"), cfg).Attempt {
+		t.Fatal("should attempt")
+	}
+	cleanup := planFaultEscalationCleanup(false, false)
+	if cleanup.CloseOutput || cleanup.InvokeOldCancel {
+		t.Fatalf("none %#v", cleanup)
+	}
+	cleanup = planFaultEscalationCleanup(true, true)
+	if !cleanup.CloseOutput || !cleanup.InvokeOldCancel {
+		t.Fatalf("both %#v", cleanup)
+	}
+	if planTerminalWaitFailure(nil).Publish || !planTerminalWaitFailure(errors.New("x")).Publish {
+		t.Fatal("terminal wait failure")
+	}
+
+	// Output read plan
+	read := planOutputRead(0, nil)
+	if read.Process || read.Stop {
+		t.Fatalf("empty %#v", read)
+	}
+	read = planOutputRead(3, io.EOF)
+	if !read.Process || !read.Stop {
+		t.Fatalf("data+eof %#v", read)
+	}
+	if planOutputStoreWriteLog(nil).Log || !planOutputStoreWriteLog(errors.New("x")).Log {
+		t.Fatal("output store write log")
+	}
+	if planAgentFailurePersistLog(nil).Log || !planAgentFailurePersistLog(errors.New("x")).Log {
+		t.Fatal("agent failure persist log")
+	}
+	if planRunOutputCloseLog(nil).Log || !planRunOutputCloseLog(errors.New("x")).Log {
+		t.Fatal("run output close log")
+	}
+
+	// Spawn residual
+	if planSpawnSlotReserve(false).Try || !planSpawnSlotReserve(true).Try {
+		t.Fatal("spawn reserve")
+	}
+	if planSpawnSlotRejectLog(nil).Log || !planSpawnSlotRejectLog(errors.New("x")).Log {
+		t.Fatal("spawn reject log")
+	}
+	if planSpawnSlotRelease(nil, true).Release || !planSpawnSlotRelease(errors.New("x"), true).Release {
+		t.Fatal("spawn release")
+	}
+	if planSpawnSlotRelease(errors.New("x"), false).Release {
+		t.Fatal("no release when not reserved")
+	}
+	if planSubAgentCreateLog(nil).Log || !planSubAgentCreateLog(errors.New("x")).Log {
+		t.Fatal("subagent create log")
+	}
+	if planSubAgentRegister(false).Register || !planSubAgentRegister(true).Register {
+		t.Fatal("subagent register")
+	}
+
+	// Stdin pipe open follows needsAdapterStdin
+	if planStdinPipeOpen(nil).Open {
+		t.Fatal("nil adapter stdin")
+	}
+}

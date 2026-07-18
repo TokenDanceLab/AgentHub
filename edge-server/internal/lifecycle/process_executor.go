@@ -111,10 +111,11 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		return nil, err
 	}
 	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
-	if shouldFailNewRunnerProfile(err) {
+	ctor := planNewProcessExecutor(err, cfg.WorkDir)
+	if ctor.FailProfile {
 		return nil, err
 	}
-	if shouldStatConfiguredWorkDir(cfg.WorkDir) {
+	if ctor.StatWorkDir {
 		info, statErr := os.Stat(cfg.WorkDir)
 		if err := validateConfiguredWorkDir(cfg.WorkDir, info, statErr); err != nil {
 			return nil, err
@@ -248,7 +249,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	// flush session state) rather than being killed by SIGTERM.
 	e.mu.Lock()
 	stdin, hasStdin := e.stdins[runID]
-	if shouldWriteInterruptStdin(hasStdin) {
+	if planWriteInterruptStdin(hasStdin).Write {
 		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); planInterruptWriteLog(err).Log {
 			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
@@ -343,7 +344,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 	terminalFinish := true
 	defer func() {
-		if shouldPerformTerminalFinish(terminalFinish) {
+		if planTerminalFinish(terminalFinish).Finish {
 			e.finish(run.ID)
 		}
 	}()
@@ -363,7 +364,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	adapter := e.adapter
 	if planAdapterResolve(e.adapterReg != nil, runCtx.AgentID, adapter != nil).Resolve {
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
-		if shouldPublishAdapterResolveFailure(err) {
+		if planAdapterResolveFailure(err).Fail {
 			e.publishFailed(run, err)
 			return
 		}
@@ -376,11 +377,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if preflight, ok := asPreflightAdapter(adapter); ok {
 		err := preflight.PreflightCheck()
 		if planPreflightFailure(err).Fail {
-			slog.Warn("process: adapter preflight check failed",
-				"runId", run.ID,
-				"agentId", runCtx.AgentID,
-				"error", err,
-			)
+			slog.Warn("process: adapter preflight check failed", "runId", run.ID, "agentId", runCtx.AgentID, "error", err)
 			e.publishFailed(run, adapterPreflightFailed(err))
 			return
 		}
@@ -394,10 +391,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
 	if perm := planPermissionModeSanitization(runCtx); perm.Changed {
-		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
-			"runId", run.ID,
-			"agentId", runCtx.AgentID,
-		)
+		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'", "runId", run.ID, "agentId", runCtx.AgentID)
 		runCtx = perm.RunCtx
 	}
 
@@ -405,12 +399,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	metricsPlan := planRunMetrics(e.metrics != nil)
 	if metricsPlan.AttachFinishDefer {
 		defer func() {
-			if !shouldRecordRunFinishMetrics(runStartTime) {
-				return // run never started (early failure before cmd.Start)
-			}
 			r, ok := e.store.GetRun(run.ID)
 			if !planFinishMetricsRecord(runStartTime, ok).Record {
-				return
+				return // never started or missing run
 			}
 			e.metrics.RecordRunFinish(adapterLabel, r.Status, time.Since(runStartTime).Seconds())
 		}()
@@ -436,7 +427,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// Profile mode: use configured command template
 			var err error
 			args, env, err = e.profile.Template.Expand(runCtx)
-			if shouldPublishCommandBuildFailure(err) {
+			if planCommandBuildFailure(err).Fail {
 				e.publishFailed(run, err)
 				return
 			}
@@ -458,7 +449,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-		if shouldPublishCommandBuildFailure(err) {
+		if planCommandBuildFailure(err).Fail {
 			e.publishFailed(run, err)
 			return
 		}
@@ -472,19 +463,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// uses the administrator-configured env base. See envForAdapterOrProfile.
 		cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
 		stdout, err := cmd.StdoutPipe()
-		if shouldPublishPipeFailure(err) {
+		if planPipeFailure(err).Fail {
 			e.publishFailed(run, pipeOpenError("stdout", err))
 			return
 		}
 		stderr, err := cmd.StderrPipe()
-		if shouldPublishPipeFailure(err) {
+		if planPipeFailure(err).Fail {
 			e.publishFailed(run, pipeOpenError("stderr", err))
 			return
 		}
 		var stdin io.WriteCloser
-		if needsAdapterStdin(adapter) {
+		if planStdinPipeOpen(adapter).Open {
 			stdin, err = cmd.StdinPipe()
-			if shouldPublishPipeFailure(err) {
+			if planPipeFailure(err).Fail {
 				e.publishFailed(run, pipeOpenError("stdin", err))
 				return
 			}
@@ -539,7 +530,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// An open pipe with no data causes CLI agents (Claude Code) to wait
 		// ~3s and warn "no stdin data", so we close it eagerly when neither
 		// control protocol nor DecisionLoop requires stdin.
-		stdinPlan := planEagerStdinClose(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil)
+		stdinPlan := planEagerStdinClose(stdin != nil, planStdinPipeOpen(adapter).Open, e.decisionLoopFactory != nil)
 		if stdinPlan.ClosePipe {
 			_ = stdin.Close()
 		}
@@ -610,16 +601,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// When triggered, we log the budget state and emit a compaction event
 		// so upstream session managers can compact the actual message history.
 		if compact := planContextCompaction(runCtx.Budget, run.ID); compact.Emit {
-			slog.Info("process: context compaction threshold reached",
-				"runId", run.ID,
-				"usagePercent", compact.UsagePct,
-				"tokensUsed", compact.TokensUsed,
-				"tokensRemaining", compact.Remaining,
-			)
+			slog.Info("process: context compaction threshold reached", "runId", run.ID, "usagePercent", compact.UsagePct, "tokensUsed", compact.TokensUsed, "tokensRemaining", compact.Remaining)
 			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), compact.Payload)
 		}
 
-		if shouldTreatAsCancelled(ctx.Err(), e.runStatus(run.ID)) {
+		if planCancelledRun(ctx.Err(), e.runStatus(run.ID)).Cancelled {
 			e.publishCancelled(run)
 			e.sendSubAgentResult(run.ID, "cancelled", nil)
 			return
@@ -631,18 +617,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// (stderr is read via StderrPipe in a separate goroutine and stored in
 		// outStore), so we also pass the captured stderr output.
 		var stderrCapture string
-		if shouldReadOutputStoreCapture(outStore != nil) {
+		if planOutputStoreCapture(outStore != nil).Read {
 			stderrCapture, _ = outStore.ReadAll()
 		}
 		sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart), outStore != nil)
 		if sessionPlan.Retry {
 			newSession := newRandomSessionID()
-			slog.Warn("process: session conflict detected, retrying with fresh session ID",
-				"runId", run.ID,
-				"oldSessionId", runCtx.SessionID,
-				"newSessionId", newSession,
-				"error", lastWaitErr,
-			)
+			slog.Warn("process: session conflict detected, retrying with fresh session ID", "runId", run.ID, "oldSessionId", runCtx.SessionID, "newSessionId", newSession, "error", lastWaitErr)
 			runCtx = withFreshSession(runCtx, newSession)
 			// Clean up the tracked process from this attempt before retrying.
 			e.mu.Lock()
@@ -662,7 +643,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Wait error is not a session-conflict retry. Leave the session-retry
 		// loop so fault-escalation can re-launch the run when configured.
 		// Terminal publishFailed happens after the escalation check below.
-		if shouldBreakSessionRetryOnWaitError(lastWaitErr) {
+		if planSessionRetryBreak(lastWaitErr).Break {
 			break
 		}
 		// #179: handle structured output parse errors with recoverability distinction.
@@ -692,11 +673,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			evidencePlan = planEvidenceGateOutcome(true, evidenceResult.Passed)
 			finalStatus = evidencePlan.FinalStatus
 			if evidencePlan.LogFailure {
-				slog.Warn("process: evidence gate verification failed",
-					"runId", run.ID,
-					"projectType", evidenceResult.ProjectType,
-					"summary", evidenceResult.Summary,
-				)
+				slog.Warn("process: evidence gate verification failed", "runId", run.ID, "projectType", evidenceResult.ProjectType, "summary", evidenceResult.Summary)
 			}
 		}
 
@@ -713,7 +690,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	// Exhausted session retries — attempt fault escalation if configured.
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
-	if shouldAttemptFaultEscalation(lastWaitErr, e.faultEscalationCfg) {
+	if planFaultEscalationAttempt(lastWaitErr, e.faultEscalationCfg).Attempt {
 		r, ok := e.store.GetRun(run.ID)
 		if planFaultEscalationHandoff(ok, e.faultEscalationCfg, r.RetryCount).Retry {
 			newCount := nextFaultEscalationRetryCount(r.RetryCount)
@@ -727,25 +704,24 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// for the successor attempt. Terminal finish is owned by the successor.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
-			if s, ok3 := e.runOutputs[run.ID]; shouldCloseTrackedRunOutput(ok3) {
+			s, hasOut := e.runOutputs[run.ID]
+			oldCancel, hasOldCancel := e.running[run.ID]
+			cleanup := planFaultEscalationCleanup(hasOut, hasOldCancel)
+			if cleanup.CloseOutput {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
 			// Re-register the cancel func before releasing the slot ownership so
 			// Cancel() and max-concurrent accounting stay consistent across handoff.
 			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
-			if oldCancel, ok4 := e.running[run.ID]; shouldInvokeOldCancelOnEscalationHandoff(ok4) {
+			if cleanup.InvokeOldCancel {
 				oldCancel()
 			}
 			e.running[run.ID] = cancel
 			e.mu.Unlock()
 			e.bus.Publish("run.fault_escalation.retry", runScope(run),
 				faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
-			slog.Warn("process: fault escalation auto-retry",
-				"runId", run.ID,
-				"retryCount", newCount,
-				"maxRetries", e.faultEscalationCfg.MaxRetries,
-			)
+			slog.Warn("process: fault escalation auto-retry", "runId", run.ID, "retryCount", newCount, "maxRetries", e.faultEscalationCfg.MaxRetries)
 			terminalFinish = false
 			go e.run(newCtx, run, runCtx)
 			return
@@ -756,7 +732,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
 	}
 	// Report the last error (terminal failure after retries exhausted or disabled).
-	if shouldPublishTerminalWaitFailure(lastWaitErr) {
+	if planTerminalWaitFailure(lastWaitErr).Publish {
 		e.publishFailed(run, errorWithRunOutput(lastWaitErr, lastOutStore))
 		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 	}
@@ -769,7 +745,8 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 	offset := 0
 	for {
 		n, err := reader.Read(buf)
-		if shouldProcessOutputRead(n) {
+		readPlan := planOutputRead(n, err)
+		if readPlan.Process {
 			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
 			chunk := planOutputChunk(run.ID, stream, allowed, offset, truncatedNow, written, maxBytes, outStore != nil)
 			if chunk.Publish {
@@ -782,7 +759,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					}
 				}
 				if chunk.WriteStore {
-					if _, err := outStore.Write(chunk.Text); shouldLogRunOutputStoreWriteFailure(err) {
+					if _, err := outStore.Write(chunk.Text); planOutputStoreWriteLog(err).Log {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 					}
 				}
@@ -797,7 +774,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 				offset = chunk.NextOffset
 			}
 		}
-		if shouldStopOutputRead(err) {
+		if readPlan.Stop {
 			return
 		}
 	}
@@ -827,7 +804,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
-	if shouldLogAgentFailurePersistError(err) {
+	if planAgentFailurePersistLog(err).Log {
 		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "error", err)
 		return
 	}
@@ -906,7 +883,7 @@ func (e *ProcessExecutor) finish(runID string) {
 		delete(e.cancelDone, runID)
 	}
 	if s, ok := e.runOutputs[runID]; plan.CloseRunOutput && ok {
-		if err := s.Close(); shouldLogRunOutputStoreCloseFailure(err) {
+		if err := s.Close(); planRunOutputCloseLog(err).Log {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
 		delete(e.runOutputs, runID)
@@ -1073,18 +1050,14 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// CanSpawn (seeing count=4) and both subsequently increment, exceeding
 	// MaxChildrenPerAgent=5.
 	var reserveErr error
-	if shouldReserveSpawnSlot(e.agentRegistry != nil) {
+	reservePlan := planSpawnSlotReserve(e.agentRegistry != nil)
+	if reservePlan.Try {
 		reserveErr = e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth)
 	}
-	slotReserved, reject := evaluateSpawnSlotReservation(e.agentRegistry != nil, reserveErr)
+	slotReserved, reject := evaluateSpawnSlotReservation(reservePlan.Try, reserveErr)
 	if reject != nil {
-		if shouldLogSpawnSlotRejection(reject) {
-			slog.Warn("spawn slot rejected",
-				"parentRunId", parentRun.ID,
-				"taskId", task.TaskID,
-				"depth", task.Depth,
-				"error", reject,
-			)
+		if planSpawnSlotRejectLog(reject).Log {
+			slog.Warn("spawn slot rejected", "parentRunId", parentRun.ID, "taskId", task.TaskID, "depth", task.Depth, "error", reject)
 		}
 		return "", "", reject
 	}
@@ -1093,7 +1066,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// On success, the slot is released by sendSubAgentResult when the child
 	// run completes (keeps increment/decrement pair lexically close).
 	defer func() {
-		if shouldReleaseReservedSpawnSlot(err, slotReserved) {
+		if planSpawnSlotRelease(err, slotReserved).Release {
 			e.agentRegistry.DecrChildCount(parentRun.ID)
 		}
 	}()
@@ -1109,7 +1082,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 
 	// Create the run in the store
 	run, createErr := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
-	if shouldLogSubAgentCreateFailure(createErr) {
+	if planSubAgentCreateLog(createErr).Log {
 		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", createErr)
 		err = createErr
 		return "", "", err
@@ -1120,16 +1093,13 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// monitors only the child's tokens, and parent/child results are
 	// independently routed via the message queue.
 	registered := false
-	if shouldRegisterSubAgentInstance(e.agentRegistry != nil) {
+	if planSubAgentRegister(e.agentRegistry != nil).Register {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
 		regErr := e.agentRegistry.Register(inst)
 		var logFailure bool
 		registered, logFailure = evaluateSubAgentRegistration(true, regErr)
 		if logFailure {
-			slog.Warn("failed to register sub-agent instance in registry",
-				"agentInstanceId", agentInstanceID,
-				"error", regErr,
-			)
+			slog.Warn("failed to register sub-agent instance in registry", "agentInstanceId", agentInstanceID, "error", regErr)
 		}
 	}
 
