@@ -191,6 +191,7 @@ html[data-theme-sync='true'] *::after {
   --tool-default: #71717A;
 
   /* ── Frosted glass material (dark) ───────────── */
+  --glass-tint-plum: rgba(41, 171, 226, 0.045);
   --glass-panel: rgba(30, 30, 38, 0.65);
   --glass-panel-strong: rgba(27, 27, 35, 0.82);
   --glass-panel-overlay: rgba(26, 26, 33, 0.92);
@@ -216,6 +217,13 @@ html[data-theme-sync='true'] *::after {
   --elevated-card-border: var(--glass-card-border);
   --elevated-card-shadow: var(--glass-elev-1);
   --elevated-card-shadow-strong: var(--glass-elev-2);
+
+  /* ── Canvas ambient (dark) ───────────────────── */
+  --canvas-ambient: radial-gradient(
+    ellipse 780px 520px at 50% 42%,
+    rgba(41, 171, 226, 0.028) 0%,
+    transparent 64%
+  );
 }
 
 /* ── Light Theme (default) ───────────────────────────────────────────── */
