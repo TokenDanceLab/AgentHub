@@ -1,7 +1,7 @@
 # Design system SSOT map
 
-最后更新：2026-07-17
-Issue: #466 (P9.1) / #491 (chatview drift inventory) / #518 (chatview radius·type·dark residual) / #607 (residual inventory + shared UI bare-token cluster)
+最后更新：2026-07-18
+Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
 > 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
@@ -37,6 +37,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 4. **`designTokens.ts`** is an **alias + surface-rules registry** for mobile/web naming. It is **not** a second color SSOT.
 5. **Brand icon hex** in brand assets (e.g. `designIcons.tsx`) is brand-literal OK. Product chrome (status, surfaces, text) must use theme tokens.
 6. **CSS fallbacks** on semantic tokens (`var(--danger, #…)` etc.) are discouraged: stale light fallbacks break dark mode. Prefer bare `var(--token)`.
+7. **Product CSS** uses semantic tokens `--success` / `--danger` / `--primary` / `--bdr` (and related surface tokens). **`--color-*` is legacy alias / preset-private only** — not for new product module consumers (#910 / #1021 closed ghost product usage).
 
 ## 3. Legitimate surface glue (not forks)
 
@@ -46,14 +47,17 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | Chatview `.chatview` scoped tokens | Isolation from host theme; document drift risk; merge is a follow-up |
 | Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI |
 
-## 4. Known forks / drift (follow-ups)
+## 4. Known forks / residual (follow-ups)
 
 | Item | Status | Follow-up |
 |---|---|---|
 | ThemeContext dual providers | **Mitigated in #466** — preset constants + apply moved to shared; providers are thin wrappers | Optional: one shared React provider with `enablePresets` |
-| Stale CSS status fallbacks | **#466** ApprovalCard bare status tokens; **#482** Welcome/Auth glass; **#607** shared UI + DocsPage + FileSearchDialog bare semantic/surface tokens (`DeployCard` / `CollapsibleBlock` / `ProgressBar` / `Avatar` / `Button` gradient / Docs delete / FileSearch primary). Re-audit: no remaining `var(--danger|success|warning|primary|info|brand|destructive|skill, …)` in app CSS | Continue hardcode passes on EntryGate / FileExplorer / IM panels / ModelDropdown (literal hex density, not fallback form) |
-| Chatview parallel spacing / density | **Partial in #491** — chatview `--sp-md` aliases base compat `--space-md` (12px); lg/xl stay dense 20/28. **#518 residual inventory** — radius (3/6/10/14 vs base 6/8/12/16), dense type (`--body` 13px / `--label-xs` 11px), and full dark palette (incl. primary `#3399dd` vs `#29ABE2`) remain intentional forks; **#607 reconfirmed hold** — no further zero-visual alias (audit §6.14 / §7) | Full merge + dark palette → `themes.css` (or dual-scale product decision) needs deliberate visual redesign + standalone load-path plan |
-| Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing decls → `--sp-*` / compat `--space-md|3xl`; odd steps (3/5/7/9/18…) + sizes left raw | Optional: scale extension or redesign normalize |
+| Stale CSS status fallbacks | **#466** ApprovalCard bare status tokens; **#482** Welcome/Auth glass; **#607** shared UI bare semantic/surface tokens | Re-audit: no remaining `var(--danger|success|warning|primary|…, …)` fallback form in app CSS |
+| EntryGate / FileExplorer hardcode | **Closed #879** — desktop modules map to design-token SSOT | — |
+| Ghost `var(--color-*)` product consumers | **Closed #910 / #1021** — product modules use semantic SSOT; `--color-*` remains legacy/preset-private | — |
+| ModelDropdown + IM rgba chrome | **Open residual** — `ModelDropdown.module.css` (~22 hex/rgba); IM panels retain local rgba chrome | Hardcode pass to semantic / glass tokens |
+| Chatview parallel spacing / density | **Partial in #491** — chatview `--sp-md` aliases base compat `--space-md` (12px); lg/xl stay dense 20/28. **#518 residual inventory** — radius / type / dark remain intentional forks; **#607 reconfirmed hold** | Full merge + dark palette needs deliberate redesign |
+| Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing → `--sp-*` / compat `--space-md|3xl`; odd steps remain raw | Optional: scale extension or redesign normalize |
 | `designTokens.ts` not package-exported | Open | Export when mobile/web path aliases stabilize |
 | Mobile RN color SSOT | Open | Align RN values to themes.css via registry |
 

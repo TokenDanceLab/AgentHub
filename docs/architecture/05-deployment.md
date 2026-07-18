@@ -2,15 +2,15 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-07-16
+> 最后更新：2026-07-18
 
 本文件只记录仓库内可维护的部署结构和证据边界。Live host、DNS、TLS、secret、机器路径、发布状态和生产回滚记录由 TokenDance server SSOT 维护，不在本仓库复制。
 
 ## Current production pointer
 
-- **Live facts（权威）**：server `projects/agenthub/STATE.md`（hk3；生产 LIVE）。本仓库不复制 host/secret/IP。
+- **Live facts（权威）**：外部 server `projects/agenthub/STATE.md`（运维 SSOT）。本仓库不复制 host 标签、secret 或 IP。
 - **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
-- **非权威遗留**：`hub-server/deployments/*` 下的旧 prod compose/nginx/env 模板仅作历史参考，不以之为当前生产 SSOT。
+- **非权威遗留**：`hub-server/deployments/*` 下的旧 prod compose / reverse-proxy / env 模板仅作历史参考，不以之为当前生产 SSOT。
 
 ## 仓库内资产
 
@@ -20,7 +20,8 @@
 | `deployments/production/docker-compose.yml` | 当前生产形状 compose 模板（权威 in-repo shape） |
 | `hub-server/deployments/Dockerfile` | Hub Server 镜像构建 |
 | `hub-server/deployments/docker-compose.prod.yml` | 旧生产形状模板（非权威） |
-| `hub-server/deployments/nginx.prod.conf` | Nginx reverse proxy 参考（非权威） |
+| `hub-server/deployments/Caddyfile` | reverse-proxy 模板（非权威；历史参考） |
+| `hub-server/deployments/Caddyfile.prod` | 生产 reverse-proxy 模板（非权威；历史参考） |
 | `hub-server/deployments/.env.production.example` | 生产 env 占位模板（非权威） |
 | `.github/workflows/` | CI、构建、E2E、vuln scan、cross-platform gates |
 
