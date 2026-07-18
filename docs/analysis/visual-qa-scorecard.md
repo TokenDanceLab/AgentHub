@@ -1,9 +1,9 @@
 # Visual QA scorecard
 
-最后更新：2026-07-19  
+最后更新：2026-07-19
 Issue: #1199 (P74)
 
-> 100-point rubric for Desktop/Web shell screenshots. North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair.  
+> 100-point rubric for Desktop/Web shell screenshots. North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair.
 > Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../architecture/07-design-system-ssot.md).
 
 ## 1. Pass bar
@@ -69,9 +69,9 @@ Baselines are **generated locally** (`screenshots/` is gitignored). Commit score
 
 ## 5. Iteration loop
 
-1. Capture light+dark shells (§4).  
-2. Score with §2 sheet; gate = min of four.  
-3. Fix tokens/consumers only via design SSOT (no local rgba glass).  
+1. Capture light+dark shells (§4).
+2. Score with §2 sheet; gate = min of four.
+3. Fix tokens/consumers only via design SSOT (no local rgba glass).
 4. Re-capture → re-score until Ship (≥85) or explicit residual filed.
 
 ## 6. Out of scope (follow-ups)
