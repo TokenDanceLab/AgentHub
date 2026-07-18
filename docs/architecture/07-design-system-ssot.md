@@ -109,3 +109,7 @@ Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; d
 | `.ah-glass-press` | soft hover lift + press scale | optional utility class |
 
 Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.
+
+## 9. Visual QA gate (#1199)
+
+Screenshot score loop SSOT: [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt rubric · 1440×810 light+dark · Desktop/Web shell scripts `visual:qa:shell`).
