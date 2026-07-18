@@ -1,5 +1,9 @@
 # Task Dependency Graph
 
+> **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
+> Not live backlog. Live phases: [../progress/MASTER.md](../progress/MASTER.md).
+> Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
+
 ```mermaid
 graph TD
   subgraph P1 [Phase 1 Governance Lock]
@@ -61,7 +65,7 @@ graph TD
     T44 --> T65
   end
 
-  subgraph P7 [Phase 7 CI Green + SDD Closeout]
+  subgraph P7 [Phase 7 CI Green + SDD Closeout — COMPLETE]
     T71[T7.1 hubClient envelope + contracts]
     T72[T7.2 trailing whitespace]
     T73[T7.3 plan docs sync]

@@ -1,10 +1,11 @@
 # AgentHub Cleanup Strategy（权威程序决策）
 
-> last-updated: 2026-07-16
+> **ARCHIVED PROGRAM — cleanup-baseline closed 2026-07-16 / PR #446.** Do not open new `cleanup-baseline` issues. Live work: `phase:58` / milestone 79 via [../progress/MASTER.md](../progress/MASTER.md).
+> last-updated: 2026-07-18
 > program: **knowledge-first strangler cleanup** + **lightweight llmwiki as compiler only**
 > hard rule: **NO big-bang rewrite**
 
-本文是 cleanup-baseline 的程序决策。规则 SSOT 仍是 `AGENTS.md`；架构/API SSOT 仍是 `docs/architecture*` 与 `api/*`；生产 live SSOT 仍是 server `projects/agenthub` external ops SSOT。**任务编号以 GitHub Issues #424–#440 为准（label `cleanup-baseline`）。**
+本文是 cleanup-baseline 的历史程序决策（冻结快照）。规则 SSOT 仍是 `AGENTS.md`；架构/API SSOT 仍是 `docs/architecture*` 与 `api/*`；生产 live SSOT 仍是 server `projects/agenthub` external ops SSOT。历史任务编号：GitHub Issues #424–#451（label `cleanup-baseline`，已关闭）。
 
 ---
 
