@@ -18,7 +18,9 @@
   min-height: 100%;
   min-width: 0;
   overflow: hidden;
-  background: var(--app-bg);
+  background:
+    radial-gradient(ellipse at 18% 0%, var(--glass-tint-plum, transparent) 0%, transparent 55%),
+    var(--app-bg);
   color: var(--text-1);
   transition:
     grid-template-columns var(--inspector-motion-duration) var(--inspector-motion-ease),
@@ -256,9 +258,11 @@
   min-height: 38px;
   margin: var(--sp-10) var(--sp-10) var(--sp-xxs);
   padding: 0 var(--sp-14);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-md);
-  background: var(--surface-low);
+  background: var(--glass-input-bg, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   font: var(--body);
   color: var(--text-1);
   outline: none;
@@ -319,8 +323,8 @@
 }
 
 .conversationButton[aria-current='true'] {
-  background: var(--primary-light);
-  padding-left: 7px;
+  background: var(--glass-bg-active, var(--primary-light));
+  box-shadow: inset 0 0 0 1px var(--glass-border-subtle, transparent);
 }
 
 .conversationButton[aria-current='true'] .conversationTitle {
