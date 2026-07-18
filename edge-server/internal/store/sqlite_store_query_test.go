@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
 func TestDecodeSQLiteRowPayload(t *testing.T) {
@@ -587,5 +588,123 @@ func TestPrepareArtifactDiffPreviewProjectionWrite(t *testing.T) {
 	_, skip, err = preparePreviewProjectionWrite(`{"previewId":"v3","runId":"r1","workspaceId":""}`, now)
 	if err != nil || !skip {
 		t.Fatalf("preview empty workspace skip=%v err=%v", skip, err)
+	}
+}
+
+func TestSQLiteResidualPureHelpers1032(t *testing.T) {
+	t.Parallel()
+
+	opts := sqlitePeriodicCleanupOptions()
+	if opts.TerminalTTL != sqliteCleanupTerminalTTL || opts.MaxTerminalRunsPerThread != sqliteCleanupMaxTerminalRunsPerThread {
+		t.Fatalf("cleanup opts = %#v", opts)
+	}
+	if sqliteBackgroundLoopInterval != 5*time.Minute {
+		t.Fatalf("interval = %v", sqliteBackgroundLoopInterval)
+	}
+
+	// Load source plan
+	if !planSQLiteLoadSource(true).UseRows || planSQLiteLoadSource(true).UseSnapshot {
+		t.Fatal("rows path")
+	}
+	if planSQLiteLoadSource(false).UseRows || !planSQLiteLoadSource(false).UseSnapshot {
+		t.Fatal("snapshot path")
+	}
+
+	// Legacy snapshot load plan
+	if !planLegacySnapshotLoad(true, nil, "").Skip {
+		t.Fatal("no rows skip")
+	}
+	if !planLegacySnapshotLoad(false, errors.New("db"), "").Fail {
+		t.Fatal("read fail")
+	}
+	if !planLegacySnapshotLoad(false, nil, "   ").Skip {
+		t.Fatal("blank payload skip")
+	}
+	if !planLegacySnapshotLoad(false, nil, `{"projects":{}}`).Decode {
+		t.Fatal("decode path")
+	}
+
+	// Persist gates
+	if !shouldSkipPersistOnProjectExists(ErrProjectExists) {
+		t.Fatal("skip on exists")
+	}
+	if shouldSkipPersistOnProjectExists(errors.New("other")) {
+		t.Fatal("other err")
+	}
+	if shouldSyncAfterCleanup(RunCleanupResult{}) {
+		t.Fatal("empty cleanup no sync")
+	}
+	if !shouldSyncAfterCleanup(RunCleanupResult{RemovedRuns: 1}) || !shouldSyncAfterCleanup(RunCleanupResult{RemovedItems: 2}) {
+		t.Fatal("cleanup sync")
+	}
+	empty := finalizeSQLiteCleanupAfterPersist(RunCleanupResult{RemovedRuns: 3}, errors.New("p"))
+	if empty.RemovedRuns != 0 {
+		t.Fatalf("cleanup persist fail = %#v", empty)
+	}
+	kept := finalizeSQLiteCleanupAfterPersist(RunCleanupResult{RemovedRuns: 3}, nil)
+	if kept.RemovedRuns != 3 {
+		t.Fatalf("cleanup persist ok = %#v", kept)
+	}
+
+	// Bool write finalize
+	run, ok := finalizeSQLiteBoolWrite(Run{ID: "r1"}, false, nil)
+	if ok || run.ID != "" {
+		t.Fatalf("!ok = %#v ok=%v", run, ok)
+	}
+	run, ok = finalizeSQLiteBoolWrite(Run{ID: "r1"}, true, errors.New("p"))
+	if ok || run.ID != "" {
+		t.Fatalf("persist fail = %#v ok=%v", run, ok)
+	}
+	run, ok = finalizeSQLiteBoolWrite(Run{ID: "r1"}, true, nil)
+	if !ok || run.ID != "r1" {
+		t.Fatalf("persist ok = %#v ok=%v", run, ok)
+	}
+	if finalizeSQLiteBoolOK(false, nil) || finalizeSQLiteBoolOK(true, errors.New("p")) || !finalizeSQLiteBoolOK(true, nil) {
+		t.Fatal("bool ok finalize")
+	}
+
+	// Err write finalize
+	profile, err := finalizeSQLiteErrWrite(AgentProfile{ID: "a"}, errors.New("missing"), nil)
+	if err == nil || profile.ID != "" {
+		t.Fatalf("pre-err = %#v err=%v", profile, err)
+	}
+	profile, err = finalizeSQLiteErrWrite(AgentProfile{ID: "a"}, nil, errors.New("p"))
+	if err == nil || profile.ID != "" {
+		t.Fatalf("persist err = %#v err=%v", profile, err)
+	}
+	profile, err = finalizeSQLiteErrWrite(AgentProfile{ID: "a"}, nil, nil)
+	if err != nil || profile.ID != "a" {
+		t.Fatalf("ok = %#v err=%v", profile, err)
+	}
+	if finalizeSQLiteDeleteErr(errors.New("missing"), errors.New("p")).Error() != "missing" {
+		t.Fatal("delete pre-err wins")
+	}
+	if finalizeSQLiteDeleteErr(nil, errors.New("p")) == nil {
+		t.Fatal("delete persist err")
+	}
+	if finalizeSQLiteDeleteErr(nil, nil) != nil {
+		t.Fatal("delete ok")
+	}
+
+	// Projection payload maps
+	oldSnap := fileSnapshot{
+		Projects: map[string]Project{"p1": {ID: "p1", Name: "Old"}},
+		Runs:     map[string]Run{"r1": {ID: "r1", ProjectID: "p1"}},
+	}
+	newSnap := fileSnapshot{
+		Projects: map[string]Project{"p1": {ID: "p1", Name: "New"}},
+		Runs:     map[string]Run{"r1": {ID: "r1", ProjectID: "p1", Status: "started"}},
+	}
+	payloads := buildRelationalProjectionPayloads(oldSnap, newSnap)
+	if len(payloads.OldWorkspaces) != 1 || len(payloads.NewWorkspaces) != 1 {
+		t.Fatalf("workspaces %#v %#v", payloads.OldWorkspaces, payloads.NewWorkspaces)
+	}
+	if len(payloads.OldRuns) != 1 || len(payloads.NewRuns) != 1 {
+		t.Fatalf("runs %#v %#v", payloads.OldRuns, payloads.NewRuns)
+	}
+	if payloads.OldArtifacts == nil || payloads.NewArtifacts == nil ||
+		payloads.OldDiffs == nil || payloads.NewDiffs == nil ||
+		payloads.OldPreviews == nil || payloads.NewPreviews == nil {
+		t.Fatal("nil projection maps")
 	}
 }
