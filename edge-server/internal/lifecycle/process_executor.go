@@ -206,13 +206,9 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	current, ok := e.store.GetRun(run.ID)
-	if err := validateStartRunState(ok, current.Status); err != nil {
-		return err
-	}
-
+	current, found := e.store.GetRun(run.ID)
 	_, alreadyRunning := e.running[run.ID]
-	if err := canStartRun(len(e.running), e.maxConcurrentRuns, alreadyRunning); err != nil {
+	if err := planStartAdmission(found, current.Status, len(e.running), e.maxConcurrentRuns, alreadyRunning); err != nil {
 		return err
 	}
 	// Create context and atomically insert cancel into the map while holding
@@ -220,8 +216,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	ctx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
 	e.running[run.ID] = cancel
 
-	runCtx.Run = run
-	go e.run(ctx, run, runCtx)
+	go e.run(ctx, run, bindRunProcessContext(runCtx, run))
 	return nil
 }
 
@@ -628,7 +623,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// Clean up the tracked process from this attempt before retrying.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
-			if s, ok := e.runOutputs[run.ID]; sessionPlan.CloseOutput && ok {
+			if s, ok := e.runOutputs[run.ID]; shouldApplyTrackedClose(sessionPlan.CloseOutput, ok) {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
@@ -664,13 +659,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// TypeScript typecheck+test, generic file existence) against the workDir.
 		// If verification fails, the run is marked as completed_with_issues instead
 		// of finished, and the full evidence output is stored in run metadata.
-		gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir)
-		evidencePlan := planEvidenceGateOutcome(gateEnabled, true)
-		finalStatus := evidencePlan.FinalStatus
-		if planEvidenceRun(gateEnabled).RunGate {
+		attempt := planEvidenceGateAttempt(isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir))
+		finalStatus := attempt.FinalStatus
+		if attempt.RunGate {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-			evidencePlan = planEvidenceGateOutcome(true, evidenceResult.Passed)
+			evidencePlan := planEvidenceGateResult(evidenceResult.Passed)
 			finalStatus = evidencePlan.FinalStatus
 			if evidencePlan.LogFailure {
 				slog.Warn("process: evidence gate verification failed", "runId", run.ID, "projectType", evidenceResult.ProjectType, "summary", evidenceResult.Summary)
@@ -831,12 +825,12 @@ func (e *ProcessExecutor) publishCancelled(run store.Run) {
 // checkPersistError logs and emits a persistence_error event when the FileStore
 // has a pending persistence failure after a status transition.
 func (e *ProcessExecutor) checkPersistError(runID string) {
-	pc, ok := asPersistErrorSource(e.store)
-	if !ok {
-		return
+	pc, sourceOK := asPersistErrorSource(e.store)
+	var persistErr error
+	if sourceOK {
+		persistErr = pc.LastPersistError()
 	}
-	persistErr := pc.LastPersistError()
-	if !planPersistError(true, persistErr).Emit {
+	if !planPersistError(sourceOK, persistErr).Emit {
 		return
 	}
 	slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
@@ -881,11 +875,11 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.hubOutputs, runID)
 	delete(e.workDirs, runID)
 	delete(e.surfacers, runID)
-	if done, ok := e.cancelDone[runID]; plan.CloseCancelDone && ok {
+	if done, ok := e.cancelDone[runID]; shouldApplyTrackedClose(plan.CloseCancelDone, ok) {
 		close(done)
 		delete(e.cancelDone, runID)
 	}
-	if s, ok := e.runOutputs[runID]; plan.CloseRunOutput && ok {
+	if s, ok := e.runOutputs[runID]; shouldApplyTrackedClose(plan.CloseRunOutput, ok) {
 		if err := s.Close(); planRunOutputCloseLog(err).Log {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
@@ -942,35 +936,21 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		e.agentRegistry.SetStatus(agentID, plan.RegistryStatus, "")
 	}
 
-	// Sanitize the sub-agent result before it enters the message queue.
-	// This redacts stack traces, file paths, and API keys, and truncates
-	// oversized outputs to keep queue payloads bounded.
-	sanitizedResult, sanitizeReason := SanitizeSubAgentResult(payload)
-
+	// Pure outbound prep: sanitize + queue message + aggregator value.
+	// Queue/registry side-effects stay here.
 	now := time.Now().UTC()
+	msg, aggResult := prepareSubAgentResultOutbound(
+		payload, runID, agentID, inst.Name, inst.ParentID, status, now,
+	)
 	e.messageQueue.EnsureAgent(inst.ParentID, 64)
-	e.messageQueue.Send(buildSubAgentResultMessage(
-		runID, agentID, inst.Name, inst.ParentID, status, sanitizedResult, sanitizeReason, now,
-	))
+	e.messageQueue.Send(msg)
 
 	// Store structured result in the aggregator's collector for eventual
 	// synthesis when all children of the parent complete (or timeout).
 	// Reference: AionUi Team Mode Mailbox — persisted sub-agent results.
 	// Reference: LibreChat — structured subagent result return.
-	//
-	// Apply sanitization to the raw payload before storing in the result
-	// aggregator. This ensures that even if the message queue copy is
-	// tampered with, the raw persisted output does not leak API keys,
-	// file paths, or stack traces.
 	if plan.StoreAgg {
-		e.resultAgg.StoreSubAgentResult(inst.ParentID, buildSubAgentResult(
-			agentID,
-			inst.Name,
-			runID,
-			status,
-			aggregatorOutput(payload, sanitizedResult, sanitizeReason),
-			now,
-		))
+		e.resultAgg.StoreSubAgentResult(inst.ParentID, aggResult)
 	}
 
 	// Decrement per-parent active child count so the slot can be reused.
