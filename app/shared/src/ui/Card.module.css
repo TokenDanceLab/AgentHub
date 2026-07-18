@@ -5,16 +5,20 @@
   color: var(--card-foreground);
 }
 
+/* Frosted glass recipe — values from design-token SSOT (#1197). */
 .glass {
-  background: oklch(1 0 0 / 0.72);
-  border-color: oklch(1 0 0 / 0.7);
-  box-shadow: 0 18px 48px oklch(0.15 0.005 260 / 0.14);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: var(--glass-card-bg, var(--glass-panel));
+  border-color: var(--glass-card-border, var(--glass-border));
+  box-shadow: var(--glass-card-shadow, var(--glass-elev-2));
+  border-radius: var(--glass-card-radius, var(--radius-xl, 0.75rem));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .elevated {
-  box-shadow: 0 4px 12px oklch(0 0 0 / 0.08);
+  background: var(--elevated-card-bg, var(--card));
+  border-color: var(--elevated-card-border, var(--border));
+  box-shadow: var(--elevated-card-shadow, var(--glass-elev-1));
 }
 
 .compact { padding: var(--space-sm, 0.5rem); }
