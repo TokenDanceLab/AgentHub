@@ -8,6 +8,7 @@ import type {
 import { ConversationHost } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
 import { RightInspector } from './RightInspector';
+import { ChatEngineeringColumn } from './ChatEngineeringColumn';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import {
   SidebarResizer,
@@ -88,9 +89,21 @@ export function WorkbenchRoutesFrame(
   );
 }
 
-/** RightInspector host for chat page. */
+/** RightInspector host for chat page; stacks AuxPanel when localFiles. */
 export function ChatInspectorFrame(
   props: ChatInspectorFrameProps,
 ): React.ReactElement {
-  return <RightInspector {...buildChatInspectorProps(props)} />;
+  const inspector = <RightInspector {...buildChatInspectorProps(props)} />;
+  const localFiles = props.platform.capabilities.localFiles;
+  if (!localFiles) {
+    return inspector;
+  }
+  const workDir = props.session.composer?.workDir;
+  return (
+    <ChatEngineeringColumn
+      inspector={inspector}
+      hasWorkspace={Boolean(workDir && String(workDir).trim())}
+      localFiles={localFiles}
+    />
+  );
 }
