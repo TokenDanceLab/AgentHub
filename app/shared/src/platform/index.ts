@@ -1,4 +1,9 @@
-export { createMockPlatform, createMockTerminalPort } from './createMockPlatform';
+export {
+  createMockPlatform,
+  createMockTerminalPort,
+  createMockWorkspaceFilesPort,
+  createMockWorkspaceGitPort,
+} from './createMockPlatform';
 export { resolveEvidencePreviewTarget } from './previewTargets';
 export type { MockPlatform, MockPlatformSeed, MockTerminalPort } from './createMockPlatform';
 export type {
@@ -23,4 +28,9 @@ export type {
   TerminalWritePayload,
   WorkbenchAgent,
   WorkbenchConversation,
+  WorkspaceFileEntry,
+  WorkspaceFilesPort,
+  WorkspaceGitChange,
+  WorkspaceGitCommit,
+  WorkspaceGitPort,
 } from './types';

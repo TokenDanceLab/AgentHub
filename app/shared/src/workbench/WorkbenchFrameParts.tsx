@@ -110,6 +110,8 @@ export function ChatInspectorFrame(
       inspector={inspector}
       hasWorkspace={hasWorkspace}
       localFiles={localFiles}
+      platform={props.platform}
+      {...(workDir !== undefined ? { workDir } : {})}
     />
   );
 }
