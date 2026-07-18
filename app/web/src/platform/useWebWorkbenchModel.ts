@@ -69,6 +69,7 @@ import {
   resolveWebTaskContractStatusBlocks,
   resolveWebWorkbenchTranscript,
 } from './webWorkbenchTranscript';
+import { errorMessage } from './webWorkbenchError';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
@@ -102,12 +103,16 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   });
 
   const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
-  const activeConversationId = (
-    conversations.some((conversation) => conversation.id === selectedConversationId)
-      ? selectedConversationId
-      : conversations[0]?.id
-  ) ?? 'agent-collab';
-  const activeHubSessionId = hubReady && sessions.data?.length ? activeConversationId : null;
+  // Prefer explicit selection. Fall back to first conversation only when none selected.
+  // Keep a parent-provided id even if it is temporarily absent from the list (#1010).
+  const activeConversationId = selectedConversationId
+    ?? conversations[0]?.id
+    ?? 'agent-collab';
+  // Only treat as Hub session when the resolved id is actually a Hub session.
+  const activeHubSessionId = hubReady
+    && sessions.data?.some((session) => session.id === activeConversationId)
+    ? activeConversationId
+    : null;
 
   useEffect(() => {
     setLiveRuntimeEvents([]);
@@ -468,6 +473,19 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       targetLabel: executionTargetStatus.selectedTarget
         ? executionTargetLabel(executionTargetStatus.selectedTarget)
         : undefined,
+      initialLoading: hubReady
+        && (sessions.isLoading || (Boolean(activeHubSessionId) && messages.isLoading))
+        && conversations.length === 0
+        && !sessions.error
+        && !messages.error,
+      ...(sessions.error || messages.error
+        ? {
+            loadError: errorMessage(
+              sessions.error ?? messages.error,
+              'Hub chat load failed',
+            ),
+          }
+        : {}),
       replayLabel: activeHubSessionId
         ? activeAgentTaskId
           ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length) === 1 ? '' : 's'} observed`

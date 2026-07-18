@@ -281,6 +281,9 @@ export const chatviewResources = {
     'connection.connected': '已连接',
     'connection.connectingBrief': '连接中',
     'connection.disconnected': '已断开',
+    'connection.loadErrorTitle': '会话加载失败',
+    'connection.loadErrorDescription': '无法加载当前聊天数据。请检查连接后重试，避免停留在空白会话。',
+    'connection.retry': '重试',
 
     // ═══ Inspector ═══
     'inspector.htmlPreview': 'HTML 预览',
@@ -677,6 +680,9 @@ export const chatviewResources = {
     'connection.connected': 'Connected',
     'connection.connectingBrief': 'Connecting',
     'connection.disconnected': 'Disconnected',
+    'connection.loadErrorTitle': 'Failed to load chat',
+    'connection.loadErrorDescription': 'Chat data could not be loaded. Check the connection and retry instead of leaving a blank transcript.',
+    'connection.retry': 'Retry',
 
     // ═══ Inspector ═══
     'inspector.htmlPreview': 'HTML preview',
