@@ -92,19 +92,31 @@ export function buildRemoveSessionMemberPath(sessionId: string, userId: string):
 export function buildGetMessagesPath(
   sessionId: string,
   params?: { before_seq?: number; limit?: number },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages${qs(params)}`;
+}
 
 export function buildSyncMessagesPath(
   sessionId: string,
   params?: { after_seq?: number; limit?: number },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/sync${qs(params)}`;
+}
 
 export function buildSearchSessionMessagesPath(
   sessionId: string,
   params: { q: string; content_type?: string; from?: string; to?: string },
+): string {
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/search${qs(params)}`;
+}
 
 export function buildListWorkspaceProjectThreadMessagesPath(
   projectId: string,
   threadId: string,
   params?: { limit?: number },
+): string {
+  return `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params)}`;
+}
 
 export function buildSendWorkspaceProjectThreadMessagePath(
   projectId: string,
