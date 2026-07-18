@@ -880,10 +880,18 @@ func (e *ProcessExecutor) finish(runID string) {
 	_, hasRunOutput := e.runOutputs[runID]
 	e.mu.Unlock()
 	plan := planFinishCleanup(e.agentRegistry != nil, hasCancelDone, hasRunOutput)
-	// Cascade: when a parent agent finishes, recursively terminate all
-	// descendant sub-agents (Codex AgentTree shutdown pattern).
+	// Cascade: when a parent agent finishes, disconnect descendant registry
+	// nodes and Cancel their process runIDs (Codex AgentTree shutdown).
+	// ShutdownCascade accepts parent runID even when no agent is registered
+	// under that ID — children are keyed ParentID=parentRunID (#1001).
+	// Preserve #867 terminalFinish, #987 hubOutputs, #988 Cancel grace path.
 	if plan.Cascade {
-		e.agentRegistry.ShutdownCascade(runID)
+		for _, childRunID := range e.agentRegistry.ShutdownCascade(runID) {
+			if childRunID == "" || childRunID == runID {
+				continue
+			}
+			e.Cancel(childRunID)
+		}
 	}
 
 	// Auto-surface: detect file changes and emit artifact/preview/diff events.
