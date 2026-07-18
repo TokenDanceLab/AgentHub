@@ -1,9 +1,10 @@
 # Hub `internal/service` Boundary Map
 
-> last-updated: 2026-07-17
-> issue: #823 (Dispatch pure residual closed / boundary-map refresh; prior #811 / #800 / #789 / #779 / #768 / #756 / #744 / #732 / #720 / #708 / #697 / #685 / #673 / #662 / #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468)
-> status: map current — pure helpers closed for runtime + **#628/#639/#651 IM pure package** (`service/im`) + **#662 first IM typed-service package** (`service/messagereaction`) + **#673 second IM typed-service package** (`service/workspace`, DB-only) + **#685 third IM typed-service package** (`service/contact`, bus+cache ports) + **#697 fourth IM typed-service package** (`service/attachment`, ObjectStorage port) + **#708 fifth IM typed-service package** (`service/session`, bus+cache ports) + **#720 sixth IM typed-service package** (`service/message`, bus+cache ports) + **#732→#811 Dispatch pure residual continue** (`service/dispatch`, ~1.2k prod LOC) + **#823 pure residual closed** + **#744 DeliveryOutbox pure residual** (`service/deliveryoutbox` status/eligibility); IM typed-service package moves closed for primary surfaces; next residual = optional outbox model package move / optional typed DispatchService package move
-> companion: `cleanup-strategy.md` Phase 4 Hub · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/dispatch` / `service/messagereaction` / `service/workspace` / `service/contact` / `service/attachment` / `service/session` / `service/message`
+> last-updated: 2026-07-18
+> tip: origin/master `8f4a846c` (Phase 58 peels landing)
+> issue: #823 (Dispatch pure residual closed / boundary-map refresh; prior #811 / #800 / #789 / #779 / #768 / #756 / #744 / #732 / #720 / #708 / #697 / #685 / #673 / #662 / #651 / #639 / #628 / #617 / #606 / #594 / #593 / #585 / #573 / #563 / #551 / #540 / #528 / #514 / #505 / #493 / #478 / #468) · Phase 58 residual peels #1033 (agent_dispatch) / #1035 (hygiene closeout); #1030–#1032/#1034 closed via PRs #1036–#1039
+> status: map current at tip — flat `service` ~5892 prod / ~6910 test; `agent_dispatch.go` 800; `delivery_outbox.go` 469 (+ companions); pure `service/dispatch` ~1963; IM typed packages + Dispatch pure residual closed as before; next residual peels align MASTER Phase 58 open work only
+> companion: `cleanup-strategy.md` (archived program pointer) · live progress `docs/progress/MASTER.md` · precedent `service/agentteam` (ADR-014) / `service/agentevent` / `service/deliveryoutbox` / `service/dispatch` / `service/messagereaction` / `service/workspace` / `service/contact` / `service/attachment` / `service/session` / `service/message`
 
 This document is the authoritative **read-only boundary map** for
 `hub-server/internal/service`. It records package shape, coupling risks,
@@ -14,13 +15,13 @@ an acceptance sketch.
 
 | Surface | Prod LOC | Test LOC | Files | Notes |
 |---|---:|---:|---:|---|
-| Flat `service` package | ~9,1xx | ~10,8xx | 56 `.go` | 32 prod + 24 test (approx; re-count on extract PRs) |
+| Flat `service` package | ~5892 | ~6910 | 44 `.go` | 28 prod + 16 test (recount tip `8f4a846c` 2026-07-18) |
 | Already-extracted `service/agentteam` | ~3,012 | ~3,259 | 13 | Template for later domain extracts |
 | Pure extract `service/agentevent` | ~620 | unit tests | pure helpers | no DB/WS/cache/`*AgentService` (#468) |
 | Same-package type extract `RunEventService` | ~200 methods + facade | existing `agent_run_event_test.go` | still in flat `service` | injected `runEventControl` (#478) |
 | Same-package type extract `EdgeCallbackService` | ~500 methods + facade | existing HandleTask*/outbox auto-ack tests | still in flat `service` | injected bus/seq/outbox (#505) |
 | Pure extract `service/deliveryoutbox` | ~80–100 | unit tests | pure helpers | backoff/truncate + retry constants (#514) + status/eligibility/last-error residual (#744); no DB/WS/cache/`*AgentService` |
-| Pure extract `service/dispatch` | ~1,251 | ~826 unit tests | 19 prod + 5 test | pure helpers (#732→#811; **closed #823**): loopback / runtime type / select / merge / prompt+history / task-status / edge constants / Message+Payload DTOs / Edge request / team+target+capability+redelivery / routing / task-access / events / mint resolve / trigger mapping / model→DTO mappers / route classify; no DB/WS/cache/`*Service` |
+| Pure extract `service/dispatch` | ~1963 | ~1248 unit tests | 31 prod + 6 test | pure helpers (#732→#811; **closed #823**; later peels grew package): loopback / runtime type / select / merge / prompt+history / task-status / edge constants / Message+Payload DTOs / Edge request / team+target+capability+redelivery / routing / task-access / events / mint resolve / trigger mapping / model→DTO mappers / route classify; no DB/WS/cache/`*Service` |
 | Pure extract `service/im` | ~280 | unit tests | pure helpers | content/attachment + reaction normalize/summary + workspace thread content + workspace name/description fields; no DB/WS/cache/`*Service` (#628/#639/#651) |
 | Typed extract `service/messagereaction` | ~217 | ~278 | 2 | **DONE #662** first IM typed-service package; Bus port + DTOs + add/remove/list; pure helpers stay in `im` |
 | Typed extract `service/workspace` | ~370 | ~273 | 2 | **DONE #673** second IM typed-service package; DB-only Service + DTOs + project/thread CRUD; pure helpers stay in `im`; no bus/cache ports invented |
@@ -29,7 +30,7 @@ an acceptance sketch.
 | Typed extract `service/session` | ~790 | ~1,5xx | 3 | **DONE #708** fifth IM typed-service package; Bus + Cache ports + DTOs + private/group lifecycle; ports from #593 kept interface-shaped |
 | Typed extract `service/message` | ~800 | ~1,3xx | 3 | **DONE #720** sixth IM typed-service package; Bus + Cache ports + DTOs + send/edit/pin/forward/search/read; ports from #585 kept interface-shaped; pure helpers stay in `im` |
 | Same-package type extract `DeliveryOutbox` | **landed #540 + #551 + #744 pure residual** | existing `TestOutbox_*` + fake Redispatcher tests + `service/deliveryoutbox` unit tests | still in flat `service` | opaque `Redispatcher`; private `deliveryOutboxRecord` + repo helpers; scan returns `DeliveryOutboxEntry`; redispatch uses `redispatchTarget`; pure status/eligibility → `service/deliveryoutbox` |
-| Same-package type extract `DispatchService` | **landed #563 thin first seam + #573 redispatch residual + #617 ports residual + #732→#811 pure helpers + #823 pure residual closed** | existing `agent_test` / `agent_logic_test` + `TestOutbox_*` + `service/dispatch` unit tests | still in flat `service` (~903 LOC orchestration) | injected `dispatchBus` / `dispatchOutbox` / narrow `dispatchCache` / `dispatchWS` / relay; `dispatchPayload` private; redispatch via `dispatchRedispatcher`; pure helpers → `service/dispatch` (~1.2k); no further pure extract |
+| Same-package type extract `DispatchService` | **landed #563 thin first seam + #573 redispatch residual + #617 ports residual + #732→#811 pure helpers + #823 pure residual closed** | existing `agent_test` / `agent_logic_test` + `TestOutbox_*` + `service/dispatch` unit tests | still in flat `service` (**800** LOC orchestration at tip) | injected `dispatchBus` / `dispatchOutbox` / narrow `dispatchCache` / `dispatchWS` / relay; `dispatchPayload` private; redispatch via `dispatchRedispatcher`; pure helpers → `service/dispatch` (~1963); optional further peel tracked Phase 58 #1033 |
 | Same-package type extract `MessageService` | **superseded by #720 package move** (prior #585 bus+cache ports) | moved tests in `service/message` | **extracted** | was flat; now `service/message` |
 | Same-package type extract `SessionService` | **superseded by #708 package move** (prior #593 bus+cache ports) | moved tests in `service/session` | **extracted** | was flat; now `service/session` |
 | Same-package type extract `ContactService` | **superseded by #685 package move** (prior #594 bus+cache ports) | moved tests in `service/contact` | **extracted** | was flat; now `service/contact` |
@@ -88,7 +89,7 @@ Bus+Cache ports stay interface-shaped (from #585); flat `message.go` removed; pu
 **#756/#768/#779/#789/#800/#811:** Dispatch pure residual **continued** — Message/Payload DTOs, Edge
 request builders, team/target/capability/redelivery, routing classifiers, task-access/events, mint
 resolve, model→DTO mappers, redispatch prep, Edge HTTP headers, redelivery route classify, finalize
-delivery payload. Pure package grew to ~1.2k prod LOC; `agent_dispatch.go` orchestration ~903 LOC.
+delivery payload. Pure package grew further via residual peels; tip recount `agent_dispatch.go` orchestration **800** LOC, pure `service/dispatch` **~1963**.
 Thin same-package aliases retained for test/call stability.
 
 **#823:** Dispatch pure residual **closed** (docs + ownership comments). No further pure-only extract
@@ -117,7 +118,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 
 | Domain | Prod LOC | Files (prod) | Role |
 |--------|---------:|--------------|------|
-| **agent_runtime** | ~2,7xx | `agent.go`, `agent_custom.go`, `agent_dispatch.go` (`DispatchService` + residual ports + facade + thin pure aliases, **~903**), `agent_run_event.go` (`RunEventService` + facade), `agent_edge_callback.go` (`EdgeCallbackService` + facade), `delivery_outbox.go` (~820), `agent_control.go`, `agent_team_helpers.go` (compat wrappers), `relay.go` | Task dispatch, edge callback, outbox retry, run-event projection |
+| **agent_runtime** | residual flat | `agent.go`, `agent_custom.go`, `agent_dispatch.go` (`DispatchService` + residual ports + facade + thin pure aliases, **800**), `agent_run_event.go` (`RunEventService` + facade), `agent_edge_callback.go` (`EdgeCallbackService` + facade), `delivery_outbox.go` (**469** + `delivery_outbox_facade.go` 133 + `delivery_outbox_model.go` 142), `agent_control.go`, `agent_team_helpers.go` (compat wrappers), `relay.go` | Task dispatch, edge callback, outbox retry, run-event projection |
 | **im_messaging** | ~4xx | `attachment.go` (~20; thin im aliases after #697), `notification.go`, `image_meta.go` | IM messaging residual pure/notification only (reaction + workspace + contact + attachment + session + message extracted) |
 | **agent_catalog** | ~1,133 | `agent_profile.go`, `document.go`, `skill.go`, `mcp_server.go`, `provider_binding.go` | Profiles/docs/market installables |
 | **identity_auth** | ~829 | `auth.go`, `oidc.go`, `device.go`, `user_settings.go` | Login/OIDC/device/settings |
@@ -126,7 +127,7 @@ Precedent: `service/agentteam` uses **local interfaces**
 | **agentteam/** (subpkg) | ~3,012 | CRUD/member/run/routing/approval/guard/compete | **Already extracted** team domain |
 | **agentevent/** (subpkg) | ~620 | pure project/validate/helpers | **Extracted in #468** |
 | **deliveryoutbox/** (subpkg) | ~80–100 | pure retry/truncate + status/eligibility helpers | **Extracted in #514; residual #744** |
-| **dispatch/** (subpkg) | ~1,251 | pure loopback/runtime-type/select/merge/prompt/history-text + Message/Payload DTO + Edge request + team/target/capability/redelivery + routing + task-access/events + mint + mappers (#732→#811) | **Extracted #732; continued #756–#811; pure residual closed #823** |
+| **dispatch/** (subpkg) | ~1963 | pure loopback/runtime-type/select/merge/prompt/history-text + Message/Payload DTO + Edge request + team/target/capability/redelivery + routing + task-access/events + mint + mappers (#732→#811 + later peels) | **Extracted #732; continued #756–#811; pure residual closed #823; tip recount 2026-07-18** |
 | **im/** (subpkg) | ~280 | pure content/attachment/reaction/workspace-content/workspace-fields helpers | **Extracted in #628/#639/#651** |
 | **messagereaction/** (subpkg) | ~217 | typed reaction orchestration + Bus port + DTOs | **Extracted in #662** |
 | **workspace/** (subpkg) | ~370 | typed workspace project/thread CRUD + DTOs (DB-only) | **Extracted in #673** |
@@ -139,11 +140,11 @@ Precedent: `service/agentteam` uses **local interfaces**
 
 | File | LOC | Owns | Couples to |
 |------|----:|------|------------|
-| `agent_dispatch.go` | **~903** | `DispatchService` + facades: `TriggerAgentTask`, `dispatchTask`, edge HTTP, capability, history/pins, cancel/regenerate, **redispatch residual**, residual ports + thin pure aliases | injected `dispatchOutbox` / `dispatchBus` / `dispatchCache` / `dispatchWS` / relay (**#563/#617**); private `dispatchPayload`; redispatch owned by `DispatchService` (**#573**); pure helpers → `service/dispatch` (**#732→#811**; pure residual **closed #823**) |
-| `dispatch/` | **~1,251** | pure helpers: loopback, runtime agent type, select instance, merge model params, prompt/history text, Message/Payload DTOs, Edge request, team/target/capability/redelivery, routing, task-access/events, mint resolve, model→DTO mappers, route classify | **#732→#811 pure residual; closed #823**; no DB/WS/cache/`*Service` |
-| `delivery_outbox.go` | ~6xx | `DeliveryOutbox` owns private model + repo helpers + journal/retry + `Redispatcher` adapter; facades on `AgentService` | pure helpers → `deliveryoutbox` (#514/#744); thin type + `Redispatcher` (**#540**); model ownership residual (**#551**); redispatch impl moved off this file onto `DispatchService` (**#573**); pure residual status/eligibility (**#744**) |
-| `message/` | ~800 | typed `Service` + Bus/Cache ports: send/edit/recall/pin/forward/search/read + DTOs; thin aliases to `im` pure helpers | **#720 package move** from flat `message.go`; ports from **#585**; pure content helpers remain in `im` |
-| `session/` | ~790 | typed `Service` + Bus/Cache ports: private/group lifecycle, members, dissolve, settings + DTOs | **#708 package move** from flat `session.go`; ports from **#593** |
+| `agent_dispatch.go` | **800** | `DispatchService` + facades: `TriggerAgentTask`, `dispatchTask`, edge HTTP, capability, history/pins, cancel/regenerate, **redispatch residual**, residual ports + thin pure aliases | injected `dispatchOutbox` / `dispatchBus` / `dispatchCache` / `dispatchWS` / relay (**#563/#617**); private `dispatchPayload`; redispatch owned by `DispatchService` (**#573**); pure helpers → `service/dispatch` (**#732→#811**; pure residual **closed #823**); further peel **#1033** |
+| `dispatch/` | **~1963** | pure helpers: loopback, runtime agent type, select instance, merge model params, prompt/history text, Message/Payload DTOs, Edge request, team/target/capability/redelivery, routing, task-access/events, mint resolve, model→DTO mappers, route classify | **#732→#811 pure residual; closed #823**; tip recount 2026-07-18; no DB/WS/cache/`*Service` |
+| `delivery_outbox.go` | **469** | `DeliveryOutbox` owns private model + repo helpers + journal/retry + `Redispatcher` adapter; facades on `AgentService` | companions `delivery_outbox_facade.go` (133) + `delivery_outbox_model.go` (142); pure helpers → `deliveryoutbox` (#514/#744); thin type + `Redispatcher` (**#540**); model ownership residual (**#551**); redispatch impl moved off this file onto `DispatchService` (**#573**); pure residual status/eligibility (**#744**) |
+| `message/` | ~915 | typed `Service` + Bus/Cache ports: send/edit/recall/pin/forward/search/read + DTOs; thin aliases to `im` pure helpers | **#720 package move** (flat `message.go` **removed**); ports from **#585**; pure content helpers remain in `im` |
+| `session/` | ~936 | typed `Service` + Bus/Cache ports: private/group lifecycle, members, dissolve, settings + DTOs | **#708 package move** (flat `session.go` **removed**); ports from **#593** |
 | `contact/` | ~400 | typed `Service` + Bus/Cache ports: search/request/accept/reject/list/remove/block/unblock/remark + DTOs | **#685 package move** from flat `contact.go`; ports from **#594** |
 | `attachment.go` | ~20 | thin aliases for `im.IsValidAttachmentHash` / `im.PathFromHash` / `im.NormalizeAttachmentMetadataJSON` | pure-only after #697 package move |
 | `attachment/` | ~420 | typed `Service` + `ObjectStorage` port + LocalStorage/S3Storage: probe/save/store/get/delete/presign/access + mime policy | **#697 package move** from flat `attachment.go`; pure helpers remain in `im`; thin aliases preserved |
@@ -259,7 +260,7 @@ Cleanup strategy alignment (`docs/analysis/cleanup-strategy.md` Phase 4 Hub):
 | **8l** | **Fourth IM typed-service package move (`service/attachment`)** | **Lowest remaining typed move** | High seam | **DONE #697** — agentteam-style package; ObjectStorage port from #606; pure helpers stay in `im`; one service only |
 | **8m** | **Fifth IM typed-service package move (`service/session`)** | **Lowest remaining typed move** | High seam | **DONE #708** — agentteam-style package; Bus+Cache ports from #593; one service only |
 | **8n** | **Sixth IM typed-service package move (`service/message`)** | **Lowest remaining typed move** | High seam | **DONE #720** — agentteam-style package; Bus+Cache ports from #585; pure helpers stay in `im`; one service only |
-| **8o** | **Dispatch residual pure helpers (`service/dispatch`)** | **Lowest remaining dispatch residual** | Med seam | **DONE #732→#811; pure residual closed #823** — pure only (~1.2k prod LOC); thin aliases on `agent_dispatch.go` (~903 orchestration); typed DispatchService package move deferred |
+| **8o** | **Dispatch residual pure helpers (`service/dispatch`)** | **Lowest remaining dispatch residual** | Med seam | **DONE #732→#811; pure residual closed #823** — pure only (~1963 prod LOC at tip); thin aliases on `agent_dispatch.go` (**800** orchestration); further residual peel **#1033**; typed DispatchService package move deferred |
 | 9 | Optional outbox model package move (`deliveryOutboxRecord` → model/repo) | High | Med | Deferred after #551 private ownership; higher risk than IM pure/port seams |
 | 10 | IM typed-service subpackages | Med | High | **reaction DONE #662**; **workspace DONE #673**; **contact DONE #685**; **attachment DONE #697**; **session DONE #708**; **message DONE #720** — primary IM typed packages closed |
 | 10b | Optional workspace ports residual (if bus/cache appears) | Low | Low | **Closed as N/A in #651/#673** — `workspace.Service` remains DB-only |
@@ -547,7 +548,7 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 - [x] `service/deliveryoutbox` has **no** `*gorm.DB` / `*Service` / ws / cache imports
 - [x] Existing outbox tests + short suite + `./internal/service/deliveryoutbox` green
 - [x] Boundary map residual next = optional outbox model package move / optional typed DispatchService package move
-- [x] Dispatch pure residual continue chain (#756/#768/#779/#789/#800/#811) grew `service/dispatch` to ~1.2k prod LOC; `agent_dispatch.go` orchestration ~903
+- [x] Dispatch pure residual continue chain (#756/#768/#779/#789/#800/#811) grew `service/dispatch`; tip recount pure ~1963 / `agent_dispatch.go` orchestration **800**
 - [x] Dispatch pure residual **closed** (#823): docs/map/comments only; no theater pure extract; no typed package move; go test green
 
 ## 6. Suggested follow-up extract order
@@ -590,8 +591,8 @@ go test ./internal/service/ -short -count=1 -run 'Test(HandleTask|Outbox)'
 |------|------|-------|
 | `service/delivery_outbox.go` | status const aliases, private `deliveryOutboxRecord` + repo helpers, `DeliveryOutboxEntry` view, `redispatchTarget`, `DeliveryOutbox` journal + retry loop, `Redispatcher`, `dispatchRedispatcher` adapter, facades | **#540 thin type + #551 model residual + #573 adapter + #744 pure residual aliases** |
 | `service/deliveryoutbox/` (~80–100) | pure backoff/TTL/truncate + status/eligibility/last-error | **DONE #514 + residual #744** — pure residual exhausted for outbox |
-| `service/agent_dispatch.go` (**~903**) | `DispatchService` + residual ports, `dispatchPayload`, edge HTTP, trigger/dispatch/cancel/regenerate, **redispatch residual**, facades + thin pure aliases | **#563 thin first seam + #573 redispatch residual + #617 residual ports + #732→#811 pure helpers + #823 pure residual closed**; package-private DTO retained |
-| `service/dispatch/` (**~1,251**) | pure loopback / runtime type / select / merge / prompt / history-text + Message/Payload DTO + Edge request + team/target/capability/redelivery + routing + task-access/events + mint + mappers | **DONE #732→#811; pure residual closed #823** — no pure residual left to extract from dispatch |
+| `service/agent_dispatch.go` (**800**) | `DispatchService` + residual ports, `dispatchPayload`, edge HTTP, trigger/dispatch/cancel/regenerate, **redispatch residual**, facades + thin pure aliases | **#563 thin first seam + #573 redispatch residual + #617 residual ports + #732→#811 pure helpers + #823 pure residual closed**; package-private DTO retained; further peel **#1033** |
+| `service/dispatch/` (**~1963**) | pure loopback / runtime type / select / merge / prompt / history-text + Message/Payload DTO + Edge request + team/target/capability/redelivery + routing + task-access/events + mint + mappers | **DONE #732→#811; pure residual closed #823** — tip recount 2026-07-18 |
 | `service/agent_edge_callback.go` | `edgeCallbackOutbox` port only | auto-ack **only** via `DeliveryOutbox` (**#551** removed `deliveryOutboxAcker`) |
 | `service/agent.go` | `AgentService` composition (`runEvents`, `edgeCallbacks`, `deliveryOutbox`, `dispatch`) | `NewDispatchService(..., deliveryOutbox)` then `SetRedispatcher(dispatchRedispatcher{dispatch})` |
 | `app/wiring.go` | `AgentService.StartDeliveryRetryLoop(coreCtx)` | retry loop **is** wired (AH-SR-049); facade unchanged |
@@ -1184,10 +1185,10 @@ type Service struct {
 
 ## 7. Bottom line
 
-- **Map:** six domains in flat package; **agent_runtime** still dominates residual flat surface; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** + **`im`** + **`dispatch`** (~1.2k pure) are pure seams; **`messagereaction`** + **`workspace`** + **`contact`** + **`attachment`** + **`session`** + **`message`** are IM typed-service extracts; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, and **`DispatchService`** (~903 orchestration) remain orchestration type extracts still flat (#478/#505/#540/#563/#573/#617).
-- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; runtime redispatch + residual ports + **Dispatch pure residual closed** (#732→#823) on `DispatchService` / `service/dispatch`; optional outbox model package move still high-risk; primary IM typed-service package moves **closed** (#662/#673/#685/#697/#708/#720).
-- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam** + **#594 ContactService thin first seam** + **#606 AttachmentService thin first seam** + **#617 DispatchService residual ports** + pure **`im`** (#628) + deeper pure **`im`** + **MessageReaction bus port** (#639) + workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651) + **first IM typed package `messagereaction` (#662)** + **second IM typed package `workspace` (#673)** + **third IM typed package `contact` (#685)** + **fourth IM typed package `attachment` (#697)** + **fifth IM typed package `session` (#708)** + **sixth IM typed package `message` (#720)** + pure **`dispatch`** (#732→#811) + **Dispatch pure residual closed (#823)**.
-- **Pure residual (runtime / dispatch):** **closed** (#732→#823). **Pure residual (IM):** first + deeper + #651 residual **landed** (#628/#639/#651). **IM typed package residual:** **closed** for primary surfaces (#662/#673/#685/#697/#708/#720).
+- **Map:** six domains in flat package; **agent_runtime** still dominates residual flat surface; **agentteam** is the extract template; **`agentevent`** + **`deliveryoutbox`** + **`im`** + **`dispatch`** (~1963 pure) are pure seams; **`messagereaction`** + **`workspace`** + **`contact`** + **`attachment`** + **`session`** + **`message`** are IM typed-service extracts; **`RunEventService`**, **`EdgeCallbackService`**, **`DeliveryOutbox`**, and **`DispatchService`** (**800** orchestration) remain orchestration type extracts still flat (#478/#505/#540/#563/#573/#617).
+- **Highest remaining coupling:** package flatness + `AgentService` facade/custom-agent surface; runtime redispatch + residual ports + **Dispatch pure residual closed** (#732→#823) on `DispatchService` / `service/dispatch`; optional outbox model package move still high-risk; primary IM typed-service package moves **closed** (#662/#673/#685/#697/#708/#720). Live open peels: Phase 58 **#1033** / **#1035** (`docs/progress/MASTER.md`).
+- **Landed:** pure **`agentevent`** (#468) + **`RunEventService`** (#478) + **`EdgeCallbackService`** (#505) + pure **`deliveryoutbox`** (#514) + **#528 docs sketch** + **#540 thin `DeliveryOutbox` + opaque `Redispatcher`** + **#551 model residual** + **#563 thin `DispatchService` first seam** + **#573 redispatch residual** + **#585 MessageService thin first seam** + **#593 SessionService thin first seam** + **#594 ContactService thin first seam** + **#606 AttachmentService thin first seam** + **#617 DispatchService residual ports** + pure **`im`** (#628) + deeper pure **`im`** + **MessageReaction bus port** (#639) + workspace field pure helpers + reaction summary pure helpers + typed-move sketch (#651) + **first IM typed package `messagereaction` (#662)** + **second IM typed package `workspace` (#673)** + **third IM typed package `contact` (#685)** + **fourth IM typed package `attachment` (#697)** + **fifth IM typed package `session` (#708)** + **sixth IM typed package `message` (#720)** + pure **`dispatch`** (#732→#811) + **Dispatch pure residual closed (#823)** + Phase 58 partial peels (#1030–#1032/#1034 closed).
+- **Pure residual (runtime / dispatch):** **closed** (#732→#823) with ongoing orchestration peels under Phase 58. **Pure residual (IM):** first + deeper + #651 residual **landed** (#628/#639/#651). **IM typed package residual:** **closed** for primary surfaces (#662/#673/#685/#697/#708/#720).
 - **#540 decision:** thin same-package extract **landed**. Redispatch initially stayed on `AgentService` behind port; no DispatchService big-bang.
 - **#551 decision:** model ownership residual **landed** (option A). Private GORM record + repo helpers on `DeliveryOutbox`; `DeliveryOutboxEntry` scan view; redispatch `redispatchTarget`; edge-callback acker removed. Full package move deferred.
 - **#563 decision:** thin same-package `DispatchService` **landed**. Trigger/dispatch/cancel/regenerate + edge HTTP/capability/history moved; facades preserve handlers; `dispatchPayload` stays private.
@@ -1206,9 +1207,10 @@ type Service struct {
 - **#697 decision:** fourth IM typed-service package move **landed** as `service/attachment` (agentteam-style). ObjectStorage port + LocalStorage/S3Storage + Service + methods moved; wiring/app/handler/tests updated; flat `attachment.go` stripped to thin aliases (`IsValidAttachmentHash`/`PathFromHash`/`NormalizeAttachmentMetadataJSON` → `im`); `s3_client.go` moved into new package. Pure helpers stay in `service/im`; thin aliases preserved for handler/test call sites. One service only; no OpenAPI/handler/frontend redesign.
 - **#708 decision:** fifth IM typed-service package move **landed** as `service/session` (agentteam-style). Bus+Cache ports + DTOs + methods moved; wiring/app/handler/tests updated; flat `session.go` removed. One service only; no OpenAPI/handler/frontend redesign.
 - **#720 decision:** sixth IM typed-service package move **landed** as `service/message` (agentteam-style). Bus+Cache ports + DTOs + methods moved; pure helpers remain in `service/im`; wiring/app/handler/tests updated; flat `message.go` removed. One service only; no OpenAPI/handler/frontend redesign.
-- **#732→#811 decision:** Dispatch pure residual **continued** into `service/dispatch` (Message/Payload DTOs, Edge request, team/target/capability/redelivery, routing classifiers, task-access/events, mint resolve, model→DTO mappers, redispatch prep). Pure package ~1.2k prod LOC; thin aliases retained; typed package move deferred.
+- **#732→#811 decision:** Dispatch pure residual **continued** into `service/dispatch` (Message/Payload DTOs, Edge request, team/target/capability/redelivery, routing classifiers, task-access/events, mint resolve, model→DTO mappers, redispatch prep). Pure package tip ~1963 prod LOC; thin aliases retained; typed package move deferred.
 - **#823 decision:** Dispatch pure residual **closed**. Boundary map + ownership comments refreshed to match code (#756–#811 chain). No further pure-only extract (remaining free funcs are thin aliases; redispatch body is WS/cache/DB orchestration). Next real seam = optional typed `DispatchService` package move (high risk) or leave flat. No OpenAPI/handler/frontend; no payload JSON redesign.
-- **Next code step:** optional outbox model package move / optional `DispatchService` package move (still deferred/high-risk) / AgentService facade residual cleanup.
+- **Phase 58 tip recount (2026-07-18):** flat `service` ~5892 prod / ~6910 test; `agent_dispatch.go` **800**; `delivery_outbox.go` **469** (+ facade/model companions); pure `dispatch/` ~1963. Open residual peels: **#1033** agent_dispatch · **#1035** hygiene closeout (see `docs/progress/MASTER.md`).
+- **Next code step:** Phase 58 open peels only (#1033 / #1035); optional outbox model package move / optional `DispatchService` package move remain deferred/high-risk.
 
 ## Key paths
 
@@ -1218,11 +1220,11 @@ type Service struct {
 - `hub-server/internal/service/agentteam/`
 - `hub-server/internal/service/agent_run_event.go` (`RunEventService`)
 - `hub-server/internal/service/agent_edge_callback.go` (`EdgeCallbackService`)
-- `hub-server/internal/service/delivery_outbox.go` (`DeliveryOutbox` + private model ownership + Redispatcher adapter)
-- `hub-server/internal/service/agent_dispatch.go` (`DispatchService` + redispatch residual + facades; private `dispatchPayload`; ~903 orchestration; pure residual closed #823)
-- `hub-server/internal/service/dispatch/` (pure helpers ~1.2k prod LOC; #732→#811; pure residual closed #823)
-- `hub-server/internal/service/message.go` (`MessageService` + `messageBus` / `messageCache` ports)
-- `hub-server/internal/service/session.go` (`SessionService` + `sessionBus` / `sessionCache` ports)
+- `hub-server/internal/service/delivery_outbox.go` (`DeliveryOutbox` + private model ownership + Redispatcher adapter; **469** LOC + companions)
+- `hub-server/internal/service/agent_dispatch.go` (`DispatchService` + redispatch residual + facades; private `dispatchPayload`; **800** orchestration; pure residual closed #823; further peel #1033)
+- `hub-server/internal/service/dispatch/` (pure helpers ~1963 prod LOC; #732→#811; pure residual closed #823)
+- `hub-server/internal/service/message/` (typed `message.Service` + Bus/Cache ports; flat `message.go` **removed** #720)
+- `hub-server/internal/service/session/` (typed `session.Service` + Bus/Cache ports; flat `session.go` **removed** #708)
 - `hub-server/internal/service/attachment.go` (`ObjectStorage` thin aliases after #697)
 - `hub-server/internal/service/attachment/` (typed attachment Service + ObjectStorage + LocalStorage/S3Storage + s3_client; #606 + #697)
 - `hub-server/internal/service/s3_client.go` (**removed in #697**; moved to `service/attachment/s3_client.go`)
@@ -1231,4 +1233,5 @@ type Service struct {
 - `hub-server/internal/service/contact/` (typed contact Service + Bus/Cache + DTOs; #685)
 - `hub-server/internal/service/im/` (pure IM content/attachment/reaction/workspace-content/workspace-fields helpers; #628/#639/#651)
 - `hub-server/internal/app/wiring.go` (`StartDeliveryRetryLoop`, `NewMessageService`, `NewSessionService`, `attachment.NewService`, `messagereaction.NewService`, `workspace.NewService`, `contact.NewService`)
-- `docs/analysis/cleanup-strategy.md`
+- `docs/analysis/cleanup-strategy.md` (archived-program pointer)
+- `docs/progress/MASTER.md` (live Phase 58 progress SSOT)

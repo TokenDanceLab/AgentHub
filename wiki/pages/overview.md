@@ -1,19 +1,19 @@
 ---
 title: AgentHub 产品总览
-summary: AgentHub 是 IM 形态的多 Agent 协作工作台，采用 Hub/Edge 双层架构，处于活跃开发期，当前聚焦文档治理、安全边界和 cleanup 基线建立
+summary: AgentHub 是 IM 形态的多 Agent 协作工作台，采用 Hub/Edge 双层架构；活进度以 docs/progress/MASTER.md 为准（Phase 58）
 tags:
   - overview
   - product
   - hub-edge
-  - cleanup
   - architecture
 sources:
   - docs/architecture.md
   - docs/decisions.md
   - docs/roadmap.md
+  - docs/progress/MASTER.md
   - docs/governance/security-risk-register.md
   - AGENTS.md
-updated: 2026-07-16
+updated: 2026-07-18
 ---
 
 # AgentHub 产品总览
@@ -86,15 +86,18 @@ Web:     Workbench -> Platform Adapter -> Hub Server -> Edge routing/relay -> Lo
 
 固定端口：Hub Server `8080`，Local Edge `3210`，Desktop Vite `5173`，Web Vite `5174`。
 
-## 实时生产状态
+## 程序状态（非 SSOT）
 
-### 当前基线
+wiki 是编译知识层，**不覆盖** `AGENTS.md` / architecture / api / risk register。
 
-- 开发分支：`dev/delicious233`，合并路径 `feat/* -> dev/delicious233 -> master`
-- 当前**无活跃 spec-driven 专项**；新大型任务必须重新建立 SPEC 和 `docs/progress/MASTER.md`
-- 最近完成：Phase 1-4 治理基线 + Repo Structure Doc Tooling Cleanup
+| 表面 | 权威位置 |
+|---|---|
+| 规则 | `AGENTS.md` |
+| 活进度 | `docs/progress/MASTER.md`（Phase 58 / milestone 79，2026-07-18） |
+| 总进度入口 | `docs/roadmap.md` |
+| 安全门禁 | `docs/governance/security-risk-register.md` |
 
-### P0 优先级
+P0 方向概览（细节以 MASTER + risk register 为准）：
 
 | 方向 | 目标 |
 |---|---|
@@ -102,33 +105,9 @@ Web:     Workbench -> Platform Adapter -> Hub Server -> Edge routing/relay -> Lo
 | **真实 E2E 合同** | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 |
 | **远控拓扑前置** | P0 remote-control fixture 验证 `Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK` 离线拓扑 |
 | **Chat flow 可靠性** | 发送不消失、消息线性排序、自动滚动、卡片合并 |
-| **安全边界** | Hub/Edge 授权分离，[[risks-open|安全风险登记表]]是发布门禁 |
+| **安全边界** | Hub/Edge 授权分离；Critical/High Open 默认阻断公开发布 |
 
-### 安全风险态势
-
-当前有 **High 风险：037/045 Open；046/049 Partial mitigated in repo；其余见 register 状态**（[[risks-open]]）：
-
-| ID | 风险 |
-|---|---|
-| AH-SR-037 | Web 仍用 `sessionStorage` 保存 Hub session，缺少 BFF/HttpOnly cookie |
-| AH-SR-045 | Remote Edge read API 缺少 route/target/workspace/user-action 级授权 |
-| AH-SR-046 | Edge run-start 缺少 per-run capability token |
-| AH-SR-049 | Hub-Edge delivery 缺少 durable end-to-end delivery contract |
-
-另有 **3 项 Critical/High 风险**已在代码层面缓解但需要部署验证（JWT secret 轮换、OIDC callback 真实流、Desktop PKCE 闭环）。
-
-Critical/High 且状态为 Open 的风险**默认阻断公开发布**。
-
-## Cleanup 意图
-
-本次 cleanup 基线工作的目标：
-
-1. **文档 SSOT 强化**：确保 `AGENTS.md` 为唯一规则入口，旧 longform/审计/发布材料/过期 skill 归档到外部 TokenDance docs，不在源仓保留 `docs/archive/` 或 `docs/archives/`
-2. **证据等级归一**：Mock、fixture、observed、approved-real、production 五级显式标注，消除 stub/fixture 冒充真实登录/执行的风险
-3. **仓库结构治理**：`scripts/` 根目录只保留分类子目录，过期 skill 白名单外不提交，历史 ADR 正文外迁、仓内只保留摘要
-4. **安全门禁对齐**：Open High 风险需有 owner 和下一步，[[cleanup-playbook|cleanup 实施手册]]中追踪关闭条件
-
-具体实施计划见 [[cleanup-playbook]]，架构决策上下文见 [[architecture-seams]]，安全风险详情见 [[risks-open]]。
+安全风险态势与关闭条件见 [[risks-open]] 与 register SSOT，不在本页复述 Open/Accepted 状态表。
 
 ## 相关页面
 
@@ -137,7 +116,6 @@ Critical/High 且状态为 Open 的风险**默认阻断公开发布**。
 - [[module-frontend]] — 前端（Desktop/Web/Shared）模块详解
 - [[hotspots]] — 代码热点与复杂度地图
 - [[risks-open]] — 当前安全风险登记与关闭条件
-- [[cleanup-playbook]] — Cleanup 实施手册
+- [[cleanup-playbook]] — Cleanup 实施手册（历史基线）
 - [[architecture-seams]] — 架构决策要点（ADR 摘要）
 - [[flow-control-event]] — 控制流与事件流详解
-- [[ops-hk3]] — 生产运维（hk3 部署）

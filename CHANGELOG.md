@@ -4,8 +4,8 @@
 
 ## [Unreleased]
 
-- 当前开发基线：`dev/delicious233`。
-- 当前没有 active spec-driven 专项；已完成专项见 [docs/history.md](docs/history.md)。
+- 程序进度 SSOT：`docs/progress/MASTER.md`（Last Updated 以该文件为准；2026-07-18 起 Phase 58 / milestone 79）。
+- 已完成历史与归档专项见 [docs/history.md](docs/history.md) 与 `docs/archives/`；本段不复述 phase 流水账。
 - Release/merge-readiness 结论必须带真实证据等级；stub/fixture/readiness-only 不得写成真实登录、真实模型/API、packaged Desktop 或 production deploy。
 
 ## [v0.5.2] - 2026-06-25
@@ -13,7 +13,7 @@
 - 合入 docs/governance、真实 E2E evidence contract、CI gate 和 Desktop/Web shared workbench 方向的集中治理。
 - 统一证据等级：fixture/unit、Playwright UI、Visual QA、stubbed Hub、observed local、approved-real、backend/API、performance/leak、packaged-release。
 - 保留 Desktop/Web 为当前 UI/UX 主线，Mobile 深度 UI/native 工作延后到单独任务。
-- 关键边界：`AGENTS.md` 是项目规则 SSOT，`docs/progress/MASTER.md` 是当前 SPEC 进度，`docs/roadmap.md` 是总进度。
+- 权威边界：`AGENTS.md` 是项目规则 SSOT，`docs/progress/MASTER.md` 是当前程序进度，`docs/roadmap.md` 是总进度入口。
 
 ## 历史
 
