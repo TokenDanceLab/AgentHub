@@ -51,4 +51,8 @@ Format:
 
 - Phase 66 closed (ms 87; PRs #1126–#1130).
 - Phase 67 open (ms 88; #1131–#1135): workbenchDemo / chatviewFixtures / model_catalog / hub config + MASTER hygiene.
+## 2026-07-19 (P68)
+
+- Phase 67 closed (ms 88; PRs #1136–#1140).
+- Phase 68 open (ms 89; #1141–#1145): context_budget / anthropic_sdk / chatview adapter / store + MASTER hygiene.
 
