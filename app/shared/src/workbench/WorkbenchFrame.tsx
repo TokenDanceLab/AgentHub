@@ -12,6 +12,7 @@ import {
   ChatInspectorFrame,
   ChatSidebarFrame,
   WorkbenchRoutesFrame,
+  WorkspaceLoadErrorState,
   WorkspaceLoadingState,
 } from './WorkbenchFrameParts';
 import styles from './AgentHubWorkbench.module.css';
@@ -122,8 +123,11 @@ export function WorkbenchFrame({
     surface: platform.surface,
   });
 
+  const loadError = workbenchStatus?.loadError;
+  // Prefer a visible recovery panel over spinner → blank chat (#1010).
+  const showLoadError = Boolean(isChatPage && loadError);
   const showInitialLoading = Boolean(
-    workbenchStatus?.initialLoading && conversations.length === 0,
+    !showLoadError && workbenchStatus?.initialLoading && conversations.length === 0,
   );
 
   return (
@@ -161,7 +165,14 @@ export function WorkbenchFrame({
         className={styles.workspace}
         {...workspaceDataAttrs}
       >
-        {showInitialLoading ? (
+        {showLoadError ? (
+          <WorkspaceLoadErrorState
+            title={t('connection.loadErrorTitle')}
+            description={t('connection.loadErrorDescription')}
+            meta={loadError}
+            retryLabel={t('connection.retry')}
+          />
+        ) : showInitialLoading ? (
           <WorkspaceLoadingState label={t('connection.connecting')} />
         ) : isChatPage ? (
           <ChatConversationHostFrame
