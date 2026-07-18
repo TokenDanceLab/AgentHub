@@ -1,4 +1,5 @@
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { AgentHubPlatform, TerminalPort } from '../platform';
 import type { TranscriptBlock } from '../transcript';
 import type { TranscriptContextMenuEvent } from './transcriptEventTypes';
 
@@ -134,4 +135,33 @@ export function assignIfDefined<T extends object, K extends keyof T>(
   if (value !== undefined) {
     target[key] = value;
   }
+}
+
+/**
+ * Terminal bottom dock is Desktop/chat-only and strictly capability-gated.
+ * Web / missing / false never renders the dock (#1182).
+ */
+export function shouldRenderTerminalDock(input: {
+  isChatPage: boolean;
+  localTerminal?: boolean | undefined;
+}): boolean {
+  return input.isChatPage && input.localTerminal === true;
+}
+
+export interface TerminalPanelDockProps {
+  localTerminal: true;
+  terminal?: TerminalPort | undefined;
+}
+
+/** exactOptionalPropertyTypes-safe TerminalPanel props for the workbench dock. */
+export function buildTerminalPanelDockProps(
+  platform: Pick<AgentHubPlatform, 'terminal'>,
+): TerminalPanelDockProps {
+  const props: TerminalPanelDockProps = {
+    localTerminal: true,
+  };
+  if (platform.terminal) {
+    props.terminal = platform.terminal;
+  }
+  return props;
 }
