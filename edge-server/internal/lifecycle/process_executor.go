@@ -249,7 +249,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Lock()
 	stdin, hasStdin := e.stdins[runID]
 	if shouldWriteInterruptStdin(hasStdin) {
-		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); shouldLogInterruptWriteFailure(err) {
+		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); planInterruptWriteLog(err).Log {
 			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
 	}
@@ -266,7 +266,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Lock()
 	proc := e.processes[runID]
 	e.mu.Unlock()
-	if shouldStartGracefulProcessShutdown(proc) {
+	if planCancelGraceArm(proc).Arm {
 		// Graceful shutdown: run in a goroutine so Cancel() returns
 		// immediately and does not block the HTTP response. The goroutine
 		// is tracked via cancelDone so finish() can abort it early if the
@@ -293,7 +293,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				slog.Debug("process: force kill failed", "run_id", runID, "error", err)
 			}
 			// run() also Wait()s; a second Wait is best-effort reaping only.
-			if _, err := proc.Wait(); shouldLogProcessWaitAfterKill(err) {
+			if _, err := proc.Wait(); planProcessWaitAfterKill(err).Log {
 				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
 			}
 		}()
@@ -315,7 +315,8 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 // not already armed a grace path. Without this, dropping CommandContext would
 // leave run-timeout processes orphaned (#988).
 func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, proc *os.Process, stop <-chan struct{}) {
-	if proc == nil {
+	// Pure nil-process gate; select/map lookup stay here (#988).
+	if !planWatchProcessEntry(proc).Watch {
 		return
 	}
 	select {
@@ -327,7 +328,7 @@ func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, pro
 	e.mu.Lock()
 	_, graceActive := e.cancelDone[runID]
 	e.mu.Unlock()
-	if graceActive {
+	if !planWatchProcessKill(graceActive).Kill {
 		return
 	}
 	if err := killProcessTree(proc); err != nil {
@@ -360,7 +361,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
-	if shouldResolveAdapter(e.adapterReg != nil, runCtx.AgentID, adapter != nil) {
+	if planAdapterResolve(e.adapterReg != nil, runCtx.AgentID, adapter != nil).Resolve {
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
 		if shouldPublishAdapterResolveFailure(err) {
 			e.publishFailed(run, err)
@@ -373,7 +374,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// it is properly configured (e.g. API keys, credentials) before launching
 	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
 	if preflight, ok := asPreflightAdapter(adapter); ok {
-		if err := preflight.PreflightCheck(); shouldPublishPreflightFailure(err) {
+		err := preflight.PreflightCheck()
+		if planPreflightFailure(err).Fail {
 			slog.Warn("process: adapter preflight check failed",
 				"runId", run.ID,
 				"agentId", runCtx.AgentID,
@@ -391,22 +393,23 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// before launching the agent process. If the API validation is somehow
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
-	if sanitized, forbidden := applyPermissionModeSanitization(runCtx); shouldLogForbiddenPermissionMode(forbidden) {
+	if perm := planPermissionModeSanitization(runCtx); perm.Changed {
 		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
 			"runId", run.ID,
 			"agentId", runCtx.AgentID,
 		)
-		runCtx = sanitized
+		runCtx = perm.RunCtx
 	}
 
 	var runStartTime time.Time
-	if shouldAttachFinishMetricsDefer(e.metrics != nil) {
+	metricsPlan := planRunMetrics(e.metrics != nil)
+	if metricsPlan.AttachFinishDefer {
 		defer func() {
 			if !shouldRecordRunFinishMetrics(runStartTime) {
 				return // run never started (early failure before cmd.Start)
 			}
 			r, ok := e.store.GetRun(run.ID)
-			if !shouldRecordFinishMetricsForRun(ok) {
+			if !planFinishMetricsRecord(runStartTime, ok).Record {
 				return
 			}
 			e.metrics.RecordRunFinish(adapterLabel, r.Status, time.Since(runStartTime).Seconds())
@@ -424,8 +427,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		var args, env []string
 		var workDir string
 		adapterCtx := adapters.RunProcessContext(runCtx)
+		cmdPlan := planCommandBuild(adapter != nil)
 
-		if shouldUseAdapterCommand(adapter != nil) {
+		if cmdPlan.UseAdapter {
 			// Adapter mode: BuildCommand provides full command configuration
 			cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
 		} else {
@@ -439,7 +443,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			cmdPath = e.profile.Command
 			workDir = e.profile.WorkDir
 		}
-		if shouldPublishCLIInvocationPlan(adapter != nil) {
+		if cmdPlan.PublishCLIPlan {
 			plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
 			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 		}
@@ -522,7 +526,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// watchStop is always created so close(watchStop) after Wait is safe even
 		// when the process handle is not tracked.
 		watchStop := make(chan struct{})
-		if shouldTrackStartedProcess(cmd.Process) {
+		if planTrackStartedProcess(cmd.Process).Track {
 			e.mu.Lock()
 			e.processes[run.ID] = cmd.Process
 			e.mu.Unlock()
@@ -546,13 +550,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		// Record metrics: run has started successfully
-		if shouldRecordRunStartMetrics(e.metrics != nil) {
+		if metricsPlan.RecordStart {
 			e.metrics.RecordRunStart(adapterLabel)
 			runStartTime = time.Now()
 		}
 
 		started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-		if shouldPublishStatusTransition(ok) {
+		if planPublishStatus(ok).Publish {
 			e.bus.Publish("run.started", runScope(started), RunResponse(started))
 			// Fire Hub TaskAck callback (Edge→Hub direct bridge)
 			e.fireHubAck(run.ID)
@@ -582,7 +586,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		parserCtx := withParserContextValues(ctx, runCtx)
 
 		var parseErr error
-		if shouldUseStructuredOutputParser(adapter != nil) {
+		if cmdPlan.UseStructuredParser {
 			wg.Add(1)
 			go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
 		} else {
@@ -605,16 +609,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// whether the context budget exceeded the auto-compaction threshold.
 		// When triggered, we log the budget state and emit a compaction event
 		// so upstream session managers can compact the actual message history.
-		if shouldEmitContextCompaction(runCtx.Budget) {
-			usagePct, tokensUsed, remaining := contextCompactionSnapshot(runCtx.Budget)
+		if compact := planContextCompaction(runCtx.Budget, run.ID); compact.Emit {
 			slog.Info("process: context compaction threshold reached",
 				"runId", run.ID,
-				"usagePercent", usagePct,
-				"tokensUsed", tokensUsed,
-				"tokensRemaining", remaining,
+				"usagePercent", compact.UsagePct,
+				"tokensUsed", compact.TokensUsed,
+				"tokensRemaining", compact.Remaining,
 			)
-			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run),
-				contextCompactionPayload(run.ID, usagePct, tokensUsed, remaining))
+			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), compact.Payload)
 		}
 
 		if shouldTreatAsCancelled(ctx.Err(), e.runStatus(run.ID)) {
@@ -651,7 +653,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			}
 			e.mu.Unlock()
 			// Reset run status back to queued so the retry can transition to started.
-			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); shouldResetSessionRetryStatus(ok) {
+			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); planSessionRetryStatus(ok).LogReset {
 				slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
 			}
 			continue
@@ -667,16 +669,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
 		// Recoverable errors (malformed event, orphaned tool) emit a warning and
 		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-		parseOutcome, psErr := classifyStructuredParseOutcome(parseErr)
-		if shouldPublishRecoverableParseWarning(parseOutcome) {
+		parseHandle := planStructuredParseHandleFromErr(parseErr, run.ID)
+		if parseHandle.WarnRecoverable {
 			slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
-			e.bus.Publish(adapters.BusEventContextWarning, runScope(run),
-				recoverableParseWarningPayload(
-					run.ID,
-					recoverableParseWarningMessage(psErr.Unwrap()),
-					psErr.Error(),
-				))
-		} else if shouldFailOnStructuredParse(parseOutcome) {
+			e.bus.Publish(adapters.BusEventContextWarning, runScope(run), parseHandle.WarningPayload)
+		} else if parseHandle.FailFatal {
 			e.publishFailed(run, structuredOutputParseFailed(parseErr))
 			e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
 			return
@@ -689,7 +686,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir)
 		evidencePlan := planEvidenceGateOutcome(gateEnabled, true)
 		finalStatus := evidencePlan.FinalStatus
-		if shouldRunEvidenceGate(gateEnabled) {
+		if planEvidenceRun(gateEnabled).RunGate {
 			evidenceResult := runEvidenceGate(workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
 			evidencePlan = planEvidenceGateOutcome(true, evidenceResult.Passed)
@@ -704,7 +701,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 
 		finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
-		if shouldPublishStatusTransition(ok) {
+		if planPublishStatus(ok).Publish {
 			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 			e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
 			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
@@ -718,7 +715,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 	if shouldAttemptFaultEscalation(lastWaitErr, e.faultEscalationCfg) {
 		r, ok := e.store.GetRun(run.ID)
-		if shouldAcceptFaultEscalationRetry(ok, e.faultEscalationCfg, r.RetryCount) {
+		if planFaultEscalationHandoff(ok, e.faultEscalationCfg, r.RetryCount).Retry {
 			newCount := nextFaultEscalationRetryCount(r.RetryCount)
 			e.store.SetRunRetryCount(run.ID, newCount)
 			run.RetryCount = newCount
@@ -809,29 +806,24 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	slog.Debug("executor.run.failed", "runId", run.ID, "error", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
-	if shouldPublishStatusTransition(ok) {
-		classified := classifyPublishedFailure(err)
-		if shouldPersistClassifiedFailure(classified) {
-			e.persistAgentFailureMessage(failed, classified.Message)
+	failPlan := planPublishFailed(ok, err)
+	if failPlan.Publish {
+		if failPlan.Persist {
+			e.persistAgentFailureMessage(failed, failPlan.Classified.Message)
 		}
-		e.bus.Publish("run.failed", runScope(failed),
-			runFailedEventPayload(failed.ID, failed.Status, classified))
-		// Fire Hub callback if configured
-		e.fireHubFail(failed.ID, classified.Message)
+		e.bus.Publish("run.failed", runScope(failed), runFailedEventPayload(failed.ID, failed.Status, failPlan.Classified))
+		e.fireHubFail(failed.ID, failPlan.Classified.Message)
 	}
 	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
-	content, ok := trimAgentFailureContent(content)
-	if !shouldPersistAgentFailureContent(ok) {
+	content, contentOK := trimAgentFailureContent(content)
+	repository, repoOK := asAgentFailureRepository(e.store)
+	if !contentOK || !repoOK {
 		return
 	}
-	repository, ok := asAgentFailureRepository(e.store)
-	if !shouldUseAgentFailureRepository(ok) {
-		return
-	}
-	if shouldSkipExistingAgentFailureMessage(hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)) {
+	if !planPersistAgentFailure(true, true, hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)).Proceed {
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
@@ -846,7 +838,7 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	cancelled, ok := e.store.SetRunStatusIf(run.ID, "cancelled", "queued", "started", "cancelling")
-	if shouldPublishStatusTransition(ok) {
+	if planPublishStatus(ok).Publish {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
 		// Fire Hub callback if configured
 		e.fireHubFail(cancelled.ID, cancelledFailReason())
@@ -858,14 +850,16 @@ func (e *ProcessExecutor) publishCancelled(run store.Run) {
 // has a pending persistence failure after a status transition.
 func (e *ProcessExecutor) checkPersistError(runID string) {
 	pc, ok := asPersistErrorSource(e.store)
-	if !shouldCheckPersistErrorSource(ok) {
+	if !ok {
 		return
 	}
-	if persistErr := pc.LastPersistError(); shouldEmitPersistenceError(persistErr) {
-		slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
-		scope, payload := persistenceErrorScopePayload(runID, persistErr)
-		e.bus.Publish("run.persistence_error", scope, payload)
+	persistErr := pc.LastPersistError()
+	if !planPersistError(true, persistErr).Emit {
+		return
 	}
+	slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
+	scope, payload := persistenceErrorScopePayload(runID, persistErr)
+	e.bus.Publish("run.persistence_error", scope, payload)
 }
 
 func (e *ProcessExecutor) runStatus(runID string) string {
@@ -887,7 +881,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	// Preserve #867 terminalFinish, #987 hubOutputs, #988 Cancel grace path.
 	if plan.Cascade {
 		for _, childRunID := range e.agentRegistry.ShutdownCascade(runID) {
-			if childRunID == "" || childRunID == runID {
+			if !shouldCancelCascadeChild(runID, childRunID) {
 				continue
 			}
 			e.Cancel(childRunID)
@@ -1022,14 +1016,16 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
-	if budget, ok := budgetFromParserContext(ctx); shouldApplyBudgetAwareEmitter(ok) {
+	budget, hasBudget := budgetFromParserContext(ctx)
+	wrapPlan := planStructuredEmitterWraps(hasBudget, e.decisionLoopFactory != nil)
+	if wrapPlan.ApplyBudget {
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
 	// Wrap emitter with decision-loop step tracking and max-steps enforcement.
 	// When configured, tool_call events increment a step counter and force-finish
 	// is triggered when maxSteps is exceeded.
-	if shouldWrapDecisionLoopEmitter(e.decisionLoopFactory != nil) {
+	if wrapPlan.WrapDecisionLoop {
 		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
 	}
 
