@@ -9,10 +9,12 @@
   z-index: var(--z-context-menu);
   width: 244px;
   padding: var(--sp-xxs);
-  border: 1px solid var(--bdr-strong);
+  border: 1px solid var(--glass-border-strong, var(--bdr-strong));
   border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
-  box-shadow: var(--e-3);
+  background: var(--glass-panel-overlay, var(--glass-panel));
+  box-shadow: var(--glass-elev-3, var(--e-3));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   opacity: 0;
   transform: translateY(4px) scale(0.985);
   transform-origin: top left;
