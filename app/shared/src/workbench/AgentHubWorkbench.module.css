@@ -12,6 +12,8 @@
 
   display: grid;
   grid-template-columns: 52px minmax(0, var(--sidebar-w)) minmax(0, 1fr) minmax(0, var(--inspector-w));
+  /* Row 2 hosts the capability-gated terminal dock (#1182); collapses when empty. */
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   min-height: 100%;
   min-width: 0;
@@ -2488,14 +2490,25 @@
   padding: var(--sp-lg);
 }
 
+/* Bottom terminal dock — dense dark shell, Desktop/localTerminal only (#1182) */
 .terminalDock {
   grid-column: 1 / -1;
   grid-row: 2;
-  min-height: 180px;
-  max-height: 280px;
   height: 220px;
+  min-height: 180px;
+  max-height: 240px;
   min-width: 0;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--bdr);
+  background: var(--surface-lowest, var(--surface));
+  overflow: hidden;
   z-index: 2;
-  background: var(--surface-base, #0b0d12);
+}
+
+.terminalDock > * {
+  height: 100%;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: none;
 }
