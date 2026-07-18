@@ -93,14 +93,14 @@ export function buildGetMessagesPath(
   sessionId: string,
   params?: { before_seq?: number; limit?: number },
 ): string {
-  return `/client/sessions/${encodeURIComponent(sessionId)}/messages${qs(params)}`;
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages${qs(params ?? {})}`;
 }
 
 export function buildSyncMessagesPath(
   sessionId: string,
   params?: { after_seq?: number; limit?: number },
 ): string {
-  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/sync${qs(params)}`;
+  return `/client/sessions/${encodeURIComponent(sessionId)}/messages/sync${qs(params ?? {})}`;
 }
 
 export function buildSearchSessionMessagesPath(
@@ -115,7 +115,7 @@ export function buildListWorkspaceProjectThreadMessagesPath(
   threadId: string,
   params?: { limit?: number },
 ): string {
-  return `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params)}`;
+  return `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`;
 }
 
 export function buildSendWorkspaceProjectThreadMessagePath(
