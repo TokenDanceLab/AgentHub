@@ -4,8 +4,10 @@
   min-height: 0;
   min-width: 0;
   height: 100%;
-  background: var(--ah-surface-raised, var(--color-surface-raised, #12141a));
-  border-left: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--glass-panel, var(--surface-raised, var(--surface)));
+  border-left: 1px solid var(--glass-border, var(--bdr));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .tabStrip {
@@ -13,19 +15,19 @@
   flex-shrink: 0;
   gap: var(--wb-gap-2xs, var(--sp-2, 2px));
   padding: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 8px);
-  border-bottom: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .tab,
 .tabActive {
   appearance: none;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-xs, 6px);
   padding: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 8px);
   font-size: 12px;
   line-height: 1.2;
   cursor: pointer;
-  color: var(--ah-text-muted, #9aa3b2);
+  color: var(--text-2, var(--muted-foreground));
   background: transparent;
   transition:
     background-color var(--motion-hover, 90ms ease),
@@ -34,8 +36,8 @@
 }
 
 .tab:hover {
-  color: var(--ah-text, #e8ecf4);
-  background: var(--ah-surface-hover, rgba(255, 255, 255, 0.04));
+  color: var(--text-1, var(--foreground));
+  background: var(--glass-bg-hover, var(--surface-high));
 }
 
 .tab:active {
@@ -43,8 +45,8 @@
 }
 
 .tabActive {
-  color: var(--ah-text, #e8ecf4);
-  background: var(--ah-surface-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-1, var(--foreground));
+  background: var(--glass-bg-active, var(--surface-high));
   font-weight: 600;
 }
 
