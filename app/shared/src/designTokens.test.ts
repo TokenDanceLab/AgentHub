@@ -21,6 +21,9 @@ describe('designTokens', () => {
       '--td-moss',
       '--td-danger',
       '--td-radius-control',
+      '--td-glass-blur',
+      '--td-glass-card',
+      '--td-glass-elev',
     ]);
 
     for (const token of DESKTOP_GLASS_TOKEN_ALIASES) {
@@ -36,11 +39,15 @@ describe('designTokens', () => {
       'no-left-rails',
       'dense-operational-copy',
       'mobile-touch-targets',
+      'frosted-glass-material',
     ]);
 
     expect(getSurfaceRulesForPlatform('web').map((rule) => rule.id)).toContain('no-gradient-surfaces');
     expect(getSurfaceRulesForPlatform('mobile').map((rule) => rule.id)).toContain('no-left-rails');
-    expect(getSurfaceRulesForPlatform('desktop').map((rule) => rule.id)).toEqual(['dense-operational-copy']);
+    expect(getSurfaceRulesForPlatform('desktop').map((rule) => rule.id)).toEqual([
+      'dense-operational-copy',
+      'frosted-glass-material',
+    ]);
   });
 
   it('looks up individual aliases without embedding app-specific copies', () => {
@@ -49,6 +56,10 @@ describe('designTokens', () => {
       desktopValue: '#5d68cc',
       webAlias: '--brand',
       mobileAlias: '--td-plum',
+    });
+    expect(getGlassTokenAlias('--td-glass-blur')).toMatchObject({
+      intent: 'Frosted glass blur radius',
+      webAlias: '--glass-blur-lg',
     });
     expect(getGlassTokenAlias('--unknown')).toBeUndefined();
   });
