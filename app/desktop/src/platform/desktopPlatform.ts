@@ -8,7 +8,13 @@ import {
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
-import type { AgentHubPlatform, LocalCliDiscoveryManifest, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
+import {
+  createMockTerminalPort,
+  type AgentHubPlatform,
+  type LocalCliDiscoveryManifest,
+  type WorkbenchAgent,
+  type WorkbenchConversation,
+} from '@shared/platform';
 import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
@@ -116,15 +122,20 @@ export interface DesktopPlatform extends AgentHubPlatform {
 }
 
 export function createDesktopPlatform(options: DesktopPlatformOptions = {}): DesktopPlatform {
+  // In-memory mock only (#1193): lets TerminalPanel list/spawn/close without a real PTY.
+  // Real Tauri host adapter remains out of scope; renderer still has no raw process access.
+  const localTerminal = true;
+  const terminal = localTerminal ? createMockTerminalPort() : undefined;
+
   return {
     surface: 'desktop',
     capabilities: {
       localEdge: true,
       localFiles: true,
       browserPreview: true,
-      // Foundation only (#1174): capability declared for Desktop host surface.
-      // Real PTY / Tauri host adapter is out of scope; UI gates on this flag.
-      localTerminal: true,
+      // Foundation (#1174) + in-memory TerminalPort host (#1193).
+      // Real PTY / Tauri adapter is still out of scope; UI gates on this flag + port.
+      localTerminal,
     },
     host: {
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
@@ -161,6 +172,8 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       openEvidence: options.openPreview ?? openDesktopEvidencePreview,
     },
     settings: createDesktopSettingsAdapter(),
+    // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.
+    ...(terminal ? { terminal } : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         if (options.submitRun && (!options.activeProjectId || !options.activeThreadId)) {
