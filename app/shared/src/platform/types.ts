@@ -111,8 +111,23 @@ export interface LocalCliDiscoveryManifest {
   items: LocalCliDiscoveryItem[];
 }
 
+/** Local runtime session summary for Desktop settings import list (#1192). */
+export type RuntimeSessionSummary = {
+  runtime: string;
+  id: string;
+  title?: string | undefined;
+  path?: string | undefined;
+  updatedAt?: string | undefined;
+  sourceMode?: string | undefined;
+};
+
 export interface HostDiagnosticsPort {
   localCliDiscovery?(): Promise<LocalCliDiscoveryManifest>;
+  /**
+   * Optional host-owned list of local runtime sessions (Edge GET /v1/runtime-sessions).
+   * Desktop only; Web must omit. Renderer never opens foreign session stores.
+   */
+  listRuntimeSessions?(limit?: number): Promise<RuntimeSessionSummary[]>;
 }
 
 export interface SettingsPort {

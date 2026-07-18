@@ -366,4 +366,39 @@ describe('createDesktopPlatform', () => {
     expect(discovery).not.toHaveProperty('prompt');
     expect(discovery).not.toHaveProperty('model');
   });
+
+  it('exposes listRuntimeSessions host port for Desktop settings import (#1192)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          items: [
+            {
+              id: 'sess-1',
+              runtime: 'codex',
+              title: 'sess-1',
+              sourceMode: 'import',
+              updatedAt: '2026-07-19T00:00:00Z',
+            },
+          ],
+        },
+      }),
+    } as Response);
+
+    try {
+      const platform = createDesktopPlatform();
+      const items = await platform.host.listRuntimeSessions(10);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toEqual(expect.objectContaining({
+        id: 'sess-1',
+        runtime: 'codex',
+        sourceMode: 'import',
+      }));
+      expect(fetchSpy).toHaveBeenCalled();
+      const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? '');
+      expect(calledUrl).toContain('/v1/runtime-sessions?limit=10');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });

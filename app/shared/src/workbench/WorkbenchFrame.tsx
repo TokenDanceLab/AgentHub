@@ -101,6 +101,11 @@ export function WorkbenchFrame({
     currentConversationId,
     selectConversation,
     localCliDiscovery,
+    sessionImportItems,
+    sessionImportLoading,
+    sessionImportError,
+    sessionImportVisible,
+    refreshSessionImport,
     workspaceRef,
     handleToggleTheme,
   } = session;
@@ -220,6 +225,11 @@ export function WorkbenchFrame({
             contactsActions={contactsActions}
             documentsActions={documentsActions}
             localCliDiscovery={localCliDiscovery}
+            sessionImportItems={sessionImportItems}
+            sessionImportLoading={sessionImportLoading}
+            sessionImportError={sessionImportError}
+            sessionImportVisible={sessionImportVisible}
+            onRefreshSessionImport={refreshSessionImport}
             modelCatalog={modelCatalog}
             ccSwitchStatus={ccSwitchStatus}
             ccSwitchProviders={ccSwitchProviders}
