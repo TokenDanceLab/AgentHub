@@ -5,7 +5,7 @@
   justify-content: flex-start;
   max-width: 560px;
   margin: 0 auto;
-  padding: 120px var(--space-md, 1rem) var(--space-xl, 1.5rem);
+  padding: 120px var(--wb-gap-md, var(--space-md, 1rem)) var(--space-xl, 1.5rem);
   color: var(--foreground);
   text-align: center;
   user-select: none;
@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-md, 0.75rem);
+  gap: var(--wb-gap-sm, var(--space-md, 0.75rem));
 }
 
 /* ── Icon with gradient background ─────────────────────────────────── */
@@ -33,7 +33,8 @@
       var(--glass-tint-plum, rgba(0, 113, 188, 0.12)),
       var(--glass-tint-sky, rgba(59, 130, 246, 0.12))
     );
-  backdrop-filter: var(--glass-blur, blur(12px));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--muted-foreground);
 }
 
@@ -59,14 +60,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: var(--wb-gap-2xs, 7px);
   min-height: 36px;
-  margin-top: var(--space-xs, 0.25rem);
+  margin-top: var(--wb-gap-2xs, var(--space-xs, 0.25rem));
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
   border-radius: var(--radius-lg, 8px);
-  padding: 0 16px;
+  padding: 0 var(--wb-gap-md, 16px);
   background: var(--glass-bg-light, rgba(255, 255, 255, 0.045));
-  backdrop-filter: var(--glass-blur, blur(12px));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm, 0.875rem);
@@ -106,11 +108,15 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .action {
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    transition:
+      background-color var(--motion-hover),
+      border-color var(--motion-hover),
+      box-shadow var(--motion-hover),
+      transform var(--motion-press);
   }
 
   .action:active {
-    transform: scale(0.98);
+    transform: scale(var(--glass-press-scale, 0.985));
   }
 }
 
@@ -118,8 +124,8 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-top: var(--space-sm, 0.5rem);
+  gap: var(--wb-gap-xs, 8px);
+  margin-top: var(--wb-gap-xs, var(--space-sm, 0.5rem));
 }
 
 .suggestionChip {
@@ -139,15 +145,18 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .suggestionChip {
-    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    transition:
+      background-color var(--motion-hover),
+      border-color var(--motion-hover),
+      transform var(--motion-press);
   }
 
   .suggestionChip:hover {
-    transform: translateY(-1px);
+    transform: var(--glass-hover-lift, translateY(-1px));
   }
 
   .suggestionChip:active {
-    transform: scale(0.98);
+    transform: scale(var(--glass-press-scale, 0.985));
   }
 }
 
