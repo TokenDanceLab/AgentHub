@@ -1447,3 +1447,162 @@ func TestCmdStartAndSpawnPureHelpers(t *testing.T) {
 		t.Fatalf("finish keys %#v", keys)
 	}
 }
+
+func TestResidualPlanPureHelpers989(t *testing.T) {
+	t.Parallel()
+
+	// Eager stdin close plan
+	plan := planEagerStdinClose(false, false, false)
+	if plan.ClosePipe || plan.ClearMap {
+		t.Fatalf("closed stdin %#v", plan)
+	}
+	plan = planEagerStdinClose(true, false, false)
+	if !plan.ClosePipe || !plan.ClearMap {
+		t.Fatalf("eager close %#v", plan)
+	}
+	plan = planEagerStdinClose(true, true, false)
+	if plan.ClosePipe || plan.ClearMap {
+		t.Fatalf("needs stdin %#v", plan)
+	}
+	plan = planEagerStdinClose(true, false, true)
+	if plan.ClosePipe || plan.ClearMap {
+		t.Fatalf("decision loop %#v", plan)
+	}
+
+	// Post-start cancel plan
+	post := planPostStartCancel(nil, &os.Process{})
+	if post.Cancel || post.Kill || post.Wait {
+		t.Fatalf("no cancel %#v", post)
+	}
+	post = planPostStartCancel(context.Canceled, &os.Process{})
+	if !post.Cancel || !post.Kill || !post.Wait {
+		t.Fatalf("cancel with proc %#v", post)
+	}
+	post = planPostStartCancel(context.Canceled, nil)
+	if !post.Cancel || post.Kill || post.Wait {
+		t.Fatalf("cancel without proc %#v", post)
+	}
+
+	// Session conflict retry plan
+	sess := planSessionConflictRetry(nil, "", 0, time.Second, true)
+	if sess.Retry || sess.CloseOutput {
+		t.Fatalf("no wait err %#v", sess)
+	}
+	conflict := errors.New("Session ID abc is already in use")
+	sess = planSessionConflictRetry(conflict, "", 0, time.Second, true)
+	if !sess.Retry || !sess.CloseOutput {
+		t.Fatalf("retry with store %#v", sess)
+	}
+	sess = planSessionConflictRetry(conflict, "", 0, time.Second, false)
+	if !sess.Retry || sess.CloseOutput {
+		t.Fatalf("retry without store %#v", sess)
+	}
+
+	// Spawn start failure cleanup
+	fail := planSpawnStartFailureCleanup(nil, true, true)
+	if fail.ClearMapping || fail.Unregister || !fail.SlotReserved {
+		t.Fatalf("nil start err %#v", fail)
+	}
+	fail = planSpawnStartFailureCleanup(errors.New("start"), true, true)
+	if !fail.ClearMapping || !fail.Unregister || fail.SlotReserved {
+		t.Fatalf("registered start fail %#v", fail)
+	}
+	fail = planSpawnStartFailureCleanup(errors.New("start"), false, true)
+	if !fail.ClearMapping || fail.Unregister || !fail.SlotReserved {
+		t.Fatalf("unregistered start fail %#v", fail)
+	}
+
+	// Sub-agent delivery plan
+	del := planSubAgentResultDelivery(false, true, true, true, "parent", "finished", true)
+	if del.Deliver {
+		t.Fatal("no registry should not deliver")
+	}
+	del = planSubAgentResultDelivery(true, true, true, true, "parent", "finished", true)
+	if !del.Deliver || !del.UpdateRegistry || del.RegistryStatus != agents.StatusCompleted || !del.StoreAgg {
+		t.Fatalf("finished delivery %#v", del)
+	}
+	del = planSubAgentResultDelivery(true, true, true, true, "parent", "failed", false)
+	if !del.Deliver || !del.UpdateRegistry || del.RegistryStatus != agents.StatusError || del.StoreAgg {
+		t.Fatalf("failed delivery %#v", del)
+	}
+	del = planSubAgentResultDelivery(true, true, true, true, "parent", "completed_with_issues", true)
+	if !del.Deliver || !del.UpdateRegistry || del.RegistryStatus != agents.StatusCompleted {
+		t.Fatalf("completed_with_issues %#v", del)
+	}
+	del = planSubAgentResultDelivery(true, true, false, false, "", "finished", true)
+	if del.Deliver {
+		t.Fatal("missing mapping")
+	}
+	del = planSubAgentResultDelivery(true, true, true, true, "", "finished", true)
+	if del.Deliver {
+		t.Fatal("empty parent should not route")
+	}
+
+	// Structured parse post plan
+	postParse := planStructuredParsePost(nil, true)
+	if postParse.RecordError || !postParse.Flush {
+		t.Fatalf("nil parse %#v", postParse)
+	}
+	postParse = planStructuredParsePost(errors.New("x"), false)
+	if !postParse.RecordError || postParse.Flush {
+		t.Fatalf("err parse %#v", postParse)
+	}
+
+	// Finish cleanup plan
+	fin := planFinishCleanup(true, true, false)
+	if !fin.Cascade || !fin.CloseCancelDone || fin.CloseRunOutput {
+		t.Fatalf("finish plan %#v", fin)
+	}
+
+	// Output chunk plan
+	chunk := planOutputChunk("run1", "stdout", []byte("hi"), 3, false, 2, 100, true)
+	if !chunk.Publish || chunk.Text != "hi" || chunk.NextOffset != 5 || chunk.LogStderr || !chunk.WriteStore || !chunk.ForwardHub {
+		t.Fatalf("stdout chunk %#v", chunk)
+	}
+	chunk = planOutputChunk("run1", "stderr", []byte("err"), 0, true, 3, 10, false)
+	if !chunk.Publish || !chunk.LogStderr || chunk.WriteStore || chunk.ForwardHub || !chunk.LogTruncate {
+		t.Fatalf("stderr chunk %#v", chunk)
+	}
+	chunk = planOutputChunk("run1", "stdout", nil, 0, false, 0, 0, true)
+	if chunk.Publish {
+		t.Fatal("empty non-truncated should not publish")
+	}
+
+	// Surface artifacts plan
+	snap := &adapters.WorkdirSnapshot{}
+	surf := planSurfaceArtifacts(nil, true, "finished", true)
+	if surf.Proceed || surf.SkipWriterLog {
+		t.Fatalf("nil snap %#v", surf)
+	}
+	surf = planSurfaceArtifacts(snap, true, "finished", false)
+	if surf.Proceed || !surf.SkipWriterLog {
+		t.Fatalf("no writer %#v", surf)
+	}
+	surf = planSurfaceArtifacts(snap, true, "finished", true)
+	if !surf.Proceed || surf.SkipWriterLog {
+		t.Fatalf("surface ok %#v", surf)
+	}
+	surf = planSurfaceArtifacts(snap, true, "failed", true)
+	if surf.Proceed {
+		t.Fatal("failed status should not surface")
+	}
+
+	// Misc track plans
+	if planCmdStartCancelWait(nil).Wait || !planCmdStartCancelWait(&os.Process{}).Wait {
+		t.Fatal("cmd start cancel wait")
+	}
+	track := planRunOutputStoreTrack(errors.New("x"))
+	if !track.LogFailure || track.Track {
+		t.Fatalf("store create fail %#v", track)
+	}
+	track = planRunOutputStoreTrack(nil)
+	if track.LogFailure || !track.Track {
+		t.Fatalf("store create ok %#v", track)
+	}
+	if planWorkdirTrack("").Track || !planWorkdirTrack("D:/tmp").Track {
+		t.Fatal("workdir track")
+	}
+	if planHubTaskRecord("").Record || !planHubTaskRecord("task").Record {
+		t.Fatal("hub task record")
+	}
+}
