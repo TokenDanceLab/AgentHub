@@ -68,4 +68,8 @@ Format:
 
 - Phase 70 closed (ms 91; PRs #1166–#1170).
 - Phase 71 open (ms 92; #1171–#1175): engineering loop + local workspace surface.
+## 2026-07-19 (P72)
+
+- Phase 71 closed (ms 92; PRs #1176–#1180).
+- Phase 72 open (ms 93; #1181–#1184): Desktop wiring for aux panel / terminal / session import.
 
