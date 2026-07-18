@@ -10,6 +10,11 @@ Format:
 
 ---
 
+## 2026-07-18
+
+- 2026-07-18 — progress baseline hygiene: tip `96588ea1` after #1070/#1073; open peels #1067–#1069 only; finished worktrees pruned (keep super-governance-baseline); MASTER/entry/wiki live pointers Phase 61 / ms 82.
+- 2026-07-18 — sync live pointers to Phase 61 / milestone 82 after MASTER self-heal (tip `7ef83beb`; open #1067–#1071; #1070 → PR #1073): `wiki/pages/overview.md`, entry docs, residual LOC band process_executor 1126 · agent_dispatch 786 · sqlite_store 709 · hubClient 526 · delivery_outbox 469.
+
 ## 2026-07-16
 
 - 2026-07-16 — rename wiki risk slugs to avoid secret-guard API-key false positives (#453): `risk-evid-grade-confusion`, `risk-session-secret-boundary` (break ri+sk-hyphen token shape).

@@ -1,7 +1,7 @@
 # Task Breakdown — AgentHub Cleanup Baseline
 
 > **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
-> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 58 / milestone 79).
+> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 61 / milestone 82).
 > Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
 >
 > last-updated: 2026-07-18
