@@ -309,10 +309,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 	}()
 
-	// Store Hub task ID for Edge→Hub direct callback reporting
+	// Store Hub task ID and allocate a bounded final-content collector for
+	// Edge→Hub direct callback reporting. Without the collector, recordHubOutput
+	// no-ops and fireHubDone falls back to literal "Run finished" (#987).
 	if shouldRecordHubTask(runCtx.HubTaskID) {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
+		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
 		e.mu.Unlock()
 	}
 
