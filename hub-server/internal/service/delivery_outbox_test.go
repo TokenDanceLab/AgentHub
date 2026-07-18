@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -981,6 +984,205 @@ func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) 
 	snap := cache.snapshot()
 	require.Len(t, snap.pushed, 1)
 	assert.Equal(t, "user-1", snap.pushedUser)
+}
+
+// ==================== #1009 atomic outbox claim (CAS on attempt_count) ====================
+
+func TestOutbox_ClaimRetryCASOnlyOneWins(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	outbox := NewDeliveryOutbox(db, nil)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"cas-1", "task-cas", "del-cas", `{}`, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, now, now,
+	)
+	require.NoError(t, err)
+
+	nextRetry := now.Add(time.Minute)
+	fields := map[string]interface{}{
+		"status":        DeliveryStatusRetrying,
+		"attempt_count": 1,
+		"last_error":    "timeout",
+		"next_retry_at": &nextRetry,
+	}
+
+	// First claim at observed attempt=0 wins.
+	rows, err := outbox.claimOutboxRetry(ctx, "del-cas", 0, fields)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	// Second claim with the same expected attempt loses (CAS).
+	rows, err = outbox.claimOutboxRetry(ctx, "del-cas", 0, fields)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-cas").First(&rec).Error)
+	assert.Equal(t, 1, rec.AttemptCount)
+	assert.Equal(t, DeliveryStatusRetrying, rec.Status)
+}
+
+func TestOutbox_MarkDeliveryRetryingLostClaimSkips(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	outbox := NewDeliveryOutbox(db, nil)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"lost-1", "task-lost", "del-lost", `{}`, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, now, now,
+	)
+	require.NoError(t, err)
+
+	// Simulate another worker claiming first (attempt 0→1).
+	nextRetry := now.Add(time.Minute)
+	rows, err := outbox.claimOutboxRetry(ctx, "del-lost", 0, map[string]interface{}{
+		"status":        DeliveryStatusRetrying,
+		"attempt_count": 1,
+		"last_error":    "other-worker",
+		"next_retry_at": &nextRetry,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), rows)
+
+	// Force a stale CAS path: claim again with expected attempt=0 (what a concurrent
+	// worker that already observed attempt=0 would attempt). Must not redispatch.
+	rows, err = outbox.claimOutboxRetry(ctx, "del-lost", 0, map[string]interface{}{
+		"status":        DeliveryStatusRetrying,
+		"attempt_count": 1,
+		"last_error":    "stale",
+		"next_retry_at": &nextRetry,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows, "stale attempt_count CAS must lose")
+
+	// Full MarkDeliveryRetrying after a real claim advances 1→2 (new cycle), not a double claim.
+	shouldRetry, err := outbox.MarkDeliveryRetrying(ctx, "del-lost", "next-cycle")
+	require.NoError(t, err)
+	assert.True(t, shouldRetry)
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-lost").First(&rec).Error)
+	assert.Equal(t, 2, rec.AttemptCount)
+	assert.Equal(t, "next-cycle", rec.LastError)
+}
+
+func TestOutbox_ConcurrentMarkDeliveryRetryingOnlyOneClaim(t *testing.T) {
+	// Shared in-memory DB with multi-conn so concurrent claims can interleave.
+	// CAS on attempt_count ensures only one worker owns redispatch for the same observation.
+	// Unique DSN per invocation so -count=N / parallel packages do not collide on table create.
+	dsn := fmt.Sprintf("file:outbox_claim_%s_%d?mode=memory&cache=shared", t.Name(), time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(16)
+	require.NoError(t, db.Exec(`CREATE TABLE delivery_outbox (
+		id TEXT PRIMARY KEY,
+		task_id TEXT NOT NULL,
+		delivery_id TEXT NOT NULL UNIQUE,
+		payload TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
+		attempt_count INTEGER NOT NULL DEFAULT 0,
+		max_attempts INTEGER NOT NULL DEFAULT 3,
+		next_retry_at DATETIME,
+		last_error TEXT DEFAULT '',
+		edge_device_id TEXT DEFAULT NULL,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		delivered_at DATETIME
+	)`).Error)
+
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"conc-1", "task-conc", "del-conc", `{}`, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, now, now,
+	).Error)
+
+	outbox := NewDeliveryOutbox(db, nil)
+	ctx := context.Background()
+
+	const workers = 16
+	var (
+		wg      sync.WaitGroup
+		start   = make(chan struct{})
+		success atomic.Int64
+		fails   atomic.Int64
+	)
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			<-start
+			// Direct CAS claim with the same expected attempt (scan snapshot).
+			// Mirrors multi-worker retry ticks that all observed attempt_count=0.
+			nextRetry := time.Now().Add(time.Minute)
+			rows, err := outbox.claimOutboxRetry(ctx, "del-conc", 0, map[string]interface{}{
+				"status":        DeliveryStatusRetrying,
+				"attempt_count": 1,
+				"last_error":    "concurrent",
+				"next_retry_at": &nextRetry,
+			})
+			if err != nil {
+				fails.Add(1)
+				return
+			}
+			if rows == 1 {
+				success.Add(1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	require.Equal(t, int64(0), fails.Load(), "claim must not error under contention")
+	assert.Equal(t, int64(1), success.Load(), "exactly one worker must win the atomic claim")
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-conc").First(&rec).Error)
+	assert.Equal(t, 1, rec.AttemptCount)
+	assert.Equal(t, DeliveryStatusRetrying, rec.Status)
+
+	// MarkDeliveryRetrying concurrent path with scan-snapshot CAS (same attempt
+	// observed by every worker — mirrors multi-replica retry ticks).
+	require.NoError(t, db.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"conc-2", "task-conc2", "del-conc2", `{}`, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, now, now,
+	).Error)
+
+	var (
+		wg2      sync.WaitGroup
+		start2   = make(chan struct{})
+		retryYes atomic.Int64
+	)
+	wg2.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg2.Done()
+			<-start2
+			// Fixed expectedAttempt=0 matches ScanRetryableDeliveries snapshot;
+			// re-find is intentionally skipped so losers cannot chain-claim.
+			should, err := outbox.claimDeliveryRetrying(ctx, "del-conc2", "task-conc2", 0, DefaultMaxDeliveryAttempts, "race")
+			if err == nil && should {
+				retryYes.Add(1)
+			}
+		}()
+	}
+	close(start2)
+	wg2.Wait()
+
+	assert.Equal(t, int64(1), retryYes.Load(), "exactly one snapshot claim may redispatch")
+
+	var rec2 deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-conc2").First(&rec2).Error)
+	assert.Equal(t, 1, rec2.AttemptCount)
+	assert.Equal(t, DeliveryStatusRetrying, rec2.Status)
 }
 
 // ==================== #1000 stream/done auto-ack + running not redispatchable ====================

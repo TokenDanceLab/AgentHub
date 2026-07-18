@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
@@ -125,5 +126,17 @@ func (o *DeliveryOutbox) updateOutboxByDeliveryID(ctx context.Context, deliveryI
 		q = q.Where("status IN ?", statusIn)
 	}
 	result := q.Updates(fields)
+	return result.RowsAffected, result.Error
+}
+
+// claimOutboxRetry performs an atomic outbox claim: UPDATE only succeeds when
+// delivery_id matches, status is still active, and attempt_count equals the
+// expected value observed by the caller. RowsAffected==1 means this worker owns
+// the redispatch; 0 means another worker already claimed (or row left active set).
+func (o *DeliveryOutbox) claimOutboxRetry(ctx context.Context, deliveryID string, expectedAttempt int, fields map[string]interface{}) (int64, error) {
+	result := o.db.WithContext(ctx).Model(outboxModel()).
+		Where("delivery_id = ? AND status IN ? AND attempt_count = ?",
+			deliveryID, deliveryoutbox.ActiveStatuses(), expectedAttempt).
+		Updates(fields)
 	return result.RowsAffected, result.Error
 }
