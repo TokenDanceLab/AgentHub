@@ -226,8 +226,13 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 
 // Cancel attempts to cancel a running or queued run. It looks up the run's cancel
 // function in the executor's running map and invokes it, which cancels the run
-// context and triggers graceful shutdown (stdin interrupt, then process termination
-// after the configured grace period).
+// context (stopping stream parsers) and starts graceful process shutdown:
+// stdin interrupt -> grace wait -> SIGTERM/group signal -> force timeout -> Kill.
+//
+// Process lifetime is intentionally NOT bound via exec.CommandContext: cancelling
+// the run context must not immediately SIGKILL the child and defeat the grace
+// path (#988). Escalation is owned by the grace goroutine below (or by the
+// context watcher when Cancel is not involved, e.g. run timeout).
 //
 // Returns a CancelResult indicating whether the run was found and whether the
 // cancellation was actually performed (a run already in terminal state cannot be
@@ -255,7 +260,9 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	}
 
 	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
-	// then send SIGTERM, wait force timeout, and escalate to SIGKILL as last resort.
+	// then send SIGTERM (process group on Unix), wait force timeout, and escalate
+	// to SIGKILL as last resort. Register cancelDone BEFORE cancel() so the
+	// context-timeout watcher defers to this path and does not force-kill early.
 	e.mu.Lock()
 	proc := e.processes[runID]
 	e.mu.Unlock()
@@ -274,19 +281,26 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				return
 			case <-time.After(e.shutdownGracePeriod):
 			}
-			_ = proc.Signal(os.Interrupt)
+			if err := signalProcessGraceful(proc); err != nil {
+				slog.Debug("process: graceful signal failed", "run_id", runID, "error", err)
+			}
 			select {
 			case <-done:
 				return
 			case <-time.After(e.shutdownForceTimeout):
 			}
-			_ = proc.Kill()
+			if err := killProcessTree(proc); err != nil {
+				slog.Debug("process: force kill failed", "run_id", runID, "error", err)
+			}
+			// run() also Wait()s; a second Wait is best-effort reaping only.
 			if _, err := proc.Wait(); shouldLogProcessWaitAfterKill(err) {
 				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
 			}
 		}()
 	}
 
+	// Cancel the run context after the grace path is armed. This stops
+	// parsers/timeouts but must not itself kill the child process.
 	cancel()
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
@@ -295,6 +309,30 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	}
 	current, found := e.store.GetRun(runID)
 	return lookupCancelResult(current, found)
+}
+
+// watchRunProcess terminates a child when the run context ends and Cancel has
+// not already armed a grace path. Without this, dropping CommandContext would
+// leave run-timeout processes orphaned (#988).
+func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, proc *os.Process, stop <-chan struct{}) {
+	if proc == nil {
+		return
+	}
+	select {
+	case <-stop:
+		return
+	case <-ctx.Done():
+	}
+	// If Cancel already registered a grace goroutine, let that path escalate.
+	e.mu.Lock()
+	_, graceActive := e.cancelDone[runID]
+	e.mu.Unlock()
+	if graceActive {
+		return
+	}
+	if err := killProcessTree(proc); err != nil {
+		slog.Debug("process: timeout kill failed", "run_id", runID, "error", err)
+	}
 }
 
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
@@ -420,7 +458,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			e.publishFailed(run, err)
 			return
 		}
-		cmd := exec.CommandContext(ctx, cmdPath, args...)
+		// Use Command (not CommandContext) so cancelling the run context does not
+		// immediately SIGKILL the child and defeat Cancel's grace escalation (#988).
+		// Process lifetime is managed explicitly: Cancel arms a grace path, and
+		// watchRunProcess force-kills on timeout when no grace path is active.
+		cmd := exec.Command(cmdPath, args...)
 		cmd.Dir = workDir
 		// Adapter mode overlays auth env onto a sanitized base; profile mode
 		// uses the administrator-configured env base. See envForAdapterOrProfile.
@@ -464,7 +506,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// If context was cancelled after Start but before we checked, kill the child.
 		if shouldKillStartedProcessOnCancel(ctx.Err()) {
 			if shouldKillProcessAfterCancel(cmd.Process) {
-				_ = cmd.Process.Kill()
+				_ = killProcessTree(cmd.Process)
 				if shouldWaitProcessAfterCancel(cmd.Process) {
 					_, _ = cmd.Process.Wait()
 				}
@@ -476,10 +518,16 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		slog.Debug("executor.subprocess.started", subprocessStartedLogArgs(run.ID, cmd.Process)...)
 
 		// Track process for graceful shutdown signals (SIGTERM on Unix).
+		// watchStop is always created so close(watchStop) after Wait is safe even
+		// when the process handle is not tracked.
+		watchStop := make(chan struct{})
 		if shouldTrackStartedProcess(cmd.Process) {
 			e.mu.Lock()
 			e.processes[run.ID] = cmd.Process
 			e.mu.Unlock()
+			// Ensure run-timeout / non-Cancel context cancellation still
+			// terminates the child now that CommandContext is not used.
+			go e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop)
 		}
 
 		// Close stdin unless the adapter needs it for the control protocol
@@ -549,6 +597,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// descriptors; otherwise structured parsers can race with Wait and see
 		// transient "file already closed" read errors.
 		wg.Wait()
+		// Stop the context watcher before Wait so it cannot race with reaping.
+		close(watchStop)
 		lastWaitErr = cmd.Wait()
 		lastOutStore = outStore
 		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
