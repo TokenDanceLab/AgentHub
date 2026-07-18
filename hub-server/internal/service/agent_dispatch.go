@@ -39,8 +39,9 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 //
 // Pure residual continue (#1012) after #977/#946/#902 and the #732→#834 chain.
 // Call dispatch.* directly; DTO aliases kept for JSON/redispatch stability.
-// Orchestration + ports stay flat here. Preserve #866/#999/#1000 outbox
-// redispatch semantics. No OpenAPI/handler/frontend; no typed package move.
+// Orchestration + ports stay flat here. Preserve #866/#999/#1000/#1009 outbox
+// redispatch semantics; #1031 coordinates offline queue vs outbox ownership.
+// No OpenAPI/handler/frontend; no typed package move.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -380,7 +381,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 					slog.Error(dispatch.DispatchLogOfflinePushConnNil, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 				}
-				if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+				// Offline queue acceptance is not Edge receipt (#1031).
+				// Leave outbox pending so redispatch owns recovery; do not MarkDeliverySent.
+				if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
 					_ = s.markDeliverySent(ctx, deliveryID)
 				}
 				return
@@ -396,6 +399,11 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 					slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
 				}
+				// WS miss → offline queue only; outbox stays pending (#1031).
+				if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
+					_ = s.markDeliverySent(ctx, deliveryID)
+				}
+				return
 			}
 			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
 				_ = s.markDeliverySent(ctx, deliveryID)
@@ -405,7 +413,8 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 			slog.Error(dispatch.DispatchLogOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
-		if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+		// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
+		if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
@@ -434,8 +443,12 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 
 	case dispatch.RouteTargetBound:
 		// local_edge / remote_ssh / cloud_edge / tailscale / hub_relay without relay.
-		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
-		if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+		live := s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
+		if live {
+			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+				_ = s.markDeliverySent(ctx, deliveryID)
+			}
+		} else if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
@@ -501,7 +514,10 @@ func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage
 	return dispatch.MapPinnedMessages(msgs)
 }
 
-func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
+// dispatchTargetBoundTask routes a target-bound task. Returns true when a live
+// WS push was queued (caller may MarkDeliverySent). Offline queue acceptance
+// alone returns false so outbox retains ownership (#1031).
+func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) bool {
 	queueTargetTask := func(reason string, err error) {
 		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
 			slog.Error(dispatch.DispatchLogTargetBoundOfflinePushFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
@@ -515,23 +531,25 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 	connID, err := cacheClient.GetRouteForDevice(ctx, userID, dispatch.DesktopDeviceType, deviceID)
 	if dispatch.TargetBoundRouteUnavailable(err, connID, dispatch.ManagerPortAvailable(s.mgr != nil)) {
 		queueTargetTask(dispatch.TargetBoundReasonRouteUnavailable, err)
-		return
+		return false
 	}
 	conn := s.mgr.FindByConnID(connID)
 	if conn == nil || !dispatch.IsTargetBoundConnUsable(true, conn.UserID, conn.DeviceType, conn.DeviceID, userID, deviceID) {
 		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
-		return
+		return false
 	}
 	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); err != nil {
 		slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
-		return
+		return false
 	}
 	result := s.mgr.PushToConn(connID, frame)
 	if !result.Queued {
 		slog.Warn(dispatch.DispatchLogTargetBoundWSNotQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
 		queueTargetTask(dispatch.TargetBoundReasonWSNotQueued, result.Err)
+		return false
 	}
+	return true
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -637,7 +655,9 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 //
 // Returns nil on successful route (HTTP / WS / offline queue) and on intentional
 // dead-letter. Soft route failures return an error so retryDeliveries does not
-// MarkDeliverySent (#999). Running is non-retryable (#1000).
+// MarkDeliverySent (#999). Initial offline dispatch does not mark sent (#1031);
+// outbox-owned redispatch offline success still marks sent (#866). Running is
+// non-retryable (#1000).
 func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) error {
 	dp, newPayload, err := dispatch.PrepareRedispatchPayload(rec.Payload, rec.DeliveryID)
 	if err != nil {
@@ -748,6 +768,8 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 	}
 	slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
 		dispatch.RedispatchOfflineSuccessLogAttrs(preferDevice, rec.DeliveryID, rec.TaskID, task.TriggeredByUserID)...)
+	// Outbox-owned redispatch may MarkDeliverySent after this nil (#866). Reconnect
+	// offline replay still consults outbox status so sent/acked rows do not dual-fire (#1031).
 	return nil
 }
 
