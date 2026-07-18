@@ -16,6 +16,7 @@ import {
   WorkspaceLoadingState,
 } from './WorkbenchFrameParts';
 import styles from './AgentHubWorkbench.module.css';
+import { TerminalPanel } from './terminal';
 
 export type { WorkbenchFrameProps } from './workbenchFrameTypes';
 
@@ -243,6 +244,14 @@ export function WorkbenchFrame({
           beginInspectorResize={beginInspectorResize}
         />
       )}
+      {platform.capabilities.localTerminal ? (
+        <div className={styles.terminalDock} data-testid="workbench-terminal-dock">
+          <TerminalPanel
+            localTerminal={platform.capabilities.localTerminal}
+            {...(platform.terminal ? { terminal: platform.terminal } : {})}
+          />
+        </div>
+      ) : null}
       {children}
     </div>
   );
