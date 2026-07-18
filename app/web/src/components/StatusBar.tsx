@@ -116,7 +116,7 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
             <Circle
               size={6}
               fill="currentColor"
-              style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
+              style={{ color: hubAuthenticated ? 'var(--success)' : 'var(--muted-foreground)' }}
               aria-hidden="true"
             />
             <span className={styles.wsStatus}>
