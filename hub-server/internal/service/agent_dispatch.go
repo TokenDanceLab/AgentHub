@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -656,7 +657,11 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 // and routing it to the target Edge device. Pure JSON prep is in dispatch
 // (#800); dead-letter + routing stay here. Accepts redispatchTarget only —
 // never the private GORM row type.
-func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) {
+//
+// Returns nil on successful route (HTTP / WS / offline queue) and on
+// intentional dead-letter (already terminal). Soft route failures return
+// an error so DeliveryOutbox.retryDeliveries does not MarkDeliverySent (#999).
+func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) error {
 	dp, newPayload, err := dispatch.PrepareRedispatchPayload(rec.Payload, rec.DeliveryID)
 	if err != nil {
 		kind, unwrap := dispatch.RedispatchPrepFailure(err)
@@ -666,7 +671,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"error", err,
 		)
 		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(kind, unwrap))
-		return
+		return nil
 	}
 
 	// Look up the task for dispatch routing.
@@ -678,7 +683,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"error", err,
 		)
 		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterReason(dispatch.DeadLetterKindTaskLookup, err))
-		return
+		return nil
 	}
 
 	// Only retry if task is still in a retryable state.
@@ -689,11 +694,11 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 			"task_status", task.Status,
 		)
 		s.moveDeliveryToDeadLetter(ctx, rec.DeliveryID, dispatch.DeadLetterTaskStatus(task.Status))
-		return
+		return nil
 	}
 
-	// Re-dispatch via HTTP (if local Edge) or WebSocket.
-	s.retryDispatchToTarget(ctx, task, dp, newPayload, rec)
+	// Re-dispatch via HTTP (if local Edge) or WebSocket / offline queue.
+	return s.retryDispatchToTarget(ctx, task, dp, newPayload, rec)
 }
 
 // getPendingTaskForRedelivery looks up a task for redelivery purposes.
@@ -732,7 +737,8 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 // Primary / connection route classification is pure (#811/#902); WS/HTTP/offline
 // side-effects stay here. Outbox MarkDeliverySent after success remains on the
 // DeliveryOutbox RedispatchDelivery path (#866) — not reopened here.
-func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) {
+// Soft offline-queue failures return an error so callers do not false-mark sent (#999).
+func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) error {
 	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
 	preferDevice := dispatch.PreferDeviceBoundRedelivery(task.EdgeDeviceID)
 
@@ -740,7 +746,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); dispatch.IsHTTPEdgeDispatchSuccess(edgeRunID) {
 			slog.Info(dispatch.RedispatchLogHTTPSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "edge_run_id", edgeRunID)
-			return
+			return nil
 		}
 	}
 
@@ -766,7 +772,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
 			slog.Info(dispatch.RedispatchLogWSSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "device_id", task.EdgeDeviceID)
-			return
+			return nil
 		}
 		slog.Warn(dispatch.RedispatchLogWSNotQueued,
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID,
@@ -776,20 +782,23 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
 			slog.Info(dispatch.RedispatchLogWSFallbackSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID)
-			return
+			return nil
 		}
 	}
 
 	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
 		slog.Error(dispatch.RedispatchOfflinePushFailedLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
-	} else if dispatch.RedispatchOfflineSuccessIncludesUserID(preferDevice) {
+		return fmt.Errorf("redispatch offline queue: %w", err)
+	}
+	if dispatch.RedispatchOfflineSuccessIncludesUserID(preferDevice) {
 		slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "user_id", task.TriggeredByUserID)
 	} else {
 		slog.Info(dispatch.RedispatchOfflineSuccessLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID)
 	}
+	return nil
 }
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────

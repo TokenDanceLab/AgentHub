@@ -857,3 +857,128 @@ func TestOutbox_RetryLoopNoRedispatcherSkipsDispatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, DeliveryStatusRetrying, status)
 }
+
+// ==================== #999 redispatch soft-fail / MarkDeliverySent updated_at ====================
+
+// failPushCache fails PushPendingTask so redispatch offline-queue soft-fails.
+type failPushCache struct {
+	mockAgentCache
+	pushErr error
+}
+
+func (f *failPushCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	if f.pushErr != nil {
+		return f.pushErr
+	}
+	return f.mockAgentCache.PushPendingTask(ctx, userID, taskJSON)
+}
+
+func seedRetryableTaskAndDelivery(t *testing.T, db *gorm.DB, taskID, deliveryID, payload string, status string, attempt int, updatedAt time.Time) {
+	t.Helper()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+	_, err = rawDB.Exec(
+		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_run_id, edge_device_id, error_message, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		taskID, "agent-1", "user-1", "msg-1", "", model.TaskStatusQueued, "", "dev-1", "", time.Now().Add(time.Hour),
+	)
+	require.NoError(t, err)
+
+	nextRetry := updatedAt.Add(-time.Second)
+	if status == DeliveryStatusSent {
+		nextRetry = time.Time{}
+	}
+	if status == DeliveryStatusRetrying {
+		_, err = rawDB.Exec(
+			`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, edge_device_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			"id-"+deliveryID, taskID, deliveryID, payload, status, attempt, DefaultMaxDeliveryAttempts, nextRetry, "dev-1", "prior", updatedAt, updatedAt,
+		)
+	} else {
+		_, err = rawDB.Exec(
+			`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, edge_device_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			"id-"+deliveryID, taskID, deliveryID, payload, status, attempt, DefaultMaxDeliveryAttempts, "dev-1", updatedAt, updatedAt,
+		)
+	}
+	require.NoError(t, err)
+}
+
+func TestOutbox_MarkDeliverySentBumpsUpdatedAt(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	outbox := NewDeliveryOutbox(db, nil)
+
+	old := time.Now().Add(-2 * time.Hour).UTC().Truncate(time.Second)
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"upd-1", "task-upd", "del-upd", `{}`, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, old.Add(time.Minute), old, old,
+	)
+	require.NoError(t, err)
+
+	before := time.Now().UTC()
+	require.NoError(t, outbox.MarkDeliverySent(ctx, "del-upd"))
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-upd").First(&rec).Error)
+	assert.Equal(t, DeliveryStatusSent, rec.Status)
+	assert.Nil(t, rec.NextRetryAt)
+	require.False(t, rec.UpdatedAt.IsZero())
+	assert.True(t, !rec.UpdatedAt.Before(before), "updated_at should advance on MarkDeliverySent, got %v before %v", rec.UpdatedAt, before)
+	assert.True(t, rec.UpdatedAt.After(old), "updated_at should be newer than seed, got %v old %v", rec.UpdatedAt, old)
+}
+
+func TestOutbox_RetryLoopAdapterSoftFailDoesNotMarkSent(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+
+	now := time.Now()
+	payload := `{"task_id":"task-soft","agent_type":"claude-code","prompt":"hi"}`
+	seedRetryableTaskAndDelivery(t, db, "task-soft", "del-soft", payload, DeliveryStatusRetrying, 1, now)
+
+	cache := &failPushCache{pushErr: errors.New("redis unavailable")}
+	ds := NewDispatchService(db, nil, nil, cache, nil, nil)
+	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
+
+	outbox.retryDeliveries(ctx)
+
+	status, err := outbox.GetDeliveryStatus(ctx, "del-soft")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusRetrying, status, "soft-fail must not MarkDeliverySent")
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-soft").First(&rec).Error)
+	assert.NotNil(t, rec.NextRetryAt)
+	assert.Equal(t, 2, rec.AttemptCount)
+}
+
+func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+
+	old := time.Now().Add(-DeliverySentTimeout - time.Second)
+	payload := `{"task_id":"task-ok","agent_type":"claude-code","prompt":"hi"}`
+	seedRetryableTaskAndDelivery(t, db, "task-ok", "del-ok", payload, DeliveryStatusSent, 0, old)
+
+	cache := &mockAgentCache{}
+	ds := NewDispatchService(db, nil, nil, cache, nil, nil)
+	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
+
+	before := time.Now().UTC()
+	outbox.retryDeliveries(ctx)
+
+	status, err := outbox.GetDeliveryStatus(ctx, "del-ok")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusSent, status, "successful redispatch should mark sent")
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-ok").First(&rec).Error)
+	assert.Nil(t, rec.NextRetryAt)
+	assert.Equal(t, 1, rec.AttemptCount)
+	assert.True(t, !rec.UpdatedAt.Before(before), "updated_at should advance on success MarkDeliverySent")
+	assert.True(t, rec.UpdatedAt.After(old), "updated_at should be newer than pre-retry seed")
+
+	// Offline queue received the payload (no WS/HTTP route available).
+	snap := cache.snapshot()
+	require.Len(t, snap.pushed, 1)
+	assert.Equal(t, "user-1", snap.pushedUser)
+}
