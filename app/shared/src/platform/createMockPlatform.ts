@@ -4,6 +4,12 @@ import type {
   AgentHubPlatform,
   AgentHubSurface,
   SurfaceCapabilities,
+  TerminalPort,
+  TerminalResizePayload,
+  TerminalSession,
+  TerminalSessionId,
+  TerminalSpawnOptions,
+  TerminalWritePayload,
   WorkbenchConversation,
 } from './types';
 
@@ -13,6 +19,19 @@ export interface MockPlatformSeed {
   conversations?: WorkbenchConversation[];
   pickFiles?: () => Promise<ComposerAttachment[]>;
   openEvidence?: (evidence: EvidenceRef) => Promise<void>;
+  /**
+   * Optional terminal port. When omitted and `capabilities.localTerminal === true`,
+   * a fixture mock port is attached so Desktop-shaped tests can exercise the panel.
+   * Web defaults keep `localTerminal` false and omit the port.
+   */
+  terminal?: TerminalPort;
+}
+
+export interface MockTerminalPort extends TerminalPort {
+  sessions: TerminalSession[];
+  writes: TerminalWritePayload[];
+  resizes: TerminalResizePayload[];
+  closed: TerminalSessionId[];
 }
 
 export interface MockPlatform extends AgentHubPlatform {
@@ -21,25 +40,95 @@ export interface MockPlatform extends AgentHubPlatform {
   };
   openedEvidence: EvidenceRef[];
   submittedIntents: ComposerIntent[];
+  terminal?: MockTerminalPort | TerminalPort;
 }
 
 const defaultCapabilities: SurfaceCapabilities = {
   localEdge: false,
   localFiles: false,
   browserPreview: false,
+  localTerminal: false,
 };
+
+export function createMockTerminalPort(seedSessions: TerminalSession[] = []): MockTerminalPort {
+  const sessions: TerminalSession[] = seedSessions.map((session) => ({ ...session }));
+  const writes: TerminalWritePayload[] = [];
+  const resizes: TerminalResizePayload[] = [];
+  const closed: TerminalSessionId[] = [];
+  let seq = sessions.length;
+
+  return {
+    sessions,
+    writes,
+    resizes,
+    closed,
+    async list() {
+      return sessions.map((session) => ({ ...session }));
+    },
+    async spawn(options: TerminalSpawnOptions = {}) {
+      seq += 1;
+      const session: TerminalSession = {
+        id: `mock-term-${seq}`,
+        title: options.title?.trim() || `Terminal ${seq}`,
+        status: 'running',
+        createdAt: new Date(0).toISOString(),
+        ...(options.cwd ? { cwd: options.cwd } : {}),
+        ...(options.cols != null ? { cols: options.cols } : {}),
+        ...(options.rows != null ? { rows: options.rows } : {}),
+      };
+      sessions.push(session);
+      return { ...session };
+    },
+    async write(payload: TerminalWritePayload) {
+      writes.push(payload);
+      const session = sessions.find((item) => item.id === payload.sessionId);
+      if (!session) {
+        throw new Error(`Unknown terminal session: ${payload.sessionId}`);
+      }
+    },
+    async resize(payload: TerminalResizePayload) {
+      resizes.push(payload);
+      const session = sessions.find((item) => item.id === payload.sessionId);
+      if (!session) {
+        throw new Error(`Unknown terminal session: ${payload.sessionId}`);
+      }
+      session.cols = payload.cols;
+      session.rows = payload.rows;
+    },
+    async close(sessionId: TerminalSessionId) {
+      closed.push(sessionId);
+      const index = sessions.findIndex((item) => item.id === sessionId);
+      if (index < 0) {
+        throw new Error(`Unknown terminal session: ${sessionId}`);
+      }
+      const current = sessions[index];
+      if (!current) {
+        throw new Error(`Unknown terminal session: ${sessionId}`);
+      }
+      sessions[index] = {
+        ...current,
+        status: 'exited',
+      };
+    },
+  };
+}
 
 export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
   const conversations = seed.conversations ?? [];
   const openedEvidence: EvidenceRef[] = [];
   const submittedIntents: ComposerIntent[] = [];
+  const capabilities: SurfaceCapabilities = {
+    ...defaultCapabilities,
+    ...seed.capabilities,
+  };
+
+  const terminal =
+    seed.terminal
+    ?? (capabilities.localTerminal ? createMockTerminalPort() : undefined);
 
   return {
     surface: seed.surface ?? 'web',
-    capabilities: {
-      ...defaultCapabilities,
-      ...seed.capabilities,
-    },
+    capabilities,
     seed: {
       conversations,
     },
@@ -76,6 +165,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
           },
         }
       : {}),
+    ...(terminal ? { terminal } : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         submittedIntents.push(intent);
