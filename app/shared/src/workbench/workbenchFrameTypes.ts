@@ -138,6 +138,14 @@ export interface WorkspaceLoadingStateProps {
   label: string;
 }
 
+export interface WorkspaceLoadErrorStateProps {
+  title: string;
+  description: string;
+  meta?: string | undefined;
+  retryLabel: string;
+  onRetry?: (() => void) | undefined;
+}
+
 export interface ChatConversationHostFrameProps {
   platform: AgentHubPlatform;
   session: WorkbenchSessionChrome;
