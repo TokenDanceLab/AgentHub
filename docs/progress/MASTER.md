@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–72 · Phase 73 host ports (#1201–#1203) · Phase 74 visual system open
+> **Merged program PRs**: Phases 1–73 · P74 foundation #1204–#1207
 
 ## Two task surfaces (do not mix)
 
@@ -27,30 +27,32 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 73**: `gh issue list -R TokenDanceLab/AgentHub --milestone 94 --state open`
 - **Phase 74**: `gh issue list -R TokenDanceLab/AgentHub --milestone 95 --state open`
 
 ## References
 
 - [engineering-loop-capability-map](../analysis/engineering-loop-capability-map.md)
 - [07-design-system-ssot](../architecture/07-design-system-ssot.md)
-- Platform · auxPanel · terminal · sessionImport
+- [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
 
 ## Milestones
 
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
-| 1–72 | Baseline + residual + loop foundations + wiring | #22–#93 | closed |
+| 1–72 | Baseline + residual + loop foundations | #22–#93 | closed |
 | 73 | Host ports + import entry | #94 | closed (#1191–#1193; PRs #1201–#1203) |
-| 74 | Light frosted glass + Visual QA | #95 | active (#1197–#1200) |
+| 74 | Light frosted glass + Visual QA | #95 | active (foundation landed; chrome consumers open) |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
-| #1181–#1184 Phase 72 | closed |
-| #1191–#1194 Phase 73 | closed (product residual landed) |
-| #1197–#1200 Phase 74 | open visual system |
+| #1191–#1194 Phase 73 | closed |
+| #1197 glass tokens | closed PR #1204 |
+| #1198 motion/spacing | closed PR #1206 |
+| #1199 Visual QA scorecard | closed PR #1207 |
+| #1200 MASTER hygiene | closed PR #1205 |
+| #1208–#1211 chrome consumers + hygiene | open |
 
 ## Quick Status Commands
 
@@ -61,33 +63,33 @@ git rev-parse --short origin/master
 
 ## Phase Checklist
 
-- [x] Phase 0–72
-- [x] Phase 73 host ports + import entry
-- [ ] Phase 74 light frosted glass + Visual QA
+- [x] Phase 0–73
+- [ ] Phase 74 light frosted glass + Visual QA (foundation done; consumers in flight)
 
 ## Current Status
 
-**Active Phase**: 74 (visual system)
-**Active Tasks**: #1197 glass tokens · #1198 motion/spacing · #1199 visual QA scorecard · #1200 hygiene
+**Active Phase**: 74 (visual system consumers)
+**Active Tasks**: #1208 shell chrome · #1209 floating overlays · #1210 Aux/Empty · #1211 hygiene
 **Blockers**: None
-**Product tip**: `145bcc2d` — session import + workspace host ports + mock terminal
-**Visual north star**: light frosted glass (blur/elev/card), dense spacing, micro-motion, screenshot scorecard iteration
+**Product tip**: `ffce69bf` — glass tokens + density/motion + visual QA scorecard
+**Visual north star**: light frosted glass, dense spacing, micro-motion, screenshot score loop
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Land P74 glass token layer (#1197 / PR #1204)
-2. Motion + spacing density (#1198)
-3. Visual QA capture matrix + scorecard loop (#1199)
-4. Keep issue-bound worktrees; main session gates only
+1. Shell chrome glass recipe (#1208)
+2. Floating overlay glass (#1209)
+3. AuxPanel + EmptyState alignment (#1210)
+4. Capture → score → iterate via `visual:qa:shell`
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-19 | lead | P73 closed (#1201–#1203); P74 dual-track frosted glass visual system open |
+| 2026-07-19 | lead | P74 foundation closed (#1204–#1207); open chrome consumer set #1208–#1211 |
+| 2026-07-19 | lead | P73 closed (#1201–#1203); P74 dual-track frosted glass open |
 
 ## Completion notes
 
-- Phase 73: WorkspaceFiles/Git ports · Desktop session import entry · mock TerminalPort.
-- Phase 72: AuxPanel wire · Terminal dock · SessionImportList · runtime-sessions.
+- P74 foundation: glass tokens · density/motion · scorecard+capture matrix.
+- Phase 73: WorkspaceFiles/Git ports · session import · mock TerminalPort.
