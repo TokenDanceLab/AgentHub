@@ -1,7 +1,7 @@
 # Design system SSOT map
 
-最后更新：2026-07-18
-Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome
+最后更新：2026-07-19
+Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome · **#1197 frosted-glass material layer**
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
 > 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
@@ -81,3 +81,18 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | Written SSOT map | this file + optional audit under `docs/analysis/` |
 | ≥1 concrete dedupe | Fix A + Fix B above |
 | Surfaces still load shared CSS | desktop/web `styles/*.css` remain thin re-exports |
+
+## 7. Frosted glass material (#1197)
+
+**Goal**: light white frosted glass + dark translucent frosted glass as first-class design tokens, not per-component hardcodes.
+
+| Token family | Where | Notes |
+|---|---|---|
+| `--glass-panel*` / `--glass-border*` / `--glass-bg-*` | `tokens-base.css` base + `themes.css` light/dark pairs | Light prefers white translucent fill; dark prefers translucent panel + hairline light edge |
+| `--glass-blur-*` / `--glass-saturate` / `--glass-backdrop-filter` | base + theme pairs | Card/panel material blur recipe |
+| `--glass-elev-1..3` / `--glass-card-*` | base + theme pairs | Elevation scale + card recipe |
+| `--elevated-card-*` | aliases to glass elev scale | Existing elevated surface consumers keep working |
+| `Card` `variant="glass"\|"elevated"` | `ui/Card.module.css` | Consumes glass/elev tokens only |
+| Alias registry | `designTokens.ts` `--td-glass-blur/card/elev` | Cross-surface naming; CSS remains value SSOT |
+
+Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; do not invent local `backdrop-filter` or rgba glass fills.
