@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import {
+  buildTerminalPanelDockProps,
   buildWorkbenchShellDataAttrs,
   buildWorkspaceMainDataAttrs,
+  shouldRenderTerminalDock,
 } from './workbenchFrameHelpers';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
 import {
@@ -244,12 +246,16 @@ export function WorkbenchFrame({
           beginInspectorResize={beginInspectorResize}
         />
       )}
-      {platform.capabilities.localTerminal ? (
-        <div className={styles.terminalDock} data-testid="workbench-terminal-dock">
-          <TerminalPanel
-            localTerminal={platform.capabilities.localTerminal}
-            {...(platform.terminal ? { terminal: platform.terminal } : {})}
-          />
+      {shouldRenderTerminalDock({
+        isChatPage,
+        localTerminal: platform.capabilities.localTerminal,
+      }) ? (
+        <div
+          className={styles.terminalDock}
+          data-testid="workbench-terminal-dock"
+          data-local-terminal="enabled"
+        >
+          <TerminalPanel {...buildTerminalPanelDockProps(platform)} />
         </div>
       ) : null}
       {children}
