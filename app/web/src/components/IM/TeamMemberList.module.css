@@ -109,22 +109,22 @@
 }
 
 .roleSupervisor {
-  background: rgba(0, 113, 188, 0.15);
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
   color: var(--primary);
 }
 
 .roleReviewer {
-  background: rgba(234, 179, 8, 0.15);
+  background: color-mix(in oklch, var(--warning) 15%, transparent);
   color: var(--warning);
 }
 
 .roleExecutor {
-  background: rgba(34, 197, 94, 0.15);
+  background: color-mix(in oklch, var(--success) 15%, transparent);
   color: var(--success);
 }
 
 .roleMember {
-  background: rgba(156, 163, 175, 0.15);
+  background: color-mix(in oklch, var(--muted-foreground) 15%, transparent);
   color: var(--muted-foreground);
 }
 
