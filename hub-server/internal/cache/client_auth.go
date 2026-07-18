@@ -1,0 +1,111 @@
+package cache
+
+import (
+	"context"
+	"log/slog"
+	"strconv"
+	"time"
+)
+
+// Residual pure-helper peel #1123: sequence numbers, token blacklist, rate limit.
+
+// AllocateSeq atomically increments and returns the next seq for a session.
+func (c *Client) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	key := "session:seq:" + sessionID
+	val, err := c.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	// Always set TTL to prevent permanent key leak: when a session's seq key
+	// expires after 30 days, the next AllocateSeq recreates it via Incr with
+	// no TTL, and subsequent InitSeqIfAbsent becomes a no-op (SetNX fails
+	// because key already exists). The Expire call closes this leak path.
+	_ = c.rdb.Expire(ctx, key, 30*24*time.Hour).Err()
+	return val, nil
+}
+
+// InitSeqIfAbsent initializes the seq key if it doesn't exist.
+func (c *Client) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error {
+	return c.rdb.SetNX(ctx, "session:seq:"+sessionID, seq, 30*24*time.Hour).Err()
+}
+
+// PeekSeq returns the current seq value for a session (diagnostics only).
+func (c *Client) PeekSeq(ctx context.Context, sessionID string) (int64, error) {
+	s, err := c.rdb.Get(ctx, "session:seq:"+sessionID).Result()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(s, 10, 64)
+}
+
+// BlacklistRefreshToken stores a refresh token hash in the Redis blacklist
+// with the specified TTL. This allows fast revocation checks without hitting
+// the database.
+func (c *Client) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
+	return c.rdb.Set(ctx, "rt_blacklist:"+tokenHash, "1", ttl).Err()
+}
+
+// IsRefreshTokenBlacklisted checks whether a key (token hash, or compound
+// userID:deviceID[:deviceType] key) exists in the Redis refresh token
+// blacklist. Returns true if the key is present, false otherwise.
+// Redis errors are logged and result in a false return (fail-open to DB-only
+// revocation), so a transient Redis outage does not block all token refresh.
+func (c *Client) IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error) {
+	n, err := c.rdb.Exists(ctx, "rt_blacklist:"+key).Result()
+	if err != nil {
+		slog.Warn("redis IsRefreshTokenBlacklisted failed, falling back to DB-only",
+			"key", key, "error", err)
+		return false, nil
+	}
+	return n > 0, nil
+}
+
+// BlacklistAccessToken stores an access-token jti in the Redis blacklist until
+// the remaining access TTL elapses. Used on logout so stolen access JWTs are
+// rejected immediately rather than remaining valid for AccessExpire (#888).
+func (c *Client) BlacklistAccessToken(ctx context.Context, jti string, ttl time.Duration) error {
+	if jti == "" || ttl <= 0 {
+		return nil
+	}
+	return c.rdb.Set(ctx, "at_blacklist:"+jti, "1", ttl).Err()
+}
+
+// IsAccessTokenBlacklisted reports whether an access-token jti is blacklisted.
+// Redis errors fail open (return false) so a transient outage does not deny
+// all authenticated traffic; logout still revokes refresh tokens in DB.
+func (c *Client) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
+	if jti == "" {
+		return false, nil
+	}
+	n, err := c.rdb.Exists(ctx, "at_blacklist:"+jti).Result()
+	if err != nil {
+		slog.Warn("redis IsAccessTokenBlacklisted failed, fail-open",
+			"jti", jti, "error", err)
+		return false, nil
+	}
+	return n > 0, nil
+}
+
+// CheckRateLimit implements a rate-limit counter with sliding-window semantics.
+// It atomically increments the counter for key and always refreshes the TTL to
+// 60 seconds on every request. This means the window slides forward with each
+// request: a trickle of 1 request every 59 seconds keeps the counter alive
+// indefinitely (though the counter still accumulates and eventually exceeds the
+// limit). This differs from strict fixed-window semantics where the TTL is set
+// only on the first request, creating a clean 60-second window from that point.
+//
+// The unconditional Expire prevents permanent key residue after a crash.
+//
+// If strict fixed-window semantics are required, use an atomic Lua script:
+//
+//	EVAL "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c" 1 key ttl
+func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (count int64, exceeded bool, err error) {
+	count, err = c.rdb.Incr(ctx, "ratelimit:"+key).Result()
+	if err != nil {
+		return 0, false, err
+	}
+	// Always refresh TTL (sliding-window semantics; see function doc).
+	_ = c.rdb.Expire(ctx, "ratelimit:"+key, 60*time.Second).Err()
+	exceeded = count > limit
+	return
+}
