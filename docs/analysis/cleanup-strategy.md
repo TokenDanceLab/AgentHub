@@ -1,6 +1,6 @@
 # AgentHub Cleanup Strategy（权威程序决策）
 
-> **ARCHIVED PROGRAM — cleanup-baseline closed 2026-07-16 / PR #446.** Do not open new `cleanup-baseline` issues. Live work: `phase:63` / milestone 84 via [../progress/MASTER.md](../progress/MASTER.md).
+> **ARCHIVED PROGRAM — cleanup-baseline closed 2026-07-16 / PR #446.** Do not open new `cleanup-baseline` issues. Live work: `phase:64` / milestone 85 via [../progress/MASTER.md](../progress/MASTER.md).
 > last-updated: 2026-07-18
 > program: **knowledge-first strangler cleanup** + **lightweight llmwiki as compiler only**
 > hard rule: **NO big-bang rewrite**
