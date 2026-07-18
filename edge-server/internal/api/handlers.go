@@ -499,6 +499,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
 	})
+	// Local runtime session aggregation index (read-only import discover)
+	mux.HandleFunc("/v1/runtime-sessions", h.GetRuntimeSessions)
 	// cc-switch integration
 	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
 	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
