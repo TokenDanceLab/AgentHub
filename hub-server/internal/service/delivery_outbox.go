@@ -90,11 +90,14 @@ func (o *DeliveryOutbox) RecordDelivery(ctx context.Context, taskID, payload, ed
 // the next scan rather than the retry cadence (avoids duplicate Edge runs).
 // Already-sent/acked rows are a no-op (RowsAffected==0 tolerated).
 func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string) error {
+	// Explicit updated_at: model uses autoUpdateTime:false so map Updates must
+	// bump it — SentRetryCutoff scans on updated_at for ack-window eligibility.
 	rows, err := o.updateOutboxByDeliveryID(ctx, deliveryID,
 		[]string{DeliveryStatusPending, DeliveryStatusRetrying},
 		map[string]interface{}{
 			"status":        DeliveryStatusSent,
 			"next_retry_at": nil,
+			"updated_at":    time.Now(),
 		})
 	if err != nil {
 		return fmt.Errorf("mark delivery sent: %w", err)
@@ -414,13 +417,15 @@ func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, de
 	if a.d == nil {
 		return fmt.Errorf("redispatch: nil dispatch service")
 	}
-	a.d.redispatchDelivery(ctx, redispatchTarget{
+	// Propagate soft-fail errors so retryDeliveries does not MarkDeliverySent
+	// after a failed offline-queue / route attempt (#999). Dead-letter paths
+	// return nil (already terminal; MarkDeliverySent is a no-op).
+	return a.d.redispatchDelivery(ctx, redispatchTarget{
 		TaskID:       taskID,
 		DeliveryID:   deliveryID,
 		Payload:      payloadJSON,
 		EdgeDeviceID: edgeDeviceID,
 	})
-	return nil
 }
 
 // lazyDispatchRedispatcher resolves DispatchService only when a retry fires.
