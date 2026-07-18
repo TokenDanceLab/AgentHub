@@ -5,6 +5,8 @@ import React from 'react';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, resolveDemoWorkbenchTranscript } from '@shared/demo';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
+import { getAccessToken } from '@/hooks/useAuth';
+import { useHubStore } from '@/stores/hubStore';
 import { useDesktopWorkbenchModel } from './useDesktopWorkbenchModel';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
 import { fetchHealth } from '@/api/edgeClient';
@@ -69,6 +71,8 @@ const mockedUseHubSessions = vi.mocked(useHubSessions);
 const mockedUseHubMessages = vi.mocked(useHubMessages);
 const mockedUseDesktopEdgeEvents = vi.mocked(useDesktopEdgeEvents);
 const mockedFetchHealth = vi.mocked(fetchHealth);
+const mockedUseHubStore = vi.mocked(useHubStore);
+const mockedGetAccessToken = vi.mocked(getAccessToken);
 
 describe('useDesktopWorkbenchModel', () => {
   const queryClient = new QueryClient();
@@ -97,6 +101,8 @@ describe('useDesktopWorkbenchModel', () => {
     } as unknown as ReturnType<typeof useHubMessages>);
     mockedUseDesktopEdgeEvents.mockReturnValue([]);
     mockedFetchHealth.mockRejectedValue(new Error('Edge not available'));
+    mockedUseHubStore.mockReturnValue(false as never);
+    mockedGetAccessToken.mockReturnValue(null);
   });
 
   function renderWithProvider() {
@@ -245,5 +251,59 @@ describe('useDesktopWorkbenchModel', () => {
       'live-earlier',
       'thread-item-persisted-later',
     ]);
+  });
+
+  it('does not let hubSessions[0] steal an explicit Edge thread selection (#1010)', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseHubStore.mockReturnValue(true as never);
+    mockedGetAccessToken.mockReturnValue('token');
+
+    mockedUseHubSessions.mockReturnValue({
+      data: [{ id: 'hub-session-1', title: 'Hub DM', type: 'private' }],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubSessions>);
+    mockedUseHubMessages.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubMessages>);
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [{
+          threadId: 'edge-thread-1',
+          title: 'Edge Thread',
+          status: 'active',
+        }],
+        page: { hasMore: false },
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useThreadMessages>);
+    mockedUseThreadPins.mockReturnValue({
+      data: { items: [] },
+    } as unknown as ReturnType<typeof useThreadPins>);
+
+    const { result } = renderHook(
+      () => useDesktopWorkbenchModel('edge-thread-1'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.activeConversationId).toBe('edge-thread-1');
+    expect(result.current.activeThreadId).toBe('edge-thread-1');
+    expect(result.current.conversations.map((c) => c.id)).toEqual(
+      expect.arrayContaining(['hub-session-1', 'edge-thread-1']),
+    );
   });
 });
