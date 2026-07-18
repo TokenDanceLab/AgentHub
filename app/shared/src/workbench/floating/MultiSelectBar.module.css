@@ -7,10 +7,12 @@
   max-width: min(calc(var(--selectbar-width, 100vw) - 44px), 980px);
   min-height: 46px;
   padding: 5px 6px 5px 10px;
-  border: 1px solid var(--bdr-strong);
+  border: 1px solid var(--glass-border-strong, var(--bdr-strong));
   border-radius: var(--r-xl);
-  background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
-  box-shadow: var(--e-3);
+  background: var(--glass-panel-overlay, var(--glass-panel));
+  box-shadow: var(--glass-elev-3, var(--e-3));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   display: flex;
   align-items: center;
   gap: var(--sp-xxs);
