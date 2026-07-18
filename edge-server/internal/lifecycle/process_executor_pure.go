@@ -1883,3 +1883,241 @@ type preflightFailurePlan struct {
 func planPreflightFailure(err error) preflightFailurePlan {
 	return preflightFailurePlan{Fail: shouldPublishPreflightFailure(err)}
 }
+
+// newProcessExecutorPlan is the pure constructor gate after profile construction.
+type newProcessExecutorPlan struct {
+	FailProfile bool
+	StatWorkDir bool
+}
+
+// planNewProcessExecutor maps profile construction error + configured workDir into
+// constructor control flags. Stat/Validate side-effects stay in NewProcessExecutor.
+func planNewProcessExecutor(profileErr error, workDir string) newProcessExecutorPlan {
+	return newProcessExecutorPlan{
+		FailProfile: shouldFailNewRunnerProfile(profileErr),
+		StatWorkDir: shouldStatConfiguredWorkDir(workDir),
+	}
+}
+
+// writeInterruptStdinPlan is the pure Cancel stdin-interrupt gate.
+type writeInterruptStdinPlan struct {
+	Write bool
+}
+
+// planWriteInterruptStdin reports whether Cancel should WriteInterrupt on a tracked stdin.
+func planWriteInterruptStdin(hasStdin bool) writeInterruptStdinPlan {
+	return writeInterruptStdinPlan{Write: shouldWriteInterruptStdin(hasStdin)}
+}
+
+// terminalFinishPlan is the pure deferred finish gate for a run attempt (#867).
+type terminalFinishPlan struct {
+	Finish bool
+}
+
+// planTerminalFinish reports whether this attempt owns terminal finish cleanup.
+// Fault-escalation successors clear the flag so attempt-local cleanup does not
+// tear down the concurrency slot the successor re-registered.
+func planTerminalFinish(terminalFinish bool) terminalFinishPlan {
+	return terminalFinishPlan{Finish: shouldPerformTerminalFinish(terminalFinish)}
+}
+
+// adapterResolveFailurePlan is the pure Resolve error publish gate.
+type adapterResolveFailurePlan struct {
+	Fail bool
+}
+
+// planAdapterResolveFailure reports whether adapterReg.Resolve failure should fail the run.
+func planAdapterResolveFailure(err error) adapterResolveFailurePlan {
+	return adapterResolveFailurePlan{Fail: shouldPublishAdapterResolveFailure(err)}
+}
+
+// commandBuildFailurePlan is the pure command/template expand failure gate.
+type commandBuildFailurePlan struct {
+	Fail bool
+}
+
+// planCommandBuildFailure reports whether a command/template expand error should publishFailed.
+func planCommandBuildFailure(err error) commandBuildFailurePlan {
+	return commandBuildFailurePlan{Fail: shouldPublishCommandBuildFailure(err)}
+}
+
+// pipeFailurePlan is the pure stdout/stderr/stdin pipe open failure gate.
+type pipeFailurePlan struct {
+	Fail bool
+}
+
+// planPipeFailure reports whether a Stdout/Stderr/StdinPipe error should publishFailed.
+func planPipeFailure(err error) pipeFailurePlan {
+	return pipeFailurePlan{Fail: shouldPublishPipeFailure(err)}
+}
+
+// cancelledRunPlan is the pure post-wait cancellation detection plan.
+type cancelledRunPlan struct {
+	Cancelled bool
+}
+
+// planCancelledRun maps context/status into the publishCancelled branch.
+func planCancelledRun(ctxErr error, status string) cancelledRunPlan {
+	return cancelledRunPlan{Cancelled: shouldTreatAsCancelled(ctxErr, status)}
+}
+
+// outputStoreCapturePlan is the pure session-conflict stderr capture gate.
+type outputStoreCapturePlan struct {
+	Read bool
+}
+
+// planOutputStoreCapture reports whether outStore.ReadAll should feed session-conflict detection.
+func planOutputStoreCapture(hasOutStore bool) outputStoreCapturePlan {
+	return outputStoreCapturePlan{Read: shouldReadOutputStoreCapture(hasOutStore)}
+}
+
+// sessionRetryBreakPlan is the pure wait-error break gate for the session-retry loop.
+type sessionRetryBreakPlan struct {
+	Break bool
+}
+
+// planSessionRetryBreak reports whether a non-retryable wait error should leave the session loop.
+func planSessionRetryBreak(waitErr error) sessionRetryBreakPlan {
+	return sessionRetryBreakPlan{Break: shouldBreakSessionRetryOnWaitError(waitErr)}
+}
+
+// faultEscalationAttemptPlan is the pure outer gate before fault-escalation handoff (#867).
+type faultEscalationAttemptPlan struct {
+	Attempt bool
+}
+
+// planFaultEscalationAttempt reports whether the wait-error path may consult fault escalation.
+func planFaultEscalationAttempt(lastWaitErr error, cfg FaultEscalationConfig) faultEscalationAttemptPlan {
+	return faultEscalationAttemptPlan{Attempt: shouldAttemptFaultEscalation(lastWaitErr, cfg)}
+}
+
+// faultEscalationCleanupPlan is the pure attempt-local cleanup plan during #867 handoff.
+// Map mutations and cancel re-registration stay in the executor.
+type faultEscalationCleanupPlan struct {
+	CloseOutput     bool
+	InvokeOldCancel bool
+}
+
+// planFaultEscalationCleanup maps map-lookup presence into handoff cleanup flags.
+// Does not rework terminalFinish ownership (#867).
+func planFaultEscalationCleanup(hasRunOutput, hasOldCancel bool) faultEscalationCleanupPlan {
+	return faultEscalationCleanupPlan{
+		CloseOutput:     shouldCloseTrackedRunOutput(hasRunOutput),
+		InvokeOldCancel: shouldInvokeOldCancelOnEscalationHandoff(hasOldCancel),
+	}
+}
+
+// terminalWaitFailurePlan is the pure post-escalation terminal wait-failure publish gate.
+type terminalWaitFailurePlan struct {
+	Publish bool
+}
+
+// planTerminalWaitFailure reports whether the last wait error should publishFailed after retries.
+func planTerminalWaitFailure(lastWaitErr error) terminalWaitFailurePlan {
+	return terminalWaitFailurePlan{Publish: shouldPublishTerminalWaitFailure(lastWaitErr)}
+}
+
+// outputReadPlan is the pure publishOutput read-loop gate for one Read result.
+type outputReadPlan struct {
+	Process bool
+	Stop    bool
+}
+
+// planOutputRead maps Read (n, err) into process-chunk / stop-loop flags.
+// Store write / hub forward stay on the chunk plan.
+func planOutputRead(n int, err error) outputReadPlan {
+	return outputReadPlan{
+		Process: shouldProcessOutputRead(n),
+		Stop:    shouldStopOutputRead(err),
+	}
+}
+
+// outputStoreWriteLogPlan is the pure run-output store write failure log gate.
+type outputStoreWriteLogPlan struct {
+	Log bool
+}
+
+// planOutputStoreWriteLog maps an outStore.Write error into the warn-log flag.
+func planOutputStoreWriteLog(err error) outputStoreWriteLogPlan {
+	return outputStoreWriteLogPlan{Log: shouldLogRunOutputStoreWriteFailure(err)}
+}
+
+// agentFailurePersistLogPlan is the pure CreateItem failure log gate.
+type agentFailurePersistLogPlan struct {
+	Log bool
+}
+
+// planAgentFailurePersistLog maps a CreateItem error into the warn-log flag.
+func planAgentFailurePersistLog(err error) agentFailurePersistLogPlan {
+	return agentFailurePersistLogPlan{Log: shouldLogAgentFailurePersistError(err)}
+}
+
+// runOutputCloseLogPlan is the pure finish-path outStore.Close failure log gate.
+type runOutputCloseLogPlan struct {
+	Log bool
+}
+
+// planRunOutputCloseLog maps an outStore.Close error into the warn-log flag.
+func planRunOutputCloseLog(err error) runOutputCloseLogPlan {
+	return runOutputCloseLogPlan{Log: shouldLogRunOutputStoreCloseFailure(err)}
+}
+
+// spawnSlotReservePlan is the pure registry presence gate before TryReserveSlot.
+type spawnSlotReservePlan struct {
+	Try bool
+}
+
+// planSpawnSlotReserve reports whether SpawnSubAgent should call TryReserveSlot.
+func planSpawnSlotReserve(hasRegistry bool) spawnSlotReservePlan {
+	return spawnSlotReservePlan{Try: shouldReserveSpawnSlot(hasRegistry)}
+}
+
+// spawnSlotRejectLogPlan is the pure spawn-slot rejection log gate.
+type spawnSlotRejectLogPlan struct {
+	Log bool
+}
+
+// planSpawnSlotRejectLog reports whether a rejected spawn slot should be warned.
+func planSpawnSlotRejectLog(err error) spawnSlotRejectLogPlan {
+	return spawnSlotRejectLogPlan{Log: shouldLogSpawnSlotRejection(err)}
+}
+
+// spawnSlotReleasePlan is the pure deferred DecrChildCount gate on spawn error paths.
+type spawnSlotReleasePlan struct {
+	Release bool
+}
+
+// planSpawnSlotRelease reports whether the deferred spawn cleanup should DecrChildCount.
+func planSpawnSlotRelease(err error, slotReserved bool) spawnSlotReleasePlan {
+	return spawnSlotReleasePlan{Release: shouldReleaseReservedSpawnSlot(err, slotReserved)}
+}
+
+// subAgentCreateLogPlan is the pure CreateRun failure log gate for SpawnSubAgent.
+type subAgentCreateLogPlan struct {
+	Log bool
+}
+
+// planSubAgentCreateLog reports whether a sub-agent CreateRun error should be logged.
+func planSubAgentCreateLog(err error) subAgentCreateLogPlan {
+	return subAgentCreateLogPlan{Log: shouldLogSubAgentCreateFailure(err)}
+}
+
+// subAgentRegisterPlan is the pure registry presence gate before Register.
+type subAgentRegisterPlan struct {
+	Register bool
+}
+
+// planSubAgentRegister reports whether SpawnSubAgent should Register a child instance.
+func planSubAgentRegister(hasRegistry bool) subAgentRegisterPlan {
+	return subAgentRegisterPlan{Register: shouldRegisterSubAgentInstance(hasRegistry)}
+}
+
+// stdinPipeOpenPlan is the pure adapter stdin pipe open gate.
+type stdinPipeOpenPlan struct {
+	Open bool
+}
+
+// planStdinPipeOpen reports whether StdinPipe should be opened for the resolved adapter.
+func planStdinPipeOpen(adapter adapters.AgentAdapter) stdinPipeOpenPlan {
+	return stdinPipeOpenPlan{Open: needsAdapterStdin(adapter)}
+}
