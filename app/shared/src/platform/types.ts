@@ -169,6 +169,44 @@ export interface TerminalPort {
   close(sessionId: TerminalSessionId): Promise<void>;
 }
 
+/** Workspace file-tree entry from a host port (never raw FS in the renderer). */
+export type WorkspaceFileEntry = {
+  path: string;
+  kind: 'file' | 'dir';
+  size?: number | undefined;
+};
+
+/** Workspace git status change (status codes like M/A/D/?). */
+export type WorkspaceGitChange = {
+  path: string;
+  status: string;
+};
+
+/** Workspace git log commit summary from a host port. */
+export type WorkspaceGitCommit = {
+  hash: string;
+  subject: string;
+  author?: string | undefined;
+  date?: string | undefined;
+};
+
+/**
+ * Typed host port for workspace file listing.
+ * Desktop/host fills this later; renderer must not call raw FS APIs.
+ */
+export interface WorkspaceFilesPort {
+  list?(rootHint?: string): Promise<WorkspaceFileEntry[]>;
+}
+
+/**
+ * Typed host port for workspace git changes + log.
+ * Desktop/host fills this later; no git binary in the renderer.
+ */
+export interface WorkspaceGitPort {
+  listChanges?(rootHint?: string): Promise<WorkspaceGitChange[]>;
+  listLog?(rootHint?: string, limit?: number): Promise<WorkspaceGitCommit[]>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
@@ -183,6 +221,16 @@ export interface AgentHubPlatform {
    * (typically Desktop with `capabilities.localTerminal === true`). No PTY ownership here.
    */
   terminal?: TerminalPort | undefined;
+  /**
+   * Optional workspace file-tree host. Present when Desktop/local host can list workspace files.
+   * Web keeps this omitted; renderer never opens raw FS.
+   */
+  workspaceFiles?: WorkspaceFilesPort | undefined;
+  /**
+   * Optional workspace git host for changes + commit log.
+   * Web keeps this omitted; renderer never shells out to git.
+   */
+  workspaceGit?: WorkspaceGitPort | undefined;
   /** Agent activity state for the streaming status bar. */
   agentActivity?: AgentActivitySnapshot;
 }
