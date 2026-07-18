@@ -259,6 +259,21 @@
   --elevated-card-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
   --elevated-card-shadow-strong: 0 14px 36px rgba(0, 0, 0, 0.2);
 
+  /* Frosted-glass material recipe (theme pairs override fill/shadow in themes.css) */
+  --glass-blur-sm: 12px;
+  --glass-blur-md: 20px;
+  --glass-blur-lg: 28px;
+  --glass-blur-xl: 40px;
+  --glass-saturate: 160%;
+  --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
+  --glass-elev-1: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --glass-elev-2: 0 10px 28px rgba(0, 0, 0, 0.12);
+  --glass-elev-3: 0 18px 48px rgba(0, 0, 0, 0.16);
+  --glass-card-bg: var(--glass-panel);
+  --glass-card-border: var(--glass-border);
+  --glass-card-shadow: var(--glass-elev-2);
+  --glass-card-radius: var(--radius-xl, 0.75rem);
+
   /* Light page fill (light-theme opaque panels) */
   --glass-light-fill: rgba(250, 250, 251, 0.92);
 

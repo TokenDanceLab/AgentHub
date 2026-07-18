@@ -86,6 +86,27 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
     webAlias: '--radius-lg',
     mobileAlias: '--td-radius-control',
   },
+  {
+    alias: '--td-glass-blur',
+    intent: 'Frosted glass blur radius',
+    desktopValue: '28px',
+    webAlias: '--glass-blur-lg',
+    mobileAlias: '--td-glass-blur',
+  },
+  {
+    alias: '--td-glass-card',
+    intent: 'Frosted glass card fill',
+    desktopValue: 'rgba(255, 255, 255, 0.72)',
+    webAlias: '--glass-card-bg',
+    mobileAlias: '--td-glass-card',
+  },
+  {
+    alias: '--td-glass-elev',
+    intent: 'Glass card elevation shadow',
+    desktopValue: '0 10px 28px rgba(15, 23, 42, 0.08)',
+    webAlias: '--glass-elev-2',
+    mobileAlias: '--td-glass-elev',
+  },
 ] as const satisfies readonly GlassTokenAlias[];
 
 export const DESKTOP_GLASS_SURFACE_RULES = [
@@ -112,6 +133,12 @@ export const DESKTOP_GLASS_SURFACE_RULES = [
     label: 'Mobile touch targets',
     appliesTo: ['mobile', 'web'],
     rule: 'Phone-width controls must keep at least 44px touch targets and avoid horizontal overflow.',
+  },
+  {
+    id: 'frosted-glass-material',
+    label: 'Frosted glass material',
+    appliesTo: ['desktop', 'web', 'mobile'],
+    rule: 'Glass cards use --glass-card-* + --glass-backdrop-filter tokens (white frosted light / translucent frosted dark). Prefer Card variant="glass" over raw rgba/blur hardcodes.',
   },
 ] as const satisfies readonly DesignSurfaceRule[];
 
