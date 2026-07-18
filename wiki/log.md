@@ -39,3 +39,8 @@ Format:
 
 ## [2026-07-16] lint | risk label partial for 046/049
 - risks-open headings aligned with security-risk-register Partial mitigated.
+## 2026-07-19
+
+- Phase 64 closed (ms 85; PRs #1106–#1110): payloadRequests/transport/codex/mcp peels + hygiene.
+- Phase 65 open (ms 86; #1111–#1115): orchestrator / surfacing / parser_ndjson / httpserver + MASTER hygiene.
+
