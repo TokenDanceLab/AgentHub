@@ -244,10 +244,16 @@ describe('workbenchFramePartsHelpers', () => {
       const onNavigatePage = vi.fn();
       const settingsService = { getSettings: vi.fn() };
       const localCliDiscovery = { status: 'idle' };
+      const onRefreshSessionImport = vi.fn();
       const props = buildWorkbenchRoutesProps({
         activePage: 'agents' as any,
         settingsService: settingsService as any,
         localCliDiscovery: localCliDiscovery as any,
+        sessionImportItems: [],
+        sessionImportLoading: false,
+        sessionImportError: null,
+        sessionImportVisible: false,
+        onRefreshSessionImport,
         onAgentProfileOpen: onAgentProfileOpen as any,
         onNavigatePage,
       });
@@ -255,6 +261,9 @@ describe('workbenchFramePartsHelpers', () => {
       expect(props.activePage).toBe('agents');
       expect(props.settingsService).toBe(settingsService);
       expect(props.localCliDiscovery).toBe(localCliDiscovery);
+      expect(props.sessionImportItems).toEqual([]);
+      expect(props.sessionImportVisible).toBe(false);
+      expect(props.onRefreshSessionImport).toBe(onRefreshSessionImport);
       expect(props.onAgentProfileOpen).toBe(onAgentProfileOpen);
       expect(props.onNavigatePage).toBe(onNavigatePage);
       expect('agents' in props).toBe(false);
@@ -286,6 +295,11 @@ describe('workbenchFramePartsHelpers', () => {
         userDisplayName: 'User',
         settingsService: { getSettings: vi.fn() } as any,
         localCliDiscovery: { status: 'idle' } as any,
+        sessionImportItems: [{ id: 's1', runtime: 'codex' }],
+        sessionImportLoading: true,
+        sessionImportError: null,
+        sessionImportVisible: true,
+        onRefreshSessionImport: vi.fn(),
         onAgentProfileOpen: vi.fn() as any,
         onNavigatePage: vi.fn(),
       });

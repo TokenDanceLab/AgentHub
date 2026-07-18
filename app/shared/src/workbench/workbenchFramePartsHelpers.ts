@@ -154,6 +154,11 @@ export function buildWorkbenchRoutesProps(
   const routesProps: WorkbenchRoutesProps = {
     activePage: props.activePage,
     localCliDiscovery: props.localCliDiscovery,
+    sessionImportItems: props.sessionImportItems,
+    sessionImportLoading: props.sessionImportLoading,
+    sessionImportError: props.sessionImportError,
+    sessionImportVisible: props.sessionImportVisible,
+    onRefreshSessionImport: props.onRefreshSessionImport,
     settingsService: props.settingsService,
     onAgentProfileOpen: props.onAgentProfileOpen,
     onNavigatePage: props.onNavigatePage,

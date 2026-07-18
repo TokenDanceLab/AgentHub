@@ -49,6 +49,11 @@ export function WorkbenchRoutes({
   onStartConversation,
   contactsActions,
   localCliDiscovery,
+  sessionImportItems,
+  sessionImportLoading,
+  sessionImportError,
+  sessionImportVisible,
+  onRefreshSessionImport,
   documentsActions,
   modelCatalog,
   ccSwitchStatus,
@@ -161,6 +166,11 @@ export function WorkbenchRoutes({
         <WorkbenchSettingsRouteView
           settingsRoute={settingsRoute}
           localCliDiscovery={localCliDiscovery}
+          sessionImportItems={sessionImportItems}
+          sessionImportLoading={sessionImportLoading}
+          sessionImportError={sessionImportError}
+          sessionImportVisible={sessionImportVisible}
+          onRefreshSessionImport={onRefreshSessionImport}
           userDisplayName={userDisplayName}
           onOpenAgentConfig={handleOpenAgentConfig}
         />
