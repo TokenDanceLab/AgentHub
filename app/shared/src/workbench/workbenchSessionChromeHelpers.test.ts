@@ -13,6 +13,7 @@ import {
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
+  shouldLoadSessionImport,
 } from './workbenchSessionChromeHelpers';
 
 function conversation(id: string): WorkbenchConversation {
@@ -209,6 +210,39 @@ describe('workbenchSessionChromeHelpers', () => {
       activePage: 'settings',
       surface: 'desktop',
       hasLocalCliDiscovery: false,
+    })).toBe(false);
+  });
+
+  it('loads session import only on desktop settings with localEdge host port', () => {
+    expect(shouldLoadSessionImport({
+      activePage: 'settings',
+      surface: 'desktop',
+      localEdge: true,
+      hasListRuntimeSessions: true,
+    })).toBe(true);
+    expect(shouldLoadSessionImport({
+      activePage: 'chat',
+      surface: 'desktop',
+      localEdge: true,
+      hasListRuntimeSessions: true,
+    })).toBe(false);
+    expect(shouldLoadSessionImport({
+      activePage: 'settings',
+      surface: 'web',
+      localEdge: true,
+      hasListRuntimeSessions: true,
+    })).toBe(false);
+    expect(shouldLoadSessionImport({
+      activePage: 'settings',
+      surface: 'desktop',
+      localEdge: false,
+      hasListRuntimeSessions: true,
+    })).toBe(false);
+    expect(shouldLoadSessionImport({
+      activePage: 'settings',
+      surface: 'desktop',
+      localEdge: true,
+      hasListRuntimeSessions: false,
     })).toBe(false);
   });
 

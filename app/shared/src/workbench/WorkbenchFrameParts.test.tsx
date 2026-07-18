@@ -94,6 +94,11 @@ function sessionMock(overrides: Record<string, unknown> = {}) {
     inspectorRunResult: null,
     settingsService: { getSettings: vi.fn(), setSettings: vi.fn() },
     localCliDiscovery: { status: 'idle' },
+    sessionImportItems: [],
+    sessionImportLoading: false,
+    sessionImportError: null,
+    sessionImportVisible: false,
+    refreshSessionImport: vi.fn(),
     selectConversation: vi.fn(),
     workspaceRef: { current: null },
     handleToggleTheme: vi.fn(),
@@ -402,6 +407,11 @@ describe('WorkbenchFrameParts', () => {
           agents={[]}
           settingsService={session.settingsService as any}
           localCliDiscovery={session.localCliDiscovery as any}
+          sessionImportItems={session.sessionImportItems as any}
+          sessionImportLoading={session.sessionImportLoading as any}
+          sessionImportError={session.sessionImportError as any}
+          sessionImportVisible={session.sessionImportVisible as any}
+          onRefreshSessionImport={session.refreshSessionImport as any}
           onAgentProfileOpen={vi.fn() as any}
           onNavigatePage={vi.fn()}
         />,
@@ -417,6 +427,11 @@ describe('WorkbenchFrameParts', () => {
           agents={[]}
           settingsService={session.settingsService as any}
           localCliDiscovery={session.localCliDiscovery as any}
+          sessionImportItems={session.sessionImportItems as any}
+          sessionImportLoading={session.sessionImportLoading as any}
+          sessionImportError={session.sessionImportError as any}
+          sessionImportVisible={session.sessionImportVisible as any}
+          onRefreshSessionImport={session.refreshSessionImport as any}
           onAgentProfileOpen={vi.fn() as any}
           onNavigatePage={vi.fn()}
         />,
@@ -447,6 +462,11 @@ describe('WorkbenchFrameParts', () => {
           documentsActions={undefined}
           settingsService={session.settingsService as any}
           localCliDiscovery={session.localCliDiscovery as any}
+          sessionImportItems={session.sessionImportItems as any}
+          sessionImportLoading={session.sessionImportLoading as any}
+          sessionImportError={session.sessionImportError as any}
+          sessionImportVisible={session.sessionImportVisible as any}
+          onRefreshSessionImport={session.refreshSessionImport as any}
           onAgentProfileOpen={vi.fn() as any}
           onNavigatePage={vi.fn()}
         />,

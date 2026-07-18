@@ -13,6 +13,7 @@ export type {
   LocalCliRuntimeId,
   PreviewPort,
   RunPort,
+  RuntimeSessionSummary,
   SurfaceCapabilities,
   TerminalPort,
   TerminalResizePayload,

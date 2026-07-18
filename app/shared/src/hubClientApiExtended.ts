@@ -273,5 +273,4 @@ export function createHubClientExtendedApi(deps: HubClientExtendedApiDeps) {
     listTaskArtifacts: (taskId: string) =>
       request<HubAgentTaskArtifactList>(hubPayload.buildListTaskArtifactsPath(taskId)),
   };
-  };
 }

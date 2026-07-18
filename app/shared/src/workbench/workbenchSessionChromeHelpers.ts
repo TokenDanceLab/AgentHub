@@ -11,6 +11,7 @@ import type {
 import type {
   AgentHubPlatform,
   LocalCliDiscoveryManifest,
+  RuntimeSessionSummary,
   WorkbenchAgent,
   WorkbenchConversation,
 } from '../platform';
@@ -89,6 +90,12 @@ export interface WorkbenchSessionChrome {
   dismissedPinnedIds: Set<string>;
   setDismissedPinnedIds: Dispatch<SetStateAction<Set<string>>>;
   localCliDiscovery: LocalCliDiscoveryManifest | null;
+  /** Desktop settings: local runtime session import list (#1192). */
+  sessionImportItems: RuntimeSessionSummary[];
+  sessionImportLoading: boolean;
+  sessionImportError: string | null;
+  sessionImportVisible: boolean;
+  refreshSessionImport: () => void;
   reviewFileRequest: FileItem | null;
   searchOpen: boolean;
   setSearchOpen: Dispatch<SetStateAction<boolean>>;
@@ -232,6 +239,19 @@ export function shouldLoadLocalCliDiscovery(input: {
   return input.activePage === 'settings'
     && input.surface === 'desktop'
     && input.hasLocalCliDiscovery;
+}
+
+/** Runtime session import only loads on desktop settings with host + localEdge. */
+export function shouldLoadSessionImport(input: {
+  activePage: GlobalRailPage;
+  surface: string;
+  localEdge: boolean;
+  hasListRuntimeSessions: boolean;
+}): boolean {
+  return input.activePage === 'settings'
+    && input.surface === 'desktop'
+    && input.localEdge
+    && input.hasListRuntimeSessions;
 }
 
 /** Ctrl/Cmd+F search shortcut for chat page. */

@@ -70,6 +70,18 @@ export interface SettingsPageProps {
   designSystemValidation: string;
   /** Optional Desktop host CLI discovery status. */
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  /** Desktop-only local runtime session import list (#1192). */
+  sessionImportItems?: Array<{
+    runtime: string;
+    id: string;
+    title?: string;
+    updatedAt?: string;
+    sourceMode?: string;
+  }> | undefined;
+  sessionImportLoading?: boolean | undefined;
+  sessionImportError?: string | undefined;
+  sessionImportVisible?: boolean | undefined;
+  onRefreshSessionImport?: (() => void) | undefined;
   /** State strategy toggles. */
   stateStrategies: Record<'empty' | 'invalid' | 'missing', boolean>;
   /** Called when the user selects a different pane. */
