@@ -189,18 +189,29 @@ func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]Deliver
 
 // MarkDeliveryRetrying transitions a delivery to retrying status and increments
 // the attempt counter. Returns true if the retry should proceed, false if max
-// attempts have been exceeded (caller should move to dead-letter).
+// attempts have been exceeded (caller should move to dead-letter) or if this
+// worker lost the atomic claim to another concurrent retry worker.
+//
+// Claim is CAS on (delivery_id, active status, attempt_count): only one of
+// multi-worker / overlapping ticks can redispatch the same delivery_id (#1009).
 func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID string, lastError string) (shouldRetry bool, err error) {
 	rec, err := o.findOutboxByDeliveryID(ctx, deliveryID)
 	if err != nil {
 		return false, fmt.Errorf("find delivery for retry: %w", err)
 	}
+	return o.claimDeliveryRetrying(ctx, deliveryID, rec.TaskID, rec.AttemptCount, rec.MaxAttempts, lastError)
+}
 
-	active := deliveryoutbox.ActiveStatuses()
-	newAttempt := deliveryoutbox.NextAttempt(rec.AttemptCount)
-	if deliveryoutbox.ShouldDeadLetter(rec.AttemptCount, rec.MaxAttempts) {
-		// Move to dead-letter.
-		_, updateErr := o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
+// claimDeliveryRetrying performs the atomic outbox claim for a known attempt
+// snapshot (from find or from ScanRetryableDeliveries). expectedAttempt is the
+// CAS key — concurrent workers that observed the same attempt compete, and only
+// RowsAffected==1 may redispatch.
+func (o *DeliveryOutbox) claimDeliveryRetrying(ctx context.Context, deliveryID, taskID string, expectedAttempt, maxAttempts int, lastError string) (shouldRetry bool, err error) {
+	newAttempt := deliveryoutbox.NextAttempt(expectedAttempt)
+	if deliveryoutbox.ShouldDeadLetter(expectedAttempt, maxAttempts) {
+		// Move to dead-letter under the same CAS so two workers cannot both
+		// observe max-attempts and race the terminal transition.
+		rows, updateErr := o.claimOutboxRetry(ctx, deliveryID, expectedAttempt, map[string]interface{}{
 			"status":        DeliveryStatusDead,
 			"attempt_count": newAttempt,
 			"last_error":    deliveryoutbox.TruncateLastError(lastError),
@@ -209,18 +220,22 @@ func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID st
 		if updateErr != nil {
 			return false, fmt.Errorf("move to dead-letter: %w", updateErr)
 		}
+		if rows == 0 {
+			// Lost claim or already terminal/stale attempt — skip.
+			return false, nil
+		}
 		slog.Warn("delivery moved to dead-letter",
 			"delivery_id", deliveryID,
-			"task_id", rec.TaskID,
+			"task_id", taskID,
 			"attempts", newAttempt,
-			"max_attempts", rec.MaxAttempts,
+			"max_attempts", maxAttempts,
 			"last_error", lastError,
 		)
 		return false, nil
 	}
 
 	nextRetry := computeNextRetryAt(newAttempt)
-	_, err = o.updateOutboxByDeliveryID(ctx, deliveryID, active, map[string]interface{}{
+	rows, err := o.claimOutboxRetry(ctx, deliveryID, expectedAttempt, map[string]interface{}{
 		"status":        DeliveryStatusRetrying,
 		"attempt_count": newAttempt,
 		"last_error":    deliveryoutbox.TruncateLastError(lastError),
@@ -229,12 +244,20 @@ func (o *DeliveryOutbox) MarkDeliveryRetrying(ctx context.Context, deliveryID st
 	if err != nil {
 		return false, fmt.Errorf("mark delivery retrying: %w", err)
 	}
+	if rows != 1 {
+		// Another worker already claimed this delivery_id at this attempt.
+		slog.Debug("delivery retry claim lost",
+			"delivery_id", deliveryID,
+			"expected_attempt", expectedAttempt,
+		)
+		return false, nil
+	}
 
 	slog.Info("delivery scheduled for retry",
 		"delivery_id", deliveryID,
-		"task_id", rec.TaskID,
+		"task_id", taskID,
 		"attempt", newAttempt,
-		"max_attempts", rec.MaxAttempts,
+		"max_attempts", maxAttempts,
 		"next_retry_at", nextRetry.Format(time.RFC3339),
 	)
 	return true, nil
@@ -365,13 +388,15 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 	}
 
 	for _, rec := range records {
-		shouldRetry, err := o.MarkDeliveryRetrying(ctx, rec.DeliveryID, rec.LastError)
+		// Claim with the scan-time attempt_count so multi-worker ticks that
+		// observed the same snapshot compete on one CAS key (#1009).
+		shouldRetry, err := o.claimDeliveryRetrying(ctx, rec.DeliveryID, rec.TaskID, rec.AttemptCount, rec.MaxAttempts, rec.LastError)
 		if err != nil {
 			slog.Warn("failed to mark delivery retrying", "delivery_id", rec.DeliveryID, "error", err)
 			continue
 		}
 		if !shouldRetry {
-			// Moved to dead-letter by MarkDeliveryRetrying.
+			// Lost claim, moved to dead-letter, or already claimed by a peer.
 			continue
 		}
 
