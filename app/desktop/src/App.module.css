@@ -135,7 +135,7 @@
 [data-theme='dark'] .iconTooltip {
   border-color: transparent;
   background: var(--glass-panel);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 14px 32px var(--glass-shadow);
 }
 
 .iconTooltipHost:hover .iconTooltip,
@@ -511,7 +511,7 @@
 [data-theme='dark'] .workspace {
   background: var(--glass-panel);
   border-color: transparent;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 14px 36px var(--glass-shadow);
 }
 
 .workspaceWithRunCard {
@@ -782,7 +782,7 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--glass-border-subtle);
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.13);
+  box-shadow: 0 18px 48px var(--glass-shadow-subtle);
   transform-origin: top right;
   transition: opacity 0.18s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -792,7 +792,7 @@
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
   border-color: var(--glass-border);
-  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 24px 54px var(--glass-shadow);
 }
 
 .rightPanelOpen {
@@ -1243,12 +1243,12 @@
 
 .authModal {
   background:
-    linear-gradient(180deg, var(--glass-input-bg-hover), rgba(255,255,255,0.68)),
-    rgba(248, 249, 252, 0.92);
+    linear-gradient(180deg, var(--glass-input-bg-hover), var(--glass-panel)),
+    var(--glass-light-fill);
   border: 1px solid var(--glass-border-strong);
   border-radius: 16px;
   box-shadow:
-    0 18px 56px rgba(15,23,42,0.16),
+    0 18px 56px var(--glass-shadow-subtle),
     inset 0 1px 0 var(--glass-input-bg-hover);
   backdrop-filter: blur(28px) saturate(1.08);
   -webkit-backdrop-filter: blur(28px) saturate(1.08);
@@ -1261,7 +1261,7 @@
     linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg-subtle)),
     var(--glass-panel-strong);
   border-color: transparent;
-  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 56px var(--glass-shadow);
 }
 
 .sidebarBrand {

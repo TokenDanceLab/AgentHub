@@ -22,7 +22,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(10, 12, 18, 0.62);
+  background: var(--glass-shadow);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
