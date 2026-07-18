@@ -3,9 +3,11 @@ import { AppError } from './errors';
 import {
   DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,
+  applyDefaultHubRequestCatchEffects,
   applyDefaultJsonContentType,
   applyHubRequestCatchEffects,
   applyRefreshedBearerAuth,
+  applyTokenRefreshFailureReport,
   buildHubFetchInit,
   buildHubUrl,
   buildMultipartFetchInit,
@@ -17,6 +19,8 @@ import {
   createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
+  fetchHubJsonWithTimeout,
+  fetchHubMultipartWithTimeout,
   hasTokenRefreshHandler,
   isAbortError,
   isNetworkFetchTypeError,
@@ -32,6 +36,7 @@ import {
   resolveHubFetch,
   resolveHubRequestCatch,
   resolveHubTimeoutMs,
+  runUnauthorizedTokenRefreshRecovery,
   shouldAttemptTokenRefresh,
   shouldEnterTokenRefreshRecovery,
   shouldRetryWithRefreshedToken,
@@ -39,7 +44,7 @@ import {
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #1023)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -361,5 +366,129 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990)', ()
       }),
     ).toThrow();
     expect(logs.some((line) => line.includes('[HubClient]'))).toBe(true);
+  });
+
+  it('peels fetch-with-timeout + unauthorized refresh residual (#1023)', async () => {
+    const calls: Array<{ url: string; method?: string; hasAuth: boolean; body?: BodyInit | null }> =
+      [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({
+        url: String(input),
+        method: init?.method,
+        hasAuth: headers.get('Authorization') === 'Bearer tok-2',
+        body: init?.body ?? null,
+      });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+
+    const headers = new Headers({ Authorization: 'Bearer tok-1' });
+    await fetchHubJsonWithTimeout(
+      fetchImpl,
+      'https://hub.example.com/client/auth/me',
+      5_000,
+      { method: 'GET' },
+      headers,
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://hub.example.com/client/auth/me');
+    expect(calls[0]?.method).toBe('GET');
+
+    const formData = new FormData();
+    formData.set('hash', 'abc');
+    await fetchHubMultipartWithTimeout(
+      fetchImpl,
+      'https://hub.example.com/client/attachments',
+      5_000,
+      headers,
+      formData,
+    );
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.method).toBe('POST');
+    expect(calls[1]?.body).toBe(formData);
+
+    const logs: Array<{ prefix: string; err: unknown }> = [];
+    const reports: Array<{ error: Error; context: { path: string; context: 'token_refresh' } }> =
+      [];
+    applyTokenRefreshFailureReport(
+      planTokenRefreshFailureReport('/client/auth/me', 'refresh-boom'),
+      'refresh-boom',
+      {
+        logError: (prefix, err) => logs.push({ prefix, err }),
+        report: (error, context) => reports.push({ error, context }),
+      },
+    );
+    expect(logs).toEqual([
+      { prefix: '[HubClient] Token refresh failed', err: 'refresh-boom' },
+    ]);
+    expect(reports[0]?.context).toEqual({ path: '/client/auth/me', context: 'token_refresh' });
+
+    // non-401 → continue without calling refresh
+    const skip = await runUnauthorizedTokenRefreshRecovery({
+      status: 200,
+      onRefreshToken: async () => 'tok-2',
+      headers,
+      path: '/client/auth/me',
+      retry: async () => 'never',
+      logError: () => undefined,
+      report: () => undefined,
+    });
+    expect(skip).toEqual({ action: 'continue' });
+
+    // 401 + refresh → retry_result
+    const retried = await runUnauthorizedTokenRefreshRecovery({
+      status: 401,
+      onRefreshToken: async () => 'tok-2',
+      headers,
+      path: '/client/auth/me',
+      retry: async () => 'ok-retry',
+      logError: () => undefined,
+      report: () => undefined,
+    });
+    expect(retried).toEqual({ action: 'retry_result', value: 'ok-retry' });
+    expect(headers.get('Authorization')).toBe('Bearer tok-2');
+
+    // 401 + refresh throws → log/report then continue
+    const failLogs: Array<{ prefix: string; err: unknown }> = [];
+    const failReports: Array<{ error: Error; context: { path: string; context: 'token_refresh' } }> =
+      [];
+    const failed = await runUnauthorizedTokenRefreshRecovery({
+      status: 401,
+      onRefreshToken: async () => {
+        throw new Error('refresh-fail');
+      },
+      headers,
+      path: '/client/auth/me',
+      retry: async () => 'never',
+      logError: (prefix, err) => failLogs.push({ prefix, err }),
+      report: (error, context) => failReports.push({ error, context }),
+    });
+    expect(failed).toEqual({ action: 'continue' });
+    expect(failLogs[0]?.prefix).toBe('[HubClient] Token refresh failed');
+    expect(failReports[0]?.context).toEqual({
+      path: '/client/auth/me',
+      context: 'token_refresh',
+    });
+
+    // 401 + empty token → abort continue (no retry)
+    const aborted = await runUnauthorizedTokenRefreshRecovery({
+      status: 401,
+      onRefreshToken: async () => null,
+      headers,
+      path: '/client/auth/me',
+      retry: async () => 'never',
+      logError: () => undefined,
+      report: () => undefined,
+    });
+    expect(aborted).toEqual({ action: 'continue' });
+
+    const defaultErr = new AppError({ error: { code: 'X', message: 'm' } }, 500);
+    expect(() =>
+      applyDefaultHubRequestCatchEffects(defaultErr, {
+        timeoutMs: 1_000,
+        method: 'GET',
+        path: '/client/auth/me',
+      }),
+    ).toThrow(defaultErr);
   });
 });
