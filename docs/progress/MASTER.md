@@ -56,7 +56,7 @@
 | 59 | Residual peels + root layout research | #80 | closed (PRs #1048–#1052; #1047 ops-only) |
 | 60 | Residual peels + product polish continue | #81 | closed (PRs #1059–#1063; #1058 ops-only) |
 | 61 | Residual peels + design-token residual continue | #82 | closed (PRs #1072–#1082; 8/8 issues) |
-| 62 | Residual peels continue | #83 | active (PRs #1089–#1092) |
+| 62 | Residual peels continue | #83 | closed (PRs #1089–#1092; 4/4 issues) |
 
 ## Issue Mapping (summary)
 
@@ -71,7 +71,7 @@
 | #1042–#1047 Phase 59 | closed (PRs #1048–#1052) |
 | #1053–#1058 Phase 60 | closed (PRs #1059–#1063; #1058 ops-only) |
 | #1066–#1071 / #1075 / #1077 Phase 61 | closed (PRs #1072–#1082) |
-| #1084–#1087 Phase 62 | peels open (PRs #1089–#1092) |
+| #1084–#1087 Phase 62 | closed (PRs #1089–#1092) |
 
 ## Quick Status Commands
 
@@ -86,19 +86,18 @@ git worktree list
 - [x] Phase 0–59 (see earlier rows)
 - [x] Phase 60 residual peels + product polish (#1053–#1058 / PRs #1059–#1063)
 - [x] Phase 61 residual peels + design-token + hygiene (#1066–#1071 / #1075 / #1077 / PRs #1072–#1082)
-- [ ] Phase 62 residual peels continue (ms 83; PRs #1089–#1092)
+- [x] Phase 62 residual peels continue (ms 83; PRs #1089–#1092)
 
 ## Current Status
 
-**Active Phase**: Phase 62 — Residual peels continue (milestone 83; PRs #1089–#1092)
-**Active Tasks**: #1084 process_executor (PR #1089) · #1085 agent_dispatch (PR #1090) · #1086 hubClient (PR #1092) · #1087 delivery_outbox (PR #1091)
+**Active Phase**: Phase 62 closed — Residual peels (milestone 83; 4/4 closed)
+**Active Tasks**: None open
 **Blockers**: None
-**Stability note**: Phase 61 closed — PE 1126→1014 · agent_dispatch 786→608 · sqlite_store 709→461 · design-token #1070 · docs hygiene #1072–#1079
-**Phase 62 deltas**: process_executor 1014→90 (file-split into 7 companions) · agent_dispatch 608→384 (4 companions) · hubClient 526→327 (factory companion) · delivery_outbox 469→360 (retry companion)
+**Stability note**: All 62 phases closed. PE 1126→90 · agent_dispatch 786→384 · hubClient 671→327 · sqlite_store 709→461 · delivery_outbox 469→360
 **Production fact**: external ops SSOT only (server `projects/agenthub`; do not invent host labels in-repo)
-**Product tip**: last product code = peels #1084–#1087 (PRs #1089–#1092); latest: `git rev-parse --short origin/master`
+**Product tip**: latest `git rev-parse --short origin/master` = `4662b438`
 **Residual LOC band**: process_executor 90 · agent_dispatch 384 · hubClient 327 · sqlite_store 461 · delivery_outbox 360
-**Boundary map next residual**: sqlite_store (461) + remaining dispatch/service surface
+**Next**: sqlite_store (461) is largest remaining single file; dispatch/service residual surfaces
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/**` local scratch only, never SSOT (#428)
 
 ## Next Steps
@@ -113,7 +112,7 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | P60 closed; P61 closed (#1066–#1082); tip peels landed; Phase 62 open (ms 83) |
+| 2026-07-18 | lead | P60 closed; P61 closed (#1066–#1082); tip peels landed; Phase 62 closed (ms 83; #1084–#1087 → PRs #1089–#1092) |
 
 ## Completion notes
 
