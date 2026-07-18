@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAcceptFriendRequest,
   buildAcceptFriendRequestPath,
   buildAckRelayCommandPath,
+  buildAckRelayCommandRequest,
   buildAckTaskPath,
   buildAckTaskRequest,
+  buildAddAgentTeamMemberRequest,
+  buildAddAgentToSessionRequest,
   buildAddMessageReactionRequest,
   buildAddSessionMembersRequest,
   buildAgentProfilePath,
@@ -17,25 +21,46 @@ import {
   buildAttachmentFormData,
   buildAttachmentsPath,
   buildBlockContactPath,
+  buildBlockContactRequest,
   buildCancelAgentTaskPaths,
   buildChangePasswordFallback,
   buildChangePasswordFallbackPath,
   buildChangePasswordPath,
   buildChangePasswordPrimary,
   buildContactRemarkPath,
+  buildCreateAgentProfileRequest,
+  buildCreateAgentTeamRequest,
+  buildCreateCustomAgentRequest,
+  buildCreateDocumentRequest,
+  buildCreateExecutionTargetRequest,
   buildCreateGroupSessionPath,
+  buildCreateGroupSessionRequest,
   buildCreatePrivateSessionPath,
+  buildCreatePrivateSessionRequest,
+  buildCreateRelayCommandRequest,
+  buildCreateWorkspaceProjectRequest,
+  buildCreateWorkspaceProjectThreadRequest,
   buildCustomAgentPath,
   buildCustomAgentsPath,
   buildDecideTaskApprovalPath,
+  buildDecideTaskApprovalRequest,
   buildDecideTeamApprovalPath,
+  buildDecideTeamApprovalRequest,
+  buildDeleteAgentProfileRequest,
+  buildDeleteAgentTeamRequest,
+  buildDeleteCustomAgentRequest,
+  buildDeleteDocumentRequest,
+  buildDeleteExecutionTargetRequest,
   buildDeleteInit,
+  buildDeleteSessionRequest,
   buildDissolveSessionPath,
+  buildDissolveSessionRequest,
   buildDocumentPath,
   buildDocumentsPath,
   buildDoneTaskPath,
   buildDoneTaskRequest,
   buildEditMessagePath,
+  buildEditMessageRequest,
   buildExecutionTargetPath,
   buildExecutionTargetsPath,
   buildFailTaskPath,
@@ -53,6 +78,7 @@ import {
   buildJsonPostInit,
   buildJsonPutInit,
   buildLeaveSessionPath,
+  buildLeaveSessionRequest,
   buildListAgentProfilesPath,
   buildListAuditEventsPath,
   buildListContactsPath,
@@ -72,7 +98,9 @@ import {
   buildListWorkspaceProjectsPath,
   buildListWorkspaceProjectThreadMessagesPath,
   buildLoginPath,
+  buildLoginRequest,
   buildLogoutPath,
+  buildLogoutRequest,
   buildMarkNotificationReadPaths,
   buildMarkReadBody,
   buildMarkReadPath,
@@ -84,14 +112,17 @@ import {
   buildOidcAuthorizePath,
   buildOidcAuthorizeRequest,
   buildOidcCallbackPath,
+  buildOidcCallbackPathInit,
   buildOptionalJsonBody,
   buildPatchSettingsBody,
   buildPatchSettingsRequest,
   buildPingExecutionTargetPath,
+  buildPingExecutionTargetRequest,
   buildPinMessagePath,
   buildPinMessageRequest,
   buildPostInit,
   buildPostTeamRouteDecisionPath,
+  buildPostTeamRouteDecisionRequest,
   buildPostWithOptionalJsonBody,
   buildProbeAttachmentBody,
   buildProbeAttachmentPath,
@@ -100,27 +131,37 @@ import {
   buildReactionBody,
   buildReadAllNotificationsPaths,
   buildRecallMessagePath,
+  buildRecallMessageRequest,
   buildRefreshBody,
   buildRefreshPath,
   buildRefreshRequest,
   buildRegenerateAgentTaskPath,
+  buildRegenerateAgentTaskRequest,
   buildRegisterDevicePaths,
   buildRegisterPath,
+  buildRegisterRequest,
+  buildRejectFriendRequest,
   buildRejectFriendRequestPath,
   buildRelayCommandPath,
   buildRelayCommandsPath,
   buildRemarkBody,
   buildRemoveAgentTeamMemberPath,
+  buildRemoveAgentTeamMemberRequest,
   buildRemoveContactPath,
+  buildRemoveContactRequest,
   buildRemoveMessageReactionRequest,
   buildRemoveSessionMemberPath,
+  buildRemoveSessionMemberRequest,
   buildResolveTeamConflictPath,
+  buildResolveTeamConflictRequest,
   buildSearchMessagesPath,
   buildSearchSessionMessagesPath,
   buildSearchSessionsPath,
   buildSearchUserPath,
   buildSendFriendRequest,
+  buildSendMessageRequest,
   buildSendWorkspaceProjectThreadMessagePath,
+  buildSendWorkspaceProjectThreadMessageRequest,
   buildSessionAgentsPath,
   buildSessionIdBody,
   buildSessionInfoPath,
@@ -129,6 +170,7 @@ import {
   buildSessionPinsPath,
   buildSessionSettingsPath,
   buildSettingsPath,
+  buildStartTeamRunRequest,
   buildStreamTaskEventBody,
   buildStreamTaskEventRequest,
   buildStreamTaskPath,
@@ -145,9 +187,19 @@ import {
   buildTriggerAgentTaskBody,
   buildTriggerAgentTaskRequest,
   buildUnblockContactPath,
+  buildUnblockContactRequest,
   buildUnpinMessageRequest,
   buildUpdateContactRemarkRequest,
+  buildUpdateCustomAgentRequest,
+  buildUpdateDocumentRequest,
+  buildUpdateExecutionTargetRequest,
   buildUpdateProfilePath,
+  buildUpdateProfileRequest,
+  buildUpdateSessionInfoRequest,
+  buildUpdateSessionSettingsRequest,
+  buildUpdateAgentProfileRequest,
+  buildUpdateAgentTeamRequest,
+  buildUpdateWorkspaceProjectRequest,
   buildUploadAttachmentRequest,
   buildWorkspaceProjectPath,
   buildWorkspaceProjectsPath,
@@ -660,5 +712,226 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     expect(upload.path).toBe('/client/attachments');
     expect(upload.formData.get('hash')).toBe('hash-1');
     expect(upload.formData.get('original_name')).toBe('note.txt');
+  });
+
+  it('peels remaining path+init composites used by createHubClient (#1055)', () => {
+    expect(buildRegisterRequest({ username: 'u' })).toEqual({
+      path: '/client/auth/register',
+      init: { method: 'POST', body: JSON.stringify({ username: 'u' }) },
+    });
+    expect(buildLoginRequest({ username: 'u', password: 'p' })).toEqual({
+      path: '/client/auth/login',
+      init: { method: 'POST', body: JSON.stringify({ username: 'u', password: 'p' }) },
+    });
+    expect(buildLogoutRequest()).toEqual({
+      path: '/client/auth/logout',
+      init: { method: 'POST' },
+    });
+    expect(buildUpdateProfileRequest({ nickname: 'n' })).toEqual({
+      path: '/client/auth/profile',
+      init: { method: 'PUT', body: JSON.stringify({ nickname: 'n' }) },
+    });
+    expect(buildOidcCallbackPathInit({ code: 'c', state: 's' })).toEqual({
+      path: '/client/auth/oidc/callback',
+      init: { method: 'POST', body: JSON.stringify({ code: 'c', state: 's' }) },
+    });
+    expect(buildAcceptFriendRequest('req/1')).toEqual({
+      path: '/client/contacts/friend-requests/req%2F1/accept',
+      init: { method: 'POST' },
+    });
+    expect(buildRejectFriendRequest('req/1')).toEqual({
+      path: '/client/contacts/friend-requests/req%2F1/reject',
+      init: { method: 'POST' },
+    });
+    expect(buildRemoveContactRequest('friend/1')).toEqual({
+      path: '/client/contacts/friend%2F1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildBlockContactRequest('user/1')).toEqual({
+      path: '/client/contacts/user%2F1/block',
+      init: { method: 'POST' },
+    });
+    expect(buildUnblockContactRequest('user/1')).toEqual({
+      path: '/client/contacts/user%2F1/unblock',
+      init: { method: 'POST' },
+    });
+    expect(buildCreatePrivateSessionRequest({ peer_user_id: 'p1' })).toEqual({
+      path: '/client/sessions/private',
+      init: { method: 'POST', body: JSON.stringify({ peer_user_id: 'p1' }) },
+    });
+    expect(buildCreateGroupSessionRequest({ name: 'g' })).toEqual({
+      path: '/client/sessions/group',
+      init: { method: 'POST', body: JSON.stringify({ name: 'g' }) },
+    });
+    expect(buildRemoveSessionMemberRequest('sess/1', 'user/2')).toEqual({
+      path: '/client/sessions/sess%2F1/members/user%2F2',
+      init: { method: 'DELETE' },
+    });
+    expect(buildLeaveSessionRequest('sess/1')).toEqual({
+      path: '/client/sessions/sess%2F1/leave',
+      init: { method: 'POST' },
+    });
+    expect(buildDissolveSessionRequest('sess/1')).toEqual({
+      path: '/client/sessions/sess%2F1/dissolve',
+      init: { method: 'POST' },
+    });
+    expect(buildUpdateSessionInfoRequest('sess/1', { title: 't' })).toEqual({
+      path: '/client/sessions/sess%2F1/info',
+      init: { method: 'PUT', body: JSON.stringify({ title: 't' }) },
+    });
+    expect(buildUpdateSessionSettingsRequest('sess/1', { mute: true })).toEqual({
+      path: '/client/sessions/sess%2F1/settings',
+      init: { method: 'PUT', body: JSON.stringify({ mute: true }) },
+    });
+    expect(buildDeleteSessionRequest('sess/1')).toEqual({
+      path: '/client/sessions/sess%2F1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildSendMessageRequest('sess/1', { content: 'hi' })).toEqual({
+      path: '/client/sessions/sess%2F1/messages',
+      init: { method: 'POST', body: JSON.stringify({ content: 'hi' }) },
+    });
+    expect(buildRecallMessageRequest('msg/1')).toEqual({
+      path: '/client/messages/msg%2F1/recall',
+      init: { method: 'POST' },
+    });
+    expect(buildAddAgentToSessionRequest('sess/1', { agent_type: 'codex' })).toEqual({
+      path: '/client/sessions/sess%2F1/agents',
+      init: { method: 'POST', body: JSON.stringify({ agent_type: 'codex' }) },
+    });
+    expect(buildRegenerateAgentTaskRequest('task/1')).toEqual({
+      path: '/web/agent-tasks/task%2F1/regenerate',
+      init: { method: 'POST' },
+    });
+    expect(buildCreateExecutionTargetRequest({ name: 'edge' })).toEqual({
+      path: '/web/execution-targets',
+      init: { method: 'POST', body: JSON.stringify({ name: 'edge' }) },
+    });
+    expect(buildUpdateExecutionTargetRequest('t1', { name: 'edge-2' })).toEqual({
+      path: '/web/execution-targets/t1',
+      init: { method: 'PATCH', body: JSON.stringify({ name: 'edge-2' }) },
+    });
+    expect(buildDeleteExecutionTargetRequest('t1')).toEqual({
+      path: '/web/execution-targets/t1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildPingExecutionTargetRequest('t1')).toEqual({
+      path: '/web/execution-targets/t1:ping',
+      init: { method: 'POST' },
+    });
+    expect(buildCreateRelayCommandRequest({ command: 'ping' })).toEqual({
+      path: '/web/relay/commands',
+      init: { method: 'POST', body: JSON.stringify({ command: 'ping' }) },
+    });
+    expect(buildAckRelayCommandRequest('cmd/1')).toEqual({
+      path: '/web/relay/commands/cmd%2F1:ack',
+      init: { method: 'POST' },
+    });
+    expect(buildCreateCustomAgentRequest({ name: 'a' })).toEqual({
+      path: '/web/custom-agents',
+      init: { method: 'POST', body: JSON.stringify({ name: 'a' }) },
+    });
+    expect(buildUpdateCustomAgentRequest('a1', { name: 'b' })).toEqual({
+      path: '/web/custom-agents/a1',
+      init: { method: 'PUT', body: JSON.stringify({ name: 'b' }) },
+    });
+    expect(buildDeleteCustomAgentRequest('a1')).toEqual({
+      path: '/web/custom-agents/a1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildCreateWorkspaceProjectRequest({ name: 'p' })).toEqual({
+      path: '/web/projects',
+      init: { method: 'POST', body: JSON.stringify({ name: 'p' }) },
+    });
+    expect(buildUpdateWorkspaceProjectRequest('p1', { name: 'p2' })).toEqual({
+      path: '/web/projects/p1',
+      init: { method: 'PATCH', body: JSON.stringify({ name: 'p2' }) },
+    });
+    expect(buildCreateWorkspaceProjectThreadRequest('p1', { title: 't' })).toEqual({
+      path: '/web/projects/p1/threads',
+      init: { method: 'POST', body: JSON.stringify({ title: 't' }) },
+    });
+    expect(
+      buildSendWorkspaceProjectThreadMessageRequest('p1', 'th1', { content: 'hi' }),
+    ).toEqual({
+      path: '/web/projects/p1/threads/th1/messages',
+      init: { method: 'POST', body: JSON.stringify({ content: 'hi' }) },
+    });
+    expect(buildEditMessageRequest('msg/1', { content: 'edited' })).toEqual({
+      path: '/client/messages/msg%2F1',
+      init: { method: 'PUT', body: JSON.stringify({ content: 'edited' }) },
+    });
+    expect(buildCreateAgentTeamRequest({ name: 'team' })).toEqual({
+      path: '/web/agent-teams',
+      init: { method: 'POST', body: JSON.stringify({ name: 'team' }) },
+    });
+    expect(buildUpdateAgentTeamRequest('team/1', { name: 'team2' })).toEqual({
+      path: '/web/agent-teams/team%2F1',
+      init: { method: 'PUT', body: JSON.stringify({ name: 'team2' }) },
+    });
+    expect(buildDeleteAgentTeamRequest('team/1')).toEqual({
+      path: '/web/agent-teams/team%2F1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildAddAgentTeamMemberRequest('team/1', { member_id: 'm1' })).toEqual({
+      path: '/web/agent-teams/team%2F1/members',
+      init: { method: 'POST', body: JSON.stringify({ member_id: 'm1' }) },
+    });
+    expect(buildStartTeamRunRequest('team/1', { goal: 'g' })).toEqual({
+      path: '/web/agent-teams/team%2F1/runs',
+      init: { method: 'POST', body: JSON.stringify({ goal: 'g' }) },
+    });
+    expect(
+      buildDecideTeamApprovalRequest('team/1', 'run/1', 'ap/1', { decision: 'approve' }),
+    ).toEqual({
+      path: '/web/agent-teams/team%2F1/runs/run%2F1/approvals/ap%2F1/decide',
+      init: { method: 'POST', body: JSON.stringify({ decision: 'approve' }) },
+    });
+    expect(
+      buildResolveTeamConflictRequest('team/1', 'run/1', 'cf/1', { choice: 'a' }),
+    ).toEqual({
+      path: '/web/agent-teams/team%2F1/runs/run%2F1/conflicts/cf%2F1/resolve',
+      init: { method: 'POST', body: JSON.stringify({ choice: 'a' }) },
+    });
+    expect(buildCreateAgentProfileRequest({ name: 'prof' })).toEqual({
+      path: '/web/agent-profiles',
+      init: { method: 'POST', body: JSON.stringify({ name: 'prof' }) },
+    });
+    expect(buildUpdateAgentProfileRequest('prof1', { name: 'prof2' })).toEqual({
+      path: '/web/agent-profiles/prof1',
+      init: { method: 'PATCH', body: JSON.stringify({ name: 'prof2' }) },
+    });
+    expect(buildDeleteAgentProfileRequest('prof1')).toEqual({
+      path: '/web/agent-profiles/prof1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildCreateDocumentRequest({ title: 'doc' })).toEqual({
+      path: '/web/documents',
+      init: { method: 'POST', body: JSON.stringify({ title: 'doc' }) },
+    });
+    expect(buildUpdateDocumentRequest('doc1', { title: 'doc2' })).toEqual({
+      path: '/web/documents/doc1',
+      init: { method: 'PATCH', body: JSON.stringify({ title: 'doc2' }) },
+    });
+    expect(buildDeleteDocumentRequest('doc1')).toEqual({
+      path: '/web/documents/doc1',
+      init: { method: 'DELETE' },
+    });
+    expect(buildRemoveAgentTeamMemberRequest('team/1', 'mem/1')).toEqual({
+      path: '/web/agent-teams/team%2F1/members/mem%2F1',
+      init: { method: 'DELETE' },
+    });
+    expect(
+      buildPostTeamRouteDecisionRequest('team/1', 'run/1', { route: 'a' }),
+    ).toEqual({
+      path: '/web/agent-teams/team%2F1/runs/run%2F1/route-decisions',
+      init: { method: 'POST', body: JSON.stringify({ route: 'a' }) },
+    });
+    expect(
+      buildDecideTaskApprovalRequest('task/1', 'ap/1', { decision: 'approve' }),
+    ).toEqual({
+      path: '/web/agent-tasks/task%2F1/approvals/ap%2F1/decide',
+      init: { method: 'POST', body: JSON.stringify({ decision: 'approve' }) },
+    });
   });
 });
