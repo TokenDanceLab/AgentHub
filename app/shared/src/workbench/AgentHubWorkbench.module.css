@@ -601,6 +601,21 @@
   container-type: inline-size;
 }
 
+/* Glass canvas depth — subtle tinted overlay for chat/transcript surfaces. */
+.workspace::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 640px 360px at 50% 44%,
+    var(--glass-panel, transparent) 0%,
+    transparent 78%
+  );
+  opacity: 0.42;
+}
+
 .workspace[data-mode='workbench'] {
   grid-template-rows: minmax(0, 1fr);
   background: var(--surface);
@@ -617,8 +632,10 @@
   min-width: 0;
   min-height: 44px;
   padding: 6px 18px;
-  border-bottom: 1px solid var(--bdr);
-  background: color-mix(in srgb, var(--surface) 86%, var(--app-bg));
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-panel, color-mix(in srgb, var(--surface) 86%, var(--app-bg)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .mainchainTrack {
@@ -790,13 +807,18 @@
 
 /* ── Workspace Header ── */
 .workspaceHeader {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   gap: var(--sp-10);
   min-height: 72px;
   padding: 10px 18px 8px;
-  border-bottom: 1px solid var(--bdr);
-  background: var(--surface);
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-panel, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -1005,12 +1027,14 @@
   display: grid;
   gap: var(--sp-sm);
   padding: 12px 22px 20px;
-  border-top: none;
+  border-top: 1px solid var(--glass-border, transparent);
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--app-bg) 86%, transparent) 0,
-    var(--app-bg) 24px
+    var(--glass-panel, color-mix(in srgb, var(--app-bg) 86%, transparent)) 0,
+    var(--app-bg) 28px
   );
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   pointer-events: none;
 }
 
@@ -1025,12 +1049,16 @@
   width: min(100%, 880px);
   margin: 0 auto;
   padding: var(--sp-xxs) var(--space-md);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface-low);
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   font: var(--caption);
   color: var(--text-2);
-  transition: background var(--dur-normal) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .replyToLabel {
@@ -1076,12 +1104,16 @@
   width: min(100%, 880px);
   margin: 0 auto;
   padding: var(--sp-xxs) var(--space-md);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface-low);
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   font: var(--caption);
   color: var(--text-2);
-  transition: background var(--dur-normal) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .quoteBarLabel {
@@ -1132,14 +1164,22 @@
   min-height: 56px;
   margin: 0 auto;
   padding: var(--sp-10) var(--sp-14) var(--sp-10) var(--sp-md);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border-strong, var(--bdr));
   border-radius: var(--r-xl);
-  background: var(--surface);
-  box-shadow: var(--e-3);
+  background: var(--glass-panel-strong, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-2);
   transition:
     width var(--dur-panel) var(--ease-panel),
     box-shadow var(--dur-normal) var(--ease),
-    border-color var(--dur-normal) var(--ease);
+    border-color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.composerRow:focus-within {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--glass-elev-2), 0 0 0 3px var(--ring);
 }
 
 .shell[data-inspector-collapsed='true'] .composerRow {
@@ -2567,4 +2607,25 @@
   border-right: 0;
   border-bottom: 0;
   box-shadow: none;
+}
+
+/* ═══ Reduced motion: soften blur on main-column glass surfaces ═══ */
+@media (prefers-reduced-motion: reduce) {
+  .workspace::before {
+    opacity: 0.18;
+  }
+
+  .workspaceHeader,
+  .composer,
+  .replyToBar,
+  .quoteBar,
+  .mainchainStrip {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .composerRow {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
 }

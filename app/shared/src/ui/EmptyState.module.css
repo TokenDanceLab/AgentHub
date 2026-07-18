@@ -5,7 +5,7 @@
   justify-content: flex-start;
   max-width: 560px;
   margin: 0 auto;
-  padding: 120px var(--wb-gap-md, var(--space-md, 1rem)) var(--space-xl, 1.5rem);
+  padding: var(--wb-gap-3xl, 120px) var(--wb-gap-md, var(--space-md, 1rem)) var(--space-xl, 1.5rem);
   color: var(--foreground);
   text-align: center;
   user-select: none;
