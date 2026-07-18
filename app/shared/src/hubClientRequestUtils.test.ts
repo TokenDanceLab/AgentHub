@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from './errors';
 import {
+  invokePathFormDataUpload,
+  invokePathInitRequest,
+  invokePathsInitRequest,
   isRouteFallbackError,
   normalizeRegisterDeviceRequest,
   qs,
@@ -12,7 +15,7 @@ import {
   unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990)', () => {
+describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -166,5 +169,65 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990)', () => {
         { path: '/client/auth/password', init: { method: 'PUT', body: '{}' } },
       ),
     ).rejects.toBe(server);
+  });
+
+  it('peels path+init / path+formData / paths+init invokers (#1023)', async () => {
+    const requestCalls: Array<{ path: string; method?: string }> = [];
+    const value = await invokePathInitRequest(
+      async (path, init) => {
+        const call: { path: string; method?: string } = { path };
+        if (init.method !== undefined) {
+          call.method = init.method;
+        }
+        requestCalls.push(call);
+        return 'ok' as const;
+      },
+      { path: '/client/auth/refresh', init: { method: 'POST', body: '{}' } },
+    );
+    expect(value).toBe('ok');
+    expect(requestCalls).toEqual([{ path: '/client/auth/refresh', method: 'POST' }]);
+
+    const form = new FormData();
+    form.set('hash', 'h1');
+    const uploadCalls: Array<{ path: string; hash: FormDataEntryValue | null }> = [];
+    const uploaded = await invokePathFormDataUpload(
+      async (path, formData) => {
+        uploadCalls.push({ path, hash: formData.get('hash') });
+        return { id: 'a1' } as const;
+      },
+      { path: '/client/attachments', formData: form },
+    );
+    expect(uploaded).toEqual({ id: 'a1' });
+    expect(uploadCalls).toEqual([{ path: '/client/attachments', hash: 'h1' }]);
+
+    // exactOptional: omit options entirely when init is undefined
+    const fallbackCalls: Array<{ paths: readonly string[]; hasOptions: boolean }> = [];
+    await invokePathsInitRequest(
+      async (paths, options) => {
+        fallbackCalls.push({
+          paths,
+          hasOptions: options !== undefined,
+        });
+        return undefined;
+      },
+      ['/a:route', '/a/route'],
+    );
+    expect(fallbackCalls).toEqual([{ paths: ['/a:route', '/a/route'], hasOptions: false }]);
+
+    await invokePathsInitRequest(
+      async (paths, options) => {
+        fallbackCalls.push({
+          paths,
+          hasOptions: options !== undefined,
+        });
+        return undefined;
+      },
+      ['/a:route', '/a/route'],
+      { method: 'POST' },
+    );
+    expect(fallbackCalls[1]).toEqual({
+      paths: ['/a:route', '/a/route'],
+      hasOptions: true,
+    });
   });
 });

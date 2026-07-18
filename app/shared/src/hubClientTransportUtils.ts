@@ -3,7 +3,7 @@
  * Extracted from hubClient.ts (#810) — pure only; control flow stays in createHubClient.
  */
 
-import { AppError } from './errors';
+import { AppError, reportApiError } from './errors';
 
 export const DEFAULT_HUB_TIMEOUT_MS = 30_000;
 
@@ -522,4 +522,104 @@ export function applyHubRequestCatchEffects(
     deps.report(effects.report.error, effects.report.context);
   }
   throw effects.error;
+}
+
+// ── Residual pure peels (#1023) ───────────────────────────────────────────────
+
+/** JSON/auth fetch under abort timeout (request primary + refresh retry residual). */
+export async function fetchHubJsonWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeoutMs: number,
+  options: RequestInit,
+  headers: Headers,
+): Promise<Response> {
+  return withHubAbortTimeout(timeoutMs, (signal) =>
+    fetchImpl(url, buildHubFetchInit(options, headers, signal)),
+  );
+}
+
+/** Multipart POST fetch under abort timeout (uploadMultipart residual). */
+export async function fetchHubMultipartWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeoutMs: number,
+  headers: Headers,
+  formData: FormData,
+): Promise<Response> {
+  return withHubAbortTimeout(timeoutMs, (signal) =>
+    fetchImpl(url, buildMultipartFetchInit(headers, formData, signal)),
+  );
+}
+
+/** Apply planned token-refresh failure log/report residual (no throw). */
+export function applyTokenRefreshFailureReport(
+  report: {
+    logPrefix: string;
+    error: Error;
+    context: { path: string; context: 'token_refresh' };
+  },
+  refreshErr: unknown,
+  deps: {
+    logError: (prefix: string, err: unknown) => void;
+    report: (error: Error, context: { path: string; context: 'token_refresh' }) => void;
+  },
+): void {
+  deps.logError(report.logPrefix, refreshErr);
+  deps.report(report.error, report.context);
+}
+
+/**
+ * Residual 401 recovery peel: optionally refresh once, then retry via injected runner.
+ * Side-effect sinks (onRefreshToken, retry, log/report) stay injected.
+ */
+export type UnauthorizedRefreshResult<T> =
+  | { action: 'retry_result'; value: T }
+  | { action: 'continue' };
+
+export async function runUnauthorizedTokenRefreshRecovery<T>(args: {
+  status: number;
+  onRefreshToken?: (() => Promise<string | null>) | null | undefined;
+  headers: Headers;
+  path: string;
+  retry: () => Promise<T>;
+  logError: (prefix: string, err: unknown) => void;
+  report: (error: Error, context: { path: string; context: 'token_refresh' }) => void;
+}): Promise<UnauthorizedRefreshResult<T>> {
+  if (!shouldEnterTokenRefreshRecovery(args.status, args.onRefreshToken)) {
+    return { action: 'continue' };
+  }
+
+  try {
+    const retryPlan = planRefreshedTokenRetry(await args.onRefreshToken!());
+    if (retryPlan.action === 'retry') {
+      applyRefreshedBearerAuth(args.headers, retryPlan.token);
+      return { action: 'retry_result', value: await args.retry() };
+    }
+  } catch (refreshErr) {
+    applyTokenRefreshFailureReport(
+      planTokenRefreshFailureReport(args.path, refreshErr),
+      refreshErr,
+      {
+        logError: args.logError,
+        report: args.report,
+      },
+    );
+  }
+
+  return { action: 'continue' };
+}
+
+/**
+ * Default request-catch residual for createHubClient: plan + log/report + rethrow.
+ * Keeps console/report sinks collocated so createHubClient catch stays one line.
+ */
+export function applyDefaultHubRequestCatchEffects(
+  error: unknown,
+  ctx: HubRequestCatchContext,
+): never {
+  applyHubRequestCatchEffects(planHubRequestCatchEffects(error, ctx), {
+    logError: (message) => console.error(message),
+    report: (err, context) => reportApiError(err, context),
+  });
 }

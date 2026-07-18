@@ -105,6 +105,47 @@ export async function runChangePasswordWithFallback(
   }
 }
 
+// ── Residual pure peels (#1023) ───────────────────────────────────────────────
+
+/**
+ * Residual path+init invoker for createHubClient methods that already build
+ * `{ path, init }` composites. Keeps method bodies one-liners.
+ */
+export function invokePathInitRequest<T>(
+  request: (path: string, init: RequestInit) => Promise<T>,
+  built: { path: string; init: RequestInit },
+): Promise<T> {
+  return request(built.path, built.init);
+}
+
+/**
+ * Residual path+formData invoker for multipart upload builders.
+ */
+export function invokePathFormDataUpload<T>(
+  upload: (path: string, formData: FormData) => Promise<T>,
+  built: { path: string; formData: FormData },
+): Promise<T> {
+  return upload(built.path, built.formData);
+}
+
+/**
+ * Residual dual-route invoker when path list + init are prebuilt.
+ * exactOptional-safe: options only forwarded when defined.
+ */
+export function invokePathsInitRequest<T>(
+  requestWithFallback: (
+    paths: readonly string[],
+    options?: RequestInit,
+  ) => Promise<T>,
+  paths: readonly string[],
+  init?: RequestInit,
+): Promise<T> {
+  if (init === undefined) {
+    return requestWithFallback(paths);
+  }
+  return requestWithFallback(paths, init);
+}
+
 export function normalizeRegisterDeviceRequest(
   body: HubRegisterDeviceRequest,
 ): HubRegisterDeviceRequest & {

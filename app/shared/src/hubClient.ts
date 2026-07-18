@@ -89,24 +89,21 @@ import type {
 import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
+  invokePathFormDataUpload,
+  invokePathInitRequest,
   normalizeRegisterDeviceRequest,
   runChangePasswordWithFallback,
   runRequestWithRouteFallback,
 } from './hubClientRequestUtils';
 import {
-  applyHubRequestCatchEffects,
-  applyRefreshedBearerAuth,
-  buildHubFetchInit,
-  buildMultipartFetchInit,
+  applyDefaultHubRequestCatchEffects,
+  fetchHubJsonWithTimeout,
+  fetchHubMultipartWithTimeout,
   normalizeHubBaseUrl,
-  planHubRequestCatchEffects,
-  planRefreshedTokenRetry,
-  planTokenRefreshFailureReport,
   prepareHubRequestContextFromClient,
   prepareMultipartUploadContextFromClient,
   resolveHubFetch,
-  shouldEnterTokenRefreshRecovery,
-  withHubAbortTimeout,
+  runUnauthorizedTokenRefreshRecovery,
 } from './hubClientTransportUtils';
 
 // ── Public type / envelope re-exports (extracted #810) ──
@@ -129,34 +126,34 @@ export function createHubClient(opts: HubClientOptions = {}) {
     });
 
     try {
-      const response = await withHubAbortTimeout(timeoutMs, (signal) =>
-        fetchImpl(url, buildHubFetchInit(options, headers, signal)),
+      const response = await fetchHubJsonWithTimeout(
+        fetchImpl,
+        url,
+        timeoutMs,
+        options,
+        headers,
       );
 
       // ── Token refresh recovery on 401 ──────────────────
-      if (shouldEnterTokenRefreshRecovery(response.status, opts.onRefreshToken)) {
-        try {
-          const retryPlan = planRefreshedTokenRetry(await opts.onRefreshToken!());
-          if (retryPlan.action === 'retry') {
-            applyRefreshedBearerAuth(headers, retryPlan.token);
-            const retryResponse = await withHubAbortTimeout(timeoutMs, (signal) =>
-              fetchImpl(url, buildHubFetchInit(options, headers, signal)),
-            );
-            return await parseHubSuccessResponse<T>(retryResponse);
-          }
-        } catch (refreshErr) {
-          const report = planTokenRefreshFailureReport(path, refreshErr);
-          console.error(report.logPrefix, refreshErr);
-          reportApiError(report.error, report.context);
-        }
+      const recovery = await runUnauthorizedTokenRefreshRecovery({
+        status: response.status,
+        onRefreshToken: opts.onRefreshToken,
+        headers,
+        path,
+        retry: async () =>
+          parseHubSuccessResponse<T>(
+            await fetchHubJsonWithTimeout(fetchImpl, url, timeoutMs, options, headers),
+          ),
+        logError: (prefix, err) => console.error(prefix, err),
+        report: (error, context) => reportApiError(error, context),
+      });
+      if (recovery.action === 'retry_result') {
+        return recovery.value;
       }
 
       return await parseHubSuccessResponse<T>(response);
     } catch (error) {
-      applyHubRequestCatchEffects(planHubRequestCatchEffects(error, { timeoutMs, method, path }), {
-        logError: (message) => console.error(message),
-        report: (err, context) => reportApiError(err, context),
-      });
+      applyDefaultHubRequestCatchEffects(error, { timeoutMs, method, path });
     }
   }
 
@@ -179,10 +176,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
       token: opts.getToken?.(),
       timeoutMs: opts.timeoutMs,
     });
-    const response = await withHubAbortTimeout(timeoutMs, (signal) =>
-      fetchImpl(url, buildMultipartFetchInit(headers, formData, signal)),
+    return parseHubSuccessResponse<T>(
+      await fetchHubMultipartWithTimeout(fetchImpl, url, timeoutMs, headers, formData),
     );
-    return parseHubSuccessResponse<T>(response);
   }
 
   return {
@@ -192,10 +188,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<{ user_id: string }>(hubPayload.buildRegisterPath(), hubPayload.buildJsonPostInit(body)),
     login: (body: HubLoginRequest) =>
       request<HubAuthResponse>(hubPayload.buildLoginPath(), hubPayload.buildJsonPostInit(body)),
-    refresh: (refreshToken: string) => {
-      const req = hubPayload.buildRefreshRequest(refreshToken);
-      return request<HubAuthResponse>(req.path, req.init);
-    },
+    refresh: (refreshToken: string) =>
+      invokePathInitRequest((path, init) => request<HubAuthResponse>(path, init), hubPayload.buildRefreshRequest(refreshToken)),
     logout: () => request<void>(hubPayload.buildLogoutPath(), hubPayload.buildPostInit()),
     me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
@@ -206,10 +200,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildChangePasswordPrimary(body),
         hubPayload.buildChangePasswordFallback(body),
       ),
-    oidcAuthorize: (body: HubOidcAuthorizeRequest) => {
-      const req = hubPayload.buildOidcAuthorizeRequest(body);
-      return request<HubOidcAuthorizeResponse>(req.path, req.init);
-    },
+    oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
+      invokePathInitRequest((path, init) => request<HubOidcAuthorizeResponse>(path, init), hubPayload.buildOidcAuthorizeRequest(body)),
     oidcCallback: (body: HubOidcCallbackRequest) =>
       request<HubOidcCallbackResponse>(
         hubPayload.buildOidcCallbackPath(),
@@ -219,10 +211,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
     listContacts: () => request<HubContactInfo[]>(hubPayload.buildListContactsPath()),
-    sendFriendRequest: (friendId: string, message?: string) => {
-      const req = hubPayload.buildSendFriendRequest(friendId, message);
-      return request<void>(req.path, req.init);
-    },
+    sendFriendRequest: (friendId: string, message?: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildSendFriendRequest(friendId, message)),
     listFriendRequests: () =>
       request<HubFriendRequest[]>(hubPayload.buildFriendRequestsPath()),
     acceptFriendRequest: (requestId: string) =>
@@ -244,10 +234,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<void>(hubPayload.buildBlockContactPath(targetUserId), hubPayload.buildPostInit()),
     unblockContact: (targetUserId: string) =>
       request<void>(hubPayload.buildUnblockContactPath(targetUserId), hubPayload.buildPostInit()),
-    updateContactRemark: (friendUserId: string, remark: string) => {
-      const req = hubPayload.buildUpdateContactRemarkRequest(friendUserId, remark);
-      return request<void>(req.path, req.init);
-    },
+    updateContactRemark: (friendUserId: string, remark: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateContactRemarkRequest(friendUserId, remark)),
 
     listSessions: () => request<HubSession[]>(hubPayload.buildListSessionsPath()),
     searchSessions: (q: string) =>
@@ -262,10 +250,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildCreateGroupSessionPath(),
         hubPayload.buildJsonPostInit(body),
       ),
-    addSessionMembers: (sessionId: string, memberIds: string[]) => {
-      const req = hubPayload.buildAddSessionMembersRequest(sessionId, memberIds);
-      return request<void>(req.path, req.init);
-    },
+    addSessionMembers: (sessionId: string, memberIds: string[]) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAddSessionMembersRequest(sessionId, memberIds)),
     removeSessionMember: (sessionId: string, userId: string) =>
       request<void>(
         hubPayload.buildRemoveSessionMemberPath(sessionId, userId),
@@ -273,10 +259,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
     leaveSession: (sessionId: string) =>
       request<void>(hubPayload.buildLeaveSessionPath(sessionId), hubPayload.buildPostInit()),
-    transferSessionOwnership: (sessionId: string, newOwnerId: string) => {
-      const req = hubPayload.buildTransferSessionOwnershipRequest(sessionId, newOwnerId);
-      return request<void>(req.path, req.init);
-    },
+    transferSessionOwnership: (sessionId: string, newOwnerId: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildTransferSessionOwnershipRequest(sessionId, newOwnerId)),
     dissolveSession: (sessionId: string) =>
       request<void>(hubPayload.buildDissolveSessionPath(sessionId), hubPayload.buildPostInit()),
     updateSessionInfo: (
@@ -311,24 +295,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       params?: { after_seq?: number; limit?: number },
     ) => request<HubMessage[]>(hubPayload.buildSyncMessagesPath(sessionId, params)),
-    markRead: (sessionId: string, lastReadSeq: number) => {
-      const req = hubPayload.buildMarkReadRequest(sessionId, lastReadSeq);
-      return request<void>(req.path, req.init);
-    },
+    markRead: (sessionId: string, lastReadSeq: number) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildMarkReadRequest(sessionId, lastReadSeq)),
     recallMessage: (messageId: string) =>
       request<void>(hubPayload.buildRecallMessagePath(messageId), hubPayload.buildPostInit()),
-    pinMessage: (messageId: string, sessionId: string) => {
-      const req = hubPayload.buildPinMessageRequest(messageId, sessionId);
-      return request<void>(req.path, req.init);
-    },
-    unpinMessage: (messageId: string, sessionId: string) => {
-      const req = hubPayload.buildUnpinMessageRequest(messageId, sessionId);
-      return request<void>(req.path, req.init);
-    },
-    forwardMessage: (messageId: string, targetSessionIds: string[]) => {
-      const req = hubPayload.buildForwardMessageRequest(messageId, targetSessionIds);
-      return request<void>(req.path, req.init);
-    },
+    pinMessage: (messageId: string, sessionId: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildPinMessageRequest(messageId, sessionId)),
+    unpinMessage: (messageId: string, sessionId: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUnpinMessageRequest(messageId, sessionId)),
+    forwardMessage: (messageId: string, targetSessionIds: string[]) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildForwardMessageRequest(messageId, targetSessionIds)),
     listPinnedMessages: (sessionId: string) =>
       request<HubMessage[]>(hubPayload.buildSessionPinsPath(sessionId)),
     searchMessages: (params: {
@@ -365,22 +341,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildRegisterDevicePaths(),
         hubPayload.buildJsonPostInit(normalizeRegisterDeviceRequest(body)),
       ),
-    ackTask: (taskId: string, runId?: string) => {
-      const req = hubPayload.buildAckTaskRequest(taskId, runId);
-      return request<void>(req.path, req.init);
-    },
-    streamTask: (taskId: string, content: string, runId?: string) => {
-      const req = hubPayload.buildStreamTaskRequest(taskId, content, runId);
-      return request<void>(req.path, req.init);
-    },
-    doneTask: (taskId: string, finalContent?: string, runId?: string) => {
-      const req = hubPayload.buildDoneTaskRequest(taskId, finalContent, runId);
-      return request<void>(req.path, req.init);
-    },
-    failTask: (taskId: string, error: string, runId?: string) => {
-      const req = hubPayload.buildFailTaskRequest(taskId, error, runId);
-      return request<void>(req.path, req.init);
-    },
+    ackTask: (taskId: string, runId?: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAckTaskRequest(taskId, runId)),
+    streamTask: (taskId: string, content: string, runId?: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildStreamTaskRequest(taskId, content, runId)),
+    doneTask: (taskId: string, finalContent?: string, runId?: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDoneTaskRequest(taskId, finalContent, runId)),
+    failTask: (taskId: string, error: string, runId?: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildFailTaskRequest(taskId, error, runId)),
 
     addAgentToSession: (
       sessionId: string,
@@ -390,10 +358,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildSessionAgentsPath(sessionId),
         hubPayload.buildJsonPostInit(body),
       ),
-    triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) => {
-      const req = hubPayload.buildTriggerAgentTaskRequest(triggerMessageId, options);
-      return request<HubAgentTask>(req.path, req.init);
-    },
+    triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
+      invokePathInitRequest((path, init) => request<HubAgentTask>(path, init), hubPayload.buildTriggerAgentTaskRequest(triggerMessageId, options)),
     cancelAgentTask: (taskId: string) =>
       requestWithFallback<void>(
         hubPayload.buildCancelAgentTaskPaths(taskId),
@@ -529,19 +495,15 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildJsonPutInit(body),
       ),
 
-    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) => {
-      const req = hubPayload.buildAddMessageReactionRequest(messageId, sessionId, reaction);
-      return request<undefined>(req.path, req.init);
-    },
+    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildAddMessageReactionRequest(messageId, sessionId, reaction)),
 
     removeMessageReaction: (
       messageId: string,
       sessionId: string,
       reaction: { emoji: string },
-    ) => {
-      const req = hubPayload.buildRemoveMessageReactionRequest(messageId, sessionId, reaction);
-      return request<undefined>(req.path, req.init);
-    },
+    ) =>
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildRemoveMessageReactionRequest(messageId, sessionId, reaction)),
 
     listMessageReactions: (messageId: string, sessionId: string) =>
       request<Record<string, unknown>[]>(
@@ -647,22 +609,19 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     fetchSettings: () => request<Record<string, string>>(hubPayload.buildSettingsPath()),
 
-    patchSettings: (values: Record<string, string>) => {
-      const req = hubPayload.buildPatchSettingsRequest(values);
-      return request<Record<string, string>>(req.path, req.init);
-    },
+    patchSettings: (values: Record<string, string>) =>
+      invokePathInitRequest(
+        (path, init) => request<Record<string, string>>(path, init),
+        hubPayload.buildPatchSettingsRequest(values),
+      ),
 
     /** Check if an attachment with the given SHA-256 hash already exists. */
-    probeAttachment: (hash: string) => {
-      const req = hubPayload.buildProbeAttachmentRequest(hash);
-      return request<HubProbeAttachmentResponse>(req.path, req.init);
-    },
+    probeAttachment: (hash: string) =>
+      invokePathInitRequest((path, init) => request<HubProbeAttachmentResponse>(path, init), hubPayload.buildProbeAttachmentRequest(hash)),
 
     /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
-    uploadAttachment: (file: File, hash: string) => {
-      const req = hubPayload.buildUploadAttachmentRequest(file, hash);
-      return uploadMultipart<HubAttachmentRef>(req.path, req.formData);
-    },
+    uploadAttachment: (file: File, hash: string) =>
+      invokePathFormDataUpload((path, formData) => uploadMultipart<HubAttachmentRef>(path, formData), hubPayload.buildUploadAttachmentRequest(file, hash)),
 
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
@@ -712,10 +671,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       eventType: string,
       payload: unknown,
       options: HubAgentTaskStreamEventOptions = {},
-    ) => {
-      const req = hubPayload.buildStreamTaskEventRequest(taskId, eventType, payload, options);
-      return request<undefined>(req.path, req.init);
-    },
+    ) =>
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildStreamTaskEventRequest(taskId, eventType, payload, options)),
 
     // ── T3.4 web task approvals/artifacts ──
     listTaskApprovals: (taskId: string) =>
