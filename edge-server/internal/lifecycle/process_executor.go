@@ -282,7 +282,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				return
 			case <-time.After(e.shutdownGracePeriod):
 			}
-			if err := signalProcessGraceful(proc); err != nil {
+			if err := signalProcessGraceful(proc); planProcessSignalLog(err).Log {
 				slog.Debug("process: graceful signal failed", "run_id", runID, "error", err)
 			}
 			select {
@@ -290,7 +290,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				return
 			case <-time.After(e.shutdownForceTimeout):
 			}
-			if err := killProcessTree(proc); err != nil {
+			if err := killProcessTree(proc); planProcessSignalLog(err).Log {
 				slog.Debug("process: force kill failed", "run_id", runID, "error", err)
 			}
 			// run() also Wait()s; a second Wait is best-effort reaping only.
@@ -332,7 +332,7 @@ func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, pro
 	if !planWatchProcessKill(graceActive).Kill {
 		return
 	}
-	if err := killProcessTree(proc); err != nil {
+	if err := killProcessTree(proc); planProcessSignalLog(err).Log {
 		slog.Debug("process: timeout kill failed", "run_id", runID, "error", err)
 	}
 }
@@ -374,7 +374,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Preflight check: if the adapter implements PreflightAdapter, verify
 	// it is properly configured (e.g. API keys, credentials) before launching
 	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
-	if preflight, ok := asPreflightAdapter(adapter); ok {
+	if preflight, ok := asPreflightAdapter(adapter); planPreflightAdapter(ok).Check {
 		err := preflight.PreflightCheck()
 		if planPreflightFailure(err).Fail {
 			slog.Warn("process: adapter preflight check failed", "runId", run.ID, "agentId", runCtx.AgentID, "error", err)
@@ -726,10 +726,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			go e.run(newCtx, run, runCtx)
 			return
 		}
-		// Max retries reached — emit escalation exhausted event.
-		e.bus.Publish("run.fault_escalation.exhausted", runScope(run),
-			faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
-		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
+		// Max retries reached — emit escalation exhausted event (#867).
+		if exhausted := planFaultEscalationExhausted(); exhausted.Publish {
+			e.bus.Publish("run.fault_escalation.exhausted", runScope(run),
+				faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
+			if exhausted.Log {
+				slog.Warn("process: fault escalation exhausted", "runId", run.ID)
+			}
+		}
 	}
 	// Report the last error (terminal failure after retries exhausted or disabled).
 	if planTerminalWaitFailure(lastWaitErr).Publish {
@@ -797,10 +801,11 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
 	content, contentOK := trimAgentFailureContent(content)
 	repository, repoOK := asAgentFailureRepository(e.store)
-	if !contentOK || !repoOK {
-		return
+	exists := false
+	if planPersistAgentFailureGate(contentOK, repoOK).ScanExists {
+		exists = hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)
 	}
-	if !planPersistAgentFailure(true, true, hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)).Proceed {
+	if !planPersistAgentFailure(contentOK, repoOK, exists).Proceed {
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
@@ -857,10 +862,8 @@ func (e *ProcessExecutor) finish(runID string) {
 	// under that ID — children are keyed ParentID=parentRunID (#1001).
 	// Preserve #867 terminalFinish, #987 hubOutputs, #988 Cancel grace path.
 	if plan.Cascade {
-		for _, childRunID := range e.agentRegistry.ShutdownCascade(runID) {
-			if !shouldCancelCascadeChild(runID, childRunID) {
-				continue
-			}
+		// Pure filter keeps #1001 self/empty skip; Cancel side-effects stay here.
+		for _, childRunID := range filterCascadeCancelChildren(runID, e.agentRegistry.ShutdownCascade(runID)) {
 			e.Cancel(childRunID)
 		}
 	}
@@ -922,13 +925,10 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	e.mu.Unlock()
 
 	var inst *agents.AgentInstance
-	if e.agentRegistry != nil && mappingFound {
+	if planSubAgentInstanceLookup(e.agentRegistry != nil, mappingFound).Lookup {
 		inst, _ = e.agentRegistry.Get(agentID)
 	}
-	parentID := ""
-	if inst != nil {
-		parentID = inst.ParentID
-	}
+	parentID := parentIDFromAgentInstance(inst)
 	plan := planSubAgentResultDelivery(
 		e.agentRegistry != nil, e.messageQueue != nil, mappingFound, inst != nil, parentID, status, e.resultAgg != nil,
 	)
@@ -1055,8 +1055,8 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		reserveErr = e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth)
 	}
 	slotReserved, reject := evaluateSpawnSlotReservation(reservePlan.Try, reserveErr)
-	if reject != nil {
-		if planSpawnSlotRejectLog(reject).Log {
+	if rejectPlan := planSpawnSlotReject(reject); rejectPlan.Reject {
+		if rejectPlan.Log {
 			slog.Warn("spawn slot rejected", "parentRunId", parentRun.ID, "taskId", task.TaskID, "depth", task.Depth, "error", reject)
 		}
 		return "", "", reject
@@ -1096,9 +1096,9 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	if planSubAgentRegister(e.agentRegistry != nil).Register {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
 		regErr := e.agentRegistry.Register(inst)
-		var logFailure bool
-		registered, logFailure = evaluateSubAgentRegistration(true, regErr)
-		if logFailure {
+		outcome := planSubAgentRegistrationOutcome(regErr)
+		registered = outcome.Registered
+		if outcome.LogFailure {
 			slog.Warn("failed to register sub-agent instance in registry", "agentInstanceId", agentInstanceID, "error", regErr)
 		}
 	}
@@ -1106,25 +1106,11 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// Emit run.queued
 	e.bus.Publish("run.queued", runScope(run), run)
 
-	// Build run context with the task prompt, target agent, and an isolated
-	// context budget allocated from the parent via AllocateChild.
-	// The child budget is independent - it does NOT reference the parent's
-	// UsedTokens counter, so the child's token consumption never pollutes
-	// the parent's budget tracking.
-	runCtx := newSubAgentRunContext(run, task, threadID)
-
-	// Inject AgentHub memory into the sub-agent run so it has persistent context.
-	// Mirror the same logic as the PostRuns handler in api/handlers.go.
-	// The parent's workDir is looked up from the executor's tracking map.
+	// Parent workDir lookup stays here; pure runCtx composition is buildSubAgentRunContext.
 	e.mu.Lock()
 	parentWorkDir := e.workDirs[parentRun.ID]
 	e.mu.Unlock()
-	runCtx = applyParentWorkDirMemory(runCtx, parentWorkDir, threadID, task.AgentID)
-
-	// Inject sibling context so the sub-agent knows about other agents working
-	// in parallel. This prevents file conflicts when multiple sub-agents modify
-	// the same workspace concurrently.
-	runCtx.AppendSystemPrompt = withSiblingSystemPrompt(runCtx.AppendSystemPrompt, task.SiblingAgents)
+	runCtx := buildSubAgentRunContext(run, task, threadID, parentWorkDir)
 
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
@@ -1132,7 +1118,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Unlock()
 
 	// Start the run
-	if startErr := e.Start(run, runCtx); startErr != nil {
+	if startErr := e.Start(run, runCtx); planSpawnStartLog(startErr).Log {
 		slog.Error("failed to start sub-agent run", "runId", runID, "error", startErr)
 		cleanup := planSpawnStartFailureCleanup(startErr, registered, slotReserved)
 		if cleanup.ClearMapping {
