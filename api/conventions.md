@@ -83,8 +83,8 @@ REST 错误使用统一 envelope：
 - `message` 使用英文，不含内部路径、密钥、主机名或用户数据。
 - `traceId` 可通过 `X-Request-ID` 串联请求链路。
 - 共享错误码定义在 `pkg/errcode/codes.go`；Edge/Hub 域码分别由各自 `internal/errcode/codes.go` 扩展。
-- Hub 当前成功响应仍是 `{"code":"OK","data":{...}}`；Edge 成功响应返回裸 JSON 对象或数组。统一成功响应格式属于后续兼容性任务。
-- 前端解析入口是 `app/shared/src/errors.ts` 的 `parseError()`。
+- Hub 成功 envelope 的 wire 值是 **小写** `ok`：`{"code":"ok","data":{...}}`（`hub-server/internal/errcode.OK.Code`，经 `handler.OK` 写出）。这不是 HTTP 状态文案，也不是 Edge 成功形状——Edge 成功响应返回裸 JSON 对象或数组。OpenAPI 中 Hub success 的 `code` enum 与此对齐为 `ok`；历史上部分文档/fixture 写过 `"OK"`。共享客户端对成功码大小写不敏感（`isHubSuccessCode`）仅作解析容错，**不是**双 wire 契约。统一 Hub/Edge 成功响应格式属于后续兼容性任务。
+- 前端解析入口是 `app/shared/src/errors.ts` 的 `parseError()`；Hub envelope 解包见 `app/shared/src/hubClientEnvelope.ts`。
 
 ## Permissions
 

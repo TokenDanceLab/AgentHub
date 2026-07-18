@@ -15,6 +15,8 @@ type Response struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
+// OK writes Hub success envelope {"code":"ok","data":...}.
+// Wire success code is lowercase "ok" (errcode.OK.Code), not HTTP "OK".
 func OK(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
 		Code: errcode.OK.Code,
