@@ -2959,3 +2959,114 @@ func TestProcessExecutorStartWithRunTimeoutCancelsSlowRun(t *testing.T) {
 		}
 	}
 }
+
+// TestProcessExecutorParentFinishCascadesCancelToChildRunIDs verifies #1001:
+// parent terminal finish must cascade Cancel to sub-agent process runIDs.
+// Children are registered under agentInstanceID with ParentID=parentRunID, so
+// ShutdownCascade must discover them by ParentID and Cancel those runIDs.
+func TestProcessExecutorParentFinishCascadesCancelToChildRunIDs(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	parent := newExecutorTestRun(t, s)
+	child, err := s.CreateRun("run_child_"+testID(t), parent.ProjectID, parent.ThreadID)
+	if err != nil {
+		t.Fatalf("CreateRun child: %v", err)
+	}
+
+	reg := agents.NewRegistry()
+	// Mirror SpawnSubAgent: child agentInstanceID != parentRunID; ParentID is
+	// the parent run ID. Parent itself is not necessarily registered.
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "agent_" + child.ID,
+		AdapterID: "worker",
+		ParentID:  parent.ID,
+		RunID:     child.ID,
+		Status:    agents.StatusBusy,
+	})
+
+	executor := newTestProcessExecutor(t, bus, s, "sleep")
+	executor.WithAgentRegistry(reg)
+	// Short grace so the cancelled child settles quickly under CI.
+	executor.mu.Lock()
+	executor.shutdownGracePeriod = 50 * time.Millisecond
+	executor.shutdownForceTimeout = 50 * time.Millisecond
+	executor.mu.Unlock()
+
+	_, ch, _ := bus.Subscribe(0)
+
+	if err := executor.Start(parent, RunProcessContext{}); err != nil {
+		t.Fatalf("Start parent: %v", err)
+	}
+	if err := executor.Start(child, RunProcessContext{}); err != nil {
+		t.Fatalf("Start child: %v", err)
+	}
+
+	// Wait until both processes are tracked so Cancel has a grace path.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		executor.mu.Lock()
+		parentProc := executor.processes[parent.ID]
+		childProc := executor.processes[child.ID]
+		executor.mu.Unlock()
+		if parentProc != nil && childProc != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for parent/child processes to be tracked")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Parent process finishes (success helper would exit immediately; here we
+	// Cancel the parent so finish() runs with a registry cascade). Using Cancel
+	// exercises the same finish() path as natural completion (#867 terminalFinish).
+	if result := executor.Cancel(parent.ID); !result.Found {
+		t.Fatalf("Cancel parent result = %#v, want found", result)
+	}
+
+	var parentDone, childCancelled bool
+	timeout := time.After(10 * time.Second)
+	for !parentDone || !childCancelled {
+		select {
+		case evt := <-ch:
+			switch evt.Type {
+			case "run.cancelled", "run.finished", "run.failed":
+				runID, _ := evt.Scope["runId"].(string)
+				if runID == parent.ID && (evt.Type == "run.cancelled" || evt.Type == "run.finished" || evt.Type == "run.failed") {
+					parentDone = true
+				}
+				if runID == child.ID && evt.Type == "run.cancelled" {
+					childCancelled = true
+				}
+			}
+		case <-timeout:
+			t.Fatalf("timeout waiting cascade: parentDone=%v childCancelled=%v", parentDone, childCancelled)
+		}
+	}
+
+	// Child registry node must be disconnected by ShutdownCascade.
+	inst, ok := reg.Get("agent_" + child.ID)
+	if !ok {
+		t.Fatal("child agent missing from registry after cascade")
+	}
+	if inst.Status != agents.StatusDisconnected {
+		t.Fatalf("child agent status = %s, want disconnected", inst.Status)
+	}
+
+	// Child run should land in cancelled (Cancel path) rather than remain running.
+	stored, ok := s.GetRun(child.ID)
+	if !ok {
+		t.Fatal("child run missing from store")
+	}
+	if stored.Status != "cancelled" && stored.Status != "cancelling" {
+		// Allow brief race before store settles to cancelled.
+		deadline = time.Now().Add(3 * time.Second)
+		for stored.Status != "cancelled" && time.Now().Before(deadline) {
+			time.Sleep(20 * time.Millisecond)
+			stored, _ = s.GetRun(child.ID)
+		}
+		if stored.Status != "cancelled" {
+			t.Fatalf("child run status = %q, want cancelled", stored.Status)
+		}
+	}
+}

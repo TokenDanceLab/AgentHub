@@ -54,32 +54,32 @@ const (
 type Status string
 
 const (
-	StatusOnline        Status = "online"
-	StatusBusy          Status = "busy"
-	StatusIdle          Status = "idle"
-	StatusError         Status = "error"
-	StatusWaitingInput  Status = "waiting_for_input"
-	StatusDraining      Status = "draining"
-	StatusCompleted     Status = "completed"
-	StatusDisconnected  Status = "disconnected"
+	StatusOnline       Status = "online"
+	StatusBusy         Status = "busy"
+	StatusIdle         Status = "idle"
+	StatusError        Status = "error"
+	StatusWaitingInput Status = "waiting_for_input"
+	StatusDraining     Status = "draining"
+	StatusCompleted    Status = "completed"
+	StatusDisconnected Status = "disconnected"
 )
 
 // AgentInstance represents a running agent tracked by the registry.
 // It corresponds to a spawned agent process or a registered adapter.
 type AgentInstance struct {
-	ID          string    `json:"id"`
-	AdapterID   string    `json:"adapterId"`
-	Name        string    `json:"name"`
-	Status      Status    `json:"status"`
-	RunID       string    `json:"runId,omitempty"`
-	ThreadID    string    `json:"threadId,omitempty"`
-	ParentID    string    `json:"parentId,omitempty"` // orchestrator that spawned this agent
-	Depth       int       `json:"depth"`              // delegation depth (root=0)
-	AgentPath   string    `json:"agentPath"`          // tree path like "/orchestrator/reviewer"
-	Role        string    `json:"role,omitempty"`     // agent's assigned role
-	LastSeen    time.Time `json:"lastSeen"`
-	CreatedAt   time.Time `json:"createdAt"`
-	Error       string    `json:"error,omitempty"`
+	ID        string    `json:"id"`
+	AdapterID string    `json:"adapterId"`
+	Name      string    `json:"name"`
+	Status    Status    `json:"status"`
+	RunID     string    `json:"runId,omitempty"`
+	ThreadID  string    `json:"threadId,omitempty"`
+	ParentID  string    `json:"parentId,omitempty"` // orchestrator that spawned this agent
+	Depth     int       `json:"depth"`              // delegation depth (root=0)
+	AgentPath string    `json:"agentPath"`          // tree path like "/orchestrator/reviewer"
+	Role      string    `json:"role,omitempty"`     // agent's assigned role
+	LastSeen  time.Time `json:"lastSeen"`
+	CreatedAt time.Time `json:"createdAt"`
+	Error     string    `json:"error,omitempty"`
 }
 
 // Registry tracks active agent instances and provides query/status operations.
@@ -509,33 +509,87 @@ func (r *Registry) CanSpawn(parentID string, childDepth int) error {
 	return nil
 }
 
-// ShutdownCascade recursively marks the given agent and all its descendants as
-// StatusDisconnected. This implements the Codex AgentTree pattern where closing
-// a parent agent terminates the entire subtree.
-func (r *Registry) ShutdownCascade(rootID string) {
+// ShutdownCascade recursively marks the agent tree rooted at rootID as
+// StatusDisconnected and returns descendant run IDs for process cancellation.
+//
+// rootID may be either:
+//   - a parent run ID (SpawnSubAgent registers children with ParentID=parentRunID
+//     under a distinct agentInstanceID), or
+//   - an agent instance ID (instance-keyed trees / tests).
+//
+// The root agent does not need to be registered under rootID: children are
+// always discovered by ParentID match. Nested spawns set ParentID to the
+// immediate parent's run ID, so recursion follows each child's RunID (and also
+// its instance ID for instance-keyed trees).
+//
+// This implements the Codex AgentTree pattern where closing a parent agent
+// terminates the entire subtree (#1001).
+func (r *Registry) ShutdownCascade(rootID string) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.shutdownTree(rootID)
+	return dedupeNonEmpty(r.shutdownTree(rootID, make(map[string]struct{})))
 }
 
 // shutdownTree is the recursive worker for ShutdownCascade. Caller must hold
-// r.mu write lock.
-func (r *Registry) shutdownTree(id string) {
-	inst, ok := r.agents[id]
-	if !ok {
-		return
+// r.mu write lock. Returns run IDs of disconnected descendants (not the root).
+// visited guards against ParentID cycles and dual RunID/instance-ID walks.
+func (r *Registry) shutdownTree(id string, visited map[string]struct{}) []string {
+	if id == "" {
+		return nil
 	}
-	inst.Status = StatusDisconnected
-	inst.LastSeen = time.Now()
+	if _, seen := visited[id]; seen {
+		return nil
+	}
+	visited[id] = struct{}{}
 
-	// Collect child IDs first to avoid modifying the map while iterating.
+	// Mark the agent registered under this ID when present. Missing root is
+	// intentional for parent-run-ID cascade (children key ParentID=runID).
+	if inst, ok := r.agents[id]; ok {
+		inst.Status = StatusDisconnected
+		inst.LastSeen = time.Now()
+	}
+
+	// Collect child instance IDs first to avoid modifying the map while iterating.
 	var children []string
 	for childID, child := range r.agents {
 		if child.ParentID == id {
 			children = append(children, childID)
 		}
 	}
+
+	var runIDs []string
 	for _, childID := range children {
-		r.shutdownTree(childID)
+		child := r.agents[childID]
+		child.Status = StatusDisconnected
+		child.LastSeen = time.Now()
+		if child.RunID != "" {
+			runIDs = append(runIDs, child.RunID)
+			// Nested SpawnSubAgent sets ParentID to this child's run ID.
+			runIDs = append(runIDs, r.shutdownTree(child.RunID, visited)...)
+		}
+		// Instance-keyed trees (and any ParentID=instanceID linkage).
+		runIDs = append(runIDs, r.shutdownTree(childID, visited)...)
 	}
+	return runIDs
+}
+
+// dedupeNonEmpty preserves first-seen order while dropping empty strings and
+// duplicates from cascade run-ID collection.
+func dedupeNonEmpty(ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
