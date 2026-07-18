@@ -15,6 +15,7 @@
     "test:e2e:stubbed-hub": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts web-stubbed-hub-replay-smoke.spec.ts task-contract.spec.ts",
     "test:e2e:approved-real-stub": "pnpm test:e2e:stubbed-hub",
     "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
+    "visual:qa:shell": "node scripts/visual-qa-shell.mjs",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
