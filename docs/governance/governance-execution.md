@@ -1,6 +1,6 @@
 # AgentHub 治理执行
 
-最后更新：2026-06-27
+最后更新：2026-07-18
 
 本文件将 TokenDance 系统治理映射为 AgentHub 执行项。AgentHub 是多 Agent 协作平台；它是 TokenDance ID 的 relying party，拥有 Hub、Edge、Desktop、Web 和 Mobile 客户端。
 
@@ -19,13 +19,13 @@
 
 | 队列 ID | 本地负责区域 | 需检查的本地文件/文档 | 最低完成证据 |
 |---|---|---|---|
-| TD-P0-HUB-01 | Hub OIDC 登录 | `hub-server/internal/handler/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`hub-server/internal/service/auth.go` | 仓库级 handler/service 测试覆盖 callback、非法 issuer/audience、`tokendance_sub` 映射、Hub access/refresh session、UUID device proof 测试完成；关闭前需提供发布分支证明、部署回调/客户端注册证明、刷新/登出冒烟测试 |
-| TD-P0-CLIENT-01 | Desktop/Web 登录 | `app/desktop/src/`、`app/web/src/`、`app/desktop/src-tauri/` | Desktop/Web token/用户元数据限制在 tab 作用域的 `sessionStorage` 内；Web 生产代码守卫为 Hub-only；WS 路由测试接受 Hub 签发的 token 并拒绝升级前的 TokenDance bearer；剩余：登录/登出截图、发布分支 WS 认证冒烟测试、部署配置、Web server-owned session 姿态 |
-| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | `/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等性、`card.action.trigger` 3s 响应、无 3xx 重定向 — **尚未开始** |
-| TD-P1-HUB-02 | Hub 授权 | `hub-server/internal/service/`、`hub-server/internal/middleware/` | 对 org/project/thread/run/profile/integration secrets 应用 resource/action 检查 — 等待 TD-P0-HUB-01 部署 |
-| TD-P0-DESIGN-01 | 视觉 QA | `app/desktop/screenshots/`、`app/web/screenshots/`、`app/mobile-rn/screenshots/` | Desktop 14 张截图（缺少审批/错误/diff）、Web 70+ 张截图（最完整）、Mobile RN 截图 QA 在 5177；公开产品站点待定 |
-| TD-P0-I18N-01 | i18n 对等 | `app/desktop/src/i18n/locales/`、`app/web/src/i18n/locales/` | Desktop 扁平 `zh.json`/`en.json` 和 Web 命名空间 JSON 目录结构匹配；Mobile 缺少专用 i18n 文件 |
-| TD-P0-SEC-01 | 安全/风险 | `docs/governance/security-risk-register.md` | 登记表创建于 2026-06-01；严重/高危发现需提供生产部署证据 |
+| TD-P0-HUB-01 | Hub OIDC 登录 | `hub-server/internal/handler/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`hub-server/internal/service/auth.go` | **代码已落地**：handler/service 覆盖 callback、非法 issuer/audience、`tokendance_sub` 映射、Hub access/refresh session、device proof。**部署证据队列**：发布分支证明、回调/客户端注册、刷新/登出冒烟（对齐 AH-SR-035） |
+| TD-P0-CLIENT-01 | Desktop/Web 登录 | `app/desktop/src/`、`app/web/src/`、`app/desktop/src-tauri/` | **代码已落地**：Desktop/Web tab-scoped `sessionStorage`；Web Hub-only 守卫；WS 接受 Hub-issued session、拒绝升级前 TokenDance bearer。**会话姿态**：AH-SR-037 **Accepted**（#438，非 Open）。**部署/客户端证据队列**：登录/登出截图、WS 认证冒烟、部署配置（对齐 AH-SR-036） |
+| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | 目标：`/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等、`card.action.trigger` 3s 响应、无 3xx 重定向。**状态（2026-07-18）**：仓库内尚无 feishu 集成 handler 落地；仍待开工 |
+| TD-P1-HUB-02 | Hub 授权 | `hub-server/internal/service/`、`hub-server/internal/middleware/` | 对 org/project/thread/run/profile/integration secrets 应用 resource/action 检查。**状态**：代码侧 owner fail-closed / capability 绑定已推进（见 AH-SR-045/046 Mitigated）；完整 membership 矩阵与 live 证据仍排队 |
+| TD-P0-DESIGN-01 | 视觉 QA | `app/desktop/screenshots/`、`app/web/screenshots/`、`app/mobile-rn/screenshots/` | Desktop/Web/Mobile 截图基线与 Visual QA 矩阵；公开产品站点待定 |
+| TD-P0-I18N-01 | i18n 对等 | `app/desktop/src/i18n/locales/`、`app/web/src/i18n/locales/` | Desktop 扁平 `zh.json`/`en.json` 与 Web 命名空间目录对齐；Mobile 缺专用 i18n 文件 |
+| TD-P0-SEC-01 | 安全/风险 | `docs/governance/security-risk-register.md` | **SSOT 指针 only**：队列、状态与发布门禁以 register 为准（最后审查 **2026-07-17**）。本文件不复制长表；Critical/High Open\|rotate\|verification-required 阻断公开发布 |
 
 ## 本地分发规则
 
@@ -63,5 +63,5 @@ D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）�
 - 当主要功能或批次完成时，更新 `docs/roadmap.md`。
 - 当部署版本和 commit hash 变更时，更新 server workspace 的 AgentHub 运维状态文档；本仓库只保留无密证据指针。
 - 当新增发现、缓解措施或部署验证时，更新 `docs/governance/security-risk-register.md`。
-- 当 Hub session 或 token 规则变更时，更新 workspace 根 `../docs/identity/identity-auth.md` / `../docs/identity/authorization-model.md`。
+- 当 Hub session 或 token 规则变更时，更新 workspace 根 `../../../docs/identity/identity-auth.md` / `../../../docs/identity/authorization-model.md`。
 - 当 API 契约变更时，更新 `api/openapi.yaml` 和 `api/events.md`。

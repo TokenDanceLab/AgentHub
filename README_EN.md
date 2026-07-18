@@ -54,6 +54,16 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 | `api` | OpenAPI and WebSocket event contracts |
 | `docs` | Architecture, roadmap, design docs |
 
+## Development
+
+| Entry | Description |
+|---|---|
+| [docs/developer-quickstart.md](docs/developer-quickstart.md) | Shortest local bootstrap path |
+| [docs/architecture.md](docs/architecture.md) | Architecture overview and module index |
+| [docs/README.md](docs/README.md) | Docs navigation |
+| [AGENTS.md](AGENTS.md) | Project rules SSOT (branch, red lines, evidence grades) |
+| [docs/progress/MASTER.md](docs/progress/MASTER.md) | Live program progress SSOT |
+
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).

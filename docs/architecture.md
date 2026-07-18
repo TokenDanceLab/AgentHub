@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-06-28
+最后更新：2026-07-18
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
@@ -12,7 +12,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 AgentHub = shared IM workbench + local/remote Agent execution + Hub collaboration network
 ```
 
-## 五层结构
+## 结构分层
 
 ```text
 Desktop shared workbench
@@ -28,6 +28,11 @@ Web shared workbench
   -> Edge routing / relay
   -> Edge Server
   -> Agent Runtime adapter
+
+Mobile shared workbench (viewer / limited control)
+  -> Mobile platform adapter
+  -> Hub Server
+  -> Edge routing / relay (via Hub)
 ```
 
 | 层 | 目录 | 职责 |
@@ -35,6 +40,7 @@ Web shared workbench
 | Shared UI | `app/shared/` | workbench、transcript、composer、inspector、platform contracts |
 | Desktop | `app/desktop/` | Tauri shell、Desktop adapter、Local Edge、本机能力 |
 | Web | `app/web/` | Hub session、Web adapter、远程审批和查看 |
+| Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface |
 | Edge | `edge-server/` | 本地项目、Thread、Run lifecycle、Runtime adapter、Artifact index |
 | Hub | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
 | API | `api/` | REST API 和 WebSocket event 契约 |
@@ -75,7 +81,7 @@ Web shared workbench
 
 ```ts
 interface AgentHubPlatform {
-  surface: "desktop" | "web";
+  surface: "desktop" | "web" | "mobile";
   capabilities: SurfaceCapabilities;
   conversations: ConversationPort;
   runs: RunPort;

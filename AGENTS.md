@@ -77,7 +77,8 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 |---|---|---|
 | 登录 | AgentHub 只接 TokenDance ID；第三方 provider、账号绑定、`oauth_bindings` 归 TokenDance ID | `../docs/identity/identity-auth.md` |
 | 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `../docs/identity/authorization-model.md` |
-| 安全风险 | Critical/High 未修复、未验证或未 accepted 前阻断公开发布 | `docs/governance/security-risk-register.md`, `../docs/security/security-risk.md` |
+| 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT：`docs/governance/security-risk-register.md`） | `docs/governance/security-risk-register.md`, `../docs/security/security-risk.md` |
+| 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop | `docs/governance/threat-model.md`, `.agents/skills/real-e2e-acceptance/` |
 | Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应 | `../docs/identity/feishu-integration.md` |
 | i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `../docs/identity/i18n-packaging.md` |
 | Gateway | TokenDance API key 不是 TokenDance ID token，不得暴露给浏览器 UI 或公开日志 | `../docs/ecosystem/product-matrix.md` |
@@ -101,7 +102,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
 - UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web 主视口优先 `1440x810`。
 
-前端 CI 易踩坑（cleanup 实测，2026-07-17）：
+前端 CI 易踩坑（站立规则）：
 
 - `exactOptionalPropertyTypes`：禁止 `...{ optional: maybeUndefined }`；只在 defined 时赋值；async handler 传给 `() => void` 时用 `void fn()` 包装。
 - `noUncheckedIndexedAccess`：CSS module / `Record<string, string>` 索引用 `styles.foo ?? ''`，不要假设必有 key。
@@ -179,6 +180,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
 - 修改目录、协议、分工或稳定规则后，同步 README、roadmap、architecture、governance owner 文档和 verifier。
+- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件、`docs/progress/MASTER.md` 与 GitHub issues（指针见 `docs/analysis/local-memory-pointer.md`）。
 
 ## 9. 安全和隐私
 
@@ -187,7 +189,12 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - `.env`、API key、token、cookie、私钥、证书、SSH 配置。
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、含敏感字段的日志。
-- 本机 Agent 记忆和运行状态。
+- 本机 Agent 记忆和运行状态（含 `.agenthub/memory/**` 内容；该目录仅为本地 scratch）。
+
+发布红线：
+
+- stub/demo/fixture 不得冒充真实登录、真实模型/API 或 packaged Desktop。
+- Critical/High 且 Open、rotate required 或 *verification required 阻断公开发布；Accepted 与当前队列以 `docs/governance/security-risk-register.md` 为准。
 
 需要示例配置时只提交 `.env.example`，值用占位符。新增本地生成目录、缓存、数据库、日志或私钥目录前，先更新 `.gitignore`。
 
