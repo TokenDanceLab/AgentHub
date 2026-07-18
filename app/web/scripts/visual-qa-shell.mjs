@@ -1,5 +1,5 @@
 /**
- * P74 Visual QA — Web shell capture matrix (#1199)
+ * P74 Visual QA — Web shell capture matrix (#1199 / #1219)
  * Viewport 1440x810 · themes light+dark · authenticated mock hub
  *
  * Usage (from app/web):
@@ -26,7 +26,9 @@ const baseUrl =
   `http://127.0.0.1:${port}/`;
 const viewport = { width: 1440, height: 810 };
 const themes = ['light', 'dark'];
-const THEME_KEY = 'agenthub-v4-theme';
+const THEME_KEY_V4 = 'agenthub-v4-theme';
+const THEME_KEY_LEGACY = 'agenthub-theme';
+const WORKBENCH_SHELL = '[data-testid="agenthub-workbench"]';
 const hubUrlPattern =
   /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
@@ -130,6 +132,11 @@ async function installMockHub(context) {
         ),
       );
     }
+    // Session pins — needed by conversation sidebar
+    if (pathname.match(/^\/client\/sessions\/[^/]+\/pins$/)) {
+      return route.fulfill(json(hubEnvelope([])));
+    }
+    // Session messages
     if (pathname.match(/^\/client\/sessions\/[^/]+\/messages$/)) {
       return route.fulfill(
         json(
@@ -148,6 +155,26 @@ async function installMockHub(context) {
         ),
       );
     }
+    // Execution targets — needed by composer target picker
+    if (pathname === '/web/execution-targets') {
+      return route.fulfill(
+        json(
+          hubEnvelope({
+            items: [
+              {
+                id: 'target_local_edge',
+                name: 'Local Edge',
+                kind: 'local',
+                status: 'online',
+                updated_at: '2026-05-30T01:25:00Z',
+              },
+            ],
+            page: { hasMore: false },
+          }),
+        ),
+      );
+    }
+    // Catch-all: empty envelope for unknown routes (agent-tasks, public-skills, etc.)
     return route.fulfill(json(hubEnvelope({})));
   });
 }
@@ -163,7 +190,13 @@ async function maybeStartDevServer() {
       cwd: projectRoot,
       stdio: 'ignore',
       shell: process.platform === 'win32',
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        // Pin mock data mode so workbench renders with demo agents/conversations
+        VITE_AGENTHUB_DATA_MODE: 'mock',
+        // Pin hub URL so the app routes all calls through Playwright mock
+        VITE_HUB_URL: 'http://localhost:8080',
+      },
     },
   );
   await waitForUrl(baseUrl);
@@ -178,34 +211,87 @@ async function captureTheme(browser, theme) {
   const context = await browser.newContext({
     viewport,
     serviceWorkers: 'block',
+    // Match prefers-color-scheme so system-theme resolution is predictable
+    colorScheme: theme,
   });
   await installMockHub(context);
   const page = await context.newPage();
+
+  // Set storage BEFORE navigation so auth + theme are ready on first load
   await page.addInitScript(
-    ({ key, theme: t }) => {
-      window.localStorage.setItem(key, t);
+    ({ v4Key, legacyKey, theme: t }) => {
+      // Theme: dual-write both v4 (SSOT) and legacy keys for any component that reads either
+      window.localStorage.setItem(v4Key, t);
+      window.localStorage.setItem(legacyKey, t);
       window.localStorage.setItem('agenthub-language', 'en');
       window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
+      // Auth: hub access token + user profile in sessionStorage
       window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
       window.sessionStorage.setItem(
         'agenthub_hub_user',
         JSON.stringify({ userId: 'user_visual', username: 'visual-reviewer' }),
       );
     },
-    { key: THEME_KEY, theme },
+    { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
   );
-  await page.goto(new URL('/', baseUrl).toString(), { waitUntil: 'networkidle' });
+
+  // Navigate to the app root with absolute URL (#1216 pattern)
+  const appUrl = new URL('/', baseUrl).toString();
+  await page.goto(appUrl, { waitUntil: 'networkidle', timeout: 45_000 });
+
+  // Wait for the workbench shell to appear — confirms React mounted without crash
+  try {
+    await page.waitForSelector(WORKBENCH_SHELL, { state: 'visible', timeout: 30_000 });
+  } catch {
+    // Diagnostic capture on failure
+    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810-DIAGNOSTIC.png`);
+    await page.screenshot({ path: diagFile, fullPage: false });
+    const pageUrl = page.url();
+    const pageTitle = await page.title();
+    const bodyText = await page.evaluate(() =>
+      (document.body?.innerText ?? '(no body)').slice(0, 500),
+    );
+    throw new Error(
+      `Workbench shell not visible for theme=${theme}. ` +
+        `URL: ${pageUrl}, Title: "${pageTitle}". ` +
+        `Body: ${bodyText.slice(0, 200)}. ` +
+        `Diagnostic: ${diagFile}`,
+    );
+  }
+
+  // Re-apply theme attributes after React hydration to guarantee correctness
   await page.evaluate(
-    ({ key, theme: t }) => {
-      window.localStorage.setItem(key, t);
+    ({ v4Key, legacyKey, theme: t }) => {
+      window.localStorage.setItem(v4Key, t);
+      window.localStorage.setItem(legacyKey, t);
       document.documentElement.setAttribute('data-theme', t);
       document.documentElement.style.colorScheme = t;
     },
-    { key: THEME_KEY, theme },
+    { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
   );
-  await wait(300);
+
+  // Wait for meaningful painted content: body must have text and not be pure black
+  await page.waitForFunction(
+    () => {
+      const body = document.body;
+      if (!body || body.innerText.trim().length < 5) return false;
+      const bg = window.getComputedStyle(body).backgroundColor;
+      // Reject pure-black background (often means CSS not loaded or crash)
+      if (bg === 'rgb(0, 0, 0)' || bg === 'rgba(0, 0, 0, 1)') return false;
+      return true;
+    },
+    { timeout: 15_000 },
+  ).catch(() => {
+    // Non-fatal: a valid dark theme might use near-black; capture anyway
+    console.warn(`warn: body content check inconclusive for theme=${theme}, capturing anyway`);
+  });
+
+  // Extra settle time for CSS transitions, fonts, and lazy async chunks
+  await wait(800);
+
   const file = path.join(outDir, `web-shell-${theme}-1440x810.png`);
   await page.screenshot({ path: file, fullPage: false });
+
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
   return { file, applied, theme };
