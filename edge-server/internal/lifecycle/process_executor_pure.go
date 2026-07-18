@@ -2253,3 +2253,69 @@ type persistAgentFailureGatePlan struct {
 func planPersistAgentFailureGate(contentOK, repoOK bool) persistAgentFailureGatePlan {
 	return persistAgentFailureGatePlan{ScanExists: contentOK && repoOK}
 }
+
+// planStartAdmission composes Start admission gates (lookup/status + concurrency)
+// into a single pure error. Side-effects (context/map insert/goroutine) stay in Start.
+func planStartAdmission(found bool, status string, runningCount, maxConcurrent int, alreadyRunning bool) error {
+	if err := validateStartRunState(found, status); err != nil {
+		return err
+	}
+	return canStartRun(runningCount, maxConcurrent, alreadyRunning)
+}
+
+// bindRunProcessContext returns a copy of runCtx with Run bound for the lifecycle.
+// Pure value transform; map/context ownership stays in Start.
+func bindRunProcessContext(runCtx RunProcessContext, run store.Run) RunProcessContext {
+	runCtx.Run = run
+	return runCtx
+}
+
+// shouldApplyTrackedClose reports whether a planned close should run when the
+// tracked map entry is present (finish / session-retry cleanup).
+func shouldApplyTrackedClose(planned, found bool) bool {
+	return planned && found
+}
+
+// evidenceGateAttemptPlan is the pure pre-gate attempt plan (run gate + default status).
+type evidenceGateAttemptPlan struct {
+	RunGate     bool
+	FinalStatus string
+}
+
+// planEvidenceGateAttempt maps gate enablement into RunGate + default FinalStatus
+// (passed=true until runEvidenceGate reports otherwise). I/O stays in run().
+func planEvidenceGateAttempt(gateEnabled bool) evidenceGateAttemptPlan {
+	outcome := planEvidenceGateOutcome(gateEnabled, true)
+	return evidenceGateAttemptPlan{
+		RunGate:     shouldRunEvidenceGate(gateEnabled),
+		FinalStatus: outcome.FinalStatus,
+	}
+}
+
+// planEvidenceGateResult maps a completed gate pass/fail into terminal status + log.
+// Call only after runEvidenceGate (gate path taken).
+func planEvidenceGateResult(passed bool) evidenceGateOutcome {
+	return planEvidenceGateOutcome(true, passed)
+}
+
+// prepareSubAgentResultOutbound sanitizes payload and builds the queue message plus
+// aggregator result for sendSubAgentResult. Queue/registry I/O stays in the executor.
+func prepareSubAgentResultOutbound(
+	payload any,
+	runID, agentID, agentName, parentID, status string,
+	now time.Time,
+) (agents.Message, SubAgentResult) {
+	sanitizedResult, sanitizeReason := SanitizeSubAgentResult(payload)
+	msg := buildSubAgentResultMessage(
+		runID, agentID, agentName, parentID, status, sanitizedResult, sanitizeReason, now,
+	)
+	agg := buildSubAgentResult(
+		agentID,
+		agentName,
+		runID,
+		status,
+		aggregatorOutput(payload, sanitizedResult, sanitizeReason),
+		now,
+	)
+	return msg, agg
+}
