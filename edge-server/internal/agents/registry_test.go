@@ -480,13 +480,13 @@ func TestRegistry_ShutdownCascade(t *testing.T) {
 
 	// Build a 3-level tree: root -> child1 -> grandchild1
 	//                              \-> child2
-	_ = r.Register(&AgentInstance{ID: "root", AdapterID: "orch", ParentID: "", Status: StatusBusy})
-	_ = r.Register(&AgentInstance{ID: "child1", AdapterID: "worker", ParentID: "root", Status: StatusBusy})
-	_ = r.Register(&AgentInstance{ID: "child2", AdapterID: "worker", ParentID: "root", Status: StatusIdle})
-	_ = r.Register(&AgentInstance{ID: "grandchild1", AdapterID: "specialist", ParentID: "child1", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "root", AdapterID: "orch", ParentID: "", Status: StatusBusy, RunID: "run_root"})
+	_ = r.Register(&AgentInstance{ID: "child1", AdapterID: "worker", ParentID: "root", Status: StatusBusy, RunID: "run_child1"})
+	_ = r.Register(&AgentInstance{ID: "child2", AdapterID: "worker", ParentID: "root", Status: StatusIdle, RunID: "run_child2"})
+	_ = r.Register(&AgentInstance{ID: "grandchild1", AdapterID: "specialist", ParentID: "child1", Status: StatusBusy, RunID: "run_gc1"})
 
 	// Shutdown the root.
-	r.ShutdownCascade("root")
+	runIDs := r.ShutdownCascade("root")
 
 	// All descendants must be disconnected.
 	for _, id := range []string{"root", "child1", "child2", "grandchild1"} {
@@ -498,13 +498,25 @@ func TestRegistry_ShutdownCascade(t *testing.T) {
 			t.Fatalf("agent %q status = %s, want %s after cascade", id, inst.Status, StatusDisconnected)
 		}
 	}
+	wantRuns := map[string]bool{"run_child1": true, "run_child2": true, "run_gc1": true}
+	if len(runIDs) != len(wantRuns) {
+		t.Fatalf("ShutdownCascade runIDs = %v, want %v", runIDs, wantRuns)
+	}
+	for _, id := range runIDs {
+		if !wantRuns[id] {
+			t.Fatalf("unexpected cascade runID %q in %v", id, runIDs)
+		}
+	}
 
 	// ShutdownCascade on a single leaf should only affect that leaf.
 	r2 := NewRegistry()
-	_ = r2.Register(&AgentInstance{ID: "a", AdapterID: "cc", ParentID: "", Status: StatusIdle})
-	_ = r2.Register(&AgentInstance{ID: "b", AdapterID: "cc", ParentID: "", Status: StatusIdle})
+	_ = r2.Register(&AgentInstance{ID: "a", AdapterID: "cc", ParentID: "", Status: StatusIdle, RunID: "run_a"})
+	_ = r2.Register(&AgentInstance{ID: "b", AdapterID: "cc", ParentID: "", Status: StatusIdle, RunID: "run_b"})
 
-	r2.ShutdownCascade("a")
+	runIDs2 := r2.ShutdownCascade("a")
+	if len(runIDs2) != 0 {
+		t.Fatalf("leaf cascade runIDs = %v, want empty", runIDs2)
+	}
 
 	instA, _ := r2.Get("a")
 	if instA.Status != StatusDisconnected {
@@ -513,6 +525,69 @@ func TestRegistry_ShutdownCascade(t *testing.T) {
 	instB, _ := r2.Get("b")
 	if instB.Status != StatusIdle {
 		t.Fatalf("unrelated leaf b should be unaffected, got %s", instB.Status)
+	}
+}
+
+// TestRegistry_ShutdownCascade_ParentRunIDLookup covers #1001: SpawnSubAgent
+// registers children under agentInstanceID with ParentID=parentRunID. Cascade
+// by parent run ID must still find those children even when no agent is keyed
+// under the parent run ID itself.
+func TestRegistry_ShutdownCascade_ParentRunIDLookup(t *testing.T) {
+	r := NewRegistry()
+
+	const parentRunID = "run_parent"
+	const childRunID = "run_child"
+	const grandRunID = "run_grand"
+
+	// No agent registered as ID=parentRunID (mirrors real parent process finish).
+	_ = r.Register(&AgentInstance{
+		ID:        "agent_child",
+		AdapterID: "worker",
+		ParentID:  parentRunID,
+		RunID:     childRunID,
+		Status:    StatusBusy,
+	})
+	// Nested spawn: ParentID is the intermediate child's run ID.
+	_ = r.Register(&AgentInstance{
+		ID:        "agent_grand",
+		AdapterID: "specialist",
+		ParentID:  childRunID,
+		RunID:     grandRunID,
+		Status:    StatusBusy,
+	})
+	// Unrelated peer under a different parent must stay online.
+	_ = r.Register(&AgentInstance{
+		ID:        "agent_other",
+		AdapterID: "worker",
+		ParentID:  "run_other",
+		RunID:     "run_other_child",
+		Status:    StatusBusy,
+	})
+
+	runIDs := r.ShutdownCascade(parentRunID)
+
+	wantRuns := map[string]bool{childRunID: true, grandRunID: true}
+	if len(runIDs) != len(wantRuns) {
+		t.Fatalf("cascade runIDs = %v, want %v", runIDs, wantRuns)
+	}
+	for _, id := range runIDs {
+		if !wantRuns[id] {
+			t.Fatalf("unexpected cascade runID %q", id)
+		}
+	}
+
+	for _, id := range []string{"agent_child", "agent_grand"} {
+		inst, ok := r.Get(id)
+		if !ok {
+			t.Fatalf("agent %q missing", id)
+		}
+		if inst.Status != StatusDisconnected {
+			t.Fatalf("agent %q status = %s, want disconnected", id, inst.Status)
+		}
+	}
+	other, ok := r.Get("agent_other")
+	if !ok || other.Status != StatusBusy {
+		t.Fatalf("unrelated agent should stay busy, got ok=%v status=%v", ok, other)
 	}
 }
 
