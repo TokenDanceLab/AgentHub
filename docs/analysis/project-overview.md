@@ -3,7 +3,7 @@
 > last-updated: 2026-07-18
 > scope: cleanup baseline synthesis（Architecture / Hub / Edge / Frontend / Risks + 主会话卫生债）
 > authority: 综合 discovery lanes；**不替代** `AGENTS.md` / `docs/architecture.md` / `docs/progress/MASTER.md` / server STATE
-> note: completion cells use absolute dates or history pointers only; live progress is MASTER Phase 70
+> note: completion cells use absolute dates or history pointers only; live progress is MASTER Phase 71
 
 ## Preliminary Direction
 
@@ -137,7 +137,7 @@ shared UI **不得**直接调用 Tauri / Hub / Edge 客户端。
 | 项目规则 | `AGENTS.md` | 唯一规则 SSOT |
 | 架构 | `docs/architecture.md` + `docs/architecture/*` | 01–07 子文档 |
 | 总进度入口 | `docs/roadmap.md` | 指针；活状态不写在本表 |
-| 专项进度 | `docs/progress/MASTER.md` | **活进度 SSOT**（Phase 70 / milestone 85，2026-07-18） |
+| 专项进度 | `docs/progress/MASTER.md` | **活进度 SSOT**（Phase 71 / milestone 85，2026-07-18） |
 | 安全 | `docs/governance/security-risk-register.md` | 发布门禁 |
 | Hub 进程 | `hub-server/cmd/server-hub` | 本地 `:8080` |
 | Edge 进程 | `edge-server/cmd/agenthub-edge` | 本地 `127.0.0.1:3210` |
@@ -195,7 +195,7 @@ cd app/desktop && corepack pnpm tauri dev         # native
 |---|---|---|
 | 规则 | `AGENTS.md` | 无第二套根级规则文件 |
 | 总进度入口 | `docs/roadmap.md` | 指针到 history / MASTER |
-| 专项 | `docs/progress/MASTER.md` | Phase 70 活进度（2026-07-18） |
+| 专项 | `docs/progress/MASTER.md` | Phase 71 活进度（2026-07-18） |
 | 架构 / 决策 | `docs/architecture*`、`docs/decisions.md` | 旧 ADR 外迁 |
 | 安全 | `docs/governance/*` | Critical/High Open 阻断公开发布 |
 | Skill 白名单 | `.agents/skills/*` + verify 脚本 | 过期 skill 不得 active |
