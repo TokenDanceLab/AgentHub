@@ -1,15 +1,19 @@
 # Task Breakdown — AgentHub Cleanup Baseline
 
-> last-updated: 2026-07-16
+> **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
+> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 58 / milestone 79).
+> Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
+>
+> last-updated: 2026-07-18
 > program: knowledge-first strangler cleanup + lightweight wiki (non-SSOT)
 > tracking: GITHUB_FULL (Issues + Milestones + Project board)
 > hard rule: **NO big-bang rewrite**
-> reality: Phases 1–6 complete (#424–#445); Phase 7 closeout in progress (#447–#451)
+> reality: Phases 1–7 complete (#424–#451 / PR #446). Do not list #447–#451 as open.
 
 ## Overview
-- **Total Phases**: 7 (Phases 1–6 baseline complete; Phase 7 = CI green + SDD closeout)
+- **Total Phases**: 7 (all complete; closed 2026-07-16 / PR #446)
 - **Total Tasks**: 27 (22 baseline #424–#445 + 5 Phase 7 #447–#451)
-- **Baseline Closed**: 22 / 22 (Phases 1–6)
+- **Baseline Closed**: 27 / 27 (Phases 1–7)
 - **Estimated Total Effort**: L (multi-PR, multi-week strangler)
 - **Strategy**: Strangler Fig + Spec-Driven Develop + GitHub Project board
 - **Live status SSOT**: `docs/progress/MASTER.md` + GitHub Project board
@@ -120,10 +124,10 @@
 | B | T6.2 | Med | `app/web/**`, `app/shared/**` |
 | C | T6.4, T6.5 | Med | `edge-server/**` capability + journal |
 
-## Phase 7: Baseline CI Green + SDD Closeout — IN PROGRESS
+## Phase 7: Baseline CI Green + SDD Closeout — COMPLETE
 **Goal**: 让汇总 PR #446 CI 绿，并同步/归档 SPEC 文档
 **S.U.P.E.R Focus**: E,R
-**Issues**: #447–#451 (open) · GitHub milestone 28
+**Issues**: #447–#451 (closed) · GitHub milestone 28 · PR #446
 
 | # | Task | Priority | Effort | Depends On | Lane | S.U.P.E.R | Test Expectation | Memory Impact | Acceptance Criteria |
 |:--|:-----|:---------|:-------|:-----------|:-----|:----------|:-----------------|:--------------|:--------------------|
@@ -142,7 +146,7 @@
 | 4 | T4.1–T4.4 | #434–#437 | closed |
 | 5 | T5.1–T5.3 | #438–#440 | closed |
 | 6 | T6.1–T6.5 | #441–#445 | closed |
-| 7 | T7.1–T7.5 | #447–#451 | open |
+| 7 | T7.1–T7.5 | #447–#451 | closed (PR #446) |
 
 ## Non-goals
 - 重写 Hub/Edge 协议双平面

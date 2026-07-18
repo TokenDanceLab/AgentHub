@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-27
+> 最后更新：2026-07-18
 
 ## 职责
 
@@ -57,6 +57,7 @@ Web shared workbench
 | Run lifecycle | `internal/lifecycle/` |
 | Runtime adapters | `internal/adapters/` |
 | Agent registry/queue | `internal/agents/` |
+| Runners compat summary | `internal/runners/` — compat summary only; `/v1/runners` is not a new business Agent model |
 | Metrics/run context | `internal/metrics/`, `internal/runnerctx/` |
 
 ## 与 Hub 的通信

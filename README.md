@@ -54,6 +54,16 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 | `api` | OpenAPI 与 WebSocket 事件合同 |
 | `docs` | 架构、路线图、设计文档 |
 
+## 开发
+
+| 入口 | 说明 |
+|---|---|
+| [docs/developer-quickstart.md](docs/developer-quickstart.md) | 本地最短启动路径 |
+| [docs/architecture.md](docs/architecture.md) | 架构总览与模块索引 |
+| [docs/README.md](docs/README.md) | 文档导航 |
+| [AGENTS.md](AGENTS.md) | 项目规则 SSOT（分支、红线、证据等级） |
+| [docs/progress/MASTER.md](docs/progress/MASTER.md) | 当前程序进度 SSOT |
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。详情见 [CONTRIBUTING.md](CONTRIBUTING.md)。
