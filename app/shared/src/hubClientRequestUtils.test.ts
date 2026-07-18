@@ -5,12 +5,14 @@ import {
   normalizeRegisterDeviceRequest,
   qs,
   resolveRouteFallbackStep,
+  runChangePasswordWithFallback,
+  runRequestWithRouteFallback,
   shouldContinueRouteFallback,
   shouldUseChangePasswordFallback,
   unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
-describe('hubClientRequestUtils (#799 / #935 / #957 / #978)', () => {
+describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990)', () => {
   it('builds query strings and skips null/undefined values', () => {
     expect(qs({})).toBe('');
     expect(qs({ a: null, b: undefined })).toBe('');
@@ -97,5 +99,72 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978)', () => {
       device_type: 'mobile',
       capabilities: { voice: true },
     });
+  });
+
+  it('runs requestWithFallback + changePassword dual-route residual (#990)', async () => {
+    const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
+    const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
+
+    const calls: string[] = [];
+    const ok = await runRequestWithRouteFallback(
+      ['/a:route', '/a/route'],
+      async (path) => {
+        calls.push(path);
+        if (path === '/a:route') {
+          throw notFound;
+        }
+        return 'ok' as const;
+      },
+    );
+    expect(ok).toBe('ok');
+    expect(calls).toEqual(['/a:route', '/a/route']);
+
+    await expect(
+      runRequestWithRouteFallback(['/only'], async () => {
+        throw notFound;
+      }),
+    ).rejects.toBe(notFound);
+
+    await expect(
+      runRequestWithRouteFallback(
+        ['/a:route', '/a/route'],
+        async (path) => {
+          if (path === '/a:route') {
+            throw server;
+          }
+          return 'never';
+        },
+      ),
+    ).rejects.toBe(server);
+
+    const pwdCalls: Array<{ path: string; method?: string }> = [];
+    await runChangePasswordWithFallback(
+      async (path, init) => {
+        const call: { path: string; method?: string } = { path };
+        if (init.method !== undefined) {
+          call.method = init.method;
+        }
+        pwdCalls.push(call);
+        if (path === '/client/auth/change-password') {
+          throw notFound;
+        }
+      },
+      { path: '/client/auth/change-password', init: { method: 'POST', body: '{}' } },
+      { path: '/client/auth/password', init: { method: 'PUT', body: '{}' } },
+    );
+    expect(pwdCalls).toEqual([
+      { path: '/client/auth/change-password', method: 'POST' },
+      { path: '/client/auth/password', method: 'PUT' },
+    ]);
+
+    await expect(
+      runChangePasswordWithFallback(
+        async () => {
+          throw server;
+        },
+        { path: '/client/auth/change-password', init: { method: 'POST', body: '{}' } },
+        { path: '/client/auth/password', init: { method: 'PUT', body: '{}' } },
+      ),
+    ).rejects.toBe(server);
   });
 });

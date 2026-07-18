@@ -90,25 +90,22 @@ import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
   normalizeRegisterDeviceRequest,
-  resolveRouteFallbackStep,
-  shouldUseChangePasswordFallback,
-  unresolvedRouteFallbackError,
+  runChangePasswordWithFallback,
+  runRequestWithRouteFallback,
 } from './hubClientRequestUtils';
 import {
+  applyHubRequestCatchEffects,
   applyRefreshedBearerAuth,
   buildHubFetchInit,
   buildMultipartFetchInit,
-  buildTokenRefreshFailedLogPrefix,
-  buildTokenRefreshReportContext,
-  hasTokenRefreshHandler,
   normalizeHubBaseUrl,
   planHubRequestCatchEffects,
-  prepareHubRequestContext,
-  prepareMultipartUploadContext,
+  planRefreshedTokenRetry,
+  planTokenRefreshFailureReport,
+  prepareHubRequestContextFromClient,
+  prepareMultipartUploadContextFromClient,
   resolveHubFetch,
-  shouldAttemptTokenRefresh,
-  shouldRetryWithRefreshedToken,
-  toReportableError,
+  shouldEnterTokenRefreshRecovery,
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
@@ -123,25 +120,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const requestCtx: {
-      baseUrl: string;
-      path: string;
-      options: RequestInit;
-      token?: string | null;
-      timeoutMs?: number;
-    } = {
+    const { headers, timeoutMs, method, url } = prepareHubRequestContextFromClient({
       baseUrl,
       path,
       options,
-    };
-    const token = opts.getToken?.();
-    if (token !== undefined) {
-      requestCtx.token = token;
-    }
-    if (opts.timeoutMs !== undefined) {
-      requestCtx.timeoutMs = opts.timeoutMs;
-    }
-    const { headers, timeoutMs, method, url } = prepareHubRequestContext(requestCtx);
+      token: opts.getToken?.(),
+      timeoutMs: opts.timeoutMs,
+    });
 
     try {
       const response = await withHubAbortTimeout(timeoutMs, (signal) =>
@@ -149,36 +134,29 @@ export function createHubClient(opts: HubClientOptions = {}) {
       );
 
       // ── Token refresh recovery on 401 ──────────────────
-      if (shouldAttemptTokenRefresh(response.status, hasTokenRefreshHandler(opts.onRefreshToken))) {
+      if (shouldEnterTokenRefreshRecovery(response.status, opts.onRefreshToken)) {
         try {
-          const newToken = await opts.onRefreshToken!();
-          if (shouldRetryWithRefreshedToken(newToken)) {
-            // Retry once with fresh token
-            applyRefreshedBearerAuth(headers, newToken);
+          const retryPlan = planRefreshedTokenRetry(await opts.onRefreshToken!());
+          if (retryPlan.action === 'retry') {
+            applyRefreshedBearerAuth(headers, retryPlan.token);
             const retryResponse = await withHubAbortTimeout(timeoutMs, (signal) =>
               fetchImpl(url, buildHubFetchInit(options, headers, signal)),
             );
             return await parseHubSuccessResponse<T>(retryResponse);
           }
         } catch (refreshErr) {
-          console.error(buildTokenRefreshFailedLogPrefix(), refreshErr);
-          reportApiError(
-            toReportableError(refreshErr),
-            buildTokenRefreshReportContext(path),
-          );
+          const report = planTokenRefreshFailureReport(path, refreshErr);
+          console.error(report.logPrefix, refreshErr);
+          reportApiError(report.error, report.context);
         }
       }
 
       return await parseHubSuccessResponse<T>(response);
     } catch (error) {
-      const effects = planHubRequestCatchEffects(error, { timeoutMs, method, path });
-      if ('logMessage' in effects) {
-        console.error(effects.logMessage);
-      }
-      if ('report' in effects) {
-        reportApiError(effects.report.error, effects.report.context);
-      }
-      throw effects.error;
+      applyHubRequestCatchEffects(planHubRequestCatchEffects(error, { timeoutMs, method, path }), {
+        logError: (message) => console.error(message),
+        report: (err, context) => reportApiError(err, context),
+      });
     }
   }
 
@@ -186,44 +164,21 @@ export function createHubClient(opts: HubClientOptions = {}) {
     paths: readonly string[],
     options: RequestInit = {},
   ): Promise<T> {
-    let fallbackError: unknown;
-
-    for (let index = 0; index < paths.length; index += 1) {
-      const path = paths[index]!;
-      try {
-        return await request<T>(path, options);
-      } catch (error) {
-        const step = resolveRouteFallbackStep(index, paths.length, error);
-        if (step.action === 'continue') {
-          fallbackError = step.fallbackError;
-          continue;
-        }
-        throw step.error;
-      }
-    }
-
-    throw unresolvedRouteFallbackError(fallbackError);
+    return runRequestWithRouteFallback(
+      paths,
+      (path, init) => request<T>(path, init),
+      options,
+    );
   }
 
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    const multipartCtx: {
-      baseUrl: string;
-      path: string;
-      token?: string | null;
-      timeoutMs?: number;
-    } = {
+    const { headers, timeoutMs, url } = prepareMultipartUploadContextFromClient({
       baseUrl,
       path,
-    };
-    const multipartToken = opts.getToken?.();
-    if (multipartToken !== undefined) {
-      multipartCtx.token = multipartToken;
-    }
-    if (opts.timeoutMs !== undefined) {
-      multipartCtx.timeoutMs = opts.timeoutMs;
-    }
-    const { headers, timeoutMs, url } = prepareMultipartUploadContext(multipartCtx);
+      token: opts.getToken?.(),
+      timeoutMs: opts.timeoutMs,
+    });
     const response = await withHubAbortTimeout(timeoutMs, (signal) =>
       fetchImpl(url, buildMultipartFetchInit(headers, formData, signal)),
     );
@@ -245,18 +200,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
     me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
       request<HubUserProfile>(hubPayload.buildUpdateProfilePath(), hubPayload.buildJsonPutInit(body)),
-    changePassword: async (body: HubChangePasswordRequest) => {
-      const primary = hubPayload.buildChangePasswordPrimary(body);
-      try {
-        return await request<void>(primary.path, primary.init);
-      } catch (error) {
-        if (shouldUseChangePasswordFallback(error)) {
-          const fallback = hubPayload.buildChangePasswordFallback(body);
-          return request<void>(fallback.path, fallback.init);
-        }
-        throw error;
-      }
-    },
+    changePassword: (body: HubChangePasswordRequest) =>
+      runChangePasswordWithFallback(
+        (path, init) => request<void>(path, init),
+        hubPayload.buildChangePasswordPrimary(body),
+        hubPayload.buildChangePasswordFallback(body),
+      ),
     oidcAuthorize: (body: HubOidcAuthorizeRequest) => {
       const req = hubPayload.buildOidcAuthorizeRequest(body);
       return request<HubOidcAuthorizeResponse>(req.path, req.init);
