@@ -17,7 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phase 61 / milestone 82）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
+活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phase 63 / milestone 84）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
 
 **Baseline closed（绝对日期指针，非 live backlog）**：
 
