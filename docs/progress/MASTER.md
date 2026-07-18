@@ -70,6 +70,7 @@
 | #1042–#1047 Phase 59 | closed (PRs #1048–#1052) |
 | #1053–#1058 Phase 60 | closed (PRs #1059–#1063; #1058 ops-only) |
 | #1066–#1071 Phase 61 | #1066/#1070/#1071 closed; open peels #1067–#1069 |
+| #1075 Phase 61 tip self-heal | closed via this commit |
 
 ## Quick Status Commands
 
@@ -92,7 +93,7 @@ git worktree list
 **Blockers**: None (Wave1 product peels #1067–#1069 not started after 429; design-token + progress hygiene landed)
 **Stability note**: #1066 MASTER (#1072) · #1070 design-token (#1073) · #1071 progress baseline hygiene closed
 **Production fact**: external ops SSOT only (server `projects/agenthub`; do not invent host labels in-repo)
-**Tip**: 96588ea1 on `master` (#1070/#1073; prior #1066/#1072 @ 7ef83beb + #1065 pg-pool)
+**Tip**: 6c42a0dc on `master` (#1071/#1074 hygiene; prior #1070/#1073 @ 96588ea1)
 **Residual LOC band**: process_executor 1126 · hubClient 526 · agent_dispatch 786 · sqlite_store 709 · delivery_outbox 469
 **Boundary map next residual**: PE / agent_dispatch / sqlite_store peels only
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/**` local scratch only, never SSOT (#428)
@@ -109,10 +110,10 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | P60 closed; P61 open; #1066/#1070/#1071 closed; tip 96588ea1; open peels #1067–#1069 |
+| 2026-07-18 | lead | P60 closed; P61 open; #1066/#1070/#1071 closed; tip 6c42a0dc; open peels #1067–#1069 |
 
 ## Completion notes
 
 - Phase 59 closed via #1042–#1047 (PRs #1048–#1052). Tip 82d904e7. ms 80 closed.
 - Phase 60 closed via #1053–#1058 (PRs #1059–#1063; #1058 hygiene ops-only): PE 1146→1126 · hubClient 671→526 · agent_dispatch 789→786 · design-token ModelDropdown/IM. Product tip 03decef8. ms 81 closed.
-- Phase 61 progress: #1066 MASTER (#1072) · #1070 design-token (#1073 @ 96588ea1) · #1071 progress SSOT + finished worktree prune. Open peels #1067–#1069.
+- Phase 61 progress: #1066 MASTER (#1072) · #1070 design-token (#1073) · #1071 progress SSOT + finished worktree prune (#1074 @ 6c42a0dc). Open peels #1067–#1069.
