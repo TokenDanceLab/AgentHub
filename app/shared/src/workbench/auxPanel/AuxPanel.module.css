@@ -11,8 +11,8 @@
 .tabStrip {
   display: flex;
   flex-shrink: 0;
-  gap: 2px;
-  padding: 6px 8px;
+  gap: var(--wb-gap-2xs, var(--sp-2, 2px));
+  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 8px);
   border-bottom: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.08));
 }
 
@@ -21,17 +21,25 @@
   appearance: none;
   border: 0;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 8px);
   font-size: 12px;
   line-height: 1.2;
   cursor: pointer;
   color: var(--ah-text-muted, #9aa3b2);
   background: transparent;
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    color var(--motion-hover, 90ms ease),
+    transform var(--motion-press, 90ms ease);
 }
 
 .tab:hover {
   color: var(--ah-text, #e8ecf4);
   background: var(--ah-surface-hover, rgba(255, 255, 255, 0.04));
+}
+
+.tab:active {
+  transform: scale(var(--glass-press-scale, 0.985));
 }
 
 .tabActive {
@@ -44,5 +52,14 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px;
+  padding: var(--wb-gap-xs, 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .tabActive,
+  .tab:active {
+    transition: none;
+    transform: none;
+  }
 }
