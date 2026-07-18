@@ -1,13 +1,10 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -27,55 +24,6 @@ import (
 
 // dispatchToEdgeHTTP POSTs a task to local Edge /v1/runs. Returns Edge run ID on
 // success, or empty string when unreachable / rejected / decode fails.
-func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
-	// Pure Edge HTTP prep (#946); client/request side-effects stay here.
-	parts, insecure, err := dispatch.PrepareEdgeHTTPRequest(
-		os.Getenv("AGENTHUB_EDGE_URL"),
-		os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN"),
-		dp.Prompt, dp.AgentType, dp.SystemPrompt, task.ID, dp.DeliveryID,
-		dp.Messages, dp.PinnedMessages, dp.OutputSchema,
-		s.issueRunStartCapability(dp),
-	)
-	if insecure {
-		// AH-SR-053: non-loopback cleartext rejected.
-		slog.Error(dispatch.EdgeHTTPLogInsecureCleartext, "edge_url", parts.EdgeURL)
-		return ""
-	}
-	if err != nil {
-		slog.Error(dispatch.EdgeHTTPLogMarshalFailed, "task_id", task.ID, "error", err)
-		return ""
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, parts.RunsURL, bytes.NewReader(parts.Body))
-	if err != nil {
-		slog.Error(dispatch.EdgeHTTPLogCreateReqFailed, "task_id", task.ID, "error", err)
-		return ""
-	}
-	httpReq.Header = parts.Headers
-
-	client := &http.Client{Timeout: parts.Timeout}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		slog.Debug(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", err)
-		return ""
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, dispatch.EdgeHTTPResponseBodyLimit))
-	plan := dispatch.PlanEdgeHTTPClientResponse(resp.StatusCode, respBody)
-	if plan.NonSuccess {
-		slog.Warn(plan.LogMessage, "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
-		return ""
-	}
-	if plan.DecodeFail {
-		slog.Warn(plan.LogMessage, "task_id", task.ID, "error", plan.DecodeErr)
-		return ""
-	}
-	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", task.ID, "edge_run_id", plan.RunID, "url", parts.RunsURL)
-	return plan.RunID
-}
-
-// TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
 func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
 	if err := dispatch.MapTriggerMessageLookupError(err); err != nil {
@@ -283,178 +231,6 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		return
 	}
 }
-
-func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
-	var rawCustomAgentID *string
-	if ai != nil {
-		rawCustomAgentID = ai.CustomAgentID
-	}
-	customAgentID := dispatch.CustomAgentIDFromAgentPresence(ai != nil, rawCustomAgentID)
-	if !dispatch.TeamContextResolutionReady(s != nil, s != nil && s.db != nil, ai != nil, customAgentID) {
-		return dispatch.EmptyTeamContext()
-	}
-	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
-	var rawRunID string
-	if run != nil {
-		rawRunID = run.ID
-	}
-	runID := dispatch.TeamRunIDValue(run != nil, rawRunID)
-	if !dispatch.TeamRunLoadable(err, run != nil, runID) {
-		return dispatch.EmptyTeamContext()
-	}
-	members, err := repository.ListTeamMembers(s.db, run.TeamID)
-	if !dispatch.TeamMembersPresent(err) {
-		return dispatch.EmptyTeamContext()
-	}
-	return dispatch.MatchTeamContext(run.TeamID, runID, dispatch.TeamMatchCustomAgentID(customAgentID), dispatch.TeamMemberRefsFromMembers(members))
-}
-
-// loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
-// Limits to dispatch.MaxThreadHistory messages to avoid oversized dispatch payloads.
-func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
-	if !dispatch.HistoryLoadIDs(sessionID, triggerMessageID) {
-		return nil
-	}
-	triggerMsg, err := repository.GetMessageByID(s.db, triggerMessageID)
-	if !dispatch.HistoryTriggerMessageLoadable(err, triggerMsg != nil) {
-		return nil
-	}
-	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, dispatch.MaxThreadHistory)
-	if !dispatch.HistoryMessagesPresent(err, len(msgs)) {
-		return nil
-	}
-	// Reverse to chronological order (GetMessagesBySession returns DESC) via pure mapper (#756).
-	return dispatch.MapMessagesChronological(msgs, true)
-}
-
-// loadPinnedMessages loads pinned messages for a session for context continuity.
-func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage {
-	if !dispatch.ShouldLoadPinnedMessages(sessionID) {
-		return nil
-	}
-	pins, err := repository.ListPinsBySession(s.db, sessionID)
-	if !dispatch.PinnedRowsPresent(err, len(pins)) {
-		return nil
-	}
-	messageIDs := dispatch.PinMessageIDsFromModels(pins)
-	msgs, err := repository.GetMessagesByIDs(s.db, messageIDs)
-	if !dispatch.PinMessagesLoadable(err) {
-		return nil
-	}
-	return dispatch.MapPinnedMessages(msgs)
-}
-
-// dispatchTargetBoundTask routes a target-bound task. Returns true when a live
-// WS push was queued (caller may MarkDeliverySent). Offline queue acceptance
-// alone returns false so outbox retains ownership (#1031).
-func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) bool {
-	queueTargetTask := func(reason string, err error) {
-		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
-			slog.Error(dispatch.DispatchLogTargetBoundOfflinePushFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
-			return
-		}
-		if dispatch.TargetBoundOfflinePushInfoLog(err) {
-			slog.Info(dispatch.DispatchLogTargetBoundQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", err)
-		}
-	}
-
-	connID, err := cacheClient.GetRouteForDevice(ctx, userID, dispatch.DesktopDeviceType, deviceID)
-	if dispatch.TargetBoundRouteUnavailable(err, connID, dispatch.ManagerPortAvailable(s.mgr != nil)) {
-		queueTargetTask(dispatch.TargetBoundReasonRouteUnavailable, err)
-		return false
-	}
-	conn := s.mgr.FindByConnID(connID)
-	if !dispatch.TargetBoundConnFound(conn != nil) {
-		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
-		return false
-	}
-	if dispatch.TargetBoundConnRejected(true, conn.UserID, conn.DeviceType, conn.DeviceID, userID, deviceID) {
-		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
-		return false
-	}
-	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
-	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); !dispatch.RepoUpdateSucceeded(err) {
-		slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
-		return false
-	}
-	result := s.mgr.PushToConn(connID, frame)
-	if !dispatch.RedeliveryWSPushSucceeded(result.Queued) {
-		slog.Warn(dispatch.DispatchLogTargetBoundWSNotQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
-		queueTargetTask(dispatch.TargetBoundReasonWSNotQueued, result.Err)
-		return false
-	}
-	return true
-}
-
-// CancelTask cancels a pending task by its ID.
-func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string) error {
-	task, err := repository.GetPendingTaskByID(s.db, taskID)
-	if err := dispatch.MapPendingTaskLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
-		return err
-	}
-	if err := dispatch.TaskNotFoundIfNotOwner(task.TriggeredByUserID, userID); err != nil {
-		return err
-	}
-	if err := dispatch.CancelTaskTerminalError(task.Status); err != nil {
-		return err
-	}
-
-	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusCancelled, "")
-	if err != nil {
-		return err
-	}
-	if err := dispatch.CancelTaskNoRowsError(rowsAffected); err != nil {
-		return err
-	}
-
-	s.publish(ctx, Event{Type: dispatch.EventTypeAgentCancel, Payload: dispatch.CancelEventPayload(
-		taskID, task.AgentInstanceID, ai.SessionID, task.TriggeredByUserID,
-	)})
-
-	return nil
-}
-
-// RegenerateAgentTask creates a new task using the same prompt as an existing task.
-// It looks up the original task, verifies ownership, and triggers a new task with
-// the same trigger message, agent instance, and target.
-func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
-	original, err := repository.GetPendingTaskByID(s.db, taskID)
-	if err := dispatch.MapPendingTaskLookupError(err, errors.Is(err, gorm.ErrRecordNotFound)); err != nil {
-		return nil, err
-	}
-	if err := dispatch.TaskNotFoundIfNotOwner(original.TriggeredByUserID, userID); err != nil {
-		return nil, err
-	}
-
-	// Only allow regenerating from terminal tasks (done/failed/cancelled/timeout).
-	if err := dispatch.RegenerateTaskStatusError(original.Status); err != nil {
-		return nil, err
-	}
-
-	ai, err := repository.GetAgentInstanceByID(s.db, original.AgentInstanceID)
-	if err != nil {
-		return nil, err
-	}
-
-	newTask, err := s.TriggerAgentTask(ctx, userID, original.TriggerMessageID, ai.ID, ai.AgentType, "", "", original.TargetID)
-	if err != nil {
-		return nil, err
-	}
-
-	s.publish(ctx, Event{Type: dispatch.EventTypeAgentRegenerate, Payload: dispatch.RegenerateEventPayload(
-		taskID, newTask.ID, ai.ID, ai.SessionID, original.TriggerMessageID,
-	)})
-
-	return newTask, nil
-}
-
-// issueRunStartCapability mints a short-lived capability token for Edge dual-token auth.
-// Empty when secret/device unavailable so local/dev dispatch still works.
 func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	if !dispatch.CapabilityPayloadPresent(dp != nil) {
 		return ""
