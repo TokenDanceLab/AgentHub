@@ -16,6 +16,7 @@ import {
   classifyHubRequestCatch,
   createAuthOnlyHeaders,
   createHubAbortTimeout,
+  createHubClientTransport,
   createJsonAuthHeaders,
   createNetworkAppError,
   createTimeoutAppError,
@@ -33,9 +34,13 @@ import {
   prepareMultipartUploadContext,
   prepareMultipartUploadContextFromClient,
   requestMethodOf,
+  resolveHubClientRuntime,
+  resolveHubClientTransportOptions,
   resolveHubFetch,
   resolveHubRequestCatch,
   resolveHubTimeoutMs,
+  runHubClientJsonRequest,
+  runHubClientMultipartUploadRequest,
   runHubJsonRequest,
   runHubMultipartUploadRequest,
   runUnauthorizedTokenRefreshRecovery,
@@ -46,7 +51,7 @@ import {
   withHubAbortTimeout,
 } from './hubClientTransportUtils';
 
-describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #1023 / #1044)', () => {
+describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #1023 / #1044 / #1055)', () => {
   it('exports the default hub timeout used by createHubClient', () => {
     expect(DEFAULT_HUB_TIMEOUT_MS).toBe(30_000);
   });
@@ -579,5 +584,138 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(multiCalls).toEqual([
       { url: 'https://hub.example.com/client/attachments', method: 'POST' },
     ]);
+  });
+
+  it('peels createHubClient transport runtime + envelope wrappers (#1055)', async () => {
+    const runtime = resolveHubClientRuntime({
+      baseUrl: 'https://hub.example.com///',
+      fetch: async () => new Response('{}', { status: 200 }),
+    });
+    expect(runtime.baseUrl).toBe('https://hub.example.com');
+    expect(typeof runtime.fetchImpl).toBe('function');
+
+    // exactOptional: omit optional keys when undefined
+    const transportOptsMinimal = resolveHubClientTransportOptions(runtime, {});
+    expect(transportOptsMinimal).toEqual({
+      baseUrl: 'https://hub.example.com',
+      fetchImpl: runtime.fetchImpl,
+    });
+    expect(Object.prototype.hasOwnProperty.call(transportOptsMinimal, 'getToken')).toBe(
+      false,
+    );
+    expect(Object.prototype.hasOwnProperty.call(transportOptsMinimal, 'timeoutMs')).toBe(
+      false,
+    );
+    expect(
+      Object.prototype.hasOwnProperty.call(transportOptsMinimal, 'onRefreshToken'),
+    ).toBe(false);
+
+    const getToken = () => 'tok';
+    const onRefreshToken = async () => null;
+    const transportOpts = resolveHubClientTransportOptions(runtime, {
+      getToken,
+      timeoutMs: 5_000,
+      onRefreshToken,
+    });
+    expect(transportOpts.getToken).toBe(getToken);
+    expect(transportOpts.timeoutMs).toBe(5_000);
+    expect(transportOpts.onRefreshToken).toBe(onRefreshToken);
+
+    const envelopeFetch: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe('https://hub.example.com/client/auth/me');
+      expect(init?.method).toBe('GET');
+      return new Response(JSON.stringify({ code: 'OK', data: { id: 'u1' } }), {
+        status: 200,
+      });
+    };
+    const me = await runHubClientJsonRequest({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/auth/me',
+      options: { method: 'GET' },
+      token: 'tok',
+      timeoutMs: 5_000,
+      fetchImpl: envelopeFetch,
+    });
+    expect(me).toEqual({ id: 'u1' });
+
+    const form = new FormData();
+    form.set('hash', 'h1');
+    const multiFetch: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe('https://hub.example.com/client/attachments');
+      expect(init?.method).toBe('POST');
+      return new Response(JSON.stringify({ code: 'OK', data: { id: 'a1' } }), {
+        status: 200,
+      });
+    };
+    const uploaded = await runHubClientMultipartUploadRequest({
+      baseUrl: 'https://hub.example.com',
+      path: '/client/attachments',
+      formData: form,
+      token: 'tok',
+      timeoutMs: 5_000,
+      fetchImpl: multiFetch,
+    });
+    expect(uploaded).toEqual({ id: 'a1' });
+
+    const calls: Array<{ url: string; method?: string }> = [];
+    const transportFetch: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), method: init?.method });
+      return new Response(JSON.stringify({ code: 'OK', data: { ok: true } }), {
+        status: 200,
+      });
+    };
+    const transport = createHubClientTransport({
+      baseUrl: 'https://hub.example.com',
+      fetchImpl: transportFetch,
+      getToken: () => 'tok',
+      timeoutMs: 5_000,
+    });
+    const result = await transport.request<{ ok: boolean }>('/client/auth/me', {
+      method: 'GET',
+    });
+    expect(result).toEqual({ ok: true });
+    expect(calls[0]?.url).toBe('https://hub.example.com/client/auth/me');
+
+    // dual-route fallback residual via transport
+    let attempt = 0;
+    const fallbackFetch: typeof fetch = async (input) => {
+      attempt += 1;
+      if (String(input).includes(':cancel') && attempt === 1) {
+        return new Response(JSON.stringify({ error: { code: 'x', message: 'm' } }), {
+          status: 404,
+        });
+      }
+      return new Response(JSON.stringify({ code: 'OK', data: null }), { status: 200 });
+    };
+    const fallbackTransport = createHubClientTransport({
+      baseUrl: 'https://hub.example.com',
+      fetchImpl: fallbackFetch,
+      getToken: () => 'tok',
+    });
+    await fallbackTransport.requestWithFallback<null>(
+      ['/web/agent-tasks/t1:cancel', '/web/agent-tasks/t1/cancel'],
+      { method: 'POST' },
+    );
+    expect(attempt).toBe(2);
+
+    const multiCalls: string[] = [];
+    const uploadTransport = createHubClientTransport({
+      baseUrl: 'https://hub.example.com',
+      fetchImpl: async (input) => {
+        multiCalls.push(String(input));
+        return new Response(JSON.stringify({ code: 'OK', data: { id: 'a2' } }), {
+          status: 200,
+        });
+      },
+      getToken: () => 'tok',
+    });
+    const form2 = new FormData();
+    form2.set('hash', 'h2');
+    const up = await uploadTransport.uploadMultipart<{ id: string }>(
+      '/client/attachments',
+      form2,
+    );
+    expect(up).toEqual({ id: 'a2' });
+    expect(multiCalls).toEqual(['https://hub.example.com/client/attachments']);
   });
 });
