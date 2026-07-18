@@ -109,4 +109,3 @@ Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; d
 | `.ah-glass-press` | soft hover lift + press scale | optional utility class |
 
 Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.
-
