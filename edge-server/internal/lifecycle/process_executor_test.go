@@ -1426,6 +1426,97 @@ func TestProcessExecutorCancelPublishesCancelledEvent(t *testing.T) {
 	}
 }
 
+// TestProcessExecutorCancelGraceNotImmediateKill verifies #988: Cancel must
+// not immediately kill the child via CommandContext. With a positive grace
+// period the process should survive until escalation, so the wall time from
+// Cancel() to run.cancelled is at least the configured grace period.
+func TestProcessExecutorCancelGraceNotImmediateKill(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	const grace = 400 * time.Millisecond
+	const force = 100 * time.Millisecond
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command:              os.Args[0],
+		Args:                 []string{processExecutorHelperRunFlag, "--", "sleep"},
+		Env:                  append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		ShutdownGracePeriod:  grace,
+		ShutdownForceTimeout: force,
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+	executor.faultEscalationCfg = FaultEscalationConfig{Enabled: false}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	// Wait until the child is tracked so Cancel arms the grace path (not just
+	// context cancel before Start).
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		executor.mu.Lock()
+		proc := executor.processes[run.ID]
+		executor.mu.Unlock()
+		if proc != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for process to be tracked")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Confirm grace path is armed and cancelDone is registered before the
+	// run context is cancelled (unit-level proof for #988).
+	cancelAt := time.Now()
+	result := executor.Cancel(run.ID)
+	if !result.Found || result.Status != "cancelling" {
+		t.Fatalf("Cancel result = %#v, want found cancelling", result)
+	}
+
+	executor.mu.Lock()
+	_, graceArmed := executor.cancelDone[run.ID]
+	procAfter := executor.processes[run.ID]
+	executor.mu.Unlock()
+	if !graceArmed {
+		t.Fatal("cancelDone not registered; grace path was not armed")
+	}
+	if procAfter == nil {
+		t.Fatal("process handle cleared immediately on Cancel")
+	}
+
+	// Immediately after Cancel the child must still be alive. If CommandContext
+	// were wired to the same ctx, Go would already have SIGKILLed it.
+	time.Sleep(80 * time.Millisecond)
+	if !processLikelyAlive(procAfter) {
+		t.Fatal("process died immediately after Cancel; grace period was defeated")
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.cancelled":
+			elapsed := time.Since(cancelAt)
+			// Allow a little scheduling slack under the grace floor, but require
+			// that cancellation was not an immediate CommandContext kill.
+			if elapsed < grace-50*time.Millisecond {
+				t.Fatalf("run.cancelled after %v, want at least ~%v grace (CommandContext may still be killing immediately)", elapsed, grace)
+			}
+			return
+		case "run.started", "run.output.batch":
+		case "run.failed":
+			t.Fatal("run failed instead of cancelling")
+		default:
+			// ignore other bus noise
+		}
+	}
+}
+
 func TestProcessExecutorCancelMissingRun(t *testing.T) {
 	executor := newTestProcessExecutor(t, events.NewBus(10), store.New(), "success")
 
