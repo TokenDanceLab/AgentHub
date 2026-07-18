@@ -89,3 +89,10 @@ func DeadLetterTaskStatus(status string) string {
 
 // PendingTaskRedeliverySelect is the column list for getPendingTaskForRedelivery.
 const PendingTaskRedeliverySelect = "id, agent_instance_id, triggered_by_user_id, status, edge_device_id, edge_run_id, target_id"
+
+// MapPendingTaskRedeliveryRow maps scanned redelivery columns onto PendingTaskSnapshot.
+func MapPendingTaskRedeliveryRow(
+	id, agentInstanceID, triggeredByUserID, status, edgeDeviceID, edgeRunID, targetID string,
+) PendingTaskSnapshot {
+	return NewPendingTaskSnapshot(id, agentInstanceID, triggeredByUserID, status, edgeDeviceID, edgeRunID, targetID)
+}

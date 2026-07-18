@@ -10,9 +10,11 @@
 // #811 → #823 (docs close) → #834 (alias drop) → #902 (assemble / target /
 // redispatch-prep peel) → #946 (edge-http prep / trigger guards / target-bound
 // / redispatch log peel) → #977 (lookup-error mappers / port predicates /
-// redispatch log constants / team+capability residual). Typed DispatchService
-// package move remains deferred and high risk. Do not re-open outbox redispatch
-// MarkDeliverySent semantics from #866 in this package.
+// redispatch log constants / team+capability residual) → #1012 (dispatch log
+// constants / redispatch task gate / offline success attrs / relay port /
+// capability payload guard). Typed DispatchService package move remains deferred
+// and high risk. Do not re-open outbox redispatch MarkDeliverySent semantics from
+// #866; preserve #999 soft-fail errors and #1000 running-not-retryable.
 //
 // See docs/analysis/hub-service-boundary-map.md.
 package dispatch
