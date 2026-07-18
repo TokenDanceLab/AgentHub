@@ -85,7 +85,6 @@ import type {
   HubRelayCommand,
 } from './hubClientDomainTypes';
 
-import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
   invokeNormalizedRegisterDeviceRequest,
@@ -94,75 +93,36 @@ import {
   invokePathsInitRequest,
   runChangePasswordWithFallback,
   runNormalizedExecutionTargetsListRequest,
-  runRequestWithRouteFallback,
 } from './hubClientRequestUtils';
 import {
-  normalizeHubBaseUrl,
-  resolveHubFetch,
-  runHubJsonRequest,
-  runHubMultipartUploadRequest,
+  createHubClientTransport,
+  resolveHubClientRuntime,
+  resolveHubClientTransportOptions,
 } from './hubClientTransportUtils';
 
 // ── Public type / envelope re-exports (extracted #810) ──
 export * from './hubClientPublicReexports';
 
 export function createHubClient(opts: HubClientOptions = {}) {
-  const baseUrl = normalizeHubBaseUrl(opts.baseUrl);
-  const fetchImpl = resolveHubFetch(opts.fetch);
-
-  async function request<T>(
-    path: string,
-    options: RequestInit = {},
-  ): Promise<T> {
-    return runHubJsonRequest({
-      baseUrl,
-      path,
-      options,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
-      fetchImpl,
-      onRefreshToken: opts.onRefreshToken,
-      parseSuccess: (response) => parseHubSuccessResponse<T>(response),
-    });
-  }
-
-  async function requestWithFallback<T>(
-    paths: readonly string[],
-    options: RequestInit = {},
-  ): Promise<T> {
-    return runRequestWithRouteFallback(
-      paths,
-      (path, init) => request<T>(path, init),
-      options,
-    );
-  }
-
-  async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
-    // Let the runtime set multipart boundary; do not force JSON content-type.
-    return runHubMultipartUploadRequest({
-      baseUrl,
-      path,
-      formData,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
-      fetchImpl,
-      parseSuccess: (response) => parseHubSuccessResponse<T>(response),
-    });
-  }
+  const runtime = resolveHubClientRuntime(opts);
+  const { request, requestWithFallback, uploadMultipart } =
+    createHubClientTransport(resolveHubClientTransportOptions(runtime, opts));
+  const { baseUrl } = runtime;
 
   return {
     request,
 
     register: (body: HubRegisterRequest) =>
-      request<{ user_id: string }>(hubPayload.buildRegisterPath(), hubPayload.buildJsonPostInit(body)),
+      invokePathInitRequest((path, init) => request<{ user_id: string }>(path, init), hubPayload.buildRegisterRequest(body)),
     login: (body: HubLoginRequest) =>
-      request<HubAuthResponse>(hubPayload.buildLoginPath(), hubPayload.buildJsonPostInit(body)),
+      invokePathInitRequest((path, init) => request<HubAuthResponse>(path, init), hubPayload.buildLoginRequest(body)),
     refresh: (refreshToken: string) =>
       invokePathInitRequest((path, init) => request<HubAuthResponse>(path, init), hubPayload.buildRefreshRequest(refreshToken)),
-    logout: () => request<void>(hubPayload.buildLogoutPath(), hubPayload.buildPostInit()),
+    logout: () =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildLogoutRequest()),
     me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
-      request<HubUserProfile>(hubPayload.buildUpdateProfilePath(), hubPayload.buildJsonPutInit(body)),
+      invokePathInitRequest((path, init) => request<HubUserProfile>(path, init), hubPayload.buildUpdateProfileRequest(body)),
     changePassword: (body: HubChangePasswordRequest) =>
       runChangePasswordWithFallback(
         (path, init) => request<void>(path, init),
@@ -172,10 +132,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
       invokePathInitRequest((path, init) => request<HubOidcAuthorizeResponse>(path, init), hubPayload.buildOidcAuthorizeRequest(body)),
     oidcCallback: (body: HubOidcCallbackRequest) =>
-      request<HubOidcCallbackResponse>(
-        hubPayload.buildOidcCallbackPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubOidcCallbackResponse>(path, init), hubPayload.buildOidcCallbackPathInit(body)),
 
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),
@@ -185,24 +142,15 @@ export function createHubClient(opts: HubClientOptions = {}) {
     listFriendRequests: () =>
       request<HubFriendRequest[]>(hubPayload.buildFriendRequestsPath()),
     acceptFriendRequest: (requestId: string) =>
-      request<void>(
-        hubPayload.buildAcceptFriendRequestPath(requestId),
-        hubPayload.buildPostInit(),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAcceptFriendRequest(requestId)),
     rejectFriendRequest: (requestId: string) =>
-      request<void>(
-        hubPayload.buildRejectFriendRequestPath(requestId),
-        hubPayload.buildPostInit(),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildRejectFriendRequest(requestId)),
     removeContact: (friendUserId: string) =>
-      request<void>(
-        hubPayload.buildRemoveContactPath(friendUserId),
-        hubPayload.buildDeleteInit(),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildRemoveContactRequest(friendUserId)),
     blockContact: (targetUserId: string) =>
-      request<void>(hubPayload.buildBlockContactPath(targetUserId), hubPayload.buildPostInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildBlockContactRequest(targetUserId)),
     unblockContact: (targetUserId: string) =>
-      request<void>(hubPayload.buildUnblockContactPath(targetUserId), hubPayload.buildPostInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUnblockContactRequest(targetUserId)),
     updateContactRemark: (friendUserId: string, remark: string) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateContactRemarkRequest(friendUserId, remark)),
 
@@ -210,52 +158,28 @@ export function createHubClient(opts: HubClientOptions = {}) {
     searchSessions: (q: string) =>
       request<HubSession[]>(hubPayload.buildSearchSessionsPath(q)),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
-      request<HubCreateSessionResponse>(
-        hubPayload.buildCreatePrivateSessionPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubCreateSessionResponse>(path, init), hubPayload.buildCreatePrivateSessionRequest(body)),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
-      request<HubCreateSessionResponse>(
-        hubPayload.buildCreateGroupSessionPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubCreateSessionResponse>(path, init), hubPayload.buildCreateGroupSessionRequest(body)),
     addSessionMembers: (sessionId: string, memberIds: string[]) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAddSessionMembersRequest(sessionId, memberIds)),
     removeSessionMember: (sessionId: string, userId: string) =>
-      request<void>(
-        hubPayload.buildRemoveSessionMemberPath(sessionId, userId),
-        hubPayload.buildDeleteInit(),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildRemoveSessionMemberRequest(sessionId, userId)),
     leaveSession: (sessionId: string) =>
-      request<void>(hubPayload.buildLeaveSessionPath(sessionId), hubPayload.buildPostInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildLeaveSessionRequest(sessionId)),
     transferSessionOwnership: (sessionId: string, newOwnerId: string) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildTransferSessionOwnershipRequest(sessionId, newOwnerId)),
     dissolveSession: (sessionId: string) =>
-      request<void>(hubPayload.buildDissolveSessionPath(sessionId), hubPayload.buildPostInit()),
-    updateSessionInfo: (
-      sessionId: string,
-      body: HubUpdateSessionInfoRequest,
-    ) =>
-      request<void>(
-        hubPayload.buildSessionInfoPath(sessionId),
-        hubPayload.buildJsonPutInit(body),
-      ),
-    updateSessionSettings: (
-      sessionId: string,
-      body: HubUpdateSessionSettingsRequest,
-    ) =>
-      request<void>(
-        hubPayload.buildSessionSettingsPath(sessionId),
-        hubPayload.buildJsonPutInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDissolveSessionRequest(sessionId)),
+    updateSessionInfo: (sessionId: string, body: HubUpdateSessionInfoRequest) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateSessionInfoRequest(sessionId, body)),
+    updateSessionSettings: (sessionId: string, body: HubUpdateSessionSettingsRequest) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateSessionSettingsRequest(sessionId, body)),
     deleteSession: (sessionId: string) =>
-      request<void>(hubPayload.buildSessionPath(sessionId), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDeleteSessionRequest(sessionId)),
 
     sendMessage: (sessionId: string, body: HubSendMessageRequest) =>
-      request<HubSendMessageResponse>(
-        hubPayload.buildGetMessagesPath(sessionId),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubSendMessageResponse>(path, init), hubPayload.buildSendMessageRequest(sessionId, body)),
     getMessages: (
       sessionId: string,
       params?: { before_seq?: number; limit?: number },
@@ -267,7 +191,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     markRead: (sessionId: string, lastReadSeq: number) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildMarkReadRequest(sessionId, lastReadSeq)),
     recallMessage: (messageId: string) =>
-      request<void>(hubPayload.buildRecallMessagePath(messageId), hubPayload.buildPostInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildRecallMessageRequest(messageId)),
     pinMessage: (messageId: string, sessionId: string) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildPinMessageRequest(messageId, sessionId)),
     unpinMessage: (messageId: string, sessionId: string) =>
@@ -323,14 +247,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
     failTask: (taskId: string, error: string, runId?: string) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildFailTaskRequest(taskId, error, runId)),
 
-    addAgentToSession: (
-      sessionId: string,
-      body: HubAddAgentToSessionRequest,
-    ) =>
-      request<HubAgentInstance>(
-        hubPayload.buildSessionAgentsPath(sessionId),
-        hubPayload.buildJsonPostInit(body),
-      ),
+    addAgentToSession: (sessionId: string, body: HubAddAgentToSessionRequest) =>
+      invokePathInitRequest((path, init) => request<HubAgentInstance>(path, init), hubPayload.buildAddAgentToSessionRequest(sessionId, body)),
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       invokePathInitRequest((path, init) => request<HubAgentTask>(path, init), hubPayload.buildTriggerAgentTaskRequest(triggerMessageId, options)),
     cancelAgentTask: (taskId: string) =>
@@ -341,10 +259,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
 
     regenerateAgentTask: (taskId: string) =>
-      request<HubAgentTask>(
-        hubPayload.buildRegenerateAgentTaskPath(taskId),
-        hubPayload.buildPostInit(),
-      ),
+      invokePathInitRequest((path, init) => request<HubAgentTask>(path, init), hubPayload.buildRegenerateAgentTaskRequest(taskId)),
 
     listExecutionTargets: (params?: {
       pageSize?: number;
@@ -358,49 +273,31 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.normalizeExecutionTargetsResponse,
       ),
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
-      request<HubExecutionTarget>(
-        hubPayload.buildExecutionTargetsPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubExecutionTarget>(path, init), hubPayload.buildCreateExecutionTargetRequest(body)),
     getExecutionTarget: (id: string) =>
       request<HubExecutionTarget>(hubPayload.buildExecutionTargetPath(id)),
-    updateExecutionTarget: (
-      id: string,
-      body: Partial<HubExecutionTargetRequest>,
-    ) =>
-      request<HubExecutionTarget>(
-        hubPayload.buildExecutionTargetPath(id),
-        hubPayload.buildJsonPatchInit(body),
-      ),
+    updateExecutionTarget: (id: string, body: Partial<HubExecutionTargetRequest>) =>
+      invokePathInitRequest((path, init) => request<HubExecutionTarget>(path, init), hubPayload.buildUpdateExecutionTargetRequest(id, body)),
     deleteExecutionTarget: (id: string) =>
-      request<void>(hubPayload.buildExecutionTargetPath(id), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDeleteExecutionTargetRequest(id)),
     pingExecutionTarget: (id: string) =>
-      request<HubExecutionTarget>(
-        hubPayload.buildPingExecutionTargetPath(id),
-        hubPayload.buildPostInit(),
-      ),
+      invokePathInitRequest((path, init) => request<HubExecutionTarget>(path, init), hubPayload.buildPingExecutionTargetRequest(id)),
     listAuditEvents: (params?: { pageSize?: number; pageCursor?: string }) =>
       request<HubListResponse<HubAuditEvent>>(hubPayload.buildListAuditEventsPath(params)),
     createRelayCommand: (body: HubRelayCommandRequest) =>
-      request<HubRelayCommand>(
-        hubPayload.buildRelayCommandsPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubRelayCommand>(path, init), hubPayload.buildCreateRelayCommandRequest(body)),
     getRelayCommand: (id: string) =>
       request<HubRelayCommand>(hubPayload.buildRelayCommandPath(id)),
     ackRelayCommand: (id: string) =>
-      request<void>(hubPayload.buildAckRelayCommandPath(id), hubPayload.buildPostInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAckRelayCommandRequest(id)),
 
     listCustomAgents: () => request<HubCustomAgent[]>(hubPayload.buildCustomAgentsPath()),
     createCustomAgent: (body: HubCustomAgentRequest) =>
-      request<HubCustomAgent>(
-        hubPayload.buildCustomAgentsPath(),
-        hubPayload.buildJsonPostInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubCustomAgent>(path, init), hubPayload.buildCreateCustomAgentRequest(body)),
     updateCustomAgent: (id: string, body: HubCustomAgentRequest) =>
-      request<void>(hubPayload.buildCustomAgentPath(id), hubPayload.buildJsonPutInit(body)),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateCustomAgentRequest(id, body)),
     deleteCustomAgent: (id: string) =>
-      request<void>(hubPayload.buildCustomAgentPath(id), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDeleteCustomAgentRequest(id)),
 
     listPublicSkills: (params?: {
       skill_type?: string;
@@ -426,25 +323,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getWorkspaceProject: (id: string) =>
       request<HubWorkspaceProject>(hubPayload.buildWorkspaceProjectPath(id)),
     createWorkspaceProject: (data: HubCreateWorkspaceProjectRequest) =>
-      request<HubWorkspaceProject>(
-        hubPayload.buildWorkspaceProjectsPath(),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubWorkspaceProject>(path, init), hubPayload.buildCreateWorkspaceProjectRequest(data)),
     updateWorkspaceProject: (id: string, data: HubUpdateWorkspaceProjectRequest) =>
-      request<HubWorkspaceProject>(
-        hubPayload.buildWorkspaceProjectPath(id),
-        hubPayload.buildJsonPatchInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubWorkspaceProject>(path, init), hubPayload.buildUpdateWorkspaceProjectRequest(id, data)),
     listWorkspaceProjectThreads: (projectId: string) =>
       request<HubWorkspaceProjectThread[]>(hubPayload.buildWorkspaceProjectThreadsPath(projectId)),
     createWorkspaceProjectThread: (
       projectId: string,
       data: HubCreateWorkspaceProjectThreadRequest,
     ) =>
-      request<HubWorkspaceProjectThread>(
-        hubPayload.buildWorkspaceProjectThreadsPath(projectId),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubWorkspaceProjectThread>(path, init), hubPayload.buildCreateWorkspaceProjectThreadRequest(projectId, data)),
     listWorkspaceProjectThreadMessages: (
       projectId: string,
       threadId: string,
@@ -458,17 +346,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
       threadId: string,
       data: HubSendWorkspaceProjectThreadMessageRequest,
     ) =>
-      request<HubWorkspaceProjectThreadMessage>(
-        hubPayload.buildSendWorkspaceProjectThreadMessagePath(projectId, threadId),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubWorkspaceProjectThreadMessage>(path, init), hubPayload.buildSendWorkspaceProjectThreadMessageRequest(projectId, threadId, data)),
 
     // ── T3.2 parity: team/settings/attachments/message extras (desktop∩web) ──
     editMessage: (messageId: string, body: { content: string }) =>
-      request<HubMessage>(
-        hubPayload.buildEditMessagePath(messageId),
-        hubPayload.buildJsonPutInit(body),
-      ),
+      invokePathInitRequest((path, init) => request<HubMessage>(path, init), hubPayload.buildEditMessageRequest(messageId, body)),
 
     addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
       invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildAddMessageReactionRequest(messageId, sessionId, reaction)),
@@ -497,7 +379,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentRunEvent[]>(hubPayload.buildListTaskRunEventsAfterPath(taskId, afterSeq)),
 
     createAgentTeam: (data: HubCreateAgentTeamRequest) =>
-      request<HubAgentTeam>(hubPayload.buildAgentTeamsPath(), hubPayload.buildJsonPostInit(data)),
+      invokePathInitRequest((path, init) => request<HubAgentTeam>(path, init), hubPayload.buildCreateAgentTeamRequest(data)),
 
     listAgentTeams: () => request<HubAgentTeam[]>(hubPayload.buildAgentTeamsPath()),
 
@@ -505,22 +387,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentTeamDetail>(hubPayload.buildAgentTeamPath(teamId)),
 
     updateAgentTeam: (teamId: string, data: HubUpdateAgentTeamRequest) =>
-      request<void>(hubPayload.buildAgentTeamPath(teamId), hubPayload.buildJsonPutInit(data)),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateAgentTeamRequest(teamId, data)),
 
     deleteAgentTeam: (teamId: string) =>
-      request<void>(hubPayload.buildAgentTeamPath(teamId), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildDeleteAgentTeamRequest(teamId)),
 
     addAgentTeamMember: (teamId: string, data: HubAddAgentTeamMemberRequest) =>
-      request<void>(
-        hubPayload.buildAgentTeamMembersPath(teamId),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAddAgentTeamMemberRequest(teamId, data)),
 
     startTeamRun: (teamId: string, data: HubStartAgentTeamRunRequest) =>
-      request<HubAgentTeamRun>(
-        hubPayload.buildAgentTeamRunsPath(teamId),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubAgentTeamRun>(path, init), hubPayload.buildStartTeamRunRequest(teamId, data)),
 
     listTeamRuns: (teamId: string) =>
       request<HubAgentTeamRun[]>(hubPayload.buildAgentTeamRunsPath(teamId)),
@@ -543,10 +419,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       approvalId: string,
       decision: HubTeamApprovalDecisionRequest,
     ) =>
-      request<HubTeamApprovalState>(
-        hubPayload.buildDecideTeamApprovalPath(teamId, runId, approvalId),
-        hubPayload.buildJsonPostInit(decision),
-      ),
+      invokePathInitRequest((path, init) => request<HubTeamApprovalState>(path, init), hubPayload.buildDecideTeamApprovalRequest(teamId, runId, approvalId, decision)),
 
     resolveTeamConflict: (
       teamId: string,
@@ -554,10 +427,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       conflictId: string,
       resolution: HubTeamConflictResolutionRequest,
     ) =>
-      request<HubTeamConflictState>(
-        hubPayload.buildResolveTeamConflictPath(teamId, runId, conflictId),
-        hubPayload.buildJsonPostInit(resolution),
-      ),
+      invokePathInitRequest((path, init) => request<HubTeamConflictState>(path, init), hubPayload.buildResolveTeamConflictRequest(teamId, runId, conflictId, resolution)),
 
     listAgentProfiles: (params?: {
       runtime_id?: string;
@@ -568,19 +438,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<HubAgentProfileListResponse>(hubPayload.buildListAgentProfilesPath(params)),
 
     createAgentProfile: (data: HubCreateAgentProfileRequest) =>
-      request<HubAgentProfile>(
-        hubPayload.buildAgentProfilesPath(),
-        hubPayload.buildJsonPostInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubAgentProfile>(path, init), hubPayload.buildCreateAgentProfileRequest(data)),
 
     updateAgentProfile: (id: string, data: HubUpdateAgentProfileRequest) =>
-      request<HubAgentProfile>(
-        hubPayload.buildAgentProfilePath(id),
-        hubPayload.buildJsonPatchInit(data),
-      ),
+      invokePathInitRequest((path, init) => request<HubAgentProfile>(path, init), hubPayload.buildUpdateAgentProfileRequest(id, data)),
 
     deleteAgentProfile: (id: string) =>
-      request<undefined>(hubPayload.buildAgentProfilePath(id), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildDeleteAgentProfileRequest(id)),
 
     fetchSettings: () => request<Record<string, string>>(hubPayload.buildSettingsPath()),
 
@@ -614,32 +478,26 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getDocument: (id: string) => request<HubDocument>(hubPayload.buildDocumentPath(id)),
 
     createDocument: (data: HubCreateDocumentRequest) =>
-      request<HubDocument>(hubPayload.buildDocumentsPath(), hubPayload.buildJsonPostInit(data)),
+      invokePathInitRequest((path, init) => request<HubDocument>(path, init), hubPayload.buildCreateDocumentRequest(data)),
 
     updateDocument: (id: string, data: HubUpdateDocumentRequest) =>
-      request<HubDocument>(hubPayload.buildDocumentPath(id), hubPayload.buildJsonPatchInit(data)),
+      invokePathInitRequest((path, init) => request<HubDocument>(path, init), hubPayload.buildUpdateDocumentRequest(id, data)),
 
     deleteDocument: (id: string) =>
-      request<undefined>(hubPayload.buildDocumentPath(id), hubPayload.buildDeleteInit()),
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildDeleteDocumentRequest(id)),
 
     getAgentProfile: (id: string) =>
       request<HubAgentProfile>(hubPayload.buildAgentProfilePath(id)),
 
     removeAgentTeamMember: (teamId: string, memberId: string) =>
-      request<undefined>(
-        hubPayload.buildRemoveAgentTeamMemberPath(teamId, memberId),
-        hubPayload.buildDeleteInit(),
-      ),
+      invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildRemoveAgentTeamMemberRequest(teamId, memberId)),
 
     postTeamRouteDecision: (
       teamId: string,
       runId: string,
       decision: HubCoordinatorRouteDecision,
     ) =>
-      request<Record<string, unknown>>(
-        hubPayload.buildPostTeamRouteDecisionPath(teamId, runId),
-        hubPayload.buildJsonPostInit(decision),
-      ),
+      invokePathInitRequest((path, init) => request<Record<string, unknown>>(path, init), hubPayload.buildPostTeamRouteDecisionRequest(teamId, runId, decision)),
 
     streamTaskEvent: (
       taskId: string,
@@ -658,10 +516,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       approvalId: string,
       decision: HubTaskApprovalDecisionRequest,
     ) =>
-      request<HubAgentTaskApproval>(
-        hubPayload.buildDecideTaskApprovalPath(taskId, approvalId),
-        hubPayload.buildJsonPostInit(decision),
-      ),
+      invokePathInitRequest((path, init) => request<HubAgentTaskApproval>(path, init), hubPayload.buildDecideTaskApprovalRequest(taskId, approvalId, decision)),
 
     listTaskArtifacts: (taskId: string) =>
       request<HubAgentTaskArtifactList>(hubPayload.buildListTaskArtifactsPath(taskId)),
