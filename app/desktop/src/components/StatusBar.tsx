@@ -71,7 +71,7 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
         size={8}
         fill="currentColor"
         className={isReconnecting ? styles.pulse : undefined}
-        style={{ color: online ? 'var(--color-success)' : 'var(--color-danger)' }}
+        style={{ color: online ? 'var(--success)' : 'var(--danger)' }}
         aria-hidden="true"
         data-testid={online ? 'status-dot-online' : 'status-dot-offline'}
       />
@@ -126,7 +126,7 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
             <Circle
               size={6}
               fill="currentColor"
-              style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
+              style={{ color: hubAuthenticated ? 'var(--success)' : 'var(--muted-foreground)' }}
               aria-hidden="true"
             />
             <span className={styles.wsStatus}>

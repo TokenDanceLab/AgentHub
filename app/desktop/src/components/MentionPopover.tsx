@@ -125,8 +125,8 @@ export default function MentionPopover({
                     style={{
                       color:
                         item.status === 'available'
-                          ? 'var(--color-success)'
-                          : 'var(--color-danger)',
+                          ? 'var(--success)'
+                          : 'var(--danger)',
                     }}
                   />
                 )}
