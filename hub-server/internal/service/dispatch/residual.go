@@ -1,8 +1,9 @@
 package dispatch
 
-// residual.go holds pure residual helpers peeled from agent_dispatch (#1033).
-// Decision helpers, identity extractors, and delivery-mark plans only — no DB /
-// WS / cache / *Service ownership. Preserve #866/#999/#1000/#1009/#1031 semantics.
+// residual.go holds pure residual helpers peeled from agent_dispatch
+// (#1033 → #1056). Decision helpers, identity extractors, delivery-mark plans,
+// and DTO assembly cores only — no DB / WS / cache / *Service ownership.
+// Preserve #866/#999/#1000/#1009/#1031 semantics.
 
 // CustomAgentIDFromAgentPresence returns the custom-agent pointer when the agent
 // row is present; nil when the agent argument was nil (resolveDispatchTeamContext).
@@ -19,6 +20,52 @@ func TeamRunIDValue(runPresent bool, runID string) string {
 		return ""
 	}
 	return runID
+}
+
+// TeamRunIdentity extracts pure team-run identity for MatchTeamContext.
+// When runPresent is false both IDs are empty (short-circuit before TeamRunLoadable).
+func TeamRunIdentity(runPresent bool, teamID, runID string) (teamIDOut, runIDOut string) {
+	if !runPresent {
+		return "", ""
+	}
+	return teamID, runID
+}
+
+// MapPendingTaskRedeliveryLookup maps a redelivery SELECT row onto a snapshot, or
+// returns the lookup error unchanged (getPendingTaskForRedelivery).
+func MapPendingTaskRedeliveryLookup(
+	err error,
+	id, agentInstanceID, triggeredByUserID, status, edgeDeviceID, edgeRunID, targetID string,
+) (*PendingTaskSnapshot, error) {
+	if err != nil {
+		return nil, err
+	}
+	snap := MapPendingTaskRedeliveryRow(
+		id, agentInstanceID, triggeredByUserID, status, edgeDeviceID, edgeRunID, targetID,
+	)
+	return &snap, nil
+}
+
+// EdgeHTTPClientResponsePlan is the pure post-HTTP-Do classification for
+// dispatchToEdgeHTTP (run id vs non-success vs decode failure).
+type EdgeHTTPClientResponsePlan struct {
+	RunID      string
+	NonSuccess bool
+	DecodeFail bool
+	DecodeErr  error
+	LogMessage string
+}
+
+// PlanEdgeHTTPClientResponse classifies an Edge /v1/runs response body/status.
+func PlanEdgeHTTPClientResponse(statusCode int, respBody []byte) EdgeHTTPClientResponsePlan {
+	runID, nonSuccess, decodeErr := EdgeHTTPDispatchResult(statusCode, respBody)
+	if nonSuccess {
+		return EdgeHTTPClientResponsePlan{NonSuccess: true, LogMessage: EdgeHTTPLogNonSuccess}
+	}
+	if decodeErr != nil {
+		return EdgeHTTPClientResponsePlan{DecodeFail: true, DecodeErr: decodeErr, LogMessage: EdgeHTTPLogDecodeFailed}
+	}
+	return EdgeHTTPClientResponsePlan{RunID: runID}
 }
 
 // TaskStatusOrEmpty returns task.Status for redispatch gating, or "" when task is nil.
@@ -124,4 +171,81 @@ func HubRelayCreateSucceeded(err error) bool {
 // CapabilityTokenMintSucceeded is true when jwtutil.IssueCapabilityToken returned no error.
 func CapabilityTokenMintSucceeded(err error) bool {
 	return err == nil
+}
+
+// UnboundInviterDesktopWSQueued is true when inviter-desktop PushToConn queued
+// the agent_dispatch frame (live path). Mirrors RedeliveryWSPushSucceeded under
+// the initial-dispatch naming so call sites stay symmetric with target-bound.
+func UnboundInviterDesktopWSQueued(queued bool) bool {
+	return RedeliveryWSPushSucceeded(queued)
+}
+
+// TargetBoundOfflinePushInfoLog is true when target-bound offline queue accepted
+// a push that carried a non-nil prior error (route/WS failure path logs Info).
+// When priorErr is nil (conn mismatch with no route err), only Error on push
+// failure is emitted — historical dispatchTargetBoundTask queueTargetTask branch.
+func TargetBoundOfflinePushInfoLog(priorErr error) bool {
+	return priorErr != nil
+}
+
+// RepoUpdateSucceeded is true when a repository write (UpdatePendingTask*) returned no error.
+func RepoUpdateSucceeded(err error) bool {
+	return err == nil
+}
+
+// OfflineQueuePushSucceeded is true when PushPendingTask / PushPendingTargetTask
+// returned no error (queue acceptance; not Edge receipt — #1031).
+func OfflineQueuePushSucceeded(err error) bool {
+	return err == nil
+}
+
+// CapabilityMintResult is the pure post-mint decision for issueRunStartCapability.
+// Token is non-empty only when minting succeeded; LogFailure means warn + return "".
+type CapabilityMintResult struct {
+	Token      string
+	LogFailure bool
+}
+
+// PlanCapabilityMintResult maps IssueCapabilityToken outcome onto token vs warn.
+// On mint error LogFailure is true and Token is empty (local/dev skip path).
+func PlanCapabilityMintResult(token string, err error) CapabilityMintResult {
+	if !CapabilityTokenMintSucceeded(err) {
+		return CapabilityMintResult{LogFailure: true}
+	}
+	return CapabilityMintResult{Token: token}
+}
+
+// RedispatchPrepGate is the pure dead-letter branch after PrepareRedispatchPayload.
+// DeadLetter=true means redispatchDelivery should move the row and return nil.
+type RedispatchPrepGate struct {
+	DeadLetter bool
+	Kind       string
+	Unwrap     error
+	LogMessage string
+}
+
+// PlanRedispatchPrepGate classifies PrepareRedispatchPayload errors for the
+// historical redispatchDelivery dead-letter path. err==nil yields DeadLetter=false.
+func PlanRedispatchPrepGate(err error) RedispatchPrepGate {
+	if err == nil {
+		return RedispatchPrepGate{}
+	}
+	kind, unwrap := RedispatchPrepFailure(err)
+	return RedispatchPrepGate{
+		DeadLetter: true,
+		Kind:       kind,
+		Unwrap:     unwrap,
+		LogMessage: RedispatchPrepLogMessage(kind),
+	}
+}
+
+// IsUnboundInviterDesktopRoute is true when post-HTTP unbound fallback is inviter desktop.
+func IsUnboundInviterDesktopRoute(route RouteKind) bool {
+	return route == RouteInviterDesktop
+}
+
+// TeamMatchCustomAgentID resolves the custom-agent id string passed to MatchTeamContext
+// after TeamContextResolutionReady already established agent presence + binding.
+func TeamMatchCustomAgentID(customAgentID *string) string {
+	return CustomAgentIDValue(customAgentID)
 }

@@ -225,6 +225,71 @@ func TestResidual1033Helpers(t *testing.T) {
 	require.Len(t, in.PinnedMessages, 1)
 }
 
+func TestResidual1056Helpers(t *testing.T) {
+	// Team-run identity extractors (#1056).
+	teamID, runID := TeamRunIdentity(true, "team-1", "run-1")
+	assert.Equal(t, "team-1", teamID)
+	assert.Equal(t, "run-1", runID)
+	teamID, runID = TeamRunIdentity(false, "team-1", "run-1")
+	assert.Equal(t, "", teamID)
+	assert.Equal(t, "", runID)
+
+	ca := "ca-1"
+	assert.Equal(t, "ca-1", TeamMatchCustomAgentID(&ca))
+	assert.Equal(t, "", TeamMatchCustomAgentID(nil))
+
+	// Repo / offline / WS residual predicates — #1031 offline still never marks sent.
+	assert.True(t, RepoUpdateSucceeded(nil))
+	assert.False(t, RepoUpdateSucceeded(errors.New("db")))
+	assert.True(t, OfflineQueuePushSucceeded(nil))
+	assert.False(t, OfflineQueuePushSucceeded(errors.New("redis")))
+	assert.True(t, UnboundInviterDesktopWSQueued(true))
+	assert.False(t, UnboundInviterDesktopWSQueued(false))
+	assert.True(t, TargetBoundOfflinePushInfoLog(errors.New("route")))
+	assert.False(t, TargetBoundOfflinePushInfoLog(nil))
+	assert.True(t, IsUnboundInviterDesktopRoute(RouteInviterDesktop))
+	assert.False(t, IsUnboundInviterDesktopRoute(RouteOffline))
+
+	// Capability mint result plan.
+	ok := PlanCapabilityMintResult("tok", nil)
+	assert.Equal(t, "tok", ok.Token)
+	assert.False(t, ok.LogFailure)
+	fail := PlanCapabilityMintResult("tok", errors.New("mint"))
+	assert.Equal(t, "", fail.Token)
+	assert.True(t, fail.LogFailure)
+
+	// Redispatch prep gate: err → dead-letter; nil → retry path.
+	prepOK := PlanRedispatchPrepGate(nil)
+	assert.False(t, prepOK.DeadLetter)
+	prepFail := PlanRedispatchPrepGate(&PayloadPrepError{Kind: DeadLetterKindPayloadUnmarshal, Err: errors.New("bad")})
+	assert.True(t, prepFail.DeadLetter)
+	assert.Equal(t, DeadLetterKindPayloadUnmarshal, prepFail.Kind)
+	assert.Equal(t, "failed to unmarshal delivery payload for redispatch", prepFail.LogMessage)
+	require.Error(t, prepFail.Unwrap)
+
+	// Redelivery lookup mapper.
+	snap, err := MapPendingTaskRedeliveryLookup(nil, "id", "ai", "u", "queued", "d", "r", "t")
+	require.NoError(t, err)
+	require.NotNil(t, snap)
+	assert.Equal(t, "id", snap.ID)
+	assert.Equal(t, "queued", snap.Status)
+	_, err = MapPendingTaskRedeliveryLookup(errors.New("missing"), "", "", "", "", "", "", "")
+	require.Error(t, err)
+
+	// Edge HTTP client response plan.
+	plan := PlanEdgeHTTPClientResponse(http.StatusAccepted, []byte(`{"success":true,"data":{"runId":"run-9"}}`))
+	assert.Equal(t, "run-9", plan.RunID)
+	assert.False(t, plan.NonSuccess)
+	assert.False(t, plan.DecodeFail)
+	plan = PlanEdgeHTTPClientResponse(http.StatusBadRequest, []byte(`nope`))
+	assert.True(t, plan.NonSuccess)
+	assert.Equal(t, EdgeHTTPLogNonSuccess, plan.LogMessage)
+	plan = PlanEdgeHTTPClientResponse(http.StatusOK, []byte(`{`))
+	assert.True(t, plan.DecodeFail)
+	assert.Equal(t, EdgeHTTPLogDecodeFailed, plan.LogMessage)
+	require.Error(t, plan.DecodeErr)
+}
+
 func TestTriggerGuards(t *testing.T) {
 	assert.Equal(t, "t1", NormalizeOptionalTargetID(" t1 "))
 	assert.True(t, IsEmptyTargetID(""))
