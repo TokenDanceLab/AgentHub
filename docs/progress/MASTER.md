@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-18
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43 · [#882](https://github.com/TokenDanceLab/AgentHub/pull/882)–[#886](https://github.com/TokenDanceLab/AgentHub/pull/886) Phase 44 · [#893](https://github.com/TokenDanceLab/AgentHub/pull/893)–[#897](https://github.com/TokenDanceLab/AgentHub/pull/897) Phase 45 · [#904](https://github.com/TokenDanceLab/AgentHub/pull/904)–[#908](https://github.com/TokenDanceLab/AgentHub/pull/908) Phase 46 · [#915](https://github.com/TokenDanceLab/AgentHub/pull/915)–[#919](https://github.com/TokenDanceLab/AgentHub/pull/919) Phase 47 · [#926](https://github.com/TokenDanceLab/AgentHub/pull/926)–[#930](https://github.com/TokenDanceLab/AgentHub/pull/930) Phase 48 · [#937](https://github.com/TokenDanceLab/AgentHub/pull/937)–[#941](https://github.com/TokenDanceLab/AgentHub/pull/941) Phase 49 · [#948](https://github.com/TokenDanceLab/AgentHub/pull/948)–[#952](https://github.com/TokenDanceLab/AgentHub/pull/952) Phase 50 · [#959](https://github.com/TokenDanceLab/AgentHub/pull/959)–[#963](https://github.com/TokenDanceLab/AgentHub/pull/963) Phase 51 · [#970](https://github.com/TokenDanceLab/AgentHub/pull/970)–[#974](https://github.com/TokenDanceLab/AgentHub/pull/974) Phase 52 · [#981](https://github.com/TokenDanceLab/AgentHub/pull/981)–[#985](https://github.com/TokenDanceLab/AgentHub/pull/985) Phase 53 · [#992](https://github.com/TokenDanceLab/AgentHub/pull/992)–[#996](https://github.com/TokenDanceLab/AgentHub/pull/996) Phase 54 · [#1003](https://github.com/TokenDanceLab/AgentHub/pull/1003)–[#1007](https://github.com/TokenDanceLab/AgentHub/pull/1007) Phase 55 · [#1014](https://github.com/TokenDanceLab/AgentHub/pull/1014)–[#1018](https://github.com/TokenDanceLab/AgentHub/pull/1018) Phase 56 · [#1025](https://github.com/TokenDanceLab/AgentHub/pull/1025)–[#1029](https://github.com/TokenDanceLab/AgentHub/pull/1029) Phase 57 · [#1036](https://github.com/TokenDanceLab/AgentHub/pull/1036)–[#1040](https://github.com/TokenDanceLab/AgentHub/pull/1040) Phase 58
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#875](https://github.com/TokenDanceLab/AgentHub/pull/875) Phase 43 · [#882](https://github.com/TokenDanceLab/AgentHub/pull/882)–[#886](https://github.com/TokenDanceLab/AgentHub/pull/886) Phase 44 · [#893](https://github.com/TokenDanceLab/AgentHub/pull/893)–[#897](https://github.com/TokenDanceLab/AgentHub/pull/897) Phase 45 · [#904](https://github.com/TokenDanceLab/AgentHub/pull/904)–[#908](https://github.com/TokenDanceLab/AgentHub/pull/908) Phase 46 · [#915](https://github.com/TokenDanceLab/AgentHub/pull/915)–[#919](https://github.com/TokenDanceLab/AgentHub/pull/919) Phase 47 · [#926](https://github.com/TokenDanceLab/AgentHub/pull/926)–[#930](https://github.com/TokenDanceLab/AgentHub/pull/930) Phase 48 · [#937](https://github.com/TokenDanceLab/AgentHub/pull/937)–[#941](https://github.com/TokenDanceLab/AgentHub/pull/941) Phase 49 · [#948](https://github.com/TokenDanceLab/AgentHub/pull/948)–[#952](https://github.com/TokenDanceLab/AgentHub/pull/952) Phase 50 · [#959](https://github.com/TokenDanceLab/AgentHub/pull/959)–[#963](https://github.com/TokenDanceLab/AgentHub/pull/963) Phase 51 · [#970](https://github.com/TokenDanceLab/AgentHub/pull/970)–[#974](https://github.com/TokenDanceLab/AgentHub/pull/974) Phase 52 · [#981](https://github.com/TokenDanceLab/AgentHub/pull/981)–[#985](https://github.com/TokenDanceLab/AgentHub/pull/985) Phase 53 · [#992](https://github.com/TokenDanceLab/AgentHub/pull/992)–[#996](https://github.com/TokenDanceLab/AgentHub/pull/996) Phase 54 · [#1003](https://github.com/TokenDanceLab/AgentHub/pull/1003)–[#1007](https://github.com/TokenDanceLab/AgentHub/pull/1007) Phase 55 · [#1014](https://github.com/TokenDanceLab/AgentHub/pull/1014)–[#1018](https://github.com/TokenDanceLab/AgentHub/pull/1018) Phase 56 · [#1025](https://github.com/TokenDanceLab/AgentHub/pull/1025)–[#1029](https://github.com/TokenDanceLab/AgentHub/pull/1029) Phase 57 · [#1036](https://github.com/TokenDanceLab/AgentHub/pull/1036)–[#1041](https://github.com/TokenDanceLab/AgentHub/pull/1041) Phase 58
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 58 open Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 79 --state open`
-- **Labels**: `spec-driven` · `phase:58`
+- **Phase 59 open Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 80 --state open`
+- **Labels**: `spec-driven` · `phase:59`
 
 ## References
 
@@ -51,7 +51,8 @@
 | 55 | MCP workDir SSOT + outbox truthfulness + cascade cancel | #76 | closed (PRs #1003–#1007) |
 | 56 | Outbox atomic claim + chat loadError UX + residual peels | #77 | closed (PRs #1014–#1018) |
 | 57 | Callback backpressure + design token residual + peels | #78 | closed (PRs #1025–#1029) |
-| 58 | Offline/outbox dual redelivery + residual peels | #79 | active (open #1035; closed #1030–#1034 via PRs #1036–#1040) |
+| 58 | Offline/outbox dual redelivery + residual peels | #79 | closed (PRs #1036–#1041) |
+| 59 | Residual peels + root layout research | #80 | active (open #1042–#1047) |
 
 ## Issue Mapping (summary)
 
@@ -69,13 +70,14 @@
 | #997–#1002 Phase 55 MCP workDir + outbox truthfulness + cascade cancel | closed (PRs #1003–#1007; #1002 hygiene ops-only) |
 | #1008–#1013 Phase 56 outbox atomic claim + chat loadError UX + residual peels | closed (PRs #1014–#1018; #1013 hygiene ops-only) |
 | #1019–#1024 Phase 57 callback backpressure + design token residual + peels | closed (PRs #1025–#1029; #1024 hygiene ops-only) |
-| #1030–#1035 Phase 58 offline/outbox dual redelivery + residual peels | partial — closed #1030–#1034 (PRs #1036–#1040); open #1035 hygiene (milestone 79 open=1) |
+| #1030–#1035 Phase 58 offline/outbox dual redelivery + residual peels | closed (PRs #1036–#1041; #1035 hygiene ops-only) |
+| #1042–#1047 Phase 59 residual peels + root layout research | open (milestone 80) |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=79) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 79 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=29 and .number<=80) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 80 --state open
 git worktree list
 ```
 
@@ -93,23 +95,24 @@ git worktree list
 - [x] Phase 55 MCP workDir SSOT + outbox truthfulness + cascade cancel (#997–#1002 / PRs #1003–#1007)
 - [x] Phase 56 outbox atomic claim + chat loadError UX + residual peels (#1008–#1013 / PRs #1014–#1018)
 - [x] Phase 57 callback backpressure + design token residual + peels (#1019–#1024 / PRs #1025–#1029)
-- [ ] Phase 58 offline/outbox dual redelivery + residual peels (#1030–#1035)
+- [x] Phase 58 offline/outbox dual redelivery + residual peels (#1030–#1035 / PRs #1036–#1041)
+- [ ] Phase 59 residual peels + root layout research (#1042–#1047)
 
 ## Current Status
 
-**Active Phase**: Phase 58 — Offline/outbox dual redelivery + residual peels (milestone 79; open=1)
-**Active Tasks**: #1035 hygiene closeout (neat-freak docs PR in flight)
+**Active Phase**: Phase 59 — Residual peels + root layout research (milestone 80; open=6)
+**Active Tasks**: #1042 MASTER · #1043 process_executor peel · #1044 hubClient peel · #1045 store_query peel · #1046 root layout ADR · #1047 hygiene
 **Blockers**: None
-**Stability note**: Phase 58 nearly closed — dual redelivery + peels + envelope note + agent_dispatch residual peel landed; hygiene closeout open
+**Stability note**: Phase 58 closed (ms 79) — dual redelivery + peels + envelope note + neat-freak hygiene landed
 **Production fact**: external ops SSOT only (server `projects/agenthub`; do not invent host labels in-repo)
-**Tip**: a3e68f90 on `master` (Phase 58 PRs #1036–#1040)
-**Residual LOC band**: process_executor 1160 · hubClient 696 · agent_dispatch 789 · sqlite_store 709 · delivery_outbox 469
-**Boundary map next residual**: hygiene closeout (#1035) · next residual measure after docs merge
+**Tip**: 08ceb364 on `master` (Phase 58 PRs #1036–#1041; docs neat-freak #1041)
+**Residual LOC band**: process_executor ~1160 · hubClient ~696 · agent_dispatch ~789 · sqlite_store ~709 · delivery_outbox ~469 · store_query ~1321
+**Boundary map next residual**: process_executor / hubClient / store_query peels · root layout research (no bulk move) · hygiene closeout
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/**` local scratch only, never SSOT (#428)
 
 ## Next Steps
 
-1. Land #1035 hygiene closeout (docs neat-freak PR); close milestone 79
+1. Land Phase 59 Wave1: MASTER (#1042) then residual peels (#1043–#1045) + root layout ADR (#1046)
 2. Keep MASTER ≤150 lines; archive detail elsewhere
 3. Hold unmerged locals (`task/super-governance-baseline`) for separate review
 
@@ -119,9 +122,9 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | Phase 42–57 closed; Phase 58 landings #1030–#1034 (PRs #1036–#1040); open #1035 hygiene |
+| 2026-07-18 | lead | Phase 42–58 closed; Phase 59 open #1042–#1047 (ms 80); tip 08ceb364 |
 
 ## Completion notes
 
 - Phase 57 closed via #1019–#1024 (PRs #1025–#1029). Tip then dd576b4a.
-- 2026-07-18 Phase 58: #1030 MASTER (#1036) · #1031 dual redelivery (#1038) · #1032 sqlite_store (#1039) · #1033 agent_dispatch peel (#1040) · #1034 OpenAPI envelope note (#1037). Tip a3e68f90. Open: #1035 hygiene.
+- Phase 58 closed via #1030–#1035 (PRs #1036–#1041): #1030 MASTER (#1036) · #1031 dual redelivery (#1038) · #1032 sqlite_store (#1039) · #1033 agent_dispatch peel (#1040) · #1034 OpenAPI envelope note (#1037) · #1035 neat-freak hygiene (#1041). Milestone 79 closed. Tip 08ceb364.
