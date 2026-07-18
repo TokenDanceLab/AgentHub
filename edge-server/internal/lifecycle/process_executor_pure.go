@@ -2121,3 +2121,135 @@ type stdinPipeOpenPlan struct {
 func planStdinPipeOpen(adapter adapters.AgentAdapter) stdinPipeOpenPlan {
 	return stdinPipeOpenPlan{Open: needsAdapterStdin(adapter)}
 }
+
+// processSignalLogPlan is the pure log gate for process signal/kill errors.
+type processSignalLogPlan struct {
+	Log bool
+}
+
+// planProcessSignalLog maps a signal/kill error into the debug-log flag used by
+// Cancel grace escalation and watchRunProcess timeout kill (#988).
+func planProcessSignalLog(err error) processSignalLogPlan {
+	return processSignalLogPlan{Log: err != nil}
+}
+
+// preflightAdapterPlan is the pure type-assert gate before PreflightCheck.
+type preflightAdapterPlan struct {
+	Check bool
+}
+
+// planPreflightAdapter reports whether the resolved adapter implements
+// PreflightAdapter and should run PreflightCheck.
+func planPreflightAdapter(ok bool) preflightAdapterPlan {
+	return preflightAdapterPlan{Check: ok}
+}
+
+// subAgentInstanceLookupPlan is the pure gate before registry.Get in sendSubAgentResult.
+type subAgentInstanceLookupPlan struct {
+	Lookup bool
+}
+
+// planSubAgentInstanceLookup reports whether sendSubAgentResult should call
+// agentRegistry.Get for the run→agent mapping.
+func planSubAgentInstanceLookup(hasRegistry, mappingFound bool) subAgentInstanceLookupPlan {
+	return subAgentInstanceLookupPlan{Lookup: hasRegistry && mappingFound}
+}
+
+// parentIDFromAgentInstance returns ParentID when inst is non-nil; empty otherwise.
+// Keeps nil-deref free of orchestration in sendSubAgentResult.
+func parentIDFromAgentInstance(inst *agents.AgentInstance) string {
+	if inst == nil {
+		return ""
+	}
+	return inst.ParentID
+}
+
+// filterCascadeCancelChildren returns child run IDs that should receive Cancel
+// after ShutdownCascade (#1001). Empty/self IDs are dropped via shouldCancelCascadeChild.
+func filterCascadeCancelChildren(parentRunID string, childRunIDs []string) []string {
+	if len(childRunIDs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(childRunIDs))
+	for _, childRunID := range childRunIDs {
+		if shouldCancelCascadeChild(parentRunID, childRunID) {
+			out = append(out, childRunID)
+		}
+	}
+	return out
+}
+
+// buildSubAgentRunContext composes the pure sub-agent RunProcessContext from
+// task fields, parent workdir memory, and sibling system prompt. Map/IO stays
+// in SpawnSubAgent (parent workdir lookup).
+func buildSubAgentRunContext(run store.Run, task adapters.SubAgentTask, threadID, parentWorkDir string) RunProcessContext {
+	runCtx := newSubAgentRunContext(run, task, threadID)
+	runCtx = applyParentWorkDirMemory(runCtx, parentWorkDir, threadID, task.AgentID)
+	runCtx.AppendSystemPrompt = withSiblingSystemPrompt(runCtx.AppendSystemPrompt, task.SiblingAgents)
+	return runCtx
+}
+
+// spawnSlotRejectPlan is the pure reject path after evaluateSpawnSlotReservation.
+type spawnSlotRejectPlan struct {
+	Reject bool
+	Log    bool
+}
+
+// planSpawnSlotReject maps a non-nil reject error into reject/log flags.
+// evaluateSpawnSlotReservation already filters non-reject cases; reject!=nil
+// always logs (same as shouldLogSpawnSlotRejection for non-nil err).
+func planSpawnSlotReject(reject error) spawnSlotRejectPlan {
+	if reject == nil {
+		return spawnSlotRejectPlan{}
+	}
+	return spawnSlotRejectPlan{Reject: true, Log: shouldLogSpawnSlotRejection(reject)}
+}
+
+// subAgentRegistrationOutcome is the pure Register result after registry.Register.
+type subAgentRegistrationOutcome struct {
+	Registered bool
+	LogFailure bool
+}
+
+// planSubAgentRegistrationOutcome maps a Register error when the registry path
+// was taken (hasRegistry=true at call site).
+func planSubAgentRegistrationOutcome(regErr error) subAgentRegistrationOutcome {
+	registered, logFailure := evaluateSubAgentRegistration(true, regErr)
+	return subAgentRegistrationOutcome{Registered: registered, LogFailure: logFailure}
+}
+
+// spawnStartLogPlan reports whether a Start error should be logged.
+type spawnStartLogPlan struct {
+	Log bool
+}
+
+// planSpawnStartLog reports whether a Start error should be logged.
+func planSpawnStartLog(startErr error) spawnStartLogPlan {
+	return spawnStartLogPlan{Log: startErr != nil}
+}
+
+// faultEscalationExhaustedPlan is the pure exhausted-path publish/log gate after
+// a failed handoff attempt (#867).
+type faultEscalationExhaustedPlan struct {
+	Publish bool
+	Log     bool
+}
+
+// planFaultEscalationExhausted is true when fault escalation was attempted but
+// the handoff was not accepted (max retries / missing run). Caller still owns
+// bus Publish payload construction.
+func planFaultEscalationExhausted() faultEscalationExhaustedPlan {
+	// Reached only after Attempt && !Retry; always publish+log.
+	return faultEscalationExhaustedPlan{Publish: true, Log: true}
+}
+
+// persistAgentFailureGatePlan is the pure early gate for content/repo presence
+// before ListThreadItems (avoids store scan when content/repo unavailable).
+type persistAgentFailureGatePlan struct {
+	ScanExists bool
+}
+
+// planPersistAgentFailureGate reports whether hasAgentMessageForRun should run.
+func planPersistAgentFailureGate(contentOK, repoOK bool) persistAgentFailureGatePlan {
+	return persistAgentFailureGatePlan{ScanExists: contentOK && repoOK}
+}
