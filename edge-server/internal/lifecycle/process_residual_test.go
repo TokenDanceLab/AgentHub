@@ -1911,3 +1911,101 @@ func TestResidualPlanPureHelpers1022(t *testing.T) {
 		t.Fatal("nil adapter stdin")
 	}
 }
+
+func TestResidualPlanPureHelpers1043(t *testing.T) {
+	t.Parallel()
+
+	// Process signal log
+	if planProcessSignalLog(nil).Log || !planProcessSignalLog(errors.New("x")).Log {
+		t.Fatal("process signal log")
+	}
+
+	// Preflight adapter gate
+	if planPreflightAdapter(false).Check || !planPreflightAdapter(true).Check {
+		t.Fatal("preflight adapter")
+	}
+
+	// Sub-agent instance lookup + parent ID
+	if planSubAgentInstanceLookup(false, true).Lookup || planSubAgentInstanceLookup(true, false).Lookup {
+		t.Fatal("lookup false")
+	}
+	if !planSubAgentInstanceLookup(true, true).Lookup {
+		t.Fatal("lookup true")
+	}
+	if parentIDFromAgentInstance(nil) != "" {
+		t.Fatal("nil parent")
+	}
+	if parentIDFromAgentInstance(&agents.AgentInstance{ParentID: "p1"}) != "p1" {
+		t.Fatal("parent id")
+	}
+
+	// Cascade filter (#1001)
+	filtered := filterCascadeCancelChildren("parent", []string{"", "parent", "child"})
+	if len(filtered) != 1 || filtered[0] != "child" {
+		t.Fatalf("filter %#v", filtered)
+	}
+	if filterCascadeCancelChildren("p", nil) != nil {
+		t.Fatal("nil children")
+	}
+
+	// Spawn reject plan
+	if planSpawnSlotReject(nil).Reject || planSpawnSlotReject(nil).Log {
+		t.Fatal("no reject")
+	}
+	rp := planSpawnSlotReject(errors.New("full"))
+	if !rp.Reject || !rp.Log {
+		t.Fatalf("reject %#v", rp)
+	}
+
+	// Registration outcome
+	out := planSubAgentRegistrationOutcome(nil)
+	if !out.Registered || out.LogFailure {
+		t.Fatalf("ok reg %#v", out)
+	}
+	out = planSubAgentRegistrationOutcome(errors.New("x"))
+	if out.Registered || !out.LogFailure {
+		t.Fatalf("fail reg %#v", out)
+	}
+
+	// Spawn start log
+	if planSpawnStartLog(nil).Log || !planSpawnStartLog(errors.New("x")).Log {
+		t.Fatal("spawn start log")
+	}
+
+	// Fault escalation exhausted plan (always publish+log at call site)
+	ex := planFaultEscalationExhausted()
+	if !ex.Publish || !ex.Log {
+		t.Fatalf("exhausted %#v", ex)
+	}
+
+	// Persist gate
+	if planPersistAgentFailureGate(false, true).ScanExists || planPersistAgentFailureGate(true, false).ScanExists {
+		t.Fatal("gate closed")
+	}
+	if !planPersistAgentFailureGate(true, true).ScanExists {
+		t.Fatal("gate open")
+	}
+
+	// buildSubAgentRunContext composes memory + siblings without panicking
+	run := store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"}
+	task := adapters.SubAgentTask{
+		TaskID:  "task-1",
+		AgentID: "agent-1",
+		Prompt:  "do it",
+		Depth:   1,
+		SiblingAgents: []adapters.SiblingInfo{
+			{AgentName: "sib", TaskDesc: "other"},
+		},
+	}
+	ctx := buildSubAgentRunContext(run, task, "thread-child", "")
+	if ctx.Prompt != "do it" || ctx.AgentID != "agent-1" || ctx.SessionID != "thread-child" {
+		t.Fatalf("basic ctx %#v", ctx)
+	}
+	if ctx.AppendSystemPrompt == "" {
+		t.Fatal("expected sibling prompt")
+	}
+	ctx = buildSubAgentRunContext(run, task, "thread-child", "D:/work")
+	if ctx.WorkDir != "D:/work" {
+		t.Fatalf("workdir %#v", ctx.WorkDir)
+	}
+}
