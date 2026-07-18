@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -17,36 +16,6 @@ import (
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
-
-var ErrProcessBusRequired = errors.New("process event bus is required")
-var ErrProcessCommandRequired = errors.New("process command is required")
-var ErrProcessStoreRequired = errors.New("process store is required")
-var ErrTooManyConcurrentRuns = errors.New("too many concurrent runs")
-
-type ProcessExecutorConfig struct {
-	Command  string
-	Args     []string
-	Env      []string
-	ExtraEnv []string
-	WorkDir  string
-
-	// RunTimeout is the per-run deadline. After this duration the runner
-	// context is cancelled, which triggers process termination. Zero means
-	// use defaultRunTimeout (30 minutes).
-	RunTimeout time.Duration
-
-	// ShutdownGracePeriod is how long to wait after sending a stdin interrupt
-	// before escalating to process termination. On Unix, SIGTERM is sent first
-	// and the process is given ShutdownForceTimeout before a final SIGKILL.
-	// Zero means use defaultShutdownGracePeriod (10 seconds).
-	ShutdownGracePeriod time.Duration
-
-	// ShutdownForceTimeout is how long to wait after sending SIGTERM (Unix)
-	// before escalating to SIGKILL. Zero means use defaultShutdownForceTimeout
-	// (5 seconds). Only relevant on Unix; on Windows we escalate directly to
-	// os.Kill after the grace period.
-	ShutdownForceTimeout time.Duration
-}
 
 type ProcessExecutor struct {
 	bus        *events.Bus
@@ -107,88 +76,7 @@ type ProcessExecutor struct {
 // callback, decision loop, metrics) via the fluent With* methods before calling
 // Start for the first time.
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
-	if err := requireProcessExecutorDeps(bus, store); err != nil {
-		return nil, err
-	}
-	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
-	ctor := planNewProcessExecutor(err, cfg.WorkDir)
-	if ctor.FailProfile {
-		return nil, err
-	}
-	if ctor.StatWorkDir {
-		info, statErr := os.Stat(cfg.WorkDir)
-		if err := validateConfiguredWorkDir(cfg.WorkDir, info, statErr); err != nil {
-			return nil, err
-		}
-	}
-	runTimeout, shutdownGP, shutdownFT := resolveProcessExecutorTimeouts(cfg)
-	return buildProcessExecutor(
-		bus,
-		store,
-		profile,
-		adapter,
-		adapterReg,
-		runTimeout,
-		shutdownGP,
-		shutdownFT,
-		EvidenceGateConfigFromEnv(),
-		FaultEscalationConfigFromEnv(),
-	), nil
-}
-
-// SetMetrics attaches Prometheus instrumentation to this executor.
-// It is safe to call with nil to disable metrics.
-func (e *ProcessExecutor) SetMetrics(m *metrics.EdgeMetrics) {
-	e.metrics = m
-}
-
-// WithAgentRegistry attaches an agent instance registry for sub-agent tracking
-// and result aggregation. When set, the executor will send result messages via
-// the message queue when sub-agent runs complete.
-func (e *ProcessExecutor) WithAgentRegistry(r *agents.Registry) *ProcessExecutor {
-	e.agentRegistry = r
-	return e
-}
-
-// WithMessageQueue attaches an inter-agent message queue for delivering sub-agent
-// results back to parent orchestration runs.
-func (e *ProcessExecutor) WithMessageQueue(q *agents.Queue) *ProcessExecutor {
-	e.messageQueue = q
-	return e
-}
-
-// WithResultAggregator attaches a ResultAggregator for tracking sub-agent
-// completion and emitting sub_agents_complete events.
-func (e *ProcessExecutor) WithResultAggregator(ra *ResultAggregator) *ProcessExecutor {
-	e.resultAgg = ra
-	return e
-}
-
-// WithDecisionLoop attaches a DecisionLoopEmitterFactory that wraps the
-// adapter event stream with step counting, max-steps enforcement, and
-// tool-approval gating. This enables multi-step execution visibility for
-// agents that otherwise run as opaque single-shot processes.
-//
-// When set, the factory is applied in publishStructuredOutput to wrap the
-// raw adapter emitter. The DecisionLoop state (currentStep, phase, etc.)
-// is accessible via the factory's Loop() method for API progress reporting.
-func (e *ProcessExecutor) WithDecisionLoop(factory *DecisionLoopEmitterFactory) *ProcessExecutor {
-	e.decisionLoopFactory = factory
-	return e
-}
-
-// SetHubCallback configures the Edge→Hub direct callback client.
-// When set, run lifecycle transitions (started, finished, failed, cancelled)
-// are reported to the Hub server. Callbacks are fire-and-forget: errors are
-// logged but never block the run lifecycle.
-func (e *ProcessExecutor) SetHubCallback(c CallbackReporter) {
-	e.hubCallback = c
-}
-
-// WithHubCallback is a fluent variant of SetHubCallback.
-func (e *ProcessExecutor) WithHubCallback(c CallbackReporter) *ProcessExecutor {
-	e.SetHubCallback(c)
-	return e
+	return newProcessExecutor(bus, store, cfg, adapter, adapterReg)
 }
 
 // Start creates a background context with the configured run timeout, registers
