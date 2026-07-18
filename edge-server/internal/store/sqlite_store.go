@@ -70,11 +70,11 @@ func NewSQLite(path string) (*SQLiteStore, error) {
 	// in-memory page cache small. On Windows the Go runtime is reluctant to
 	// return freed memory to the OS, so keeping the WAL small is critical.
 	s.stopCheckpoint = make(chan struct{})
-	go s.checkpointLoop(5 * time.Minute)
+	go s.checkpointLoop(sqliteBackgroundLoopInterval)
 	// Periodically clean up old terminal runs to prevent unbounded Store map growth.
 	// Without this, Store maps only shrink when a new run is created,
 	// which may never happen on an idle server.
-	go s.cleanupLoop(5 * time.Minute)
+	go s.cleanupLoop(sqliteBackgroundLoopInterval)
 
 	return s, nil
 }
@@ -103,7 +103,7 @@ func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			s.store.CleanupRuns(RunCleanupOptions{TerminalTTL: 24 * time.Hour, MaxTerminalRunsPerThread: 50})
+			s.store.CleanupRuns(sqlitePeriodicCleanupOptions())
 		case <-s.stopCheckpoint:
 			return
 		}
@@ -142,7 +142,7 @@ func (s *SQLiteStore) load() error {
 	if err != nil {
 		return err
 	}
-	if ok {
+	if planSQLiteLoadSource(ok).UseRows {
 		s.store.applySnapshot(rowSnapshot)
 		return nil
 	}
@@ -152,14 +152,12 @@ func (s *SQLiteStore) load() error {
 		`SELECT payload FROM agenthub_store_snapshots WHERE key = ?`,
 		sqliteSnapshotKey,
 	).Scan(&payload)
-	if errors.Is(err, sql.ErrNoRows) {
+	plan := planLegacySnapshotLoad(errors.Is(err, sql.ErrNoRows), err, payload)
+	if plan.Skip {
 		return nil
 	}
-	if err != nil {
+	if plan.Fail {
 		return fmt.Errorf("read sqlite store snapshot: %w", err)
-	}
-	if isBlankSQLiteSnapshotPayload(payload) {
-		return nil
 	}
 
 	snapshot, err := decodeSQLiteSnapshotPayload(payload)
@@ -306,6 +304,7 @@ ON CONFLICT(row_kind, row_id) DO UPDATE SET payload = excluded.payload, order_in
 
 func deltaSQLiteRelationalProjection(tx *sql.Tx, oldSnapshot, newSnapshot fileSnapshot) error {
 	now := nowString()
+	payloads := buildRelationalProjectionPayloads(oldSnapshot, newSnapshot)
 
 	if _, err := tx.Exec(
 		`INSERT INTO edge_owners (owner_id, source, display_name, created_at, updated_at)
@@ -316,10 +315,8 @@ ON CONFLICT(owner_id) DO UPDATE SET updated_at = excluded.updated_at`,
 		return fmt.Errorf("project owner: %w", err)
 	}
 
-	oldWorkspaceIDs := buildJSONPayloadMap(oldSnapshot.Projects)
-	newWorkspaceIDs := buildJSONPayloadMap(newSnapshot.Projects)
 	if err := deltaProjectionMap("edge_workspaces", "workspace_id",
-		oldWorkspaceIDs, newWorkspaceIDs,
+		payloads.OldWorkspaces, payloads.NewWorkspaces,
 		func(id string, payload string) error {
 			write, skip, err := prepareWorkspaceProjectionWrite(payload, now)
 			if err != nil {
@@ -344,10 +341,8 @@ ON CONFLICT(workspace_id) DO UPDATE SET owner_id = excluded.owner_id, local_path
 		return fmt.Errorf("project workspace delta: %w", err)
 	}
 
-	oldRunPayloads := buildJSONPayloadMap(oldSnapshot.Runs)
-	newRunPayloads := buildJSONPayloadMap(newSnapshot.Runs)
 	if err := deltaProjectionMap("edge_runs", "run_id",
-		oldRunPayloads, newRunPayloads,
+		payloads.OldRuns, payloads.NewRuns,
 		func(id string, payload string) error {
 			write, skip, err := prepareRunProjectionWrite(payload, newSnapshot.Projects, now)
 			if err != nil {
@@ -373,10 +368,8 @@ ON CONFLICT(run_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = e
 		return fmt.Errorf("run delta: %w", err)
 	}
 
-	oldArtifactProj := buildArtifactProjectionMap(oldSnapshot)
-	newArtifactProj := buildArtifactProjectionMap(newSnapshot)
 	if err := deltaProjectionMap("edge_artifacts", "artifact_id",
-		oldArtifactProj, newArtifactProj,
+		payloads.OldArtifacts, payloads.NewArtifacts,
 		func(id string, payload string) error {
 			write, skip, err := prepareArtifactProjectionWrite(payload, now)
 			if err != nil {
@@ -403,10 +396,8 @@ ON CONFLICT(artifact_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_i
 		return fmt.Errorf("artifact delta: %w", err)
 	}
 
-	oldDiffProj := buildDiffProjectionMap(oldSnapshot)
-	newDiffProj := buildDiffProjectionMap(newSnapshot)
 	if err := deltaProjectionMap("edge_diffs", "diff_id",
-		oldDiffProj, newDiffProj,
+		payloads.OldDiffs, payloads.NewDiffs,
 		func(id string, payload string) error {
 			write, skip, err := prepareDiffProjectionWrite(payload, now)
 			if err != nil {
@@ -433,10 +424,8 @@ ON CONFLICT(diff_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = 
 		return fmt.Errorf("diff delta: %w", err)
 	}
 
-	oldPreviewProj := buildPreviewProjectionMap(oldSnapshot)
-	newPreviewProj := buildPreviewProjectionMap(newSnapshot)
 	if err := deltaProjectionMap("edge_previews", "preview_id",
-		oldPreviewProj, newPreviewProj,
+		payloads.OldPreviews, payloads.NewPreviews,
 		func(id string, payload string) error {
 			write, skip, err := preparePreviewProjectionWrite(payload, now)
 			if err != nil {
@@ -477,7 +466,7 @@ func persistAfterSQLiteWrite[T any](s *SQLiteStore, value T, err error) (T, erro
 
 func (s *SQLiteStore) CreateProject(id, name, ownerID string) (Project, error) {
 	project, err := s.store.CreateProject(id, name, ownerID)
-	if errors.Is(err, ErrProjectExists) {
+	if shouldSkipPersistOnProjectExists(err) {
 		return project, err
 	}
 	return persistAfterSQLiteWrite(s, project, err)
@@ -503,23 +492,17 @@ func (s *SQLiteStore) GetThread(id string) (Thread, bool) {
 func (s *SQLiteStore) UpdateThread(id string, title *string, status *string) (Thread, bool) {
 	thread, ok := s.store.UpdateThread(id, title, status)
 	if !ok {
-		return Thread{}, false
+		return finalizeSQLiteBoolWrite(Thread{}, false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return Thread{}, false
-	}
-	return thread, true
+	return finalizeSQLiteBoolWrite(thread, true, s.syncPersist())
 }
 
 func (s *SQLiteStore) DeleteThread(id string) bool {
 	ok := s.store.DeleteThread(id)
 	if !ok {
-		return false
+		return finalizeSQLiteBoolOK(false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return false
-	}
-	return true
+	return finalizeSQLiteBoolOK(true, s.syncPersist())
 }
 
 func (s *SQLiteStore) ListThreads(projectID string) []Thread {
@@ -541,57 +524,43 @@ func (s *SQLiteStore) ListRuns(threadID string) []Run {
 
 func (s *SQLiteStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	result := s.store.CleanupRuns(opts)
-	if result.RemovedRuns == 0 && result.RemovedItems == 0 {
+	if !shouldSyncAfterCleanup(result) {
 		return result
 	}
-	if err := s.syncPersist(); err != nil {
-		return RunCleanupResult{}
-	}
-	return result
+	return finalizeSQLiteCleanupAfterPersist(result, s.syncPersist())
 }
 
 func (s *SQLiteStore) SetRunStatus(id, status string) (Run, bool) {
 	run, ok := s.store.SetRunStatus(id, status)
 	if !ok {
-		return Run{}, false
+		return finalizeSQLiteBoolWrite(Run{}, false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return Run{}, false
-	}
-	return run, true
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
 func (s *SQLiteStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	run, ok := s.store.SetRunStatusIf(id, status, allowedCurrent...)
 	if !ok {
+		// Preserve pre-persist run value on !ok (differs from other bool writers).
 		return run, false
 	}
-	if err := s.syncPersist(); err != nil {
-		return Run{}, false
-	}
-	return run, true
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
 func (s *SQLiteStore) SetRunEvidenceGate(id, result string) (Run, bool) {
 	run, ok := s.store.SetRunEvidenceGate(id, result)
 	if !ok {
-		return Run{}, false
+		return finalizeSQLiteBoolWrite(Run{}, false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return Run{}, false
-	}
-	return run, true
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
 func (s *SQLiteStore) SetRunRetryCount(id string, count int) (Run, bool) {
 	run, ok := s.store.SetRunRetryCount(id, count)
 	if !ok {
-		return Run{}, false
+		return finalizeSQLiteBoolWrite(Run{}, false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return Run{}, false
-	}
-	return run, true
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
 func (s *SQLiteStore) CreateItem(item Item) (Item, error) {
@@ -620,12 +589,9 @@ func (s *SQLiteStore) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPi
 func (s *SQLiteStore) DeleteThreadPin(threadID, itemID string) bool {
 	ok := s.store.DeleteThreadPin(threadID, itemID)
 	if !ok {
-		return false
+		return finalizeSQLiteBoolOK(false, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return false
-	}
-	return true
+	return finalizeSQLiteBoolOK(true, s.syncPersist())
 }
 
 func (s *SQLiteStore) ListThreadPins(threadID string) []ThreadPin {
@@ -713,19 +679,17 @@ func (s *SQLiteStore) ListAgentProfiles(adapterID string) []AgentProfile {
 func (s *SQLiteStore) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
 	profile, err := s.store.UpdateAgentProfile(id, patch)
 	if err != nil {
-		return AgentProfile{}, err
+		return finalizeSQLiteErrWrite(AgentProfile{}, err, nil)
 	}
-	if err := s.syncPersist(); err != nil {
-		return AgentProfile{}, err
-	}
-	return profile, nil
+	return finalizeSQLiteErrWrite(profile, nil, s.syncPersist())
 }
 
 func (s *SQLiteStore) DeleteAgentProfile(id string) error {
-	if err := s.store.DeleteAgentProfile(id); err != nil {
-		return err
+	err := s.store.DeleteAgentProfile(id)
+	if err != nil {
+		return finalizeSQLiteDeleteErr(err, nil)
 	}
-	return s.syncPersist()
+	return finalizeSQLiteDeleteErr(nil, s.syncPersist())
 }
 
 func (s *SQLiteStore) GetCurrentUser() (UserProfile, bool) {
