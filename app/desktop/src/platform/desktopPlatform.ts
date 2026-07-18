@@ -122,6 +122,9 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       localEdge: true,
       localFiles: true,
       browserPreview: true,
+      // Foundation only (#1174): capability declared for Desktop host surface.
+      // Real PTY / Tauri host adapter is out of scope; UI gates on this flag.
+      localTerminal: true,
     },
     host: {
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,

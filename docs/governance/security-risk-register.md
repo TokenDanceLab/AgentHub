@@ -47,6 +47,7 @@
 | AH-SR-043 | Mitigated in repo (web + shared gates; residual desktop seeds) | Web composer demo success 仅允许显式 `mock`/`fixture` + shell `demoRuntimeFallback`；共享 `allowsWorkbenchDemoRuntimeMutation` fail-closed，`auto`/`observed`/`approved-real` 不静默假成功；mutation path inventory + unit tests。Desktop 仍有 demo seed conversations / isDemo fallback（非本 issue 主范围）。 | 可选：Desktop seed 去默认 + live Hub mutation E2E 证据。 |
 | AH-SR-044 | Mitigated in repo (#465) | Desktop/Web product health 不再把 Edge runners 当 inventory SSOT；Local Edge status 由 health + agents/models 推导，Hub sync 发布 agent/model capability；`/v1/runners` 与 `health.checks.runners` 保留为 diagnostics。 | 可选：settings UI 若仍插值旧 runner 文案键则清理；live Desktop/Web 健康面板截图证据。 |
 | AH-SR-013 | Local-only | 本机未跟踪 `.env` 可能包含 secret-looking 值。 | 保持 `.env` ignored；不要 zip/paste/force-add；必要时本机轮换。 |
+| AH-SR-050 | Open (foundation only; #1174) | Desktop **local terminal host** surface: typed `TerminalPort` + capability gate only; no real PTY yet. Residual risk if future host adapter exposes free-form shell or renderer process APIs. | Real host must: (1) keep PTY ownership off renderer, (2) allowlist profiles only (no free-form command from UI), (3) Web `localTerminal=false` + UI hidden, (4) audit spawn/write/close. |
 
 ## Dependency Watch
 

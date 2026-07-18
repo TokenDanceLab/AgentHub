@@ -20,6 +20,7 @@ const mobileCapabilities: SurfaceCapabilities = {
   localEdge: false,
   localFiles: true,
   browserPreview: false,
+  localTerminal: false,
 };
 
 function mapFixtureToConversations(fixture: MobileAppFixture): WorkbenchConversation[] {

@@ -1,6 +1,6 @@
-export { createMockPlatform } from './createMockPlatform';
+export { createMockPlatform, createMockTerminalPort } from './createMockPlatform';
 export { resolveEvidencePreviewTarget } from './previewTargets';
-export type { MockPlatform, MockPlatformSeed } from './createMockPlatform';
+export type { MockPlatform, MockPlatformSeed, MockTerminalPort } from './createMockPlatform';
 export type {
   AgentHubPlatform,
   AgentHubSurface,
@@ -14,6 +14,13 @@ export type {
   PreviewPort,
   RunPort,
   SurfaceCapabilities,
+  TerminalPort,
+  TerminalResizePayload,
+  TerminalSession,
+  TerminalSessionId,
+  TerminalSessionStatus,
+  TerminalSpawnOptions,
+  TerminalWritePayload,
   WorkbenchAgent,
   WorkbenchConversation,
 } from './types';
