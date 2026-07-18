@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-07-16
+最后更新：2026-07-18
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
@@ -17,17 +17,14 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-Cleanup baseline SPEC 进行中：进度见 [progress/MASTER.md](progress/MASTER.md)（worktree `.worktrees/cleanup-baseline`）。已完成的 Repo Structure Doc Tooling Cleanup 归档见 [history.md](history.md)。
+活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phase 58 / milestone 79）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
 
-最近完成：
+**Baseline closed（绝对日期指针，非 live backlog）**：
 
-| Phase | 状态 | 说明 |
+| Program | Closed | Pointer |
 |---|---|---|
-| Phase 1 Governance Baseline | 完成 | `AGENTS.md` 为项目规则 SSOT，根级重复规则文件已移除，旧 skill 归档 |
-| Phase 2 Real E2E Contract | 完成 | 证据等级、数据模式边界、Visual QA、smoke manifest 归一化 |
-| Phase 3 Source And Test Alignment | 完成 | API/Hub、模块 README、进度 SSOT、聊天流、前端架构、后端性能/泄漏、Desktop packaged evidence、active docs 和 Web/Mobile client lanes 已对齐 |
-| Phase 4 Acceptance And Merge Readiness | 完成 | 聚合验收、架构审批、归档和合并准备；下一轮仓库结构清理必须单独开 SPEC |
-| Repo Structure Doc Tooling Cleanup | 完成 | 历史归档、ADR 摘要、root evidence、scripts/tests 分层、根级 wrapper 删除、SPEC 外部归档 |
+| Cleanup baseline Phases 1–7 | 2026-07-16 / PR #446 | [progress/MASTER.md](progress/MASTER.md) · [archives/cleanup-baseline/](archives/cleanup-baseline/) |
+| Repo Structure Doc Tooling Cleanup | pre-baseline | [history.md](history.md) |
 
 ## 当前优先级
 
@@ -70,6 +67,7 @@ Cleanup baseline SPEC 进行中：进度见 [progress/MASTER.md](progress/MASTER
 | Frontend data flow | [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md) |
 | Deployment | [architecture/05-deployment.md](architecture/05-deployment.md) |
 | Auth and identity | [architecture/06-auth-identity.md](architecture/06-auth-identity.md) |
+| Design system SSOT | [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md) |
 | Architecture decisions | [decisions.md](decisions.md) |
 
 ## API 入口
@@ -103,7 +101,7 @@ Cleanup baseline SPEC 进行中：进度见 [progress/MASTER.md](progress/MASTER
 5. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
 6. Mock 和 fixture 模式必须显式；real mode 不能静默降级。
 7. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. 当前 spec 进度只在专项执行中写 `docs/progress/MASTER.md`，规则写 `AGENTS.md`，历史 longform、审计、发布材料、已完成 spec 工件和过期项目 skill 放到 [history.md](history.md) 指向的外部归档。
+8. 当前 spec 进度只在 `docs/progress/MASTER.md`；规则写 `AGENTS.md`；历史 longform、审计、发布材料、已完成 spec 工件和过期项目 skill 放到 [history.md](history.md) 指向的外部归档。
 9. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 10. TokenDance API key 不得暴露给浏览器 UI。
 
@@ -113,3 +111,4 @@ Cleanup baseline SPEC 进行中：进度见 [progress/MASTER.md](progress/MASTER
 |---|---|
 | 历史 roadmap、审计、发布说明、过期设计、旧参考调研 | [history.md](history.md) |
 | 已完成 spec-driven 专项和过期项目 skill | [history.md](history.md) |
+| cleanup-baseline 程序快照（closed 2026-07-16 / PR #446） | [archives/cleanup-baseline/](archives/cleanup-baseline/) |

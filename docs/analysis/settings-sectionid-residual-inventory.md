@@ -1,8 +1,9 @@
 # Settings SectionId / surfaceMetadata Residual Inventory
 
-> last-updated: 2026-07-17
+> last-updated: 2026-07-18
 > issue: #530 inventory (Phase 14) · #541 Phase B collapse (Phase 15)
 > scope: residual section model vs 5-pane Settings SSOT — inventory + ordered collapse
+> note: absolute-date hygiene only; live program progress is `docs/progress/MASTER.md`
 > non-goals: UX redesign, MASTER edits, product Settings UI changes
 
 ## 0. Summary
@@ -322,7 +323,7 @@ Matching desktop dead twins removed when present and zero-ref:
 |---|---|
 | 20 surface description keys (web) + 20 section labels (desktop) | Still string-coupled to `surfaceMetadata` |
 | `settings.title` | Referenced by workbench test mock map |
-| Desktop ~1000 orphan form keys | Zero-ref today, but mass delete is a separate hygiene PR; keep until Phase C/D |
+| Desktop ~1000 orphan form keys | Zero-ref as of 2026-07-17 inventory, but mass delete is a separate hygiene PR; keep until Phase C/D |
 | Live §4.2 keys | Still rendered |
 | Surface rows / helpers | Code collapse is Phase C, not silent locale-only |
 
