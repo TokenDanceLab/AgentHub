@@ -291,6 +291,11 @@ func TestEnvOverrideDBConfig(t *testing.T) {
 	t.Setenv("AGENTHUB_DB_HOST", "env-db-host")
 	t.Setenv("AGENTHUB_DB_USER", "env-db-user")
 	t.Setenv("AGENTHUB_DB_NAME", "env-db-name")
+	t.Setenv("AGENTHUB_DB_APPLICATION_NAME", "agenthub-test")
+	t.Setenv("AGENTHUB_DB_MAX_OPEN_CONNS", "3")
+	t.Setenv("AGENTHUB_DB_MAX_IDLE_CONNS", "2")
+	t.Setenv("AGENTHUB_DB_CONN_MAX_LIFETIME", "45m")
+	t.Setenv("AGENTHUB_DB_CONN_MAX_IDLE_TIME", "3m")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -304,6 +309,15 @@ func TestEnvOverrideDBConfig(t *testing.T) {
 	}
 	if cfg.DB.Name != "env-db-name" {
 		t.Errorf("DB.Name = %q, want env-db-name", cfg.DB.Name)
+	}
+	if cfg.DB.ApplicationName != "agenthub-test" {
+		t.Errorf("DB.ApplicationName = %q, want agenthub-test", cfg.DB.ApplicationName)
+	}
+	if cfg.DB.MaxOpenConns != 3 || cfg.DB.MaxIdleConns != 2 {
+		t.Errorf("DB pool = %d/%d, want 3/2", cfg.DB.MaxOpenConns, cfg.DB.MaxIdleConns)
+	}
+	if cfg.DB.ConnMaxLifetime != 45*time.Minute || cfg.DB.ConnMaxIdleTime != 3*time.Minute {
+		t.Errorf("DB lifetimes = %s/%s, want 45m/3m", cfg.DB.ConnMaxLifetime, cfg.DB.ConnMaxIdleTime)
 	}
 	// Password was NOT overridden via env — stays from YAML.
 	if cfg.DB.Password != "yaml-pass" {
@@ -564,10 +578,14 @@ func TestEnvOverrideAgentTeamGuardrails(t *testing.T) {
 func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
 	cfg := &Config{
 		DB: DBConfig{
-			Host: "localhost",
-			Port: 5432,
-			User: "agenthub",
-			Name: "agenthub",
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
 		},
 		Redis: RedisConfig{
 			Host: "localhost",
@@ -593,10 +611,14 @@ func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
 func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
 	cfg := &Config{
 		DB: DBConfig{
-			Host: "localhost",
-			Port: 5432,
-			User: "agenthub",
-			Name: "agenthub",
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
 		},
 		Redis: RedisConfig{
 			Host: "localhost",
@@ -849,10 +871,14 @@ func TestEnvOverrideS3Config(t *testing.T) {
 func TestValidateS3ConfigRequiresCompleteCredentials(t *testing.T) {
 	cfg := &Config{
 		DB: DBConfig{
-			Host: "localhost",
-			Port: 5432,
-			User: "agenthub",
-			Name: "agenthub",
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
 		},
 		Redis: RedisConfig{
 			Host: "localhost",
@@ -879,10 +905,14 @@ func TestValidateS3ConfigRequiresCompleteCredentials(t *testing.T) {
 func TestValidateS3ConfigDoesNotRequireLocalUploadDir(t *testing.T) {
 	cfg := &Config{
 		DB: DBConfig{
-			Host: "localhost",
-			Port: 5432,
-			User: "agenthub",
-			Name: "agenthub",
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
 		},
 		Redis: RedisConfig{
 			Host: "localhost",
