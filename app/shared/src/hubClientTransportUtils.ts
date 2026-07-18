@@ -741,7 +741,7 @@ export function resolveHubClientRuntime(opts: {
 
 /**
  * Residual JSON request peel with Hub envelope parseSuccess baked in (#1055).
- * exactOptional-safe: optional token/timeout/refresh forwarded as-is to runHubJsonRequest.
+ * exactOptional-safe: only assign optional keys when defined (no `opt: undefined`).
  */
 export async function runHubClientJsonRequest<T>(args: {
   baseUrl: string;
@@ -752,20 +752,39 @@ export async function runHubClientJsonRequest<T>(args: {
   fetchImpl: typeof fetch;
   onRefreshToken?: (() => Promise<string | null>) | null | undefined;
 }): Promise<T> {
-  return runHubJsonRequest({
+  const requestArgs: {
+    baseUrl: string;
+    path: string;
+    options?: RequestInit;
+    token?: string | null | undefined;
+    timeoutMs?: number | undefined;
+    fetchImpl: typeof fetch;
+    onRefreshToken?: (() => Promise<string | null>) | null | undefined;
+    parseSuccess: (response: Response) => Promise<T>;
+  } = {
     baseUrl: args.baseUrl,
     path: args.path,
-    options: args.options,
-    token: args.token,
-    timeoutMs: args.timeoutMs,
     fetchImpl: args.fetchImpl,
-    onRefreshToken: args.onRefreshToken,
     parseSuccess: (response) => parseHubSuccessResponse<T>(response),
-  });
+  };
+  if (args.options !== undefined) {
+    requestArgs.options = args.options;
+  }
+  if (args.token !== undefined) {
+    requestArgs.token = args.token;
+  }
+  if (args.timeoutMs !== undefined) {
+    requestArgs.timeoutMs = args.timeoutMs;
+  }
+  if (args.onRefreshToken !== undefined) {
+    requestArgs.onRefreshToken = args.onRefreshToken;
+  }
+  return runHubJsonRequest(requestArgs);
 }
 
 /**
  * Residual multipart upload peel with Hub envelope parseSuccess baked in (#1055).
+ * exactOptional-safe: only assign optional keys when defined.
  */
 export async function runHubClientMultipartUploadRequest<T>(args: {
   baseUrl: string;
@@ -775,15 +794,28 @@ export async function runHubClientMultipartUploadRequest<T>(args: {
   timeoutMs?: number | undefined;
   fetchImpl: typeof fetch;
 }): Promise<T> {
-  return runHubMultipartUploadRequest({
+  const requestArgs: {
+    baseUrl: string;
+    path: string;
+    formData: FormData;
+    token?: string | null | undefined;
+    timeoutMs?: number | undefined;
+    fetchImpl: typeof fetch;
+    parseSuccess: (response: Response) => Promise<T>;
+  } = {
     baseUrl: args.baseUrl,
     path: args.path,
     formData: args.formData,
-    token: args.token,
-    timeoutMs: args.timeoutMs,
     fetchImpl: args.fetchImpl,
     parseSuccess: (response) => parseHubSuccessResponse<T>(response),
-  });
+  };
+  if (args.token !== undefined) {
+    requestArgs.token = args.token;
+  }
+  if (args.timeoutMs !== undefined) {
+    requestArgs.timeoutMs = args.timeoutMs;
+  }
+  return runHubMultipartUploadRequest(requestArgs);
 }
 
 /** Transport surface used by createHubClient method table. */
@@ -843,15 +875,30 @@ export function createHubClientTransport(
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    return runHubClientJsonRequest({
+    const jsonArgs: {
+      baseUrl: string;
+      path: string;
+      options: RequestInit;
+      token?: string | null | undefined;
+      timeoutMs?: number | undefined;
+      fetchImpl: typeof fetch;
+      onRefreshToken?: (() => Promise<string | null>) | null | undefined;
+    } = {
       baseUrl: opts.baseUrl,
       path,
       options,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
       fetchImpl: opts.fetchImpl,
-      onRefreshToken: opts.onRefreshToken,
-    });
+    };
+    if (opts.getToken !== undefined) {
+      jsonArgs.token = opts.getToken();
+    }
+    if (opts.timeoutMs !== undefined) {
+      jsonArgs.timeoutMs = opts.timeoutMs;
+    }
+    if (opts.onRefreshToken !== undefined) {
+      jsonArgs.onRefreshToken = opts.onRefreshToken;
+    }
+    return runHubClientJsonRequest(jsonArgs);
   }
 
   async function requestWithFallback<T>(
@@ -869,14 +916,26 @@ export function createHubClientTransport(
     path: string,
     formData: FormData,
   ): Promise<T> {
-    return runHubClientMultipartUploadRequest({
+    const uploadArgs: {
+      baseUrl: string;
+      path: string;
+      formData: FormData;
+      token?: string | null | undefined;
+      timeoutMs?: number | undefined;
+      fetchImpl: typeof fetch;
+    } = {
       baseUrl: opts.baseUrl,
       path,
       formData,
-      token: opts.getToken?.(),
-      timeoutMs: opts.timeoutMs,
       fetchImpl: opts.fetchImpl,
-    });
+    };
+    if (opts.getToken !== undefined) {
+      uploadArgs.token = opts.getToken();
+    }
+    if (opts.timeoutMs !== undefined) {
+      uploadArgs.timeoutMs = opts.timeoutMs;
+    }
+    return runHubClientMultipartUploadRequest(uploadArgs);
   }
 
   return {
