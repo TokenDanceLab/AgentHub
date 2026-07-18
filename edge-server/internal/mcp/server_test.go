@@ -6,17 +6,22 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // newTestServer creates an MCP server with a mock store for testing.
+// The workspace allowlist root is a real temp directory so EvalSymlinks-based
+// workDir checks (shared with REST / #998) can resolve successfully.
 func newTestServer(t *testing.T) (*Server, *store.Store) {
 	t.Helper()
 	s := store.New()
@@ -28,8 +33,18 @@ func newTestServer(t *testing.T) (*Server, *store.Store) {
 	permReg := api.NewPermissionRegistry(0)
 
 	srv := NewServer(s, nil, bus, permReg)
-	srv.SetWorkspaceAllowlist([]string{"/tmp"})
+	srv.SetWorkspaceAllowlist([]string{t.TempDir()})
 	return srv, s
+}
+
+// testMCPWorkDir returns a path inside the server's workspace allowlist that
+// exists on disk (required by EvalSymlinks containment).
+func testMCPWorkDir(t *testing.T, srv *Server) string {
+	t.Helper()
+	if len(srv.workspaceAllowlist) == 0 {
+		t.Fatal("workspace allowlist not configured")
+	}
+	return srv.workspaceAllowlist[0]
 }
 
 // doJSONRPC sends a JSON-RPC request to the MCP server and returns the response.
@@ -825,6 +840,7 @@ func TestToolStartRunCreatesRunMessageAndStartsExecutor(t *testing.T) {
 	srv, s := newTestServer(t)
 	executor := &recordingRunExecutor{}
 	srv.executor = executor
+	workDir := testMCPWorkDir(t, srv)
 
 	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
 		"name": "start_run",
@@ -834,7 +850,7 @@ func TestToolStartRunCreatesRunMessageAndStartsExecutor(t *testing.T) {
 			"prompt":    "Build the CI patch",
 			"agentId":   "codex",
 			"model":     "gpt-5",
-			"workDir":   "/tmp/agenthub",
+			"workDir":   workDir,
 		},
 	})
 
@@ -872,8 +888,8 @@ func TestToolStartRunCreatesRunMessageAndStartsExecutor(t *testing.T) {
 	if ctx.Model != "gpt-5" {
 		t.Fatalf("model = %q", ctx.Model)
 	}
-	if ctx.WorkDir != "/tmp/agenthub" {
-		t.Fatalf("workDir = %q", ctx.WorkDir)
+	if ctx.WorkDir != workDir {
+		t.Fatalf("workDir = %q, want %q", ctx.WorkDir, workDir)
 	}
 	if ctx.SessionID != "mcp_thread_test" {
 		t.Fatalf("sessionID = %q, want mcp_thread_test", ctx.SessionID)
@@ -972,7 +988,7 @@ func TestToolStartRunRejectsActiveRun(t *testing.T) {
 			"projectId": "proj_test",
 			"threadId":  "thread_test",
 			"prompt":    "Should wait",
-			"workDir":   "/tmp",
+			"workDir":   testMCPWorkDir(t, srv),
 		},
 	})
 
@@ -994,7 +1010,7 @@ func TestToolStartRunMarksRunFailedWhenExecutorFails(t *testing.T) {
 			"projectId": "proj_test",
 			"threadId":  "thread_test",
 			"prompt":    "Start and fail",
-			"workDir":   "/tmp",
+			"workDir":   testMCPWorkDir(t, srv),
 		},
 	})
 
@@ -1196,6 +1212,118 @@ func TestInvalidJSONRPCVersion(t *testing.T) {
 	}
 	if resp.Error.Code != codeInvalidRequest {
 		t.Errorf("expected error code %d, got %d", codeInvalidRequest, resp.Error.Code)
+	}
+}
+
+func TestToolStartRunWorkspaceAllowlistPolicy(t *testing.T) {
+	// Table tests for the shared REST/MCP workDir SSOT (AH-SR-006 residual / #998).
+	// MCP must reject symlink escapes the same way REST does (EvalSymlinks + IsPathWithin).
+	parent := t.TempDir()
+	allowedRoot := filepath.Join(parent, "allowed")
+	outsideRoot := filepath.Join(parent, "outside")
+	inside := filepath.Join(allowedRoot, "project-a")
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatalf("MkdirAll inside: %v", err)
+	}
+	if err := os.MkdirAll(outsideRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll outside: %v", err)
+	}
+
+	linkPath := filepath.Join(allowedRoot, "linked-outside")
+	if err := os.Symlink(outsideRoot, linkPath); err != nil {
+		t.Skipf("symlink creation unavailable: %v", err)
+	}
+
+	cases := []struct {
+		name      string
+		allowlist []string
+		workDir   string
+		wantCode  string
+	}{
+		{
+			name:      "happy path child of root",
+			allowlist: []string{allowedRoot},
+			workDir:   inside,
+			wantCode:  "",
+		},
+		{
+			name:      "outside allowlist",
+			allowlist: []string{allowedRoot},
+			workDir:   outsideRoot,
+			wantCode:  errcode.ErrWorkspaceNotAllowed.Code,
+		},
+		{
+			name:      "symlink escape rejected",
+			allowlist: []string{allowedRoot},
+			workDir:   linkPath,
+			wantCode:  errcode.ErrWorkspaceNotAllowed.Code,
+		},
+		{
+			name:      "empty allowlist fail-closed",
+			allowlist: nil,
+			workDir:   inside,
+			wantCode:  errcode.ErrWorkspaceAllowlistNotConfigured.Code,
+		},
+		{
+			name:      "parent escape via .. segments",
+			allowlist: []string{allowedRoot},
+			workDir:   filepath.Join(allowedRoot, "..", "outside"),
+			wantCode:  errcode.ErrWorkspaceNotAllowed.Code,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			srv, s := newTestServer(t)
+			executor := &recordingRunExecutor{}
+			srv.executor = executor
+			srv.SetWorkspaceAllowlist(tc.allowlist)
+
+			// Fresh thread per case so active-run checks do not collide.
+			threadID := "thread_" + tc.name
+			if _, err := s.CreateThread(threadID, "proj_test", tc.name, "", "", ""); err != nil {
+				t.Fatalf("CreateThread: %v", err)
+			}
+
+			rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+				"name": "agenthub_start_run",
+				"arguments": map[string]any{
+					"projectId": "proj_test",
+					"threadId":  threadID,
+					"prompt":    "allowlist policy " + tc.name,
+					"workDir":   tc.workDir,
+				},
+			})
+
+			if tc.wantCode == "" {
+				data := parseToolResult(t, rec)
+				if data["threadId"] != threadID {
+					t.Fatalf("threadId = %v, want %s", data["threadId"], threadID)
+				}
+				if len(executor.started) != 1 {
+					t.Fatalf("executor starts = %d, want 1", len(executor.started))
+				}
+				if executor.contexts[0].WorkDir != tc.workDir {
+					t.Fatalf("executor workDir = %q, want %q", executor.contexts[0].WorkDir, tc.workDir)
+				}
+				return
+			}
+
+			result := assertToolError(t, rec)
+			content := result["content"].([]any)[0].(map[string]any)
+			text := content["text"].(string)
+			// errcode.Error.Error() formats as "code: message".
+			if !strings.Contains(text, tc.wantCode) {
+				t.Fatalf("error text = %q, want code %s", text, tc.wantCode)
+			}
+			if len(executor.started) != 0 {
+				t.Fatalf("executor starts = %d, want 0", len(executor.started))
+			}
+			if runs := s.ListRuns(threadID); len(runs) != 0 {
+				t.Fatalf("stored runs = %d, want 0", len(runs))
+			}
+		})
 	}
 }
 
