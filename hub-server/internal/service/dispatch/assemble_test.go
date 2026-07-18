@@ -152,6 +152,17 @@ func TestObserveRedeliveryConnAndOfflineKind(t *testing.T) {
 func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
 	assert.True(t, DeliveryMarkAfterDispatch("del-1"))
 	assert.False(t, DeliveryMarkAfterDispatch(""))
+	assert.False(t, DeliveryMarkAfterOfflineQueue("del-1"), "offline accept must not mark sent (#1031)")
+	assert.False(t, DeliveryMarkAfterOfflineQueue(""))
+
+	assert.True(t, ShouldReplayOfflinePayload("", "sent", true), "legacy empty delivery_id replays")
+	assert.True(t, ShouldReplayOfflinePayload("del-1", "pending", true))
+	assert.True(t, ShouldReplayOfflinePayload("del-1", "retrying", true))
+	assert.False(t, ShouldReplayOfflinePayload("del-1", "sent", true))
+	assert.False(t, ShouldReplayOfflinePayload("del-1", "delivered", true))
+	assert.False(t, ShouldReplayOfflinePayload("del-1", "dead", true))
+	assert.True(t, ShouldReplayOfflinePayload("del-1", "sent", false), "lookup failure fails open")
+
 	assert.True(t, IsHTTPEdgeDispatchSuccess("run-1"))
 	assert.False(t, IsHTTPEdgeDispatchSuccess(""))
 	assert.True(t, ShouldIssueCapabilityToken(CapabilityMintResolved{Ok: true}))
