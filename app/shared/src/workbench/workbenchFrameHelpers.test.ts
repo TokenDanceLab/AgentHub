@@ -3,6 +3,7 @@ import type { TranscriptBlock } from '../transcript';
 import {
   DEFAULT_BROWSER_PREVIEW_URL,
   assignIfDefined,
+  buildTerminalPanelDockProps,
   buildWorkbenchShellDataAttrs,
   buildWorkspaceMainDataAttrs,
   createTranscriptBlockContextMenuHandler,
@@ -11,6 +12,7 @@ import {
   createVerticalResizerPointerDownHandler,
   resolveComposerWorkDir,
   shellBooleanAttr,
+  shouldRenderTerminalDock,
   toIdSet,
 } from './workbenchFrameHelpers';
 
@@ -181,5 +183,30 @@ describe('workbenchFrameHelpers', () => {
     assignIfDefined(target, 'label', 'ok');
     assignIfDefined(target, 'count', 3);
     expect(target).toEqual({ label: 'ok', count: 3 });
+  });
+
+  it('gates terminal dock on chat page + localTerminal === true only', () => {
+    expect(shouldRenderTerminalDock({ isChatPage: true, localTerminal: true })).toBe(true);
+    expect(shouldRenderTerminalDock({ isChatPage: true, localTerminal: false })).toBe(false);
+    expect(shouldRenderTerminalDock({ isChatPage: true, localTerminal: undefined })).toBe(false);
+    expect(shouldRenderTerminalDock({ isChatPage: false, localTerminal: true })).toBe(false);
+    expect(shouldRenderTerminalDock({ isChatPage: false })).toBe(false);
+  });
+
+  it('builds TerminalPanel dock props without undefined optional fields', () => {
+    const withoutPort = buildTerminalPanelDockProps({});
+    expect(withoutPort).toEqual({ localTerminal: true });
+    expect('terminal' in withoutPort).toBe(false);
+
+    const terminal = {
+      list: vi.fn(),
+      spawn: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      close: vi.fn(),
+    };
+    const withPort = buildTerminalPanelDockProps({ terminal });
+    expect(withPort.localTerminal).toBe(true);
+    expect(withPort.terminal).toBe(terminal);
   });
 });
