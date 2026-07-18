@@ -3,15 +3,16 @@ package mcp
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -490,43 +491,20 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	}
 
 	// Require non-empty workDir for adapter runs (#854), then validate against
-	// the workspace allowlist (AH-SR-006). Mirrors REST validateRunWorkDir.
+	// the shared REST/MCP workspace allowlist policy (AH-SR-006 / #998):
+	// EvalSymlinks + IsPathWithin via security.ValidateWorkDirAgainstAllowlist.
 	params.WorkDir = strings.TrimSpace(params.WorkDir)
 	if params.WorkDir == "" {
 		return nil, errcode.ErrWorkDirRequired
 	}
-	if len(s.workspaceAllowlist) == 0 {
-		return nil, errcode.ErrWorkspaceAllowlistNotConfigured
-	}
-	allowed := false
-	candidate, err := filepath.Abs(params.WorkDir)
-	if err != nil {
+	if err := security.ValidateWorkDirAgainstAllowlist(params.WorkDir, s.workspaceAllowlist); err != nil {
+		if errors.Is(err, security.ErrWorkspaceAllowlistEmpty) {
+			return nil, errcode.ErrWorkspaceAllowlistNotConfigured
+		}
+		if errors.Is(err, security.ErrWorkspaceOutsideAllowlist) {
+			return nil, errcode.ErrWorkspaceNotAllowed
+		}
 		return nil, fmt.Errorf("invalid workDir: %w", err)
-	}
-	for _, root := range s.workspaceAllowlist {
-		root = strings.TrimSpace(root)
-		if root == "" {
-			continue
-		}
-		absRoot, err := filepath.Abs(root)
-		if err != nil {
-			continue
-		}
-		rel, err := filepath.Rel(absRoot, candidate)
-		if err != nil {
-			continue
-		}
-		if !strings.HasPrefix(rel, "..") && rel != "." {
-			allowed = true
-			break
-		}
-		if strings.EqualFold(filepath.Clean(candidate), filepath.Clean(absRoot)) {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
-		return nil, errcode.ErrWorkspaceNotAllowed
 	}
 
 	// Verify project and thread exist
