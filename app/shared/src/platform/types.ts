@@ -8,6 +8,12 @@ export interface SurfaceCapabilities {
   localEdge: boolean;
   localFiles: boolean;
   browserPreview: boolean;
+  /**
+   * Local interactive terminal host (Desktop / Local Edge).
+   * When false or omitted, the Terminal panel must stay hidden.
+   * Renderer never owns a PTY — only a typed TerminalPort may talk to the host.
+   */
+  localTerminal?: boolean | undefined;
 }
 
 export type ConversationKind = 'direct' | 'group';
@@ -116,6 +122,53 @@ export interface SettingsPort {
   writeSettings(values: Record<string, string>): Promise<void>;
 }
 
+/** Stable id for a host-owned terminal session (not a renderer process handle). */
+export type TerminalSessionId = string;
+
+export type TerminalSessionStatus = 'starting' | 'running' | 'exited' | 'error';
+
+export interface TerminalSession {
+  id: TerminalSessionId;
+  title: string;
+  cwd?: string | undefined;
+  cols?: number | undefined;
+  rows?: number | undefined;
+  status: TerminalSessionStatus;
+  createdAt: string;
+}
+
+export interface TerminalSpawnOptions {
+  cwd?: string | undefined;
+  cols?: number | undefined;
+  rows?: number | undefined;
+  title?: string | undefined;
+  /** Host allowlist key only — never a free-form shell command from the renderer. */
+  profile?: string | undefined;
+}
+
+export interface TerminalWritePayload {
+  sessionId: TerminalSessionId;
+  data: string;
+}
+
+export interface TerminalResizePayload {
+  sessionId: TerminalSessionId;
+  cols: number;
+  rows: number;
+}
+
+/**
+ * Typed host port for local terminal sessions.
+ * Implementations live in Desktop/Tauri or Local Edge — never raw process APIs in the renderer.
+ */
+export interface TerminalPort {
+  list(): Promise<TerminalSession[]>;
+  spawn(options?: TerminalSpawnOptions): Promise<TerminalSession>;
+  write(payload: TerminalWritePayload): Promise<void>;
+  resize(payload: TerminalResizePayload): Promise<void>;
+  close(sessionId: TerminalSessionId): Promise<void>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
@@ -125,6 +178,11 @@ export interface AgentHubPlatform {
   preview?: PreviewPort;
   runs: RunPort;
   settings?: SettingsPort;
+  /**
+   * Optional typed terminal host. Present only when the surface can host a local terminal
+   * (typically Desktop with `capabilities.localTerminal === true`). No PTY ownership here.
+   */
+  terminal?: TerminalPort | undefined;
   /** Agent activity state for the streaming status bar. */
   agentActivity?: AgentActivitySnapshot;
 }

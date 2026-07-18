@@ -71,4 +71,39 @@ describe('createMockPlatform', () => {
     expect(platform.surface).toBe('mobile');
     expect(platform.capabilities.localEdge).toBe(false);
   });
+
+  it('defaults localTerminal to false and omits the terminal port on web mocks', () => {
+    const platform = createMockPlatform({ surface: 'web' });
+
+    expect(platform.capabilities.localTerminal).toBe(false);
+    expect(platform.terminal).toBeUndefined();
+  });
+
+  it('attaches a mock terminal port when localTerminal is explicitly enabled', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: {
+        localEdge: true,
+        localFiles: true,
+        browserPreview: true,
+        localTerminal: true,
+      },
+    });
+
+    expect(platform.capabilities.localTerminal).toBe(true);
+    expect(platform.terminal).toBeDefined();
+
+    const session = await platform.terminal!.spawn({ title: 'Desktop shell', cols: 120, rows: 40 });
+    expect(session.title).toBe('Desktop shell');
+    await expect(platform.terminal!.list()).resolves.toEqual([
+      expect.objectContaining({ id: session.id, status: 'running' }),
+    ]);
+
+    await platform.terminal!.write({ sessionId: session.id, data: 'echo hi\n' });
+    await platform.terminal!.resize({ sessionId: session.id, cols: 100, rows: 30 });
+    await platform.terminal!.close(session.id);
+    await expect(platform.terminal!.list()).resolves.toEqual([
+      expect.objectContaining({ id: session.id, status: 'exited', cols: 100, rows: 30 }),
+    ]);
+  });
 });

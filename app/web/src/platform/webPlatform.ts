@@ -113,6 +113,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       localEdge: false,
       localFiles: false,
       browserPreview: true,
+      localTerminal: false,
     },
     conversations: {
       async list(): Promise<WorkbenchConversation[]> {
