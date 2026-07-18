@@ -1,0 +1,48 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  background: var(--ah-surface-raised, var(--color-surface-raised, #12141a));
+  border-left: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.tabStrip {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.tab,
+.tabActive {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  color: var(--ah-text-muted, #9aa3b2);
+  background: transparent;
+}
+
+.tab:hover {
+  color: var(--ah-text, #e8ecf4);
+  background: var(--ah-surface-hover, rgba(255, 255, 255, 0.04));
+}
+
+.tabActive {
+  color: var(--ah-text, #e8ecf4);
+  background: var(--ah-surface-hover, rgba(255, 255, 255, 0.08));
+  font-weight: 600;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}

@@ -191,3 +191,5 @@ export type {
   ProfilePopoverProps,
   ToastProps,
 } from './floating';
+
+export * from './auxPanel';
