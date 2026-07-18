@@ -47,4 +47,8 @@ Format:
 
 - Phase 65 closed (ms 86; PRs #1116–#1120): orchestrator/surfacing/parser_ndjson/httpserver peels + hygiene.
 - Phase 66 open (ms 87; #1121–#1125): process_executor_pure / sdk_fixture_mapper / cache client / edgeEventMappers + MASTER hygiene.
+## 2026-07-19 (P67)
+
+- Phase 66 closed (ms 87; PRs #1126–#1130).
+- Phase 67 open (ms 88; #1131–#1135): workbenchDemo / chatviewFixtures / model_catalog / hub config + MASTER hygiene.
 

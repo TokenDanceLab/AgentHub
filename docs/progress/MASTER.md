@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#996](https://github.com/TokenDanceLab/AgentHub/pull/996) Phase 43–54 · [#1003](https://github.com/TokenDanceLab/AgentHub/pull/1003)–[#1007](https://github.com/TokenDanceLab/AgentHub/pull/1007) Phase 55 · [#1014](https://github.com/TokenDanceLab/AgentHub/pull/1014)–[#1018](https://github.com/TokenDanceLab/AgentHub/pull/1018) Phase 56 · [#1025](https://github.com/TokenDanceLab/AgentHub/pull/1025)–[#1029](https://github.com/TokenDanceLab/AgentHub/pull/1029) Phase 57 · [#1036](https://github.com/TokenDanceLab/AgentHub/pull/1036)–[#1041](https://github.com/TokenDanceLab/AgentHub/pull/1041) Phase 58 · [#1048](https://github.com/TokenDanceLab/AgentHub/pull/1048)–[#1052](https://github.com/TokenDanceLab/AgentHub/pull/1052) Phase 59 · [#1059](https://github.com/TokenDanceLab/AgentHub/pull/1059)–[#1063](https://github.com/TokenDanceLab/AgentHub/pull/1063) Phase 60 · [#1072](https://github.com/TokenDanceLab/AgentHub/pull/1072)–[#1082](https://github.com/TokenDanceLab/AgentHub/pull/1082) Phase 61 · [#1089](https://github.com/TokenDanceLab/AgentHub/pull/1089)–[#1092](https://github.com/TokenDanceLab/AgentHub/pull/1092) Phase 62 · [#1097](https://github.com/TokenDanceLab/AgentHub/pull/1097)–[#1100](https://github.com/TokenDanceLab/AgentHub/pull/1100) Phase 63 · [#1106](https://github.com/TokenDanceLab/AgentHub/pull/1106)–[#1110](https://github.com/TokenDanceLab/AgentHub/pull/1110) Phase 64 · [#1116](https://github.com/TokenDanceLab/AgentHub/pull/1116)–[#1120](https://github.com/TokenDanceLab/AgentHub/pull/1120) Phase 65
+> **Merged program PRs**: [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) baseline · [#464](https://github.com/TokenDanceLab/AgentHub/pull/464) Phase 8 · [#471](https://github.com/TokenDanceLab/AgentHub/pull/471)–[#613](https://github.com/TokenDanceLab/AgentHub/pull/613) Phase 9–21 · [#620](https://github.com/TokenDanceLab/AgentHub/pull/620)–[#704](https://github.com/TokenDanceLab/AgentHub/pull/704) Phase 22–29 · [#711](https://github.com/TokenDanceLab/AgentHub/pull/711)–[#786](https://github.com/TokenDanceLab/AgentHub/pull/786) Phase 30–36 · [#793](https://github.com/TokenDanceLab/AgentHub/pull/793)–[#831](https://github.com/TokenDanceLab/AgentHub/pull/831) Phase 37–40 · [#844](https://github.com/TokenDanceLab/AgentHub/pull/844)–[#851](https://github.com/TokenDanceLab/AgentHub/pull/851) Phase 41 · [#858](https://github.com/TokenDanceLab/AgentHub/pull/858)–[#864](https://github.com/TokenDanceLab/AgentHub/pull/864) Phase 42 · [#871](https://github.com/TokenDanceLab/AgentHub/pull/871)–[#996](https://github.com/TokenDanceLab/AgentHub/pull/996) Phase 43–54 · [#1003](https://github.com/TokenDanceLab/AgentHub/pull/1003)–[#1007](https://github.com/TokenDanceLab/AgentHub/pull/1007) Phase 55 · [#1014](https://github.com/TokenDanceLab/AgentHub/pull/1014)–[#1018](https://github.com/TokenDanceLab/AgentHub/pull/1018) Phase 56 · [#1025](https://github.com/TokenDanceLab/AgentHub/pull/1025)–[#1029](https://github.com/TokenDanceLab/AgentHub/pull/1029) Phase 57 · [#1036](https://github.com/TokenDanceLab/AgentHub/pull/1036)–[#1041](https://github.com/TokenDanceLab/AgentHub/pull/1041) Phase 58 · [#1048](https://github.com/TokenDanceLab/AgentHub/pull/1048)–[#1052](https://github.com/TokenDanceLab/AgentHub/pull/1052) Phase 59 · [#1059](https://github.com/TokenDanceLab/AgentHub/pull/1059)–[#1063](https://github.com/TokenDanceLab/AgentHub/pull/1063) Phase 60 · [#1072](https://github.com/TokenDanceLab/AgentHub/pull/1072)–[#1082](https://github.com/TokenDanceLab/AgentHub/pull/1082) Phase 61 · [#1089](https://github.com/TokenDanceLab/AgentHub/pull/1089)–[#1092](https://github.com/TokenDanceLab/AgentHub/pull/1092) Phase 62 · [#1097](https://github.com/TokenDanceLab/AgentHub/pull/1097)–[#1100](https://github.com/TokenDanceLab/AgentHub/pull/1100) Phase 63 · [#1106](https://github.com/TokenDanceLab/AgentHub/pull/1106)–[#1110](https://github.com/TokenDanceLab/AgentHub/pull/1110) Phase 64 · [#1116](https://github.com/TokenDanceLab/AgentHub/pull/1116)–[#1120](https://github.com/TokenDanceLab/AgentHub/pull/1120) Phase 65 · [#1126](https://github.com/TokenDanceLab/AgentHub/pull/1126)–[#1130](https://github.com/TokenDanceLab/AgentHub/pull/1130) Phase 66
 
 ## Two task surfaces (do not mix)
 
@@ -27,8 +27,8 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 66 open Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 87 --state open`
-- **Labels**: `spec-driven` · `phase:66`
+- **Phase 67 open Issues**: `gh issue list -R TokenDanceLab/AgentHub --milestone 88 --state open`
+- **Labels**: `spec-driven` · `phase:67`
 
 ## References
 
@@ -41,78 +41,53 @@
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
 | 1–7 | Cleanup baseline | #22–#28 | closed |
-| 8 | Post-baseline security | #29 | closed (PR #464) |
-| 9–21 | Polish / strangler continue | #30–#42 | closed (PRs #471–#613) |
-| 22–29 | Residual polish continue | #43–#50 | closed (PRs #620–#704) |
-| 30–36 | Residual polish continue | #51–#57 | closed (PRs #711–#786) |
-| 37–40 | Residual polish continue | #58–#61 | closed (PRs #793–#831) |
-| 41 | Residual polish continue | #62 | closed (PRs #844–#851) |
-| 42 | Security gates + residual polish | #63 | closed (PRs #858–#864) |
-| 43–54 | Delivery/security/WS auth + residual peels | #64–#75 | closed (PRs #871–#996) |
-| 55 | MCP workDir SSOT + outbox truthfulness + cascade cancel | #76 | closed (PRs #1003–#1007) |
-| 56 | Outbox atomic claim + chat loadError UX + residual peels | #77 | closed (PRs #1014–#1018) |
-| 57 | Callback backpressure + design token residual + peels | #78 | closed (PRs #1025–#1029) |
-| 58 | Offline/outbox dual redelivery + residual peels | #79 | closed (PRs #1036–#1041) |
-| 59 | Residual peels + root layout research | #80 | closed (PRs #1048–#1052; #1047 ops-only) |
-| 60 | Residual peels + product polish continue | #81 | closed (PRs #1059–#1063; #1058 ops-only) |
-| 61 | Residual peels + design-token residual continue | #82 | closed (PRs #1072–#1082; 8/8 issues) |
-| 62 | Residual peels continue | #83 | closed (PRs #1089–#1092; 4/4 issues) |
-| 63 | Residual peels continue | #84 | closed (PRs #1097–#1100; 4/4 issues) |
-| 64 | Residual peels continue | #85 | closed (PRs #1106–#1110; 5/5 issues) |
+| 8–64 | Polish / residual peels | #29–#85 | closed (see prior rows) |
 | 65 | Residual peels continue | #86 | closed (PRs #1116–#1120; 5/5 issues) |
-| 66 | Residual peels continue | #87 | active (open #1121–#1125) |
+| 66 | Residual peels continue | #87 | closed (PRs #1126–#1130; 5/5 issues) |
+| 67 | Residual peels continue | #88 | active (open #1131–#1135) |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
-| #424–#457 cleanup Phases 1–7 | closed (PR #446) |
-| #458–#991 Phase 8–54 | closed (see prior session logs) |
-| #997–#1002 Phase 55 | closed (PRs #1003–#1007) |
-| #1008–#1013 Phase 56 | closed (PRs #1014–#1018) |
-| #1019–#1024 Phase 57 | closed (PRs #1025–#1029) |
-| #1030–#1035 Phase 58 | closed (PRs #1036–#1041) |
-| #1042–#1047 Phase 59 | closed (PRs #1048–#1052) |
-| #1053–#1058 Phase 60 | closed (PRs #1059–#1063; #1058 ops-only) |
-| #1066–#1071 / #1075 / #1077 Phase 61 | closed (PRs #1072–#1082) |
-| #1084–#1087 Phase 62 | closed (PRs #1089–#1092) |
-| #1093–#1096 Phase 63 | closed (PRs #1097–#1100) |
+| #424–#1100 Phase 1–63 | closed (see prior session logs) |
 | #1101–#1105 Phase 64 | closed (PRs #1106–#1110) |
 | #1111–#1115 Phase 65 | closed (PRs #1116–#1120) |
-| #1121–#1125 Phase 66 | open peels + hygiene |
+| #1121–#1125 Phase 66 | closed (PRs #1126–#1130) |
+| #1131–#1135 Phase 67 | open peels + hygiene |
 
 ## Quick Status Commands
 
 ```bash
-gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=83 and .number<=87) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
-gh issue list -R TokenDanceLab/AgentHub --milestone 87 --state open
+gh api repos/TokenDanceLab/AgentHub/milestones --jq '.[] | select(.number>=85 and .number<=88) | "\(.title): \(.open_issues)/\(.closed_issues) \(.state)"'
+gh issue list -R TokenDanceLab/AgentHub --milestone 88 --state open
 git worktree list
 ```
 
 ## Phase Checklist
 
-- [x] Phase 0–64 (see earlier rows)
-- [x] Phase 65 residual peels continue (ms 86; PRs #1116–#1120)
-- [ ] Phase 66 residual peels continue (ms 87)
+- [x] Phase 0–65 (see earlier rows)
+- [x] Phase 66 residual peels continue (ms 87; PRs #1126–#1130)
+- [ ] Phase 67 residual peels continue (ms 88)
 
 ## Current Status
 
-**Active Phase**: Phase 66 — Residual peels continue (milestone 87; open=5)
-**Active Tasks**: #1121 process_executor_pure · #1122 sdk_fixture_mapper · #1123 hub cache client · #1124 edgeEventMappers · #1125 MASTER hygiene
+**Active Phase**: Phase 67 — Residual peels continue (milestone 88; open=5)
+**Active Tasks**: #1131 workbenchDemo · #1132 chatviewFixtures · #1133 model_catalog · #1134 hub config · #1135 MASTER hygiene
 **Blockers**: None
-**Stability note**: Phase 65 closed — orchestrator 818→206 · surfacing 785→232 · parser_ndjson 704→213 · httpserver 735→385
+**Stability note**: Phase 66 closed — process_executor_pure 2440→238 · sdk_fixture_mapper 694→169 · cache/client 682→106 · edgeEventMappers 679→40 barrel
 **Production fact**: external ops SSOT only (server `projects/agenthub`; do not invent host labels in-repo)
-**Product tip**: last product code = peels #1111–#1114 (PRs #1117–#1120); latest: `git rev-parse --short origin/master`
-**Residual LOC band**: process_executor_pure 2440 · workbenchDemo 897 · chatviewFixtures 844 · i18n/resources 817 · sdk_fixture_mapper 694 · cache/client 682 · edgeEventMappers 679 · model_catalog 676 · config 670 · context_budget 668 · anthropic_sdk 668
-**Boundary map next residual**: process_executor_pure / sdk_fixture_mapper / cache client / edgeEventMappers peels
+**Product tip**: last product code = peels #1121–#1124 (PRs #1127–#1130); latest: `git rev-parse --short origin/master`
+**Residual LOC band**: workbenchDemo 897 · chatviewFixtures 844 · i18n/resources 817 · model_catalog 676 · config 670 · context_budget 668 · anthropic_sdk 668 · DiffReviewPanel 667 · chatview/adapter 659 · store 635
+**Boundary map next residual**: workbenchDemo / chatviewFixtures / model_catalog / hub config peels
 **Governance**: `AGENTS.md` only · Claude native project memory · `.agenthub/memory/**` local scratch only, never SSOT (#428)
 
 ## Next Steps
 
-1. Land Phase 66 peels #1121–#1124 (issue-bound worktrees)
-2. Land hygiene #1125 (MASTER/roadmap live pointers)
+1. Land Phase 67 peels #1131–#1134 (issue-bound worktrees)
+2. Land hygiene #1135 (MASTER/roadmap live pointers)
 3. Keep `super-governance-baseline` held; no bulk root move (ADR #1046)
-4. MASTER ≤150 lines; live open = `gh issue list --milestone 87 --state open`
+4. MASTER ≤150 lines; live open = `gh issue list --milestone 88 --state open`
 
 ## Session Log
 
@@ -120,10 +95,9 @@ git worktree list
 |:-----|:--------|:--------|
 | 2026-07-16 | lead | Phases 1–8 closed; PRs #446/#464 |
 | 2026-07-17 | lead | Phase 9–41 closed; Phase 42 security advanced |
-| 2026-07-18 | lead | P60–P65 closed; P66 open (ms 87; #1121–#1125) |
-| 2026-07-19 | lead | P65 peels merged; MASTER open-set P66 |
+| 2026-07-18–19 | lead | P60–P66 closed; P67 open (ms 88; #1131–#1135) |
 
 ## Completion notes
 
-- Phase 64 closed via #1101–#1105 (PRs #1106–#1110). ms 85 closed.
-- Phase 65 closed via #1111–#1115 (PRs #1116–#1120): orchestrator 818→206 · surfacing 785→232 · parser_ndjson 704→213 · httpserver 735→385. ms 86 closed.
+- Phase 65 closed via #1111–#1115 (PRs #1116–#1120). ms 86 closed.
+- Phase 66 closed via #1121–#1125 (PRs #1126–#1130): pure 2440→238 · fixture 694→169 · cache 682→106 · mappers 679→40. ms 87 closed.
