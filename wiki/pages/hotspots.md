@@ -4,13 +4,14 @@ title: God-file 与债务热点（P0–P2）
 type: hotspot
 status: active
 severity: p0
-updated: 2026-07-16
+updated: 2026-07-18
 sources:
   - docs/analysis/_lane_digest.md
   - docs/analysis/_raw_lane_results.json
   - docs/architecture.md
   - docs/decisions.md
   - docs/governance/security-risk-register.md
+  - docs/progress/MASTER.md
   - AGENTS.md
 tags:
   - god-file
@@ -27,13 +28,14 @@ related:
   - architecture-seams
 summary: >
   AgentHub 全仓 god-file 与架构债务热点汇总，按 P0/P1/P2 分级，标注位置、行数、风险与推荐拆分方向。
-  数据来自 docs/analysis/_lane_digest.md 与 _raw_lane_results.json。
+  活 residual LOC 以 tip `7ef83beb` + MASTER residual band 为准；历史 baseline 数字仅作上下文。
 ---
 
 本页是 AgentHub 清理基线中所有高耦合、大文件、安全半成品与分叉残留的集中索引。
 每个热点标注文件路径、规模、严重度、根因及推荐处置方向。优先按 [[cleanup-playbook]] 的 strangler-fig 模式渐进拆分，不重写架构。
 
 相关总览：[[architecture-seams]]（架构缝线总图）、[[risks-open]]（安全风险未关闭项）。
+活进度：`docs/progress/MASTER.md`（Phase 61 / milestone 82）。
 
 ---
 
@@ -48,16 +50,16 @@ P0 热点要么是安全 gate 未闭合（AH-SR 项），要么是超过 2000 �
 | 1 | `.github/workflows/checks.yml` | header + jobs | CI header 与 job 注释仍写 runtime decommissioned，同 hk3 LIVE 事实冲突；mobile/e2e/benchmark 全设 manual | 重写 CI 叙事为 LIVE/hk3；恢复应运行的 gate，昂贵 lane 保留 manual+显式理由 |
 | **Edge god-files 与安全半成品** |
 | 2 | `edge-server/internal/api/handlers.go` | ~2374 行 | REST/WS 单 god-file：authz、run create、events WS、permissions、plans、profiles、runners health、cc-switch、memory 全耦合 | 按 route domain 拆分（runs / threads+projects / events+ws / agents+profiles / approvals / health+runners），Handler facade 保持薄层 |
-| 3 | `edge-server/internal/lifecycle/process_executor.go` | ~2279 行 | 生命周期核心同时嵌入 Hub callback 发射、SubAgentSpawn、输出收集、decision-loop 包装、evidence/fault；最难解耦点 | 提取 CallbackReporter、SubAgentSpawner service、stream/output pipeline 为接口；ProcessExecutor 仅保留进程状态机 |
+| 3 | `edge-server/internal/lifecycle/process_executor.go` | **1126** 行（tip；P61 #1067） | 生命周期核心仍嵌 Hub callback / SubAgentSpawn / 输出收集 / decision-loop / evidence；已 peel 到 pure companions | 继续 pure-helper peel（#1067）；保留 cancel/cascade/hubOutputs/callback；不 big-bang |
 | 4 | `edge-server/internal/hub/callback.go` | fire-and-forget | AH-SR-049：仅 best-effort HTTP callback，无 durable outbox、sequence、idempotent ack、reconciliation | 实现 Edge outbox/journal + retry worker + Hub 幂等 endpoint；先建合同再扩 payload |
 | 5 | `edge-server/internal/jwtutil/capability.go` | schema 不完整 | AH-SR-046：capability token 缺少 workspace/target/action/route 字段；purpose 未在 call site 强制 | 扩展 claims + PostRuns 校验 + wrong-target/project/action/stale 负例；purpose==run-start 强制 |
 | 6 | `edge-server/internal/httpserver/server.go` | composition root | Remote Edge auth 入口：CORS 缺 X-AgentHub-Capability-Token header；read API 授权粒度不足 | remote mode 强制 HubJWT + device/purpose 绑定；read API 加 route/target/workspace/user-action 负例 |
 | **Hub 安全与核心服务** |
-| 7 | `hub-server/internal/service/agent_dispatch.go` | 781 行 | 多关注点 dispatch 核心：target validation、HTTP edge run、WS push、offline queue、hub_relay branch、cancel/regenerate | 提取 DispatchService（validate/target/http/ws/offline）为接口；AgentService 保持 facade |
-| 8 | `hub-server/internal/service/delivery_outbox.go` | 599 行 | outbox model+repo+retry loop 寄生在 AgentService；retry loop 未被 app wiring 启动，持久化路径未闭环 | 迁移 outbox 类型到 model/repository；app 后台启动 StartDeliveryRetryLoop；补 app 级行为测试 |
+| 7 | `hub-server/internal/service/agent_dispatch.go` | **786** 行（tip；pure `service/dispatch` ~1963；P61 #1068） | 多关注点 dispatch 核心：target validation、HTTP edge run、WS push、offline queue、hub_relay branch、cancel/regenerate | 继续 residual pure peel（#1068）；preserve offline/outbox redispatch；typed package move deferred |
+| 8 | `hub-server/internal/service/delivery_outbox.go` | **469** 行（tip；+ companions） | outbox model+repo+retry 已 thin；仍 flat package residual | 保持 retry loop wiring；optional model package move deferred high-risk |
 | 9 | `app/web/src/api/hubTokenStorage.ts` | sessionStorage | AH-SR-037：Web session 仍存 sessionStorage，XSS 可读 | 做 BFF/HttpOnly server-owned session，或正式 Accepted risk + CSP/短TTL/refresh 轮换补偿 |
 | **前端 hubClient 三重分叉** |
-| 10 | `app/shared/src/hubClient.ts` | ~1533 行 | 预期为共享 SSOT，但 desktop/web 产品路径未使用 | 补齐 desktop/web 需要的方法，设 contract tests；确认为 SSOT 后删除分叉 |
+| 10 | `app/shared/src/hubClient.ts` | **526** 行（tip；DTO/transport peels 到 companions） | 共享 SSOT 主体已 thin；desktop/web 分叉残留仍需对账 | 继续 pure DTO peel；desktop/web thin re-export 方向不变 |
 | 11 | `app/desktop/src/api/hubClient.ts` | ~1854 行 | 最大分叉：方法与 web/shared 重叠但不一致；types/task/team API/auth 差异大 | 以 shared 为 SSOT；desktop 薄化为 re-export + desktop-only 扩展；冻结新方法 |
 | 12 | `app/web/src/api/hubClient.ts` | ~1705 行 | 与 desktop 近乎重复，Session 类型与 task approvals/artifacts 方法集漂移 | diff shared+desktop；迁移 web 调用方到 shared client；仅保留 web 专属 transport/auth glue |
 | **AH-SR-043：demo/mock 泄漏到生产 mutation 路径** |
@@ -74,7 +76,7 @@ P1 在 P0 闭合后推进。主要是 800-1600 行的大文件拆分、package �
 | # | 文件 | 规模 | 根因 | 推荐方向 |
 |---|---|---|---|---|
 | **Edge** |
-| 16 | `edge-server/internal/store/store.go` | ~1559 行 | 内存多实体 repository（projects/threads/runs/items/pins/diffs/artifacts/previews/profiles/settings）+ sqlite_store.go 1178 行 | 拆分 domain 接口（RunStore / ThreadStore / ProfileStore）；保留 Repository composite |
+| 16 | `edge-server/internal/store/store.go` + `sqlite_store.go` | store 历史大 · **sqlite_store.go 709**（tip；P61 #1069） | 内存多实体 repository + sqlite residual；query companions 已 peel | 继续 sqlite pure peel（#1069）；domain 接口拆分保持 composite |
 | 17 | `edge-server/internal/adapters/orchestrator.go` | ~1276 + 1013 行 | orchestrator + failure recovery + DAG/dispatch interceptor 混在 adapter 包，违反 AGENTS.md adapters=runtime 边界 | 迁移 OrchestratorAdapter/dispatch/failure 到 lifecycle/agents 包；adapters 保持纯 CLI/SDK backend |
 | **Hub** |
 | 18 | `hub-server/internal/service/` | ~12k 行/41 文件 | 扁平 service 包混合 IM、auth、catalog、audit、dispatch、outbox、relay、documents；仅 agentteam 已提取 | 按 domain subpackage 绞杀（im/ auth/ catalog/ agent/ audit/），先建立 Bus/WS/Cache 端口 |
