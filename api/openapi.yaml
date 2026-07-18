@@ -23,6 +23,16 @@ info:
     The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
     migration and not currently implemented.
 
+    ## Hub success envelope code
+
+    Hub Server success responses use `{"code":"ok","data":...}` with lowercase
+    `ok` (`hub-server/internal/errcode.OK.Code` via `handler.OK`). This is not
+    HTTP status text and is not the Edge success shape (Edge returns bare JSON).
+    Some older OpenAPI fragments and client fixtures used uppercase `OK`; the
+    wire value on tip is lowercase `ok`. Shared clients treat success
+    case-insensitively (`isHubSuccessCode`) for fixture compatibility — that is
+    parser tolerance, not a dual wire contract. See `api/conventions.md`.
+
     ## Status tags
     - `x-agenthub-status: implemented` — 已实现，可直接调用
     - `x-agenthub-status: planned` — 远期规划，尚未实现
@@ -3042,7 +3052,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [OK]
+                    enum: [ok]
                   data:
                     type: array
                     items:
@@ -3076,7 +3086,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [OK]
+                    enum: [ok]
                   data:
                     $ref: "#/components/schemas/MessageReactionResponse"
     delete:
@@ -3108,7 +3118,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [OK]
+                    enum: [ok]
                   data:
                     $ref: "#/components/schemas/MessageReactionResponse"
 
@@ -5140,7 +5150,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           $ref: "#/components/schemas/RunDiff"
     ModelCatalogResponse:
@@ -5149,7 +5159,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           $ref: "#/components/schemas/ModelCatalog"
     ModelCatalog:
@@ -5267,7 +5277,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           $ref: "#/components/schemas/ArtifactList"
     Preview:
@@ -5322,7 +5332,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           $ref: "#/components/schemas/PreviewList"
     ErrorResponse:
@@ -5372,7 +5382,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         message:
           type: string
         data:
@@ -5416,7 +5426,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         message:
           type: string
         data:
@@ -6649,7 +6659,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           $ref: "#/components/schemas/ThreadPin"
     ThreadPinListResponse:
@@ -6658,7 +6668,7 @@ components:
       properties:
         code:
           type: string
-          enum: [OK]
+          enum: [ok]
         data:
           type: object
           required: [items, page]
