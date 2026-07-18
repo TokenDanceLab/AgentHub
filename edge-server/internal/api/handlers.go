@@ -73,6 +73,11 @@ type Handler struct {
 	// nil means cc-switch is not installed or database is not readable.
 	CCSwitchReader *ccswitch.Reader
 
+	// SessionHome optionally overrides the home root used by GET /v1/runtime-sessions
+	// (sessionindex). Empty = env HOME/USERPROFILE or os.UserHomeDir.
+	// Tests inject a temp dir so real foreign session stores are never scanned.
+	SessionHome string
+
 	runCreateMu               sync.Mutex
 	permissionRegistryMu      sync.Mutex
 	permissionObserverCancel  func()
