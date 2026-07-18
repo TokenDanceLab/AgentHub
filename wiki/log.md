@@ -64,4 +64,8 @@ Format:
 - Phase 69 closed (ms 90; PRs #1156–#1160).
 - Phase 70 open (ms 91; #1161–#1165): session service / agent_team model / agent_team handler / skills + MASTER hygiene.
 - Orchestration: sonnet-first pure peels; main session gate; fable for hard races only.
+## 2026-07-19 (P71)
+
+- Phase 70 closed (ms 91; PRs #1166–#1170).
+- Phase 71 open (ms 92; #1171–#1175): engineering loop + local workspace surface.
 
