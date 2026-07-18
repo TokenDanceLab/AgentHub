@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -121,30 +122,19 @@ func (h *Handler) validateWorkDirAllowed(workDir string) error {
 	if workDir == "" {
 		return nil
 	}
-	// Fail-closed: an empty or nil allowlist rejects any non-empty workDir.
-	// This prevents accidental "allow all" when the operator forgets to configure
-	// the workspace allowlist (AH-SR-006).
-	if len(h.WorkspaceAllowlist) == 0 {
+	// Shared REST/MCP allowlist policy (AH-SR-006 / #998): EvalSymlinks + IsPathWithin.
+	err := security.ValidateWorkDirAgainstAllowlist(workDir, h.WorkspaceAllowlist)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, security.ErrWorkspaceAllowlistEmpty) {
+		// Fail-closed: empty allowlist rejects any non-empty workDir.
 		return fmt.Errorf("workspace allowlist is not configured; configure at least one allowed workspace root to enable file system access")
 	}
-	candidate, err := normalizedRealPath(workDir)
-	if err != nil {
-		return err
+	if errors.Is(err, security.ErrWorkspaceOutsideAllowlist) {
+		return fmt.Errorf("workDir is outside the Edge workspace allowlist")
 	}
-	for _, root := range h.WorkspaceAllowlist {
-		root = strings.TrimSpace(root)
-		if root == "" {
-			continue
-		}
-		allowedRoot, err := normalizedRealPath(root)
-		if err != nil {
-			continue
-		}
-		if isPathWithin(allowedRoot, candidate) {
-			return nil
-		}
-	}
-	return fmt.Errorf("workDir is outside the Edge workspace allowlist")
+	return err
 }
 
 // validateRunWorkDir enforces a non-empty workDir for adapter-backed run starts,
