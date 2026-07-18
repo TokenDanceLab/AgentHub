@@ -18,6 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
 // ExecutionTargetService handles CRUD for execution targets.
@@ -37,8 +38,6 @@ type TargetListResult struct {
 	HasMore bool                    `json:"has_more"`
 	Cursor  string                  `json:"next_cursor,omitempty"`
 }
-
-const desktopTargetStaleAfter = 2 * time.Minute
 
 func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 	return &ExecutionTargetService{db: db}
@@ -369,41 +368,8 @@ func applyExecutionTargetHealthProjection(target *model.ExecutionTarget, now tim
 	if target == nil {
 		return
 	}
-	target.HealthState = resolveExecutionTargetHealthState(target, now)
+	target.HealthState = dispatch.ResolveExecutionTargetHealthState(target, now)
 	target.IsOnline = target.HealthState == "online" || target.HealthState == "healthy"
-}
-
-func resolveExecutionTargetHealthState(target *model.ExecutionTarget, now time.Time) string {
-	if target == nil {
-		return "offline"
-	}
-	state := strings.TrimSpace(strings.ToLower(target.HealthState))
-	switch state {
-	case "mismatch", "offline":
-		return state
-	}
-	if target.TargetType != "local_edge" {
-		if target.IsOnline && (state == "healthy" || state == "online") {
-			return "online"
-		}
-		if state == "degraded" || state == "unknown" || state == "stale" {
-			return state
-		}
-		return "offline"
-	}
-	if !target.IsOnline {
-		return "offline"
-	}
-	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
-		return "mismatch"
-	}
-	if target.LastSeenAt == nil || now.Sub(*target.LastSeenAt) > desktopTargetStaleAfter {
-		return "stale"
-	}
-	if state == "degraded" || state == "unknown" {
-		return state
-	}
-	return "online"
 }
 
 func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
