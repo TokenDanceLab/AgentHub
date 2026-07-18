@@ -39,7 +39,7 @@ docs/
 
 | 需要 | 去看 |
 |------|------|
-| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md)（活 SSOT；Phase 63 / milestone 84） |
+| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md)（活 SSOT；Phase 64 / milestone 85） |
 | 总路线与验收边界 | [roadmap.md](roadmap.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |

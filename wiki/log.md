@@ -12,6 +12,8 @@ Format:
 
 ## 2026-07-18
 
+- 2026-07-18 — Phase 64 open-set hygiene: MASTER/roadmap/wiki → Phase 64 / ms 85; residual band payloadRequests/transport/codex/mcp tools; P63 closed (#1093–#1100).
+
 - 2026-07-18 — Phase 63 open-set hygiene: MASTER/roadmap/wiki live pointers → Phase 63 / ms 84; residual band store query / payload utils / orchestrator_failure; ms 83 closed.
 
 - 2026-07-18 — MASTER tip/PR-list align to HEAD `a26a2828` (#1077): open peels #1067–#1069 only; hygiene/design-token closed via #1072–#1076.
