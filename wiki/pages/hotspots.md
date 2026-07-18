@@ -28,14 +28,14 @@ related:
   - architecture-seams
 summary: >
   AgentHub 全仓 god-file 与架构债务热点汇总，按 P0/P1/P2 分级，标注位置、行数、风险与推荐拆分方向。
-  活 residual LOC 以 MASTER residual band 为准（Phase 68）；历史 baseline 数字仅作上下文。
+  活 residual LOC 以 MASTER residual band 为准（Phase 69）；历史 baseline 数字仅作上下文。
 ---
 
 本页是 AgentHub 清理基线中所有高耦合、大文件、安全半成品与分叉残留的集中索引。
 每个热点标注文件路径、规模、严重度、根因及推荐处置方向。优先按 [[cleanup-playbook]] 的 strangler-fig 模式渐进拆分，不重写架构。
 
 相关总览：[[architecture-seams]]（架构缝线总图）、[[risks-open]]（安全风险未关闭项）。
-活进度：`docs/progress/MASTER.md`（Phase 68 / milestone 85）。
+活进度：`docs/progress/MASTER.md`（Phase 69 / milestone 85）。
 
 ---
 
