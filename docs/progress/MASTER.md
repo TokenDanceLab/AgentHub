@@ -56,7 +56,7 @@
 | 59 | Residual peels + root layout research | #80 | closed (PRs #1048–#1052; #1047 ops-only) |
 | 60 | Residual peels + product polish continue | #81 | closed (PRs #1059–#1063; #1058 ops-only) |
 | 61 | Residual peels + design-token residual continue | #82 | closed (PRs #1072–#1082; 8/8 issues) |
-| 62 | Residual peels continue | #83 | active (open=0; seed next peels) |
+| 62 | Residual peels continue | #83 | active (open #1084–#1087) |
 
 ## Issue Mapping (summary)
 
@@ -71,6 +71,7 @@
 | #1042–#1047 Phase 59 | closed (PRs #1048–#1052) |
 | #1053–#1058 Phase 60 | closed (PRs #1059–#1063; #1058 ops-only) |
 | #1066–#1071 / #1075 / #1077 Phase 61 | closed (PRs #1072–#1082) |
+| #1084–#1087 Phase 62 | open peels |
 
 ## Quick Status Commands
 
@@ -89,8 +90,8 @@ git worktree list
 
 ## Current Status
 
-**Active Phase**: Phase 62 — Residual peels continue (milestone 83; open=0)
-**Active Tasks**: seed next residual peels from residual band
+**Active Phase**: Phase 62 — Residual peels continue (milestone 83; open=4)
+**Active Tasks**: #1084 process_executor · #1085 agent_dispatch · #1086 hubClient · #1087 delivery_outbox
 **Blockers**: None
 **Stability note**: Phase 61 closed — PE 1126→1014 · agent_dispatch 786→608 · sqlite_store 709→461 · design-token #1070 · docs hygiene #1072–#1079
 **Production fact**: external ops SSOT only (server `projects/agenthub`; do not invent host labels in-repo)
@@ -101,7 +102,7 @@ git worktree list
 
 ## Next Steps
 
-1. Open Phase 62 residual peel issues (PE / hubClient / agent_dispatch / outbox as needed)
+1. Land Phase 62 peels #1084–#1087 (issue-bound worktrees)
 2. Keep `super-governance-baseline` held; no bulk root move (ADR #1046)
 3. MASTER ≤150 lines; live open = `gh issue list --milestone 83 --state open`
 
