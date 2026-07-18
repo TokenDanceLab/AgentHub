@@ -400,3 +400,126 @@ export function planHubRequestCatchEffects(
 export function buildTokenRefreshFailedLogPrefix(): string {
   return '[HubClient] Token refresh failed';
 }
+
+// ── Residual pure peels (#990) ────────────────────────────────────────────────
+
+/**
+ * exactOptional-safe prepareHubRequestContext entry for createHubClient.request.
+ * Accepts explicit undefined from opts getters; omits those keys before prepare
+ * (exactOptionalPropertyTypes-safe for the inner HubRequestContext builder).
+ */
+export function prepareHubRequestContextFromClient(args: {
+  baseUrl: string;
+  path: string;
+  options: RequestInit;
+  token?: string | null | undefined;
+  timeoutMs?: number | undefined;
+}): HubRequestContext {
+  const input: {
+    baseUrl: string;
+    path: string;
+    options: RequestInit;
+    token?: string | null;
+    timeoutMs?: number;
+  } = {
+    baseUrl: args.baseUrl,
+    path: args.path,
+    options: args.options,
+  };
+  if (args.token !== undefined) {
+    input.token = args.token;
+  }
+  if (args.timeoutMs !== undefined) {
+    input.timeoutMs = args.timeoutMs;
+  }
+  return prepareHubRequestContext(input);
+}
+
+/**
+ * exactOptional-safe prepareMultipartUploadContext entry for uploadMultipart.
+ * Accepts explicit undefined from opts getters; omits those keys before prepare.
+ */
+export function prepareMultipartUploadContextFromClient(args: {
+  baseUrl: string;
+  path: string;
+  token?: string | null | undefined;
+  timeoutMs?: number | undefined;
+}): HubMultipartUploadContext {
+  const input: {
+    baseUrl: string;
+    path: string;
+    token?: string | null;
+    timeoutMs?: number;
+  } = {
+    baseUrl: args.baseUrl,
+    path: args.path,
+  };
+  if (args.token !== undefined) {
+    input.token = args.token;
+  }
+  if (args.timeoutMs !== undefined) {
+    input.timeoutMs = args.timeoutMs;
+  }
+  return prepareMultipartUploadContext(input);
+}
+
+/** Pure residual: after onRefreshToken settles, retry once or abort. */
+export type RefreshedTokenRetryPlan =
+  | { action: 'retry'; token: string }
+  | { action: 'abort' };
+
+export function planRefreshedTokenRetry(
+  newToken: string | null | undefined,
+): RefreshedTokenRetryPlan {
+  if (shouldRetryWithRefreshedToken(newToken)) {
+    return { action: 'retry', token: newToken };
+  }
+  return { action: 'abort' };
+}
+
+/** Pure residual: console/report payloads for failed onRefreshToken. */
+export function planTokenRefreshFailureReport(
+  path: string,
+  refreshErr: unknown,
+): {
+  logPrefix: string;
+  error: Error;
+  context: { path: string; context: 'token_refresh' };
+} {
+  return {
+    logPrefix: buildTokenRefreshFailedLogPrefix(),
+    error: toReportableError(refreshErr),
+    context: buildTokenRefreshReportContext(path),
+  };
+}
+
+/**
+ * Pure residual: whether the primary response should enter token-refresh recovery.
+ * Combines status + handler presence so createHubClient stays a thin if-branch.
+ */
+export function shouldEnterTokenRefreshRecovery(
+  status: number,
+  onRefreshToken?: (() => Promise<string | null>) | null | undefined,
+): boolean {
+  return shouldAttemptTokenRefresh(status, hasTokenRefreshHandler(onRefreshToken));
+}
+
+/**
+ * Apply planned request-catch effects (log / report) then rethrow.
+ * Side-effect sinks stay injected so the helper remains testable without I/O coupling.
+ */
+export function applyHubRequestCatchEffects(
+  effects: HubRequestCatchEffects,
+  deps: {
+    logError: (message: string) => void;
+    report: (error: AppError, context: Record<string, unknown>) => void;
+  },
+): never {
+  if ('logMessage' in effects) {
+    deps.logError(effects.logMessage);
+  }
+  if ('report' in effects) {
+    deps.report(effects.report.error, effects.report.context);
+  }
+  throw effects.error;
+}
