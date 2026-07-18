@@ -1,5 +1,7 @@
 package dispatch
 
+import "fmt"
+
 // RedispatchPrepFailure classifies PrepareRedispatchPayload errors into the
 // historical dead-letter kind + unwrap used by redispatchDelivery logging.
 // Non-prep errors fall back to payload-unmarshal kind (defensive).
@@ -11,6 +13,22 @@ func RedispatchPrepFailure(err error) (kind string, unwrap error) {
 		return prep.Kind, prep.Err
 	}
 	return DeadLetterKindPayloadUnmarshal, err
+}
+
+// RedispatchOfflineQueueError wraps offline-queue push failures so
+// retryDeliveries does not MarkDeliverySent (#999 soft-fail path).
+func RedispatchOfflineQueueError(err error) error {
+	return fmt.Errorf("redispatch offline queue: %w", err)
+}
+
+// RedispatchOfflineSuccessLogAttrs builds structured slog attrs for offline-queue
+// success logs (device-bound path historically includes user_id).
+func RedispatchOfflineSuccessLogAttrs(preferDevice bool, deliveryID, taskID, userID string) []any {
+	attrs := []any{"delivery_id", deliveryID, "task_id", taskID}
+	if RedispatchOfflineSuccessIncludesUserID(preferDevice) {
+		attrs = append(attrs, "user_id", userID)
+	}
+	return attrs
 }
 
 // IsPayloadMarshalDeadLetter is true when redispatch prep failed on re-marshal

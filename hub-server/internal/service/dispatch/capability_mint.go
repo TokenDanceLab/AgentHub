@@ -75,6 +75,11 @@ func CapabilityMintFromEnv(jwtSecret, payloadDeviceID, envDeviceID, triggerUserI
 	))
 }
 
+// CapabilityPayloadPresent is true when issueRunStartCapability has a non-nil payload.
+func CapabilityPayloadPresent(payloadPresent bool) bool {
+	return payloadPresent
+}
+
 // CapabilityTokenIssueArgs is the pure jwtutil.IssueCapabilityToken argument surface
 // derived from a successful CapabilityMintResolved (Ok must already be true).
 type CapabilityTokenIssueArgs struct {
