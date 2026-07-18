@@ -5,6 +5,7 @@
 
 import {
   buildForwardMessageBody,
+  buildReactionBody,
   buildFriendRequestBody,
   buildMarkReadBody,
   buildMemberIdsBody,
@@ -21,6 +22,7 @@ import {
   buildDissolveSessionPath,
   buildEditMessagePath,
   buildForwardMessagePath,
+  buildMessageReactionsPath,
   buildFriendRequestsPath,
   buildGetMessagesPath,
   buildLeaveSessionPath,
@@ -151,11 +153,29 @@ export function buildAddMessageReactionRequest(
   messageId: string,
   sessionId: string,
   reaction: { emoji: string },
+): {
+  path: string;
+  init: { method: 'POST'; body: string };
+} {
+  return {
+    path: buildMessageReactionsPath(messageId),
+    init: buildJsonPostInit(buildReactionBody(sessionId, reaction)),
+  };
+}
 
 export function buildRemoveMessageReactionRequest(
   messageId: string,
   sessionId: string,
   reaction: { emoji: string },
+): {
+  path: string;
+  init: { method: 'DELETE'; body: string };
+} {
+  return {
+    path: buildMessageReactionsPath(messageId),
+    init: buildJsonDeleteInit(buildReactionBody(sessionId, reaction)),
+  };
+}
 
 export function buildAcceptFriendRequest(requestId: string): {
   path: string;

@@ -29,9 +29,9 @@ export function DiffReviewFileTabs({
 }: {
   files: DiffReviewFile[];
   safeIndex: number;
-  fileTabsClassName?: string;
-  fileTabClassName?: string;
-  activeFileTabClassName?: string;
+  fileTabsClassName?: string | undefined;
+  fileTabClassName?: string | undefined;
+  activeFileTabClassName?: string | undefined;
   onSelectFile: (idx: number) => void;
 }) {
   return (
@@ -80,7 +80,7 @@ export function DiffReviewToolbar({
   modifiedCount: number;
   acceptAllLabel: string;
   rejectAllLabel: string;
-  toolbarClassName?: string;
+  toolbarClassName?: string | undefined;
   onAcceptAll: () => void;
   onRejectAll: () => void;
 }) {
@@ -155,9 +155,9 @@ export function DiffReviewSideColumn({
   rejectedLabel: string;
   acceptLineLabel: string;
   rejectLineLabel: string;
-  diffRowClassName?: string;
-  lineActionBtnClassName?: string;
-  columnClassName?: string;
+  diffRowClassName?: string | undefined;
+  lineActionBtnClassName?: string | undefined;
+  columnClassName?: string | undefined;
   onAcceptClick: (rowIndex: number) => void;
   onRejectClick: (rowIndex: number) => void;
 }) {
