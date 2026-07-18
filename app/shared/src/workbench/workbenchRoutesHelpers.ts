@@ -1,4 +1,4 @@
-import type { LocalCliDiscoveryManifest } from '../platform';
+import type { LocalCliDiscoveryManifest, RuntimeSessionSummary } from '../platform';
 import type { ContactsPageProps } from './pages/ContactsPage';
 import type { DocsPageProps } from './pages/DocsPage';
 import type { ProjectsPageProps } from './pages/ProjectsPage';
@@ -122,6 +122,11 @@ export function buildProjectsPageProps(
 export interface BuildSettingsPagePropsInput {
   settingsRoute: WorkbenchSettingsRoute;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  sessionImportItems?: RuntimeSessionSummary[] | undefined;
+  sessionImportLoading?: boolean | undefined;
+  sessionImportError?: string | null | undefined;
+  sessionImportVisible?: boolean | undefined;
+  onRefreshSessionImport?: (() => void) | undefined;
   userDisplayName?: string | undefined;
   onOpenAgentConfig: () => void;
   spaceTitle?: string | undefined;
@@ -147,6 +152,11 @@ export function buildSettingsPageProps(
 
   assignDefined(props, 'localCliDiscovery', input.localCliDiscovery);
   assignDefined(props, 'currentUserDisplayName', input.userDisplayName);
+  assignDefined(props, 'sessionImportItems', input.sessionImportItems);
+  assignDefined(props, 'sessionImportLoading', input.sessionImportLoading);
+  assignDefined(props, 'sessionImportError', input.sessionImportError ?? undefined);
+  assignDefined(props, 'sessionImportVisible', input.sessionImportVisible);
+  assignDefined(props, 'onRefreshSessionImport', input.onRefreshSessionImport);
 
   if (settingsRoute.hasSettingsService) {
     props.onRetrySettingsLoad = settingsRoute.handleRetrySettingsLoad;

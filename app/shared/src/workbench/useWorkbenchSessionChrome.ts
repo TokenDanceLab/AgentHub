@@ -27,6 +27,7 @@ import {
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
+  shouldLoadSessionImport,
   type UseWorkbenchSessionChromeOptions,
   type WorkbenchSessionChrome,
 } from './workbenchSessionChromeHelpers';
@@ -43,6 +44,7 @@ export {
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
+  shouldLoadSessionImport,
   type UseWorkbenchSessionChromeOptions,
   type WorkbenchSessionChrome,
 } from './workbenchSessionChromeHelpers';
@@ -90,6 +92,10 @@ export function useWorkbenchSessionChrome({
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
   const [localCliDiscovery, setLocalCliDiscovery] = useState<WorkbenchSessionChrome['localCliDiscovery']>(null);
+  const [sessionImportItems, setSessionImportItems] = useState<WorkbenchSessionChrome['sessionImportItems']>([]);
+  const [sessionImportLoading, setSessionImportLoading] = useState(false);
+  const [sessionImportError, setSessionImportError] = useState<string | null>(null);
+  const [sessionImportTick, setSessionImportTick] = useState(0);
   const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
@@ -160,6 +166,49 @@ export function useWorkbenchSessionChrome({
     };
   }, [activePage, platform]);
 
+  const sessionImportVisible = shouldLoadSessionImport({
+    activePage,
+    surface: platform.surface,
+    localEdge: Boolean(platform.capabilities.localEdge),
+    hasListRuntimeSessions: Boolean(platform.host?.listRuntimeSessions),
+  });
+
+  useEffect(() => {
+    if (!sessionImportVisible) {
+      setSessionImportItems([]);
+      setSessionImportError(null);
+      setSessionImportLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSessionImportLoading(true);
+    setSessionImportError(null);
+    platform.host!.listRuntimeSessions!(50)
+      .then((items) => {
+        if (!cancelled) {
+          setSessionImportItems(items);
+          setSessionImportLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error('listRuntimeSessions failed:', err);
+        if (!cancelled) {
+          setSessionImportItems([]);
+          setSessionImportError(err instanceof Error ? err.message : '加载本地会话失败');
+          setSessionImportLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [platform, sessionImportTick, sessionImportVisible]);
+
+  function refreshSessionImport(): void {
+    setSessionImportTick((n) => n + 1);
+  }
+
   useEffect(() => {
     if (!isChatPage) return;
 
@@ -214,6 +263,11 @@ export function useWorkbenchSessionChrome({
     dismissedPinnedIds,
     setDismissedPinnedIds,
     localCliDiscovery,
+    sessionImportItems,
+    sessionImportLoading,
+    sessionImportError,
+    sessionImportVisible,
+    refreshSessionImport,
     reviewFileRequest,
     searchOpen,
     setSearchOpen,
