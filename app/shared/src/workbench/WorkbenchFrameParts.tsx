@@ -12,6 +12,7 @@ import { WorkbenchRoutes } from './WorkbenchRoutes';
 import {
   SidebarResizer,
   WorkbenchPageHost,
+  WorkspaceLoadErrorState,
   WorkspaceLoadingState,
 } from './WorkbenchFrameChromeParts';
 import {
@@ -22,7 +23,10 @@ import {
 } from './workbenchFramePartsHelpers';
 import styles from './AgentHubWorkbench.module.css';
 
-export { WorkspaceLoadingState } from './WorkbenchFrameChromeParts';
+export {
+  WorkspaceLoadErrorState,
+  WorkspaceLoadingState,
+} from './WorkbenchFrameChromeParts';
 
 /* ==========================================================================
    WorkbenchFrameParts -- presentational residual slices from WorkbenchFrame

@@ -210,13 +210,20 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   // Hub sessions provide IM/social conversations; Edge threads provide execution threads.
   const useHubConversations = hubReady && hubSessions.length > 0;
 
-  // Active conversation: prefer Hub session match, then Edge thread match.
-  const activeHubSession = useHubConversations
-    ? hubSessions.find((s) => s.id === selectedConversationId) ?? hubSessions[0]
+  // Active conversation: match explicit selection first.
+  // Never fall back to hubSessions[0] when the user is on an Edge thread (or any
+  // non-Hub id) — that steals Edge selection whenever any Hub session exists (#1010).
+  const matchedHubSession = useHubConversations
+    ? hubSessions.find((s) => s.id === selectedConversationId)
     : undefined;
-  const activeThread = edgeEnabled
-    ? threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0]
+  const matchedThread = edgeEnabled
+    ? threads.find((thread) => thread.threadId === selectedConversationId)
     : undefined;
+  // Default only when there is no intentional selection id.
+  const activeHubSession = matchedHubSession
+    ?? (!selectedConversationId && useHubConversations ? hubSessions[0] : undefined);
+  const activeThread = matchedThread
+    ?? (!selectedConversationId && !activeHubSession && edgeEnabled ? threads[0] : undefined);
   const activeConversationId = activeHubSession?.id ?? activeThread?.threadId ?? selectedConversationId ?? '';
 
   // Edge thread messages (execution path).
@@ -415,10 +422,24 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     transcript,
     agentActivity,
-    threadsLoading: threadsQuery.isLoading,
-    itemsLoading: threadItemsQuery.isLoading,
-    ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
-    ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
+    threadsLoading: threadsQuery.isLoading || (hubReady && hubSessionsQuery.isLoading),
+    itemsLoading: activeHubSession ? hubMessagesQuery.isLoading : threadItemsQuery.isLoading,
+    ...(threadsQuery.error || hubSessionsQuery.error
+      ? {
+          threadsError: errorMessage(
+            threadsQuery.error ?? hubSessionsQuery.error,
+            threadsQuery.error ? 'Threads 加载失败' : 'Hub sessions 加载失败',
+          ),
+        }
+      : {}),
+    ...(threadItemsQuery.error || (activeHubSession && hubMessagesQuery.error)
+      ? {
+          itemsError: errorMessage(
+            threadItemsQuery.error ?? hubMessagesQuery.error,
+            threadItemsQuery.error ? '消息加载失败' : 'Hub 消息加载失败',
+          ),
+        }
+      : {}),
   };
 
   return useDemo ? demoModel : liveModel;

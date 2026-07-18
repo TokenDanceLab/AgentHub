@@ -6,6 +6,7 @@ import {
   ChatConversationHostFrame,
   ChatInspectorFrame,
   WorkbenchRoutesFrame,
+  WorkspaceLoadErrorState,
   WorkspaceLoadingState,
 } from './WorkbenchFrameParts';
 
@@ -132,6 +133,27 @@ describe('WorkbenchFrameParts', () => {
     it('uses role status', () => {
       render(<WorkspaceLoadingState label="Wait" />);
       expect(screen.getByRole('status')).toBeTruthy();
+    });
+  });
+
+  describe('WorkspaceLoadErrorState', () => {
+    it('renders RecoveryPanel with load error meta and retry', () => {
+      const onRetry = vi.fn();
+      render(
+        <WorkspaceLoadErrorState
+          title="Failed to load chat"
+          description="Chat data could not be loaded."
+          meta="network down"
+          retryLabel="Retry"
+          onRetry={onRetry}
+        />,
+      );
+      // RecoveryPanel exposes role=alert with the error content.
+      expect(screen.getByRole('alert', { name: 'Failed to load chat' })).toBeTruthy();
+      expect(screen.getByText('Chat data could not be loaded.')).toBeTruthy();
+      expect(screen.getByText('network down')).toBeTruthy();
+      screen.getByRole('button', { name: /Retry/i }).click();
+      expect(onRetry).toHaveBeenCalledTimes(1);
     });
   });
 
