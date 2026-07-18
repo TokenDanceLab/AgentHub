@@ -49,6 +49,18 @@ vi.mock('./RightInspector', () => ({
   ),
 }));
 
+vi.mock('./ChatEngineeringColumn', () => ({
+  ChatEngineeringColumn: (props: Record<string, unknown>) => (
+    <div
+      data-testid="chat-engineering-column"
+      data-has-workspace={props.hasWorkspace ? 'true' : 'false'}
+      data-local-files={props.localFiles ? 'true' : 'false'}
+    >
+      {props.inspector as React.ReactNode}
+    </div>
+  ),
+}));
+
 vi.mock('./WorkbenchRoutes', () => ({
   WorkbenchRoutes: (props: Record<string, unknown>) => (
     <div data-testid="workbench-routes" data-active-page={props.activePage as string} />
@@ -113,11 +125,19 @@ function profileMock(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function platformMock() {
+function platformMock(overrides: {
+  surface?: string;
+  capabilities?: Record<string, unknown>;
+  preview?: Record<string, unknown>;
+} = {}) {
   return {
-    surface: 'web',
-    capabilities: { browserPreview: true },
-    preview: { canOpenEvidence: false, openEvidence: vi.fn() },
+    surface: overrides.surface ?? 'web',
+    capabilities: {
+      browserPreview: true,
+      localFiles: false,
+      ...(overrides.capabilities ?? {}),
+    },
+    preview: overrides.preview ?? { canOpenEvidence: false, openEvidence: vi.fn() },
   };
 }
 
@@ -308,6 +328,68 @@ describe('WorkbenchFrameParts', () => {
         />,
       );
       expect(screen.getByTestId('right-inspector')).toBeTruthy();
+    });
+
+    it('does not mount AuxPanel column when localFiles is false (Web)', () => {
+      const session = sessionMock({ composer: { workDir: '/tmp/workspace' } });
+      render(
+        <ChatInspectorFrame
+          platform={platformMock({ surface: 'web', capabilities: { localFiles: false } }) as any}
+          session={session as any}
+          inspectorCollapsed={false}
+          inspectorWidth={400}
+          resizeInspectorBy={vi.fn()}
+          beginInspectorResize={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('right-inspector')).toBeTruthy();
+      expect(screen.queryByTestId('chat-engineering-column')).toBeNull();
+      expect(screen.queryByTestId('aux-panel')).toBeNull();
+    });
+
+    it('stacks AuxPanel column when localFiles is true (Desktop)', () => {
+      const session = sessionMock({ composer: { workDir: '/tmp/workspace' } });
+      render(
+        <ChatInspectorFrame
+          platform={
+            platformMock({
+              surface: 'desktop',
+              capabilities: { localFiles: true, browserPreview: true },
+            }) as any
+          }
+          session={session as any}
+          inspectorCollapsed={false}
+          inspectorWidth={400}
+          resizeInspectorBy={vi.fn()}
+          beginInspectorResize={vi.fn()}
+        />,
+      );
+      const column = screen.getByTestId('chat-engineering-column');
+      expect(column.getAttribute('data-local-files')).toBe('true');
+      expect(column.getAttribute('data-has-workspace')).toBe('true');
+      expect(screen.getByTestId('right-inspector')).toBeTruthy();
+    });
+
+    it('marks hasWorkspace false when workDir is empty even with localFiles', () => {
+      const session = sessionMock({ composer: { workDir: '   ' } });
+      render(
+        <ChatInspectorFrame
+          platform={
+            platformMock({
+              surface: 'desktop',
+              capabilities: { localFiles: true },
+            }) as any
+          }
+          session={session as any}
+          inspectorCollapsed={false}
+          inspectorWidth={400}
+          resizeInspectorBy={vi.fn()}
+          beginInspectorResize={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('chat-engineering-column').getAttribute('data-has-workspace')).toBe(
+        'false',
+      );
     });
   });
 

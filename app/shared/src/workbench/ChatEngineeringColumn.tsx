@@ -5,6 +5,7 @@ import {
   resolveEffectiveAuxTab,
   type AuxPanelTab,
 } from './auxPanel';
+import shellStyles from './AgentHubWorkbench.module.css';
 import styles from './ChatEngineeringColumn.module.css';
 
 export type ChatEngineeringColumnProps = {
@@ -23,6 +24,7 @@ const LABELS: Record<AuxPanelTab, string> = {
 /**
  * Desktop engineering-loop column: RightInspector + AuxPanel stack (#1181).
  * Folder-scoped aux tabs require hasWorkspace && localFiles.
+ * Shell width / collapse chrome lives on `.engineeringColumn`.
  */
 export function ChatEngineeringColumn({
   inspector,
@@ -41,7 +43,10 @@ export function ChatEngineeringColumn({
   }, [effective, activeTab]);
 
   return (
-    <div className={styles.column} data-testid="chat-engineering-column">
+    <div
+      className={[shellStyles.engineeringColumn, styles.column].filter(Boolean).join(' ')}
+      data-testid="chat-engineering-column"
+    >
       <div className={styles.inspectorSlot}>{inspector}</div>
       <div className={styles.auxSlot}>
         <AuxPanel
