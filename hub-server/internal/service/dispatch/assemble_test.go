@@ -172,6 +172,59 @@ func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
 	_ = model.TaskStatusQueued
 }
 
+func TestResidual1033Helpers(t *testing.T) {
+	// Delivery-mark plans preserve #1031 offline ownership vs live mark.
+	assert.True(t, PlanLiveDispatchMark("del-1"))
+	assert.False(t, PlanLiveDispatchMark(""))
+	assert.False(t, PlanOfflineDispatchMark("del-1"))
+	assert.False(t, PlanOfflineDispatchMark(""))
+	assert.True(t, PlanTargetBoundDeliveryMark(true, "del-1"))
+	assert.False(t, PlanTargetBoundDeliveryMark(false, "del-1"), "target-bound offline keeps outbox pending")
+	assert.False(t, PlanTargetBoundDeliveryMark(true, ""))
+	assert.True(t, PlanUnboundInviterDesktopMark(true, "del-1"))
+	assert.False(t, PlanUnboundInviterDesktopMark(false, "del-1"))
+
+	// Identity extractors.
+	ca := "ca-1"
+	assert.Nil(t, CustomAgentIDFromAgentPresence(false, &ca))
+	assert.Equal(t, &ca, CustomAgentIDFromAgentPresence(true, &ca))
+	assert.Equal(t, "run-1", TeamRunIDValue(true, "run-1"))
+	assert.Equal(t, "", TeamRunIDValue(false, "run-1"))
+	assert.Equal(t, "", TaskStatusOrEmpty(nil))
+	snap := NewPendingTaskSnapshot("id", "ai", "u", "queued", "d", "r", "t")
+	assert.Equal(t, "queued", TaskStatusOrEmpty(&snap))
+
+	assert.True(t, OutboxRecordSucceeded(nil))
+	assert.False(t, OutboxRecordSucceeded(errors.New("x")))
+	assert.True(t, HubRelayCreateSucceeded(nil))
+	assert.False(t, HubRelayCreateSucceeded(errors.New("x")))
+	assert.True(t, CapabilityTokenMintSucceeded(nil))
+	assert.False(t, CapabilityTokenMintSucceeded(errors.New("x")))
+	assert.True(t, RedeliveryPreferDeviceRoute("d1"))
+	assert.False(t, RedeliveryPreferDeviceRoute(""))
+	assert.True(t, TargetBoundConnFound(true))
+	assert.False(t, TargetBoundConnFound(false))
+	assert.False(t, TargetBoundConnRejected(true, "u1", DesktopDeviceType, "d1", "u1", "d1"))
+	assert.True(t, TargetBoundConnRejected(false, "u1", DesktopDeviceType, "d1", "u1", "d1"))
+	assert.True(t, TargetBoundConnRejected(true, "u2", DesktopDeviceType, "d1", "u1", "d1"))
+
+	in := AssembleInputCore(
+		"task-1", "ai-1", "claude", "t1", "d1", "s1",
+		"m1", "u1", "hi", "Bot", "ca-1",
+		&CustomAgentFields{SystemPrompt: "sys"},
+		`{"model":"x"}`,
+		TeamContext{TeamID: "team", TeamRunID: "run"},
+		[]Message{{Role: "user", Content: "hi"}},
+		[]Message{{Role: "assistant", Content: "pin"}},
+	)
+	assert.Equal(t, "task-1", in.TaskID)
+	assert.Equal(t, "ca-1", in.CustomAgentID)
+	assert.Equal(t, "sys", in.CustomFields.SystemPrompt)
+	assert.Equal(t, "team", in.Team.TeamID)
+	require.Len(t, in.Messages, 1)
+	require.Len(t, in.PinnedMessages, 1)
+}
+
 func TestTriggerGuards(t *testing.T) {
 	assert.Equal(t, "t1", NormalizeOptionalTargetID(" t1 "))
 	assert.True(t, IsEmptyTargetID(""))

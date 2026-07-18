@@ -37,8 +37,8 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Pure residual continue (#1012) after #977/#946/#902 and the #732→#834 chain.
-// Call dispatch.* directly; DTO aliases kept for JSON/redispatch stability.
+// Pure residual continue (#1033) after #1012/#977/#946/#902 and the #732→#834
+// chain. Call dispatch.* directly; DTO aliases kept for JSON/redispatch stability.
 // Orchestration + ports stay flat here. Preserve #866/#999/#1000/#1009 outbox
 // redispatch semantics; #1031 coordinates offline queue vs outbox ownership.
 // No OpenAPI/handler/frontend; no typed package move.
@@ -80,7 +80,7 @@ type dispatchWS interface {
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
 // redispatch residual. DeliveryOutbox retries enter via Redispatcher; Payload DTO
 // lives in service/dispatch with a thin same-package alias. Same-package extract
-// (#563/#573/#617) + pure helpers (#732→#1012) — typed package move still deferred.
+// (#563/#573/#617) + pure helpers (#732→#1033) — typed package move still deferred.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -323,30 +323,22 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 }
 
 func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
-	// Pure payload assembly (#902); history loaders stay orchestration-side.
-	dp := dispatch.AssembleDispatchPayload(dispatch.AssemblePayloadInput{
-		TaskID:           task.ID,
-		AgentInstanceID:  ai.ID,
-		AgentType:        ai.AgentType,
-		TargetID:         task.TargetID,
-		EdgeDeviceID:     task.EdgeDeviceID,
-		SessionID:        ai.SessionID,
-		TriggerMessageID: task.TriggerMessageID,
-		TriggerUserID:    task.TriggeredByUserID,
-		Prompt:           prompt,
-		DisplayName:      ai.DisplayName,
-		CustomAgentID:    dispatch.CustomAgentIDValue(ai.CustomAgentID),
-		CustomFields:     dispatch.CustomAgentFieldsFromModel(customAgent),
-		ModelParams:      modelParams,
-		Team:             s.resolveDispatchTeamContext(ai),
-		Messages:         s.loadThreadHistory(ai.SessionID, task.TriggerMessageID),
-		PinnedMessages:   s.loadPinnedMessages(ai.SessionID),
-	})
+	// Pure payload assembly (#902/#1033); history loaders stay orchestration-side.
+	dp := dispatch.AssembleDispatchPayload(dispatch.AssembleInputCore(
+		task.ID, ai.ID, ai.AgentType, task.TargetID, task.EdgeDeviceID, ai.SessionID,
+		task.TriggerMessageID, task.TriggeredByUserID, prompt, ai.DisplayName,
+		dispatch.CustomAgentIDValue(ai.CustomAgentID),
+		dispatch.CustomAgentFieldsFromModel(customAgent),
+		modelParams,
+		s.resolveDispatchTeamContext(ai),
+		s.loadThreadHistory(ai.SessionID, task.TriggerMessageID),
+		s.loadPinnedMessages(ai.SessionID),
+	))
 
 	// Record delivery in outbox before dispatching (AH-SR-049).
 	payload, _ := dispatch.MarshalPayload(dp)
 	deliveryID, err := s.recordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
-	if err != nil {
+	if !dispatch.OutboxRecordSucceeded(err) {
 		// Still dispatch for availability, but durability is degraded until outbox is healthy.
 		slog.Error(dispatch.DispatchLogOutboxRecordFailed,
 			"task_id", task.ID, "edge_device_id", task.EdgeDeviceID, "error", err)
@@ -368,7 +360,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); err != nil {
 				slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
 			}
-			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+			if dispatch.PlanLiveDispatchMark(deliveryID) {
 				_ = s.markDeliverySent(ctx, deliveryID)
 			}
 			return
@@ -382,8 +374,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 					slog.Error(dispatch.DispatchLogOfflinePushConnNil, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 				}
 				// Offline queue acceptance is not Edge receipt (#1031).
-				// Leave outbox pending so redispatch owns recovery; do not MarkDeliverySent.
-				if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
+				if dispatch.PlanOfflineDispatchMark(deliveryID) {
 					_ = s.markDeliverySent(ctx, deliveryID)
 				}
 				return
@@ -400,12 +391,12 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 					slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
 				}
 				// WS miss → offline queue only; outbox stays pending (#1031).
-				if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
+				if dispatch.PlanUnboundInviterDesktopMark(false, deliveryID) {
 					_ = s.markDeliverySent(ctx, deliveryID)
 				}
 				return
 			}
-			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+			if dispatch.PlanUnboundInviterDesktopMark(true, deliveryID) {
 				_ = s.markDeliverySent(ctx, deliveryID)
 			}
 			return
@@ -414,7 +405,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			slog.Error(dispatch.DispatchLogOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
 		// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
-		if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
+		if dispatch.PlanOfflineDispatchMark(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
@@ -426,7 +417,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 	case dispatch.RouteHubRelay:
 		// hub_relay uses the relay service; failures fall back to offline target queue.
 		_, err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
-		if err != nil {
+		if !dispatch.HubRelayCreateSucceeded(err) {
 			slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); pushErr != nil {
 				slog.Error(dispatch.DispatchLogRelayOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
@@ -436,7 +427,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); err != nil {
 			slog.Error(dispatch.DispatchLogMarkHubRelayDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
-		if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
+		if dispatch.PlanLiveDispatchMark(deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
@@ -444,11 +435,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 	case dispatch.RouteTargetBound:
 		// local_edge / remote_ssh / cloud_edge / tailscale / hub_relay without relay.
 		live := s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
-		if live {
-			if dispatch.DeliveryMarkAfterDispatch(deliveryID) {
-				_ = s.markDeliverySent(ctx, deliveryID)
-			}
-		} else if dispatch.DeliveryMarkAfterOfflineQueue(deliveryID) {
+		if dispatch.PlanTargetBoundDeliveryMark(live, deliveryID) {
 			_ = s.markDeliverySent(ctx, deliveryID)
 		}
 		return
@@ -456,18 +443,20 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 }
 
 func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
-	var customAgentID *string
+	var rawCustomAgentID *string
 	if ai != nil {
-		customAgentID = ai.CustomAgentID
+		rawCustomAgentID = ai.CustomAgentID
 	}
+	customAgentID := dispatch.CustomAgentIDFromAgentPresence(ai != nil, rawCustomAgentID)
 	if !dispatch.TeamContextResolutionReady(s != nil, s != nil && s.db != nil, ai != nil, customAgentID) {
 		return dispatch.EmptyTeamContext()
 	}
 	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
-	runID := ""
+	var rawRunID string
 	if run != nil {
-		runID = run.ID
+		rawRunID = run.ID
 	}
+	runID := dispatch.TeamRunIDValue(run != nil, rawRunID)
 	if !dispatch.TeamRunLoadable(err, run != nil, runID) {
 		return dispatch.EmptyTeamContext()
 	}
@@ -475,8 +464,7 @@ func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) di
 	if !dispatch.TeamMembersPresent(err) {
 		return dispatch.EmptyTeamContext()
 	}
-	refs := dispatch.TeamMemberRefsFromMembers(members)
-	return dispatch.MatchTeamContext(run.TeamID, run.ID, dispatch.CustomAgentIDValue(ai.CustomAgentID), refs)
+	return dispatch.MatchTeamContext(run.TeamID, run.ID, dispatch.CustomAgentIDValue(ai.CustomAgentID), dispatch.TeamMemberRefsFromMembers(members))
 }
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
@@ -534,7 +522,11 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 		return false
 	}
 	conn := s.mgr.FindByConnID(connID)
-	if conn == nil || !dispatch.IsTargetBoundConnUsable(true, conn.UserID, conn.DeviceType, conn.DeviceID, userID, deviceID) {
+	if conn == nil {
+		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
+		return false
+	}
+	if dispatch.TargetBoundConnRejected(true, conn.UserID, conn.DeviceType, conn.DeviceID, userID, deviceID) {
 		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
 		return false
 	}
@@ -544,7 +536,7 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 		return false
 	}
 	result := s.mgr.PushToConn(connID, frame)
-	if !result.Queued {
+	if !dispatch.RedeliveryWSPushSucceeded(result.Queued) {
 		slog.Warn(dispatch.DispatchLogTargetBoundWSNotQueued, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
 		queueTargetTask(dispatch.TargetBoundReasonWSNotQueued, result.Err)
 		return false
@@ -640,7 +632,7 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 		args.Secret, args.UserID, args.DeviceID, args.ProjectID, args.Action, args.TTL,
 		jwtutil.CapabilityIssueOptions{Action: args.Action, TargetID: args.TargetID, ThreadID: args.ThreadID},
 	)
-	if err != nil {
+	if !dispatch.CapabilityTokenMintSucceeded(err) {
 		slog.Warn(dispatch.CapabilityMintFailedLog, "error", err, "device_id", args.DeviceID)
 		return ""
 	}
@@ -669,10 +661,7 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 	}
 
 	task, err := s.getPendingTaskForRedelivery(ctx, rec.TaskID)
-	status := ""
-	if task != nil {
-		status = task.Status
-	}
+	status := dispatch.TaskStatusOrEmpty(task)
 	gate := dispatch.PlanRedispatchTaskGate(err, status)
 	switch gate.Kind {
 	case dispatch.RedispatchGateDeadLetterLookup:
@@ -714,7 +703,7 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 // Outbox MarkDeliverySent after success remains on DeliveryOutbox RedispatchDelivery.
 func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) error {
 	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
-	preferDevice := dispatch.PreferDeviceBoundRedelivery(task.EdgeDeviceID)
+	preferDevice := dispatch.RedeliveryPreferDeviceRoute(task.EdgeDeviceID)
 
 	if dispatch.ClassifyRedeliveryPrimaryRoute(task.TargetID, task.EdgeDeviceID) == dispatch.RouteHTTP {
 		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); dispatch.IsHTTPEdgeDispatchSuccess(edgeRunID) {
@@ -735,7 +724,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 
 	facts := dispatch.RedeliveryConnFacts{}
 	if dispatch.CanPushInviterDesktop(connID, dispatch.ManagerPortAvailable(s.mgr != nil), routeErr) {
-		if conn := s.mgr.FindByConnID(connID); conn != nil {
+		if conn := s.mgr.FindByConnID(connID); dispatch.TargetBoundConnFound(conn != nil) {
 			facts = dispatch.ObserveRedeliveryConn(true, conn.UserID, task.TriggeredByUserID)
 		}
 	}
