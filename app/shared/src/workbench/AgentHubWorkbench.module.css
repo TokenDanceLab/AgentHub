@@ -2629,3 +2629,17 @@
     -webkit-backdrop-filter: blur(6px);
   }
 }
+
+/* ═══ Dark ambient — empty canvas (#1227) ════════════════════════════════ */
+
+[data-theme='dark'] .workspace {
+  background:
+    var(--canvas-ambient),
+    var(--app-bg);
+}
+
+[data-theme='dark'] .workspace[data-mode='workbench'] {
+  background:
+    var(--canvas-ambient),
+    var(--surface);
+}
