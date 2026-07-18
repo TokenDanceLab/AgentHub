@@ -542,14 +542,21 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-xxs);
-  padding: var(--space-3xl) var(--sp-md);
+  gap: var(--sp-sm);
+  margin: var(--sp-sm) var(--sp-xxs);
+  padding: var(--space-2xl) var(--sp-md);
   text-align: center;
+  border: 1px solid var(--glass-border-subtle, transparent);
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-bg-subtle, transparent);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .conversationEmptyTitle {
-  font: 500 0.8125rem var(--font-sans);
+  font: 500 0.875rem var(--font-sans);
   color: var(--text-2);
+  letter-spacing: 0;
 }
 
 .conversationEmptyHint {
@@ -1941,6 +1948,25 @@
 }
 .transcriptRegion > *:last-child {
   scroll-margin-bottom: var(--composer-scroll-gap);
+}
+
+/* ── Empty transcript glass center card (4/6 width, sparse flat) ── */
+.transcriptRegion :global(.chatview-empty) {
+  max-width: min(66.66%, 520px);
+  width: 100%;
+  margin: auto;
+  padding: var(--space-3xl, 48px) var(--space-xl, 24px);
+  border: 1px solid var(--glass-border-strong, var(--bdr));
+  border-radius: var(--glass-card-radius, var(--r-xl));
+  background: var(--glass-card-bg, var(--glass-panel));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-card-shadow, var(--glass-elev-2));
+  color: var(--text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
 }
 
 @keyframes inspectorMenuIn {
