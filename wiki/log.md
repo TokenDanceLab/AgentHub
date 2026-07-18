@@ -55,4 +55,8 @@ Format:
 
 - Phase 67 closed (ms 88; PRs #1136–#1140).
 - Phase 68 open (ms 89; #1141–#1145): context_budget / anthropic_sdk / chatview adapter / store + MASTER hygiene.
+## 2026-07-19 (P69)
+
+- Phase 68 closed (ms 89; PRs #1146–#1150).
+- Phase 69 open (ms 90; #1151–#1155): DiffReviewPanel / openai_sdk / message service / agents registry + MASTER hygiene.
 
