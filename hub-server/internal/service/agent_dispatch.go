@@ -686,7 +686,8 @@ func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatch
 		return nil
 	}
 
-	// Only retry if task is still in a retryable state.
+	// Only retry if task is still in a retryable state (queued/dispatched).
+	// Running is intentionally non-retryable (#1000) so Edge execution is not duplicated.
 	if !dispatch.IsRetryableTaskStatus(task.Status) {
 		slog.Info(dispatch.RedispatchLogTaskTerminal,
 			"delivery_id", rec.DeliveryID,

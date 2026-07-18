@@ -30,8 +30,8 @@ type edgeCallbackSeq interface {
 	allocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
-// edgeCallbackOutbox auto-acks delivery journal rows when Edge acks a task.
-// Implemented solely by *DeliveryOutbox (owns deliveryOutboxRecord persistence).
+// edgeCallbackOutbox auto-acks delivery journal rows when Edge proves receipt
+// (ack, first authorized stream, or done). Implemented solely by *DeliveryOutbox.
 type edgeCallbackOutbox interface {
 	autoAckDeliveriesForTask(ctx context.Context, taskID string)
 }
@@ -232,6 +232,11 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	// #154: update session last_message_at when agent stream creates a message
 	_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
 
+	// #1000: first authorized stream proves Edge received the task — ack outbox
+	// so SentTimeout does not redispatch while Edge is already executing.
+	// After successful persist only (matches HandleTaskAck post-transition ack).
+	s.autoAck(ctx, taskID)
+
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 		s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
@@ -368,6 +373,9 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 			s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 		}
 	}
+
+	// #1000: done also acks outbox (covers Edge paths that skip stream/ack).
+	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "agent.done", Payload: map[string]interface{}{

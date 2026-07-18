@@ -40,9 +40,12 @@ func TestTaskStatusHelpers(t *testing.T) {
 
 	assert.True(t, IsRetryableTaskStatus(model.TaskStatusQueued))
 	assert.True(t, IsRetryableTaskStatus(model.TaskStatusDispatched))
-	assert.True(t, IsRetryableTaskStatus(model.TaskStatusRunning))
+	// #1000: running must not be redispatchable while Edge executes.
+	assert.False(t, IsRetryableTaskStatus(model.TaskStatusRunning))
 	assert.False(t, IsRetryableTaskStatus(model.TaskStatusDone))
 	assert.False(t, IsRetryableTaskStatus(model.TaskStatusCancelled))
+	assert.False(t, IsRetryableTaskStatus(model.TaskStatusFailed))
+	assert.False(t, IsRetryableTaskStatus(model.TaskStatusTimeout))
 }
 
 func TestMapMessagesChronological(t *testing.T) {
