@@ -45,7 +45,12 @@ export interface TerminalPanelLabels {
   statusError?: string | undefined;
 }
 
-const defaultLabels: Required<TerminalPanelLabels> = {
+/** Fully-resolved labels: every key is a concrete string (exactOptional-safe). */
+export type ResolvedTerminalPanelLabels = {
+  [K in keyof Required<TerminalPanelLabels>]-?: string;
+};
+
+const defaultLabels: ResolvedTerminalPanelLabels = {
   ariaLabel: '本地终端',
   emptyTitle: '暂无终端会话',
   emptyDescription: '新建会话由 Desktop / Local Edge 主机托管，渲染进程不持有 PTY。',
@@ -62,7 +67,7 @@ const defaultLabels: Required<TerminalPanelLabels> = {
 
 function sessionStatusLabel(
   status: TerminalSession['status'],
-  labels: Required<TerminalPanelLabels>,
+  labels: ResolvedTerminalPanelLabels,
 ): string {
   switch (status) {
     case 'starting':
@@ -80,7 +85,7 @@ function sessionStatusLabel(
 
 function resolveTerminalPanelLabels(
   labelsProp?: TerminalPanelLabels | undefined,
-): Required<TerminalPanelLabels> {
+): ResolvedTerminalPanelLabels {
   return {
     ariaLabel: labelsProp?.ariaLabel ?? defaultLabels.ariaLabel,
     emptyTitle: labelsProp?.emptyTitle ?? defaultLabels.emptyTitle,
