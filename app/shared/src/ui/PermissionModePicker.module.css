@@ -57,12 +57,12 @@
 
 .popover {
   padding: 8px;
-  border: 1px solid var(--composer-panel-edge, rgba(0, 0, 0, 0.34));
+  border: 1px solid var(--glass-border-strong, var(--composer-panel-edge, var(--bdr-strong)));
   border-radius: 12px;
-  background: var(--composer-panel-bg, rgba(35, 35, 43, 0.97));
-  box-shadow: var(--composer-panel-shadow, 0 22px 56px rgba(0, 0, 0, 0.38), 0 3px 12px rgba(0, 0, 0, 0.22));
-  backdrop-filter: blur(22px) saturate(1.05);
-  -webkit-backdrop-filter: blur(22px) saturate(1.05);
+  background: var(--glass-panel-overlay, var(--composer-panel-bg, var(--glass-panel)));
+  box-shadow: var(--glass-elev-3, var(--composer-panel-shadow));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 @media (prefers-reduced-motion: no-preference) {
