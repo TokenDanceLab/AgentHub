@@ -1534,7 +1534,42 @@
   will-change: width, flex-basis, clip-path;
 }
 
-.shell[data-inspector-collapsed='true'] .inspector {
+/*
+ * Desktop engineering-loop column (#1181): owns the shell grid cell width /
+ * collapse chrome so RightInspector + AuxPanel can stack without the nested
+ * inspector's flex-basis treating --inspector-w as height.
+ */
+.engineeringColumn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--inspector-w);
+  flex: 0 0 var(--inspector-w);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-low);
+  border-left: 1px solid var(--bdr);
+  clip-path: inset(0 0 0 0);
+  transition:
+    width var(--inspector-motion-duration) var(--inspector-motion-ease),
+    flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
+    clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
+    border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+    background var(--dur-normal) var(--ease);
+  will-change: width, flex-basis, clip-path;
+}
+
+.engineeringColumn .inspector {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  border-left: none;
+}
+
+.shell[data-inspector-collapsed='true'] .inspector,
+.shell[data-inspector-collapsed='true'] .engineeringColumn {
   width: 0;
   flex-basis: 0;
   border-left-color: transparent;
@@ -1542,7 +1577,8 @@
   pointer-events: none;
 }
 
-.shell[data-inspector-resizing='true'] .inspector {
+.shell[data-inspector-resizing='true'] .inspector,
+.shell[data-inspector-resizing='true'] .engineeringColumn {
   transition: none;
 }
 
@@ -2196,7 +2232,8 @@
   }
 
   .sidebarFrame,
-  .inspector {
+  .inspector,
+  .engineeringColumn {
     display: none;
   }
 
