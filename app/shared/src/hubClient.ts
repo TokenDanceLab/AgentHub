@@ -1,4 +1,3 @@
-import { reportApiError } from './errors';
 import type {
   HubAgentRunEventSummary,
   HubAgentRunEvent,
@@ -89,21 +88,19 @@ import type {
 import { parseHubSuccessResponse } from './hubClientEnvelope';
 import * as hubPayload from './hubClientPayloadUtils';
 import {
+  invokeNormalizedRegisterDeviceRequest,
   invokePathFormDataUpload,
   invokePathInitRequest,
-  normalizeRegisterDeviceRequest,
+  invokePathsInitRequest,
   runChangePasswordWithFallback,
+  runNormalizedExecutionTargetsListRequest,
   runRequestWithRouteFallback,
 } from './hubClientRequestUtils';
 import {
-  applyDefaultHubRequestCatchEffects,
-  fetchHubJsonWithTimeout,
-  fetchHubMultipartWithTimeout,
   normalizeHubBaseUrl,
-  prepareHubRequestContextFromClient,
-  prepareMultipartUploadContextFromClient,
   resolveHubFetch,
-  runUnauthorizedTokenRefreshRecovery,
+  runHubJsonRequest,
+  runHubMultipartUploadRequest,
 } from './hubClientTransportUtils';
 
 // ── Public type / envelope re-exports (extracted #810) ──
@@ -117,44 +114,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const { headers, timeoutMs, method, url } = prepareHubRequestContextFromClient({
+    return runHubJsonRequest({
       baseUrl,
       path,
       options,
       token: opts.getToken?.(),
       timeoutMs: opts.timeoutMs,
+      fetchImpl,
+      onRefreshToken: opts.onRefreshToken,
+      parseSuccess: (response) => parseHubSuccessResponse<T>(response),
     });
-
-    try {
-      const response = await fetchHubJsonWithTimeout(
-        fetchImpl,
-        url,
-        timeoutMs,
-        options,
-        headers,
-      );
-
-      // ── Token refresh recovery on 401 ──────────────────
-      const recovery = await runUnauthorizedTokenRefreshRecovery({
-        status: response.status,
-        onRefreshToken: opts.onRefreshToken,
-        headers,
-        path,
-        retry: async () =>
-          parseHubSuccessResponse<T>(
-            await fetchHubJsonWithTimeout(fetchImpl, url, timeoutMs, options, headers),
-          ),
-        logError: (prefix, err) => console.error(prefix, err),
-        report: (error, context) => reportApiError(error, context),
-      });
-      if (recovery.action === 'retry_result') {
-        return recovery.value;
-      }
-
-      return await parseHubSuccessResponse<T>(response);
-    } catch (error) {
-      applyDefaultHubRequestCatchEffects(error, { timeoutMs, method, path });
-    }
   }
 
   async function requestWithFallback<T>(
@@ -170,15 +139,15 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
   async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
     // Let the runtime set multipart boundary; do not force JSON content-type.
-    const { headers, timeoutMs, url } = prepareMultipartUploadContextFromClient({
+    return runHubMultipartUploadRequest({
       baseUrl,
       path,
+      formData,
       token: opts.getToken?.(),
       timeoutMs: opts.timeoutMs,
+      fetchImpl,
+      parseSuccess: (response) => parseHubSuccessResponse<T>(response),
     });
-    return parseHubSuccessResponse<T>(
-      await fetchHubMultipartWithTimeout(fetchImpl, url, timeoutMs, headers, formData),
-    );
   }
 
   return {
@@ -326,20 +295,24 @@ export function createHubClient(opts: HubClientOptions = {}) {
       offset?: number;
     }) => request<HubNotification[]>(hubPayload.buildListNotificationsPath(params)),
     markNotificationRead: (id: string) =>
-      requestWithFallback<void>(
+      invokePathsInitRequest(
+        (paths, init) => requestWithFallback<void>(paths, init),
         hubPayload.buildMarkNotificationReadPaths(id),
         hubPayload.buildPostInit(),
       ),
     readAllNotifications: () =>
-      requestWithFallback<void>(
+      invokePathsInitRequest(
+        (paths, init) => requestWithFallback<void>(paths, init),
         hubPayload.buildReadAllNotificationsPaths(),
         hubPayload.buildPostInit(),
       ),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
-      requestWithFallback<HubDevice>(
-        hubPayload.buildRegisterDevicePaths(),
-        hubPayload.buildJsonPostInit(normalizeRegisterDeviceRequest(body)),
+      invokeNormalizedRegisterDeviceRequest(
+        (paths, init) => requestWithFallback<HubDevice>(paths, init),
+        body,
+        hubPayload.buildRegisterDevicePaths,
+        hubPayload.buildJsonPostInit,
       ),
     ackTask: (taskId: string, runId?: string) =>
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAckTaskRequest(taskId, runId)),
@@ -361,7 +334,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
     triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       invokePathInitRequest((path, init) => request<HubAgentTask>(path, init), hubPayload.buildTriggerAgentTaskRequest(triggerMessageId, options)),
     cancelAgentTask: (taskId: string) =>
-      requestWithFallback<void>(
+      invokePathsInitRequest(
+        (paths, init) => requestWithFallback<void>(paths, init),
         hubPayload.buildCancelAgentTaskPaths(taskId),
         hubPayload.buildPostInit(),
       ),
@@ -372,16 +346,17 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildPostInit(),
       ),
 
-    listExecutionTargets: async (params?: {
+    listExecutionTargets: (params?: {
       pageSize?: number;
       pageCursor?: string;
       target_type?: string;
-    }) => {
-      const data = await request<HubExecutionTarget[] | HubExecutionTargetListResponse>(
+    }) =>
+      runNormalizedExecutionTargetsListRequest(
+        (path) =>
+          request<HubExecutionTarget[] | HubExecutionTargetListResponse>(path),
         hubPayload.buildListExecutionTargetsPath(params),
-      );
-      return hubPayload.normalizeExecutionTargetsResponse(data);
-    },
+        hubPayload.normalizeExecutionTargetsResponse,
+      ),
     createExecutionTarget: (body: HubExecutionTargetRequest) =>
       request<HubExecutionTarget>(
         hubPayload.buildExecutionTargetsPath(),

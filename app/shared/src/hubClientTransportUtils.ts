@@ -623,3 +623,100 @@ export function applyDefaultHubRequestCatchEffects(
     report: (err, context) => reportApiError(err, context),
   });
 }
+
+// ── Residual pure peels (#1044) ───────────────────────────────────────────────
+
+/**
+ * Residual JSON request peel for createHubClient.request (#1044).
+ * prepare → fetch → optional 401 refresh retry → parse; catch → default effects.
+ * exactOptional-safe via prepareHubRequestContextFromClient.
+ */
+export async function runHubJsonRequest<T>(args: {
+  baseUrl: string;
+  path: string;
+  options?: RequestInit;
+  token?: string | null | undefined;
+  timeoutMs?: number | undefined;
+  fetchImpl: typeof fetch;
+  onRefreshToken?: (() => Promise<string | null>) | null | undefined;
+  parseSuccess: (response: Response) => Promise<T>;
+}): Promise<T> {
+  const options = args.options ?? {};
+  const { headers, timeoutMs, method, url } = prepareHubRequestContextFromClient({
+    baseUrl: args.baseUrl,
+    path: args.path,
+    options,
+    token: args.token,
+    timeoutMs: args.timeoutMs,
+  });
+
+  try {
+    const response = await fetchHubJsonWithTimeout(
+      args.fetchImpl,
+      url,
+      timeoutMs,
+      options,
+      headers,
+    );
+
+    const recovery = await runUnauthorizedTokenRefreshRecovery({
+      status: response.status,
+      onRefreshToken: args.onRefreshToken,
+      headers,
+      path: args.path,
+      retry: async () =>
+        args.parseSuccess(
+          await fetchHubJsonWithTimeout(
+            args.fetchImpl,
+            url,
+            timeoutMs,
+            options,
+            headers,
+          ),
+        ),
+      logError: (prefix, err) => console.error(prefix, err),
+      report: (error, context) => reportApiError(error, context),
+    });
+    if (recovery.action === 'retry_result') {
+      return recovery.value;
+    }
+
+    return await args.parseSuccess(response);
+  } catch (error) {
+    applyDefaultHubRequestCatchEffects(error, {
+      timeoutMs,
+      method,
+      path: args.path,
+    });
+  }
+}
+
+/**
+ * Residual multipart upload peel for createHubClient.uploadMultipart (#1044).
+ * prepare auth-only context → multipart fetch → parse success.
+ */
+export async function runHubMultipartUploadRequest<T>(args: {
+  baseUrl: string;
+  path: string;
+  formData: FormData;
+  token?: string | null | undefined;
+  timeoutMs?: number | undefined;
+  fetchImpl: typeof fetch;
+  parseSuccess: (response: Response) => Promise<T>;
+}): Promise<T> {
+  const { headers, timeoutMs, url } = prepareMultipartUploadContextFromClient({
+    baseUrl: args.baseUrl,
+    path: args.path,
+    token: args.token,
+    timeoutMs: args.timeoutMs,
+  });
+  return args.parseSuccess(
+    await fetchHubMultipartWithTimeout(
+      args.fetchImpl,
+      url,
+      timeoutMs,
+      headers,
+      args.formData,
+    ),
+  );
+}
