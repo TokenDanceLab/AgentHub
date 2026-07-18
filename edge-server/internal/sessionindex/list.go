@@ -1,18 +1,15 @@
 package sessionindex
 
 import (
-	"os"
-	"path/filepath"
 	"sort"
-	"strings"
-	"time"
 )
 
 // ListOptions bounds a read-only directory scan.
 type ListOptions struct {
 	Home            string
-	ClaudeConfigDir string // optional override
-	CodexHome       string // optional override
+	ClaudeConfigDir string // optional override (CLAUDE_CONFIG_DIR)
+	CodexHome       string // optional override (CODEX_HOME)
+	OpenCodeHome    string // optional override; stub-ready
 	Limit           int
 	IncludeRuntimes []RuntimeID // empty = claude-code + codex
 }
@@ -31,58 +28,61 @@ func ListRecent(opts ListOptions) ([]SessionSummary, error) {
 
 	var out []SessionSummary
 	for _, rt := range runtimes {
-		var root string
 		switch rt {
 		case RuntimeClaudeCode:
-			root = ResolveClaudeCodeSessionsDir(opts.Home, opts.ClaudeConfigDir)
+			root := ResolveClaudeCodeSessionsDir(opts.Home, opts.ClaudeConfigDir)
+			history := ResolveClaudeCodeHistoryPath(opts.Home, opts.ClaudeConfigDir)
+			items, err := listClaudeCodeSessions(root, history)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, items...)
 		case RuntimeCodex:
-			root = ResolveCodexSessionsDir(opts.Home, opts.CodexHome)
+			root := ResolveCodexSessionsDir(opts.Home, opts.CodexHome)
+			index := ResolveCodexSessionIndexPath(opts.Home, opts.CodexHome)
+			items, err := listCodexSessions(root, index)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, items...)
+		case RuntimeOpenCode:
+			// Stub-ready: resolve path but only list when layout is productized.
+			root := ResolveOpenCodeSessionsDir(opts.Home, opts.OpenCodeHome)
+			if root == "" {
+				continue
+			}
+			items, err := listOpenCodeStub(root)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, items...)
 		default:
 			continue
 		}
-		if root == "" {
-			continue
-		}
-		entries, err := os.ReadDir(root)
-		if err != nil {
-			// Missing root is not fatal — runtime simply not installed / empty.
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, err
-		}
-		for _, e := range entries {
-			if !e.IsDir() && !strings.HasSuffix(e.Name(), ".jsonl") && !strings.HasSuffix(e.Name(), ".json") {
-				// Keep dirs and common session file extensions.
-				if !e.IsDir() {
-					continue
-				}
-			}
-			info, err := e.Info()
-			if err != nil {
-				continue
-			}
-			// Skip very shallow noise
-			name := e.Name()
-			if name == "." || name == ".." {
-				continue
-			}
-			out = append(out, SessionSummary{
-				Runtime:    rt,
-				ID:         name,
-				Title:      name,
-				Path:       filepath.Join(root, name),
-				UpdatedAt:  info.ModTime().UTC().Format(time.RFC3339),
-				SourceMode: "import",
-			})
-		}
 	}
 
-	sort.Slice(out, func(i, j int) bool {
+	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].UpdatedAt > out[j].UpdatedAt
 	})
 	if len(out) > limit {
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+// listOpenCodeStub returns empty until OpenCode on-disk layout is productized.
+func listOpenCodeStub(root string) ([]SessionSummary, error) {
+	_ = root
+	return nil, nil
+}
+
+// ListRecentFromEnv builds options from process env + DefaultHome.
+func ListRecentFromEnv(limit int, runtimes []RuntimeID) ([]SessionSummary, error) {
+	return ListRecent(ListOptions{
+		Home:            DefaultHome(),
+		ClaudeConfigDir: EnvClaudeConfigDir(),
+		CodexHome:       EnvCodexHome(),
+		Limit:           limit,
+		IncludeRuntimes: runtimes,
+	})
 }
