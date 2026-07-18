@@ -1539,3 +1539,347 @@ type hubTaskRecordPlan struct {
 func planHubTaskRecord(hubTaskID string) hubTaskRecordPlan {
 	return hubTaskRecordPlan{Record: shouldRecordHubTask(hubTaskID)}
 }
+
+// commandBuildPlan consolidates adapter-vs-profile command build flags for one run attempt.
+type commandBuildPlan struct {
+	UseAdapter          bool
+	PublishCLIPlan      bool
+	UseStructuredParser bool
+}
+
+// planCommandBuild maps adapter presence into command-build / CLI-plan / structured-parser flags.
+// Side-effects (BuildCommand, Expand, Publish, ParseStream) stay in the executor.
+func planCommandBuild(hasAdapter bool) commandBuildPlan {
+	return commandBuildPlan{
+		UseAdapter:          shouldUseAdapterCommand(hasAdapter),
+		PublishCLIPlan:      shouldPublishCLIInvocationPlan(hasAdapter),
+		UseStructuredParser: shouldUseStructuredOutputParser(hasAdapter),
+	}
+}
+
+// runMetricsPlan consolidates metrics attach/start gates for a run attempt.
+type runMetricsPlan struct {
+	AttachFinishDefer bool
+	RecordStart       bool
+}
+
+// planRunMetrics maps metrics presence into finish-defer and start-record flags.
+func planRunMetrics(hasMetrics bool) runMetricsPlan {
+	return runMetricsPlan{
+		AttachFinishDefer: shouldAttachFinishMetricsDefer(hasMetrics),
+		RecordStart:       shouldRecordRunStartMetrics(hasMetrics),
+	}
+}
+
+// finishMetricsRecordPlan is the pure late-finish metrics gate inside the deferred closer.
+type finishMetricsRecordPlan struct {
+	Record bool
+}
+
+// planFinishMetricsRecord decides whether RecordRunFinish should fire after a successful Start.
+func planFinishMetricsRecord(runStartTime time.Time, runFound bool) finishMetricsRecordPlan {
+	if !shouldRecordRunFinishMetrics(runStartTime) {
+		return finishMetricsRecordPlan{}
+	}
+	if !shouldRecordFinishMetricsForRun(runFound) {
+		return finishMetricsRecordPlan{}
+	}
+	return finishMetricsRecordPlan{Record: true}
+}
+
+// publishFailedPlan is the pure publishFailed side-effect plan after a status transition.
+type publishFailedPlan struct {
+	Publish    bool
+	Persist    bool
+	Classified *RunError
+}
+
+// planPublishFailed maps a SetRunStatusIf result + raw error into publish/persist flags
+// and the classified RunError payload. Classify only runs when publishing (same as before).
+func planPublishFailed(transitionOK bool, err error) publishFailedPlan {
+	if !shouldPublishStatusTransition(transitionOK) {
+		return publishFailedPlan{}
+	}
+	classified := classifyPublishedFailure(err)
+	return publishFailedPlan{
+		Publish:    true,
+		Persist:    shouldPersistClassifiedFailure(classified),
+		Classified: classified,
+	}
+}
+
+// persistAgentFailurePlan is the pure multi-gate plan for persistAgentFailureMessage.
+type persistAgentFailurePlan struct {
+	Proceed bool
+}
+
+// planPersistAgentFailure decides whether CreateItem should run after content trim,
+// repository type-assert, and existing-message lookup.
+func planPersistAgentFailure(contentOK, repoOK, alreadyExists bool) persistAgentFailurePlan {
+	if !shouldPersistAgentFailureContent(contentOK) {
+		return persistAgentFailurePlan{}
+	}
+	if !shouldUseAgentFailureRepository(repoOK) {
+		return persistAgentFailurePlan{}
+	}
+	if shouldSkipExistingAgentFailureMessage(alreadyExists) {
+		return persistAgentFailurePlan{}
+	}
+	return persistAgentFailurePlan{Proceed: true}
+}
+
+// persistErrorPlan is the pure checkPersistError emit plan.
+type persistErrorPlan struct {
+	Emit bool
+}
+
+// planPersistError decides whether a LastPersistError should emit run.persistence_error.
+// sourceOK gates the store type-assert; persistErr is the looked-up error (nil when absent).
+func planPersistError(sourceOK bool, persistErr error) persistErrorPlan {
+	if !shouldCheckPersistErrorSource(sourceOK) {
+		return persistErrorPlan{}
+	}
+	return persistErrorPlan{Emit: shouldEmitPersistenceError(persistErr)}
+}
+
+// structuredEmitterWrapPlan is the pure emitter-wrapper plan for publishStructuredOutput.
+type structuredEmitterWrapPlan struct {
+	ApplyBudget      bool
+	WrapDecisionLoop bool
+}
+
+// planStructuredEmitterWraps maps budget/decision-loop presence into wrap flags.
+// Actual Wrap construction stays in the executor.
+func planStructuredEmitterWraps(hasBudget, hasDecisionLoop bool) structuredEmitterWrapPlan {
+	return structuredEmitterWrapPlan{
+		ApplyBudget:      shouldApplyBudgetAwareEmitter(hasBudget),
+		WrapDecisionLoop: shouldWrapDecisionLoopEmitter(hasDecisionLoop),
+	}
+}
+
+// watchProcessEntryPlan is the pure nil-process gate for watchRunProcess.
+type watchProcessEntryPlan struct {
+	Watch bool
+}
+
+// planWatchProcessEntry reports whether the context watcher should arm for proc.
+// Preserves #988: nil process handles are never watched.
+func planWatchProcessEntry(proc *os.Process) watchProcessEntryPlan {
+	return watchProcessEntryPlan{Watch: proc != nil}
+}
+
+// watchProcessKillPlan is the pure kill decision after ctx.Done in watchRunProcess.
+type watchProcessKillPlan struct {
+	Kill bool
+}
+
+// planWatchProcessKill decides whether the timeout watcher may force-kill.
+// When Cancel already armed a grace path (graceActive), kill is deferred to that
+// path so CommandContext removal does not defeat grace escalation (#988).
+func planWatchProcessKill(graceActive bool) watchProcessKillPlan {
+	return watchProcessKillPlan{Kill: !graceActive}
+}
+
+// shouldCancelCascadeChild reports whether a ShutdownCascade child runID should
+// receive Cancel. Skips empty IDs and the parent itself (#1001).
+func shouldCancelCascadeChild(parentRunID, childRunID string) bool {
+	return childRunID != "" && childRunID != parentRunID
+}
+
+// trackStartedProcessPlan is the pure post-Start process tracking plan.
+type trackStartedProcessPlan struct {
+	Track bool
+	Watch bool
+}
+
+// planTrackStartedProcess decides whether to store the process handle and arm
+// the context watcher. Track and Watch stay coupled (same gate as before).
+func planTrackStartedProcess(proc *os.Process) trackStartedProcessPlan {
+	track := shouldTrackStartedProcess(proc)
+	return trackStartedProcessPlan{Track: track, Watch: track}
+}
+
+// faultEscalationHandoffPlan is the pure retry decision for the #867 handoff path.
+// Map mutations, cancel re-registration, and successor go run() stay in the executor.
+type faultEscalationHandoffPlan struct {
+	Retry bool
+}
+
+// planFaultEscalationHandoff decides whether a looked-up run may hand off to a
+// successor attempt. Does not rework terminalFinish ownership (#867).
+func planFaultEscalationHandoff(found bool, cfg FaultEscalationConfig, retryCount int) faultEscalationHandoffPlan {
+	return faultEscalationHandoffPlan{
+		Retry: shouldAcceptFaultEscalationRetry(found, cfg, retryCount),
+	}
+}
+
+// adapterResolvePlan is the pure adapter-registry resolve gate for run().
+type adapterResolvePlan struct {
+	Resolve bool
+}
+
+// planAdapterResolve reports whether adapterReg.Resolve should run for this attempt.
+func planAdapterResolve(hasRegistry bool, agentID string, hasDefaultAdapter bool) adapterResolvePlan {
+	return adapterResolvePlan{
+		Resolve: shouldResolveAdapter(hasRegistry, agentID, hasDefaultAdapter),
+	}
+}
+
+// cancelGraceArmPlan is the pure Cancel grace-path arm decision (#988).
+type cancelGraceArmPlan struct {
+	Arm bool
+}
+
+// planCancelGraceArm reports whether Cancel should register cancelDone and start
+// the interrupt→SIGTERM→kill escalation goroutine for a tracked process.
+func planCancelGraceArm(proc *os.Process) cancelGraceArmPlan {
+	return cancelGraceArmPlan{Arm: shouldStartGracefulProcessShutdown(proc)}
+}
+
+// evidenceRunPlan is the pure evidence-gate execution plan for a successful wait.
+type evidenceRunPlan struct {
+	RunGate bool
+}
+
+// planEvidenceRun reports whether runEvidenceGate should execute for this attempt.
+func planEvidenceRun(gateEnabled bool) evidenceRunPlan {
+	return evidenceRunPlan{RunGate: shouldRunEvidenceGate(gateEnabled)}
+}
+
+// sessionRetryStatusPlan is the pure log gate after resetting status for session retry.
+type sessionRetryStatusPlan struct {
+	LogReset bool
+}
+
+// planSessionRetryStatus maps SetRunStatusIf success into the debug-log flag.
+func planSessionRetryStatus(resetOK bool) sessionRetryStatusPlan {
+	return sessionRetryStatusPlan{LogReset: shouldResetSessionRetryStatus(resetOK)}
+}
+
+// processWaitLogPlan is the pure log gate for post-kill Wait errors in Cancel grace.
+type processWaitLogPlan struct {
+	Log bool
+}
+
+// planProcessWaitAfterKill maps a post-kill Wait error into the warn-log flag.
+func planProcessWaitAfterKill(err error) processWaitLogPlan {
+	return processWaitLogPlan{Log: shouldLogProcessWaitAfterKill(err)}
+}
+
+// interruptWriteLogPlan is the pure log gate for Cancel stdin interrupt failures.
+type interruptWriteLogPlan struct {
+	Log bool
+}
+
+// planInterruptWriteLog maps a WriteInterrupt error into the debug-log flag.
+func planInterruptWriteLog(err error) interruptWriteLogPlan {
+	return interruptWriteLogPlan{Log: shouldLogInterruptWriteFailure(err)}
+}
+
+// contextCompactionPlan is the pure post-stream compaction emit plan.
+type contextCompactionPlan struct {
+	Emit       bool
+	UsagePct   float64
+	TokensUsed int64
+	Remaining  int64
+	Payload    map[string]any
+}
+
+// planContextCompaction snapshots budget usage and builds the bus payload when
+// the auto-compaction threshold is crossed. Side-effects stay in the executor.
+func planContextCompaction(budget *runnerctx.ContextBudget, runID string) contextCompactionPlan {
+	if !shouldEmitContextCompaction(budget) {
+		return contextCompactionPlan{}
+	}
+	usagePct, tokensUsed, remaining := contextCompactionSnapshot(budget)
+	return contextCompactionPlan{
+		Emit:       true,
+		UsagePct:   usagePct,
+		TokensUsed: tokensUsed,
+		Remaining:  remaining,
+		Payload:    contextCompactionPayload(runID, usagePct, tokensUsed, remaining),
+	}
+}
+
+// structuredParseHandlePlan is the pure post-classify handle for ParseStream outcomes.
+type structuredParseHandlePlan struct {
+	WarnRecoverable bool
+	FailFatal       bool
+	WarningPayload  map[string]any
+}
+
+// planStructuredParseHandle maps a classified parse outcome into warn/fail flags
+// and the recoverable warning payload. publishFailed/sendSubAgentResult stay in the executor.
+func planStructuredParseHandle(
+	outcome structuredParseOutcome,
+	psErr *adapters.ParseStreamError,
+	runID string,
+	parseErr error,
+) structuredParseHandlePlan {
+	if shouldPublishRecoverableParseWarning(outcome) {
+		msg := ""
+		errText := ""
+		if psErr != nil {
+			msg = recoverableParseWarningMessage(psErr.Unwrap())
+			errText = psErr.Error()
+		} else if parseErr != nil {
+			errText = parseErr.Error()
+		}
+		return structuredParseHandlePlan{
+			WarnRecoverable: true,
+			WarningPayload:  recoverableParseWarningPayload(runID, msg, errText),
+		}
+	}
+	if shouldFailOnStructuredParse(outcome) {
+		return structuredParseHandlePlan{FailFatal: true}
+	}
+	return structuredParseHandlePlan{}
+}
+
+// planStructuredParseHandleFromErr classifies parseErr then builds the handle plan.
+func planStructuredParseHandleFromErr(parseErr error, runID string) structuredParseHandlePlan {
+	outcome, psErr := classifyStructuredParseOutcome(parseErr)
+	return planStructuredParseHandle(outcome, psErr, runID, parseErr)
+}
+
+// permissionModePlan is the pure SEC-02 permission-mode sanitization result.
+type permissionModePlan struct {
+	Changed      bool
+	LogForbidden bool
+	RunCtx       RunProcessContext
+}
+
+// planPermissionModeSanitization rejects forbidden permission modes and returns
+// the sanitized run context. Control-flow assignment stays in the executor.
+func planPermissionModeSanitization(runCtx RunProcessContext) permissionModePlan {
+	sanitized, forbidden := applyPermissionModeSanitization(runCtx)
+	if !shouldLogForbiddenPermissionMode(forbidden) {
+		return permissionModePlan{RunCtx: runCtx}
+	}
+	return permissionModePlan{
+		Changed:      true,
+		LogForbidden: true,
+		RunCtx:       sanitized,
+	}
+}
+
+// publishStatusPlan is the pure status-transition publish gate.
+type publishStatusPlan struct {
+	Publish bool
+}
+
+// planPublishStatus reports whether a conditional SetRunStatusIf transition may
+// publish bus/Hub side effects.
+func planPublishStatus(ok bool) publishStatusPlan {
+	return publishStatusPlan{Publish: shouldPublishStatusTransition(ok)}
+}
+
+// preflightFailurePlan is the pure PreflightCheck failure gate.
+type preflightFailurePlan struct {
+	Fail bool
+}
+
+// planPreflightFailure reports whether a PreflightCheck error should fail the run.
+func planPreflightFailure(err error) preflightFailurePlan {
+	return preflightFailurePlan{Fail: shouldPublishPreflightFailure(err)}
+}

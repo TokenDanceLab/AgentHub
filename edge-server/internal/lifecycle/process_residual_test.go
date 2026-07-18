@@ -1606,3 +1606,190 @@ func TestResidualPlanPureHelpers989(t *testing.T) {
 		t.Fatal("hub task record")
 	}
 }
+
+func TestResidualPlanPureHelpers1011(t *testing.T) {
+	t.Parallel()
+
+	// Command build plan consolidates adapter-vs-profile flags.
+	cmd := planCommandBuild(false)
+	if cmd.UseAdapter || cmd.PublishCLIPlan || cmd.UseStructuredParser {
+		t.Fatalf("no adapter %#v", cmd)
+	}
+	cmd = planCommandBuild(true)
+	if !cmd.UseAdapter || !cmd.PublishCLIPlan || !cmd.UseStructuredParser {
+		t.Fatalf("with adapter %#v", cmd)
+	}
+
+	// Metrics attach/start + finish record plan.
+	metrics := planRunMetrics(false)
+	if metrics.AttachFinishDefer || metrics.RecordStart {
+		t.Fatalf("no metrics %#v", metrics)
+	}
+	metrics = planRunMetrics(true)
+	if !metrics.AttachFinishDefer || !metrics.RecordStart {
+		t.Fatalf("with metrics %#v", metrics)
+	}
+	fin := planFinishMetricsRecord(time.Time{}, true)
+	if fin.Record {
+		t.Fatal("zero start time should not record")
+	}
+	fin = planFinishMetricsRecord(time.Now(), false)
+	if fin.Record {
+		t.Fatal("missing run should not record")
+	}
+	fin = planFinishMetricsRecord(time.Now(), true)
+	if !fin.Record {
+		t.Fatal("started run should record")
+	}
+
+	// publishFailed plan: classify only when transition succeeds.
+	fail := planPublishFailed(false, errors.New("boom"))
+	if fail.Publish || fail.Persist || fail.Classified != nil {
+		t.Fatalf("no transition %#v", fail)
+	}
+	fail = planPublishFailed(true, errors.New("boom"))
+	if !fail.Publish || fail.Classified == nil {
+		t.Fatalf("transition ok %#v", fail)
+	}
+
+	// persistAgentFailure multi-gate
+	persist := planPersistAgentFailure(false, true, false)
+	if persist.Proceed {
+		t.Fatal("bad content")
+	}
+	persist = planPersistAgentFailure(true, false, false)
+	if persist.Proceed {
+		t.Fatal("no repo")
+	}
+	persist = planPersistAgentFailure(true, true, true)
+	if persist.Proceed {
+		t.Fatal("already exists")
+	}
+	persist = planPersistAgentFailure(true, true, false)
+	if !persist.Proceed {
+		t.Fatal("should proceed")
+	}
+
+	// persist error emit plan
+	pe := planPersistError(false, errors.New("x"))
+	if pe.Emit {
+		t.Fatal("no source")
+	}
+	pe = planPersistError(true, nil)
+	if pe.Emit {
+		t.Fatal("nil err")
+	}
+	pe = planPersistError(true, errors.New("x"))
+	if !pe.Emit {
+		t.Fatal("should emit")
+	}
+
+	// structured emitter wraps
+	wrap := planStructuredEmitterWraps(false, false)
+	if wrap.ApplyBudget || wrap.WrapDecisionLoop {
+		t.Fatalf("none %#v", wrap)
+	}
+	wrap = planStructuredEmitterWraps(true, true)
+	if !wrap.ApplyBudget || !wrap.WrapDecisionLoop {
+		t.Fatalf("both %#v", wrap)
+	}
+
+	// watchRunProcess plans (#988)
+	if planWatchProcessEntry(nil).Watch || !planWatchProcessEntry(&os.Process{}).Watch {
+		t.Fatal("watch entry")
+	}
+	if planWatchProcessKill(true).Kill || !planWatchProcessKill(false).Kill {
+		t.Fatal("watch kill grace defer")
+	}
+
+	// cascade child filter (#1001)
+	if shouldCancelCascadeChild("parent", "") || shouldCancelCascadeChild("parent", "parent") {
+		t.Fatal("skip empty/self")
+	}
+	if !shouldCancelCascadeChild("parent", "child") {
+		t.Fatal("cancel child")
+	}
+
+	// track started process
+	track := planTrackStartedProcess(nil)
+	if track.Track || track.Watch {
+		t.Fatalf("nil proc %#v", track)
+	}
+	track = planTrackStartedProcess(&os.Process{})
+	if !track.Track || !track.Watch {
+		t.Fatalf("proc %#v", track)
+	}
+
+	// fault escalation handoff (#867)
+	cfg := FaultEscalationConfig{Enabled: true, MaxRetries: 2}
+	if planFaultEscalationHandoff(false, cfg, 0).Retry {
+		t.Fatal("missing run")
+	}
+	if !planFaultEscalationHandoff(true, cfg, 0).Retry {
+		t.Fatal("should retry")
+	}
+	if planFaultEscalationHandoff(true, cfg, 2).Retry {
+		t.Fatal("exhausted")
+	}
+
+	// adapter resolve / cancel grace / evidence / session status / log plans
+	if planAdapterResolve(false, "a", false).Resolve || !planAdapterResolve(true, "a", false).Resolve {
+		t.Fatal("adapter resolve")
+	}
+	if planCancelGraceArm(nil).Arm || !planCancelGraceArm(&os.Process{}).Arm {
+		t.Fatal("cancel grace arm")
+	}
+	if planEvidenceRun(false).RunGate || !planEvidenceRun(true).RunGate {
+		t.Fatal("evidence run")
+	}
+	if planSessionRetryStatus(false).LogReset || !planSessionRetryStatus(true).LogReset {
+		t.Fatal("session retry status")
+	}
+	if planProcessWaitAfterKill(nil).Log || !planProcessWaitAfterKill(errors.New("x")).Log {
+		t.Fatal("process wait log")
+	}
+	if planInterruptWriteLog(nil).Log || !planInterruptWriteLog(errors.New("x")).Log {
+		t.Fatal("interrupt write log")
+	}
+}
+
+func TestResidualPlanPureHelpers1011b(t *testing.T) {
+	t.Parallel()
+
+	// Context compaction plan
+	if planContextCompaction(nil, "r1").Emit {
+		t.Fatal("nil budget")
+	}
+
+	// Structured parse handle
+	h := planStructuredParseHandleFromErr(nil, "r1")
+	if h.WarnRecoverable || h.FailFatal {
+		t.Fatalf("none %#v", h)
+	}
+	h = planStructuredParseHandleFromErr(errors.New("x"), "r1")
+	if !h.FailFatal || h.WarnRecoverable {
+		t.Fatalf("fatal %#v", h)
+	}
+
+	// Permission mode plan
+	ctx := RunProcessContext{PermissionMode: "default"}
+	perm := planPermissionModeSanitization(ctx)
+	if perm.Changed || perm.LogForbidden {
+		t.Fatalf("default %#v", perm)
+	}
+	ctx.PermissionMode = "bypassPermissions"
+	perm = planPermissionModeSanitization(ctx)
+	if !perm.Changed || !perm.LogForbidden || perm.RunCtx.PermissionMode != "default" {
+		t.Fatalf("forbidden %#v", perm)
+	}
+
+	// Publish status plan
+	if planPublishStatus(false).Publish || !planPublishStatus(true).Publish {
+		t.Fatal("publish status")
+	}
+
+	// Preflight failure plan
+	if planPreflightFailure(nil).Fail || !planPreflightFailure(errors.New("x")).Fail {
+		t.Fatal("preflight")
+	}
+}
