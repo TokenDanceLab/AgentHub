@@ -3,12 +3,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  max-width: 560px;
+  max-width: 520px;
   margin: 0 auto;
   padding: var(--wb-gap-3xl, 120px) var(--wb-gap-md, var(--space-md, 1rem)) var(--space-xl, 1.5rem);
   color: var(--foreground);
   text-align: center;
   user-select: none;
+  /* glass card density */
+  border: 1px solid var(--glass-border-strong, var(--border));
+  border-radius: var(--glass-card-radius, var(--radius-xl));
+  background: var(--glass-card-bg, var(--glass-panel));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-card-shadow, var(--glass-elev-2));
 }
 
 .content {
@@ -25,7 +32,7 @@
   justify-content: center;
   width: 56px;
   height: 56px;
-  border: 1px solid var(--glass-border-strong, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--glass-border-strong, var(--border));
   border-radius: 16px;
   background:
     linear-gradient(
@@ -35,6 +42,7 @@
     );
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   color: var(--muted-foreground);
 }
 
@@ -63,12 +71,13 @@
   gap: var(--wb-gap-2xs, 7px);
   min-height: 36px;
   margin-top: var(--wb-gap-2xs, var(--space-xs, 0.25rem));
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--glass-border-strong, var(--bdr));
   border-radius: var(--radius-lg, 8px);
   padding: 0 var(--wb-gap-md, 16px);
-  background: var(--glass-bg-light, rgba(255, 255, 255, 0.045));
+  background: var(--glass-bg-medium, var(--surface-low));
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm, 0.875rem);
@@ -77,9 +86,9 @@
 }
 
 .action:hover {
-  border-color: color-mix(in oklch, var(--primary) 40%, var(--glass-border-strong, rgba(255, 255, 255, 0.1)));
-  background: color-mix(in oklch, var(--primary) 12%, var(--glass-bg-light, rgba(255, 255, 255, 0.045)));
-  box-shadow: 0 0 16px color-mix(in oklch, var(--primary) 18%, transparent);
+  border-color: var(--glass-border-heavy, var(--bdr-focus));
+  background: var(--glass-bg-strong, var(--surface-high));
+  box-shadow: var(--glass-elev-2), 0 0 16px color-mix(in oklch, var(--primary) 18%, transparent);
 }
 
 .action:focus-visible {
@@ -94,9 +103,9 @@
   justify-content: center;
   min-height: 20px;
   padding: 0 6px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: var(--radius-sm, 4px);
-  background: var(--glass-bg-subtle, rgba(255, 255, 255, 0.03));
+  background: var(--glass-bg-subtle, var(--surface-low));
   color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-size: var(--font-size-2xs, 0.625rem);
@@ -133,10 +142,12 @@
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  border: 1px solid color-mix(in oklch, var(--glass-border, rgba(255, 255, 255, 0.06)) 80%, transparent);
+  border: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: var(--radius-lg, 8px);
   padding: 0 12px;
-  background: color-mix(in oklch, var(--glass-bg-light, rgba(255, 255, 255, 0.045)) 64%, transparent);
+  background: var(--glass-bg-subtle, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -161,8 +172,8 @@
 }
 
 .suggestionChip:hover {
-  border-color: color-mix(in oklch, var(--primary) 22%, var(--glass-border, rgba(255, 255, 255, 0.06)));
-  background: color-mix(in oklch, var(--primary) 8%, var(--glass-bg-light, rgba(255, 255, 255, 0.045)));
+  border-color: var(--glass-border-strong, var(--bdr-focus));
+  background: var(--glass-bg-light, var(--surface-high));
 }
 
 .suggestionIcon {
