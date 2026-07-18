@@ -1,6 +1,6 @@
 # AgentHub Decisions
 
-最后更新：2026-06-28
+最后更新：2026-07-18
 
 本文件是当前架构决策摘要。旧 ADR 全文已外迁到 `docs/history.md` 指向的 TokenDance docs archive；旧正文只作追溯，不覆盖 `AGENTS.md`、`docs/architecture.md`、`docs/architecture/`、`api/` 或当前源码事实。
 
@@ -22,6 +22,7 @@
 | ADR-015 | Accepted | 避免服务间循环依赖；优先窄接口、构造函数显式依赖和事件中介，不用 setter 注入掩盖循环。 | Hub architecture | 是 |
 | ADR-016 | Accepted | Hub->Edge dispatch 需要 delivery outbox / ACK / retry / dead-letter 语义，避免 fire-and-forget 造成状态永久分歧。 | Hub reliability | 是 |
 | ADR-017 | Accepted | Hub/Edge 授权区分身份令牌和 per-run capability token；真实安全边界以当前 JWT/capability 实现和风险登记表为准。 | Edge auth / Security | 是 |
+| ADR-018 | Accepted | 仓库根布局：README/AGENTS/LICENSE/go.work/.github 与编辑器/CI 根配置必须留在根目录；不 bulk move。根 `docker-compose.yml` + `.env.example` 暂留；仅当 scripts/dev 与 verify 同改时可迁 `deployments/dev/`。正文：[analysis/root-layout.md](analysis/root-layout.md)。 | Repository layout | 是 |
 
 ## Archive
 
