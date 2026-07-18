@@ -1292,3 +1292,250 @@ func finishRunMapKeys() []string {
 		"runOutputs",
 	}
 }
+
+// eagerStdinClosePlan is the pure post-start stdin close decision.
+type eagerStdinClosePlan struct {
+	ClosePipe bool
+	ClearMap  bool
+}
+
+// planEagerStdinClose decides whether to close the child stdin pipe and drop the
+// run's stdin map entry after Start. Control-flow (Close/delete) stays in the executor.
+func planEagerStdinClose(stdinOpen, needsStdin, hasDecisionLoop bool) eagerStdinClosePlan {
+	if !shouldCloseStdinAfterStart(stdinOpen, needsStdin, hasDecisionLoop) {
+		return eagerStdinClosePlan{}
+	}
+	closed := shouldCloseStdinPipe(stdinOpen)
+	return eagerStdinClosePlan{
+		ClosePipe: closed,
+		// Preserve prior behavior: clear the map whenever stdin was open for the
+		// eager-close branch (even if Close was skipped by a nil-guard race).
+		ClearMap: shouldClearStdinAfterEagerClose(closed || stdinOpen),
+	}
+}
+
+// postStartCancelPlan is the pure kill/wait plan when context is cancelled
+// after a successful cmd.Start but before the process is fully tracked.
+type postStartCancelPlan struct {
+	Cancel bool
+	Kill   bool
+	Wait   bool
+}
+
+// planPostStartCancel maps a post-start context error + process handle into the
+// cancel cleanup actions. Does not rework Cancel grace / CommandContext (#988).
+func planPostStartCancel(ctxErr error, proc *os.Process) postStartCancelPlan {
+	if !shouldKillStartedProcessOnCancel(ctxErr) {
+		return postStartCancelPlan{}
+	}
+	return postStartCancelPlan{
+		Cancel: true,
+		Kill:   shouldKillProcessAfterCancel(proc),
+		Wait:   shouldWaitProcessAfterCancel(proc),
+	}
+}
+
+// sessionConflictRetryPlan is the pure attempt-local cleanup plan for a
+// session-conflict retry. Map mutations stay in the executor.
+type sessionConflictRetryPlan struct {
+	Retry       bool
+	CloseOutput bool
+}
+
+// planSessionConflictRetry decides whether to retry with a fresh session and
+// whether a tracked run-output store should be closed for the failed attempt.
+func planSessionConflictRetry(waitErr error, stderrCapture string, attempt int, elapsed time.Duration, hasOutStore bool) sessionConflictRetryPlan {
+	if !shouldRetrySessionConflict(waitErr, stderrCapture, attempt, elapsed) {
+		return sessionConflictRetryPlan{}
+	}
+	return sessionConflictRetryPlan{
+		Retry:       true,
+		CloseOutput: shouldCloseTrackedRunOutput(hasOutStore),
+	}
+}
+
+// spawnStartFailurePlan is the pure cleanup plan when SpawnSubAgent's Start fails.
+type spawnStartFailurePlan struct {
+	ClearMapping bool
+	Unregister   bool
+	SlotReserved bool
+}
+
+// planSpawnStartFailureCleanup maps Start failure + registration state into the
+// cleanup flags used before returning the error. SlotReserved is the value to
+// assign back to the deferred release flag (false when Unregister will Decr).
+func planSpawnStartFailureCleanup(startErr error, registered, slotReserved bool) spawnStartFailurePlan {
+	if !shouldClearRunAgentMappingOnStartFailure(startErr) {
+		return spawnStartFailurePlan{SlotReserved: slotReserved}
+	}
+	return spawnStartFailurePlan{
+		ClearMapping: true,
+		Unregister:   shouldUnregisterOnStartFailure(registered),
+		SlotReserved: slotReservedAfterUnregister(registered, slotReserved),
+	}
+}
+
+// subAgentResultDeliveryPlan is the pure delivery plan for sendSubAgentResult.
+type subAgentResultDeliveryPlan struct {
+	Deliver        bool
+	UpdateRegistry bool
+	RegistryStatus agents.Status
+	StoreAgg       bool
+}
+
+// planSubAgentResultDelivery decides whether to deliver a result message, update
+// the agent registry terminal status, and store into the result aggregator.
+// Sanitization and queue I/O stay in the executor.
+func planSubAgentResultDelivery(
+	hasRegistry, hasQueue, mappingFound, agentFound bool,
+	parentID, status string,
+	hasAggregator bool,
+) subAgentResultDeliveryPlan {
+	if !shouldDeliverSubAgentResult(hasRegistry, hasQueue) {
+		return subAgentResultDeliveryPlan{}
+	}
+	if !shouldLookupSubAgentMapping(mappingFound) {
+		return subAgentResultDeliveryPlan{}
+	}
+	if !shouldRouteSubAgentToParent(agentFound, parentID) {
+		return subAgentResultDeliveryPlan{}
+	}
+	regStatus, update := subAgentRegistryTerminalStatus(status)
+	return subAgentResultDeliveryPlan{
+		Deliver:        true,
+		UpdateRegistry: update,
+		RegistryStatus: regStatus,
+		StoreAgg:       shouldStoreSubAgentAggregatorResult(hasAggregator),
+	}
+}
+
+// structuredParsePostPlan is the pure post-ParseStream plan for publishStructuredOutput.
+type structuredParsePostPlan struct {
+	RecordError bool
+	Flush       bool
+}
+
+// planStructuredParsePost decides whether to record a ParseStream error and
+// whether the transcript emitter should flush after parsing completes.
+func planStructuredParsePost(parseErr error, hasTranscript bool) structuredParsePostPlan {
+	return structuredParsePostPlan{
+		RecordError: shouldRecordStructuredParseError(parseErr),
+		Flush:       shouldFlushTranscriptEmitter(hasTranscript),
+	}
+}
+
+// finishCleanupPlan is the pure terminal-finish side-effect plan (cascade +
+// optional channel/store close). Map deletes stay in the executor.
+type finishCleanupPlan struct {
+	Cascade         bool
+	CloseCancelDone bool
+	CloseRunOutput  bool
+}
+
+// planFinishCleanup decides cascade shutdown and which optional tracked resources
+// need close during terminal finish. Does not rework #867 handoff ownership.
+func planFinishCleanup(hasRegistry, hasCancelDone, hasRunOutput bool) finishCleanupPlan {
+	return finishCleanupPlan{
+		Cascade:         shouldCascadeAgentShutdown(hasRegistry),
+		CloseCancelDone: shouldCloseCancelDoneChannel(hasCancelDone),
+		CloseRunOutput:  shouldCloseTrackedRunOutput(hasRunOutput),
+	}
+}
+
+// outputChunkPlan is the pure publish plan for one publishOutput read chunk.
+type outputChunkPlan struct {
+	Publish     bool
+	Text        string
+	LogStderr   bool
+	WriteStore  bool
+	ForwardHub  bool
+	LogTruncate bool
+	Payload     map[string]any
+	NextOffset  int
+}
+
+// planOutputChunk maps a limiter.allow result into publish/log/store/hub flags
+// and the bus payload. Side-effects stay in the executor.
+func planOutputChunk(runID, stream string, allowed []byte, offset int, truncatedNow bool, written, maxBytes int64, hasOutStore bool) outputChunkPlan {
+	if !shouldPublishOutputChunk(len(allowed), truncatedNow) {
+		return outputChunkPlan{NextOffset: offset}
+	}
+	text := string(allowed)
+	return outputChunkPlan{
+		Publish:     true,
+		Text:        text,
+		LogStderr:   shouldLogStderrLines(stream, text),
+		WriteStore:  shouldWriteRunOutputStore(hasOutStore, len(allowed)),
+		ForwardHub:  shouldForwardStdoutToHub(stream, text),
+		LogTruncate: shouldLogRunOutputTruncation(truncatedNow),
+		Payload:     runOutputBatchPayload(runID, stream, text, offset, truncatedNow, written, maxBytes),
+		NextOffset:  offset + len(allowed),
+	}
+}
+
+// surfaceArtifactsPlan is the pure auto-surface gate for surfaceRunArtifacts.
+type surfaceArtifactsPlan struct {
+	Proceed       bool
+	SkipWriterLog bool
+}
+
+// planSurfaceArtifacts decides whether auto-surface should run and whether to
+// log the "store does not implement Writer" skip path.
+func planSurfaceArtifacts(snapshot *adapters.WorkdirSnapshot, runFound bool, status string, hasWriter bool) surfaceArtifactsPlan {
+	if !shouldSurfaceWithSnapshot(snapshot) {
+		return surfaceArtifactsPlan{}
+	}
+	if !shouldSurfaceRunArtifacts(runFound, status) {
+		return surfaceArtifactsPlan{}
+	}
+	if !shouldSurfaceWithWriter(hasWriter) {
+		return surfaceArtifactsPlan{SkipWriterLog: true}
+	}
+	return surfaceArtifactsPlan{Proceed: true}
+}
+
+// cmdStartCancelWaitPlan is the pure wait decision for a cancelled cmd.Start.
+type cmdStartCancelWaitPlan struct {
+	Wait bool
+}
+
+// planCmdStartCancelWait reports whether to Wait a process handle after a
+// cancelled Start failure (before publishCancelled).
+func planCmdStartCancelWait(proc *os.Process) cmdStartCancelWaitPlan {
+	return cmdStartCancelWaitPlan{Wait: shouldWaitProcessAfterCancel(proc)}
+}
+
+// runOutputStoreTrackPlan is the pure create-result plan for NewRunOutputStore.
+type runOutputStoreTrackPlan struct {
+	LogFailure bool
+	Track      bool
+}
+
+// planRunOutputStoreTrack maps NewRunOutputStore's error into log/track flags.
+func planRunOutputStoreTrack(err error) runOutputStoreTrackPlan {
+	return runOutputStoreTrackPlan{
+		LogFailure: shouldLogRunOutputStoreCreateFailure(err),
+		Track:      shouldTrackRunOutputStore(err),
+	}
+}
+
+// workdirTrackPlan is the pure pre-run workdir snapshot gate.
+type workdirTrackPlan struct {
+	Track bool
+}
+
+// planWorkdirTrack reports whether a workdir should be snapshotted/tracked.
+func planWorkdirTrack(workDir string) workdirTrackPlan {
+	return workdirTrackPlan{Track: shouldTrackWorkDir(workDir)}
+}
+
+// hubTaskRecordPlan is the pure Hub task-ID recording gate for run().
+type hubTaskRecordPlan struct {
+	Record bool
+}
+
+// planHubTaskRecord reports whether a non-empty Hub task ID should be stored.
+// Does not allocate hubOutputs collectors (#987 owns that residual).
+func planHubTaskRecord(hubTaskID string) hubTaskRecordPlan {
+	return hubTaskRecordPlan{Record: shouldRecordHubTask(hubTaskID)}
+}

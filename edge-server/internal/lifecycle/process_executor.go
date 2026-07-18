@@ -350,7 +350,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Store Hub task ID and allocate a bounded final-content collector for
 	// Edge→Hub direct callback reporting. Without the collector, recordHubOutput
 	// no-ops and fireHubDone falls back to literal "Run finished" (#987).
-	if shouldRecordHubTask(runCtx.HubTaskID) {
+	// Pure gate only; hubOutputs allocation stays here (#987 residual ownership).
+	if planHubTaskRecord(runCtx.HubTaskID).Record {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
 		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
@@ -443,9 +444,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 		}
 
-		// Take workdir snapshot for auto-surface detection (post-finish).
-		// Captures pre-run file state so we can detect new/modified files.
-		if shouldTrackWorkDir(workDir) {
+		// Pre-run workdir snapshot for auto-surface.
+		if planWorkdirTrack(workDir).Track {
 			snapshot := adapters.TakeWorkdirSnapshot(workDir)
 			e.mu.Lock()
 			e.workDirs[run.ID] = workDir
@@ -494,7 +494,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		startErr := cmd.Start()
 		switch classifyCmdStartOutcome(startErr, ctx.Err()) {
 		case cmdStartCancelled:
-			if shouldWaitProcessAfterCancel(cmd.Process) {
+			if planCmdStartCancelWait(cmd.Process).Wait {
 				_, _ = cmd.Process.Wait()
 			}
 			e.publishCancelled(run)
@@ -503,11 +503,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			e.publishFailed(run, startErr)
 			return
 		}
-		// If context was cancelled after Start but before we checked, kill the child.
-		if shouldKillStartedProcessOnCancel(ctx.Err()) {
-			if shouldKillProcessAfterCancel(cmd.Process) {
+		// Post-start cancel kill/wait plan. Kill uses killProcessTree so
+		// process-group teardown from #988 remains intact.
+		if cancelPlan := planPostStartCancel(ctx.Err(), cmd.Process); cancelPlan.Cancel {
+			if cancelPlan.Kill {
 				_ = killProcessTree(cmd.Process)
-				if shouldWaitProcessAfterCancel(cmd.Process) {
+				if cancelPlan.Wait {
 					_, _ = cmd.Process.Wait()
 				}
 			}
@@ -530,22 +531,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			go e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop)
 		}
 
-		// Close stdin unless the adapter needs it for the control protocol
-		// (permission responses) or a DecisionLoop is configured (force-finish
-		// via stdin interrupt). An open pipe with no data causes CLI agents
-		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
-		// eagerly when neither mechanism requires stdin.
-		if shouldCloseStdinAfterStart(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil) {
-			closed := false
-			if shouldCloseStdinPipe(stdin != nil) {
-				_ = stdin.Close()
-				closed = true
-			}
-			if shouldClearStdinAfterEagerClose(closed || stdin != nil) {
-				e.mu.Lock()
-				delete(e.stdins, run.ID)
-				e.mu.Unlock()
-			}
+		// Eager-close stdin when adapter/decision-loop do not need the pipe.
+		// An open pipe with no data causes CLI agents (Claude Code) to wait
+		// ~3s and warn "no stdin data", so we close it eagerly when neither
+		// control protocol nor DecisionLoop requires stdin.
+		stdinPlan := planEagerStdinClose(stdin != nil, needsAdapterStdin(adapter), e.decisionLoopFactory != nil)
+		if stdinPlan.ClosePipe {
+			_ = stdin.Close()
+		}
+		if stdinPlan.ClearMap {
+			e.mu.Lock()
+			delete(e.stdins, run.ID)
+			e.mu.Unlock()
 		}
 
 		// Record metrics: run has started successfully
@@ -564,9 +561,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 		// Create temp file for run output persistence and replay
 		outStore, err := runnerctx.NewRunOutputStore(run.ID)
-		if shouldLogRunOutputStoreCreateFailure(err) {
+		outTrack := planRunOutputStoreTrack(err)
+		if outTrack.LogFailure {
 			slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
-		} else if shouldTrackRunOutputStore(err) {
+		} else if outTrack.Track {
 			e.mu.Lock()
 			e.runOutputs[run.ID] = outStore
 			e.mu.Unlock()
@@ -634,7 +632,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		if shouldReadOutputStoreCapture(outStore != nil) {
 			stderrCapture, _ = outStore.ReadAll()
 		}
-		if shouldRetrySessionConflict(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart)) {
+		sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart), outStore != nil)
+		if sessionPlan.Retry {
 			newSession := newRandomSessionID()
 			slog.Warn("process: session conflict detected, retrying with fresh session ID",
 				"runId", run.ID,
@@ -646,7 +645,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// Clean up the tracked process from this attempt before retrying.
 			e.mu.Lock()
 			delete(e.processes, run.ID)
-			if s, ok := e.runOutputs[run.ID]; shouldCloseTrackedRunOutput(ok) {
+			if s, ok := e.runOutputs[run.ID]; sessionPlan.CloseOutput && ok {
 				_ = s.Close()
 				delete(e.runOutputs, run.ID)
 			}
@@ -775,31 +774,30 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 		n, err := reader.Read(buf)
 		if shouldProcessOutputRead(n) {
 			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
-			if shouldPublishOutputChunk(len(allowed), truncatedNow) {
-				text := string(allowed)
+			chunk := planOutputChunk(run.ID, stream, allowed, offset, truncatedNow, written, maxBytes, outStore != nil)
+			if chunk.Publish {
 				// Log stderr to structured logger so CC failure diagnostics
 				// are visible in Edge server logs without subscribing to bus events.
-				if shouldLogStderrLines(stream, text) {
-					for _, line := range stderrLogLines(text) {
+				if chunk.LogStderr {
+					for _, line := range stderrLogLines(chunk.Text) {
 						sanitizedLine, _ := recursiveSanitizeString(line)
 						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 					}
 				}
-				if shouldWriteRunOutputStore(outStore != nil, len(allowed)) {
-					if _, err := outStore.Write(text); shouldLogRunOutputStoreWriteFailure(err) {
+				if chunk.WriteStore {
+					if _, err := outStore.Write(chunk.Text); shouldLogRunOutputStoreWriteFailure(err) {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 					}
 				}
-				if shouldForwardStdoutToHub(stream, text) {
-					e.recordHubOutput(run.ID, text)
-					e.fireHubStream(run.ID, text)
+				if chunk.ForwardHub {
+					e.recordHubOutput(run.ID, chunk.Text)
+					e.fireHubStream(run.ID, chunk.Text)
 				}
-				payload := runOutputBatchPayload(run.ID, stream, text, offset, truncatedNow, written, maxBytes)
-				if shouldLogRunOutputTruncation(truncatedNow) {
+				if chunk.LogTruncate {
 					slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
 				}
-				e.bus.Publish("run.output.batch", runScope(run), payload)
-				offset += len(allowed)
+				e.bus.Publish("run.output.batch", runScope(run), chunk.Payload)
+				offset = chunk.NextOffset
 			}
 		}
 		if shouldStopOutputRead(err) {
@@ -876,9 +874,15 @@ func (e *ProcessExecutor) runStatus(runID string) string {
 }
 
 func (e *ProcessExecutor) finish(runID string) {
+	// Pure cleanup plan; map deletes stay here. Do not rework #867 handoff.
+	e.mu.Lock()
+	_, hasCancelDone := e.cancelDone[runID]
+	_, hasRunOutput := e.runOutputs[runID]
+	e.mu.Unlock()
+	plan := planFinishCleanup(e.agentRegistry != nil, hasCancelDone, hasRunOutput)
 	// Cascade: when a parent agent finishes, recursively terminate all
 	// descendant sub-agents (Codex AgentTree shutdown pattern).
-	if shouldCascadeAgentShutdown(e.agentRegistry != nil) {
+	if plan.Cascade {
 		e.agentRegistry.ShutdownCascade(runID)
 	}
 
@@ -895,11 +899,11 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.hubOutputs, runID)
 	delete(e.workDirs, runID)
 	delete(e.surfacers, runID)
-	if done, ok := e.cancelDone[runID]; shouldCloseCancelDoneChannel(ok) {
+	if done, ok := e.cancelDone[runID]; plan.CloseCancelDone && ok {
 		close(done)
 		delete(e.cancelDone, runID)
 	}
-	if s, ok := e.runOutputs[runID]; shouldCloseTrackedRunOutput(ok) {
+	if s, ok := e.runOutputs[runID]; plan.CloseRunOutput && ok {
 		if err := s.Close(); shouldLogRunOutputStoreCloseFailure(err) {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
@@ -917,53 +921,46 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	snapshot := e.surfacers[runID]
 	e.mu.Unlock()
 
-	if !shouldSurfaceWithSnapshot(snapshot) {
-		return // no workdir tracked for this run
-	}
-
-	// Only surface for successfully finished runs.
-	current, ok := e.store.GetRun(runID)
-	if !shouldSurfaceRunArtifacts(ok, current.Status) {
-		return
-	}
-
-	// Resolve a store.Writer for direct persistence.
-	writer, ok := asStoreWriter(e.store)
-	if !shouldSurfaceWithWriter(ok) {
+	// Only surface for successfully finished runs with a writable store.
+	current, runFound := e.store.GetRun(runID)
+	writer, hasWriter := asStoreWriter(e.store)
+	plan := planSurfaceArtifacts(snapshot, runFound, current.Status, hasWriter)
+	if plan.SkipWriterLog {
 		slog.Debug("surfacing: store does not implement Writer, skipping", "runId", runID)
 		return
 	}
-
-	adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
+	if plan.Proceed {
+		adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
+	}
 }
 
 // sendSubAgentResult delivers a result message from a completed sub-agent run
 // back to its parent agent via the message queue. This enables the orchestrator
 // to aggregate results from dispatched sub-agents.
 func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) {
-	if !shouldDeliverSubAgentResult(e.agentRegistry != nil, e.messageQueue != nil) {
-		return
-	}
-
 	e.mu.Lock()
-	agentID, ok := e.runToAgent[runID]
+	agentID, mappingFound := e.runToAgent[runID]
 	e.mu.Unlock()
-	if !shouldLookupSubAgentMapping(ok) {
+
+	var inst *agents.AgentInstance
+	if e.agentRegistry != nil && mappingFound {
+		inst, _ = e.agentRegistry.Get(agentID)
+	}
+	parentID := ""
+	if inst != nil {
+		parentID = inst.ParentID
+	}
+	plan := planSubAgentResultDelivery(
+		e.agentRegistry != nil, e.messageQueue != nil, mappingFound, inst != nil, parentID, status, e.resultAgg != nil,
+	)
+	if !plan.Deliver {
 		return
 	}
 
-	inst, found := e.agentRegistry.Get(agentID)
-	if !shouldRouteSubAgentToParent(found, inst.ParentID) {
-		return
-	}
-
-	if regStatus, update := subAgentRegistryTerminalStatus(status); update {
-		// completed_with_issues is a terminal status set by the evidence gate
-		// when verification fails. It is still a result (MsgTypeResult), but the
-		// agent registry must be updated to StatusCompleted so the parent
-		// orchestrator does not wait indefinitely for a child it thinks is still
-		// running.
-		e.agentRegistry.SetStatus(agentID, regStatus, "")
+	if plan.UpdateRegistry {
+		// completed_with_issues remains MsgTypeResult; registry must go StatusCompleted
+		// so the parent orchestrator does not wait forever on evidence-gate issues.
+		e.agentRegistry.SetStatus(agentID, plan.RegistryStatus, "")
 	}
 
 	// Sanitize the sub-agent result before it enters the message queue.
@@ -971,16 +968,10 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// oversized outputs to keep queue payloads bounded.
 	sanitizedResult, sanitizeReason := SanitizeSubAgentResult(payload)
 
+	now := time.Now().UTC()
 	e.messageQueue.EnsureAgent(inst.ParentID, 64)
 	e.messageQueue.Send(buildSubAgentResultMessage(
-		runID,
-		agentID,
-		inst.Name,
-		inst.ParentID,
-		status,
-		sanitizedResult,
-		sanitizeReason,
-		time.Now().UTC(),
+		runID, agentID, inst.Name, inst.ParentID, status, sanitizedResult, sanitizeReason, now,
 	))
 
 	// Store structured result in the aggregator's collector for eventual
@@ -992,14 +983,14 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// aggregator. This ensures that even if the message queue copy is
 	// tampered with, the raw persisted output does not leak API keys,
 	// file paths, or stack traces.
-	if shouldStoreSubAgentAggregatorResult(e.resultAgg != nil) {
+	if plan.StoreAgg {
 		e.resultAgg.StoreSubAgentResult(inst.ParentID, buildSubAgentResult(
 			agentID,
 			inst.Name,
 			runID,
 			status,
 			aggregatorOutput(payload, sanitizedResult, sanitizeReason),
-			time.Now().UTC(),
+			now,
 		))
 	}
 
@@ -1046,11 +1037,13 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	hooks := buildProcessSecurityHooks(allowedTools, emitter, scope)
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
-	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); shouldRecordStructuredParseError(err) {
+	err := adapter.ParseStream(ctx, stdout, stdin, emitter, run)
+	parsePlan := planStructuredParsePost(err, transcriptEmitter != nil)
+	if parsePlan.RecordError {
 		slog.Error("structured output parse error", "runId", run.ID, "error", err)
 		*parseErr = err
 	}
-	if shouldFlushTranscriptEmitter(transcriptEmitter != nil) {
+	if parsePlan.Flush {
 		transcriptEmitter.Flush()
 	}
 }
@@ -1165,19 +1158,22 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Unlock()
 
 	// Start the run
-	if startErr := e.Start(run, runCtx); shouldClearRunAgentMappingOnStartFailure(startErr) {
+	if startErr := e.Start(run, runCtx); startErr != nil {
 		slog.Error("failed to start sub-agent run", "runId", runID, "error", startErr)
-		e.mu.Lock()
-		delete(e.runToAgent, runID)
-		e.mu.Unlock()
+		cleanup := planSpawnStartFailureCleanup(startErr, registered, slotReserved)
+		if cleanup.ClearMapping {
+			e.mu.Lock()
+			delete(e.runToAgent, runID)
+			e.mu.Unlock()
+		}
 
 		// Cleanup on start failure: unregister the agent instance,
 		// mark the run as failed, and release the reserved slot.
 		// Set slotReserved=false BEFORE Unregister to prevent the
 		// deferred DecrChildCount from double-decrementing.
 		// Unregister already decrements childrenCount internally.
-		slotReserved = slotReservedAfterUnregister(registered, slotReserved)
-		if shouldUnregisterOnStartFailure(registered) {
+		slotReserved = cleanup.SlotReserved
+		if cleanup.Unregister {
 			e.agentRegistry.Unregister(agentInstanceID)
 		}
 		_, _ = e.store.SetRunStatus(runID, "failed")
