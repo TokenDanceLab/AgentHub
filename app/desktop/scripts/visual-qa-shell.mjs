@@ -66,7 +66,7 @@ async function maybeStartDevServer() {
 }
 
 async function enterDemoWorkbench(page) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   const demo = page.getByRole('button', { name: '使用 Demo 模式继续' });
   if (await demo.isVisible().catch(() => false)) {
     await demo.click();
