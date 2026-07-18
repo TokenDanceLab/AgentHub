@@ -58,6 +58,53 @@ export function resolveRouteFallbackStep(
   return { action: 'throw', error };
 }
 
+/**
+ * Residual orchestration peel for requestWithFallback (#990).
+ * Tries each path until one succeeds or a non-fallback error is thrown.
+ */
+export async function runRequestWithRouteFallback<T>(
+  paths: readonly string[],
+  request: (path: string, options: RequestInit) => Promise<T>,
+  options: RequestInit = {},
+): Promise<T> {
+  let fallbackError: unknown;
+
+  for (let index = 0; index < paths.length; index += 1) {
+    const path = paths[index]!;
+    try {
+      return await request(path, options);
+    } catch (error) {
+      const step = resolveRouteFallbackStep(index, paths.length, error);
+      if (step.action === 'continue') {
+        fallbackError = step.fallbackError;
+        continue;
+      }
+      throw step.error;
+    }
+  }
+
+  throw unresolvedRouteFallbackError(fallbackError);
+}
+
+/**
+ * Residual dual-route peel for changePassword (#990).
+ * Primary POST may 404/405 on older hubs → PUT fallback (methods differ).
+ */
+export async function runChangePasswordWithFallback(
+  request: (path: string, init: RequestInit) => Promise<void>,
+  primary: { path: string; init: RequestInit },
+  fallback: { path: string; init: RequestInit },
+): Promise<void> {
+  try {
+    return await request(primary.path, primary.init);
+  } catch (error) {
+    if (shouldUseChangePasswordFallback(error)) {
+      return request(fallback.path, fallback.init);
+    }
+    throw error;
+  }
+}
+
 export function normalizeRegisterDeviceRequest(
   body: HubRegisterDeviceRequest,
 ): HubRegisterDeviceRequest & {
