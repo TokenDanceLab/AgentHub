@@ -59,4 +59,9 @@ Format:
 
 - Phase 68 closed (ms 89; PRs #1146–#1150).
 - Phase 69 open (ms 90; #1151–#1155): DiffReviewPanel / openai_sdk / message service / agents registry + MASTER hygiene.
+## 2026-07-19 (P70)
+
+- Phase 69 closed (ms 90; PRs #1156–#1160).
+- Phase 70 open (ms 91; #1161–#1165): session service / agent_team model / agent_team handler / skills + MASTER hygiene.
+- Orchestration: sonnet-first pure peels; main session gate; fable for hard races only.
 
