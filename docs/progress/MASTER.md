@@ -2,10 +2,10 @@
 
 > **Task**: continuous product polish (architecture / UIUX / design system / hygiene)
 > **Started**: 2026-07-16
-> **Last Updated**: 2026-07-19
+> **Last Updated**: 2026-07-20
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 Wave1+2 through #1293 (path-filter visual:qa:shell)
+> **Merged program PRs**: Phases 1–73 · P74 through rescore-8 (#1295)
 
 ## Two task surfaces (do not mix)
 
@@ -71,30 +71,32 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [ ] Phase 74 frosted glass + Visual QA (gate min~76 Iterate; residual toward Ship ≥85)
+- [ ] Phase 74 frosted glass + Visual QA (gate min~79 Iterate; residual toward Ship ≥85)
 
 ## Current Status
 
-**Active Phase**: 74 (visual score loop + test-platform residual)
-**Active Tasks**: Milestone 95 open set empty on test-platform residual — next is re-score toward Ship ≥85
+**Active Phase**: 74 (visual score loop)
+**Active Tasks**: #1295 rescore-8 notes (this) · residual toward Ship if still Iterate
 **Blockers**: None
-**Product tip**: `3ec43287` (post #1293)
-**Rescore-7 gate**: min~**76**/100 (D-light 81 · D-dark 77 · W-light 80 · W-dark 76) — re-score recommended after #1280/#1283 density+dock
-**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → 70 → **76** (web list void fixed)
+**Product tip**: `db2c2ec7`
+**Rescore-8 gate**: min~**79**/100 (D-light 82 · D-dark 79 · W-light 82 · W-dark 79)
+**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → 70 → 76 → **79**
 **Visual north star**: light white frosted glass, dense spacing, micro-motion, Chinese-first product copy, screenshot score loop
-**Test platform**: geometry smoke + zh copy contract + terminal dock CSS + path-filter visual:qa:shell CI (non-blank) landed
+**Test platform**: geometry smoke + zh copy contract + terminal dock CSS + path-filter visual:qa:shell CI (non-blank)
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Re-capture Desktop/Web shell light+dark → re-score toward Ship ≥85
-2. Optional: wire Desktop visual:qa:shell into path-filter job (Web only today)
-3. Archive Phase 74 when gate ≥85 or accept Iterate freeze
+1. Land rescore-8 notes (#1295)
+2. Highest residual: Desktop chat inspector density + Agents form collapse
+3. Optional: Desktop path-filter visual:qa:shell job
+4. Re-capture when residual lands → Ship ≥85
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
+| 2026-07-20 | lead | Rescore-8 min~79 (D82/D79/W82/W79); notes #1295 |
 | 2026-07-19 | lead | Wave1–2 done: #1280/#1283–#1287 via #1288–#1293; tip 3ec43287; open set clear |
 | 2026-07-19 | lead | Wave1: #1280 density, #1283 dock, #1284 geometry, #1285 copy, #1286 SSOT; #1287 CI |
 | 2026-07-19 | lead | #1276 dual-scroll + zh copy; rescore-7 min~76; notes #1278 |
@@ -102,6 +104,6 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 
 ## Completion notes
 
-- Gate climbed ~55 → ~76; still Iterate (not Ship).
+- Gate climbed ~55 → ~79; still Iterate (not Ship, −6).
 - Web Agents empty void root-caused as single-scroll scroll-away; dual-scroll + zh copy landed.
 - Test-platform Wave1 closed the unit/CSS/e2e blind spots for dock occlusion + list viewport + product EN meta.
