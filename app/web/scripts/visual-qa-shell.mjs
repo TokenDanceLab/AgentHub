@@ -13,6 +13,7 @@
  *   node scripts/visual-qa-shell.mjs
  *   pnpm --filter agenthub-web visual:qa:shell
  * Env:
+ *   VISUAL_QA_DPR (default 1; set 2 for Retina capture #1308)
  *   AGENTHUB_WEB_E2E_PORT (default 5174)
  *   WEB_QA_URL / AGENTHUB_WEB_QA_URL — skip vite spawn when set
  *
@@ -33,6 +34,8 @@ const baseUrl =
   process.env.WEB_QA_URL ??
   `http://127.0.0.1:${port}/`;
 const viewport = { width: 1440, height: 810 };
+const dpr = Math.max(1, Number(process.env.VISUAL_QA_DPR ?? 1) || 1);
+const dprSuffix = dpr === 1 ? '' : `@${dpr}x`;
 const themes = ['light', 'dark'];
 const THEME_KEY_V4 = 'agenthub-v4-theme';
 const THEME_KEY_LEGACY = 'agenthub-theme';
@@ -240,6 +243,7 @@ async function maybeStartDevServer() {
 async function captureTheme(browser, theme) {
   const context = await browser.newContext({
     viewport,
+    deviceScaleFactor: dpr,
     serviceWorkers: 'block',
     // Match prefers-color-scheme so system-theme resolution is predictable
     colorScheme: theme,
@@ -274,7 +278,7 @@ async function captureTheme(browser, theme) {
     await page.waitForSelector(WORKBENCH_SHELL, { state: 'visible', timeout: 30_000 });
   } catch {
     // Diagnostic capture on failure
-    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
     const pageUrl = page.url();
     const pageTitle = await page.title();
@@ -297,7 +301,7 @@ async function captureTheme(browser, theme) {
     await agentsRail.click();
     await page.waitForSelector(AGENTS_PAGE, { state: 'visible', timeout: 15_000 });
   } catch {
-    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810-AGENTS-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}-AGENTS-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
     const pageUrl = page.url();
     const bodyText = await page.evaluate(() =>
@@ -366,7 +370,7 @@ async function captureTheme(browser, theme) {
   // Extra settle time for CSS transitions, fonts, and lazy async chunks
   await wait(800);
 
-  const file = path.join(outDir, `web-shell-${theme}-1440x810.png`);
+  const file = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
 
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));

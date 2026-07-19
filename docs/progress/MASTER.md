@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-20
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 through rescore-8 (#1295)
+> **Merged program PRs**: Phases 1–73 · P74 through rescore-8 (#1295) · P75 open (#1304–#1309)
 
 ## Two task surfaces (do not mix)
 
@@ -28,6 +28,7 @@
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
 - **Phase 74**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 74: Light frosted glass system + Visual QA" --state open`
+- **Phase 75**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 75: HiDPI fidelity + typography polish" --state open`
 
 ## References
 
@@ -42,6 +43,7 @@
 |:------|:-----|:----------|:-------|
 | 1–73 | Baseline through host ports | #22–#94 | closed |
 | 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79 Iterate; 0 open / 47 closed) |
+| 75 | HiDPI fidelity + typography polish | #96 | active (#1304–#1309) |
 
 ## Issue Mapping (summary)
 
@@ -58,41 +60,52 @@
 | #1285 zh product-copy contract | closed via #1289 |
 | #1286 visual QA 1440×810 SSOT | closed via #1288 |
 | #1287 path-filter visual:qa:shell CI | closed via #1293 |
+| #1304 font rendering / OpenType | open (this PR) |
+| #1305 fluid type clamp headlines | open (this PR) |
+| #1306 HiDPI glass blur/elev | open (this PR) |
+| #1307 HiDPI hairline borders | open (this PR) |
+| #1308 visual:qa 2x + scorecard HiDPI | open (this PR) |
+| #1309 unify 760 breakpoint + wide type | open (this PR) |
 
 ## Quick Status Commands
 
 ```bash
-gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 74: Light frosted glass system + Visual QA" --state open
+gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 75: HiDPI fidelity + typography polish" --state open
 git rev-parse --short origin/master
 cd app && pnpm --filter agenthub-desktop visual:qa:shell
 cd app && pnpm --filter agenthub-web visual:qa:shell
+cd app && pnpm --filter agenthub-web visual:qa:shell:2x
 ```
 
 ## Phase Checklist
 
 - [x] Phase 0–73
 - [x] Phase 74 frosted glass + Visual QA (gate min~79 Iterate; milestone 95 open=0/closed=47)
+- [ ] Phase 75 HiDPI + typography (#1304–#1309)
 
 ## Current Status
 
-**Active Phase**: 74 complete — milestone 95 closed (open=0 / closed=47)
-**Product tip**: `727b7e93` (rescore-8 final)
+**Active Phase**: 75 — HiDPI fidelity + typography polish (milestone 96)
+**Open issues**: #1304–#1309
+**Product tip (pre-P75)**: `4123c2d3`
 **Rescore-8 gate**: min~**79**/100 (D-light 82 · D-dark 79 · W-light 82 · W-dark 79)
 **Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → 70 → 76 → **79**
-**Test platform**: geometry smoke + zh copy contract + terminal dock CSS + path-filter visual:qa:shell CI (non-blank)
+**P75 scope**: OpenType/font rendering, fluid headlines, 2x glass media, visual:qa DPR, 760 breakpoint unify, wide root type
+**Test platform**: geometry smoke + zh copy contract + terminal dock CSS + path-filter visual:qa:shell CI + tokens HiDPI contract
 **Blockers**: None
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
-## Next Steps (post-Phase 74)
+## Next Steps
 
-- Desktop chat inspector + transcript density (toward Ship ≥85)
-- Desktop path-filter visual:qa:shell CI
-- Agents form further collapse
+1. Land P75 PR closing #1304–#1309
+2. Re-capture 1x + optional 2x → score Type/HiDPI residual toward Ship
+3. Desktop chat inspector density residual
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
+| 2026-07-20 | lead | P75 open: #1304–#1309 HiDPI+type; worktree feat/p75-hidpi-typography |
 | 2026-07-20 | lead | Final neat-freak: milestone 95 closed, branches/worktrees pruned, .tmp-issues removed, MASTER synced; tip 727b7e93 |
 | 2026-07-20 | lead | Rescore-8 min~79 (D82/D79/W82/W79); notes #1295 |
 | 2026-07-19 | lead | Wave1–2 done: #1280/#1283–#1287 via #1288–#1293; tip 3ec43287; open set clear |

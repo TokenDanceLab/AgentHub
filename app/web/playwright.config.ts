@@ -19,6 +19,15 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], viewport: webWorkspaceViewport },
     },
+    {
+      // Optional HiDPI geometry/e2e lane (#1308). Not default CI gate.
+      name: 'chromium-2x',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: webWorkspaceViewport,
+        deviceScaleFactor: 2,
+      },
+    },
   ],
   webServer: {
     command: `pnpm dev --host 127.0.0.1 --port ${webE2EPort}`,
