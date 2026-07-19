@@ -41,7 +41,7 @@
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
 | 1–73 | Baseline through host ports | #22–#94 | closed |
-| 74 | Light frosted glass + Visual QA | #95 | active (Iterate residual toward Ship) |
+| 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79 Iterate; 0 open / 47 closed) |
 
 ## Issue Mapping (summary)
 
@@ -71,31 +71,29 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [ ] Phase 74 frosted glass + Visual QA (gate min~79 Iterate; residual toward Ship ≥85)
+- [x] Phase 74 frosted glass + Visual QA (gate min~79 Iterate; milestone 95 open=0/closed=47)
 
 ## Current Status
 
-**Active Phase**: 74 (visual score loop)
-**Active Tasks**: #1295 rescore-8 notes (this) · residual toward Ship if still Iterate
-**Blockers**: None
-**Product tip**: `db2c2ec7`
+**Active Phase**: 74 complete — milestone 95 closed (open=0 / closed=47)
+**Product tip**: `727b7e93` (rescore-8 final)
 **Rescore-8 gate**: min~**79**/100 (D-light 82 · D-dark 79 · W-light 82 · W-dark 79)
 **Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → 70 → 76 → **79**
-**Visual north star**: light white frosted glass, dense spacing, micro-motion, Chinese-first product copy, screenshot score loop
 **Test platform**: geometry smoke + zh copy contract + terminal dock CSS + path-filter visual:qa:shell CI (non-blank)
+**Blockers**: None
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
-## Next Steps
+## Next Steps (post-Phase 74)
 
-1. Land rescore-8 notes (#1295)
-2. Highest residual: Desktop chat inspector density + Agents form collapse
-3. Optional: Desktop path-filter visual:qa:shell job
-4. Re-capture when residual lands → Ship ≥85
+- Desktop chat inspector + transcript density (toward Ship ≥85)
+- Desktop path-filter visual:qa:shell CI
+- Agents form further collapse
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
+| 2026-07-20 | lead | Final neat-freak: milestone 95 closed, branches/worktrees pruned, .tmp-issues removed, MASTER synced; tip 727b7e93 |
 | 2026-07-20 | lead | Rescore-8 min~79 (D82/D79/W82/W79); notes #1295 |
 | 2026-07-19 | lead | Wave1–2 done: #1280/#1283–#1287 via #1288–#1293; tip 3ec43287; open set clear |
 | 2026-07-19 | lead | Wave1: #1280 density, #1283 dock, #1284 geometry, #1285 copy, #1286 SSOT; #1287 CI |
