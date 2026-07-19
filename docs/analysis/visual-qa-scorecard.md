@@ -1,10 +1,21 @@
 # Visual QA scorecard
 
 最后更新：2026-07-19
-Issue: #1199 (P74)
+Issue: #1199 (P74) · SSOT ownership: #1286
 
 > 100-point rubric for Desktop/Web shell screenshots. North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair.
 > Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../architecture/07-design-system-ssot.md).
+
+## 0. Gate SSOT (current)
+
+| Role | Path | Viewport | Themes |
+|---|---|---|---|
+| **P74 gate matrix (current)** | `app/web/scripts/visual-qa-shell.mjs` · `app/desktop/scripts/visual-qa-shell.mjs` | **1440×810** (16:9) | light + dark |
+| Package entry | `pnpm --filter agenthub-{web,desktop} visual:qa:shell` | same | same |
+| Score rubric (this file) | `docs/analysis/visual-qa-scorecard.md` | — | min of four shots |
+| **Optional / legacy multi-scene battery** | `app/web/scripts/visual-qa.mjs` | broader scenes (incl. historical 1440×920 names) | **not** the P74 gate |
+
+Do **not** treat `visual-qa.mjs` scene names or any `1440x920` string as the merge gate. Gate path is shell-only at **1440×810**. Historical rescore notes under `docs/analysis/visual-qa-score-*.md` keep their recorded viewports; they are not rewritten when the gate SSOT is clarified.
 
 ## 1. Pass bar
 
@@ -63,7 +74,9 @@ pnpm --filter agenthub-web exec node scripts/visual-qa-shell.mjs
 
 Package scripts: `pnpm --filter agenthub-desktop visual:qa:shell` · `pnpm --filter agenthub-web visual:qa:shell`.
 
-Playwright configs already pin **1440×810** (`app/{desktop,web}/playwright.config.ts`). Full Web scene battery remains `app/web/scripts/visual-qa.mjs` (broader; not the P74 gate).
+Playwright configs already pin **1440×810** (`app/{desktop,web}/playwright.config.ts`).
+
+**Optional / legacy:** full Web multi-scene battery is `app/web/scripts/visual-qa.mjs` (broader scene set; may still use historical `1440x920` capture names). It is **not** the P74 merge gate — use `visual:qa:shell` only for gate evidence.
 
 Baselines are **generated locally** (`screenshots/` is gitignored). Commit score notes + scripts, not PNG blobs, unless an explicit baseline PR force-adds a named set.
 
