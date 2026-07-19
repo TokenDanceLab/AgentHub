@@ -10,7 +10,12 @@ import type { TranscriptContextMenuEvent } from './transcriptEventTypes';
    adapters. No React hooks / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
+/**
+ * Demo/fixture BrowserPreview default (#1247).
+ * about:blank + BrowserPreview themed empty document — not external white pages.
+ * Users can still open real URLs via preview evidence / address navigation.
+ */
+export const DEFAULT_BROWSER_PREVIEW_URL = 'about:blank';
 
 export type ShellBooleanAttr = 'true' | 'false';
 

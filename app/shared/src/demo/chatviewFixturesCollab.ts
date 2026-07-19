@@ -299,6 +299,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     previewId: 'preview_rbac_a3c91d',
     threadId: 'thread_rbac_001',
     status: 'completed',
-    url: 'https://preview.example.com/deploy-rbac-a3c91d',
+    // Themed blank — never load external white placeholder pages (#1247)
+    url: 'about:blank',
   },
 ]
