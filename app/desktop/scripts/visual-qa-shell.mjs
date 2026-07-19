@@ -1,9 +1,15 @@
 /**
- * P74 Visual QA — Desktop shell capture matrix (#1199)
+ * P74 Visual QA — Desktop shell capture matrix (#1199 / #1286)
  * Viewport 1440x810 · themes light+dark · Demo workbench entry
+ *
+ * CURRENT GATE MATRIX (Desktop half). Pair with:
+ *   app/web/scripts/visual-qa-shell.mjs
+ * Score SSOT: docs/analysis/visual-qa-scorecard.md
+ * Optional multi-scene battery (not gate): app/web/scripts/visual-qa.mjs
  *
  * Usage (from app/desktop):
  *   node scripts/visual-qa-shell.mjs
+ *   pnpm --filter agenthub-desktop visual:qa:shell
  * Env:
  *   AGENTHUB_DESKTOP_E2E_PORT (default 5199)
  *   AGENTHUB_DESKTOP_QA_URL   (skip spawning vite when set)
