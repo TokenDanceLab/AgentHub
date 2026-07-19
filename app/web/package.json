@@ -17,7 +17,8 @@
     "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
     "visual:qa:shell": "node scripts/visual-qa-shell.mjs",
     "lint": "eslint src",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:e2e:geometry-smoke": "playwright test --config playwright.config.ts --project=chromium geometry-smoke.spec.ts"
   },
   "dependencies": {
     "@lobehub/icons": "^5.10.0",
