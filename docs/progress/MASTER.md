@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-20
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 through rescore-8 (#1295) · P75 via #1310 (#1304–#1309) · P76 in flight (#1311–#1314)
+> **Merged program PRs**: Phases 1–73 · P74 rescore-8 (#1295) · P75 #1310 · **P76 #1315** (#1311–#1314)
 
 ## Two task surfaces (do not mix)
 
@@ -27,7 +27,7 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 76**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 76: Chat + Inspector density" --state open`
+- **Phase 76 (closed)**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 76: Chat + Inspector density" --state all`
 
 ## References
 
@@ -41,71 +41,65 @@
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
 | 1–73 | Baseline through host ports | #22–#94 | closed |
-| 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79 Iterate; 0 open / 47 closed) |
-| 75 | HiDPI fidelity + typography polish | #96 | closed via #1310 (0 open / 13 closed) |
-| 76 | Chat + Inspector density | #97 | **active** (#1311–#1313 in PR; #1314 open) |
+| 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79 Iterate) |
+| 75 | HiDPI fidelity + typography polish | #96 | closed via #1310 |
+| 76 | Chat + Inspector density | #97 | **closed** via #1315 (0 open / 4 closed) |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
-| #1197–#1270 foundation through empty/nav glass | closed |
-| #1280–#1293 P74 density/dock/test platform | closed |
 | #1304–#1309 P75 HiDPI/type | closed via #1310 |
-| #1311 transcript density tokens | in flight (P76) |
-| #1312 inspector single primary card | in flight (P76) |
-| #1313 composer status zh visibility | in flight (P76) |
-| #1314 Chat path visual:qa capture | in flight (P76) |
+| #1311 transcript density | closed via #1315 |
+| #1312 inspector single primary card | closed via #1315 |
+| #1313 composer status zh | closed via #1315 |
+| #1314 Chat path visual:qa | closed via #1315 |
 
 ## Quick Status Commands
 
 ```bash
-gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 76: Chat + Inspector density" --state open
 git rev-parse --short origin/master
 cd app && pnpm --filter agenthub-desktop visual:qa:shell
 cd app && pnpm --filter agenthub-web visual:qa:shell
+cd app && pnpm --filter agenthub-desktop visual:qa:chat
+cd app && pnpm --filter agenthub-web visual:qa:chat
 ```
 
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [x] Phase 74 frosted glass + Visual QA (gate min~79 Iterate; milestone 95 open=0/closed=47)
+- [x] Phase 74 frosted glass + Visual QA (gate min~79 Iterate)
 - [x] Phase 75 HiDPI + typography (#1304–#1309 via #1310)
-- [ ] Phase 76 Chat + Inspector density (#1311–#1314)
+- [x] Phase 76 Chat + Inspector density (#1311–#1314 via #1315)
 
 ## Current Status
 
-**Active Phase**: 76 — Chat + Inspector density (milestone 97)
-**Product tip**: `66f7fa93` (handoff) / P75 product `2f94b7f2`
-**Rescore-8 gate**: min~**79**/100 (pre-P76; re-score after Chat density + capture)
-**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → 70 → 76 → **79**
-**P76 scope**: transcript denser rhythm · inspector single primary card · composer zh status · (#1314) chat visual:qa
+**Active Phase**: 76 complete — milestone 97 closed (0 open / 4 closed) via #1315
+**Product tip**: `ad911aba` (P76 Chat density)
+**Rescore-8 gate**: min~**79**/100 (pre-P76 Agents shell; re-score recommended with Chat path)
+**Gate history**: ~55 → … → 76 → **79**
+**P76 landed**: transcript denser rhythm · inspector overview-only default · composer zh status · `visual:qa:chat`
 **Blockers**: None
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
-## Next Steps (post-Phase 76 merge)
+## Next Steps (post-Phase 76)
 
-1. Merge P76 density PR → close #1311–#1313
-2. #1314 Chat path shell capture → rescore toward Ship ≥85
-3. Optional: Desktop path-filter visual:qa:shell CI
+1. Capture shell + chat 1x (and optional 2x) → rescore toward Ship ≥85
+2. Optional: Desktop path-filter visual:qa:shell CI
+3. Optional: Agents form further collapse / first-success E2E
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-20 | lead | P76 milestone 97 + #1311–#1314; feat/p76-chat-density density PR |
-| 2026-07-20 | lead | P75 merged #1310 closes #1304–#1309; tip 2f94b7f2; milestone 96 closed |
-| 2026-07-20 | lead | P75 open: #1304–#1309 HiDPI+type; worktree feat/p75-hidpi-typography |
-| 2026-07-20 | lead | Final neat-freak: milestone 95 closed, branches/worktrees pruned, .tmp-issues removed, MASTER synced; tip 727b7e93 |
+| 2026-07-20 | lead | P76 merged #1315 closes #1311–#1314; tip ad911aba; milestone 97 closed |
+| 2026-07-20 | lead | P76 milestone 97 + density PR; CI fix on-demand tabs; visual:qa:chat |
+| 2026-07-20 | lead | P75 merged #1310; tip 2f94b7f2; milestone 96 closed |
 | 2026-07-20 | lead | Rescore-8 min~79 (D82/D79/W82/W79); notes #1295 |
-| 2026-07-19 | lead | Wave1–2 done: #1280/#1283–#1287 via #1288–#1293; tip 3ec43287; open set clear |
-| 2026-07-19 | lead | Wave1: #1280 density, #1283 dock, #1284 geometry, #1285 copy, #1286 SSOT; #1287 CI |
-| 2026-07-19 | lead | #1276 dual-scroll + zh copy; rescore-7 min~76; notes #1278 |
-| 2026-07-19 | lead | Rescore-6 min~70; closed #1269–#1270 empty/nav glass |
 
 ## Completion notes
 
-- Gate climbed ~55 → ~79; still Iterate (not Ship, −6).
-- Web Agents empty void root-caused as single-scroll scroll-away; dual-scroll + zh copy landed.
-- Test-platform Wave1 closed the unit/CSS/e2e blind spots for dock occlusion + list viewport + product EN meta.
-- P75 HiDPI/type closed via #1310 (OpenType, fluid type, 2x glass, visual:qa DPR, 760 SSOT).
+- Gate climbed ~55 → ~79; still Iterate (not Ship, −6 pre-P76).
+- P76 targets Desktop chat inspector + transcript residual named in rescore-8.
+- Inspector tabs beyond overview are on-demand; files section default collapsed.
+- `visual:qa:chat` is optional density review — does **not** replace Agents shell merge gate.
