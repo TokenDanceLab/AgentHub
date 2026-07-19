@@ -21,7 +21,8 @@
     "test:e2e:web": "pnpm --filter agenthub-web test:e2e",
     "test:e2e:desktop": "pnpm --filter agenthub-desktop test:e2e",
     "test:smoke:matrix": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/smoke/verify-e2e-smoke-matrix.ps1 -RepoRoot ..",
-    "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore"
+    "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore",
+    "test:e2e:geometry-smoke": "pnpm --filter agenthub-web test:e2e:geometry-smoke && pnpm --filter agenthub-desktop test:e2e:geometry-smoke"
   },
   "pnpm": {
     "hoistedDependencies": [
