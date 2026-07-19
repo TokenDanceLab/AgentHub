@@ -121,6 +121,8 @@ desktop="$(get_job_block "$workflow" "frontend-desktop")" || fail "missing job '
 web="$(get_job_block "$workflow" "frontend-web")" || fail "missing job 'frontend-web'"
 mobile="$(get_job_block "$workflow" "frontend-mobile")" || fail "missing job 'frontend-mobile'"
 e2e="$(get_job_block "$workflow" "e2e-smoke")" || fail "missing job 'e2e-smoke'"
+changes_visual="$(get_job_block "$workflow" "changes-visual-qa-shell")" || fail "missing job 'changes-visual-qa-shell'"
+visual_shell="$(get_job_block "$workflow" "visual-qa-shell")" || fail "missing job 'visual-qa-shell'"
 validate="$(get_job_block "$workflow" "validate")" || fail "missing job 'validate'"
 
 # Coverage policies
@@ -193,12 +195,13 @@ for forbidden in "${backend_forbidden_patterns[@]}"; do
 done
 
 # pnpm setup for frontend jobs
-for job_name in "frontend-desktop" "frontend-web" "frontend-mobile" "e2e-smoke"; do
+for job_name in "frontend-desktop" "frontend-web" "frontend-mobile" "e2e-smoke" "visual-qa-shell"; do
   case "$job_name" in
     frontend-desktop) job_body="$desktop" ;;
     frontend-web) job_body="$web" ;;
     frontend-mobile) job_body="$mobile" ;;
     e2e-smoke) job_body="$e2e" ;;
+    visual-qa-shell) job_body="$visual_shell" ;;
     *) fail "unknown frontend job '$job_name'" ;;
   esac
   lockfile="app/pnpm-lock.yaml"
@@ -224,5 +227,28 @@ mobile_visual_step="$(get_step_block "$mobile" "Screenshot visual QA (mobile)")"
 mobile_mock_hub_step="$(get_step_block "$mobile" "E2E (mock hub)")" || fail "missing step 'E2E (mock hub)'"
 assert_contains "$mobile_visual_step" '^[[:space:]]+timeout-minutes:[[:space:]]+12[[:space:]]*$' "mobile visual QA must have a hard timeout"
 assert_contains "$mobile_mock_hub_step" '^[[:space:]]+timeout-minutes:[[:space:]]+10[[:space:]]*$' "mobile mock-hub E2E must have a hard timeout"
+
+# Path-filtered visual:qa:shell job (#1287)
+assert_contains "$changes_visual" "dorny/paths-filter@v3" "changes-visual-qa-shell must use dorny/paths-filter"
+assert_contains_fixed "$changes_visual" "app/shared/src/workbench/**" "changes-visual-qa-shell must watch workbench paths"
+assert_contains_fixed "$changes_visual" "app/shared/src/styles/**" "changes-visual-qa-shell must watch shared styles"
+assert_contains_fixed "$changes_visual" "app/web/scripts/visual-qa*" "changes-visual-qa-shell must watch web visual-qa scripts"
+assert_contains_fixed "$changes_visual" "app/desktop/scripts/visual-qa*" "changes-visual-qa-shell must watch desktop visual-qa scripts"
+assert_contains_fixed "$changes_visual" ".github/workflows/checks.yml" "changes-visual-qa-shell must watch checks.yml"
+
+assert_contains "$visual_shell" "Visual QA shell \\(web, path-filtered\\)" "visual-qa-shell must use a clear job name"
+assert_contains_fixed "$visual_shell" "changes-visual-qa-shell" "visual-qa-shell must depend on path filter job"
+assert_contains "$visual_shell" "Install Playwright Chromium" "visual-qa-shell must install chromium only"
+assert_contains_fixed "$visual_shell" "playwright install --with-deps chromium" "visual-qa-shell must install chromium only"
+assert_contains_fixed "$visual_shell" "pnpm visual:qa:shell" "visual-qa-shell must run visual:qa:shell"
+assert_contains_fixed "$visual_shell" "pnpm assert:visual:qa:shell" "visual-qa-shell must assert non-blank screenshots"
+assert_contains "$visual_shell" "Upload visual QA shell screenshots" "visual-qa-shell must upload artifacts"
+assert_contains_fixed "$visual_shell" "web-visual-qa-shell-screenshots" "visual-qa-shell must name the artifact"
+assert_contains "$visual_shell" '^    timeout-minutes:[[:space:]]+20[[:space:]]*$' "visual-qa-shell job must have a hard timeout"
+capture_step="$(get_step_block "$visual_shell" "Capture web visual:qa:shell")" || fail "missing step 'Capture web visual:qa:shell'"
+assert_contains "$capture_step" '^[[:space:]]+timeout-minutes:[[:space:]]+15[[:space:]]*$' "visual-qa-shell capture step must have a hard timeout"
+assert_not_contains "$visual_shell" "pixel[-_ ]?golden" "visual-qa-shell must not fail on pixel golden"
+assert_not_contains "$visual_shell" "toHaveScreenshot" "visual-qa-shell must not use Playwright pixel golden matchers"
+assert_not_contains "$visual_shell" "windows-latest" "visual-qa-shell must stay on ubuntu for cost control"
 
 echo "ci gate policy ok"
