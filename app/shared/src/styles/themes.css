@@ -231,19 +231,19 @@ html[data-theme-sync='true'] *::after {
 [data-theme='light'] {
   color-scheme: light;
 
-  /* Core surface */
-  --app-bg: #f7f6f9;
-  --background: #f7f6f9;
+  /* Core surface — white frost (not lavender) */
+  --app-bg: #f8f9fb;
+  --background: #f8f9fb;
   --foreground: #1a1a2e;
 
-  /* Surface layers */
+  /* Surface layers — whiter cool-gray stack */
   --surface: #ffffff;
-  --surface-dim: #f1f0f5;
-  --surface-low: #faf9fc;
-  --surface-high: #efedf5;
-  --surface-highest: #e6e4ef;
-  --surface-overlay: rgba(255,255,255,0.88);
-  --surface-sidebar: rgba(250,249,252,0.88);
+  --surface-dim: #f3f4f6;
+  --surface-low: #fcfcfe;
+  --surface-high: #f1f3f5;
+  --surface-highest: #eaecf0;
+  --surface-overlay: rgba(255,255,255,0.90);
+  --surface-sidebar: rgba(252,252,254,0.90);
 
   /* Text */
   --text-1: #1a1a2e;
@@ -251,9 +251,9 @@ html[data-theme-sync='true'] *::after {
   --text-3: #9595ac;
   --text-inv: #ffffff;
 
-  /* Borders */
-  --bdr: rgba(0,0,0,0.055);
-  --bdr-strong: rgba(0,0,0,0.095);
+  /* Borders — hairline */
+  --bdr: rgba(0,0,0,0.045);
+  --bdr-strong: rgba(0,0,0,0.075);
   --bdr-focus: #0071BC;
 
   /* Primary — AgentHub logo blue */
@@ -337,11 +337,11 @@ html[data-theme-sync='true'] *::after {
   --scrollbar-thumb-hover: rgba(0,0,0,0.20);
   --scrollbar-track: transparent;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.04), 0 2px 8px -1px rgba(0,0,0,0.02);
+  /* Shadows — soft frost */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-md: 0 4px 16px -2px rgba(15,23,42,0.05), 0 2px 6px -1px rgba(15,23,42,0.03);
 
-  --sidebar-bg: rgba(246,246,247,0.75);
+  --sidebar-bg: rgba(250,250,252,0.78);
 
   /* Surface aliases (legacy) */
   --surface-base: var(--app-bg);
@@ -402,51 +402,51 @@ html[data-theme-sync='true'] *::after {
   --tool-read: #2563EB;
   --tool-default: #71717A;
 
-  /* ── Glass tokens (light: white frosted material) ─── */
-  --glass-bg-subtle: rgba(255, 255, 255, 0.42);
-  --glass-bg-light: rgba(255, 255, 255, 0.55);
-  --glass-bg-medium: rgba(255, 255, 255, 0.66);
-  --glass-bg-strong: rgba(255, 255, 255, 0.78);
-  --glass-bg-heavy: rgba(255, 255, 255, 0.88);
+  /* ── Glass tokens (light: white frost material) ─── */
+  --glass-bg-subtle: rgba(255, 255, 255, 0.44);
+  --glass-bg-light: rgba(255, 255, 255, 0.58);
+  --glass-bg-medium: rgba(255, 255, 255, 0.70);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.90);
 
-  --glass-bg-hover: rgba(255, 255, 255, 0.72);
-  --glass-bg-active: rgba(255, 255, 255, 0.84);
+  --glass-bg-hover: rgba(255, 255, 255, 0.76);
+  --glass-bg-active: rgba(255, 255, 255, 0.88);
 
-  --glass-border-subtle: rgba(15, 23, 42, 0.06);
-  --glass-border: rgba(15, 23, 42, 0.10);
-  --glass-border-strong: rgba(15, 23, 42, 0.14);
-  --glass-border-heavy: rgba(15, 23, 42, 0.18);
+  --glass-border-subtle: rgba(15, 23, 42, 0.04);
+  --glass-border: rgba(15, 23, 42, 0.07);
+  --glass-border-strong: rgba(15, 23, 42, 0.10);
+  --glass-border-heavy: rgba(15, 23, 42, 0.13);
 
-  --glass-panel: rgba(255, 255, 255, 0.86);
-  --glass-panel-strong: rgba(255, 255, 255, 0.93);
-  --glass-panel-overlay: rgba(255, 255, 255, 0.97);
+  --glass-panel: rgba(255, 255, 255, 0.82);
+  --glass-panel-strong: rgba(255, 255, 255, 0.91);
+  --glass-panel-overlay: rgba(255, 255, 255, 0.96);
 
-  --glass-tint-plum: rgba(0, 113, 188, 0.06);
-  --glass-tint-moss: rgba(34, 197, 94, 0.06);
-  --glass-tint-danger: rgba(239, 68, 68, 0.05);
-  --glass-tint-amber: rgba(245, 158, 11, 0.06);
-  --glass-tint-sky: rgba(59, 130, 246, 0.06);
+  --glass-tint-plum: rgba(0, 113, 188, 0.04);
+  --glass-tint-moss: rgba(34, 197, 94, 0.04);
+  --glass-tint-danger: rgba(239, 68, 68, 0.03);
+  --glass-tint-amber: rgba(245, 158, 11, 0.04);
+  --glass-tint-sky: rgba(59, 130, 246, 0.04);
 
-  --glass-shadow: rgba(15, 23, 42, 0.12);
-  --glass-shadow-subtle: rgba(15, 23, 42, 0.08);
+  --glass-shadow: rgba(15, 23, 42, 0.08);
+  --glass-shadow-subtle: rgba(15, 23, 42, 0.05);
 
   --glass-text-muted: rgba(15, 23, 42, 0.45);
   --glass-text-disabled: rgba(15, 23, 42, 0.25);
 
-  --glass-input-bg: rgba(255, 255, 255, 0.72);
-  --glass-input-bg-hover: rgba(255, 255, 255, 0.86);
+  --glass-input-bg: rgba(255, 255, 255, 0.76);
+  --glass-input-bg-hover: rgba(255, 255, 255, 0.88);
 
-  --glass-light-fill: rgba(255, 255, 255, 0.94);
+  --glass-light-fill: rgba(255, 255, 255, 0.96);
 
-  --glass-blur-sm: 14px;
-  --glass-blur-md: 22px;
-  --glass-blur-lg: 32px;
-  --glass-blur-xl: 44px;
+  --glass-blur-sm: 16px;
+  --glass-blur-md: 24px;
+  --glass-blur-lg: 36px;
+  --glass-blur-xl: 48px;
   --glass-saturate: 180%;
   --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
-  --glass-elev-1: 0 4px 18px rgba(15, 23, 42, 0.08);
-  --glass-elev-2: 0 10px 32px rgba(15, 23, 42, 0.10);
-  --glass-elev-3: 0 20px 56px rgba(15, 23, 42, 0.14);
+  --glass-elev-1: 0 2px 12px rgba(15, 23, 42, 0.05);
+  --glass-elev-2: 0 8px 24px rgba(15, 23, 42, 0.07);
+  --glass-elev-3: 0 16px 40px rgba(15, 23, 42, 0.09);
   --glass-card-bg: var(--glass-panel);
   --glass-card-border: var(--glass-border);
   --glass-card-shadow: var(--glass-elev-2);
@@ -455,5 +455,12 @@ html[data-theme-sync='true'] *::after {
   --elevated-card-border: var(--glass-card-border);
   --elevated-card-shadow: var(--glass-elev-1);
   --elevated-card-shadow-strong: var(--glass-elev-2);
+
+  /* ── Canvas ambient (light white frost) ──────── */
+  --canvas-ambient: radial-gradient(
+    ellipse 780px 520px at 50% 42%,
+    rgba(59, 130, 246, 0.018) 0%,
+    transparent 64%
+  );
 }
 
