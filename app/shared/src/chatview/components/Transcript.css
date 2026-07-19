@@ -169,12 +169,13 @@
   font-weight:400;
 }
 
-/* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ──────── */
+/* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ────────
+   P76 density: row rhythm uses chat density tokens (12px step), not base 20/24. */
 .grp-row {
-  display:flex; gap:var(--sp-md); align-items:flex-start;
-  margin-bottom:var(--sp-lg);
+  display:flex; gap:var(--sp-sm); align-items:flex-start;
+  margin-bottom:var(--sp-md);
 }
-.grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-xxs) }
+.grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-2) }
 .card-stack {
   align-self:flex-start;
   display:flex;
@@ -270,16 +271,17 @@
   color:var(--text-3);
 }
 
-/* ── Bubbles ───────────────────────────────────────────────────────── */
+/* ── Bubbles ─────────────────────────────────────────────────────────
+   P76 density: tighter vertical padding, keep horizontal reading comfort. */
 .user-bubble {
   background:var(--primary); color:var(--on-primary);
-  border-radius:var(--r-lg); padding:var(--sp-sm) var(--sp-14);
-  font:var(--bubble-font); line-height:1.6; word-break:break-word;
+  border-radius:var(--r-lg); padding:var(--sp-xxs) var(--sp-sm);
+  font:var(--bubble-font); line-height:1.55; word-break:break-word;
 }
 .agent-bubble {
   background:var(--surface); border:1px solid var(--bdr);
-  border-radius:var(--r-md); padding:var(--sp-sm) var(--sp-14);
-  font:var(--body); color:var(--text-1); line-height:1.55;
+  border-radius:var(--r-md); padding:var(--sp-xxs) var(--sp-sm);
+  font:var(--body); color:var(--text-1); line-height:1.5;
   max-width:100%;
   min-width:0;
 }

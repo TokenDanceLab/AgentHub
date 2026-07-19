@@ -94,7 +94,7 @@ describe('UnifiedComposer execution target selection', () => {
     );
 
     expect(screen.getByLabelText('Desktop/Edge target')).toBeDisabled();
-    expect(screen.getByText('No online Desktop/Edge target is available.')).toBeInTheDocument();
+    expect(screen.getByText('当前无在线执行目标。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start agent task' })).toBeDisabled();
   });
 
@@ -112,7 +112,7 @@ describe('UnifiedComposer execution target selection', () => {
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Composer input' }), { key: 'Enter' });
 
-    expect(screen.getByText('Select a Desktop/Edge target before starting.')).toBeInTheDocument();
+    expect(screen.getByText('请先选择执行目标再开始。')).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 
@@ -133,8 +133,8 @@ describe('UnifiedComposer execution target selection', () => {
       />,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
-    expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
+    expect(screen.getByRole('status')).toHaveTextContent('数据：真实数据');
+    expect(screen.getByRole('status')).toHaveTextContent('目标：就绪 · Alpha Desktop');
     expect(screen.getByRole('status')).toHaveTextContent('Hub replay: 2 runtime events observed');
   });
 });

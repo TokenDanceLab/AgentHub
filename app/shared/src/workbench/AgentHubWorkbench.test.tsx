@@ -2569,12 +2569,12 @@ describe('AgentHubWorkbench', () => {
       target: { value: 'target-local-edge-1' },
     });
     expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('Target Alpha Desktop')).toBeInTheDocument();
-    expect(screen.getByText('Task draft required')).toBeInTheDocument();
+    expect(screen.getByText('目标 Alpha Desktop')).toBeInTheDocument();
+    expect(screen.getByText('需填写内容')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
       target: { value: 'Start the Web main chain' },
     });
-    expect(screen.getByText('Task ready')).toBeInTheDocument();
+    expect(screen.getByText('任务就绪')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '启动 Agent 任务' }));
 
     await waitFor(() => {
@@ -2593,8 +2593,8 @@ describe('AgentHubWorkbench', () => {
         }),
       ]);
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
-    expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
+    expect(screen.getByRole('status')).toHaveTextContent('数据：真实数据');
+    expect(screen.getByRole('status')).toHaveTextContent('目标：就绪 · Alpha Desktop');
   });
 
   it('summarizes the Web to Edge demo main chain in one visible strip', () => {
@@ -2688,9 +2688,9 @@ describe('AgentHubWorkbench', () => {
     });
 
     expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('Target missing')).toBeInTheDocument();
-    expect(screen.getByText('Task draft required')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Select a Desktop/Edge target before starting.');
+    expect(screen.getByText('目标未选')).toBeInTheDocument();
+    expect(screen.getByText('需填写内容')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('请先选择执行目标再开始。');
     expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);
   });
