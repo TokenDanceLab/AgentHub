@@ -2669,3 +2669,19 @@
     var(--canvas-ambient),
     var(--surface);
 }
+
+/* ═══ Light ambient — white frost canvas (#1234) ══════════════════════════ */
+
+:root:not([data-theme='dark']) .workspace,
+[data-theme='light'] .workspace {
+  background:
+    var(--canvas-ambient),
+    var(--app-bg);
+}
+
+:root:not([data-theme='dark']) .workspace[data-mode='workbench'],
+[data-theme='light'] .workspace[data-mode='workbench'] {
+  background:
+    var(--canvas-ambient),
+    var(--surface);
+}
