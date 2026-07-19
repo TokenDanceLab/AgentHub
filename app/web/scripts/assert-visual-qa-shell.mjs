@@ -12,68 +12,67 @@
  *   VISUAL_QA_SHELL_MIN_BYTES (default 8000)
  *   VISUAL_QA_SHELL_OUT_DIR   (optional override)
  */
-import { readdir, stat } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = path.resolve(__dirname, '..');
 const outDir = process.env.VISUAL_QA_SHELL_OUT_DIR
   ? path.resolve(process.env.VISUAL_QA_SHELL_OUT_DIR)
-  : path.join(projectRoot, "screenshots", "visual-qa");
+  : path.join(projectRoot, 'screenshots', 'visual-qa');
 const minBytes = Number(process.env.VISUAL_QA_SHELL_MIN_BYTES ?? 8000);
-const expected = ["web-shell-light-1440x810.png", "web-shell-dark-1440x810.png"];
+const expected = ['web-shell-light-1440x810.png', 'web-shell-dark-1440x810.png'];
 
 async function main() {
   let names;
   try {
     names = await readdir(outDir);
   } catch (err) {
-    throw new Error(`visual-qa shell output dir missing: ${outDir} (${err.message})`);
+    throw new Error('visual-qa shell output dir missing: ' + outDir + ' (' + err.message + ')');
   }
 
   const failures = [];
   for (const name of expected) {
     if (!names.includes(name)) {
-      failures.push(`missing screenshot: ${name}`);
+      failures.push('missing screenshot: ' + name);
       continue;
     }
     const filePath = path.join(outDir, name);
     const info = await stat(filePath);
     if (!info.isFile()) {
-      failures.push(`not a file: ${name}`);
+      failures.push('not a file: ' + name);
       continue;
     }
     if (info.size < minBytes) {
       failures.push(
-        `blank/undersized screenshot: ${name} is ${info.size} bytes (min ${minBytes})`,
+        'blank/undersized screenshot: ' + name + ' is ' + info.size + ' bytes (min ' + minBytes + ')',
       );
       continue;
     }
-    console.log(`ok ${name} (${info.size} bytes)`);
+    console.log('ok ' + name + ' (' + info.size + ' bytes)');
   }
 
-  const diag = names.filter((n) => n.includes("DIAGNOSTIC"));
+  const diag = names.filter(function (n) { return n.includes('DIAGNOSTIC'); });
   if (diag.length > 0) {
-    console.warn(`warn: diagnostic captures present: ${diag.join(", ")}`);
+    console.warn('warn: diagnostic captures present: ' + diag.join(', '));
   }
 
   if (failures.length > 0) {
+    const details = failures.map(function (f) { return '  - ' + f; }).join(String.fromCharCode(10));
     throw new Error(
-      [
-        "visual:qa:shell assert failed (non-blank + required shells only; no pixel golden):",
-        ...failures.map((f) => `  - ${f}`),
-      ].join("
-"),
+      'visual:qa:shell assert failed (non-blank + required shells only; no pixel golden):' +
+        String.fromCharCode(10) +
+        details,
     );
   }
 
   console.log(
-    `visual:qa:shell assert ok (${expected.length} shots, min ${minBytes} bytes) → ${outDir}`,
+    'visual:qa:shell assert ok (' + expected.length + ' shots, min ' + minBytes + ' bytes) -> ' + outDir,
   );
 }
 
-main().catch((err) => {
+main().catch(function (err) {
   console.error(err);
   process.exit(1);
 });
