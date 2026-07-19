@@ -15,19 +15,21 @@
      ═══════════════════════════════════════════════════════════════════════ */
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC',
-    'Microsoft YaHei', system-ui, sans-serif;
+    'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
   --font-mono:
-    'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
+    'SF Mono', 'Cascadia Code', 'JetBrains Mono',
+    'PingFang SC', 'Microsoft YaHei',
+    ui-monospace, monospace;
 
-  /* v4 typography shorthands */
-  --headline-lg: 700 2rem/1.2 var(--font-sans);
-  --headline-md: 600 1.5rem/1.2 var(--font-sans);
-  --headline-sm: 600 1.25rem/1.2 var(--font-sans);
-  --title-sm:    600 1.125rem/1.2 var(--font-sans);
-  --body-lg:     400 1rem/1.5 var(--font-sans);
-  --body:        400 0.875rem/1.5 var(--font-sans);
-  --label:       500 0.75rem/1.5 var(--font-sans);
-  --label-xs:    600 0.625rem/1.5 var(--font-sans);
+  /* v4 typography shorthands — headlines fluid (#1305); body/label fixed for chrome density */
+  --headline-lg: 700 clamp(1.5rem, 1.25rem + 1vw, 2.25rem) / 1.2 var(--font-sans);
+  --headline-md: 600 clamp(1.25rem, 1rem + 0.75vw, 1.75rem) / 1.2 var(--font-sans);
+  --headline-sm: 600 clamp(1.125rem, 1rem + 0.5vw, 1.375rem) / 1.2 var(--font-sans);
+  --title-sm:    600 clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem) / 1.2 var(--font-sans);
+  --body-lg:     400 clamp(0.9375rem, 0.875rem + 0.25vw, 1.0625rem) / 1.5 var(--font-sans);
+  --body:        400 0.875rem/1.5 var(--font-sans);   /* 14px — chrome body fixed */
+  --label:       500 0.75rem/1.5 var(--font-sans);    /* 12px — metadata fixed */
+  --label-xs:    600 0.625rem/1.5 var(--font-sans);   /* 10px — keybind / badge */
 
   /* Backward-compat font-size tokens */
   --font-size-xs:   0.75rem;  /* 12px — metadata, badge, timestamp */
@@ -305,11 +307,14 @@
   --right-panel-max: 600px;
   --statusbar-height: 36px;
 
-  /* ── Responsive Breakpoints (documentation — use in @media) ──────── */
-  /* --bp-tablet: 768px;   tablet / small desktop */
-  /* --bp-desktop: 1024px; full desktop layout */
-  /* Note: CSS custom properties cannot be used inside @media queries,
-     so these are documented here and mirrored in each component's CSS. */
+  /* ── Responsive Breakpoints (documentation — copy into @media) ──── */
+  /* CSS custom properties cannot be used inside @media queries.       */
+  /* --bp-mobile:  480px;  compact / touch-target enlarge              */
+  /* --bp-narrow:  760px;  sidebar collapse, mobile shell (SSOT)       */
+  /* --bp-medium:  1024px; full desktop layout                         */
+  /* --bp-wide:    1440px; design target (visual QA viewport)          */
+  /* --bp-xwide:   1920px; large desktop — root type bump              */
+  /* --bp-ultra:   2560px; ultrawide — root type bump                  */
 
   /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
   --touch-target-min: 44px;
@@ -362,12 +367,38 @@ body,
   line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prefer kerning + ligatures; disable faux bold/italic (#1304) */
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+  font-synthesis: none;
   /* 中文与拉丁字符间距自动插入 (Chrome 119+) */
   text-autospace: ideograph-alpha ideograph-numeric;
 }
 
+/* Non-Retina: subpixel AA reads fuller than greyscale AA (#1304) */
+@media (-webkit-max-device-pixel-ratio: 1.49), (max-resolution: 143dpi) {
+  html,
+  body,
+  #root {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
 html {
   font-size: 16px;
+}
+
+/* Wide screens: subtle root bump for viewing distance (#1309) */
+@media (min-width: 1920px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 2560px) {
+  html {
+    font-size: 18px;
+  }
 }
 
 body {
@@ -377,4 +408,22 @@ body {
   overflow-y: auto;
   /* overflow-y: auto provides scroll fallback for layout overflows
      while preserving the desktop-SPA clip model via overflow-x: hidden */
+}
+
+/* ── High-DPI refinements (2x+ Retina) #1306 / #1307 ─────────────────
+   Blur scales ~1.4× (perceptual, not linear). Borders slightly stronger
+   so 1 CSS px hairlines remain visible on physical half-pixels. */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  :root {
+    --glass-blur-sm: 16px;
+    --glass-blur-md: 28px;
+    --glass-blur-lg: 40px;
+    --glass-blur-xl: 56px;
+    --glass-saturate: 140%;
+    --glass-elev-1: 0 2px 10px rgba(15, 23, 42, 0.06);
+    --glass-elev-2: 0 6px 20px rgba(15, 23, 42, 0.09);
+    --glass-elev-3: 0 12px 36px rgba(15, 23, 42, 0.12);
+    --ring-width: 3px;
+    --focus-ring: 0 0 0 4px var(--ring);
+  }
 }

@@ -110,12 +110,24 @@ Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; d
 
 Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.
 
-## 9. Visual QA gate (#1199 / #1286)
+## 9. Visual QA gate (#1199 / #1286 / #1308)
 
 | Layer | SSOT |
 |---|---|
-| Capture matrix (P74 gate) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark |
-| Score rubric / pass bar | [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt · min of four shots) |
+| Capture matrix (P74/P75 gate) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark · DPR **1x default** |
+| Optional 2x capture | `visual:qa:shell:2x` / `VISUAL_QA_DPR=2` · files suffix `@2x` |
+| Score rubric / pass bar | [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt core + optional HiDPI 6 bonus) |
 | Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
 
 Do not cite `1440x920` as the Desktop/Web gate viewport.
+
+## 10. Typography + HiDPI (#1304–#1309, P75)
+
+| Concern | Where | Notes |
+|---|---|---|
+| OpenType / rendering | `tokens-base.css` roots | `text-rendering: optimizeLegibility`; `font-feature-settings: "kern" 1, "liga" 1`; `font-synthesis: none`; non-Retina subpixel AA |
+| Font stacks | `--font-sans` / `--font-mono` | Noto Sans SC + mono CJK fallbacks |
+| Fluid type | `--headline-*` / `--body-lg` / `--title-sm` | `clamp()`; `--body` / `--label` stay fixed 14/12 |
+| Root scale wide | `html` @ 1920 / 2560 | 17px / 18px for viewing distance |
+| HiDPI glass | `@media (min-resolution: 192dpi)` in tokens + themes | blur ~1.4×, stronger hairline borders, focus ring 3–4px |
+| Breakpoint SSOT | docs in tokens + hooks | **760** shell narrow; hooks `max-width: 759px` / tablet from 760 |

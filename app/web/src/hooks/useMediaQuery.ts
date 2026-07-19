@@ -21,12 +21,12 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** True when viewport width < 768px (mobile). */
+/** True when viewport width < 760px (mobile / shell narrow SSOT #1309). */
 export function useIsMobile(): boolean {
-  return useMediaQuery('(max-width: 767px)');
+  return useMediaQuery('(max-width: 759px)');
 }
 
-/** True when 768px <= viewport width < 1024px (tablet). */
+/** True when 760px <= viewport width < 1024px (tablet). */
 export function useIsTablet(): boolean {
-  return useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
+  return useMediaQuery('(min-width: 760px) and (max-width: 1023px)');
 }
