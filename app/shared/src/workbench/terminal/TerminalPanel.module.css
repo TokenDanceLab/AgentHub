@@ -8,21 +8,25 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-panel, var(--surface));
   overflow: hidden;
-  box-shadow: var(--e-1);
+  box-shadow: var(--glass-elev-1, var(--e-1));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .toolbar {
   min-height: 40px;
   padding: var(--wb-gap-2xs, var(--sp-xxs)) var(--wb-gap-xs, var(--sp-sm));
-  border-bottom: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--glass-border-subtle, var(--bdr));
   display: flex;
   align-items: center;
   gap: var(--wb-gap-2xs, var(--sp-xxs));
-  background: var(--surface);
+  background: var(--glass-bg-light, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .tabs {
@@ -136,7 +140,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--surface-low, var(--surface));
+  background: var(--glass-bg-subtle, var(--surface-low, var(--surface)));
 }
 
 .empty {
@@ -147,8 +151,15 @@
   align-items: center;
   justify-content: center;
   gap: var(--wb-gap-xs, var(--sp-sm));
+  margin: var(--wb-gap-sm, var(--sp-md));
   padding: var(--wb-gap-md, var(--sp-lg));
   text-align: center;
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-card-bg, var(--glass-panel, var(--surface)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1, var(--e-1));
 }
 
 .emptyTitle {
@@ -168,20 +179,24 @@
 .primaryBtn {
   min-height: 30px;
   padding: 0 var(--wb-gap-md, var(--sp-md));
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border-strong, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--glass-bg-medium, var(--surface));
   color: var(--text-1);
   cursor: pointer;
   font-size: var(--fs-sm, 12px);
+  box-shadow: var(--glass-elev-1);
   transition:
     background-color var(--motion-hover, 90ms ease),
     transform var(--motion-press, 90ms ease),
-    border-color var(--motion-hover, 90ms ease);
+    border-color var(--motion-hover, 90ms ease),
+    box-shadow var(--motion-hover, 90ms ease);
 }
 
 .primaryBtn:hover:not(:disabled) {
-  background: var(--surface-high);
+  background: var(--glass-bg-strong, var(--surface-high));
+  border-color: var(--glass-border-heavy, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
 }
 
 .primaryBtn:active:not(:disabled) {

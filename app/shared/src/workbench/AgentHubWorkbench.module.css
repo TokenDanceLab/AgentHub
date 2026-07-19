@@ -2168,9 +2168,9 @@
 .runtimeEvidenceState {
   min-height: 26px;
   padding: 5px 8px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--glass-bg-subtle, var(--surface));
   color: var(--text-2);
   font: 500 0.75rem var(--font-sans);
 }
@@ -2210,12 +2210,16 @@
 .browserPreviewCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 9px;
+  gap: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 9px);
   align-items: start;
-  padding: var(--space-md);
+  margin: var(--wb-gap-xs, var(--sp-sm));
+  padding: var(--wb-gap-md, var(--space-md));
   border: 1px solid var(--glass-border, var(--bdr));
-  border-radius: var(--r-md);
-  background: var(--glass-bg-light, var(--surface));
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-card-bg, var(--glass-bg-light, var(--surface)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
 }
 
 .browserPreviewCard strong {
@@ -2290,10 +2294,24 @@
   opacity: 0.62;
 }
 
-/* ── Inspector empty state ── */
+/* ── Inspector empty state — glass card residual (#1256) ── */
 .inspectorEmpty {
-  color: var(--text-3);
-  font: 400 0.8125rem var(--font-sans);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wb-gap-xs, var(--sp-sm));
+  margin: var(--wb-gap-sm, var(--sp-md));
+  padding: var(--wb-gap-md, var(--space-md));
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-card-bg, var(--glass-panel, var(--surface)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
+  color: var(--text-2);
+  font: 400 0.8125rem/1.5 var(--font-sans);
+  text-align: center;
 }
 
 /* ═══ Container queries ═══ */
@@ -2614,7 +2632,7 @@
   padding: var(--sp-lg);
 }
 
-/* Bottom terminal dock — dense dark shell, Desktop/localTerminal only (#1182) */
+/* Bottom terminal dock — glass residual (#1256); Desktop/localTerminal only (#1182) */
 .terminalDock {
   grid-column: 1 / -1;
   grid-row: 2;
@@ -2622,8 +2640,11 @@
   min-height: 180px;
   max-height: 240px;
   min-width: 0;
-  border-top: 1px solid var(--bdr);
-  background: var(--surface-lowest, var(--surface));
+  border-top: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-panel, var(--surface-lowest, var(--surface)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   overflow: hidden;
   z-index: 2;
 }
