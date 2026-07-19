@@ -1692,8 +1692,10 @@
   min-width: var(--inspector-w);
   height: 48px;
   padding: 0 var(--sp-10) 0 var(--space-md);
-  border-bottom: 1px solid var(--bdr);
-  background: var(--surface-low);
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2211,9 +2213,9 @@
   gap: 4px 9px;
   align-items: start;
   padding: var(--space-md);
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-sm);
-  background: var(--surface);
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--r-md);
+  background: var(--glass-bg-light, var(--surface));
 }
 
 .browserPreviewCard strong {
@@ -2525,8 +2527,8 @@
   align-items: center;
   gap: var(--sp-xxs);
   padding: var(--sp-xxs) var(--sp-10);
-  border-bottom: 1px solid var(--bdr);
-  background: var(--surface-low);
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-bg-subtle, var(--surface-low));
   font: 500 0.6875rem var(--font-sans);
   color: var(--text-2);
   flex: 0 0 auto;
