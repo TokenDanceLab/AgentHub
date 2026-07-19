@@ -3,7 +3,7 @@ import { DesignNavIcon } from '../../designIcons';
 import { buildAgentCapabilityContractFromConfig, buildAgentCapabilitySummary } from '../../agentCapabilities';
 import { StatusNotice } from '../../../ui';
 import styles from '../AgentsPage.module.css';
-import { AgentCapabilityStrip, AgentConfigSummary, AgentDetailHead, AgentEditActions, AgentEditGrid, AgentMcpMemorySection, AgentMiniLog, AgentRuntimeLine, AgentSkillChipGrid, AgentSpecFixturePanel, AgentToolPermissions } from './AgentEditItemParts';
+import { AgentCapabilityStrip, AgentConfigSummary, AgentDetailHead, AgentEditActions, AgentEditGrid, AgentMcpMemorySection, AgentMiniLog, AgentRuntimeLine, AgentSkillChipGrid, AgentToolPermissions } from './AgentEditItemParts';
 import { buildStatusNoticeClassName } from './AgentEditHelpers';
 import type { AgentConfig, AgentRecentEvent, ToolPermission } from './types';
 
@@ -51,7 +51,6 @@ export const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       <AgentRuntimeLine agent={agent} />
       <AgentCapabilityStrip agent={agent} capabilitySummary={capabilitySummary} />
       <AgentConfigSummary agent={agent} capabilitySummary={capabilitySummary} />
-      <AgentSpecFixturePanel agent={agent} />
       <AgentEditGrid agent={agent} onFieldChange={onFieldChange} />
       <AgentMcpMemorySection agent={agent} />
       <AgentSkillChipGrid

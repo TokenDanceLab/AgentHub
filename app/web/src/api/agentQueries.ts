@@ -125,12 +125,19 @@ function splitModelLabel(value: string | undefined): { provider?: string; model?
 function persistableAgentDescription(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
-  if (trimmed === 'Hub AgentProfile' || trimmed === 'Hub owner scope') return undefined;
+  const placeholderRoles = new Set([
+    'Hub AgentProfile',
+    'Hub owner scope',
+    'Hub 配置档案',
+    'Hub 所有者范围',
+  ]);
+  if (placeholderRoles.has(trimmed)) return undefined;
   const withoutRuntimeHints = trimmed
     .replace(/\s+-\s+Runtime:\s*[^-]+(?=\s+-\s+Model:|$)/i, '')
     .replace(/\s+-\s+Model:\s*.+$/i, '')
+    .replace(/\s*·\s*Runtime:\s*\S+/i, '')
     .trim();
-  if (!withoutRuntimeHints || withoutRuntimeHints === 'Hub AgentProfile' || withoutRuntimeHints === 'Hub owner scope') {
+  if (!withoutRuntimeHints || placeholderRoles.has(withoutRuntimeHints)) {
     return undefined;
   }
   return withoutRuntimeHints;
@@ -191,7 +198,6 @@ function capabilitiesForProfile(profile: AgentProfile): AgentCapabilities {
 
 export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo {
   const runtimeID = normalizeRuntimeID(profile.runtime_id);
-  const modelHint = [profile.provider, profile.model].filter(Boolean).join('/');
   const skills = parseStringArray(profile.skills);
   const mcpServers = parseIDArray(profile.mcp_servers);
   const toolAllowlist = parseStringArray(profile.tool_allowlist);
@@ -202,11 +208,9 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
   const memoryRetention = typeof memoryPolicy?.retention === 'string' ? memoryPolicy.retention : undefined;
   const memorySummary = typeof memoryPolicy?.summary === 'string' ? memoryPolicy.summary : undefined;
   const targetPreferences = parseJSONObject(profile.target_preferences);
-  const descriptionParts = [
-    profile.description?.trim(),
-    runtimeID ? `Runtime: ${runtimeID}` : undefined,
-    modelHint ? `Model: ${modelHint}` : undefined,
-  ].filter(Boolean);
+  // #1277: keep product description free of Runtime/Model engineering suffixes;
+  // runtime/model already live on dedicated AgentInfo fields.
+  const description = profile.description?.trim();
 
   return {
     id: profile.id,
@@ -225,7 +229,7 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
     ...(memoryRetention ? { memoryRetention } : {}),
     ...(memorySummary ? { memorySummary } : {}),
     ...(targetPreferences ? { targetPreferences } : {}),
-    ...(descriptionParts.length > 0 ? { description: descriptionParts.join(' - ') } : {}),
+    ...(description ? { description } : {}),
     ...(profile.version != null ? { version: String(profile.version) } : {}),
     status: runtimeID ? 'available' : 'configuring',
     capabilities: capabilitiesForProfile(profile),

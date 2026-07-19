@@ -33,10 +33,10 @@ describe('AgentEditHelpers', () => {
 
   it('exports state options for all AgentState values', () => {
     expect(EDIT_STATE_OPTIONS).toHaveLength(4);
-    expect(EDIT_STATE_OPTIONS).toContainEqual(['running', 'running']);
-    expect(EDIT_STATE_OPTIONS).toContainEqual(['idle', 'idle']);
-    expect(EDIT_STATE_OPTIONS).toContainEqual(['ready', 'ready']);
-    expect(EDIT_STATE_OPTIONS).toContainEqual(['waiting', 'waiting']);
+    expect(EDIT_STATE_OPTIONS).toContainEqual(['running', '运行中']);
+    expect(EDIT_STATE_OPTIONS).toContainEqual(['idle', '空闲']);
+    expect(EDIT_STATE_OPTIONS).toContainEqual(['ready', '就绪']);
+    expect(EDIT_STATE_OPTIONS).toContainEqual(['waiting', '等待中']);
   });
 
   it('exports tool permission labels in display order', () => {

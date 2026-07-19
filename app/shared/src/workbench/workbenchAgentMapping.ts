@@ -70,23 +70,23 @@ export function formatAgentTargetPreference(value: string[] | Record<string, unk
 }
 
 export function workbenchAgentToAgentConfig(agent: WorkbenchAgent): AgentConfig {
-  const runtimeLabel = agent.runtimeId?.trim() || 'Hub AgentProfile';
+  const runtimeLabel = agent.runtimeId?.trim() || 'Hub 配置档案';
   const providerLabel = agent.provider?.trim();
   const modelLabel = [providerLabel, agent.model?.trim()].filter(Boolean).join(' / ') || '未配置模型';
   const targetPreference = formatAgentTargetPreference(agent.targetPreferences);
   return {
     id: agent.id,
     name: agent.name,
-    role: agent.description?.trim() || 'Hub AgentProfile',
+    role: agent.description?.trim() || 'Hub 配置档案',
     ...(agent.icon ? { icon: agent.icon } : {}),
     engine: runtimeLabel,
     runtimeId: agent.runtimeId,
     provider: agent.provider,
     model: modelLabel,
-    mode: agent.reasoningEffort ? `Reasoning ${agent.reasoningEffort}` : 'Hub read-through',
+    mode: agent.reasoningEffort ? `推理 ${agent.reasoningEffort}` : 'Hub 只读透传',
     approval: agent.approvalPolicy?.trim() || agent.permissionMode?.trim() || 'Hub 默认策略',
     approvalMode: agent.permissionMode,
-    scope: agent.permissionMode?.trim() || 'Hub owner scope',
+    scope: agent.permissionMode?.trim() || 'Hub 所有者范围',
     ...(targetPreference ? { targetPreference } : {}),
     state: workbenchAgentStateToAgentState(agent.status),
     skills: agent.skills ?? [],
