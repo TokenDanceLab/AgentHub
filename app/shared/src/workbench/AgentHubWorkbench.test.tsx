@@ -1810,8 +1810,8 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
     expect(within(page).getAllByText('openai / gpt-5.5').length).toBeGreaterThan(0);
     expect(within(page).getByText('Architecture · Review')).toBeInTheDocument();
-    expect(within(page).getAllByText('AGENTS.md missing').length).toBeGreaterThan(0);
-    expect(within(page).getByText('partial')).toBeInTheDocument();
+    expect(within(page).getAllByText('工作区说明未配置').length).toBeGreaterThan(0);
+    expect(within(page).getByText('部分就绪')).toBeInTheDocument();
     expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(page).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
   });

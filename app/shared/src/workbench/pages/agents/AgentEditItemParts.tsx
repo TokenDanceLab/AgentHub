@@ -102,8 +102,8 @@ export const AgentEditGrid: React.FC<{
 export const AgentMcpMemorySection: React.FC<{ agent: AgentConfig }> = ({ agent }) => (
   <section className={styles['agent-skill-editor']}>
     <div className={styles['section-title-row']}>
-      <h3>MCP / Memory</h3>
-      <span>{agent.memoryRetention || 'policy pending'}</span>
+      <h3>MCP / 记忆</h3>
+      <span>{agent.memoryRetention || '策略待定'}</span>
     </div>
     <div className={styles['agent-token-grid']}>
       {(agent.mcpServers ?? []).map((server) => (
@@ -131,8 +131,8 @@ export const AgentSkillChipGrid: React.FC<{
 }> = ({ agent, allSkills, onAgentSkillToggle }) => (
   <section className={styles['agent-skill-editor']}>
     <div className={styles['section-title-row']}>
-      <h3>Skills</h3>
-      <span>{agent.skills.length} enabled</span>
+      <h3>技能</h3>
+      <span>已启用 {agent.skills.length} 个</span>
     </div>
     <div className={styles['skill-chip-grid']}>
       {allSkills.map((skill) => (
@@ -160,7 +160,7 @@ export const AgentToolPermissions: React.FC<{
   <section className={styles['editable-tools']}>
     <div className={styles['section-title-row']}>
       <h3>工具权限</h3>
-      <span>Allow / Confirm / Deny</span>
+      <span>允许 / 需确认 / 禁止</span>
     </div>
     {allTools.map((tool) => (
       <div key={tool} className={`${styles['scope-row']} ${styles.editable}`}>
@@ -188,7 +188,7 @@ export const AgentMiniLog: React.FC<{ recentEvents: AgentRecentEvent[] }> = ({ r
   <section className={styles['agent-mini-log']}>
     <div className={styles['section-title-row']}>
       <h3>最近运行</h3>
-      <span>{recentEvents.length} events</span>
+      <span>{recentEvents.length} 条</span>
     </div>
     {recentEvents.map((evt, i) => (
       <div key={i}>
@@ -211,7 +211,7 @@ export const AgentDetailHead: React.FC<{
     <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
     <div>
       <h2>{agent.name}</h2>
-      <span>{agent.role.trim() || 'Hub AgentProfile'} Agent</span>
+      <span>{agent.role.trim() || 'Hub 配置档案'}</span>
     </div>
     <span className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}>
       {saveStateLabel}
@@ -242,19 +242,25 @@ interface CapabilitySummary {
   readiness: string;
 }
 
+const READINESS_LABEL: Record<string, string> = {
+  ready: '就绪',
+  partial: '部分就绪',
+  blocked: '受阻',
+};
+
 export const AgentCapabilityStrip: React.FC<{
   agent: AgentConfig;
   capabilitySummary: CapabilitySummary;
 }> = ({ agent, capabilitySummary }) => (
-  <div className={styles['agent-capability-strip']} aria-label={`${agent.name} capability readiness`}>
-    <CapabilityBadge label="AGENTS.md" value={capabilitySummary.agentsMd} />
-    <CapabilityBadge label="Skills" value={capabilitySummary.skills} />
+  <div className={styles['agent-capability-strip']} aria-label={`${agent.name} 能力就绪状态`}>
+    <CapabilityBadge label="工作区说明" value={capabilitySummary.agentsMd} />
+    <CapabilityBadge label="技能" value={capabilitySummary.skills} />
     <CapabilityBadge label="MCP" value={capabilitySummary.mcp} />
-    <CapabilityBadge label="Memory" value={capabilitySummary.memory} />
-    <CapabilityBadge label="Tools" value={capabilitySummary.tools} />
-    <CapabilityBadge label="Avatar" value={capabilitySummary.avatar} />
+    <CapabilityBadge label="记忆" value={capabilitySummary.memory} />
+    <CapabilityBadge label="工具" value={capabilitySummary.tools} />
+    <CapabilityBadge label="头像" value={capabilitySummary.avatar} />
     <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
-      {capabilitySummary.readiness}
+      {READINESS_LABEL[capabilitySummary.readiness] ?? capabilitySummary.readiness}
     </span>
   </div>
 );
@@ -266,11 +272,11 @@ export const AgentConfigSummary: React.FC<{
   capabilitySummary: CapabilitySummary;
 }> = ({ agent, capabilitySummary }) => (
   <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
-    <ConfigSummaryRow label="AGENTS.md" value={capabilitySummary.agentsMd} />
+    <ConfigSummaryRow label="工作区说明" value={capabilitySummary.agentsMd} />
     <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
-    <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
-    <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
-    <ConfigSummaryRow label="Target" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明 target')} />
+    <ConfigSummaryRow label="记忆" value={agent.memorySummary || formatList(agent.memorySources, '未声明记忆源')} />
+    <ConfigSummaryRow label="审批" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
+    <ConfigSummaryRow label="目标" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明目标')} />
   </div>
 );
 

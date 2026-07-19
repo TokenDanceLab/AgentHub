@@ -127,7 +127,7 @@ async function installMockHub(context) {
               {
                 id: 'profile_codex',
                 name: 'Codex',
-                description: 'Shell visual QA profile',
+                description: '视觉验收主配置',
                 runtime_id: 'codex',
                 provider: 'openai',
                 model: 'gpt-5',
@@ -136,7 +136,7 @@ async function installMockHub(context) {
               {
                 id: 'profile_claude',
                 name: 'Claude Code',
-                description: 'Shell visual QA secondary profile',
+                description: '视觉验收次配置',
                 runtime_id: 'claude-code',
                 provider: 'anthropic',
                 model: 'claude-opus-4-5',
@@ -145,7 +145,7 @@ async function installMockHub(context) {
               {
                 id: 'profile_opencode',
                 name: 'OpenCode',
-                description: 'Shell visual QA tertiary profile',
+                description: '视觉验收第三配置',
                 runtime_id: 'opencode',
                 provider: 'openai',
                 model: 'gpt-5-mini',
