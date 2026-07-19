@@ -12,6 +12,9 @@ export type { FilePreviewRouterProps, PreviewFile } from './FilePreviewRouter';
 export {
   BrowserPreview,
   THEMED_BLANK_PREVIEW_SRCDOC,
+  THEMED_BLANK_PREVIEW_SRCDOC_DARK,
+  THEMED_BLANK_PREVIEW_SRCDOC_LIGHT,
+  buildThemedBlankPreviewSrcDoc,
   isThemedBlankPreviewUrl,
 } from './BrowserPreview';
 export type { BrowserPreviewProps } from './BrowserPreview';
