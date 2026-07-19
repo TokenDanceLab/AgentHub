@@ -132,6 +132,13 @@
   color-scheme: inherit;
 }
 
+/* Host-themed blank docs: let frameShell glass show if document is transparent
+   and avoid a pure-white iframe chrome flash before srcDoc paints (#1251). */
+.frameBlank {
+  background: transparent;
+  color-scheme: inherit;
+}
+
 /* ── Status bar ── */
 .status {
   min-height: 30px;
