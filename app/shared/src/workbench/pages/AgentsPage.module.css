@@ -344,7 +344,8 @@
 .agent-config-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-xxs);
+  gap: var(--wb-gap-2xs, var(--sp-xxs));
+  min-height: 160px;
 }
 
 .statusStack {
@@ -388,15 +389,18 @@
   margin: 0;
 }
 
-/* Compact EmptyState overrides for in-list / market section density */
+/* Compact EmptyState — glass residual for installed empty list (#1269) */
 .agent-empty-compact {
   max-width: 100%;
   margin: 0;
-  min-height: 118px;
-  padding: 18px;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-md);
-  background: var(--surface-low);
+  min-height: 140px;
+  padding: var(--wb-gap-md, 16px);
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-card-bg, var(--glass-panel, var(--surface-low)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   color: var(--text-2);
   align-items: center;
   justify-content: center;
@@ -405,7 +409,7 @@
 
 .agent-empty-compact-content {
   align-items: center;
-  gap: var(--sp-xxs);
+  gap: var(--wb-gap-2xs, var(--sp-xxs));
 }
 
 .agent-empty-compact-title {
@@ -422,21 +426,26 @@
 .agent-empty-compact-action {
   height: 28px;
   min-height: 28px;
-  margin-top: var(--sp-xxs);
-  padding: 0 var(--sp-10);
-  border: 1px solid var(--bdr-strong);
+  margin-top: var(--wb-gap-2xs, var(--sp-xxs));
+  padding: 0 var(--wb-gap-sm, var(--sp-10));
+  border: 1px solid var(--glass-border-strong, var(--bdr-strong));
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--glass-bg-medium, var(--surface));
   color: var(--text-1);
   font: 500 0.75rem var(--font-sans);
-  backdrop-filter: none;
-  box-shadow: none;
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    border-color var(--motion-hover, 90ms ease),
+    box-shadow var(--motion-hover, 90ms ease);
 }
 
 .agent-empty-compact-action:hover {
-  border-color: var(--bdr-strong);
-  background: var(--surface-high);
-  box-shadow: none;
+  border-color: var(--glass-border-heavy, var(--bdr-strong));
+  background: var(--glass-bg-strong, var(--surface-high));
+  box-shadow: var(--glass-elev-2);
 }
 
 .agent-config-row {
