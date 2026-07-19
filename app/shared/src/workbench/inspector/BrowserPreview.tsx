@@ -1,4 +1,8 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
+import {
+  getAppliedAgentHubTheme,
+  type AgentHubTheme,
+} from '../../theme';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
 import styles from './BrowserPreview.module.css';
 
@@ -13,9 +17,9 @@ import styles from './BrowserPreview.module.css';
    Mirrors the desktop demo .browser-preview-pane visual design using
    ONLY v4 CSS custom properties. Pure presentational — no data fetching.
 
-   Demo/fixture blank URLs use a color-scheme-aware empty document so the
-   pane never paints pure white in dark mode (#1247). Real URLs still load
-   via src as before.
+   Demo/fixture blank URLs use a host data-theme-aware empty document so
+   the pane never paints pure white in dark mode (#1247, #1251). Real
+   URLs still load via src as before.
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -25,28 +29,57 @@ export interface BrowserPreviewProps {
   onClose: () => void;
 }
 
+/** Surface tokens for blank preview docs — match themes.css app canvas. */
+const BLANK_PREVIEW_SURFACE: Record<
+  AgentHubTheme,
+  { background: string; color: string; ambient: string; scheme: AgentHubTheme }
+> = {
+  dark: {
+    scheme: 'dark',
+    background: '#1a1a20',
+    color: '#e3e4e6',
+    ambient:
+      'radial-gradient(ellipse 78% 58% at 50% 38%, rgba(41,171,226,0.045) 0%, transparent 68%)',
+  },
+  light: {
+    scheme: 'light',
+    background: '#f8f9fb',
+    color: '#1a1a2e',
+    ambient:
+      'radial-gradient(ellipse 78% 58% at 50% 38%, rgba(0,113,188,0.04) 0%, transparent 68%)',
+  },
+};
+
 /**
- * Empty document for demo defaults: Canvas/CanvasText + light/dark scheme
- * so blank previews follow the host theme instead of a white void.
+ * Empty document for demo defaults. Uses explicit host-theme surfaces
+ * (not system Canvas) so blank previews follow data-theme even when OS
+ * prefers-color-scheme disagrees (#1251).
  */
-export const THEMED_BLANK_PREVIEW_SRCDOC = [
-  '<!DOCTYPE html>',
-  '<html lang="en">',
-  '<head>',
-  '<meta charset="utf-8" />',
-  '<meta name="color-scheme" content="light dark" />',
-  '<title>Preview</title>',
-  '<style>',
-  ':root{color-scheme:light dark}',
-  'html,body{margin:0;min-height:100%;background:Canvas;color:CanvasText}',
-  'body{background:',
-  'radial-gradient(ellipse 78% 58% at 50% 38%, color-mix(in srgb, CanvasText 4%, transparent) 0%, transparent 68%),',
-  'Canvas}',
-  '</style>',
-  '</head>',
-  '<body></body>',
-  '</html>',
-].join('');
+export function buildThemedBlankPreviewSrcDoc(theme: AgentHubTheme): string {
+  const { scheme, background, color, ambient } = BLANK_PREVIEW_SURFACE[theme];
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="utf-8" />',
+    `<meta name="color-scheme" content="${scheme}" />`,
+    '<title>Preview</title>',
+    '<style>',
+    `:root{color-scheme:${scheme}}`,
+    `html,body{margin:0;min-height:100%;background:${background};color:${color}}`,
+    `body{background:${ambient},${background}}`,
+    '</style>',
+    '</head>',
+    '<body></body>',
+    '</html>',
+  ].join('');
+}
+
+/** @deprecated Prefer buildThemedBlankPreviewSrcDoc(hostTheme). Light fallback for static consumers. */
+export const THEMED_BLANK_PREVIEW_SRCDOC = buildThemedBlankPreviewSrcDoc('light');
+
+export const THEMED_BLANK_PREVIEW_SRCDOC_DARK = buildThemedBlankPreviewSrcDoc('dark');
+export const THEMED_BLANK_PREVIEW_SRCDOC_LIGHT = buildThemedBlankPreviewSrcDoc('light');
 
 export function isThemedBlankPreviewUrl(url: string): boolean {
   const value = url.trim().toLowerCase();
@@ -58,14 +91,34 @@ export function isThemedBlankPreviewUrl(url: string): boolean {
   );
 }
 
+function subscribeHostTheme(onStoreChange: () => void): () => void {
+  if (typeof document === 'undefined') return () => {};
+  const root = document.documentElement;
+  const observer = new MutationObserver(onStoreChange);
+  observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => observer.disconnect();
+}
+
+function useHostAgentHubTheme(): AgentHubTheme {
+  return useSyncExternalStore(
+    subscribeHostTheme,
+    getAppliedAgentHubTheme,
+    () => 'light' as AgentHubTheme,
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   url,
   onClose,
 }) => {
+  const hostTheme = useHostAgentHubTheme();
   const themedBlank = isThemedBlankPreviewUrl(url);
   const addressLabel = themedBlank ? (url.trim() || 'about:blank') : url;
+  const blankSrcDoc = themedBlank
+    ? buildThemedBlankPreviewSrcDoc(hostTheme)
+    : undefined;
 
   return (
     <section
@@ -130,9 +183,9 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
       <div className={styles.frameShell}>
         {themedBlank ? (
           <iframe
-            className={styles.frame}
+            className={`${styles.frame} ${styles.frameBlank}`}
             title={`预览 ${addressLabel}`}
-            srcDoc={THEMED_BLANK_PREVIEW_SRCDOC}
+            srcDoc={blankSrcDoc}
             loading="lazy"
           />
         ) : (
