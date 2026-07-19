@@ -29,7 +29,7 @@
 
 .sectionCount {
   font-size: 11px;
-  background: var(--surface-high);
+  background: var(--glass-bg-medium);
   padding: 1px 6px;
   border-radius: 10px;
   color: var(--text-2);
@@ -46,8 +46,11 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--surface-high);
-  border: 1px solid var(--bdr);
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-elev-1);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .approvalInfo {
@@ -141,7 +144,7 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 6px;
-  background: var(--surface-high);
+  background: var(--glass-bg-light);
   font-size: 12px;
 }
 
@@ -227,7 +230,7 @@
   font-family: monospace;
   padding: 1px 5px;
   border-radius: 3px;
-  background: var(--surface);
+  background: var(--glass-bg-medium);
   color: var(--text-2);
 }
 

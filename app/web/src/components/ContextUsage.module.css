@@ -17,7 +17,7 @@
   height: 8px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: var(--surface-base);
+  background: var(--glass-bg-medium);
   display: flex;
 }
 
@@ -55,15 +55,15 @@
 .statRow {
   min-height: 50px;
   gap: 2px;
-  border-color: rgba(0,0,0,0.04);
+  border-color: var(--glass-border-subtle);
   border-radius: 8px;
   padding: 7px 8px;
-  background: rgba(255,255,255,0.35);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .statRow {
-  border-color: rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.035);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-medium);
 }
 
 .statLabel {
