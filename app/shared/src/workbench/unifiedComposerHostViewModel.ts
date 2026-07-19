@@ -172,7 +172,8 @@ export function deriveComposerChromeVisibility(params: {
     replyBar: Boolean(composer.replyTo),
     quoteBar: Boolean(composer.quote),
     mentionChips: hasMentions,
-    mainchainStrip: hasMentions,
+    /* P76: show mainchain when mentions or targets exist so Agent/目标/任务 always readable. */
+    mainchainStrip: hasMentions || hasExecutionTargets,
     attachmentBar: composer.attachments.length > 0,
     agentPicker: mentionableAgentsCount > 0,
     targetPicker: hasExecutionTargets,

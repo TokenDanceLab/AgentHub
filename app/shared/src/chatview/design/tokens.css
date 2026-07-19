@@ -22,14 +22,19 @@
   --label-xs: 600 0.6875rem/1.5 var(--font-sans);  /* larger than base --label-xs (0.625rem) */
   --bubble-font: 400 0.875rem/1.5 var(--font-sans);  /* bubble message font, distinct from --body at 0.8125rem */
 
-  /* Chat density scale (intentional): md/lg/xl = 12/20/28
+  /* Chat density scale (intentional P76): md/lg/xl = 12/16/24
      Base v4 scale: md/lg/xl = 16/24/32
      Matching micro steps inherit names only: 2/4/6/8/10/14/16
-     --sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px) */
+     --sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px)
+     Row rhythm consumes --sp-md (12) not --sp-lg so more turns fit 1440×810. */
   --sp-xs: 4px; --sp-sm: 8px;
   --sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
-  --sp-lg: 20px; --sp-xl: 28px;
+  --sp-lg: 16px; --sp-xl: 24px;
   --sp-xxs: 6px; --sp-2: 2px; --sp-10: 10px; --sp-14: 14px; --sp-16: 16px;
+  /* Optional density aliases (map onto chat scale / workbench map) */
+  --chat-row-gap: var(--sp-md);
+  --chat-bubble-pad-y: var(--sp-xxs);
+  --chat-bubble-pad-x: var(--sp-sm);
   /* Chat radius density (tighter than v4 base r-xs/sm/md/lg) */
   --r-xs: 3px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 9999px;
   --dur: 160ms; --dur-slow: 400ms; --dur-pulse: 1.2s; --dur-route: 1.5s; --dur-bar: 0.5s;

@@ -68,7 +68,7 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
       ) : (
         <div className={styles.agent}>
           <span className={`${styles.icon} ${styles.iconPulse}`} aria-hidden="true">{'\u{1F916}'}</span>
-          <span className={styles.name}>{activeCount} agents active</span>
+          <span className={styles.name}>{activeCount} 个 Agent 运行中</span>
           <span className={styles.detail}>
             {agents.map((a) => STATUS_ICON[a.status]).join(' ')}
           </span>
@@ -82,11 +82,11 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
 
 function statusLabel(status: AgentActivityStatus): string {
   switch (status) {
-    case 'dispatching': return 'dispatching…';
-    case 'thinking': return 'thinking…';
-    case 'streaming': return 'streaming…';
-    case 'done': return 'done';
-    case 'failed': return 'failed';
+    case 'dispatching': return '调度中…';
+    case 'thinking': return '思考中…';
+    case 'streaming': return '输出中…';
+    case 'done': return '完成';
+    case 'failed': return '失败';
   }
 }
 
