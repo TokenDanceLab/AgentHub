@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: oklch(0 0 0 / 0.5);
+  background: var(--glass-shadow);
   animation: fade-in var(--duration-medium) var(--ease-out);
 }
 
@@ -16,10 +16,12 @@
   max-width: 90vw;
   max-height: 80vh;
   overflow-y: auto;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  background: var(--glass-panel-overlay);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--glass-elev-2), 0 18px 48px var(--glass-shadow);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   animation: fade-in var(--duration-medium) var(--ease-out);
 }
 
@@ -91,12 +93,12 @@
 .kbd {
   display: inline-block;
   padding: 2px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--foreground);
-  background: var(--surface-base);
+  background: var(--glass-bg-light);
   line-height: 1.6;
   vertical-align: middle;
 }
