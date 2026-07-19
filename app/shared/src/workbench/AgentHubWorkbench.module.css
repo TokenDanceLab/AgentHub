@@ -107,7 +107,8 @@
   padding: 0;
   transition:
     background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease);
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--motion-hover);
 }
 
 .railButton svg {
@@ -122,6 +123,12 @@
 
 .railButton:hover {
   background: var(--primary-light);
+  color: var(--primary);
+}
+
+.railButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
   color: var(--primary);
 }
 
@@ -311,7 +318,13 @@
   cursor: pointer;
   transition:
     background var(--motion-hover, var(--dur-normal) var(--ease)),
-    transform var(--motion-press, var(--dur-pop) var(--ease-press));
+    transform var(--motion-press, var(--dur-pop) var(--ease-press)),
+    box-shadow var(--motion-hover);
+}
+
+.conversationButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .conversationButton:hover {
@@ -1021,6 +1034,12 @@
 
 .iconButton:active {
   transform: scale(var(--glass-press-scale, 0.985));
+}
+
+.iconButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  color: var(--text-1);
 }
 
 .iconButton svg {
