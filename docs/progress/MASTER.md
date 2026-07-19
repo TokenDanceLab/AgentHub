@@ -33,6 +33,7 @@
 
 - [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
 - [visual-qa-score-2026-07-20-rescore-8](../analysis/visual-qa-score-2026-07-20-rescore-8.md)
+- [visual-qa-score-2026-07-20-rescore-9](../analysis/visual-qa-score-2026-07-20-rescore-9.md)
 - [07-design-system-ssot](../architecture/07-design-system-ssot.md)
 - [P74–P75 handoff](../handoff/2026-07-20-phase-74-75-handoff.md)
 
@@ -76,22 +77,23 @@ cd app && pnpm --filter agenthub-web visual:qa:chat
 
 **Active Phase**: 76 complete — milestone 97 closed (0 open / 4 closed) via #1315
 **Product tip**: `ad911aba` (P76 Chat density)
-**Rescore-8 gate**: min~**79**/100 (pre-P76 Agents shell; re-score recommended with Chat path)
-**Gate history**: ~55 → … → 76 → **79**
+**Rescore-9 gate**: min~**82**/100 (W83/W82/D82/D82) — Iterate; Ship −3
+**Gate history**: ~55 → … → 76 → **79** → **82**
 **P76 landed**: transcript denser rhythm · inspector overview-only default · composer zh status · `visual:qa:chat`
 **Blockers**: None
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
-## Next Steps (post-Phase 76)
+## Next Steps (post-rescore-9)
 
-1. Capture shell + chat 1x (and optional 2x) → rescore toward Ship ≥85
-2. Optional: Desktop path-filter visual:qa:shell CI
-3. Optional: Agents form further collapse / first-success E2E
+1. Desktop inspector: stop auto-restoring browser tab so overview-only is true default
+2. Compact terminal dock empty on Chat path
+3. Optional: Desktop path-filter visual:qa CI / Agents form collapse
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
+| 2026-07-20 | lead | Rescore-9 min~82 after P76 captures; notes rescore-9.md |
 | 2026-07-20 | lead | P76 merged #1315 closes #1311–#1314; tip ad911aba; milestone 97 closed |
 | 2026-07-20 | lead | P76 milestone 97 + density PR; CI fix on-demand tabs; visual:qa:chat |
 | 2026-07-20 | lead | P75 merged #1310; tip 2f94b7f2; milestone 96 closed |
