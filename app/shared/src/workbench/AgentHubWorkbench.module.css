@@ -276,7 +276,7 @@
 .sidebarSearch:focus {
   border-color: var(--bdr-focus);
   box-shadow: var(--focus-ring);
-  background: var(--surface);
+  background: var(--glass-input-bg, var(--surface));
 }
 
 .conversationList {
@@ -314,7 +314,7 @@
 }
 
 .conversationButton:hover {
-  background: var(--surface-high);
+  background: var(--glass-bg-light, var(--surface-high));
   transform: translateX(1px);
 }
 
@@ -580,7 +580,7 @@
 }
 
 .conversationActionBtn:hover {
-  background: var(--surface-highest);
+  background: var(--glass-bg-medium, var(--surface-highest));
   color: var(--text-1);
 }
 
@@ -625,7 +625,7 @@
 
 .workspace[data-mode='workbench'] {
   grid-template-rows: minmax(0, 1fr);
-  background: var(--surface);
+  background: var(--glass-bg-subtle, var(--surface));
 }
 
 .workspace[data-mode='chat'][data-mainchain='false'] {

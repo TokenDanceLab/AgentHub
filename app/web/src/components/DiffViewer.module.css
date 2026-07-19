@@ -55,8 +55,11 @@
 
 /* ── File Tree Sidebar ──────────────────────────────────────────── */
 .fileTree {
-  background: var(--card);
-  border-right: 1px solid var(--border);
+  background: var(--glass-panel, var(--card));
+  border-right: 1px solid var(--glass-border, var(--border));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -184,7 +187,9 @@
 .fileHeader {
   display: flex;
   align-items: center;
-  background: var(--card);
+  background: var(--glass-panel, var(--card));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
