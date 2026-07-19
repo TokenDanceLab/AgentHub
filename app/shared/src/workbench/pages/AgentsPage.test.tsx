@@ -89,26 +89,20 @@ describe('AgentsPage profile catalog rendering', () => {
     const summary = screen.getByLabelText('Builder 配置摘要');
     expect(within(summary).getByText('MCP')).toBeInTheDocument();
     expect(within(summary).getByText('filesystem · github')).toBeInTheDocument();
-    expect(within(summary).getByText('Memory')).toBeInTheDocument();
-    expect(within(summary).getAllByText(/AGENTS\.md/).length).toBeGreaterThan(0);
-    expect(within(summary).getByText('Approval')).toBeInTheDocument();
+    expect(within(summary).getByText('记忆')).toBeInTheDocument();
+    expect(within(summary).getByText('审批')).toBeInTheDocument();
     expect(within(summary).getByText(/workspace-write/)).toBeInTheDocument();
-    expect(within(summary).getByText('Target')).toBeInTheDocument();
+    expect(within(summary).getByText('目标')).toBeInTheDocument();
     expect(within(summary).getByText('local-edge · remote-edge')).toBeInTheDocument();
 
     expect(screen.getAllByTitle('Builder agenthub:avatar/builder').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/TokenDance Gateway \/ DeepSeek-V4-Pro/).length).toBeGreaterThan(0);
-    expect(screen.getByText('MCP / Memory')).toBeInTheDocument();
+    expect(screen.getByText('MCP / 记忆')).toBeInTheDocument();
     expect(screen.getByText('agents-md')).toBeInTheDocument();
     expect(screen.getByText('project-memory')).toBeInTheDocument();
 
-    const specPanel = screen.getByLabelText('Builder AgentSpec fixture');
-    expect(within(specPanel).getByText('no-spend')).toBeInTheDocument();
-    expect(within(specPanel).getByText('claude-code · Claude Code')).toBeInTheDocument();
-    expect(within(specPanel).getByText('TokenDance Gateway / DeepSeek-V4-Pro')).toBeInTheDocument();
-    expect(within(specPanel).getByText('read_file · write_file · shell · git_diff · browser_screenshot')).toBeInTheDocument();
-    expect(within(specPanel).getByText('project · project-policy')).toBeInTheDocument();
-    expect(within(specPanel).getByText(/不导入 SDK、不启动 CLI、不调用模型/)).toBeInTheDocument();
+    // #1277: AgentSpec fixture dump is not shown in default product detail
+    expect(screen.queryByLabelText('Builder AgentSpec fixture')).not.toBeInTheDocument();
   });
 
   it('shows market profile configuration summaries before install', () => {
@@ -159,8 +153,8 @@ describe('AgentsPage empty states', () => {
       />,
     );
 
-    const emptyState = screen.getByRole('region', { name: '暂无 Agent Profile' });
-    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装 Agent。')).toBeInTheDocument();
+    const emptyState = screen.getByRole('region', { name: '暂无已安装 Agent' });
+    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装配置。')).toBeInTheDocument();
     fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
     expect(onAgentAdd).toHaveBeenCalledTimes(1);
   });
@@ -179,7 +173,7 @@ describe('AgentsPage empty states', () => {
       />,
     );
 
-    expect(screen.queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '暂无已安装 Agent' })).not.toBeInTheDocument();
     expect(screen.getByText('同步中')).toBeInTheDocument();
   });
 
@@ -238,7 +232,7 @@ describe('AgentsPage load/action status', () => {
 
     const recovery = screen.getByRole('alert', { name: 'Agent 加载失败' });
     expect(within(recovery).getByText('Hub AgentProfiles unavailable')).toBeInTheDocument();
-    expect(within(recovery).getByText(/无法从当前 Hub 读取已安装 Agent Profile/)).toBeInTheDocument();
+    expect(within(recovery).getByText(/无法从当前 Hub 读取已安装配置/)).toBeInTheDocument();
     fireEvent.click(within(recovery).getByRole('button', { name: '重试' }));
     expect(onAgentsRetry).toHaveBeenCalledTimes(1);
   });
@@ -257,7 +251,7 @@ describe('AgentsPage load/action status', () => {
       />,
     );
 
-    expect(screen.queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '暂无已安装 Agent' })).not.toBeInTheDocument();
     expect(screen.getByRole('alert', { name: 'Agent 加载失败' })).toBeInTheDocument();
   });
 

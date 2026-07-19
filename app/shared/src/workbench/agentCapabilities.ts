@@ -86,14 +86,14 @@ export function buildAgentCapabilitySummary(contract: AgentCapabilityContract): 
   ];
 
   return {
-    agentsMd: contract.agentsMd.status === 'enabled' ? 'AGENTS.md enabled' : 'AGENTS.md missing',
-    avatar: contract.avatar.status === 'enabled' ? contract.avatar.id : 'Generated initials only',
+    agentsMd: contract.agentsMd.status === 'enabled' ? '工作区说明已配置' : '工作区说明未配置',
+    avatar: contract.avatar.status === 'enabled' ? contract.avatar.id : '使用生成首字母',
     memory: isMemoryDisabled(contract.memoryPolicy)
-      ? 'Memory disabled'
-      : contract.memoryPolicy.summary || `${contract.memoryPolicy.sources.length} memory sources`,
+      ? '记忆未启用'
+      : contract.memoryPolicy.summary || `${contract.memoryPolicy.sources.length} 个记忆源`,
     mcp: countEnabled(contract.mcpServers, 'MCP'),
-    skills: countEnabled(contract.skills, 'skills'),
-    tools: contract.toolAllowlist.length === 0 ? 'No tools allowed' : `${contract.toolAllowlist.length} tools allowed`,
+    skills: countEnabled(contract.skills, '技能'),
+    tools: contract.toolAllowlist.length === 0 ? '未开放工具' : `已开放 ${contract.toolAllowlist.length} 个工具`,
     readiness: readinessFromIssues(issues),
     issues,
   };
@@ -124,7 +124,7 @@ function isMemoryDisabled(memoryPolicy: AgentMemoryPolicy): boolean {
 
 function countEnabled(refs: AgentCapabilityRef[], label: string): string {
   const enabled = refs.filter((item) => item.status === 'enabled').length;
-  return `${enabled}/${refs.length} ${label} enabled`;
+  return `${enabled}/${refs.length} ${label} 已启用`;
 }
 
 function capabilityIssues(prefix: string, refs: AgentCapabilityRef[]): string[] {
