@@ -119,6 +119,7 @@ async function installMockHub(context) {
       return route.fulfill(json(hubEnvelope([])));
     }
     if (pathname === '/web/agent-profiles') {
+      // #1275: multi-row installed list so Hierarchy/Empty score on dual-scroll layout
       return route.fulfill(
         json(
           hubEnvelope({
@@ -130,6 +131,24 @@ async function installMockHub(context) {
                 runtime_id: 'codex',
                 provider: 'openai',
                 model: 'gpt-5',
+                version: 1,
+              },
+              {
+                id: 'profile_claude',
+                name: 'Claude Code',
+                description: 'Shell visual QA secondary profile',
+                runtime_id: 'claude-code',
+                provider: 'anthropic',
+                model: 'claude-opus-4-5',
+                version: 1,
+              },
+              {
+                id: 'profile_opencode',
+                name: 'OpenCode',
+                description: 'Shell visual QA tertiary profile',
+                runtime_id: 'opencode',
+                provider: 'openai',
+                model: 'gpt-5-mini',
                 version: 1,
               },
             ],
@@ -312,6 +331,31 @@ async function captureTheme(browser, theme) {
   ).catch(() => {
     // Non-fatal: a valid dark theme might use near-black; capture anyway
     console.warn(`warn: body content check inconclusive for theme=${theme}, capturing anyway`);
+  });
+
+  // #1275: wait for installed list rows (or empty glass) and pin scroll to top
+  // so tall detail focus cannot scroll the short list out of the 1440×810 frame.
+  try {
+    await page.waitForFunction(
+      () => {
+        const rows = document.querySelectorAll('.agent-config-row, button.agent-config-row');
+        const empty = document.querySelector('.agent-empty-compact, [class*="agent-empty"]');
+        return rows.length > 0 || Boolean(empty);
+      },
+      { timeout: 12_000 },
+    );
+  } catch {
+    console.warn(`warn: installed list rows not detected for theme=${theme}, capturing anyway`);
+  }
+
+  await page.evaluate(() => {
+    const main = document.querySelector('.agent-main, main.agent-main, main.workbench-main');
+    if (main instanceof HTMLElement) main.scrollTop = 0;
+    const list = document.querySelector('.agent-config-list');
+    if (list instanceof HTMLElement) list.scrollTop = 0;
+    const detail = document.querySelector('.agent-detail, aside.agent-detail');
+    if (detail instanceof HTMLElement) detail.scrollTop = 0;
+    window.scrollTo(0, 0);
   });
 
   // Extra settle time for CSS transitions, fonts, and lazy async chunks
