@@ -1247,7 +1247,7 @@ describe('AgentHubWorkbench', () => {
     expect(backIcon).toHaveAttribute('stroke-width', String(DESIGN_NAV_GLYPH_STROKE_WIDTH));
     expect(screen.getByRole('button', { name: '前进' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '刷新' })).toBeInTheDocument();
-    expect(screen.getByText('/demo-preview.html')).toBeInTheDocument();
+    expect(screen.getByText('about:blank')).toBeInTheDocument();
     expect(screen.getByText('只读预览')).toBeInTheDocument();
     expect(openEvidence).not.toHaveBeenCalledWith(expect.objectContaining({
       id: 'ev-artifact',
@@ -1266,7 +1266,7 @@ describe('AgentHubWorkbench', () => {
     expect(browserMenuItem).toBeDefined();
     fireEvent.click(browserMenuItem!);
     expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
-    expect(screen.getByText('/demo-preview.html')).toBeInTheDocument();
+    expect(screen.getByText('about:blank')).toBeInTheDocument();
   });
 
   it('routes subtask orchestration blocks to the inspector instead of the main chat stream', () => {

@@ -9,7 +9,11 @@ export type { FilePreviewProps } from './FilePreview';
 export { FilePreviewRouter } from './FilePreviewRouter';
 export type { FilePreviewRouterProps, PreviewFile } from './FilePreviewRouter';
 
-export { BrowserPreview } from './BrowserPreview';
+export {
+  BrowserPreview,
+  THEMED_BLANK_PREVIEW_SRCDOC,
+  isThemedBlankPreviewUrl,
+} from './BrowserPreview';
 export type { BrowserPreviewProps } from './BrowserPreview';
 
 export {
