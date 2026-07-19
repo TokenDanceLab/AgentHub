@@ -43,7 +43,7 @@ const builderEvidence: RuntimeEvidenceSnapshot = {
     { id: 'a4', runId: 'run-builder-1', threadId: 'builder', kind: 'md', path: 'B0-SQLITE-RISKS.md', sizeBytes: 290, createdAt: '2026-06-10T14:49:00Z' },
   ],
   previews: [
-    { id: 'p1', runId: 'run-builder-1', threadId: 'builder', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-10T14:49:00Z' },
+    { id: 'p1', runId: 'run-builder-1', threadId: 'builder', url: 'about:blank', status: 'ready', createdAt: '2026-06-10T14:49:00Z' },
   ],
 };
 
@@ -76,7 +76,7 @@ const teamRunEvidence: RuntimeEvidenceSnapshot = {
     { id: 't1', runId: 'run-teamrun-1', threadId: 'teamrun-fixture', kind: 'json', path: 'fixture/evidence-capture.json', sizeBytes: 4200, createdAt: '2026-06-10T10:11:00Z' },
   ],
   previews: [
-    { id: 'tp1', runId: 'run-teamrun-1', threadId: 'teamrun-fixture', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-10T10:11:00Z' },
+    { id: 'tp1', runId: 'run-teamrun-1', threadId: 'teamrun-fixture', url: 'about:blank', status: 'ready', createdAt: '2026-06-10T10:11:00Z' },
   ],
 };
 
@@ -97,7 +97,7 @@ const deployerEvidence: RuntimeEvidenceSnapshot = {
     { id: 'd2', runId: 'run-deployer-1', threadId: 'deployer', kind: 'conf', path: 'nginx/default.conf', sizeBytes: 420, createdAt: '2026-06-10T14:48:00Z' },
   ],
   previews: [
-    { id: 'dp1', runId: 'run-deployer-1', threadId: 'deployer', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-10T14:48:00Z' },
+    { id: 'dp1', runId: 'run-deployer-1', threadId: 'deployer', url: 'about:blank', status: 'ready', createdAt: '2026-06-10T14:48:00Z' },
   ],
 };
 
@@ -164,7 +164,7 @@ const projectAiEvidence: RuntimeEvidenceSnapshot = {
     { id: 'ai2', runId: 'run-project-ai-1', threadId: 'project-ai', kind: 'ts', path: 'game/asset-pipeline.ts', sizeBytes: 2800, createdAt: '2026-06-04T18:00:00Z' },
   ],
   previews: [
-    { id: 'aip1', runId: 'run-project-ai-1', threadId: 'project-ai', url: '/demo-preview.html', status: 'ready', createdAt: '2026-06-04T18:00:00Z' },
+    { id: 'aip1', runId: 'run-project-ai-1', threadId: 'project-ai', url: 'about:blank', status: 'ready', createdAt: '2026-06-04T18:00:00Z' },
   ],
 };
 

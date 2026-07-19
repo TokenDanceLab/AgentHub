@@ -343,7 +343,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   /* ── Deploy ── */
   {
     id: 'bdep1', kind: 'deploy', createdAt: T(26), author: B('builder'),
-    runId: 'run_builder_001', status: 'deployed', url: 'https://preview.example.com/deploy-f7c92a',
+    runId: 'run_builder_001', status: 'deployed', url: 'about:blank',
   },
 
   /* ── Context usage ── */
@@ -414,7 +414,8 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     previewId: 'preview_f7c92a',
     threadId: 'thread_builder_001',
     status: 'completed',
-    url: 'https://preview.example.com/deploy-f7c92a',
+    // Themed blank — never load external white placeholder pages (#1247)
+    url: 'about:blank',
   },
 
   /* ── Second preview (still running for testing the pending state) ── */
@@ -423,7 +424,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     previewId: 'preview_e2b890',
     threadId: 'thread_builder_001',
     status: 'running',
-    url: 'https://preview.example.com/deploy-e2b890',
+    url: 'about:blank',
   },
 
   /* ── Second approval (waiting state, exercises onApprove/onReject) ── */
