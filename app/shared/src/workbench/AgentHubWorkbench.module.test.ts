@@ -57,4 +57,17 @@ describe('AgentHubWorkbench CSS module contract', () => {
     expect(css).not.toMatch(/\.agentBlockRow\b/);
     expect(css).not.toMatch(/\.workspaceDataMode\b/);
   });
+
+  it('keeps the terminal dock under workspace + inspector only (not rail/sidebar)', () => {
+    const cssPath = path.resolve(process.cwd(), '../shared/src/workbench/AgentHubWorkbench.module.css');
+    const css = readFileSync(cssPath, 'utf8');
+
+    // Dock spans shell columns 3–4 (workspace + inspector), not full width over channel list.
+    expect(css).toMatch(/\.terminalDock\s*\{[^}]*grid-column:\s*3\s*\/\s*-1;/s);
+    expect(css).not.toMatch(/\.terminalDock\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
+
+    // Left chrome keeps full height beside the dock so conversation cards are not shortened.
+    expect(css).toMatch(/\.rail\s*\{[^}]*grid-row:\s*1\s*\/\s*-1;/s);
+    expect(css).toMatch(/\.sidebarFrame\s*\{[^}]*grid-row:\s*1\s*\/\s*-1;/s);
+  });
 });
