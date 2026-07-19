@@ -1,6 +1,9 @@
 /**
- * P74 Visual QA — Web shell capture matrix (#1199 / #1219)
+ * P74 Visual QA — Web shell capture matrix (#1199 / #1219 / #1242)
  * Viewport 1440x810 · themes light+dark · authenticated mock hub
+ *
+ * Captures the frosted Agents page surface (glass chrome from #1226/#1235),
+ * not only bare chat workbench.
  *
  * Usage (from app/web):
  *   node scripts/visual-qa-shell.mjs
@@ -29,6 +32,9 @@ const themes = ['light', 'dark'];
 const THEME_KEY_V4 = 'agenthub-v4-theme';
 const THEME_KEY_LEGACY = 'agenthub-theme';
 const WORKBENCH_SHELL = '[data-testid="agenthub-workbench"]';
+// Frosted Agents page surface (#1226 / #1242) — prefer over bare chat workbench.
+const AGENTS_PAGE = 'section.agents-page, .agents-page';
+const AGENTS_RAIL_BUTTON = 'nav[aria-label="Global rail"] button[aria-label="Agent"]';
 const hubUrlPattern =
   /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
@@ -259,6 +265,27 @@ async function captureTheme(browser, theme) {
     );
   }
 
+  // Navigate to Agents via global rail so capture shows frosted page chrome
+  // (Agents list glass from #1226/#1235), not only bare chat workbench (#1242).
+  try {
+    const agentsRail = page.locator(AGENTS_RAIL_BUTTON).first();
+    await agentsRail.waitFor({ state: 'visible', timeout: 10_000 });
+    await agentsRail.click();
+    await page.waitForSelector(AGENTS_PAGE, { state: 'visible', timeout: 15_000 });
+  } catch {
+    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810-AGENTS-DIAGNOSTIC.png`);
+    await page.screenshot({ path: diagFile, fullPage: false });
+    const pageUrl = page.url();
+    const bodyText = await page.evaluate(() =>
+      (document.body?.innerText ?? '(no body)').slice(0, 500),
+    );
+    throw new Error(
+      `Agents frosted page not visible for theme=${theme}. ` +
+        `URL: ${pageUrl}. Body: ${bodyText.slice(0, 200)}. ` +
+        `Diagnostic: ${diagFile}`,
+    );
+  }
+
   // Re-apply theme attributes after React hydration to guarantee correctness
   await page.evaluate(
     ({ v4Key, legacyKey, theme: t }) => {
@@ -278,7 +305,8 @@ async function captureTheme(browser, theme) {
       const bg = window.getComputedStyle(body).backgroundColor;
       // Reject pure-black background (often means CSS not loaded or crash)
       if (bg === 'rgb(0, 0, 0)' || bg === 'rgba(0, 0, 0, 1)') return false;
-      return true;
+      // Require Agents page chrome so we do not capture bare chat by accident
+      return Boolean(document.querySelector('section.agents-page, .agents-page'));
     },
     { timeout: 15_000 },
   ).catch(() => {
