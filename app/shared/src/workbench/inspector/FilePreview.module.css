@@ -10,11 +10,13 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 0;
-  border-radius: 0;
-  background: var(--surface);
+  border: 1px solid var(--glass-border, transparent);
+  border-radius: var(--r-lg);
+  background: var(--glass-panel, var(--surface));
   overflow: hidden;
-  box-shadow: none;
+  box-shadow: var(--glass-elev-1);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   animation: editorIn var(--dur-medium) var(--ease-spring);
 }
 
@@ -22,12 +24,12 @@
 .toolbar {
   min-height: 40px;
   padding: 6px 8px 5px 10px;
-  border-bottom: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--sp-xxs);
-  background: var(--surface);
+  background: var(--glass-bg-light, var(--surface));
 }
 
 /* ── File title block (icon + name + type) ── */
@@ -284,12 +286,12 @@
 .meta {
   min-height: 22px;
   padding: 0 var(--sp-10);
-  border-bottom: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--glass-border, var(--bdr));
   display: flex;
   align-items: center;
   gap: 7px;
   color: var(--text-3);
-  background: color-mix(in srgb, var(--surface-low) 62%, var(--surface) 38%);
+  background: var(--glass-bg-subtle, color-mix(in srgb, var(--surface-low) 62%, var(--surface) 38%));
   font: 500 0.625rem var(--font-sans);
   overflow: hidden;
 }
