@@ -149,7 +149,7 @@ describe('unifiedComposerHostHelpers', () => {
     expect(model.attachment?.uploadProgresses?.a1.percent).toBe(10);
     expect(model.agentOptions).toHaveLength(1);
     expect(model.targetPicker?.executionTargetId).toBe('t1');
-    expect(model.statusItems).toContain('Data: approved-real');
+    expect(model.statusItems).toContain('数据：真实数据');
   });
 
   it('builds host view-model with derived labels and chrome', () => {
@@ -172,8 +172,8 @@ describe('unifiedComposerHostHelpers', () => {
     expect(vm.submitDisabled).toBe(true);
     expect(vm.selectedAgentLabel).toBe('@Builder');
     expect(vm.availableMentionOptions).toHaveLength(1);
-    expect(vm.statusItems).toContain('Data: approved-real');
-    expect(vm.statusItems).toContain('Select a Desktop/Edge target before starting.');
+    expect(vm.statusItems).toContain('数据：真实数据');
+    expect(vm.statusItems).toContain('请先选择执行目标再开始。');
     expect(vm.mainchainTask).toBe('draft required');
     expect(vm.hasMentions).toBe(true);
     expect(vm.inputPlaceholder).toBe('发消息给 AgentHub');

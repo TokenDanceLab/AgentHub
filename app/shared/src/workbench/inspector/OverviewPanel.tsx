@@ -70,8 +70,9 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
   dagNodes,
   onFileClick,
 }) => {
+  /* P76: single primary card — tasks open by default; files collapsed until needed. */
   const [tasksOpen, setTasksOpen] = useState(true);
-  const [filesOpen, setFilesOpen] = useState(true);
+  const [filesOpen, setFilesOpen] = useState(false);
 
   const toggleTasks = useCallback(() => setTasksOpen((v) => !v), []);
   const toggleFiles = useCallback(() => setFilesOpen((v) => !v), []);

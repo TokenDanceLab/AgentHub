@@ -7,7 +7,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--wb-gap-sm, var(--space-md));
 }
 
 /* ── Run result banner ── */

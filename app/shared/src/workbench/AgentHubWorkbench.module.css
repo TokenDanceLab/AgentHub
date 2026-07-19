@@ -2512,12 +2512,12 @@
   display: block;
 }
 
-/* ═══ Overview content wrapper ═══ */
+/* ═══ Overview content wrapper (P76 denser stack) ═══ */
 
 .overviewContent {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--wb-gap-xs, var(--sp-sm));
 }
 
 /* ── Context usage (Overview) ── */
@@ -2589,12 +2589,7 @@
   color: var(--text-2);
 }
 
-/* ── Overview content wrapper ── */
-.overviewContent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
+/* ── Overview content wrapper (alias kept single-source above) ── */
 
 /* ═══ Deploy Status Bar (Browser tab) ═══ */
 .deployStatusBar {

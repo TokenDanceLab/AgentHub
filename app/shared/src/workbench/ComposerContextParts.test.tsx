@@ -80,10 +80,10 @@ describe('ComposerContextParts', () => {
       />,
     );
     expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('Target missing')).toBeInTheDocument();
-    expect(screen.getByText('Task draft required')).toBeInTheDocument();
+    expect(screen.getByText('目标未选')).toBeInTheDocument();
+    expect(screen.getByText('需填写内容')).toBeInTheDocument();
 
-    render(<ComposerStatusStrip statusItems={['Data: approved-real']} />);
-    expect(screen.getByText('Data: approved-real')).toBeInTheDocument();
+    render(<ComposerStatusStrip statusItems={['数据：真实数据']} />);
+    expect(screen.getByText('数据：真实数据')).toBeInTheDocument();
   });
 });

@@ -76,4 +76,18 @@ describe('ChatViewTranscript CSS contract', () => {
     expect(metaRule).not.toMatch(/\bbackground\s*:/);
     expect(detailRule).toMatch(/\btext-overflow\s*:\s*ellipsis/);
   });
+
+  it('uses dense row rhythm tokens for transcript messages (P76 #1311)', () => {
+    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
+    const css = readFileSync(cssPath, 'utf8');
+    const rowRule = cssRule(css, '.grp-row');
+    const contentRule = cssRule(css, '.grp-content');
+
+    expect(rowRule).toMatch(/margin-bottom\s*:\s*var\(--sp-md\)/);
+    expect(rowRule).toMatch(/gap\s*:\s*var\(--sp-sm\)/);
+    expect(contentRule).toMatch(/gap\s*:\s*var\(--sp-2\)/);
+    /* Full-file match: cssRule hits first `.user-bubble` under `.grp-content >` (align only). */
+    expect(css).toMatch(/\.user-bubble\s*\{[^}]*padding\s*:\s*var\(--sp-xxs\)\s+var\(--sp-sm\)/);
+    expect(css).toMatch(/\.agent-bubble\s*\{[^}]*padding\s*:\s*var\(--sp-xxs\)\s+var\(--sp-sm\)/);
+  });
 });

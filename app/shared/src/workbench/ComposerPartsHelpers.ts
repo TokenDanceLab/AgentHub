@@ -26,19 +26,21 @@ export function formatMentionChipLabel(mention: ComposerMention): string {
 }
 
 export function formatMainchainAgentLabel(selectedAgentLabel: string): string {
-  return `Agent ${selectedAgentLabel}`;
+  const label = selectedAgentLabel.trim();
+  if (!label) return 'Agent 未选';
+  return label.startsWith('@') ? `Agent ${label}` : `Agent @${label}`;
 }
 
 export function formatMainchainTargetLabel(
   selectedTargetLabel: string | undefined,
 ): string {
-  return `Target ${selectedTargetLabel ?? 'missing'}`;
+  return selectedTargetLabel ? `目标 ${selectedTargetLabel}` : '目标未选';
 }
 
 export function formatMainchainTaskLabel(
   mainchainTask: 'ready' | 'draft required',
 ): string {
-  return `Task ${mainchainTask}`;
+  return mainchainTask === 'ready' ? '任务就绪' : '需填写内容';
 }
 
 export function mainchainDataState(
@@ -50,7 +52,7 @@ export function mainchainDataState(
 export function agentPickerPlaceholder(
   availableCount: number,
 ): string {
-  return availableCount > 0 ? 'Mention agent' : 'All agents mentioned';
+  return availableCount > 0 ? '选择 Agent' : '已全部提及';
 }
 
 export function formatAgentOptionLabel(agent: ComposerMention): string {
@@ -60,7 +62,7 @@ export function formatAgentOptionLabel(agent: ComposerMention): string {
 export function targetPickerPlaceholder(
   availableCount: number,
 ): string {
-  return availableCount > 0 ? 'Select target' : 'No online target';
+  return availableCount > 0 ? '选择执行目标' : '无在线目标';
 }
 
 export interface ComposerAttachmentChipViewModel {

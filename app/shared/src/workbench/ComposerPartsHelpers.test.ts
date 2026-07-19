@@ -36,19 +36,19 @@ describe('ComposerPartsHelpers', () => {
     );
     expect(formatMentionChipLabel({ id: 'a1', label: 'Builder' })).toBe('@Builder');
     expect(formatMainchainAgentLabel('@Builder')).toBe('Agent @Builder');
-    expect(formatMainchainTargetLabel(undefined)).toBe('Target missing');
-    expect(formatMainchainTargetLabel('Desktop')).toBe('Target Desktop');
-    expect(formatMainchainTaskLabel('ready')).toBe('Task ready');
-    expect(formatMainchainTaskLabel('draft required')).toBe('Task draft required');
+    expect(formatMainchainTargetLabel(undefined)).toBe('目标未选');
+    expect(formatMainchainTargetLabel('Desktop')).toBe('目标 Desktop');
+    expect(formatMainchainTaskLabel('ready')).toBe('任务就绪');
+    expect(formatMainchainTaskLabel('draft required')).toBe('需填写内容');
     expect(mainchainDataState(true)).toBe('selected');
     expect(mainchainDataState(false)).toBe('missing');
   });
 
   it('builds picker placeholders and agent option labels', () => {
-    expect(agentPickerPlaceholder(0)).toBe('All agents mentioned');
-    expect(agentPickerPlaceholder(2)).toBe('Mention agent');
-    expect(targetPickerPlaceholder(0)).toBe('No online target');
-    expect(targetPickerPlaceholder(1)).toBe('Select target');
+    expect(agentPickerPlaceholder(0)).toBe('已全部提及');
+    expect(agentPickerPlaceholder(2)).toBe('选择 Agent');
+    expect(targetPickerPlaceholder(0)).toBe('无在线目标');
+    expect(targetPickerPlaceholder(1)).toBe('选择执行目标');
 
     const withRuntime: ComposerMention = {
       id: 'profile-builder',

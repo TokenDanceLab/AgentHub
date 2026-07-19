@@ -42,13 +42,13 @@ describe('unifiedComposerHelpers', () => {
       targetSelectionRequired: true,
       executionTargetId: '',
       executionTargets: [],
-    })).toBe('No online Desktop/Edge target is available.');
+    })).toBe('当前无在线执行目标。');
 
     expect(resolveTargetStatus({
       targetSelectionRequired: true,
       executionTargetId: '',
       executionTargets: [{ id: 't1', label: 'Desktop' }],
-    })).toBe('Select a Desktop/Edge target before starting.');
+    })).toBe('请先选择执行目标再开始。');
 
     expect(buildComposerStatusItems({
       status: {
@@ -59,8 +59,8 @@ describe('unifiedComposerHelpers', () => {
       },
       targetStatus: undefined,
     })).toEqual([
-      'Data: approved-real',
-      'Target: ready - Alpha Desktop (target-local-edge-1)',
+      '数据：真实数据',
+      '目标：就绪 · Alpha Desktop (target-local-edge-1)',
       'Hub replay: 2 runtime events observed',
     ]);
   });
@@ -167,8 +167,8 @@ describe('unifiedComposerHelpers', () => {
     expect(derived.submitDisabled).toBe(true);
     expect(derived.selectedAgentLabel).toBe('@Builder');
     expect(derived.availableMentionOptions).toHaveLength(1);
-    expect(derived.statusItems).toContain('Data: approved-real');
-    expect(derived.statusItems).toContain('Select a Desktop/Edge target before starting.');
+    expect(derived.statusItems).toContain('数据：真实数据');
+    expect(derived.statusItems).toContain('请先选择执行目标再开始。');
     expect(derived.mainchainTask).toBe('draft required');
   });
 });

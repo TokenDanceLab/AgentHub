@@ -15,7 +15,8 @@ describe('InspectorTabChrome', () => {
       'browser',
       'files',
     ]);
-    expect([...defaultVisibleTabs]).toEqual(['overview', 'browser', 'files']);
+    /* P76: default primary card is overview only; browser/files open on demand. */
+    expect([...defaultVisibleTabs]).toEqual(['overview']);
   });
 
   it('labels tabs through the same i18n keys as before', () => {
