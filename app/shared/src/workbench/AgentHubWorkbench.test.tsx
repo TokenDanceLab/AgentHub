@@ -1838,8 +1838,8 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
 
     const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
-    const emptyState = within(page).getByRole('region', { name: '暂无 Agent Profile' });
-    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装 Agent。')).toBeInTheDocument();
+    const emptyState = within(page).getByRole('region', { name: '暂无已安装 Agent' });
+    expect(within(emptyState).getByText('当前 Hub 账号还没有已安装配置。')).toBeInTheDocument();
     expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
 
     fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
@@ -1876,10 +1876,10 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '安装' })[0]!);
 
     const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
-    expect(within(page).getAllByText('Target: local_edge · fixture-local-edge').length).toBeGreaterThan(0);
+    expect(within(page).getAllByText('目标：local_edge · fixture-local-edge').length).toBeGreaterThan(0);
     expect(within(page).getByDisplayValue('local_edge · fixture-local-edge')).toBeInTheDocument();
     expect(within(page).getByDisplayValue('ask-before-write')).toBeInTheDocument();
-    expect(within(page).getByText('Memory disabled')).toBeInTheDocument();
+    expect(within(page).getByText('记忆未启用')).toBeInTheDocument();
   });
 
   it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
@@ -1904,7 +1904,7 @@ describe('AgentHubWorkbench', () => {
     const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
     const agentsAlert = within(agentsPage).getByRole('alert', { name: 'Agent 加载失败' });
     expect(agentsAlert).toHaveTextContent('Hub AgentProfiles unavailable');
-    expect(within(agentsPage).queryByRole('region', { name: '暂无 Agent Profile' })).not.toBeInTheDocument();
+    expect(within(agentsPage).queryByRole('region', { name: '暂无已安装 Agent' })).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
 
