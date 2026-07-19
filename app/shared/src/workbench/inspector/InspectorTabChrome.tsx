@@ -32,7 +32,8 @@ export function getInspectorTabs(t: (key: string) => string): InspectorTabDef[] 
   ];
 }
 
-export const defaultVisibleTabs = new Set<InspectorMode>(['overview', 'browser', 'files']);
+/** P76: overview is the single default primary card; browser/files open on demand. */
+export const defaultVisibleTabs = new Set<InspectorMode>(['overview']);
 
 export function getQuickOpenItems(t: (key: string) => string) {
   return [

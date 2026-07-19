@@ -97,6 +97,8 @@ export function RightInspector({
 
   const handleFileClick = useCallback((file: FileItem) => {
     setPreviewFile(resolveFileClickTarget(overviewFiles, file));
+    /* P76: files tab is on-demand — restore it when opening a file from overview. */
+    setVisibleTabs((current) => withInspectorTab(current, 'files'));
     setActiveMode('files');
   }, [overviewFiles]);
 
@@ -127,6 +129,7 @@ export function RightInspector({
 
   const handleOpenDiff = useCallback((file: FileDiff) => {
     setPreviewFile(planOpenDiffPreview(file, runtimeEvidence?.runId, workDir));
+    setVisibleTabs((current) => withInspectorTab(current, 'files'));
     setActiveMode('files');
   }, [runtimeEvidence?.runId, workDir]);
 

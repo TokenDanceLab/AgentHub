@@ -13,6 +13,7 @@ Issue: #1199 (P74) · SSOT ownership: #1286 · HiDPI extension: #1308 (P75)
 | **P74/P75 gate matrix (current)** | `app/web/scripts/visual-qa-shell.mjs` · `app/desktop/scripts/visual-qa-shell.mjs` | **1440×810** (16:9) | light + dark | **1x default** |
 | Package entry (1x) | `pnpm --filter agenthub-{web,desktop} visual:qa:shell` | same | same | 1 |
 | Package entry (2x optional) | `pnpm --filter agenthub-{web,desktop} visual:qa:shell:2x` | same | same | 2 (`VISUAL_QA_DPR=2`) |
+| Chat path (P76 optional) | `pnpm --filter agenthub-{web,desktop} visual:qa:chat` | **1440×810** | light + dark | 1x default · **not** merge gate |
 | Score rubric (this file) | `docs/analysis/visual-qa-scorecard.md` | — | min of four 1x shots | — |
 | **Optional / legacy multi-scene battery** | `app/web/scripts/visual-qa.mjs` | broader scenes (incl. historical 1440×920 names) | **not** the merge gate | — |
 
@@ -76,6 +77,14 @@ pnpm --filter agenthub-web exec node scripts/visual-qa-shell.mjs
 ```
 
 Package scripts: `pnpm --filter agenthub-desktop visual:qa:shell` · `pnpm --filter agenthub-web visual:qa:shell`.
+
+**Chat path (P76 #1314, optional density review — not merge gate):**
+
+```bash
+pnpm --filter agenthub-desktop visual:qa:chat
+pnpm --filter agenthub-web visual:qa:chat
+# outputs: app/{desktop,web}/screenshots/visual-qa/*-chat-*-1440x810.png
+```
 
 Playwright configs already pin **1440×810** (`app/{desktop,web}/playwright.config.ts`).
 

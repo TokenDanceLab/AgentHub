@@ -133,7 +133,7 @@ describe('unifiedComposerHostViewModel', () => {
     expect(model.attachment?.uploadProgresses?.a1.percent).toBe(10);
     expect(model.agentOptions).toHaveLength(1);
     expect(model.targetPicker?.executionTargetId).toBe('t1');
-    expect(model.statusItems).toContain('Data: approved-real');
+    expect(model.statusItems).toContain('数据：真实数据');
   });
 
   it('builds host view-model and combined host state', () => {

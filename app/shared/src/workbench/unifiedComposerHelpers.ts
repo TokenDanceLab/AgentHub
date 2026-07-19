@@ -62,9 +62,9 @@ export function resolveTargetStatus(params: {
   const { targetSelectionRequired, executionTargetId, executionTargets } = params;
   if (!targetSelectionRequired || executionTargetId) return undefined;
   if (executionTargets && executionTargets.length > 0) {
-    return 'Select a Desktop/Edge target before starting.';
+    return '请先选择执行目标再开始。';
   }
-  return 'No online Desktop/Edge target is available.';
+  return '当前无在线执行目标。';
 }
 
 export function filterAvailableMentionOptions(
@@ -75,15 +75,53 @@ export function filterAvailableMentionOptions(
   return mentionableAgents.filter((agent) => !selectedMentionIds.has(agent.id));
 }
 
+/** Map internal dataMode codes to Chinese product labels (P76). */
+export function formatComposerDataModeLabel(dataMode: string): string {
+  switch (dataMode) {
+    case 'approved-real':
+      return '真实数据';
+    case 'observed':
+      return '观测数据';
+    case 'fixture':
+      return '示例数据';
+    case 'mock':
+      return '模拟数据';
+    case 'auto':
+      return '自动';
+    default:
+      return dataMode;
+  }
+}
+
+/** Map target readiness codes to Chinese product labels (P76). */
+export function formatComposerTargetStateLabel(targetState: string): string {
+  switch (targetState) {
+    case 'ready':
+      return '就绪';
+    case 'offline':
+      return '离线';
+    case 'busy':
+      return '忙碌';
+    case 'error':
+      return '异常';
+    default:
+      return targetState;
+  }
+}
+
 export function buildComposerStatusItems(params: {
   status: ComposerStatusHints | undefined;
   targetStatus: string | undefined;
 }): string[] {
   const { status, targetStatus } = params;
   return [
-    status?.dataMode ? `Data: ${status.dataMode}` : undefined,
+    status?.dataMode
+      ? `数据：${formatComposerDataModeLabel(status.dataMode)}`
+      : undefined,
     status?.targetState
-      ? `Target: ${status.targetState}${status.targetLabel ? ` - ${status.targetLabel}` : ''}`
+      ? `目标：${formatComposerTargetStateLabel(status.targetState)}${
+          status.targetLabel ? ` · ${status.targetLabel}` : ''
+        }`
       : undefined,
     status?.replayLabel,
     targetStatus,
