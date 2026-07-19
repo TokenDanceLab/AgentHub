@@ -11,13 +11,16 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--surface-high);
-  border: 1px solid var(--bdr);
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
   transition: background 0.15s;
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
 }
 
 .memberCard:hover {
-  background: var(--surface-hover);
+  background: var(--glass-bg-medium);
 }
 
 .memberAvatar {
@@ -27,7 +30,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--glass-bg-medium);
   color: var(--text-2);
   flex-shrink: 0;
 }
