@@ -55,4 +55,19 @@ describe('workbenchAgentMapping', () => {
     expect(config.state).toBe('ready');
     expect(config.skills).toEqual(['docs']);
   });
+
+  it('keeps role free of Runtime/Model stuffing (#1285)', () => {
+    const config = workbenchAgentToAgentConfig(baseAgent({
+      description: '审查高风险补丁',
+      runtimeId: 'codex',
+      provider: 'openai',
+      model: 'gpt-5.5',
+    }));
+
+    expect(config.role).toBe('审查高风险补丁');
+    expect(config.role).not.toMatch(/\bRuntime\s*:/i);
+    expect(config.role).not.toMatch(/\bModel\s*:/i);
+    expect(config.engine).toBe('codex');
+    expect(config.model).toBe('openai / gpt-5.5');
+  });
 });
