@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 through score residual #1221–#1223 · MASTER #1224
+> **Merged program PRs**: Phases 1–73 · P74 through residual #1225–#1228 / PRs #1229–#1232
 
 ## Two task surfaces (do not mix)
 
@@ -31,30 +31,28 @@
 
 ## References
 
-- [engineering-loop-capability-map](../analysis/engineering-loop-capability-map.md)
-- [07-design-system-ssot](../architecture/07-design-system-ssot.md)
 - [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
 - [visual-qa-score-2026-07-19-rescore](../analysis/visual-qa-score-2026-07-19-rescore.md)
+- [visual-qa-score-2026-07-19-rescore-2](../analysis/visual-qa-score-2026-07-19-rescore-2.md)
+- [07-design-system-ssot](../architecture/07-design-system-ssot.md)
 
 ## Milestones
 
 | Phase | Name | Milestone | Status |
 |:------|:-----|:----------|:-------|
-| 1–72 | Baseline + residual + loop foundations | #22–#93 | closed |
-| 73 | Host ports + import entry | #94 | closed |
-| 74 | Light frosted glass + Visual QA | #95 | active (post-rescore residual open) |
+| 1–73 | Baseline through host ports | #22–#94 | closed |
+| 74 | Light frosted glass + Visual QA | #95 | active (rescore-2 residual open) |
 
 ## Issue Mapping (summary)
 
 | Range | Status |
 |:------|:-------|
-| #1197–#1216 foundation · consumers · capture | closed |
-| #1217–#1219 / PRs #1221–#1223 score residual | closed |
-| #1220 / PR #1224 MASTER hygiene | closed |
-| #1225 empty transcript glass | open |
-| #1226 Web page-module glass | open |
-| #1227 dark empty ambient | open |
-| #1228 rescore notes + MASTER tip | open (this) |
+| #1197–#1224 foundation · consumers · score residual 1 | closed |
+| #1225–#1228 empty/web/dark/notes | closed PRs #1229–#1232 |
+| #1233 browser/preview glass void | open |
+| #1234 light main canvas white frost | open |
+| #1235 Web shell frost catch-up | open |
+| #1236 rescore-2 notes + MASTER | open (this) |
 
 ## Quick Status Commands
 
@@ -68,33 +66,33 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [ ] Phase 74 light frosted glass + Visual QA (rescore gate min≈61; residual #1225–#1227)
+- [ ] Phase 74 frosted glass + Visual QA (gate min≈64; residual #1233–#1235)
 
 ## Current Status
 
 **Active Phase**: 74 (visual score loop)
-**Active Tasks**: #1225 empty center · #1226 web page glass · #1227 dark ambient
+**Active Tasks**: #1233 preview glass · #1234 light canvas frost · #1235 web shell catch-up
 **Blockers**: None
-**Product tip**: `540b9808`
-**Rescore gate**: min≈**61**/100 (Desktop light 70 · dark 65 · Web light 64 · dark 61) — was ~55–58
+**Product tip**: `6cf91f30`
+**Rescore-2 gate**: min≈**64**/100 (D-light 73 · D-dark 69 · W-light 66 · W-dark 64)
 **Visual north star**: light white frosted glass, dense spacing, micro-motion, screenshot score loop
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Empty transcript / welcome glass (#1225)
-2. Web Agents/list chrome glass (#1226)
-3. Dark empty ambient (#1227)
+1. Browser/preview pane glass frame (#1233)
+2. Light main canvas white frost (#1234)
+3. Web shell catch-up (#1235)
 4. Re-capture → re-score until Ship ≥85
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-19 | lead | Rescore min≈61; open residual #1225–#1227; notes #1228 |
-| 2026-07-19 | lead | Score residual closed #1221–#1223; MASTER #1224 |
+| 2026-07-19 | lead | Rescore-2 min≈64; open #1233–#1235; notes #1236 |
+| 2026-07-19 | lead | Residual wave #1225–#1228 closed (#1229–#1232) |
 
 ## Completion notes
 
-- P74 foundation + chrome consumers + score residual landed.
-- Gate still Block; highest weight: empty center, web page modules, dark voids.
+- Gate climbed ~55 → 61 → 64; still Block.
+- Highest weight: pure white browser void · muddy light canvas · Web lag.
