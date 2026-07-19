@@ -27,8 +27,8 @@ function textBlock(id = 'b1'): TranscriptBlock {
 }
 
 describe('workbenchFrameHelpers', () => {
-  it('keeps default browser preview URL stable', () => {
-    expect(DEFAULT_BROWSER_PREVIEW_URL).toBe('/demo-preview.html');
+  it('keeps default browser preview URL as themed blank', () => {
+    expect(DEFAULT_BROWSER_PREVIEW_URL).toBe('about:blank');
   });
 
   it('maps booleans to shell data attrs', () => {
