@@ -26,7 +26,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:tests": "tsc --noEmit -p tsconfig.json",
     "storybook": "storybook dev -p 6006",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "test:e2e:geometry-smoke": "playwright test --config playwright.config.ts --project=chromium geometry-smoke.spec.ts"
   },
   "dependencies": {
     "@lobehub/icons": "^5.10.0",
