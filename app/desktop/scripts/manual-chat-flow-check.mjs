@@ -148,8 +148,7 @@ try {
       const text = message.text();
       if (
         !text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") &&
-        !text.includes('the server responded with a status of 503') &&
-        !text.includes("Framing 'https://preview.example.com/' violates")
+        !text.includes('the server responded with a status of 503')
       ) {
         console.log(`[browser:${message.type()}] ${text}`);
       }
