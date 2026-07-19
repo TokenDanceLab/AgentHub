@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AgentsPage.module.css — AgentHub v4
-   6 sub-views: 已安装 / Agent 市场 / 运行策略 / 工具权限 / 模型配置 / 审计日志
+   8 sub-views: 已安装 / Agent 市场 / Skill 市场 / MCP 市场 /
+               运行策略 / 工具权限 / 模型配置 / 审计日志
    Uses ONLY v4 CSS custom properties. Never hardcodes color values.
+   Glass chrome (#1226) — panels/cards use --glass-* / Card glass.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Page shell & nav ── */
@@ -15,7 +17,9 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--glass-panel, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--text-1);
 }
 
@@ -31,7 +35,9 @@
   padding: var(--wb-main-y) var(--wb-main-x);
   overflow-x: hidden;
   overflow-y: auto;
-  background: var(--surface);
+  background: var(--glass-panel, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   scrollbar-width: thin;
   scrollbar-color: var(--text-3) transparent;
 }
@@ -42,8 +48,10 @@
   width: var(--wb-nav);
   flex: 0 0 var(--wb-nav);
   padding: 26px 12px 14px;
-  border-right: 1px solid var(--bdr);
-  background: var(--surface-low);
+  border-right: 1px solid var(--glass-border, var(--bdr));
+  background: var(--glass-panel, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--text-3) transparent;
@@ -60,9 +68,11 @@
   height: 40px;
   margin: 0 0 var(--sp-10);
   padding: 0 var(--sp-14);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--glass-input-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--text-1);
   outline: none;
   font: 400 0.875rem var(--font-sans);
@@ -145,6 +155,7 @@
 .doc-shortcut:hover {
   background: var(--surface-high);
   color: var(--text-1);
+}
 }
 
 /* ── Workbench head ── */
@@ -230,9 +241,12 @@
 .agent-stat {
   min-height: 72px;
   padding: var(--space-md) var(--sp-14);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--glass-card-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -240,8 +254,8 @@
 }
 
 .agent-stat:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
 }
 
 .agent-stat span {
@@ -282,9 +296,12 @@
 
 .agent-section {
   min-width: 0;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-card-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   padding: var(--sp-14);
   transition:
     background var(--dur-normal) var(--ease),
@@ -293,8 +310,8 @@
 }
 
 .agent-section:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
 }
 
 .section-title-row {
@@ -598,9 +615,12 @@
 /* ── Agent detail (edit panel) ── */
 
 .agent-detail {
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-card-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   padding: var(--sp-md);
   min-width: 0;
   overflow: hidden;
@@ -617,8 +637,8 @@
 }
 
 .agent-detail:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
 }
 
 .detail-head {
@@ -668,9 +688,11 @@
   min-height: 36px;
   margin: var(--space-md) 0 var(--sp-xs);
   padding: 0 var(--sp-10);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface-low);
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   display: grid;
   grid-template-columns: 9px 18px minmax(0, 1fr) minmax(0, auto);
   align-items: center;
@@ -835,9 +857,11 @@
 .agent-edit-grid label {
   min-height: 58px;
   padding: var(--sp-sm) var(--sp-10);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface-low);
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--text-3);
   display: flex;
   flex-direction: column;
@@ -1139,9 +1163,11 @@
   width: 320px;
   height: 38px;
   padding: 0 13px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--glass-input-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--text-1);
   outline: none;
   font: 400 0.8125rem var(--font-sans);
@@ -1211,21 +1237,26 @@
 .market-card {
   min-height: 190px;
   padding: var(--sp-md);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface-low);
+  background: var(--glass-card-bg, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   display: flex;
   flex-direction: column;
   gap: 9px;
   transition: box-shadow var(--dur-medium) var(--ease),
     background var(--dur-normal) var(--ease),
-    border-color var(--dur-normal) var(--ease);
+    border-color var(--dur-normal) var(--ease),
+    transform var(--dur-normal) var(--ease);
 }
 
 .market-card:hover {
-  background: var(--surface);
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  background: var(--glass-card-bg, var(--surface));
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
+  transform: var(--glass-hover-lift);
 }
 
 .market-card-head {
@@ -1511,9 +1542,11 @@
 .policy-note {
   margin-top: var(--sp-14);
   padding: 11px 12px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface-low);
+  background: var(--glass-bg-light, var(--surface-low));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .policy-note strong {
@@ -1662,9 +1695,12 @@
 /* ── cc-switch proxy status ── */
 
 .ccswitch-section {
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-card-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   padding: var(--sp-14);
   margin-bottom: var(--sp-14);
   transition:
@@ -1674,8 +1710,8 @@
 }
 
 .ccswitch-section:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2);
 }
 
 .ccswitch-badge {
@@ -1793,19 +1829,24 @@
 .model-card {
   min-height: 126px;
   padding: var(--sp-14);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-card-bg, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: var(--space-md);
   align-items: flex-start;
   transition:
-    box-shadow var(--dur-medium) var(--ease);
+    box-shadow var(--dur-medium) var(--ease),
+    transform var(--dur-normal) var(--ease);
 }
 
 .model-card:hover {
-  box-shadow: var(--e-2);
+  box-shadow: var(--glass-elev-2);
+  transform: var(--glass-hover-lift);
 }
 
 .model-card h2 {
@@ -2013,6 +2054,11 @@
   .audit-row {
     transition: none;
   }
+
+  .market-card:hover,
+  .model-card:hover {
+    transform: none;
+  }
 }
 
 .audit-row time {
@@ -2124,5 +2170,4 @@
 .transport-badge {
   background: var(--success-bg);
   color: var(--success);
-}
 }
