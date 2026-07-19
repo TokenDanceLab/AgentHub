@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 through #1251–#1252 / PRs #1253–#1254
+> **Merged program PRs**: Phases 1–73 · P74 through #1255–#1256 / PRs #1259–#1260
 
 ## Two task surfaces (do not mix)
 
@@ -27,7 +27,7 @@
 ## GitHub Resources
 
 - **Project Board**: https://github.com/users/DeliciousBuding/projects/6
-- **Phase 74**: `gh issue list -R TokenDanceLab/AgentHub --milestone 95 --state open`
+- **Phase 74**: `gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 74: Light frosted glass system + Visual QA" --state open`
 
 ## References
 
@@ -46,15 +46,17 @@
 
 | Range | Status |
 |:------|:-------|
-| #1197–#1252 foundation through dark blank + notes | closed |
-| #1255 Agents detail form glass | open |
-| #1256 Terminal/inspector empty glass | open |
-| #1257 MASTER tip (this) | open |
+| #1197–#1256 foundation through empty glass residual | closed |
+| #1257 MASTER tip (prior) | closed |
+| #1261 list + mainchain density | open |
+| #1262 composer micro-motion | open |
+| #1263 focus ring a11y | open |
+| #1264 MASTER tip (this) | open |
 
 ## Quick Status Commands
 
 ```bash
-gh issue list -R TokenDanceLab/AgentHub --milestone 95 --state open
+gh issue list -R TokenDanceLab/AgentHub --milestone "Phase 74: Light frosted glass system + Visual QA" --state open
 git rev-parse --short origin/master
 cd app && pnpm --filter agenthub-desktop visual:qa:shell
 cd app && pnpm --filter agenthub-web visual:qa:shell
@@ -63,33 +65,34 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [ ] Phase 74 frosted glass + Visual QA (gate min~72–78 Iterate; residual #1255–#1256)
+- [ ] Phase 74 frosted glass + Visual QA (gate min~70–78 Iterate; residual #1261–#1263)
 
 ## Current Status
 
 **Active Phase**: 74 (visual score loop)
-**Active Tasks**: #1255 Agents form glass · #1256 empty panels glass
+**Active Tasks**: #1261 density · #1262 micro-motion · #1263 focus a11y
 **Blockers**: None
-**Product tip**: `3800ee40`
-**Latest gate**: min~**72–78**/100 Iterate after dark blank fix (Ship >=85)
-**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → **~75** (dark blank fixed)
+**Product tip**: `a38733bf`
+**Latest gate**: min~**70–78**/100 Iterate (Ship >=85)
+**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 (Agents form + empty glass landed)
 **Visual north star**: light white frosted glass, dense spacing, micro-motion, screenshot score loop
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Agents detail form glass + density (#1255)
-2. Terminal/inspector empty glass (#1256)
-3. Re-capture → re-score toward Ship >=85
+1. Conversation list + mainchain density (#1261)
+2. Composer + chrome micro-motion (#1262)
+3. Focus ring a11y (#1263)
+4. Re-capture → re-score toward Ship >=85
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-19 | lead | #1251 dark blank closed; open Ship residual #1255–#1256; MASTER #1257 |
+| 2026-07-19 | lead | #1255/#1256 closed; open density/motion/a11y residual #1261–#1263; MASTER #1264 |
 | 2026-07-19 | lead | Continuous visual residual waves; gate climbed ~55→~75 |
 
 ## Completion notes
 
 - Gate climbed ~55 → ~75; still Iterate (not Ship).
-- Highest weight: Agents form density · empty panel glass.
+- Highest weight now: density, micro-motion, a11y focus.
