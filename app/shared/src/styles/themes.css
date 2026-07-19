@@ -464,3 +464,40 @@ html[data-theme-sync='true'] *::after {
   );
 }
 
+/* ── High-DPI theme border visibility (#1306 / #1307) ────────────────
+   Slightly stronger glass / bdr edges so 1 CSS px hairlines read on 2x. */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  [data-theme='dark'] {
+    --glass-border-subtle: rgba(255, 255, 255, 0.10);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --glass-border-strong: rgba(255, 255, 255, 0.20);
+    --glass-border-heavy: rgba(255, 255, 255, 0.24);
+    --glass-blur-sm: 16px;
+    --glass-blur-md: 28px;
+    --glass-blur-lg: 42px;
+    --glass-blur-xl: 56px;
+    --glass-saturate: 145%;
+    --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
+    --glass-elev-1: 0 4px 22px rgba(0, 0, 0, 0.32);
+    --glass-elev-2: 0 12px 40px rgba(0, 0, 0, 0.40);
+    --glass-elev-3: 0 22px 60px rgba(0, 0, 0, 0.48);
+  }
+
+  [data-theme='light'],
+  :root:not([data-theme='dark']) {
+    --glass-border-subtle: rgba(15, 23, 42, 0.06);
+    --glass-border: rgba(15, 23, 42, 0.09);
+    --glass-border-strong: rgba(15, 23, 42, 0.13);
+    --glass-border-heavy: rgba(15, 23, 42, 0.16);
+    --glass-blur-sm: 20px;
+    --glass-blur-md: 30px;
+    --glass-blur-lg: 44px;
+    --glass-blur-xl: 60px;
+    --glass-saturate: 165%;
+    --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
+    --glass-elev-1: 0 2px 14px rgba(15, 23, 42, 0.06);
+    --glass-elev-2: 0 8px 28px rgba(15, 23, 42, 0.09);
+    --glass-elev-3: 0 16px 44px rgba(15, 23, 42, 0.11);
+  }
+}
+
