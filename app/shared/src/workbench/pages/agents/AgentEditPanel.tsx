@@ -3,13 +3,17 @@ import { DesignNavIcon } from '../../designIcons';
 import { buildAgentCapabilityContractFromConfig, buildAgentCapabilitySummary } from '../../agentCapabilities';
 import { StatusNotice } from '../../../ui';
 import styles from '../AgentsPage.module.css';
-import { AgentCapabilityStrip, AgentConfigSummary, AgentDetailHead, AgentEditActions, AgentEditGrid, AgentMcpMemorySection, AgentMiniLog, AgentRuntimeLine, AgentSkillChipGrid, AgentToolPermissions } from './AgentEditItemParts';
+import { AgentCapabilityStrip, AgentDetailHead, AgentEditActions, AgentEditGrid, AgentMcpMemorySection, AgentMiniLog, AgentRuntimeLine, AgentSkillChipGrid, AgentToolPermissions } from './AgentEditItemParts';
 import { buildStatusNoticeClassName } from './AgentEditHelpers';
 import type { AgentConfig, AgentRecentEvent, ToolPermission } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Agent edit panel shell — residual thin after extracting sub-parts
    to AgentEditItemParts + AgentEditHelpers (#695).
+
+   #1280: default product detail is one primary frosted card. Capability
+   strip + edit grid already carry readiness / policy fields, so the
+   duplicate AgentConfigSummary block is omitted from this view.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface AgentEditPanelProps {
@@ -50,7 +54,6 @@ export const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       />
       <AgentRuntimeLine agent={agent} />
       <AgentCapabilityStrip agent={agent} capabilitySummary={capabilitySummary} />
-      <AgentConfigSummary agent={agent} capabilitySummary={capabilitySummary} />
       <AgentEditGrid agent={agent} onFieldChange={onFieldChange} />
       <AgentMcpMemorySection agent={agent} />
       <AgentSkillChipGrid
