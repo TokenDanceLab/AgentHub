@@ -71,6 +71,25 @@ describe('web agent profile queries', () => {
     });
   });
 
+  it('keeps mapped description free of Runtime/Model stuffing (#1285)', () => {
+    const agent = mapHubAgentProfileToAgentInfo({
+      id: '00000000-0000-0000-0000-00000000c109',
+      name: 'Reviewer',
+      description: '审查高风险补丁',
+      runtime_id: 'codex',
+      provider: 'openai',
+      model: 'gpt-5.5',
+      version: 1,
+    });
+
+    expect(agent.description).toBe('审查高风险补丁');
+    expect(agent.description).not.toMatch(/\bRuntime\s*:/i);
+    expect(agent.description).not.toMatch(/\bModel\s*:/i);
+    expect(agent.runtimeId).toBe('codex');
+    expect(agent.model).toBe('gpt-5.5');
+    expect(agent.provider).toBe('openai');
+  });
+
   it('fetches real Hub agent profiles when a Hub session token is available', async () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
