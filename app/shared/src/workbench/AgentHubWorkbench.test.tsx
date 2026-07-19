@@ -622,6 +622,14 @@ describe('AgentHubWorkbench', () => {
     },
   ];
 
+  /** P76: inspector tabs beyond overview open on demand via + menu. */
+  function restoreInspectorTab(mode: 'files' | 'browser'): void {
+    fireEvent.click(screen.getByRole('button', { name: '新建右侧窗口' }));
+    const menu = screen.getByRole('menu', { name: '右侧窗口菜单' });
+    const restoreLabel = mode === 'files' ? /恢复 文件/ : /恢复 浏览器/;
+    fireEvent.click(within(menu).getByRole('menuitem', { name: restoreLabel }));
+  }
+
   it('renders the v4 shell regions from one shared workbench', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
@@ -645,15 +653,11 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '消息' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: '云文档' })).toBeInTheDocument();
-    const inspectorTabs = screen.getAllByRole('tablist').find((tablist) => (
-      within(tablist).queryByRole('tab', { name: /概览/ })
-      && within(tablist).queryByRole('tab', { name: /浏览器/ })
-      && within(tablist).queryByRole('tab', { name: /文件/ })
-    ));
-    expect(inspectorTabs).toBeDefined();
-    expect(screen.getByRole('tab', { name: /概览/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /浏览器/ })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /文件/ })).toBeInTheDocument();
+    /* P76: default primary card is overview only. */
+    const inspectorTablist = screen.getByRole('tablist', { name: '右侧工作区' });
+    expect(within(inspectorTablist).getByRole('tab', { name: /概览/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(inspectorTablist).queryByRole('tab', { name: /浏览器/ })).not.toBeInTheDocument();
+    expect(within(inspectorTablist).queryByRole('tab', { name: /文件/ })).not.toBeInTheDocument();
     const overviewTabIcon = screen.getByRole('tab', { name: /概览/ }).querySelector('svg');
     expect(overviewTabIcon).toHaveAttribute('width', String(DESIGN_NAV_GLYPH_SIZE));
     expect(overviewTabIcon).toHaveAttribute('height', String(DESIGN_NAV_GLYPH_SIZE));
@@ -799,6 +803,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByText('B0 SQLite 迁移')).not.toBeInTheDocument();
     expect(screen.queryByText('sqlite-migration-plan.md')).not.toBeInTheDocument();
 
+    restoreInspectorTab('files');
     fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
 
     expect(screen.getByText('运行证据')).toBeInTheDocument();
@@ -862,6 +867,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
+    restoreInspectorTab('files');
     fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
 
     expect(screen.getByText('正在读取 diff snapshot')).toBeInTheDocument();
@@ -1204,7 +1210,11 @@ describe('AgentHubWorkbench', () => {
 
     const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
 
-    expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(2);
+    /* P76: tasks section open, files collapsed by default → one expanded section head. */
+    expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(1);
+    expect(inspector.getByRole('button', { name: '折叠 概览' })).toHaveAttribute('aria-expanded', 'true');
+    expect(inspector.getByRole('button', { name: '展开 产物' })).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(inspector.getByRole('button', { name: '展开 产物' }));
     expect(inspector.getByText('Run v4')).toBeInTheDocument();
     expect(inspector.getByText('产物索引: 1')).toBeInTheDocument();
     expect(inspector.getByText('变更文件: 1')).toBeInTheDocument();
@@ -1238,6 +1248,7 @@ describe('AgentHubWorkbench', () => {
       label: 'app/shared/src/workbench/RightInspector.tsx',
     }));
 
+    restoreInspectorTab('browser');
     fireEvent.click(screen.getByRole('tab', { name: /浏览器/ }));
     expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '后退' })).toBeInTheDocument();
@@ -1368,7 +1379,10 @@ describe('AgentHubWorkbench', () => {
     );
 
     expect(screen.queryByText('+ CREATE TABLE IF NOT EXISTS chat_threads (id TEXT PRIMARY KEY);')).not.toBeInTheDocument();
-    // run_step_group blocks are sidebar-only — files appear directly in the inspector overview.
+    // run_step_group blocks are sidebar-only — files appear in inspector overview (expand 产物 if collapsed).
+    const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
+    const expandFiles = inspector.queryByRole('button', { name: '展开 产物' });
+    if (expandFiles) fireEvent.click(expandFiles);
     fireEvent.click(screen.getByRole('button', { name: '打开 migrations/0007_chat_threads.sql 只读预览' }));
 
     expect(screen.getByRole('tab', { name: /文件/ })).toHaveAttribute('aria-selected', 'true');
@@ -1400,6 +1414,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
+    restoreInspectorTab('browser');
     fireEvent.click(screen.getByRole('tab', { name: /浏览器/ }));
 
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'web');

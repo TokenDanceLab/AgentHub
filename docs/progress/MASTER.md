@@ -55,7 +55,7 @@
 | #1311 transcript density tokens | in flight (P76) |
 | #1312 inspector single primary card | in flight (P76) |
 | #1313 composer status zh visibility | in flight (P76) |
-| #1314 Chat path visual:qa capture | open (P1 follow-up) |
+| #1314 Chat path visual:qa capture | in flight (P76) |
 
 ## Quick Status Commands
 
