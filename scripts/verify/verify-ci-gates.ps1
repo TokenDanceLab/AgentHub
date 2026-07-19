@@ -60,6 +60,8 @@ $desktop = Get-JobBlock $workflow "frontend-desktop"
 $web = Get-JobBlock $workflow "frontend-web"
 $mobile = Get-JobBlock $workflow "frontend-mobile"
 $e2e = Get-JobBlock $workflow "e2e-smoke"
+$changesVisual = Get-JobBlock $workflow "changes-visual-qa-shell"
+$visualShell = Get-JobBlock $workflow "visual-qa-shell"
 $validate = Get-JobBlock $workflow "validate"
 
 Assert-Contains $edge "Coverage check \(informational\)" "go-edge overall coverage must stay informational"
@@ -130,7 +132,8 @@ foreach ($job in @(
     @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-web"; Body = $web; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-mobile"; Body = $mobile; Lockfile = "app/pnpm-lock.yaml" },
-    @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" }
+    @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" },
+    @{ Name = "visual-qa-shell"; Body = $visualShell; Lockfile = "app/pnpm-lock.yaml" }
 )) {
     Assert-Contains $job.Body "pnpm/action-setup@v4" "$($job.Name) must install pnpm explicitly"
     Assert-Contains $job.Body "cache:\s+pnpm" "$($job.Name) must enable pnpm cache"
@@ -151,5 +154,26 @@ Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret gua
 Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"
 Assert-Contains (Get-StepBlock $mobile "Screenshot visual QA (mobile)") "(?m)^\s+timeout-minutes:\s+12\s*$" "mobile visual QA must have a hard timeout"
 Assert-Contains (Get-StepBlock $mobile "E2E (mock hub)") "(?m)^\s+timeout-minutes:\s+10\s*$" "mobile mock-hub E2E must have a hard timeout"
+
+Assert-Contains $changesVisual "dorny/paths-filter@v3" "changes-visual-qa-shell must use dorny/paths-filter"
+Assert-Contains $changesVisual ([regex]::Escape("app/shared/src/workbench/**")) "changes-visual-qa-shell must watch workbench paths"
+Assert-Contains $changesVisual ([regex]::Escape("app/shared/src/styles/**")) "changes-visual-qa-shell must watch shared styles"
+Assert-Contains $changesVisual ([regex]::Escape("app/web/scripts/visual-qa*")) "changes-visual-qa-shell must watch web visual-qa scripts"
+Assert-Contains $changesVisual ([regex]::Escape("app/desktop/scripts/visual-qa*")) "changes-visual-qa-shell must watch desktop visual-qa scripts"
+Assert-Contains $changesVisual ([regex]::Escape(".github/workflows/checks.yml")) "changes-visual-qa-shell must watch checks.yml"
+
+Assert-Contains $visualShell "Visual QA shell \(web, path-filtered\)" "visual-qa-shell must use a clear job name"
+Assert-Contains $visualShell "needs:\s+changes-visual-qa-shell" "visual-qa-shell must depend on path filter job"
+Assert-Contains $visualShell "Install Playwright Chromium" "visual-qa-shell must install chromium only"
+Assert-Contains $visualShell ([regex]::Escape("playwright install --with-deps chromium")) "visual-qa-shell must install chromium only"
+Assert-Contains $visualShell ([regex]::Escape("pnpm visual:qa:shell")) "visual-qa-shell must run visual:qa:shell"
+Assert-Contains $visualShell ([regex]::Escape("pnpm assert:visual:qa:shell")) "visual-qa-shell must assert non-blank screenshots"
+Assert-Contains $visualShell "Upload visual QA shell screenshots" "visual-qa-shell must upload artifacts"
+Assert-Contains $visualShell "web-visual-qa-shell-screenshots" "visual-qa-shell must name the artifact"
+Assert-Contains $visualShell "(?m)^\s+timeout-minutes:\s+20\s*$" "visual-qa-shell job must have a hard timeout"
+Assert-Contains (Get-StepBlock $visualShell "Capture web visual:qa:shell") "(?m)^\s+timeout-minutes:\s+15\s*$" "visual-qa-shell capture step must have a hard timeout"
+Assert-NotContains $visualShell "pixel[-_ ]?golden" "visual-qa-shell must not fail on pixel golden"
+Assert-NotContains $visualShell "toHaveScreenshot" "visual-qa-shell must not use Playwright pixel golden matchers"
+Assert-NotContains $visualShell "windows-latest" "visual-qa-shell must stay on ubuntu for cost control"
 
 Write-Host "ci gate policy ok"
