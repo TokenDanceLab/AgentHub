@@ -63,9 +63,12 @@
   flex-direction: column;
   gap: var(--sp-sm);
   padding: var(--sp-10) var(--space-md) var(--space-md);
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--glass-card-radius, var(--r-md));
+  background: var(--glass-panel, var(--surface));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-1);
   transition:
     gap var(--dur-medium) var(--ease-panel),
     border-color var(--dur-normal) var(--ease),
@@ -73,8 +76,8 @@
 }
 
 .section:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--glass-border-strong, var(--bdr-strong));
+  box-shadow: var(--glass-elev-2, var(--e-1));
 }
 
 .sectionCollapsed {
