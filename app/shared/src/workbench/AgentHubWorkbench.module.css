@@ -2357,6 +2357,14 @@
   text-align: center;
 }
 
+/* ═══ Wide screen (#1309) — keep content readable on ultrawide ═══ */
+@media (min-width: 1920px) {
+  .workspace {
+    /* Soft cap: ultrawide does not force unreadably long lines in page chrome */
+    --composer-max: min(100%, 960px);
+  }
+}
+
 /* ═══ Container queries ═══ */
 @media (max-width: 760px) {
   .shell,

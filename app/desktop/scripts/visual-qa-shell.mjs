@@ -11,6 +11,7 @@
  *   node scripts/visual-qa-shell.mjs
  *   pnpm --filter agenthub-desktop visual:qa:shell
  * Env:
+ *   VISUAL_QA_DPR (default 1; set 2 for Retina capture #1308)
  *   AGENTHUB_DESKTOP_E2E_PORT (default 5199)
  *   AGENTHUB_DESKTOP_QA_URL   (skip spawning vite when set)
  */
@@ -26,6 +27,8 @@ const outDir = path.join(projectRoot, 'screenshots', 'visual-qa');
 const port = Number(process.env.AGENTHUB_DESKTOP_E2E_PORT ?? 5199);
 const baseUrl = process.env.AGENTHUB_DESKTOP_QA_URL ?? `http://127.0.0.1:${port}`;
 const viewport = { width: 1440, height: 810 };
+const dpr = Math.max(1, Number(process.env.VISUAL_QA_DPR ?? 1) || 1);
+const dprSuffix = dpr === 1 ? '' : `@${dpr}x`;
 const themes = ['light', 'dark'];
 const THEME_KEY = 'agenthub-v4-theme';
 
@@ -82,7 +85,7 @@ async function enterDemoWorkbench(page) {
 }
 
 async function captureTheme(browser, theme) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: dpr });
   const page = await context.newPage();
   await page.addInitScript(
     ({ key, theme: t }) => {
@@ -101,7 +104,7 @@ async function captureTheme(browser, theme) {
     { key: THEME_KEY, theme },
   );
   await wait(200);
-  const file = path.join(outDir, `desktop-shell-${theme}-1440x810.png`);
+  const file = path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
