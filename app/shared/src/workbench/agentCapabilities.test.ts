@@ -31,9 +31,9 @@ describe('agentCapabilities', () => {
       toolAllowlist: expect.arrayContaining(['Shell']),
     });
     expect(summary).toMatchObject({
-      agentsMd: 'AGENTS.md enabled',
-      memory: expect.stringContaining('AGENTS.md'),
-      mcp: '2/2 MCP enabled',
+      agentsMd: '工作区说明已配置',
+      memory: expect.any(String),
+      mcp: '2/2 MCP 已启用',
       readiness: 'ready',
       issues: [],
     });

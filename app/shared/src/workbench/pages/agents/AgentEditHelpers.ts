@@ -22,9 +22,12 @@ export const EDIT_MODE_OPTIONS: [string, string][] = ['Plan → Code', 'Review',
   (opt) => [opt, opt],
 );
 
-export const EDIT_STATE_OPTIONS: [string, string][] = (
-  ['running', 'ready', 'idle', 'waiting'] as AgentState[]
-).map((opt) => [opt, opt]);
+export const EDIT_STATE_OPTIONS: [string, string][] = [
+  ['running', '运行中'],
+  ['ready', '就绪'],
+  ['idle', '空闲'],
+  ['waiting', '等待中'],
+];
 
 export const TOOL_PERMISSION_LABELS: ToolPermission[] = ['允许', '需确认', '禁止'];
 

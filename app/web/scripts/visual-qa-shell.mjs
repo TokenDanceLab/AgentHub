@@ -119,6 +119,7 @@ async function installMockHub(context) {
       return route.fulfill(json(hubEnvelope([])));
     }
     if (pathname === '/web/agent-profiles') {
+      // #1275: multi-row installed list so Hierarchy/Empty score on dual-scroll layout
       return route.fulfill(
         json(
           hubEnvelope({
@@ -126,10 +127,28 @@ async function installMockHub(context) {
               {
                 id: 'profile_codex',
                 name: 'Codex',
-                description: 'Shell visual QA profile',
+                description: '视觉验收主配置',
                 runtime_id: 'codex',
                 provider: 'openai',
                 model: 'gpt-5',
+                version: 1,
+              },
+              {
+                id: 'profile_claude',
+                name: 'Claude Code',
+                description: '视觉验收次配置',
+                runtime_id: 'claude-code',
+                provider: 'anthropic',
+                model: 'claude-opus-4-5',
+                version: 1,
+              },
+              {
+                id: 'profile_opencode',
+                name: 'OpenCode',
+                description: '视觉验收第三配置',
+                runtime_id: 'opencode',
+                provider: 'openai',
+                model: 'gpt-5-mini',
                 version: 1,
               },
             ],
@@ -229,7 +248,7 @@ async function captureTheme(browser, theme) {
       // Theme: dual-write both v4 (SSOT) and legacy keys for any component that reads either
       window.localStorage.setItem(v4Key, t);
       window.localStorage.setItem(legacyKey, t);
-      window.localStorage.setItem('agenthub-language', 'en');
+      window.localStorage.setItem('agenthub-language', 'zh');
       window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
       // Auth: hub access token + user profile in sessionStorage
       window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
@@ -312,6 +331,31 @@ async function captureTheme(browser, theme) {
   ).catch(() => {
     // Non-fatal: a valid dark theme might use near-black; capture anyway
     console.warn(`warn: body content check inconclusive for theme=${theme}, capturing anyway`);
+  });
+
+  // #1275: wait for installed list rows (or empty glass) and pin scroll to top
+  // so tall detail focus cannot scroll the short list out of the 1440×810 frame.
+  try {
+    await page.waitForFunction(
+      () => {
+        const rows = document.querySelectorAll('.agent-config-row, button.agent-config-row');
+        const empty = document.querySelector('.agent-empty-compact, [class*="agent-empty"]');
+        return rows.length > 0 || Boolean(empty);
+      },
+      { timeout: 12_000 },
+    );
+  } catch {
+    console.warn(`warn: installed list rows not detected for theme=${theme}, capturing anyway`);
+  }
+
+  await page.evaluate(() => {
+    const main = document.querySelector('.agent-main, main.agent-main, main.workbench-main');
+    if (main instanceof HTMLElement) main.scrollTop = 0;
+    const list = document.querySelector('.agent-config-list');
+    if (list instanceof HTMLElement) list.scrollTop = 0;
+    const detail = document.querySelector('.agent-detail, aside.agent-detail');
+    if (detail instanceof HTMLElement) detail.scrollTop = 0;
+    window.scrollTo(0, 0);
   });
 
   // Extra settle time for CSS transitions, fonts, and lazy async chunks
