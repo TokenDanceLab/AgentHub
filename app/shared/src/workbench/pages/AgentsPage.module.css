@@ -746,21 +746,19 @@
   color: var(--warning);
 }
 
-/* ── Runtime line ── */
+/* ── Runtime line (#1280: quieter, no nested frosted card) ── */
 
 .agent-runtime-line {
-  min-height: 36px;
-  margin: var(--space-md) 0 var(--sp-xs);
-  padding: 0 var(--sp-10);
-  border: 1px solid var(--glass-border, var(--bdr));
-  border-radius: var(--r-sm);
-  background: var(--glass-bg-light, var(--surface-low));
-  backdrop-filter: var(--glass-backdrop-filter);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  min-height: 28px;
+  margin: var(--wb-gap-xs, var(--sp-sm)) 0 var(--wb-gap-2xs, var(--sp-xxs));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   display: grid;
   grid-template-columns: 9px 18px minmax(0, 1fr) minmax(0, auto);
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .agent-runtime-line strong {
@@ -782,28 +780,30 @@
   font-style: normal;
 }
 
+/* ── Capability strip (#1280: compact chips, less stacked chrome) ── */
+
 .agent-capability-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wb-gap-2xs, var(--sp-xxs));
-  margin: var(--wb-gap-xs, var(--sp-sm)) 0 var(--wb-gap-2xs, var(--sp-xs));
+  gap: 4px;
+  margin: 0 0 var(--wb-gap-xs, var(--sp-sm));
+  padding-bottom: var(--wb-gap-xs, var(--sp-sm));
+  border-bottom: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .capability-badge,
 .capability-readiness {
-  min-height: 26px;
+  min-height: 22px;
   max-width: 100%;
-  padding: var(--wb-gap-2xs, var(--sp-xs)) var(--wb-gap-xs, var(--sp-sm));
-  border: 1px solid var(--glass-border, var(--bdr));
-  border-radius: var(--r-sm);
-  background: var(--glass-input-bg, var(--surface-low));
-  backdrop-filter: var(--glass-backdrop-filter);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: var(--glass-bg-subtle, var(--surface-low));
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: var(--wb-gap-2xs, var(--sp-xxs));
-  font: 600 0.6875rem/1.25 var(--font-sans);
+  gap: 4px;
+  font: 600 0.625rem/1.2 var(--font-sans);
 }
 
 .capability-badge em {
@@ -822,43 +822,45 @@
 }
 
 .capability-readiness {
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .capability-readiness.ready {
-  border-color: var(--success);
+  border-color: transparent;
   background: var(--success-bg);
   color: var(--success);
 }
 
 .capability-readiness.partial {
-  border-color: var(--warning);
+  border-color: transparent;
   background: var(--warning-bg);
   color: var(--warning);
 }
 
 .capability-readiness.blocked {
-  border-color: var(--danger);
+  border-color: transparent;
   background: var(--danger-bg);
   color: var(--danger);
 }
 
+/* Retained for market / fixture rows only — not used in default installed detail (#1280). */
 .agent-config-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin: var(--sp-sm) 0 var(--sp-2);
-  border-top: 1px solid var(--bdr);
-  border-bottom: 1px solid var(--bdr);
+  border-top: 1px solid var(--glass-border-subtle, var(--bdr));
+  border-bottom: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .config-summary-row {
-  min-height: 30px;
+  min-height: 28px;
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-10);
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .config-summary-row:first-child {
@@ -882,20 +884,20 @@
 .agent-spec-fixture {
   margin-top: var(--space-md);
   padding-top: var(--space-md);
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .agent-spec-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
 .agent-spec-preview {
   max-height: 152px;
   margin: var(--sp-10) 0 0;
   padding: var(--sp-10);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: var(--r-sm);
   background: var(--surface-low);
   color: var(--text-2);
@@ -916,8 +918,8 @@
 .agent-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--wb-gap-xs, var(--sp-sm));
-  margin: var(--wb-gap-sm, var(--sp-14)) 0;
+  gap: var(--wb-gap-2xs, var(--sp-xs));
+  margin: 0 0 var(--wb-gap-xs, var(--sp-sm));
 }
 
 .agent-edit-grid label {
@@ -969,14 +971,14 @@
   box-shadow: var(--focus-ring);
 }
 
-/* ── Skill editor ── */
+/* ── Skill editor (#1280: quieter secondary section spacing) ── */
 
 .agent-skill-editor {
   padding-top: var(--wb-gap-2xs, var(--sp-2));
   border: 0;
   border-radius: 0;
   background: transparent;
-  margin-bottom: var(--wb-gap-sm, var(--sp-14));
+  margin-bottom: var(--wb-gap-xs, var(--sp-sm));
 }
 
 .skill-chip-grid {
@@ -1043,7 +1045,8 @@
 /* ── Tool scope / permissions ── */
 
 .editable-tools {
-  margin-top: var(--wb-gap-2xs, var(--sp-xs));
+  margin-top: 0;
+  margin-bottom: var(--wb-gap-xs, var(--sp-sm));
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1132,9 +1135,9 @@
 /* ── Mini log ── */
 
 .agent-mini-log {
-  margin-top: var(--sp-14);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--bdr);
+  margin-top: var(--wb-gap-xs, var(--sp-sm));
+  padding-top: var(--wb-gap-xs, var(--sp-sm));
+  border-top: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: 0;
   background: transparent;
 }

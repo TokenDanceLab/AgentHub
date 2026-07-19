@@ -70,7 +70,7 @@ vi.mock('@lobehub/icons/es/Zhipu', () => ({ default: () => null }));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('AgentsPage profile catalog rendering', () => {
-  it('shows Agent Builder config summaries for runtime, MCP, memory, approval, and target', () => {
+  it('shows Agent Builder detail as one primary card with capability strip, not a duplicate summary', () => {
     render(
       <AgentsPage
         activePane="installed"
@@ -86,22 +86,23 @@ describe('AgentsPage profile catalog rendering', () => {
       />,
     );
 
-    const summary = screen.getByLabelText('Builder 配置摘要');
-    expect(within(summary).getByText('MCP')).toBeInTheDocument();
-    expect(within(summary).getByText('filesystem · github')).toBeInTheDocument();
-    expect(within(summary).getByText('记忆')).toBeInTheDocument();
-    expect(within(summary).getByText('审批')).toBeInTheDocument();
-    expect(within(summary).getByText(/workspace-write/)).toBeInTheDocument();
-    expect(within(summary).getByText('目标')).toBeInTheDocument();
-    expect(within(summary).getByText('local-edge · remote-edge')).toBeInTheDocument();
+    // #1280: capability strip remains; duplicate 配置摘要 is demoted out of product detail
+    expect(screen.getByLabelText('Builder 能力就绪状态')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Builder 配置摘要')).not.toBeInTheDocument();
 
     expect(screen.getAllByTitle('Builder agenthub:avatar/builder').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/TokenDance Gateway \/ DeepSeek-V4-Pro/).length).toBeGreaterThan(0);
     expect(screen.getByText('MCP / 记忆')).toBeInTheDocument();
     expect(screen.getByText('agents-md')).toBeInTheDocument();
     expect(screen.getByText('project-memory')).toBeInTheDocument();
+    // Policy fields remain on the edit grid (summary removed as redundant)
+    expect(screen.getByText('审批策略')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('写文件和 Shell 默认进入确认队列')).toBeInTheDocument();
+    expect(screen.getByText('目标偏好')).toBeInTheDocument();
+    expect(screen.getByText('工作区说明')).toBeInTheDocument();
+    expect(screen.getByText('就绪')).toBeInTheDocument();
 
-    // #1277: AgentSpec fixture dump is not shown in default product detail
+    // #1277 / #1280: AgentSpec fixture dump is not shown in default product detail
     expect(screen.queryByLabelText('Builder AgentSpec fixture')).not.toBeInTheDocument();
   });
 
