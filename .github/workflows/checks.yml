@@ -467,6 +467,88 @@ jobs:
       - name: Mock Hub contract
         run: pnpm --filter agenthub-mobile-rn run mock:hub:check
 
+  # ── Visual QA Shell (path-filtered) ──────────
+  # P74 gate matrix evidence on relevant UI paths only (#1287).
+  # ubuntu + chromium; non-blank + Agents capture via visual:qa:shell;
+  # no pixel-golden failure. Full multi-scene visual-qa.mjs stays local/manual.
+  changes-visual-qa-shell:
+    name: Detect visual QA shell paths
+    runs-on: ubuntu-latest
+    outputs:
+      shell: ${{ steps.filter.outputs.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shell:
+              - 'app/shared/src/workbench/**'
+              - 'app/shared/src/styles/**'
+              - 'app/shared/src/theme*.ts'
+              - 'app/shared/src/themePresets.*'
+              - 'app/shared/src/designTokens.*'
+              - 'app/web/scripts/visual-qa*'
+              - 'app/web/scripts/assert-visual-qa-shell.mjs'
+              - 'app/desktop/scripts/visual-qa*'
+              - 'app/web/src/**'
+              - 'app/web/package.json'
+              - 'app/desktop/package.json'
+              - '.github/workflows/checks.yml'
+
+  visual-qa-shell:
+    name: Visual QA shell (web, path-filtered)
+    needs: changes-visual-qa-shell
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes-visual-qa-shell.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Capture web visual:qa:shell
+        timeout-minutes: 15
+        working-directory: ./app/web
+        run: pnpm visual:qa:shell
+        env:
+          CI: 'true'
+          # Script spawns vite on 5174 with mock hub route; no real Hub required.
+
+      - name: Assert non-blank shell screenshots
+        working-directory: ./app/web
+        run: pnpm assert:visual:qa:shell
+        env:
+          VISUAL_QA_SHELL_MIN_BYTES: '8000'
+
+      - name: Upload visual QA shell screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-visual-qa-shell-screenshots
+          path: app/web/screenshots/visual-qa/
+          if-no-files-found: warn
+          retention-days: 7
+
   # ── E2E Smoke ─────────────────────────────────
   # 重 job；仅 workflow_dispatch 成本节流，需要时手动触发。
   e2e-smoke:
