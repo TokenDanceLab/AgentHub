@@ -3,11 +3,11 @@
   align-items: center;
   gap: 6px;
   padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid oklch(0.88 0.006 250 / 0.5);
+  border-bottom: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='dark'] .root {
-  border-bottom-color: oklch(1 0 0 / 0.08);
+  border-bottom-color: var(--glass-border);
 }
 
 .icon {
@@ -50,9 +50,9 @@
 
 .clear:hover {
   opacity: 1;
-  background: oklch(1 0 0 / 0.08);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .clear:hover {
-  background: oklch(1 0 0 / 0.1);
+  background: var(--glass-bg-medium);
 }
