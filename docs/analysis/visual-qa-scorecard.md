@@ -1,55 +1,58 @@
 # Visual QA scorecard
 
-最后更新：2026-07-19
-Issue: #1199 (P74) · SSOT ownership: #1286
+最后更新：2026-07-20
+Issue: #1199 (P74) · SSOT ownership: #1286 · HiDPI extension: #1308 (P75)
 
-> 100-point rubric for Desktop/Web shell screenshots. North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair.
+> 100-point rubric for Desktop/Web shell screenshots (+ optional HiDPI bonus). North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair, crisp type on Retina.
 > Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../architecture/07-design-system-ssot.md).
 
 ## 0. Gate SSOT (current)
 
-| Role | Path | Viewport | Themes |
-|---|---|---|---|
-| **P74 gate matrix (current)** | `app/web/scripts/visual-qa-shell.mjs` · `app/desktop/scripts/visual-qa-shell.mjs` | **1440×810** (16:9) | light + dark |
-| Package entry | `pnpm --filter agenthub-{web,desktop} visual:qa:shell` | same | same |
-| Score rubric (this file) | `docs/analysis/visual-qa-scorecard.md` | — | min of four shots |
-| **Optional / legacy multi-scene battery** | `app/web/scripts/visual-qa.mjs` | broader scenes (incl. historical 1440×920 names) | **not** the P74 gate |
+| Role | Path | Viewport | Themes | DPR |
+|---|---|---|---|---|
+| **P74/P75 gate matrix (current)** | `app/web/scripts/visual-qa-shell.mjs` · `app/desktop/scripts/visual-qa-shell.mjs` | **1440×810** (16:9) | light + dark | **1x default** |
+| Package entry (1x) | `pnpm --filter agenthub-{web,desktop} visual:qa:shell` | same | same | 1 |
+| Package entry (2x optional) | `pnpm --filter agenthub-{web,desktop} visual:qa:shell:2x` | same | same | 2 (`VISUAL_QA_DPR=2`) |
+| Score rubric (this file) | `docs/analysis/visual-qa-scorecard.md` | — | min of four 1x shots | — |
+| **Optional / legacy multi-scene battery** | `app/web/scripts/visual-qa.mjs` | broader scenes (incl. historical 1440×920 names) | **not** the merge gate | — |
 
 Do **not** treat `visual-qa.mjs` scene names or any `1440x920` string as the merge gate. Gate path is shell-only at **1440×810**. Historical rescore notes under `docs/analysis/visual-qa-score-*.md` keep their recorded viewports; they are not rewritten when the gate SSOT is clarified.
 
 ## 1. Pass bar
 
-| Band | Score | Action |
-|---|---|---|
-| Ship | ≥85 | Accept iteration; note residual ≤15 |
-| Iterate | 70–84 | Fix highest-weight fails before merge |
-| Block | <70 | Do not land visual PR |
+| Band | Core (1x, /100) | With HiDPI bonus (/106) | Action |
+|---|---|---|---|
+| Ship | ≥85 | ≥90 | Accept iteration; note residual |
+| Iterate | 70–84 | 74–89 | Fix highest-weight fails before merge |
+| Block | <70 | <74 | Do not land visual PR |
 
-Score each surface (Desktop shell / Web shell) **light + dark** separately; report the **min** of the four shots as the gate score when shipping a visual change.
+Score each surface (Desktop shell / Web shell) **light + dark** separately; report the **min** of the four **1x** shots as the core gate. HiDPI (dim 10) is an additive bonus scored from 2x captures when available — it does **not** rewrite historical P74 100-pt scores.
 
-## 2. Rubric (100 pts)
+## 2. Rubric (100 pts + optional HiDPI 6)
 
 | # | Dimension | Pts | Pass criteria (frosted-glass product) |
 |---|---|---|---|
 | 1 | Glass material | 18 | Panels/cards use `--glass-*` / Card `glass\|elevated`; visible blur+saturate on elevated chrome; no solid flat slabs where glass is intended |
 | 2 | Hierarchy | 14 | Clear primary surface vs chrome vs content; no competing equal-weight slabs |
 | 3 | Spacing density | 14 | Chrome uses `--wb-gap-*` (4/8/12/16); no large empty gutters or cramped collisions |
-| 4 | Type scale | 10 | Body/label from token scale; no runaway sizes; secondary text weaker, still readable |
+| 4 | Type scale | 10 | Body/label from token scale; fluid headlines via `clamp`; secondary text weaker, still readable; OpenType kern/liga on |
 | 5 | Motion | 10 | Hover/press use `--motion-*`; no janky multi-second anim; `prefers-reduced-motion` kills transform |
 | 6 | Light frost | 12 | Light theme: white/translucent frost, soft elev, no muddy gray wash |
 | 7 | Dark frost | 8 | Dark theme: translucent panel + hairline edge; no pure black voids or white outlines |
 | 8 | A11y chrome | 8 | Focus ring visible; contrast on primary actions; touch targets ≥44 on dense controls where interactive |
 | 9 | Empty / loading | 6 | Empty states use density tokens; no raw i18n keys or dead white boxes |
+| 10 | HiDPI fidelity *(bonus)* | 6 | 2x capture: glass blur still visible; borders not vanished; text crisp; no 1px-hairline dropouts |
 
 **Deductions (stack):** horizontal overflow −5; raw hex/rgba chrome outside SSOT −5; left-only color rail −5; gradient decoration −5; competitor/copy language in UI −100 (block).
 
 ## 3. Score sheet template
 
 ```text
-Surface: Desktop|Web   Theme: light|dark   Viewport: 1440x810   SHA: ____
+Surface: Desktop|Web   Theme: light|dark   Viewport: 1440x810   DPR: 1|2   SHA: ____
 1 Glass __/18  2 Hierarchy __/14  3 Spacing __/14  4 Type __/10
 5 Motion __/10  6 Light __/12  7 Dark __/8  8 A11y __/8  9 Empty __/6
-Deductions: ____   Total: __/100   Band: Ship|Iterate|Block
+10 HiDPI __/6 (bonus, 2x only)
+Deductions: ____   Core total: __/100   With HiDPI: __/106   Band: Ship|Iterate|Block
 Notes: …
 ```
 
