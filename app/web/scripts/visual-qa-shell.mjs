@@ -1,17 +1,22 @@
 /**
- * P74 Visual QA — Web shell capture matrix (#1199 / #1219 / #1242)
+ * P74 Visual QA — Web shell capture matrix (#1199 / #1219 / #1242 / #1286)
  * Viewport 1440x810 · themes light+dark · authenticated mock hub
+ *
+ * CURRENT GATE MATRIX (Web half). Pair with:
+ *   app/desktop/scripts/visual-qa-shell.mjs
+ * Score SSOT: docs/analysis/visual-qa-scorecard.md
  *
  * Captures the frosted Agents page surface (glass chrome from #1226/#1235),
  * not only bare chat workbench.
  *
  * Usage (from app/web):
  *   node scripts/visual-qa-shell.mjs
+ *   pnpm --filter agenthub-web visual:qa:shell
  * Env:
  *   AGENTHUB_WEB_E2E_PORT (default 5174)
  *   WEB_QA_URL / AGENTHUB_WEB_QA_URL — skip vite spawn when set
  *
- * Full multi-scene battery remains visual-qa.mjs; this file is the P74 gate matrix.
+ * Optional / legacy multi-scene battery: visual-qa.mjs (NOT the P74 gate).
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
