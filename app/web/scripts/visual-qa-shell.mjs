@@ -248,7 +248,7 @@ async function captureTheme(browser, theme) {
       // Theme: dual-write both v4 (SSOT) and legacy keys for any component that reads either
       window.localStorage.setItem(v4Key, t);
       window.localStorage.setItem(legacyKey, t);
-      window.localStorage.setItem('agenthub-language', 'en');
+      window.localStorage.setItem('agenthub-language', 'zh');
       window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
       // Auth: hub access token + user profile in sessionStorage
       window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
