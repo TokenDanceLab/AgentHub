@@ -61,7 +61,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>{t('agents.installed.title')}</h1>
           <p className={styles['head-subcopy']}>
-            查看 Agent 基础配置、skills 和工具权限；写入能力按 Hub / Edge 合同逐步接入。
+            管理已安装的 Agent 配置、技能与工具权限。
           </p>
         </div>
         <button
@@ -76,27 +76,27 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
 
       {/* Summary strip */}
       <div className={styles['agent-summary-strip']}>
-        <AgentStat label="已安装" value={installedCount} meta="active templates" />
-        <AgentStat label="可运行" value={runnableCount} meta="running / ready" />
-        <AgentStat label="需确认权限" value={confirmCount} meta="tool gates" />
-        <AgentStat label="默认模型" value={defaultModelLabel} meta="routing" />
+        <AgentStat label="已安装" value={installedCount} meta="配置档案" />
+        <AgentStat label="可运行" value={runnableCount} meta="就绪 / 运行中" />
+        <AgentStat label="需确认权限" value={confirmCount} meta="工具门禁" />
+        <AgentStat label="默认模型" value={defaultModelLabel} meta="模型路由" />
       </div>
 
       {/* Layout: list + edit panel */}
       <div className={styles['agent-layout']}>
         <section className={styles['agent-section']}>
           <div className={styles['section-title-row']}>
-            <h2>已安装 Agent</h2>
-            <span>{agentsLoading ? '同步中' : `${agents.length} active`}</span>
+            <h2>已安装</h2>
+            <span>{agentsLoading ? '同步中' : `${agents.length} 个`}</span>
           </div>
           {agentsError && agents.length === 0 ? (
             <div className={styles.statusStack}>
               <RecoveryPanel
                 {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
                 icon={<DesignNavIcon name="error404" size={18} />}
-                eyebrow="Agent recovery"
+                eyebrow="恢复"
                 title="Agent 加载失败"
-                description="无法从当前 Hub 读取已安装 Agent Profile。列表暂时不可用，重试后可重新同步。"
+                description="无法从当前 Hub 读取已安装配置。列表暂时不可用，请重试同步。"
                 meta={agentsError}
                 primaryAction={{
                   label: '重试',
@@ -138,8 +138,8 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
           <div className={styles['agent-config-list']}>
             {agents.length === 0 && !agentsLoading && !agentsError ? (
               <EmptyState
-                title="暂无 Agent Profile"
-                description="当前 Hub 账号还没有已安装 Agent。"
+                title="暂无已安装 Agent"
+                description="当前 Hub 账号还没有已安装配置。"
                 titleLevel={3}
                 {...(styles['agent-empty-compact']
                   ? { className: styles['agent-empty-compact'] }
@@ -173,7 +173,8 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                 <div>
                   <strong>{agent.name}</strong>
                   <span>
-                    {agent.role} · {agent.engine}
+                    {agent.engine}
+                    {agent.provider ? ` · ${agent.provider}` : ''}
                   </span>
                   <div className={styles['agent-capability-tags']}>
                     {deriveCapabilityTags(agent).map((tag) => (
@@ -186,10 +187,14 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                     ))}
                   </div>
                   <small>
-                    {agent.targetPreference ? `Target: ${agent.targetPreference}` : agent.skills.join(' · ') || '未配置 skill'}
+                    {agent.targetPreference
+                      ? `目标：${agent.targetPreference}`
+                      : agent.skills.length > 0
+                        ? agent.skills.join(' · ')
+                        : '未配置技能'}
                   </small>
                 </div>
-                <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
+                <em>{agent.model}</em>
                 <span className={`${styles.state} ${stateClass(agent.state)}`} />
               </button>
             ))}

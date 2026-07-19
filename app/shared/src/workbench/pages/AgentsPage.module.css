@@ -30,8 +30,10 @@
 }
 
 .agent-main {
+  /* Shared main shell for installed / market / ops panes */
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   padding: var(--wb-main-y) var(--wb-main-x);
   overflow-x: hidden;
@@ -41,6 +43,13 @@
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   scrollbar-width: thin;
   scrollbar-color: var(--text-3) transparent;
+}
+
+/* #1275: installed list+detail dual-scroll only when layout grid is present */
+.agent-main:has(.agent-layout) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Workbench nav (shared with other pages but scoped here) ── */
@@ -172,6 +181,7 @@
 .workbench-head {
   width: 100%;
   min-height: 44px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -239,6 +249,7 @@
 
 .agent-summary-strip {
   width: 100%;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-10);
@@ -296,15 +307,23 @@
 /* ── Agent layout (list + edit panel) ── */
 
 .agent-layout {
+  /* #1275: fill remaining main height; each pane scrolls independently */
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(320px, 1fr) minmax(300px, 1fr);
   gap: var(--sp-14);
-  align-items: start;
+  align-items: stretch;
 }
 
 .agent-section {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
   background: var(--glass-card-bg, var(--surface));
@@ -321,6 +340,11 @@
 .agent-section:hover {
   border-color: var(--glass-border-strong, var(--bdr-strong));
   box-shadow: var(--glass-elev-2);
+}
+
+.agent-section > .section-title-row,
+.agent-section > .statusStack {
+  flex: 0 0 auto;
 }
 
 .section-title-row {
@@ -353,7 +377,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--wb-gap-2xs, var(--sp-xxs));
+  flex: 1 1 auto;
   min-height: 160px;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
+  padding-right: 2px;
 }
 
 .statusStack {
@@ -457,12 +488,13 @@
 }
 
 .agent-config-row {
+  /* #1275: glass chip rows so installed list reads on light frost */
   width: 100%;
   min-height: 66px;
   padding: var(--sp-sm) var(--sp-10);
-  border: 1px solid transparent;
+  border: 1px solid var(--glass-border, transparent);
   border-radius: var(--r-md);
-  background: transparent;
+  background: var(--glass-bg-subtle, transparent);
   color: var(--text-1);
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) minmax(116px, 148px) 14px;
@@ -470,16 +502,23 @@
   gap: var(--sp-10);
   text-align: left;
   cursor: pointer;
+  flex: 0 0 auto;
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
     box-shadow var(--dur-normal) var(--ease);
 }
 
-.agent-config-row:hover,
+.agent-config-row:hover {
+  background: var(--glass-bg-medium, var(--surface-high));
+  border-color: var(--glass-border-strong, var(--bdr));
+  box-shadow: var(--glass-elev-1);
+}
+
 .agent-config-row.selected {
-  background: var(--surface-high);
-  border-color: var(--bdr);
+  background: var(--glass-bg-strong, var(--surface-high));
+  border-color: var(--glass-border-heavy, var(--bdr-strong));
+  box-shadow: var(--glass-elev-1);
 }
 
 .agent-config-row[disabled] {
@@ -487,8 +526,9 @@
   cursor: wait;
 }
 
-.agent-config-row.selected {
-  box-shadow: none;
+.agent-config-row:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--primary));
+  outline-offset: 2px;
 }
 
 .agent-config-row strong {
@@ -633,6 +673,7 @@
 /* ── Agent detail (edit panel) ── */
 
 .agent-detail {
+  /* #1275: independent pane scroll so list stays in viewport */
   border: 1px solid var(--glass-card-border, var(--bdr));
   border-radius: var(--r-lg);
   background: var(--glass-card-bg, var(--surface));
@@ -641,10 +682,15 @@
   box-shadow: var(--glass-elev-1);
   padding: var(--sp-md);
   min-width: 0;
-  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
   transition:
     border-color var(--dur-normal) var(--ease),
     box-shadow var(--dur-normal) var(--ease);

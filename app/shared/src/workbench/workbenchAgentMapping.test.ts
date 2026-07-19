@@ -48,7 +48,7 @@ describe('workbenchAgentMapping', () => {
     expect(config.role).toBe('Hub profile');
     expect(config.engine).toBe('codex');
     expect(config.model).toBe('openai / gpt-5');
-    expect(config.mode).toBe('Reasoning high');
+    expect(config.mode).toBe('推理 high');
     expect(config.approval).toBe('ask-before-write');
     expect(config.scope).toBe('workspace-write');
     expect(config.targetPreference).toBe('local_edge · fixture');

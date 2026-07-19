@@ -55,7 +55,7 @@ describe('web agent profile queries', () => {
       memoryRetention: 'project-policy',
       memorySummary: 'Reads AGENTS.md and project memory',
       targetPreferences: { work_dir: '<REPO_ROOT>' },
-      description: 'Reviews risky patches - Runtime: codex - Model: openai/gpt-5.5',
+      description: 'Reviews risky patches',
       version: '3',
       status: 'available',
       capabilities: {
