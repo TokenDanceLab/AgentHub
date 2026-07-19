@@ -110,6 +110,12 @@ Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; d
 
 Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.
 
-## 9. Visual QA gate (#1199)
+## 9. Visual QA gate (#1199 / #1286)
 
-Screenshot score loop SSOT: [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt rubric · 1440×810 light+dark · Desktop/Web shell scripts `visual:qa:shell`).
+| Layer | SSOT |
+|---|---|
+| Capture matrix (P74 gate) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark |
+| Score rubric / pass bar | [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt · min of four shots) |
+| Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
+
+Do not cite `1440x920` as the Desktop/Web gate viewport.
