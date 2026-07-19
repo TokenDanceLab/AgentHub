@@ -282,14 +282,14 @@
 .conversationList {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-xs);
+  gap: var(--wb-gap-2xs, 4px);
   width: 100%;
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
   overflow-y: auto;
   margin: 0;
-  padding: 0 var(--sp-xxs);
+  padding: 0 var(--wb-gap-2xs, var(--sp-xxs));
   list-style: none;
   scrollbar-width: thin;
   scrollbar-color: var(--text-3) transparent;
@@ -297,11 +297,12 @@
 
 .conversationButton {
   display: flex;
-  gap: var(--sp-10);
+  gap: var(--wb-gap-xs, var(--sp-10));
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: var(--sp-sm) var(--sp-10);
+  min-height: 40px;
+  padding: var(--wb-gap-2xs, 6px) var(--wb-gap-xs, 10px);
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
@@ -309,8 +310,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--dur-normal) var(--ease),
-    transform var(--dur-pop) var(--ease-press);
+    background var(--motion-hover, var(--dur-normal) var(--ease)),
+    transform var(--motion-press, var(--dur-pop) var(--ease-press));
 }
 
 .conversationButton:hover {
@@ -635,10 +636,10 @@
 .mainchainStrip {
   display: flex;
   align-items: center;
-  gap: var(--sp-10);
+  gap: var(--wb-gap-xs, 8px);
   min-width: 0;
-  min-height: 44px;
-  padding: 6px 18px;
+  min-height: 36px;
+  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-sm, 12px);
   border-bottom: 1px solid var(--glass-border, var(--bdr));
   background: var(--glass-panel, color-mix(in srgb, var(--surface) 86%, var(--app-bg)));
   backdrop-filter: var(--glass-backdrop-filter);
@@ -649,21 +650,21 @@
   flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(9, minmax(66px, 1fr));
-  gap: var(--sp-xxs);
+  grid-template-columns: repeat(9, minmax(56px, 1fr));
+  gap: var(--wb-gap-2xs, 4px);
 }
 
 .mainchainNode {
   position: relative;
   min-width: 0;
-  min-height: 32px;
+  min-height: 28px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 7px;
-  border: 1px solid var(--bdr);
+  gap: var(--wb-gap-2xs, 6px);
+  padding: 4px 6px;
+  border: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: var(--r-sm);
-  background: var(--surface-low);
+  background: var(--glass-bg-subtle, var(--surface-low));
   color: var(--text-2);
   overflow: hidden;
 }
