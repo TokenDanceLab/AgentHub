@@ -5,7 +5,7 @@
 > **Last Updated**: 2026-07-19
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
-> **Merged program PRs**: Phases 1–73 · P74 through #1255–#1256 / PRs #1259–#1260
+> **Merged program PRs**: Phases 1–73 · P74 through #1261–#1263 / PRs #1265–#1267 · MASTER #1268
 
 ## Two task surfaces (do not mix)
 
@@ -33,6 +33,7 @@
 
 - [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
 - [visual-qa-score-2026-07-19-rescore-5](../analysis/visual-qa-score-2026-07-19-rescore-5.md)
+- [visual-qa-score-2026-07-19-rescore-6](../analysis/visual-qa-score-2026-07-19-rescore-6.md)
 - [07-design-system-ssot](../architecture/07-design-system-ssot.md)
 
 ## Milestones
@@ -46,12 +47,11 @@
 
 | Range | Status |
 |:------|:-------|
-| #1197–#1256 foundation through empty glass residual | closed |
-| #1257 MASTER tip (prior) | closed |
-| #1261 list + mainchain density | open |
-| #1262 composer micro-motion | open |
-| #1263 focus ring a11y | open |
-| #1264 MASTER tip (this) | open |
+| #1197–#1263 foundation through density/motion/a11y | closed |
+| #1264 MASTER tip (prior) | closed |
+| #1269 Agents installed empty list glass | open |
+| #1270 Agents nav-row glass hover | open |
+| #1271 rescore-6 notes + MASTER (this) | open |
 
 ## Quick Status Commands
 
@@ -65,34 +65,33 @@ cd app && pnpm --filter agenthub-web visual:qa:shell
 ## Phase Checklist
 
 - [x] Phase 0–73
-- [ ] Phase 74 frosted glass + Visual QA (gate min~70–78 Iterate; residual #1261–#1263)
+- [ ] Phase 74 frosted glass + Visual QA (gate min~70 Iterate; residual #1269–#1270)
 
 ## Current Status
 
 **Active Phase**: 74 (visual score loop)
-**Active Tasks**: #1261 density · #1262 micro-motion · #1263 focus a11y
+**Active Tasks**: #1269 Agents empty list glass · #1270 Agents nav hover glass
 **Blockers**: None
-**Product tip**: `a38733bf`
-**Latest gate**: min~**70–78**/100 Iterate (Ship >=85)
-**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 (Agents form + empty glass landed)
+**Product tip**: `88ddc886`
+**Rescore-6 gate**: min~**70**/100 (D-light 81 · D-dark 77 · W-light 73 · W-dark 70)
+**Gate history**: ~55 → 61 → 64 → 66 → 71 → 70 → ~75 → **70** (web empty list bound)
 **Visual north star**: light white frosted glass, dense spacing, micro-motion, screenshot score loop
 **Red lines**: Web no Local Edge; renderer no raw process; product language only in public git
 
 ## Next Steps
 
-1. Conversation list + mainchain density (#1261)
-2. Composer + chrome micro-motion (#1262)
-3. Focus ring a11y (#1263)
-4. Re-capture → re-score toward Ship >=85
+1. Agents installed empty list glass (#1269)
+2. Agents nav-row glass hover (#1270)
+3. Re-capture → re-score toward Ship >=85
 
 ## Session Log
 
 | Date | Session | Summary |
 |:-----|:--------|:--------|
-| 2026-07-19 | lead | #1255/#1256 closed; open density/motion/a11y residual #1261–#1263; MASTER #1264 |
-| 2026-07-19 | lead | Continuous visual residual waves; gate climbed ~55→~75 |
+| 2026-07-19 | lead | Rescore-6 min~70; open #1269–#1270; notes #1271 |
+| 2026-07-19 | lead | #1261–#1263 density/motion/a11y closed; Desktop ~81, Web empty list lag |
 
 ## Completion notes
 
-- Gate climbed ~55 → ~75; still Iterate (not Ship).
-- Highest weight now: density, micro-motion, a11y focus.
+- Gate climbed ~55 → ~70–81; still Iterate (not Ship).
+- Highest weight: Agents installed empty void + nav hover solid.
