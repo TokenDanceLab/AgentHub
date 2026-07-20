@@ -191,25 +191,25 @@ html[data-theme-sync='true'] *::after {
   --tool-default: #71717A;
 
   /* ── Frosted glass material (dark) ───────────── */
-  --glass-tint-plum: rgba(41, 171, 226, 0.045);
-  --glass-panel: rgba(30, 30, 38, 0.65);
-  --glass-panel-strong: rgba(27, 27, 35, 0.82);
-  --glass-panel-overlay: rgba(26, 26, 33, 0.92);
+  --glass-tint-plum: rgba(41, 171, 226, 0.055);
+  --glass-panel: rgba(30, 30, 38, 0.70);
+  --glass-panel-strong: rgba(27, 27, 35, 0.84);
+  --glass-panel-overlay: rgba(26, 26, 33, 0.94);
   --glass-border-subtle: rgba(255, 255, 255, 0.10);
   --glass-border: rgba(255, 255, 255, 0.15);
   --glass-border-strong: rgba(255, 255, 255, 0.19);
   --glass-border-heavy: rgba(255, 255, 255, 0.23);
-  --glass-shadow: rgba(0, 0, 0, 0.44);
-  --glass-shadow-subtle: rgba(0, 0, 0, 0.28);
+  --glass-shadow: rgba(0, 0, 0, 0.52);
+  --glass-shadow-subtle: rgba(0, 0, 0, 0.34);
   --glass-blur-sm: 12px;
   --glass-blur-md: 20px;
   --glass-blur-lg: 30px;
   --glass-blur-xl: 40px;
-  --glass-saturate: 160%;
+  --glass-saturate: 180%;
   --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
-  --glass-elev-1: 0 4px 20px rgba(0, 0, 0, 0.28);
-  --glass-elev-2: 0 12px 36px rgba(0, 0, 0, 0.36);
-  --glass-elev-3: 0 22px 56px rgba(0, 0, 0, 0.44);
+  --glass-elev-1: 0 4px 20px rgba(0, 0, 0, 0.36);
+  --glass-elev-2: 0 12px 36px rgba(0, 0, 0, 0.46);
+  --glass-elev-3: 0 22px 56px rgba(0, 0, 0, 0.54);
   --glass-card-bg: var(--glass-panel);
   --glass-card-border: var(--glass-border);
   --glass-card-shadow: var(--glass-elev-2);
@@ -476,11 +476,11 @@ html[data-theme-sync='true'] *::after {
     --glass-blur-md: 28px;
     --glass-blur-lg: 42px;
     --glass-blur-xl: 56px;
-    --glass-saturate: 145%;
+    --glass-saturate: 165%;
     --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
-    --glass-elev-1: 0 4px 22px rgba(0, 0, 0, 0.32);
-    --glass-elev-2: 0 12px 40px rgba(0, 0, 0, 0.40);
-    --glass-elev-3: 0 22px 60px rgba(0, 0, 0, 0.48);
+    --glass-elev-1: 0 4px 22px rgba(0, 0, 0, 0.40);
+    --glass-elev-2: 0 12px 40px rgba(0, 0, 0, 0.50);
+    --glass-elev-3: 0 22px 60px rgba(0, 0, 0, 0.58);
   }
 
   [data-theme='light'],
