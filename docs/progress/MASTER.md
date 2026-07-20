@@ -1,7 +1,7 @@
 # AgentHub Progress Tracker
 
-> **Task**: post-polish residual hardening (docs authority + mobile hubClient strangler)
-> **Started**: 2026-07-16 (Visual polish); residual program 2026-07-20
+> **Task**: post-polish residual hardening — **complete** (docs authority + mobile hubClient strangler)
+> **Started**: 2026-07-16 (Visual polish); residual program 2026-07-20; closed 2026-07-21
 > **Last Updated**: 2026-07-21
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
@@ -14,14 +14,14 @@
 | Analysis SSOT | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
 | Plan SSOT | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
 | Strategy | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
-| Tracking | Issues **#1335–#1339** · GH milestones **98** (Phase 79) · **99** (Phase 80) |
+| Tracking | Issues **#1335–#1339** (closed) · GH milestones **98–99** (closed) · PRs **#1340** / **#1341** |
 
-### Open phases
+### Residual phases (closed 2026-07-21)
 
 | Phase | Name | Milestone | Issues | Status |
 |:------|:-----|:----------|:-------|:-------|
-| 79 | Docs Authority + Gates Hygiene | 98 | #1335 #1336 | in progress |
-| 80 | Mobile hubClient Strangler | 99 | #1337 #1338 #1339 | queued |
+| 79 | Docs Authority + Gates Hygiene | 98 | #1335 #1336 | **closed** · PR #1340 |
+| 80 | Mobile hubClient Strangler | 99 | #1337 #1338 #1339 | **closed** · PR #1341 (~737→~342 LOC Proxy thin) |
 
 ### Closed polish phases (2026-07-20)
 
@@ -36,9 +36,11 @@
 
 Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblings) is **HISTORICAL only** — not live backlog.
 
+**No open residual-program phases.** Next work: pick from roadmap P0/P1 (E2E contract, chat reliability, deploy-only security evidence) — not static Visual QA past 89.
+
 ## Product tip & Visual QA
 
-**Product tip**: see latest `master` (analysis tip at residual start: `4c222e06`)
+**Product tip**: `7d70fc0a` (post #1340 + #1341)
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
 **Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
@@ -93,4 +95,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 |:-----|:--------|
 | 2026-07-20 | 🟢🟢🟢 **Ship 89** — polish Phases 73–78 closed; CI path-filter; docs rescore archive |
 | 2026-07-20 | SDD Phase 0–1: post-polish analysis trio committed |
-| 2026-07-21 | Residual program live: MASTER sole index; Phases 79–80 · #1335–#1339 |
+| 2026-07-21 | Residual program delivered: Phase 79 #1340 + Phase 80 #1341; milestones 98–99 closed; hubClient ~342 LOC |
