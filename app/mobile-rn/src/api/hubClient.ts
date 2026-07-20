@@ -1,134 +1,34 @@
+// Mobile Hub client — thin surface over shared SSOT (#1338 / T80.2).
+// - Method/DTO SSOT: @agenthub/shared/hubClient
+// - Mobile-only glue: async SecureStore token cache, fixture snapshot, legacy WS types,
+//   HubApiError/HubNetworkError (test/UI compatibility)
+// Do NOT add new Hub REST methods here; add them to app/shared/src/hubClient.ts first.
+//
+// Inventory (T80.1 keep vs re-export):
+// | Surface | Decision |
+// |---|---|
+// | REST methods (auth, sessions, messages, tasks, reactions, attachments, …) | re-export / Proxy → shared |
+// | DTOs (HubAgentRunEvent, HubAgentTaskApproval, HubProbeAttachmentResponse, …) | re-export from shared |
+// | createHubClient token cache + onRefreshToken | KEEP (async SecureStore) |
+// | getMobileSnapshot + mapSessionsToMobileFixture | KEEP (mobile fixture shape) |
+// | createMockHubClient | KEEP (fixture delay + mock snapshot) |
+// | HubApiError / HubNetworkError | KEEP (test + historical UI imports) |
+// | WS_BEARER_SUBPROTOCOL, buildWSAuthProtocols, createHubWsUrl, HubWs* | KEEP (RN WS layer) |
+// | Legacy HubWsEventType mobile-only names | KEEP (App/UI compatibility) |
+
 import {
   createHubClient as createSharedHubClient,
-  type HubClientOptions,
   type HubClient as SharedHubClient,
-  type HubOidcAuthorizeRequest,
-  type HubOidcAuthorizeResponse,
-  type HubOidcCallbackRequest,
-  type HubOidcCallbackResponse,
-  type HubUserProfile,
-  type HubAuthResponse,
-  type HubMessage,
-  type HubSearchResult,
-  type HubFriendRequest,
+  type HubClientOptions,
   type HubContactInfo,
-  type HubCustomAgent,
-  type HubCustomAgentRequest,
-  type HubExecutionTarget,
-  type HubListResponse,
-  type HubRegisterRequest,
-  type HubLoginRequest,
-  type HubUpdateProfileRequest,
-  type HubChangePasswordRequest,
-  type HubRegisterDeviceRequest,
-  type HubDevice,
-  type HubAddAgentToSessionRequest,
-  type HubAgentTask,
-  type HubTriggerAgentTaskOptions,
-  type HubNotification,
-  type HubCreatePrivateSessionRequest,
-  type HubCreateGroupSessionRequest,
-  type HubUpdateSessionInfoRequest,
-  type HubUpdateSessionSettingsRequest,
   type HubSession,
-  type HubSkill,
-  type HubMCPServer,
 } from '@agenthub/shared/hubClient';
 
 import { mobileFixture } from '@/data/mobileFixtures';
 import type { MobileAppFixture } from '@/types';
 
-// ── Local types for Hub methods not yet in shared hubClient ──
-
-export interface HubAgentRunEvent {
-  id: string;
-  task_id: string;
-  edge_run_id?: string;
-  session_id: string;
-  agent_instance_id: string;
-  event_seq: number;
-  event_type: string;
-  payload: unknown;
-  created_at: string;
-}
-
-export interface HubAgentRunEventSummary {
-  task_id: string;
-  edge_run_id?: string;
-  status: string;
-  total_events: number;
-  last_event_seq: number;
-  event_type_counts: Record<string, number>;
-  tool_call_count: number;
-  step_count: number;
-  artifact_count: number;
-  approval_count: number;
-  pending_approvals: number;
-  decided_approvals: number;
-  input_tokens: number;
-  output_tokens: number;
-  output_bytes: number;
-  started_at?: string;
-  finished_at?: string;
-  elapsed_ms?: number;
-}
-
-export interface HubAgentTaskApproval {
-  approval_id: string;
-  task_id?: string;
-  edge_run_id?: string;
-  session_id?: string;
-  source_event_id?: string;
-  event_seq?: number;
-  request_id?: string;
-  tool_name?: string;
-  tool_use_id?: string;
-  status?: string;
-  reason?: string;
-  decided_by?: string;
-  created_at?: string;
-  decided_at?: string;
-  edge_control?: Record<string, unknown>;
-}
-
-export interface HubAgentTaskApprovalList {
-  task_id: string;
-  edge_run_id?: string;
-  session_id?: string;
-  approvals: HubAgentTaskApproval[];
-  pending?: HubAgentTaskApproval[];
-  decided?: HubAgentTaskApproval[];
-  last_event_seq?: number;
-}
-
-export interface HubAgentTaskArtifactList {
-  task_id: string;
-  edge_run_id?: string;
-  session_id?: string;
-  artifacts: Record<string, unknown>[];
-  last_event_seq?: number;
-}
-
-export interface HubTaskApprovalDecisionRequest {
-  decision: 'allow' | 'deny';
-  reason?: string;
-}
-
-export interface HubAttachmentRef {
-  id: string;
-  hash: string;
-  size: number;
-  mime_type: string;
-  original_name?: string;
-  uploader_user_id?: string;
-  metadata?: string;
-  created_at?: string;
-}
-
-export interface HubProbeAttachmentResponse {
-  exists: boolean;
-  attachment?: HubAttachmentRef;
-}
+// Re-export full shared SSOT for app imports (types + helpers).
+export * from '@agenthub/shared/hubClient';
 
 // ── Mobile-specific error types (preserved for test compatibility) ──
 
@@ -259,182 +159,78 @@ export interface CreateHubClientOptions {
   fetchImpl?: typeof globalThis.fetch;
 }
 
-export interface HubClient {
-  // Re-export the shared Hub client for direct access
+/** Mobile Hub client = shared SSOT + mobile glue (snapshot / shared handle). */
+export type HubClient = SharedHubClient & {
   readonly shared: SharedHubClient;
-  // Legacy mobile snapshot (for fixture/fallback mode)
   getMobileSnapshot: () => Promise<MobileAppFixture>;
-  // Auth
-  oidcAuthorize: (body: HubOidcAuthorizeRequest) => Promise<HubOidcAuthorizeResponse>;
-  oidcCallback: (body: HubOidcCallbackRequest) => Promise<HubOidcCallbackResponse>;
-  register: (body: HubRegisterRequest) => Promise<{ user_id: string }>;
-  login: (body: HubLoginRequest) => Promise<HubAuthResponse>;
-  refresh: (refreshToken: string) => Promise<HubAuthResponse>;
-  logout: () => Promise<void>;
-  me: () => Promise<HubUserProfile>;
-  updateProfile: (body: HubUpdateProfileRequest) => Promise<HubUserProfile>;
-  changePassword: (body: HubChangePasswordRequest) => Promise<void>;
-  // Sessions
-  listSessions: () => Promise<HubSession[]>;
-  searchSessions: (q: string) => Promise<HubSession[]>;
-  createPrivateSession: (body: HubCreatePrivateSessionRequest) => Promise<HubSession>;
-  createGroupSession: (body: HubCreateGroupSessionRequest) => Promise<HubSession>;
-  addSessionMembers: (sessionId: string, memberIds: string[]) => Promise<void>;
-  removeSessionMember: (sessionId: string, userId: string) => Promise<void>;
-  leaveSession: (sessionId: string) => Promise<void>;
-  dissolveSession: (sessionId: string) => Promise<void>;
-  updateSessionInfo: (sessionId: string, body: HubUpdateSessionInfoRequest) => Promise<void>;
-  updateSessionSettings: (sessionId: string, body: HubUpdateSessionSettingsRequest) => Promise<void>;
-  deleteSession: (sessionId: string) => Promise<void>;
-  // Messages
-  sendMessage: (sessionId: string, body: { client_msg_id: string; content_type: string; content: string }) => Promise<{ message_id: string; seq_id: number; created_at: string }>;
-  getMessages: (sessionId: string, params?: { before_seq?: number; limit?: number }) => Promise<HubMessage[]>;
-  syncMessages: (sessionId: string, params?: { after_seq?: number; limit?: number }) => Promise<HubMessage[]>;
-  markRead: (sessionId: string, lastReadSeq: number) => Promise<void>;
-  recallMessage: (messageId: string) => Promise<void>;
-  editMessage: (messageId: string, body: { content: string }) => Promise<HubMessage>;
-  pinMessage: (messageId: string, sessionId: string) => Promise<void>;
-  unpinMessage: (messageId: string, sessionId: string) => Promise<void>;
-  forwardMessage: (messageId: string, targetSessionIds: string[]) => Promise<void>;
-  listPinnedMessages: (sessionId: string) => Promise<HubMessage[]>;
-  searchMessages: (params: { q: string; session_id?: string; content_type?: string; from?: string; to?: string }) => Promise<HubMessage[]>;
-  searchSessionMessages: (sessionId: string, params: { q: string; content_type?: string; from?: string; to?: string }) => Promise<HubMessage[]>;
-  // Message reactions
-  addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) => Promise<void>;
-  removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) => Promise<void>;
-  listMessageReactions: (messageId: string, sessionId: string) => Promise<Record<string, unknown>[]>;
-  // Contacts
-  searchUser: (targetUserId: string) => Promise<HubSearchResult>;
-  listContacts: () => Promise<HubContactInfo[]>;
-  sendFriendRequest: (friendId: string, message?: string) => Promise<void>;
-  listFriendRequests: () => Promise<HubFriendRequest[]>;
-  acceptFriendRequest: (requestId: string) => Promise<void>;
-  rejectFriendRequest: (requestId: string) => Promise<void>;
-  blockContact: (targetUserId: string) => Promise<void>;
-  unblockContact: (targetUserId: string) => Promise<void>;
-  updateContactRemark: (friendUserId: string, remark: string) => Promise<void>;
-  removeContact: (friendUserId: string) => Promise<void>;
-  // Notifications
-  listNotifications: (params?: { unread_only?: boolean; limit?: number; offset?: number }) => Promise<HubNotification[]>;
-  markNotificationRead: (id: string) => Promise<void>;
-  readAllNotifications: () => Promise<void>;
-  // Devices
-  registerDevice: (body: HubRegisterDeviceRequest) => Promise<HubDevice>;
-  // Custom Agents
-  listCustomAgents: () => Promise<HubCustomAgent[]>;
-  createCustomAgent: (body: HubCustomAgentRequest) => Promise<HubCustomAgent>;
-  updateCustomAgent: (id: string, body: HubCustomAgentRequest) => Promise<void>;
-  deleteCustomAgent: (id: string) => Promise<void>;
-  // Agent tasks
-  addAgentToSession: (sessionId: string, body: HubAddAgentToSessionRequest) => Promise<void>;
-  triggerAgentTask: (triggerMessageId: string, options?: HubTriggerAgentTaskOptions) => Promise<HubAgentTask>;
-  cancelAgentTask: (taskId: string) => Promise<void>;
-  regenerateAgentTask: (taskId: string) => Promise<HubAgentTask>;
-  listTaskRunEvents: (taskId: string) => Promise<HubAgentRunEvent[]>;
-  listTaskRunEventsAfter: (taskId: string, afterSeq: number) => Promise<HubAgentRunEvent[]>;
-  getTaskRunEventSummary: (taskId: string) => Promise<HubAgentRunEventSummary>;
-  listTaskApprovals: (taskId: string) => Promise<HubAgentTaskApprovalList>;
-  decideTaskApproval: (taskId: string, approvalId: string, decision: HubTaskApprovalDecisionRequest) => Promise<HubAgentTaskApproval>;
-  listTaskArtifacts: (taskId: string) => Promise<HubAgentTaskArtifactList>;
-  // Execution Targets
-  listExecutionTargets: () => Promise<HubListResponse<HubExecutionTarget>>;
-  // Skills & MCP
-  listPublicSkills: (params?: { skill_type?: string; q?: string; is_public?: string; pageCursor?: string; pageSize?: number }) => Promise<HubListResponse<HubSkill>>;
-  listPublicMCPServers: (params?: { transport?: string; q?: string; is_public?: string; pageCursor?: string; pageSize?: number }) => Promise<HubListResponse<HubMCPServer>>;
-  // Edge task lifecycle
-  ackTask: (taskId: string, runId?: string) => Promise<void>;
-  streamTask: (taskId: string, content: string, runId?: string) => Promise<void>;
-  doneTask: (taskId: string, finalContent?: string, runId?: string) => Promise<void>;
-  failTask: (taskId: string, error: string, runId?: string) => Promise<void>;
-  // Attachments
-  probeAttachment: (hash: string) => Promise<HubProbeAttachmentResponse>;
-  downloadAttachmentUrl: (attachmentId: string) => string;
+};
+
+/** Methods that must not wait on SecureStore token resolution. */
+const NO_AUTH_METHOD_KEYS = new Set<string>([
+  'oidcAuthorize',
+  'oidcCallback',
+  'register',
+  'login',
+  'refresh',
+  // Sync URL builder — no network; shared already prefixes baseUrl.
+  'downloadAttachmentUrl',
+]);
+
+function wrapSharedAsMobileClient(
+  shared: SharedHubClient,
+  glue: {
+    ensureToken: () => Promise<string | null | undefined>;
+    withAuth: <T>(fn: () => Promise<T>) => Promise<T>;
+    clearToken: () => void;
+    getMobileSnapshot: () => Promise<MobileAppFixture>;
+  },
+): HubClient {
+  return new Proxy(shared as object, {
+    get(target, prop, receiver) {
+      if (prop === 'shared') return shared;
+      if (prop === 'getMobileSnapshot') return glue.getMobileSnapshot;
+
+      if (prop === 'logout') {
+        return async () => {
+          try {
+            await glue.ensureToken();
+            await shared.logout();
+          } finally {
+            glue.clearToken();
+          }
+        };
+      }
+
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') {
+        return value;
+      }
+
+      const key = String(prop);
+      if (NO_AUTH_METHOD_KEYS.has(key)) {
+        return (value as (...args: unknown[]) => unknown).bind(target);
+      }
+
+      return (...args: unknown[]) =>
+        glue.withAuth(() => (value as (...a: unknown[]) => Promise<unknown>).apply(target, args));
+    },
+  }) as HubClient;
 }
 
 export function createMockHubClient(delayMs = 80): HubClient {
   const shared = createSharedHubClient();
 
-  return {
-    shared,
-    async getMobileSnapshot() {
+  return wrapSharedAsMobileClient(shared, {
+    ensureToken: async () => null,
+    withAuth: async (fn) => fn(),
+    clearToken: () => {},
+    getMobileSnapshot: async () => {
       await new Promise((resolve) => {
         setTimeout(resolve, delayMs);
       });
       return mobileFixture;
     },
-    oidcAuthorize: () => { throw new Error('Mock: OIDC not available'); },
-    oidcCallback: () => { throw new Error('Mock: OIDC not available'); },
-    register: () => { throw new Error('Mock: register not available'); },
-    login: () => { throw new Error('Mock: login not available'); },
-    refresh: () => { throw new Error('Mock: refresh not available'); },
-    logout: async () => {},
-    me: () => { throw new Error('Mock: me not available'); },
-    updateProfile: () => { throw new Error('Mock: updateProfile not available'); },
-    changePassword: async () => {},
-    listSessions: async () => [],
-    searchSessions: async () => [],
-    createPrivateSession: () => { throw new Error('Mock: createPrivateSession not available'); },
-    createGroupSession: () => { throw new Error('Mock: createGroupSession not available'); },
-    addSessionMembers: async () => {},
-    removeSessionMember: async () => {},
-    leaveSession: async () => {},
-    dissolveSession: async () => {},
-    updateSessionInfo: async () => {},
-    updateSessionSettings: async () => {},
-    deleteSession: async () => {},
-    sendMessage: () => { throw new Error('Mock: sendMessage not available'); },
-    getMessages: async () => [],
-    syncMessages: async () => [],
-    markRead: async () => {},
-    recallMessage: async () => {},
-    editMessage: () => { throw new Error('Mock: editMessage not available'); },
-    pinMessage: async () => {},
-    unpinMessage: async () => {},
-    forwardMessage: async () => {},
-    listPinnedMessages: async () => [],
-    searchMessages: async () => [],
-    searchSessionMessages: async () => [],
-    addMessageReaction: async () => {},
-    removeMessageReaction: async () => {},
-    listMessageReactions: async () => [],
-    searchUser: () => { throw new Error('Mock: searchUser not available'); },
-    listContacts: async () => [],
-    sendFriendRequest: async () => {},
-    listFriendRequests: async () => [],
-    acceptFriendRequest: async () => {},
-    rejectFriendRequest: async () => {},
-    blockContact: async () => {},
-    unblockContact: async () => {},
-    updateContactRemark: async () => {},
-    removeContact: async () => {},
-    listNotifications: async () => [],
-    markNotificationRead: async () => {},
-    readAllNotifications: async () => {},
-    registerDevice: () => { throw new Error('Mock: registerDevice not available'); },
-    listCustomAgents: async () => [],
-    createCustomAgent: () => { throw new Error('Mock: createCustomAgent not available'); },
-    updateCustomAgent: async () => {},
-    deleteCustomAgent: async () => {},
-    addAgentToSession: async () => {},
-    triggerAgentTask: () => { throw new Error('Mock: triggerAgentTask not available'); },
-    cancelAgentTask: async () => {},
-    regenerateAgentTask: () => { throw new Error('Mock: regenerateAgentTask not available'); },
-    listTaskRunEvents: async () => [],
-    listTaskRunEventsAfter: async () => [],
-    getTaskRunEventSummary: () => { throw new Error('Mock: getTaskRunEventSummary not available'); },
-    listTaskApprovals: async () => ({ approvals: [], task_id: '' }),
-    decideTaskApproval: () => { throw new Error('Mock: decideTaskApproval not available'); },
-    listTaskArtifacts: async () => ({ artifacts: [], task_id: '' }),
-    listExecutionTargets: async () => ({ items: [], page: { hasMore: false } }),
-    listPublicSkills: async () => ({ items: [], page: { hasMore: false } }),
-    listPublicMCPServers: async () => ({ items: [], page: { hasMore: false } }),
-    ackTask: async () => {},
-    streamTask: async () => {},
-    doneTask: async () => {},
-    failTask: async () => {},
-    probeAttachment: async () => ({ exists: false }),
-    downloadAttachmentUrl: (attachmentId: string) => `/mock/attachments/${attachmentId}`,
-  };
+  });
 }
 
 export function createHubClient(options: CreateHubClientOptions): HubClient {
@@ -509,23 +305,15 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
 
   const shared = createSharedHubClient(sharedOpts);
 
-  // Helper for building query strings
-  function qs(params: Record<string, string | number | boolean | undefined | null>): string {
-    const p = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v != null) p.set(k, String(v));
-    }
-    const s = p.toString();
-    return s ? `?${s}` : '';
-  }
-
-  return {
-    shared,
-
-    async getMobileSnapshot() {
+  return wrapSharedAsMobileClient(shared, {
+    ensureToken,
+    withAuth,
+    clearToken: () => {
+      cachedToken = null;
+    },
+    getMobileSnapshot: async () => {
       await ensureToken();
 
-      // Build a mobile snapshot from real Hub API data
       const [sessions, contacts] = await Promise.all([
         shared.listSessions().catch(() => [] as HubSession[]),
         shared.listContacts().catch(() => [] as HubContactInfo[]),
@@ -533,142 +321,7 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
 
       return mapSessionsToMobileFixture(sessions, contacts);
     },
-
-    // Unauthenticated entry points — no token gate.
-    oidcAuthorize: (body) => shared.oidcAuthorize(body),
-    oidcCallback: (body) => shared.oidcCallback(body),
-    register: (body) => shared.register(body),
-    login: (body) => shared.login(body),
-    refresh: (refreshToken) => shared.refresh(refreshToken),
-    logout: async () => {
-      try {
-        await ensureToken();
-        await shared.logout();
-      } finally {
-        cachedToken = null;
-      }
-    },
-    me: () => withAuth(() => shared.me()),
-    updateProfile: (body) => withAuth(() => shared.updateProfile(body)),
-    changePassword: (body) => withAuth(() => shared.changePassword(body)),
-    listSessions: () => withAuth(() => shared.listSessions()),
-    searchSessions: (q) => withAuth(() => shared.searchSessions(q)),
-    createPrivateSession: (body) => withAuth(() => shared.createPrivateSession(body)),
-    createGroupSession: (body) => withAuth(() => shared.createGroupSession(body)),
-    addSessionMembers: (sessionId, memberIds) => withAuth(() => shared.addSessionMembers(sessionId, memberIds)),
-    removeSessionMember: (sessionId, userId) => withAuth(() => shared.removeSessionMember(sessionId, userId)),
-    leaveSession: (sessionId) => withAuth(() => shared.leaveSession(sessionId)),
-    dissolveSession: (sessionId) => withAuth(() => shared.dissolveSession(sessionId)),
-    updateSessionInfo: (sessionId, body) => withAuth(() => shared.updateSessionInfo(sessionId, body)),
-    updateSessionSettings: (sessionId, body) => withAuth(() => shared.updateSessionSettings(sessionId, body)),
-    deleteSession: (sessionId) => withAuth(() => shared.deleteSession(sessionId)),
-    sendMessage: (sessionId, body) => withAuth(() => shared.sendMessage(sessionId, body)),
-    getMessages: (sessionId, params) => withAuth(() => shared.getMessages(sessionId, params)),
-    syncMessages: (sessionId, params) => withAuth(() => shared.syncMessages(sessionId, params)),
-    markRead: (sessionId, lastReadSeq) => withAuth(() => shared.markRead(sessionId, lastReadSeq)),
-    recallMessage: (messageId) => withAuth(() => shared.recallMessage(messageId)),
-    editMessage: (messageId, body) =>
-      withAuth(() =>
-        shared.request<HubMessage>(`/client/messages/${encodeURIComponent(messageId)}`, {
-          method: 'PUT',
-          body: JSON.stringify(body),
-        }),
-      ),
-    pinMessage: (messageId, sessionId) => withAuth(() => shared.pinMessage(messageId, sessionId)),
-    unpinMessage: (messageId, sessionId) => withAuth(() => shared.unpinMessage(messageId, sessionId)),
-    forwardMessage: (messageId, targetSessionIds) => withAuth(() => shared.forwardMessage(messageId, targetSessionIds)),
-    listPinnedMessages: (sessionId) => withAuth(() => shared.listPinnedMessages(sessionId)),
-    searchMessages: (params) => withAuth(() => shared.searchMessages(params)),
-    searchSessionMessages: (sessionId, params) => withAuth(() => shared.searchSessionMessages(sessionId, params)),
-    addMessageReaction: (messageId, sessionId, reaction) =>
-      withAuth(() =>
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-        shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-          method: 'POST',
-          body: JSON.stringify({ session_id: sessionId, ...reaction }),
-        }),
-      ),
-    removeMessageReaction: (messageId, sessionId, reaction) =>
-      withAuth(() =>
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-        shared.request<void>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
-          method: 'DELETE',
-          body: JSON.stringify({ session_id: sessionId, ...reaction }),
-        }),
-      ),
-    listMessageReactions: (messageId, sessionId) =>
-      withAuth(() =>
-        shared.request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
-      ),
-    searchUser: (targetUserId) => withAuth(() => shared.searchUser(targetUserId)),
-    listContacts: () => withAuth(() => shared.listContacts()),
-    sendFriendRequest: (friendId, message) => withAuth(() => shared.sendFriendRequest(friendId, message)),
-    listFriendRequests: () => withAuth(() => shared.listFriendRequests()),
-    acceptFriendRequest: (requestId) => withAuth(() => shared.acceptFriendRequest(requestId)),
-    rejectFriendRequest: (requestId) => withAuth(() => shared.rejectFriendRequest(requestId)),
-    blockContact: (targetUserId) => withAuth(() => shared.blockContact(targetUserId)),
-    unblockContact: (targetUserId) => withAuth(() => shared.unblockContact(targetUserId)),
-    updateContactRemark: (friendUserId, remark) => withAuth(() => shared.updateContactRemark(friendUserId, remark)),
-    removeContact: (friendUserId) => withAuth(() => shared.removeContact(friendUserId)),
-    listNotifications: (params) => withAuth(() => shared.listNotifications(params)),
-    markNotificationRead: (id) => withAuth(() => shared.markNotificationRead(id)),
-    readAllNotifications: () => withAuth(() => shared.readAllNotifications()),
-    registerDevice: (body) => withAuth(() => shared.registerDevice(body)),
-    listCustomAgents: () => withAuth(() => shared.listCustomAgents()),
-    createCustomAgent: (body) => withAuth(() => shared.createCustomAgent(body)),
-    updateCustomAgent: (id, body) => withAuth(() => shared.updateCustomAgent(id, body)),
-    deleteCustomAgent: (id) => withAuth(() => shared.deleteCustomAgent(id)),
-    addAgentToSession: (sessionId, body) =>
-      withAuth(async () => {
-        await shared.addAgentToSession(sessionId, body);
-      }),
-    triggerAgentTask: (triggerMessageId, taskOptions) => withAuth(() => shared.triggerAgentTask(triggerMessageId, taskOptions)),
-    cancelAgentTask: (taskId) => withAuth(() => shared.cancelAgentTask(taskId)),
-    regenerateAgentTask: (taskId) => withAuth(() => shared.regenerateAgentTask(taskId)),
-    listTaskRunEvents: (taskId) =>
-      withAuth(() =>
-        shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
-      ),
-    listTaskRunEventsAfter: (taskId, afterSeq) =>
-      withAuth(() =>
-        shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
-      ),
-    getTaskRunEventSummary: (taskId) =>
-      withAuth(() =>
-        shared.request<HubAgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
-      ),
-    listTaskApprovals: (taskId) =>
-      withAuth(() =>
-        shared.request<HubAgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
-      ),
-    decideTaskApproval: (taskId, approvalId, decision) =>
-      withAuth(() =>
-        shared.request<HubAgentTaskApproval>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
-          method: 'POST',
-          body: JSON.stringify(decision),
-        }),
-      ),
-    listTaskArtifacts: (taskId) =>
-      withAuth(() =>
-        shared.request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
-      ),
-    listExecutionTargets: () => withAuth(() => shared.listExecutionTargets()),
-    listPublicSkills: (params) => withAuth(() => shared.listPublicSkills(params)),
-    listPublicMCPServers: (params) => withAuth(() => shared.listPublicMCPServers(params)),
-    ackTask: (taskId, runId) => withAuth(() => shared.ackTask(taskId, runId)),
-    streamTask: (taskId, content, runId) => withAuth(() => shared.streamTask(taskId, content, runId)),
-    doneTask: (taskId, finalContent, runId) => withAuth(() => shared.doneTask(taskId, finalContent, runId)),
-    failTask: (taskId, error, runId) => withAuth(() => shared.failTask(taskId, error, runId)),
-    probeAttachment: (hash) =>
-      withAuth(() =>
-        shared.request<HubProbeAttachmentResponse>('/client/attachments/probe', {
-          method: 'POST',
-          body: JSON.stringify({ hash }),
-        }),
-      ),
-    downloadAttachmentUrl: (attachmentId) =>
-      `${options.baseUrl.replace(/\/+$/, '')}/client/attachments/${encodeURIComponent(attachmentId)}`,
-  };
+  });
 }
 
 // ── WebSocket URL builder (aligned with hub-server /client/ws) ──
