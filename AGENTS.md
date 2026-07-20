@@ -56,8 +56,10 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 - API 契约写在 `api/`。
 - 通用 UI、transcript、composer、inspector、platform contract 放 `app/shared/`。
+- Hub REST/WS 方法与 DTO 的 SSOT 是 `app/shared/src/hubClient.ts`（及拆出的 payload/extended 模块）。Desktop/Web/Mobile 的 `src/api/hubClient.ts` 只能是 thin shell（平台默认 baseUrl、Tauri proxy、SecureStore token、fixture snapshot、WS URL 等胶水）；禁止在客户端再分叉 REST 实现。
 - Desktop 只能把 Tauri/Rust native 能力放在 `app/desktop/src-tauri/`。
 - Web 只能通过 Hub/Web adapter 访问远端能力，不能直连 Local Edge 或 runtime。
+- Mobile（Expo/RN）同样 **Hub-only**：只走 Hub 合同与 shared hubClient；不得直连 Local Edge、raw runtime 或 Desktop host。详见 `app/mobile-rn/README.md`。
 - Desktop renderer 不获得 raw process execution 权限；本地执行由 Local Edge 和 Tauri host typed API 承担。
 
 ## 3. 产品术语
