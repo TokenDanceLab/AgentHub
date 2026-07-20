@@ -162,6 +162,17 @@
   box-shadow: var(--glass-elev-1, var(--e-1));
 }
 
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-lg, 12px);
+  background: var(--glass-bg-subtle, var(--surface-low, var(--surface)));
+  color: var(--text-2);
+}
+
 .emptyTitle {
   color: var(--text-1);
   font-size: var(--fs-md, 14px);
