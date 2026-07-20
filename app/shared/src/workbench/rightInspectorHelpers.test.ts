@@ -119,12 +119,16 @@ describe('rightInspectorHelpers', () => {
     expect(review.visibleTabs.has('files')).toBe(true);
   });
 
-  it('gates deploy auto-switch to new URLs only', () => {
+  it('gates deploy auto-switch to new real URLs only', () => {
     expect(shouldAutoSwitchDeployPreview(undefined, true, null)).toBe(false);
     expect(shouldAutoSwitchDeployPreview('https://a.test', false, null)).toBe(false);
     expect(shouldAutoSwitchDeployPreview('https://a.test', true, 'https://a.test')).toBe(false);
     expect(shouldAutoSwitchDeployPreview('https://a.test', true, null)).toBe(true);
     expect(shouldAutoSwitchDeployPreview('https://b.test', true, 'https://a.test')).toBe(true);
+    /* P77 #1318: themed blank demo previews must not steal overview. */
+    expect(shouldAutoSwitchDeployPreview('about:blank', true, null)).toBe(false);
+    expect(shouldAutoSwitchDeployPreview(' about:blank# ', true, null)).toBe(false);
+    expect(shouldAutoSwitchDeployPreview('', true, null)).toBe(false);
 
     const plan = planDeployAutoSwitch(new Set(['overview']), 'https://deploy.test');
     expect(plan.activeMode).toBe('browser');

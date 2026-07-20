@@ -25,6 +25,7 @@ import {
   resolveFileClickTarget,
   resolveOverviewFiles,
   resolveOverviewTasks,
+  shouldAutoSwitchDeployPreview,
   withInspectorTab,
   withoutInspectorTab,
 } from './rightInspectorHelpers';
@@ -69,12 +70,17 @@ export function RightInspector({
   const lastAutoSwitchedUrl = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!deployPreviewUrl || !browserPreviewEnabled) return;
-    // Only auto-switch on NEW deploy URLs (not on re-renders of the same URL)
-    if (lastAutoSwitchedUrl.current === deployPreviewUrl) return;
-    lastAutoSwitchedUrl.current = deployPreviewUrl;
+    if (!shouldAutoSwitchDeployPreview(
+      deployPreviewUrl,
+      browserPreviewEnabled,
+      lastAutoSwitchedUrl.current,
+    )) {
+      return;
+    }
+    // Only auto-switch on NEW real deploy URLs (not about:blank demo placeholders).
+    lastAutoSwitchedUrl.current = deployPreviewUrl!;
     setVisibleTabs((current) => withInspectorTab(current, 'browser'));
-    setBrowserUrl(deployPreviewUrl);
+    setBrowserUrl(deployPreviewUrl!);
     setActiveMode('browser');
   }, [deployPreviewUrl, browserPreviewEnabled]);
 
