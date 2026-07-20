@@ -281,12 +281,43 @@ jobs:
           cd edge-server && go test -bench=. -benchtime=1s ./internal/events/ ./internal/adapters/
           cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
 
+  # ── Frontend Path Filter ──────────────────────
+  # P78: only run frontend CI when app/{desktop,web,shared} changes change.
+  changes-frontend:
+    name: Detect frontend paths
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            desktop:
+              - 'app/desktop/**'
+              - 'app/shared/**'
+              - 'app/package.json'
+              - 'app/pnpm-lock.yaml'
+              - '.github/workflows/checks.yml'
+            web:
+              - 'app/web/**'
+              - 'app/shared/**'
+              - 'app/package.json'
+              - 'app/pnpm-lock.yaml'
+              - '.github/workflows/checks.yml'
+
   # ── Frontend: Desktop ────────────────────────
   # Known debt: 15 pre-existing test failures (97.8% pass rate: 679/694).
   # Tracked in docs/audit/comprehensive-audit-2026-06-17.md, Test Quality section.
   # Failures are in desktop integration/edge-real tests and a few component tests.
   # These are low-priority pre-existing issues, not regressions.
   frontend-desktop:
+    needs: changes-frontend
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes-frontend.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -325,6 +356,10 @@ jobs:
   # ── Frontend: Web ────────────────────────────
   frontend-web:
     name: Frontend (web)
+    needs: changes-frontend
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes-frontend.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
