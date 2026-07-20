@@ -6,49 +6,50 @@
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
-## Merged PRs (today, 10 total)
+## Merged PRs (today, 11 total)
 P74 #1295 · P75 #1310 · P76 #1315 · rescore #1317 ·
 P77 #1319 · P77 #1321 · P77 #1324 · P77 #1325 ·
-P78 #1326 · P78 #1327
+P78 #1326 · P78 #1327 · P78 #1328
 
 ## Milestones
 
-| Phase | Name | Milestone | Status |
-|:------|:-----|:----------|:-------|
-| 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79) |
-| 75 | HiDPI fidelity + typography | #96 | closed via #1310 |
-| 76 | Chat + Inspector density | #97 | closed via #1315 |
-| 77 | Agents density + blank browser + terminal dock | — | closed via 4 PRs |
-| 78 | A11y focus ring + Glass border boost | — | closed via 2 PRs |
+| Phase | Name | Status |
+|:------|:-----|:-------|
+| 74 | Light frosted glass + Visual QA | closed (gate ~79) |
+| 75 | HiDPI fidelity + typography | closed |
+| 76 | Chat + Inspector density | closed |
+| 77 | Agents density + blank browser + terminal dock | closed (4 PRs) |
+| 78 | A11y focus ring + Glass border + Dark elevation | closed (3 PRs) |
 
 ## References
 - [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
-- [visual-qa-score-2026-07-20-rescore-13](../analysis/visual-qa-score-2026-07-20-rescore-13.md)
+- [visual-qa-score-2026-07-20-rescore-14](../analysis/visual-qa-score-2026-07-20-rescore-14.md)
 
 ## Current Status
 
-**Product tip**: `1ae05eef`
-**Rescore-13 gate**: **87**/100 — 🟢 **SHIP** (+2)
-**Gate history**: 55 → … → 79 → 82 → 84 → 85 → **87**
+**Product tip**: `eeb0c52e`
+**Rescore-14 gate**: **88**/100 — 🟢 **SHIP**
+**Gate history**: 55 → … → 79 → 82 → 84 → 85 → 87 → **88**
 
-## Phase Checklist
-- [x] Phase 74 frosted glass (gate 79)
-- [x] Phase 75 HiDPI + typography
-- [x] Phase 76 Chat + Inspector density
-- [x] Phase 77 Agents density + blank browser + terminal dock
-- [x] Phase 78 A11y focus ring + Glass border boost
-- [x] **Ship gate 87** (10 PRs today, 32 points gained from 55)
+### Dimension grid
+| Dim | Score | Max | Status |
+|-----|-------|-----|--------|
+| Glass | 18 | 18 | ✅ MAX |
+| Hierarchy | 14 | 14 | ✅ MAX |
+| Spacing | 14 | 14 | ✅ MAX |
+| A11y | 8 | 8 | ✅ MAX |
+| Dark | 8 | 8 | ✅ MAX |
+| Light | 11 | 12 | 1pt |
+| Type | 9 | 10 | 1pt |
+| Motion | 9 | 10 | 1pt |
+| Empty | 5 | 6 | 1pt |
 
-## Polish backlog (post-Ship)
-- Glass: 17/18 — remaining 1pt
-- Type: 9/10 — zh refinement
-- Empty: 5/6 — dock placeholder
-- Dark: 7/8 — theme depth
+**5/9 dimensions at full marks.** Remaining 4pt across Light/Type/Motion/Empty — diminishing returns.
 
 ## Session Log
 | Date | Summary |
 |:-----|:--------|
-| 2026-07-20 | 🟢 **SHIP 87** — #1326 A11y ring + #1327 Glass border, gate 87 |
-| 2026-07-20 | 🟢 **SHIP 85** — #1324 + #1325 Agents density, gate 85 |
-| 2026-07-20 | Rescore-10/11/12: gate 82 → 84 → 85 |
+| 2026-07-20 | 🟢 **SHIP 88** — #1328 dark elevation + glass saturate, 5 dims maxed |
+| 2026-07-20 | 🟢 **SHIP 87** — #1326 A11y ring + #1327 Glass border |
+| 2026-07-20 | 🟢 **SHIP 85** — #1324 + #1325 Agents density |
 | 2026-07-20 | P76 Chat + Inspector merged, gate 82 |
