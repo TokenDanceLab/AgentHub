@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-07-20
+最后更新：2026-07-21
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
@@ -17,24 +17,23 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phases 73–78 all closed · milestones 94–95 closed · gate 89 Ship）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
+活进度只看 [progress/MASTER.md](progress/MASTER.md)。
 
-**Baseline closed（绝对日期指针，非 live backlog）**：
-
-| Program | Closed | Pointer |
+| Program | Status | Pointer |
 |---|---|---|
-| Cleanup baseline Phases 1–7 | 2026-07-16 / PR #446 | [progress/MASTER.md](progress/MASTER.md) · [archives/cleanup-baseline/](archives/cleanup-baseline/) |
-| Repo Structure Doc Tooling Cleanup | pre-baseline | [history.md](history.md) |
+| **Post-Polish Residual Hardening** (Phases 79–80) | **live** | MASTER · [plan/post-polish-task-breakdown.md](plan/post-polish-task-breakdown.md) · issues #1335–#1339 · GH milestones 98–99 |
+| Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](analysis/visual-qa-scorecard.md) |
+| Cleanup baseline (Phases 0–7) | closed 2026-07-16 / PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | [archives/cleanup-baseline/](archives/cleanup-baseline/) · historical `docs/plan/*` banners |
 
 ## 当前优先级
 
-### P0
+### P0（residual program）
 
 | 方向 | 目标 | 验收 |
 |---|---|---|
-| 文档治理 | active docs 只保留规则、当前 spec（若存在）、总路线、架构和契约入口；重复规则面和历史 longform/审计/发布材料/旧入口快照归档 | `scripts/verify/verify-doc-ssot.ps1` |
+| Docs authority | cleanup `docs/plan/*` 明确 HISTORICAL；MASTER 为 sole live index；post-polish plan 入库 | `scripts/verify/verify-doc-ssot.ps1` + MASTER 链接 #1335–#1339 |
+| Mobile hubClient thin | 再导出 shared SSOT；仅保留 SecureStore/fixture/WS 胶水；禁止 mobile 新增 REST | `pnpm --filter agenthub-mobile-rn typecheck` + focused tests · #1337–#1339 |
 | 真实 E2E 合同 | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 | `scripts/verify/verify-real-e2e-contract.ps1` |
-| 远控拓扑前置合同 | P0 remote-control fixture 验证 `Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter` 的离线拓扑形状，不声明真实登录或真实执行 | `scripts/verify/verify-p0-remote-control-fixture.ps1` |
 | Chat flow 可靠性 | 发送不消失、消息线性排序、自动滚动、卡片合并、markdown/table 渲染 | Desktop/Web Playwright + Visual QA |
 | Hub/Edge 安全边界 | TokenDance ID 只做身份，AgentHub 权限由 Hub 本地资源检查决定 | 后端 auth/permission tests + security risk register |
 
@@ -44,17 +43,16 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | Web/Mobile client test lanes | Web 保持 Hub-only；Mobile 只澄清 RN-safe shared contract gate，不做 native/UI 深入重构 | Web data-boundary checks + Mobile mock-Hub/Expo Doctor boundary notes |
 | Desktop packaged boundary | 区分 Vite renderer、Tauri packaged、sidecar、icon、installer/signing | packaged-release gate 或明确 `real_tested=false` |
-| Source/test alignment | Shared transcript/data-mode normalizer 和 Desktop/Web 实现一致 | shared unit + app E2E |
-| Backend performance/leak | 对 Hub EventBus/outbox/scheduler/Redis TTL、Edge lifecycle/store/adapters 建立路径级检查 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` |
+| Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` **PASS**（非 capacity） |
 | API contract hygiene | REST 以 `api/openapi.yaml` 为准，WS 以 `api/events.md` 为准 | OpenAPI parse + endpoint tests |
 
 ### P2
 
 | 方向 | 目标 | 验收 |
 |---|---|---|
-| Mobile | 暂不做 UI/native 深入重构；只保持现有 required gate 边界清楚 | Expo Web Visual QA + mock-Hub + Expo Doctor，不声明 native/device/real Hub |
-| Release hardening | High 风险关闭或 accepted，依赖漏洞和安全头补齐 | release gate + risk register |
-| Long-term docs | 活跃文档只保留入口/当前事实/owner 链接；历史 session log、审计和旧入口快照归档 | doc SSOT + 人工 review |
+| Mobile UI/native | 暂不做 UI/native 深入重构；只保持 required gate 边界清楚 | Expo Web Visual QA + mock-Hub + Expo Doctor，不声明 native/device/real Hub |
+| Visual residual | Type/Motion/Empty 剩余 3pt — 仅在 interactive methodology 下推进 | 不 chase static gate past 89 |
+| Release hardening | High 风险关闭或 accepted；deploy/client 证据项显式 defer | release gate + risk register |
 
 ## 架构入口
 
