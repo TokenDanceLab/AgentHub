@@ -100,38 +100,40 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 通用组件在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，禁止复制本地 UI 副本。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
-- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web **P74 gate** 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- 当前 Visual QA gate: **89/100 Ship**（Phases 74-78，2026-07-20）。7/9 维度满分。剩余 Type/Motion/Empty 需交互测试或跨组件改动，已触及静态截图方法论天花板。
 
 前端 CI 易踩坑（站立规则）：
 
 - `exactOptionalPropertyTypes`：禁止 `...{ optional: maybeUndefined }`；只在 defined 时赋值；async handler 传给 `() => void` 时用 `void fn()` 包装。
 - `noUncheckedIndexedAccess`：CSS module / `Record<string, string>` 索引用 `styles.foo ?? ''`，不要假设必有 key。
 - CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
-- Nav 图标只用 `DesignNavIcon`；禁止再引入散落的 nav glyph 组件。
+- Nav 图标只用 `DesignNavIcon`（有效名称见 `DesignNavIconName` 类型）；禁止散落的 nav glyph 组件。
+- 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。
+- CI 使用统一 `changes` job（`dorny/paths-filter@v3`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`verify-ci-gates.ps1` 校验 job 结构。
 
 ## 6. Git 和 worktree
 
-当前开发基线是 `dev/delicious233`，合并路径：
+合并路径（2026-07 起简化）：
 
 ```text
-feat/* 或 docs/* -> dev/delicious233 -> master
+feat/* 或 docs/* -> master（squash merge）
 ```
 
 开始新工作：
 
 ```powershell
-git checkout dev/delicious233
-git pull --ff-only
-git worktree add .worktrees/<topic> -b <type>/<topic>
+git pull origin master --ff-only
+git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 ```
 
 规则：
 
-- `master` 禁止直接 push。
+- `master` 禁止直接 push；所有变更通过 PR squash merge。
 - 项目级 worktree 固定放 `.worktrees/`，一个 worktree 对应一个短分支和一个任务卡/PR。
 - 不按历史 handoff 或旧审计推断分支状态；用 `git status --short --branch`、`git worktree list`、GitHub issue/PR live 状态。
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
-- 不在共享分支 force-push。
+- 不在共享分支 force-push（amend 后 force-with-lease 除外）。
 
 提交格式：
 
