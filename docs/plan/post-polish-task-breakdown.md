@@ -1,9 +1,9 @@
 # Task Breakdown — Post-Polish Residual Hardening
 
-> last-updated: 2026-07-20  
-> program: post-visual-polish residual (after gate 89)  
-> tracking: GITHUB_FULL  
-> hard rule: **NO big-bang rewrite**; Mobile UI deep refactor out of scope  
+> last-updated: 2026-07-20
+> program: post-visual-polish residual (after gate 89)
+> tracking: GITHUB_FULL
+> hard rule: **NO big-bang rewrite**; Mobile UI deep refactor out of scope
 > strategy: Strangler Fig — thin mobile hubClient + docs authority
 
 ## Overview
@@ -39,7 +39,7 @@
 
 ## Out of Scope
 
-- Live OIDC / secret rotation / packaged Desktop evidence  
-- Full Mobile UI redesign  
-- Further Edge handlers split without API change  
+- Live OIDC / secret rotation / packaged Desktop evidence
+- Full Mobile UI redesign
+- Further Edge handlers split without API change
 - Static Visual QA gate chase past 89
