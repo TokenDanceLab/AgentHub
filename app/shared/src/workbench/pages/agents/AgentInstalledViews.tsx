@@ -140,6 +140,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
               <EmptyState
                 title="暂无已安装 Agent"
                 description="当前 Hub 账号还没有已安装配置。"
+                icon={<DesignNavIcon name="package" size={28} strokeWidth={1.5} />}
                 titleLevel={3}
                 {...(styles['agent-empty-compact']
                   ? { className: styles['agent-empty-compact'] }
