@@ -195,10 +195,10 @@ html[data-theme-sync='true'] *::after {
   --glass-panel: rgba(30, 30, 38, 0.65);
   --glass-panel-strong: rgba(27, 27, 35, 0.82);
   --glass-panel-overlay: rgba(26, 26, 33, 0.92);
-  --glass-border-subtle: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-strong: rgba(255, 255, 255, 0.16);
-  --glass-border-heavy: rgba(255, 255, 255, 0.20);
+  --glass-border-subtle: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-border-strong: rgba(255, 255, 255, 0.19);
+  --glass-border-heavy: rgba(255, 255, 255, 0.23);
   --glass-shadow: rgba(0, 0, 0, 0.44);
   --glass-shadow-subtle: rgba(0, 0, 0, 0.28);
   --glass-blur-sm: 12px;
@@ -468,10 +468,10 @@ html[data-theme-sync='true'] *::after {
    Slightly stronger glass / bdr edges so 1 CSS px hairlines read on 2x. */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
   [data-theme='dark'] {
-    --glass-border-subtle: rgba(255, 255, 255, 0.10);
-    --glass-border: rgba(255, 255, 255, 0.15);
-    --glass-border-strong: rgba(255, 255, 255, 0.20);
-    --glass-border-heavy: rgba(255, 255, 255, 0.24);
+    --glass-border-subtle: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-border-strong: rgba(255, 255, 255, 0.23);
+    --glass-border-heavy: rgba(255, 255, 255, 0.27);
     --glass-blur-sm: 16px;
     --glass-blur-md: 28px;
     --glass-blur-lg: 42px;
