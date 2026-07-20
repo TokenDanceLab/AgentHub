@@ -313,7 +313,7 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(300px, 1fr);
-  gap: var(--sp-14);
+  gap: var(--sp-10);
   align-items: stretch;
 }
 
@@ -330,7 +330,7 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   box-shadow: var(--glass-elev-1);
-  padding: var(--sp-14);
+  padding: var(--sp-md);
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -353,7 +353,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--sp-10);
+  margin-bottom: var(--sp-xs);
 }
 
 .section-title-row h2 {
@@ -680,7 +680,7 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   box-shadow: var(--glass-elev-1);
-  padding: var(--sp-md);
+  padding: var(--sp-sm);
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -708,8 +708,8 @@
 .detail-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-10);
-  padding: 0 0 var(--sp-14);
+  gap: var(--sp-sm);
+  padding: 0 0 var(--sp-10);
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -750,7 +750,7 @@
 
 .agent-runtime-line {
   min-height: 28px;
-  margin: var(--wb-gap-xs, var(--sp-sm)) 0 var(--wb-gap-2xs, var(--sp-xxs));
+  margin: var(--sp-xxs) 0 var(--sp-2);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -786,8 +786,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 0 0 var(--wb-gap-xs, var(--sp-sm));
-  padding-bottom: var(--wb-gap-xs, var(--sp-sm));
+  margin: 0 0 var(--sp-2);
+  padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
@@ -919,12 +919,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--wb-gap-2xs, var(--sp-xs));
-  margin: 0 0 var(--wb-gap-xs, var(--sp-sm));
+  margin: 0 0 var(--sp-2);
 }
 
 .agent-edit-grid label {
-  min-height: 56px;
-  padding: var(--wb-gap-xs, var(--sp-sm)) var(--wb-gap-sm, var(--sp-10));
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-sm);
   border: 1px solid var(--glass-border, var(--bdr));
   border-radius: var(--r-sm);
   background: var(--glass-input-bg, var(--glass-bg-light, var(--surface-low)));
@@ -978,7 +978,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  margin-bottom: var(--wb-gap-xs, var(--sp-sm));
+  margin-bottom: var(--sp-2);
 }
 
 .skill-chip-grid {
@@ -1046,7 +1046,7 @@
 
 .editable-tools {
   margin-top: 0;
-  margin-bottom: var(--wb-gap-xs, var(--sp-sm));
+  margin-bottom: var(--sp-2);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1054,7 +1054,7 @@
 }
 
 .scope-row {
-  min-height: 32px;
+  min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1069,7 +1069,7 @@
 }
 
 .scope-row.editable {
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .scope-row.editable > span {
@@ -1122,8 +1122,8 @@
   display: flex;
   align-items: center;
   gap: var(--wb-gap-xs, var(--sp-sm));
-  margin-top: var(--wb-gap-sm, var(--sp-14));
-  padding-top: var(--wb-gap-sm, var(--sp-14));
+  margin-top: var(--sp-10);
+  padding-top: var(--sp-10);
   border-top: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
@@ -1135,8 +1135,8 @@
 /* ── Mini log ── */
 
 .agent-mini-log {
-  margin-top: var(--wb-gap-xs, var(--sp-sm));
-  padding-top: var(--wb-gap-xs, var(--sp-sm));
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
   border-top: 1px solid var(--glass-border-subtle, var(--bdr));
   border-radius: 0;
   background: transparent;
