@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-最后更新：2026-07-18
+最后更新：2026-07-20
 
 本文档是 AgentHub 的总进度入口，只记录当前方向、优先级和验收边界。历史 longform roadmap 见 [history.md](history.md)。
 
@@ -17,7 +17,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 当前 SPEC
 
-活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phase 73 closed · Phase 74 / milestones 94–95）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
+活进度只看 [progress/MASTER.md](progress/MASTER.md)（Phases 73–78 all closed · milestones 94–95 closed · gate 89 Ship）。cleanup-baseline（Phases 0–7）已于 2026-07-16 随 PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) 关闭；历史 plan/analysis 快照见 [archives/cleanup-baseline/](archives/cleanup-baseline/) 与 [history.md](history.md)。
 
 **Baseline closed（绝对日期指针，非 live backlog）**：
 
