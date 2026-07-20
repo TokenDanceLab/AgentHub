@@ -2,10 +2,10 @@
 
 | # | Milestone | Criteria | Status |
 |---|---|---|---|
-| 79 | Docs Authority + Gates Hygiene | plan/* non-live; MASTER sole index; doc SSOT green; perf gate noted | open |
-| 80 | Mobile hubClient Strangler | thin re-export; typecheck green; RN Hub-only boundary documented | open |
+| 79 | Docs Authority + Gates Hygiene | plan/* non-live; MASTER sole index; doc SSOT green; perf gate noted | **complete** · #1340 |
+| 80 | Mobile hubClient Strangler | thin re-export; typecheck green; RN Hub-only boundary documented | **complete** · #1341 |
 
-## Adaptive control (initial)
+## Adaptive control (final)
 
 ```yaml
 adaptive:
@@ -16,5 +16,5 @@ adaptive:
     replan: 2
     rescope: 3
   total_tasks: 5
-  completed_tasks: 0
+  completed_tasks: 5
 ```

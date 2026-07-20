@@ -21,21 +21,20 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | Program | Status | Pointer |
 |---|---|---|
-| **Post-Polish Residual Hardening** (Phases 79–80) | **live** | MASTER · [plan/post-polish-task-breakdown.md](plan/post-polish-task-breakdown.md) · issues #1335–#1339 · GH milestones 98–99 |
+| Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 | MASTER · [plan/post-polish-task-breakdown.md](plan/post-polish-task-breakdown.md) |
 | Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](analysis/visual-qa-scorecard.md) |
 | Cleanup baseline (Phases 0–7) | closed 2026-07-16 / PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | [archives/cleanup-baseline/](archives/cleanup-baseline/) · historical `docs/plan/*` banners |
 
 ## 当前优先级
 
-### P0（residual program）
+### P0
 
 | 方向 | 目标 | 验收 |
 |---|---|---|
-| Docs authority | cleanup `docs/plan/*` 明确 HISTORICAL；MASTER 为 sole live index；post-polish plan 入库 | `scripts/verify/verify-doc-ssot.ps1` + MASTER 链接 #1335–#1339 |
-| Mobile hubClient thin | 再导出 shared SSOT；仅保留 SecureStore/fixture/WS 胶水；禁止 mobile 新增 REST | `pnpm --filter agenthub-mobile-rn typecheck` + focused tests · #1337–#1339 |
 | 真实 E2E 合同 | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 | `scripts/verify/verify-real-e2e-contract.ps1` |
 | Chat flow 可靠性 | 发送不消失、消息线性排序、自动滚动、卡片合并、markdown/table 渲染 | Desktop/Web Playwright + Visual QA |
 | Hub/Edge 安全边界 | TokenDance ID 只做身份，AgentHub 权限由 Hub 本地资源检查决定 | 后端 auth/permission tests + security risk register |
+| 文档 SSOT 保持 | MASTER/roadmap 与 closed residual 对齐；不复活 cleanup Phase 61 叙事 | `scripts/verify/verify-doc-ssot.ps1` |
 
 ### P1
 
