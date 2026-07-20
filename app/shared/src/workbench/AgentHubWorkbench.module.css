@@ -2688,11 +2688,12 @@
  * Span workspace + inspector only (shell cols 3–4), not rail / conversation sidebar,
  * so channel cards keep full height and are not covered by the dock.
  */
+/* P77 #1320: compact base height; large empty glass slab suppressed on Chat path. */
 .terminalDock {
   grid-column: 3 / -1;
   grid-row: 2;
-  height: 220px;
-  min-height: 180px;
+  height: 160px;
+  min-height: 100px;
   max-height: 240px;
   min-width: 0;
   border-top: 1px solid var(--glass-border, var(--bdr));
