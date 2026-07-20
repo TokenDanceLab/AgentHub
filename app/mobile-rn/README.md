@@ -8,6 +8,8 @@ Historical longform notes are indexed in [docs/history.md](../../docs/history.md
 
 - Keep Mobile aligned with Desktop/Web workbench terminology and Hub event contracts.
 - Keep shared imports RN-safe; do not import shared Web/Desktop UI, CSS modules, Tauri APIs, browser storage, or raw runtime execution code.
+- **Hub-only data plane**: Mobile talks to Hub (`/client/*`, `/web/*` via shared hubClient). It must **not** open Local Edge (`127.0.0.1:3210`), raw process/runtime APIs, or Desktop Tauri host commands. Local execution remains Desktop + Local Edge.
+- Hub client SSOT is `@agenthub/shared/hubClient`. `src/api/hubClient.ts` is a thin shell (async SecureStore token, fixture snapshot, WS helpers only). Do not add new REST methods on Mobile — add them to shared first.
 - Treat Feishu/Lark mobile screenshots as density and interaction references only.
 - Do not claim native/device/live-Hub/TokenDance-ID proof unless the relevant approved-real or development-build gate was run in the current task and evidence was recorded.
 
