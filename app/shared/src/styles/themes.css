@@ -427,8 +427,8 @@ html[data-theme-sync='true'] *::after {
   --glass-tint-amber: rgba(245, 158, 11, 0.04);
   --glass-tint-sky: rgba(59, 130, 246, 0.04);
 
-  --glass-shadow: rgba(15, 23, 42, 0.08);
-  --glass-shadow-subtle: rgba(15, 23, 42, 0.05);
+  --glass-shadow: rgba(15, 23, 42, 0.11);
+  --glass-shadow-subtle: rgba(15, 23, 42, 0.07);
 
   --glass-text-muted: rgba(15, 23, 42, 0.45);
   --glass-text-disabled: rgba(15, 23, 42, 0.25);
@@ -444,9 +444,9 @@ html[data-theme-sync='true'] *::after {
   --glass-blur-xl: 48px;
   --glass-saturate: 180%;
   --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
-  --glass-elev-1: 0 2px 12px rgba(15, 23, 42, 0.05);
-  --glass-elev-2: 0 8px 24px rgba(15, 23, 42, 0.07);
-  --glass-elev-3: 0 16px 40px rgba(15, 23, 42, 0.09);
+  --glass-elev-1: 0 2px 12px rgba(15, 23, 42, 0.08);
+  --glass-elev-2: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --glass-elev-3: 0 16px 40px rgba(15, 23, 42, 0.16);
   --glass-card-bg: var(--glass-panel);
   --glass-card-border: var(--glass-border);
   --glass-card-shadow: var(--glass-elev-2);
@@ -495,9 +495,9 @@ html[data-theme-sync='true'] *::after {
     --glass-blur-xl: 60px;
     --glass-saturate: 165%;
     --glass-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate));
-    --glass-elev-1: 0 2px 14px rgba(15, 23, 42, 0.06);
-    --glass-elev-2: 0 8px 28px rgba(15, 23, 42, 0.09);
-    --glass-elev-3: 0 16px 44px rgba(15, 23, 42, 0.11);
+    --glass-elev-1: 0 2px 14px rgba(15, 23, 42, 0.09);
+    --glass-elev-2: 0 8px 28px rgba(15, 23, 42, 0.14);
+    --glass-elev-3: 0 16px 44px rgba(15, 23, 42, 0.18);
   }
 }
 
