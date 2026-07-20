@@ -4,6 +4,7 @@ import type { RuntimeEvidenceSnapshot } from '../inspector';
 import type { FileDiff } from '../types/chat';
 import type { DagNode } from '../ui/DagTree';
 import { buildDagNodesFromTranscript } from '../ui/DagTree';
+import { isThemedBlankPreviewUrl } from './inspector/BrowserPreview';
 import type { PreviewFile } from './inspector/FilePreviewRouter';
 import {
   evidenceOverviewFiles,
@@ -173,13 +174,18 @@ export function planRestoreInspectorTab(
   };
 }
 
-/** Auto-switch only on NEW deploy URLs (not re-renders of the same URL). */
+/**
+ * Auto-switch only on NEW real deploy URLs (not re-renders of the same URL).
+ * Themed blank placeholders (`about:blank`) must not steal the overview tab
+ * — demo fixtures use them for empty browser chrome (#1318 / rescore-9).
+ */
 export function shouldAutoSwitchDeployPreview(
   deployPreviewUrl: string | undefined,
   browserPreviewEnabled: boolean,
   lastAutoSwitchedUrl: string | null,
 ): boolean {
   if (!deployPreviewUrl || !browserPreviewEnabled) return false;
+  if (isThemedBlankPreviewUrl(deployPreviewUrl)) return false;
   return lastAutoSwitchedUrl !== deployPreviewUrl;
 }
 
