@@ -272,8 +272,8 @@ html[data-theme-sync='true'] *::after {
   --info: #5e8dcc;
   --info-bg: rgba(94,141,204,0.06);
 
-  /* Ring / focus */
-  --ring: rgba(0,113,188,0.22);
+  /* Ring / focus — higher opacity for dark-surface visibility (WCAG 2.4.7) */
+  --ring: rgba(41,171,226,0.40);
 
   /* Thinking */
   --thinking-bg: rgba(94,141,204,0.06);
