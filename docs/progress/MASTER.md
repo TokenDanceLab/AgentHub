@@ -1,20 +1,29 @@
 # AgentHub Progress Tracker
 
-> **Task**: continuous product polish (architecture / UIUX / design system / hygiene)
-> **Started**: 2026-07-16
-> **Last Updated**: 2026-07-20
+> **Task**: post-polish residual hardening (docs authority + mobile hubClient strangler)
+> **Started**: 2026-07-16 (Visual polish); residual program 2026-07-20
+> **Last Updated**: 2026-07-21
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
-## Merged PRs (today, 19 total)
-P74 #1295 · P75 #1310 · P76 #1315 · rescore #1317 ·
-P77 #1319 · P77 #1321 · P77 #1324 · P77 #1325 ·
-P78 #1326 · P78 #1327 · P78 #1328 · P78 #1329 ·
-P78 #1330 · P78 #1331 · infra #1332 · infra #1333 ·
-docs: rescore consolidation + AGENTS.md update + Phase 73/74 close
-deps: dependabot serde_with bump #423
+## Live program (sole index)
 
-## Milestones — ALL CLOSED
+| Item | Value |
+|---|---|
+| Program | Post-Polish Residual Hardening |
+| Analysis SSOT | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
+| Plan SSOT | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
+| Strategy | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
+| Tracking | Issues **#1335–#1339** · GH milestones **98** (Phase 79) · **99** (Phase 80) |
+
+### Open phases
+
+| Phase | Name | Milestone | Issues | Status |
+|:------|:-----|:----------|:-------|:-------|
+| 79 | Docs Authority + Gates Hygiene | 98 | #1335 #1336 | in progress |
+| 80 | Mobile hubClient Strangler | 99 | #1337 #1338 #1339 | queued |
+
+### Closed polish phases (2026-07-20)
 
 | Phase | Name | Status |
 |:------|:-----|:-------|
@@ -25,18 +34,16 @@ deps: dependabot serde_with bump #423
 | 77 | Agents density + blank browser + terminal dock | closed |
 | 78 | A11y focus + Glass border/shadows/elevation + CI path-filter | closed |
 
-## References
-- [visual-qa-scorecard](../analysis/visual-qa-scorecard.md) — canonical SSOT (final gate 89)
-- [visual-qa-score-2026-07-20-rescore-17-final.md](../analysis/visual-qa-score-2026-07-20-rescore-17-final.md) — full PR trace
-- [_archive/](../analysis/_archive/) — 16 intermediate rescore files
+Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblings) is **HISTORICAL only** — not live backlog.
 
-## Final Status
+## Product tip & Visual QA
 
-**Product tip**: `04a28663`
+**Product tip**: see latest `master` (analysis tip at residual start: `4c222e06`)
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
-**Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89** (+34 in one day)
+**Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
 ### Dimension grid (7/9 maxed)
+
 | Dim | Score | Max | Status |
 |-----|-------|-----|--------|
 | Glass | 18 | 18 | ✅ |
@@ -49,16 +56,41 @@ deps: dependabot serde_with bump #423
 | Type | 9 | 10 | ⏳ zh refinement |
 | Motion | 9 | 10 | ⏳ interactive eval |
 
-### Infrastructure wins
-- Unified CI path-filter (`changes` job via dorny/paths-filter@v3)
-- Go-only PR skips frontend CI; CSS-only PR skips Go CI
-- Estimated savings: up to 20 CI minutes per PR
+References: [visual-qa-scorecard](../analysis/visual-qa-scorecard.md) · [rescore-17-final](../analysis/visual-qa-score-2026-07-20-rescore-17-final.md) · [_archive/](../analysis/_archive/)
 
 ### Methodology ceiling
-Remaining 3pt (Type/Motion/Empty) require interactive testing, multi-state data,
-or multi-component CJK font changes — beyond static 1440×810 screenshot evaluation.
+
+Remaining 3pt (Type/Motion/Empty) require interactive testing, multi-state data, or multi-component CJK font changes — beyond static 1440×810 screenshot evaluation. **Do not chase gate past 89** under residual program.
+
+## Infrastructure & gates hygiene
+
+### CI path-filter
+
+- Unified `changes` job (`dorny/paths-filter@v3`) in `.github/workflows/checks.yml`
+- Go-only PR skips frontend CI; CSS-only PR skips Go CI
+- Estimated savings: up to ~20 CI minutes per PR
+
+### Backend perf / leak gates (T79.2 evidence)
+
+| Item | State | Note |
+|---|---|---|
+| `scripts/verify/verify-backend-perf-leak-gates.ps1` | **PASS** (behavior + short microbench) | Not production capacity |
+| [backend-performance-gates.md](../reference/backend-performance-gates.md) | Active owner (dated 2026-06-27) | Evidence classes: behavior / microbench / load smoke / pprof |
+| Capacity claim | **Not claimed** | Load smoke / pprof still path-specific; no “production capacity proven” language |
+
+Optional future: wire script as `workflow_dispatch` only — not every PR (see residual risk assessment T5).
+
+## Explicit out of scope (residual)
+
+- Live OIDC / secret rotation / packaged Desktop evidence
+- Full Mobile UI redesign
+- Static Visual QA gate chase past 89
+- Edge handlers further split without concrete API change
 
 ## Session Log
+
 | Date | Summary |
 |:-----|:--------|
-| 2026-07-20 | 🟢🟢🟢 **FINAL Ship 89** — 19 commits, 7/9 dims maxed, CI optimized, docs consolidated |
+| 2026-07-20 | 🟢🟢🟢 **Ship 89** — polish Phases 73–78 closed; CI path-filter; docs rescore archive |
+| 2026-07-20 | SDD Phase 0–1: post-polish analysis trio committed |
+| 2026-07-21 | Residual program live: MASTER sole index; Phases 79–80 · #1335–#1339 |

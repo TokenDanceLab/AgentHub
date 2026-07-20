@@ -1,7 +1,8 @@
 # Milestones
 
 > **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
-> Not live backlog. Live phases and open issues: [../progress/MASTER.md](../progress/MASTER.md) (Phase 61 / milestone 82).
+> **Not live backlog.** Do not resume these milestones as open work.
+> Live program SSOT: [../progress/MASTER.md](../progress/MASTER.md) (post-polish residual Phases 79–80 · GH milestones 98–99).
 > Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
 
 | # | Milestone | Target Phase | Criteria | Status |
@@ -29,7 +30,7 @@
 5. **PR closes Issue**; no freestyle multi-workflow implementation without Issue binding
 6. Workflows/subagents are **executors of Issues**, not a second backlog
 
-## Reality sync (2026-07-18)
+## Reality sync (2026-07-21)
 - Cleanup-baseline program Phases 1–7 closed: issues `#424`–`#451` via PR #446 (2026-07-16).
-- Live tracker SSOT: `docs/progress/MASTER.md` + Project board (Phase 61 / milestone 82).
+- Live tracker SSOT: `docs/progress/MASTER.md` + post-polish plan (Phases 79–80 · issues #1335–#1339).
 - Do not reopen `#447`–`#451` as open work.
