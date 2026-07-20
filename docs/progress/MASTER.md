@@ -6,8 +6,10 @@
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
-## Merged PRs (today)
-P74 #1295 · P75 #1310 · P76 #1315 · rescore #1317 · P77 #1319 · P77 #1321 · P77 #1324 · P77 #1325
+## Merged PRs (today, 10 total)
+P74 #1295 · P75 #1310 · P76 #1315 · rescore #1317 ·
+P77 #1319 · P77 #1321 · P77 #1324 · P77 #1325 ·
+P78 #1326 · P78 #1327
 
 ## Milestones
 
@@ -16,39 +18,37 @@ P74 #1295 · P75 #1310 · P76 #1315 · rescore #1317 · P77 #1319 · P77 #1321 �
 | 74 | Light frosted glass + Visual QA | #95 | closed (gate ~79) |
 | 75 | HiDPI fidelity + typography | #96 | closed via #1310 |
 | 76 | Chat + Inspector density | #97 | closed via #1315 |
-| 77 | Blank browser + terminal dock + Agents density | — | closed via #1319 + #1321 + #1324 + #1325 |
+| 77 | Agents density + blank browser + terminal dock | — | closed via 4 PRs |
+| 78 | A11y focus ring + Glass border boost | — | closed via 2 PRs |
 
 ## References
 - [visual-qa-scorecard](../analysis/visual-qa-scorecard.md)
-- [visual-qa-score-2026-07-20-rescore-12](../analysis/visual-qa-score-2026-07-20-rescore-12.md)
+- [visual-qa-score-2026-07-20-rescore-13](../analysis/visual-qa-score-2026-07-20-rescore-13.md)
 
 ## Current Status
 
-**Product tip**: `039c48f4`
-**Rescore-12 gate**: **85**/100 — 🟢 **SHIP**
-**Gate history**: 55 → … → 79 → 82 → 84 → **85** (Ship)
+**Product tip**: `1ae05eef`
+**Rescore-13 gate**: **87**/100 — 🟢 **SHIP** (+2)
+**Gate history**: 55 → … → 79 → 82 → 84 → 85 → **87**
 
 ## Phase Checklist
 - [x] Phase 74 frosted glass (gate 79)
 - [x] Phase 75 HiDPI + typography
 - [x] Phase 76 Chat + Inspector density
-- [x] Phase 77 Blank browser + terminal dock + Agents form density
-- [x] **Ship gate ≥85 achieved** (2026-07-20, 6 PRs)
+- [x] Phase 77 Agents density + blank browser + terminal dock
+- [x] Phase 78 A11y focus ring + Glass border boost
+- [x] **Ship gate 87** (10 PRs today, 32 points gained from 55)
 
 ## Polish backlog (post-Ship)
-- Glass: 16/18 — frosted bg contrast
-- Type: 9/10 — zh baseline
-- A11y: 7/8 — focus rings
-- Empty: 5/6 — terminal dock state
+- Glass: 17/18 — remaining 1pt
+- Type: 9/10 — zh refinement
+- Empty: 5/6 — dock placeholder
+- Dark: 7/8 — theme depth
 
 ## Session Log
 | Date | Summary |
 |:-----|:--------|
-| 2026-07-20 | 🟢 **SHIP 85** — #1324 + #1325 Agents form density, gate 85 |
-| 2026-07-20 | Rescore-11: gate 84, dark mode 1pt shy |
-| 2026-07-20 | P77 #1324 merged — Agents form grid density collapse, gate 84 |
-| 2026-07-20 | Rescore-10: W83/W82/D84/D84; Web form grid next |
-| 2026-07-20 | P77 #1321 merged — terminal dock 220→160px |
-| 2026-07-20 | P77 #1319 merged — about:blank no auto-browser |
-| 2026-07-20 | Rescore-9 min~82 after P76 captures |
-| 2026-07-20 | P76 merged #1315 closes #1311–#1314 |
+| 2026-07-20 | 🟢 **SHIP 87** — #1326 A11y ring + #1327 Glass border, gate 87 |
+| 2026-07-20 | 🟢 **SHIP 85** — #1324 + #1325 Agents density, gate 85 |
+| 2026-07-20 | Rescore-10/11/12: gate 82 → 84 → 85 |
+| 2026-07-20 | P76 Chat + Inspector merged, gate 82 |
