@@ -27,6 +27,10 @@ env:
 jobs:
   # ── Go: Edge Server ──────────────────────────
   go-edge:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -119,6 +123,10 @@ jobs:
 
   # ── Go: Hub Server ──────────────────────────
   go-hub:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -174,6 +182,10 @@ jobs:
   # ── Backend E2E: Fixture-only ────────────────
   backend-e2e-fixture:
     name: Backend E2E (fixture-only)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -197,6 +209,10 @@ jobs:
   # -- Backend: focused subset, no real CLI/model/services
   backend-focused-subset:
     name: Backend focused subset
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -219,6 +235,10 @@ jobs:
   # Windows 构建保留在 release / release-readiness；日常 CI 只跑 ubuntu。
   cross-build:
     name: Cross-platform build
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -249,6 +269,10 @@ jobs:
   # ── Docker: Hub Server ───────────────────────
   docker:
     name: Docker build (Hub Server)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -281,14 +305,16 @@ jobs:
           cd edge-server && go test -bench=. -benchtime=1s ./internal/events/ ./internal/adapters/
           cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
 
-  # ── Frontend Path Filter ──────────────────────
-  # P78: only run frontend CI when app/{desktop,web,shared} changes change.
-  changes-frontend:
-    name: Detect frontend paths
+  # ── Unified Path Filter ────────────────────────
+  # P78: only run CI jobs when relevant paths change.
+  changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
     outputs:
       desktop: ${{ steps.filter.outputs.desktop }}
       web: ${{ steps.filter.outputs.web }}
+      shell: ${{ steps.filter.outputs.shell }}
+      go: ${{ steps.filter.outputs.go }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -307,6 +333,25 @@ jobs:
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
+            shell:
+              - 'app/shared/src/workbench/**'
+              - 'app/shared/src/styles/**'
+              - 'app/shared/src/theme*.ts'
+              - 'app/shared/src/themePresets.*'
+              - 'app/shared/src/designTokens.*'
+              - 'app/web/scripts/visual-qa*'
+              - 'app/web/scripts/assert-visual-qa-shell.mjs'
+              - 'app/desktop/scripts/visual-qa*'
+              - 'app/web/src/**'
+              - 'app/web/package.json'
+              - 'app/desktop/package.json'
+              - '.github/workflows/checks.yml'
+            go:
+              - 'hub-server/**'
+              - 'edge-server/**'
+              - 'api/**'
+              - 'scripts/verify/**'
+              - '.github/workflows/checks.yml'
 
   # ── Frontend: Desktop ────────────────────────
   # Known debt: 15 pre-existing test failures (97.8% pass rate: 679/694).
@@ -314,10 +359,10 @@ jobs:
   # Failures are in desktop integration/edge-real tests and a few component tests.
   # These are low-priority pre-existing issues, not regressions.
   frontend-desktop:
-    needs: changes-frontend
+    needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.changes-frontend.outputs.desktop == 'true'
+      needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -356,10 +401,10 @@ jobs:
   # ── Frontend: Web ────────────────────────────
   frontend-web:
     name: Frontend (web)
-    needs: changes-frontend
+    needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.changes-frontend.outputs.web == 'true'
+      needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -504,39 +549,13 @@ jobs:
 
   # ── Visual QA Shell (path-filtered) ──────────
   # P74 gate matrix evidence on relevant UI paths only (#1287).
-  # ubuntu + chromium; non-blank + Agents capture via visual:qa:shell;
-  # no pixel-golden failure. Full multi-scene visual-qa.mjs stays local/manual.
-  changes-visual-qa-shell:
-    name: Detect visual QA shell paths
-    runs-on: ubuntu-latest
-    outputs:
-      shell: ${{ steps.filter.outputs.shell }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            shell:
-              - 'app/shared/src/workbench/**'
-              - 'app/shared/src/styles/**'
-              - 'app/shared/src/theme*.ts'
-              - 'app/shared/src/themePresets.*'
-              - 'app/shared/src/designTokens.*'
-              - 'app/web/scripts/visual-qa*'
-              - 'app/web/scripts/assert-visual-qa-shell.mjs'
-              - 'app/desktop/scripts/visual-qa*'
-              - 'app/web/src/**'
-              - 'app/web/package.json'
-              - 'app/desktop/package.json'
-              - '.github/workflows/checks.yml'
-
+  # Path filter merged into unified `changes` job (P78 #1333).
   visual-qa-shell:
     name: Visual QA shell (web, path-filtered)
-    needs: changes-visual-qa-shell
+    needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.changes-visual-qa-shell.outputs.shell == 'true'
+      needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
