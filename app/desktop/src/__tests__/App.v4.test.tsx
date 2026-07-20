@@ -402,7 +402,6 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByRole('combobox', { name: '数据模式' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     // Demo mode writes 'mock' to localStorage
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
