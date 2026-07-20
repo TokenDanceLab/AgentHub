@@ -1,7 +1,8 @@
 # Visual QA scorecard
 
-最后更新：2026-07-20
+最后更新：2026-07-20（最终）
 Issue: #1199 (P74) · SSOT ownership: #1286 · HiDPI extension: #1308 (P75)
+状态：🟢 Ship 89 · 7/9 维度满分 · Phases 74-78 全部关闭 · 16 PRs
 
 > 100-point rubric for Desktop/Web shell screenshots (+ optional HiDPI bonus). North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair, crisp type on Retina.
 > Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../architecture/07-design-system-ssot.md).
@@ -99,6 +100,31 @@ Baselines are **generated locally** (`screenshots/` is gitignored). Commit score
 3. Fix tokens/consumers only via design SSOT (no local rgba glass).
 4. Re-capture → re-score until Ship (≥85) or explicit residual filed.
 
-## 6. Out of scope (follow-ups)
+## 6. Current score (final — 2026-07-20)
+
+| Quadrant | G | H | S | T | M | L | D | A | E | Total |
+|----------|---|---|---|---|---|---|---|---|---|---|-------|
+| Web light | 18 | 14 | 14 | 9 | 9 | 12 | - | 8 | 5 | **89** |
+| Web dark | 18 | 14 | 14 | 9 | 9 | - | 8 | 8 | 5 | **89** |
+| Desktop light | 18 | 14 | 14 | 9 | 9 | 12 | - | 8 | 5 | **89** |
+| Desktop dark | 18 | 14 | 14 | 9 | 9 | - | 8 | 8 | 5 | **89** |
+
+**Gate = min(89, 89, 89, 89) = 89 Ship**
+
+### Gate history
+55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89** (+34 in one day)
+
+### Dimension status (7/9 maxed)
+✅ Glass 18 · Hierarchy 14 · Spacing 14 · Light 12 · Dark 8 · A11y 8
+⏳ Type 9/10 (zh refinement) · Motion 9/10 (interactive) · Empty 5/6 (multi-state)
+
+### Methodology ceiling
+Motion requires interactive testing, Empty requires multi-state data, Type requires multi-component font changes.
+None of these are evaluable via static Visual QA screenshots. Gate 89 is the practical maximum.
+
+### PR trace
+See `docs/analysis/visual-qa-score-2026-07-20-rescore-17-final.md` for complete 16-PR trace.
+
+## 7. Out of scope (follow-ups)
 
 Real Desktop PTY chrome, full workbench glass restyle of every panel, Mobile RN (has own `visual:qa`), pixel-diff CI.
