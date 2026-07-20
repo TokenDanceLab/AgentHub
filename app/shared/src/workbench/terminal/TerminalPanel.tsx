@@ -307,6 +307,9 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       <div className={styles.body} data-terminal-body>
         {sessions.length === 0 || !activeSession ? (
           <div className={styles.empty} data-terminal-empty>
+            <span className={styles.emptyIcon} aria-hidden="true">
+              <DesignNavIcon name="laptop" size={28} strokeWidth={1.5} />
+            </span>
             <strong className={styles.emptyTitle}>{labels.emptyTitle}</strong>
             <p className={styles.emptyDescription}>{labels.emptyDescription}</p>
             {!terminal ? (
