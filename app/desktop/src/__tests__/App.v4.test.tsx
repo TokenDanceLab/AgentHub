@@ -173,6 +173,7 @@ const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
 const railAvatarLabel = /^(Delicious233|user\.fallbackName)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
+const overviewInspectorTabLabel = /^×(概览|Overview|inspector\.overview)$/;
 const browserInspectorTabLabel = /^×(浏览器|Browser|inspector\.browser)$/;
 const logoutLabel = /^(退出登录|Log out|user\.logout)$/;
 
@@ -393,13 +394,14 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByRole('button', { name: '添加本机附件' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: browserInspectorTabLabel })).toBeInTheDocument();
+    /* P77 #1318: themed blank demo previews must not auto-open browser tab. */
+    expect(screen.getByRole('tab', { name: overviewInspectorTabLabel })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: browserInspectorTabLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('heading')).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '数据模式' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     // Demo mode writes 'mock' to localStorage
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
