@@ -32,6 +32,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 | 方向 | 目标 | 验收 |
 |---|---|---|
 | 真实 E2E 合同 | `.agents/skills/real-e2e-acceptance/SKILL.md` 是唯一证据等级矩阵 | `scripts/verify/verify-real-e2e-contract.ps1` |
+| 远控拓扑前置合同 | P0 remote-control fixture 验证 `Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter` 的离线拓扑形状，不声明真实登录或真实执行 | `scripts/verify/verify-p0-remote-control-fixture.ps1` |
 | Chat flow 可靠性 | 发送不消失、消息线性排序、自动滚动、卡片合并、markdown/table 渲染 | Desktop/Web Playwright + Visual QA |
 | Hub/Edge 安全边界 | TokenDance ID 只做身份，AgentHub 权限由 Hub 本地资源检查决定 | 后端 auth/permission tests + security risk register |
 | 文档 SSOT 保持 | MASTER/roadmap 与 closed residual 对齐；不复活 cleanup Phase 61 叙事 | `scripts/verify/verify-doc-ssot.ps1` |
@@ -42,7 +43,8 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 |---|---|---|
 | Web/Mobile client test lanes | Web 保持 Hub-only；Mobile 只澄清 RN-safe shared contract gate，不做 native/UI 深入重构 | Web data-boundary checks + Mobile mock-Hub/Expo Doctor boundary notes |
 | Desktop packaged boundary | 区分 Vite renderer、Tauri packaged、sidecar、icon、installer/signing | packaged-release gate 或明确 `real_tested=false` |
-| Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` **PASS**（非 capacity） |
+| Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量；**手动** `workflow_dispatch` job `Backend perf/leak gates` | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` **PASS**（非 capacity） |
+| Mobile PR CI light | mobile-rn / shared hubClient 变更跑 typecheck+unit；重 suite 仍 dispatch | checks.yml `frontend-mobile-light` path-filter |
 | API contract hygiene | REST 以 `api/openapi.yaml` 为准，WS 以 `api/events.md` 为准 | OpenAPI parse + endpoint tests |
 
 ### P2

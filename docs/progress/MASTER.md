@@ -97,3 +97,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 | 2026-07-20 | SDD Phase 0–1: post-polish analysis trio committed |
 | 2026-07-21 | Residual program delivered: Phase 79 #1340 + Phase 80 #1341; milestones 98–99 closed; hubClient ~342 LOC |
 | 2026-07-21 | Closeout #1342 + SSOT sync #1343 · tip `1ac86aa5`; analysis inventory marked delivered |
+| 2026-07-21 | CI: mobile light path-filter + backend perf/leak `workflow_dispatch` (T5) |
