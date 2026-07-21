@@ -59,10 +59,12 @@ $backendFocused = Get-JobBlock $workflow "backend-focused-subset"
 $desktop = Get-JobBlock $workflow "frontend-desktop"
 $web = Get-JobBlock $workflow "frontend-web"
 $mobile = Get-JobBlock $workflow "frontend-mobile"
+$mobileLight = Get-JobBlock $workflow "frontend-mobile-light"
 $e2e = Get-JobBlock $workflow "e2e-smoke"
 $changes = Get-JobBlock $workflow "changes"
 $visualShell = Get-JobBlock $workflow "visual-qa-shell"
 $validate = Get-JobBlock $workflow "validate"
+$backendPerf = Get-JobBlock $workflow "backend-perf-leak-gates"
 
 Assert-Contains $edge "Coverage check \(informational\)" "go-edge overall coverage must stay informational"
 Assert-Contains $edge "Coverage per-package minimums" "go-edge must keep per-package coverage minimums"
@@ -132,6 +134,7 @@ foreach ($job in @(
     @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-web"; Body = $web; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-mobile"; Body = $mobile; Lockfile = "app/pnpm-lock.yaml" },
+    @{ Name = "frontend-mobile-light"; Body = $mobileLight; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "visual-qa-shell"; Body = $visualShell; Lockfile = "app/pnpm-lock.yaml" }
 )) {
@@ -154,6 +157,23 @@ Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret gua
 Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"
 Assert-Contains (Get-StepBlock $mobile "Screenshot visual QA (mobile)") "(?m)^\s+timeout-minutes:\s+12\s*$" "mobile visual QA must have a hard timeout"
 Assert-Contains (Get-StepBlock $mobile "E2E (mock hub)") "(?m)^\s+timeout-minutes:\s+10\s*$" "mobile mock-hub E2E must have a hard timeout"
+Assert-Contains $mobile "github.event_name == 'workflow_dispatch'" "frontend-mobile full suite must stay workflow_dispatch-only"
+
+Assert-Contains $mobileLight "Frontend \(mobile light\)" "frontend-mobile-light must use a clear job name"
+Assert-Contains $mobileLight "needs:\s+changes" "frontend-mobile-light must depend on unified changes job"
+Assert-Contains $mobileLight "needs.changes.outputs.mobile" "frontend-mobile-light must path-filter on mobile"
+Assert-Contains $mobileLight "(?m)^\s+timeout-minutes:\s+15\s*$" "frontend-mobile-light job must have a hard timeout"
+Assert-Contains $mobileLight ([regex]::Escape("pnpm --filter agenthub-mobile-rn typecheck")) "frontend-mobile-light must typecheck mobile"
+Assert-Contains $mobileLight ([regex]::Escape("pnpm --filter agenthub-mobile-rn test")) "frontend-mobile-light must run mobile unit tests"
+Assert-NotContains $mobileLight "npx expo export" "frontend-mobile-light must not run Expo export"
+Assert-NotContains $mobileLight "scripts/visual-qa\.mjs" "frontend-mobile-light must not run mobile visual QA"
+Assert-NotContains $mobileLight "playwright install --with-deps" "frontend-mobile-light must not install Playwright"
+
+Assert-Contains $backendPerf "Backend perf/leak gates" "backend-perf-leak-gates must use a clear job name"
+Assert-Contains $backendPerf "github.event_name == 'workflow_dispatch'" "backend-perf-leak-gates must be workflow_dispatch-only"
+Assert-Contains $backendPerf ([regex]::Escape("verify-backend-perf-leak-gates.ps1")) "backend-perf-leak-gates must run the perf/leak script"
+Assert-Contains $backendPerf "(?m)^\s+timeout-minutes:\s+20\s*$" "backend-perf-leak-gates must have a hard timeout"
+Assert-NotContains $backendPerf "load-test" "backend-perf-leak-gates must not claim load/capacity smoke"
 
 Assert-Contains $changes "dorny/paths-filter@v3" "changes job must use dorny/paths-filter"
 Assert-Contains $changes ([regex]::Escape("app/shared/src/workbench/**")) "changes job must watch workbench paths"
@@ -163,6 +183,8 @@ Assert-Contains $changes ([regex]::Escape("app/desktop/scripts/visual-qa*")) "ch
 Assert-Contains $changes ([regex]::Escape(".github/workflows/checks.yml")) "changes job must watch checks.yml"
 Assert-Contains $changes ([regex]::Escape("hub-server/**")) "changes job must watch hub-server paths"
 Assert-Contains $changes ([regex]::Escape("edge-server/**")) "changes job must watch edge-server paths"
+Assert-Contains $changes ([regex]::Escape("app/mobile-rn/**")) "changes job must watch mobile-rn paths"
+Assert-Contains $changes "(?m)^\s+mobile:\s*$" "changes job must expose mobile output"
 
 Assert-Contains $visualShell "Visual QA shell \(web, path-filtered\)" "visual-qa-shell must use a clear job name"
 Assert-Contains $visualShell "needs:\s+changes" "visual-qa-shell must depend on unified changes job"

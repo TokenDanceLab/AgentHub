@@ -154,6 +154,11 @@ export const agentHubMobileTokenAliases = {
   '--td-shadow-lg': 'shadow.lg',
   '--td-shadow-panel': 'shadow.panel',
   '--td-shadow-hairline': 'shadow.hairline',
+  // Desktop glass contract (DESKTOP_GLASS_TOKEN_ALIASES).
+  // RN has no CSS backdrop-filter; map blur/elev to nearest elevation proxies.
+  '--td-glass-blur': 'shadow.lg',
+  '--td-glass-card': 'color.surface',
+  '--td-glass-elev': 'shadow.md',
 } as const;
 
 const semanticTypeRoles = {
