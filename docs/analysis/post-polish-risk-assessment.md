@@ -58,7 +58,7 @@
 | T2 | RN Hub-only boundary note | **Done** #1341 (AGENTS + mobile README) |
 | T3 | Docs hygiene plan/* + MASTER | **Done** #1340 / #1342 |
 | T4 | Optional: Desktop demo seed fail-closed | **Open optional** (AH-SR-043 residual) |
-| T5 | Optional: perf-gate workflow_dispatch | **Open optional** |
+| T5 | Optional: perf-gate workflow_dispatch | **Done** — `backend-perf-leak-gates` job in checks.yml (dispatch-only) |
 
 ## 6. Explicit Out of Scope
 
