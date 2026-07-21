@@ -2,7 +2,7 @@
 
 > **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
 > **Not live backlog.** Do not resume these milestones as open work.
-> Live program SSOT: [../progress/MASTER.md](../progress/MASTER.md) (post-polish residual Phases 79–80 · GH milestones 98–99).
+> Progress SSOT: [../progress/MASTER.md](../progress/MASTER.md) (post-polish residual Phases 79–80 **closed** · GH milestones 98–99 closed).
 > Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
 
 | # | Milestone | Target Phase | Criteria | Status |
@@ -32,5 +32,5 @@
 
 ## Reality sync (2026-07-21)
 - Cleanup-baseline program Phases 1–7 closed: issues `#424`–`#451` via PR #446 (2026-07-16).
-- Live tracker SSOT: `docs/progress/MASTER.md` + post-polish plan (Phases 79–80 · issues #1335–#1339).
+- Progress SSOT: `docs/progress/MASTER.md` (post-polish residual Phases 79–80 closed · #1340–#1342).
 - Do not reopen `#447`–`#451` as open work.
