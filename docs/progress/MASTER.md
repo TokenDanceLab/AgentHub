@@ -6,15 +6,15 @@
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
-## Live program (sole index)
+## Progress index (no open residual program)
 
 | Item | Value |
 |---|---|
-| Program | Post-Polish Residual Hardening |
-| Analysis SSOT | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
-| Plan SSOT | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
-| Strategy | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
-| Tracking | Issues **#1335–#1339** (closed) · GH milestones **98–99** (closed) · PRs **#1340** / **#1341** |
+| Active SPEC | **None** — residual Phases 79–80 closed; pick next from [roadmap P0/P1](../roadmap.md) |
+| Closed residual analysis | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
+| Closed residual plan | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
+| Strategy (delivered) | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
+| Tracking | Issues **#1335–#1339** (closed) · GH milestones **98–99** (closed) · PRs **#1340** / **#1341** / **#1342** |
 
 ### Residual phases (closed 2026-07-21)
 
@@ -40,7 +40,7 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 
 ## Product tip & Visual QA
 
-**Product tip**: `7d70fc0a` (post #1340 + #1341)
+**Product tip**: `df17bf7c` (post #1340 + #1341 + #1342)
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
 **Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
@@ -96,3 +96,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 | 2026-07-20 | 🟢🟢🟢 **Ship 89** — polish Phases 73–78 closed; CI path-filter; docs rescore archive |
 | 2026-07-20 | SDD Phase 0–1: post-polish analysis trio committed |
 | 2026-07-21 | Residual program delivered: Phase 79 #1340 + Phase 80 #1341; milestones 98–99 closed; hubClient ~342 LOC |
+| 2026-07-21 | Closeout #1342 + SSOT tip sync to `df17bf7c`; analysis inventory marked delivered |

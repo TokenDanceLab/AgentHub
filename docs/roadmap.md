@@ -21,7 +21,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | Program | Status | Pointer |
 |---|---|---|
-| Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 | MASTER · [plan/post-polish-task-breakdown.md](plan/post-polish-task-breakdown.md) |
+| Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 #1342 | MASTER · [plan/post-polish-task-breakdown.md](plan/post-polish-task-breakdown.md) |
 | Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](analysis/visual-qa-scorecard.md) |
 | Cleanup baseline (Phases 0–7) | closed 2026-07-16 / PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | [archives/cleanup-baseline/](archives/cleanup-baseline/) · historical `docs/plan/*` banners |
 
