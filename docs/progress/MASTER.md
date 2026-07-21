@@ -40,7 +40,7 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 
 ## Product tip & Visual QA
 
-**Product tip**: `df17bf7c` (post #1340 + #1341 + #1342)
+**Product tip**: `1ac86aa5` (post #1340–#1343)
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
 **Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
@@ -96,4 +96,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 | 2026-07-20 | 🟢🟢🟢 **Ship 89** — polish Phases 73–78 closed; CI path-filter; docs rescore archive |
 | 2026-07-20 | SDD Phase 0–1: post-polish analysis trio committed |
 | 2026-07-21 | Residual program delivered: Phase 79 #1340 + Phase 80 #1341; milestones 98–99 closed; hubClient ~342 LOC |
-| 2026-07-21 | Closeout #1342 + SSOT tip sync to `df17bf7c`; analysis inventory marked delivered |
+| 2026-07-21 | Closeout #1342 + SSOT sync #1343 · tip `1ac86aa5`; analysis inventory marked delivered |
