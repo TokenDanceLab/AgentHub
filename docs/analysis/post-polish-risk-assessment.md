@@ -1,14 +1,15 @@
 # Post-Polish Risk Assessment
 
-> last-updated: 2026-07-20  
+> last-updated: 2026-07-21
 > security SSOT remains `docs/governance/security-risk-register.md`
+> residual program Phases 79–80: **closed** (#1340–#1342)
 
 ## 1. Executive Judgment
 
-1. **Visual/product chrome is Ship-ready (gate 89).** Further glass/CSS polish is diminishing returns.  
-2. **Architecture peels already landed** (handlers/lifecycle/workbench/hubClient Desktop+Web).  
-3. **Highest actionable residual in-repo**: Mobile hubClient thickness + docs pointer drift.  
-4. **Highest product risk overall**: security items needing **deploy/client** evidence (OIDC, Desktop login, adapter logs) — not pure PR work.  
+1. **Visual/product chrome is Ship-ready (gate 89).** Further glass/CSS polish is diminishing returns.
+2. **Architecture peels already landed** (handlers/lifecycle/workbench/hubClient Desktop+Web+**Mobile**).
+3. **In-repo residual program (docs + mobile hubClient) delivered.**
+4. **Highest product risk overall**: security items needing **deploy/client** evidence (OIDC, Desktop login, adapter logs) — not pure PR work.
 5. **Backend perf gate script is green** — do not re-litigate as missing infrastructure.
 
 ## 2. Security Residual (actionability split)
@@ -43,26 +44,26 @@
 
 ## 4. Docs / Governance Residual
 
-| Risk | Impact | Fix |
+| Risk | Impact | Status |
 |---|---|---|
-| `docs/plan/*` still labeled live Phase 61/82 | Agents resume wrong backlog | Strengthen HISTORICAL banner; MASTER is sole live index |
-| Multiple residual analysis files pre-polish | Noise | Keep; add post-polish trio as current analysis SSOT for new program |
+| `docs/plan/*` live Phase 61/82 pointers | Agents resume wrong backlog | **Fixed** #1340 HISTORICAL banners |
+| Multiple residual analysis files pre-polish | Noise | Keep post-polish trio as closed-program analysis |
 | Visual rescores archived | OK | scorecard + rescore-17-final active |
 
-## 5. Top 5 Concrete In-Repo SDD Tasks (proposed)
+## 5. Top 5 In-Repo SDD Tasks — disposition
 
-| # | Task | Effort | Super | Acceptance |
-|---|---|---|---|---|
-| T1 | Mobile hubClient thin re-export over `@agenthub/shared/hubClient` | L | R,P | No new REST methods on mobile; typecheck + existing mobile tests |
-| T2 | RN-safe shared contract gate doc + verifier note | M | P,E | Boundary doc + script or package script documents hub-only |
-| T3 | Docs hygiene: plan/* + analysis pointers aligned to MASTER post-polish | S | E | `verify-doc-ssot.ps1` green; no false Phase 61 claims as live |
-| T4 | Optional: Desktop demo seed fail-closed for non-fixture dataMode | M | S | Unit tests; AH-SR-043 residual note |
-| T5 | Optional: wire perf-gate script into workflow_dispatch job | S | E | Manual trigger job exists; not every PR |
+| # | Task | Disposition |
+|---|---|---|
+| T1 | Mobile hubClient thin re-export | **Done** #1341 |
+| T2 | RN Hub-only boundary note | **Done** #1341 (AGENTS + mobile README) |
+| T3 | Docs hygiene plan/* + MASTER | **Done** #1340 / #1342 |
+| T4 | Optional: Desktop demo seed fail-closed | **Open optional** (AH-SR-043 residual) |
+| T5 | Optional: perf-gate workflow_dispatch | **Open optional** |
 
 ## 6. Explicit Out of Scope
 
-- Live Hub OIDC / Desktop packaged signing evidence  
-- Production secret rotation  
-- Full Mobile UI redesign  
-- Static Visual QA gate chase past 89 without interactive methodology  
+- Live Hub OIDC / Desktop packaged signing evidence
+- Production secret rotation
+- Full Mobile UI redesign
+- Static Visual QA gate chase past 89 without interactive methodology
 - Edge handlers further split unless a concrete API change needs it

@@ -2,12 +2,12 @@
 
 > **HISTORICAL — cleanup-baseline freeze (closed 2026-07-16 / PR #446).**
 > **Not live backlog.** Do not resume Phases 1–7 or treat #424–#451 as open work.
-> Live program SSOT: [../progress/MASTER.md](../progress/MASTER.md) (post-polish residual Phases 79–80 · issues #1335–#1339).
+> Progress SSOT: [../progress/MASTER.md](../progress/MASTER.md) (post-polish residual Phases 79–80 **closed** · #1340–#1342).
 > Snapshot also under [../archives/cleanup-baseline/plan/](../archives/cleanup-baseline/plan/).
 >
 > last-updated: 2026-07-21
 > program: knowledge-first strangler cleanup + lightweight wiki (non-SSOT) — **CLOSED**
-> tracking: historical only; live tracking is GITHUB_FULL via MASTER + post-polish plan
+> tracking: historical only; live tracking is GITHUB_FULL via MASTER
 > hard rule: **NO big-bang rewrite**
 > reality: Phases 1–7 complete (#424–#451 / PR #446). Do not list #447–#451 as open.
 
