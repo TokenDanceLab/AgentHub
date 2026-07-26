@@ -1,11 +1,19 @@
-import { QueryClient } from '@tanstack/react-query';
+import { createElement, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { getAgentActivityStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { HubWSHandle, HubWSOptions } from '@/api/hubWS';
+import type { TransportStatus } from '@/api/transport';
 import {
+  AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
   AGENT_STREAM_INVALIDATE_WINDOW_MS,
+  createWebWorkbenchLiveEventBatcher,
   createWebWorkbenchHubInvalidationScheduler,
   dispatchHubRuntimeEvent,
   invalidateWebWorkbenchHubQueries,
+  useWebHubRealtime,
 } from './webHubRealtime';
 
 describe('webHubRealtime', () => {
@@ -257,5 +265,196 @@ describe('createWebWorkbenchHubInvalidationScheduler (#1352)', () => {
     // Timer was cleared — nothing double-flushes afterwards.
     vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
     expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(1);
+  });
+});
+
+function streamEvent(seq: number): HubRuntimeEventTranscriptInput {
+  return {
+    id: `event-${seq}`,
+    task_id: 'task-1',
+    edge_run_id: 'run-1',
+    session_id: 'hub-session-1',
+    agent_instance_id: 'agent-1',
+    event_seq: seq,
+    event_type: 'run.agent.text_delta',
+    payload: { content: `token-${seq}` },
+    created_at: `2026-07-27T00:00:${String(seq).padStart(2, '0')}Z`,
+  };
+}
+
+describe('createWebWorkbenchLiveEventBatcher (#1415)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('flushes every original event in order after one display-frame window', () => {
+    const batches: HubRuntimeEventTranscriptInput[][] = [];
+    const batcher = createWebWorkbenchLiveEventBatcher((events) => {
+      batches.push([...events]);
+    });
+
+    batcher.push(streamEvent(1));
+    batcher.push(streamEvent(2));
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS - 1);
+    expect(batches).toEqual([]);
+
+    vi.advanceTimersByTime(1);
+    expect(batches).toEqual([[streamEvent(1), streamEvent(2)]]);
+    batcher.dispose();
+  });
+
+  it('supports activity-only work and never double-flushes after dispose', () => {
+    const flush = vi.fn();
+    const batcher = createWebWorkbenchLiveEventBatcher(flush);
+
+    batcher.push();
+    batcher.dispose();
+    expect(flush).toHaveBeenCalledOnce();
+    expect(flush).toHaveBeenCalledWith([]);
+
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
+    batcher.push(streamEvent(1));
+    expect(flush).toHaveBeenCalledOnce();
+  });
+});
+
+function mountRealtimeHarness() {
+  const anyHandlers = new Set<(type: string, payload: unknown) => void>();
+  const statusHandlers = new Set<(status: TransportStatus) => void>();
+  const close = vi.fn();
+  const createSocket = (_options: HubWSOptions): HubWSHandle => ({
+    onAny: (handler: (type: string, payload: unknown) => void) => {
+      anyHandlers.add(handler);
+      return () => anyHandlers.delete(handler);
+    },
+    onStatus: (handler: (status: TransportStatus) => void) => {
+      statusHandlers.add(handler);
+      return () => statusHandlers.delete(handler);
+    },
+    connect: () => undefined,
+    close,
+  }) as unknown as HubWSHandle;
+  const queryClient = new QueryClient();
+  const delivered: HubRuntimeEventTranscriptInput[] = [];
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+  const hook = renderHook(({ runtimeSessionId, runtimeTaskId }: {
+    runtimeSessionId: string;
+    runtimeTaskId: string;
+  }) => {
+    useWebHubRealtime({
+      enabled: true,
+      runtimeSessionId,
+      runtimeTaskId,
+      onRuntimeEvent: (event) => delivered.push(event),
+      createSocket,
+      getToken: () => 'fixture-token',
+    });
+  }, {
+    wrapper,
+    initialProps: {
+      runtimeSessionId: 'hub-session-1',
+      runtimeTaskId: 'task-1',
+    },
+  });
+
+  return {
+    delivered,
+    close,
+    emit: (type: string, payload: unknown) => {
+      act(() => {
+        for (const handler of anyHandlers) handler(type, payload);
+      });
+    },
+    setStatus: (status: TransportStatus) => {
+      act(() => {
+        for (const handler of statusHandlers) handler(status);
+      });
+    },
+    switchRuntime: (runtimeSessionId: string, runtimeTaskId: string) => {
+      act(() => hook.rerender({ runtimeSessionId, runtimeTaskId }));
+    },
+    unmount: () => act(() => hook.unmount()),
+    clear: () => queryClient.clear(),
+  };
+}
+
+describe('useWebHubRealtime live event ordering (#1415)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    getAgentActivityStore().reset();
+    vi.useRealTimers();
+  });
+
+  it('flushes pending stream events before dispatching a non-stream event immediately', () => {
+    const harness = mountRealtimeHarness();
+    harness.emit(HUB_EVENTS.AGENT_STREAM, streamEvent(1));
+    harness.emit(HUB_EVENTS.AGENT_DONE, {
+      task_id: 'task-1',
+      edge_run_id: 'run-1',
+      session_id: 'hub-session-1',
+      result_summary: 'done',
+      created_at: '2026-07-27T00:01:00Z',
+    });
+
+    expect(harness.delivered.map((event) => event.event_type)).toEqual([
+      'run.agent.text_delta',
+      'run.agent.result',
+    ]);
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
+    expect(harness.delivered).toHaveLength(2);
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('flushes a trailing stream frame on socket disconnect without duplication', () => {
+    const harness = mountRealtimeHarness();
+    harness.emit(HUB_EVENTS.AGENT_STREAM, streamEvent(1));
+    expect(harness.delivered).toEqual([]);
+
+    harness.setStatus('disconnected');
+    expect(harness.delivered).toEqual([streamEvent(1)]);
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
+    expect(harness.delivered).toHaveLength(1);
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('flushes a trailing stream frame during unmount before closing the socket', () => {
+    const harness = mountRealtimeHarness();
+    harness.emit(HUB_EVENTS.AGENT_STREAM, streamEvent(1));
+
+    harness.unmount();
+    expect(harness.delivered).toEqual([streamEvent(1)]);
+    expect(harness.close).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
+    expect(harness.delivered).toHaveLength(1);
+    harness.clear();
+  });
+
+  it('drains the previous conversation before switching runtime refs', () => {
+    const harness = mountRealtimeHarness();
+    harness.emit(HUB_EVENTS.AGENT_STREAM, streamEvent(1));
+
+    harness.switchRuntime('hub-session-2', 'task-2');
+    expect(harness.delivered).toEqual([streamEvent(1)]);
+
+    const nextEvent = {
+      ...streamEvent(2),
+      task_id: 'task-2',
+      session_id: 'hub-session-2',
+    };
+    harness.emit(HUB_EVENTS.AGENT_STREAM, nextEvent);
+    vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
+    expect(harness.delivered).toEqual([streamEvent(1), nextEvent]);
+    harness.unmount();
+    harness.clear();
   });
 });
