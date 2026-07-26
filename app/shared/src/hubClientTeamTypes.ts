@@ -48,6 +48,13 @@ export interface HubCoordinatorRouteDecision {
   feedback?: string;
   summary?: string;
   blocked_reason?: string;
+  // Hub-side backfill audit fields (Go model.CoordinatorRouteDecision,
+  // internal/model/agent_team_tasks.go:146-152; all omitempty).
+  accepted?: boolean;
+  subtask_id?: string;
+  parent_task_id?: string;
+  agent_id?: string;
+  reason?: string;
   correlation_id?: string;
 }
 
@@ -81,7 +88,9 @@ export interface HubAgentTeamRun {
   trigger_user_id?: string;
   trigger_message?: string;
   target_id?: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  // Go json:"mode" is not omitempty (always serialized; default "supervisor").
+  mode: 'supervisor' | 'compete' | string;
+  status: 'queued' | 'running' | 'pending_review' | 'completed' | 'failed' | 'cancelled' | string;
   created_at?: string;
   updated_at?: string;
 }
@@ -110,7 +119,9 @@ export interface HubAgentTeamTask {
   parent_task_id?: string;
   status: 'pending' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled' | string;
   objective?: string;
-  input_refs?: Record<string, unknown>;
+  // Go AgentTeamTask.InputRefs is a string column (jsonb serialized as a JSON
+  // string literal, e.g. "{}"); it is NOT an object on the wire.
+  input_refs?: string;
   run_id?: string;
   attempt?: number;
   risk_level?: 'normal' | 'high' | string;
@@ -147,6 +158,13 @@ export interface HubTeamTaskState {
   edge_run_id?: string;
   attempt?: number;
   risk_level?: string;
+}
+
+// Mirrors Go model.TeamTaskDependencyState (internal/model/agent_team_state.go:69-73).
+export interface HubTeamTaskDependencyState {
+  task_id: string;
+  depends_on_task_id: string;
+  kind: string;
 }
 
 export interface HubTeamAssignmentState {
@@ -235,19 +253,51 @@ export interface HubTeamBudget {
   compactions?: number;
 }
 
+// Mirrors Go model.TeamRouteAuditState (internal/model/agent_team_state.go:33-42).
+export interface HubTeamRouteAuditState {
+  status: 'accepted' | 'rejected' | string;
+  action?: string;
+  subtask_id?: string;
+  parent_task_id?: string;
+  agent_id?: string;
+  reason?: string;
+  correlation_id?: string;
+  created_at?: string;
+}
+
+// Mirrors Go model.HumanReviewChange (internal/model/agent_team_state.go:261-264).
+export interface HubHumanReviewChange {
+  field: string;
+  value: string;
+}
+
+// Mirrors Go model.HumanReviewState (internal/model/agent_team_state.go:267-276).
+export interface HubHumanReviewState {
+  review_id: string;
+  run_id: string;
+  action: 'approve' | 'discuss' | 'modify' | string;
+  comment?: string;
+  changes?: HubHumanReviewChange[];
+  decided_by?: string;
+  created_at: string;
+  decided_at?: string;
+}
+
 export interface HubTeamRunState {
   run_id: string;
   team_id: string;
   status: string;
   members?: HubTeamMemberState[];
   tasks?: HubTeamTaskState[];
-  dependencies?: Array<Record<string, unknown>>;
+  dependencies?: HubTeamTaskDependencyState[];
   assignments?: HubTeamAssignmentState[];
   approvals?: HubTeamApprovalState[];
   artifacts?: HubTeamArtifactState[];
   conflicts?: HubTeamConflictState[];
   run_events?: HubTeamRunEventState[];
   route_log?: HubCoordinatorRouteDecision[];
+  route_audit_log?: HubTeamRouteAuditState[];
+  reviews?: HubHumanReviewState[];
   budget?: HubTeamBudget;
   terminal_reason?: string;
 }
@@ -368,11 +418,15 @@ export type AgentTeamTask = HubAgentTeamTask;
 export type AgentTeamEvent = HubAgentTeamEvent;
 export type TeamMemberState = HubTeamMemberState;
 export type TeamTaskState = HubTeamTaskState;
+export type TeamTaskDependencyState = HubTeamTaskDependencyState;
 export type TeamAssignmentState = HubTeamAssignmentState;
 export type TeamApprovalState = HubTeamApprovalState;
 export type TeamArtifactState = HubTeamArtifactState;
 export type TeamConflictState = HubTeamConflictState;
 export type TeamRunEventState = HubTeamRunEventState;
+export type TeamRouteAuditState = HubTeamRouteAuditState;
+export type HumanReviewChange = HubHumanReviewChange;
+export type HumanReviewState = HubHumanReviewState;
 export type TeamBudget = HubTeamBudget;
 export type TeamRunState = HubTeamRunState;
 export type TeamApprovalDecisionRequest = HubTeamApprovalDecisionRequest;
