@@ -1,19 +1,6 @@
 // Internal (not consumed by any platform — available for adoption)
-// export { Button } from './Button';
-// export type { ButtonProps } from './Button';
-// export { Icon } from './Icon';
-// export { Card, CardHeader, CardContent, CardFooter } from './Card';
-// export { Pill } from './Pill';
-// export { Avatar } from './Avatar';
-// export { ProgressBar } from './ProgressBar';
-// export { SearchInput } from './SearchInput';
-// export { CollapsibleBlock } from './CollapsibleBlock';
-// export { Tooltip } from './Tooltip';
-// export { SkeletonBar } from './SkeletonBar';
-// export type { SkeletonBarProps } from './SkeletonBar';
 export { SkeletonLine, SkeletonBlock, SkeletonCircle } from './Skeleton';
 export { default as Modal } from './Modal';
-// export type { ModalProps } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
 export type { DiffReviewFile, DiffReviewLabels, DiffHunkDecision, DiffReviewPanelProps } from './DiffReviewPanel';
 export { TextShimmer } from './TextShimmer';
@@ -98,10 +85,6 @@ export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox
 export { default as DeployCard } from './DeployCard';
 export type { DeployCardProps } from './DeployCard';
 export { default as LinkCard } from './LinkCard';
-// export { default as FileChangeGroup } from './FileChangeGroup';
-// export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
-// export { default as ArtifactVersionTimeline } from './ArtifactVersionTimeline';
-// export type { ArtifactVersionTimelineProps, ArtifactVersion } from './ArtifactVersionTimeline';
 export { default as MessageSearchPanel } from './MessageSearchPanel';
 export { SlideshowPreview } from './SlideshowPreview';
 export type { SlideshowPreviewProps } from './SlideshowPreview';
