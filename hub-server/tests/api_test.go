@@ -14,8 +14,9 @@ import (
 // The pre-OIDC Register/LoginAndMe/WrongPassword/RefreshToken/ChangePassword
 // subtests were removed in #1367: /client/auth/register|login|password no
 // longer exist and any non -short run failed with NotFound. Endpoint-level
-// coverage for POST /client/auth/refresh under the OIDC flow (the removed
-// RefreshToken subtest obtained its token via password login) is tracked in #1369.
+// coverage for POST /client/auth/refresh now lives in auth_edge_cases_test.go
+// and multi_device_auth_test.go, built on directly seeded refresh tokens
+// (seedRefreshToken in setup_test.go, #1369).
 func TestAuth(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 
