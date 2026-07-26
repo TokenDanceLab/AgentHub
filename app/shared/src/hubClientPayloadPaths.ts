@@ -266,7 +266,7 @@ export function buildExecutionTargetPath(id: string): string {
 }
 
 export function buildPingExecutionTargetPath(id: string): string {
-  return `/web/execution-targets/${encodeURIComponent(id)}:ping`;
+  return `/web/execution-targets/${encodeURIComponent(id)}/ping`;
 }
 
 export function buildListAuditEventsPath(params?: {
@@ -281,7 +281,7 @@ export function buildRelayCommandPath(id: string): string {
 }
 
 export function buildAckRelayCommandPath(id: string): string {
-  return `/web/relay/commands/${encodeURIComponent(id)}:ack`;
+  return `/web/relay/commands/${encodeURIComponent(id)}/ack`;
 }
 
 export function buildCustomAgentPath(id: string): string {
@@ -381,14 +381,6 @@ export function buildListTaskArtifactsPath(taskId: string): string {
 
 // ── Static path residual (#913) ───────────────────────────────────────────────
 
-export function buildRegisterPath(): string {
-  return '/client/auth/register';
-}
-
-export function buildLoginPath(): string {
-  return '/client/auth/login';
-}
-
 export function buildRefreshPath(): string {
   return '/client/auth/refresh';
 }
@@ -403,14 +395,6 @@ export function buildMePath(): string {
 
 export function buildUpdateProfilePath(): string {
   return '/client/auth/profile';
-}
-
-export function buildChangePasswordPath(): string {
-  return '/client/auth/change-password';
-}
-
-export function buildChangePasswordFallbackPath(): string {
-  return '/client/auth/password';
 }
 
 export function buildOidcAuthorizePath(): string {

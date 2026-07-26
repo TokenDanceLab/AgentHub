@@ -23,10 +23,6 @@ import {
   buildBlockContactPath,
   buildBlockContactRequest,
   buildCancelAgentTaskPaths,
-  buildChangePasswordFallback,
-  buildChangePasswordFallbackPath,
-  buildChangePasswordPath,
-  buildChangePasswordPrimary,
   buildContactRemarkPath,
   buildCreateAgentProfileRequest,
   buildCreateAgentTeamRequest,
@@ -97,8 +93,6 @@ import {
   buildListTeamTasksPath,
   buildListWorkspaceProjectsPath,
   buildListWorkspaceProjectThreadMessagesPath,
-  buildLoginPath,
-  buildLoginRequest,
   buildLogoutPath,
   buildLogoutRequest,
   buildMarkNotificationReadPaths,
@@ -138,8 +132,6 @@ import {
   buildRegenerateAgentTaskPath,
   buildRegenerateAgentTaskRequest,
   buildRegisterDevicePaths,
-  buildRegisterPath,
-  buildRegisterRequest,
   buildRejectFriendRequest,
   buildRejectFriendRequestPath,
   buildRelayCommandPath,
@@ -493,12 +485,12 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
       '/web/execution-targets?pageSize=5&target_type=edge',
     );
     expect(buildExecutionTargetPath('t/1')).toBe('/web/execution-targets/t%2F1');
-    expect(buildPingExecutionTargetPath('t/1')).toBe('/web/execution-targets/t%2F1:ping');
+    expect(buildPingExecutionTargetPath('t/1')).toBe('/web/execution-targets/t%2F1/ping');
     expect(buildListAuditEventsPath({ pageCursor: 'c/1' })).toBe(
       '/web/audit-events?pageCursor=c%2F1',
     );
     expect(buildRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1');
-    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1:ack');
+    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1/ack');
     expect(buildCustomAgentPath('agent/1')).toBe('/web/custom-agents/agent%2F1');
 
     expect(buildListPublicSkillsPath({ q: 'x' })).toBe('/web/skills?is_public=true&q=x');
@@ -549,14 +541,10 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
   });
 
   it('builds static path residual helpers (#913)', () => {
-    expect(buildRegisterPath()).toBe('/client/auth/register');
-    expect(buildLoginPath()).toBe('/client/auth/login');
     expect(buildRefreshPath()).toBe('/client/auth/refresh');
     expect(buildLogoutPath()).toBe('/client/auth/logout');
     expect(buildMePath()).toBe('/client/auth/me');
     expect(buildUpdateProfilePath()).toBe('/client/auth/profile');
-    expect(buildChangePasswordPath()).toBe('/client/auth/change-password');
-    expect(buildChangePasswordFallbackPath()).toBe('/client/auth/password');
     expect(buildOidcAuthorizePath()).toBe('/client/auth/oidc/authorize');
     expect(buildOidcCallbackPath()).toBe('/client/auth/oidc/callback');
     expect(buildListContactsPath()).toBe('/client/contacts');
@@ -589,18 +577,6 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     expect(buildPostWithOptionalJsonBody(buildTaskAckBody('run-9'))).toEqual({
       method: 'POST',
       body: JSON.stringify({ run_id: 'run-9' }),
-    });
-  });
-
-  it('builds change-password primary/fallback request pairs (#957)', () => {
-    const body = { old_password: 'a', new_password: 'b' };
-    expect(buildChangePasswordPrimary(body)).toEqual({
-      path: '/client/auth/change-password',
-      init: { method: 'POST', body: JSON.stringify(body) },
-    });
-    expect(buildChangePasswordFallback(body)).toEqual({
-      path: '/client/auth/password',
-      init: { method: 'PUT', body: JSON.stringify(body) },
     });
   });
 
@@ -715,14 +691,6 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
   });
 
   it('peels remaining path+init composites used by createHubClient (#1055)', () => {
-    expect(buildRegisterRequest({ username: 'u' })).toEqual({
-      path: '/client/auth/register',
-      init: { method: 'POST', body: JSON.stringify({ username: 'u' }) },
-    });
-    expect(buildLoginRequest({ username: 'u', password: 'p' })).toEqual({
-      path: '/client/auth/login',
-      init: { method: 'POST', body: JSON.stringify({ username: 'u', password: 'p' }) },
-    });
     expect(buildLogoutRequest()).toEqual({
       path: '/client/auth/logout',
       init: { method: 'POST' },
@@ -816,7 +784,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
       init: { method: 'DELETE' },
     });
     expect(buildPingExecutionTargetRequest('t1')).toEqual({
-      path: '/web/execution-targets/t1:ping',
+      path: '/web/execution-targets/t1/ping',
       init: { method: 'POST' },
     });
     expect(buildCreateRelayCommandRequest({ command: 'ping' })).toEqual({
@@ -824,7 +792,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
       init: { method: 'POST', body: JSON.stringify({ command: 'ping' }) },
     });
     expect(buildAckRelayCommandRequest('cmd/1')).toEqual({
-      path: '/web/relay/commands/cmd%2F1:ack',
+      path: '/web/relay/commands/cmd%2F1/ack',
       init: { method: 'POST' },
     });
     expect(buildCreateCustomAgentRequest({ name: 'a' })).toEqual({

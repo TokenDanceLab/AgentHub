@@ -15,8 +15,6 @@ export {
   buildDeleteInit,
   buildPutInit,
   buildPostWithOptionalJsonBody,
-  buildChangePasswordPrimary,
-  buildChangePasswordFallback,
   type HubJsonPathInit,
   type HubMethodPathInit,
 } from './hubClientPayloadRequestInits';
@@ -24,8 +22,6 @@ export {
 export {
   buildRefreshRequest,
   buildOidcAuthorizeRequest,
-  buildRegisterRequest,
-  buildLoginRequest,
   buildUpdateProfileRequest,
   buildOidcCallbackPathInit,
   buildLogoutRequest,
