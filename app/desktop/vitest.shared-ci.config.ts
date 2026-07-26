@@ -22,7 +22,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     include: ['../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx'],
-    exclude: ['../shared/src/events.test.ts', '../shared/src/components/__tests__/**'],
     setupFiles: ['./src/__tests__/setup.ts'],
     execArgv: ['--max-old-space-size=4096'],
     memoryLimit: '512MB',
