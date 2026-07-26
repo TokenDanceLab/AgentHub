@@ -1314,31 +1314,16 @@ paths:
         single-token `access_token.<hub-jwt>` form. The `access_token` query
         parameter is deliberately rejected (fail closed) because query strings
         leak into proxy logs, browser history, and Referer headers — see
-        middleware.extractWSToken. The `hubWebSocketQueryToken` scheme and the
-        `access_token` query parameter documented below are retained only as
-        deprecated compatibility surface and authenticate nothing. TokenDance ID
-        RS256 bearer tokens and TokenDance API keys are not Hub WebSocket
-        credentials. The legacy first-frame `auth` event is only for tests and
-        compatibility entries that do not install WSAuthMiddleware. See
-        api/events.md for Hub event types.
+        middleware.extractWSToken. Query-string auth is therefore not part of
+        this contract. TokenDance ID RS256 bearer tokens and TokenDance API
+        keys are not Hub WebSocket credentials. The legacy first-frame `auth`
+        event is only for tests and compatibility entries that do not install
+        WSAuthMiddleware. See api/events.md for Hub event types.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security:
-        # hubWebSocketQueryToken is fail-closed on the server; retained as
-        # deprecated documentation only. Real upgrades use bearerAuth or the
-        # Sec-WebSocket-Protocol token carriage described above.
-        - hubWebSocketQueryToken: []
         - bearerAuth: []
       parameters:
-        - name: access_token
-          in: query
-          required: false
-          deprecated: true
-          schema: { type: string }
-          description: >
-            NOT ACCEPTED. Hub deliberately ignores this query parameter and
-            fails the upgrade closed. Browsers must carry the Hub-issued HS256
-            access token in Sec-WebSocket-Protocol instead.
         - name: Sec-WebSocket-Protocol
           in: header
           required: false
@@ -2659,7 +2644,7 @@ paths:
                   data:
                     $ref: "#/components/schemas/Device"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/Error"
 
   /cloud/edge/register:
     post:
@@ -2721,7 +2706,7 @@ paths:
                         type: string
                         description: Edge-scoped JWT for Edge API auth.
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
 
@@ -5339,23 +5324,6 @@ components:
       description: >
         Browser WebSocket transport for the optional Local Edge token on
         /v1/events. Hub WebSocket uses Hub-issued access tokens separately.
-    hubWebSocketQueryToken:
-      type: apiKey
-      in: query
-      name: access_token
-      x-deprecated: true
-      x-agenthub-server-behavior: rejected
-      description: >
-        DEPRECATED — NOT ACCEPTED BY THE SERVER. Historically documented as the
-        browser transport for a Hub-issued HS256 access token during /client/ws
-        HTTP upgrade. Hub middleware (WSAuthMiddleware / extractWSToken)
-        deliberately ignores the access_token query parameter and fails closed,
-        because query strings leak into proxy logs, browser history, and Referer
-        headers. Browsers must carry the Hub JWT in Sec-WebSocket-Protocol
-        (`agenthub.bearer.v1, <hub-jwt>` or `access_token.<hub-jwt>`); native
-        clients use Authorization: Bearer. This scheme grants no access and is
-        retained only so the existing Hub OpenAPI contract test keeps resolving
-        it; remove it together with that assertion.
   parameters:
     PageSize:
       name: pageSize
