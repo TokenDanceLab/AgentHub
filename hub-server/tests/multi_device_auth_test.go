@@ -3,79 +3,62 @@ package tests
 import (
 	"testing"
 
-	"golang.org/x/crypto/bcrypt"
-
-	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
-func TestLoginAllowsMultipleDesktopDevicesForSameUser(t *testing.T) {
+// TestRefreshAllowsMultipleDesktopDevicesForSameUser verifies that one user
+// can hold independent refresh-token chains on multiple desktop devices:
+// refreshing one device's token does not invalidate the other's. Password
+// login used to establish the two sessions; after the OIDC migration (#1367)
+// the tokens are seeded directly the way the OIDC callback persists them, and
+// POST /client/auth/refresh carries the behavior (#1369).
+func TestRefreshAllowsMultipleDesktopDevicesForSameUser(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 	user := register(t, "tmultidev1", "pass1234", "MultiDevice")
 
-	first := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    user.Username,
-		"password":    user.Password,
-		"device_type": "desktop",
-		"device_id":   "11111111-1111-4111-8111-111111111111",
-	}))
-	mustOK(t, first, "first desktop login")
-
-	second := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    user.Username,
-		"password":    user.Password,
-		"device_type": "desktop",
-		"device_id":   "22222222-2222-4222-8222-222222222222",
-	}))
-	mustOK(t, second, "second desktop login")
+	firstRefresh := seedRefreshToken(t, user.ID, "desktop", "11111111-1111-4111-8111-111111111111")
+	secondRefresh := seedRefreshToken(t, user.ID, "desktop", "22222222-2222-4222-8222-222222222222")
 
 	mustOK(t, parse(post("/client/auth/refresh", map[string]string{
-		"refresh_token": extract(first.Data, "refresh_token"),
+		"refresh_token": firstRefresh,
 	})), "refresh first desktop")
 	mustOK(t, parse(post("/client/auth/refresh", map[string]string{
-		"refresh_token": extract(second.Data, "refresh_token"),
+		"refresh_token": secondRefresh,
 	})), "refresh second desktop")
 }
 
-func TestLoginRejectsDeviceIDOwnedByAnotherUser(t *testing.T) {
+// TestDeviceRegisterRejectsDeviceIDOwnedByAnotherUser verifies that a
+// device_id claimed by one user cannot be re-registered by another. The
+// password login that used to surface this check was removed in #1367; the
+// ownership check lives on in repository.UpsertDevice and is reachable via
+// POST /edge/devices/register.
+func TestDeviceRegisterRejectsDeviceIDOwnedByAnotherUser(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	firstUser := createLoginUser(t, "tmultidev2a", "pass1234", "MultiDeviceA")
-	secondUser := createLoginUser(t, "tmultidev2b", "pass1234", "MultiDeviceB")
+	firstUser := register(t, "tmultidev2a", "pass1234", "MultiDeviceA")
+	secondUser := register(t, "tmultidev2b", "pass1234", "MultiDeviceB")
 	sharedDeviceID := "33333333-3333-4333-8333-333333333333"
 
-	mustOK(t, parse(post("/client/auth/login", map[string]interface{}{
-		"username":    firstUser.Username,
-		"password":    firstUser.Password,
-		"device_type": "desktop",
-		"device_id":   sharedDeviceID,
-	})), "first user desktop login")
+	// /edge/* requires a desktop-type token (DeviceTypeCheck middleware), so
+	// mint the desktop JWTs directly like register() does.
+	firstTok, err := jwtutil.GenerateAccessToken(firstUser.ID, "desktop", sharedDeviceID, testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate first desktop token: %v", err)
+	}
+	secondTok, err := jwtutil.GenerateAccessToken(secondUser.ID, "desktop", sharedDeviceID, testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate second desktop token: %v", err)
+	}
 
-	mustCode(t, parse(post("/client/auth/login", map[string]interface{}{
-		"username":    secondUser.Username,
-		"password":    secondUser.Password,
-		"device_type": "desktop",
-		"device_id":   sharedDeviceID,
+	mustOK(t, parse(postAuth("/edge/devices/register", firstTok, map[string]interface{}{
+		"device_id": sharedDeviceID, "app_version": "1.0", "capabilities": []string{"claude-code"},
+	})), "first user registers device")
+
+	mustCode(t, parse(postAuth("/edge/devices/register", secondTok, map[string]interface{}{
+		"device_id": sharedDeviceID, "app_version": "1.0", "capabilities": []string{"claude-code"},
 	})), "bad_request", "second user reuses first user's device_id")
 }
 
-func createLoginUser(t *testing.T, username, password, nickname string) testUser {
-	t.Helper()
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	user := &model.User{
-		Username:     username,
-		PasswordHash: stringPtr(string(hash)),
-		Nickname:     nickname,
-	}
-	if err := repository.CreateUser(db, user); err != nil {
-		t.Fatalf("create user %s: %v", username, err)
-	}
-	return testUser{Username: username, Password: password, ID: user.ID}
-}
-
+// stringPtr returns a pointer to the given string.
 func stringPtr(s string) *string {
 	return &s
 }

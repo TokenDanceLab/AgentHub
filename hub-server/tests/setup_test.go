@@ -348,6 +348,31 @@ func register(t *testing.T, username, password, nickname string) testUser {
 	return testUser{Username: username, Password: password, Token: token, ID: user.ID}
 }
 
+// seedRefreshToken stores a refresh token for the given user/device directly
+// in the DB — the same shape the OIDC callback persists (hash-only, TTL from
+// config) — and returns the raw token for use against /client/auth/refresh.
+// Password login used to be how tests obtained refresh tokens; it was removed
+// with the OIDC migration (#1367), so tests seed the row directly (#1369).
+func seedRefreshToken(t *testing.T, userID, deviceType, deviceID string) string {
+	t.Helper()
+
+	raw, err := jwtutil.GenerateRefreshToken()
+	if err != nil {
+		t.Fatalf("generate refresh token: %v", err)
+	}
+	rt := &model.RefreshToken{
+		UserID:     userID,
+		DeviceType: deviceType,
+		DeviceID:   deviceID,
+		TokenHash:  jwtutil.HashRefreshToken(raw),
+		ExpiresAt:  time.Now().Add(testJWT.RefreshTTL),
+	}
+	if err := repository.UpsertRefreshToken(db, rt); err != nil {
+		t.Fatalf("seed refresh token for user %s device %s: %v", userID, deviceID, err)
+	}
+	return raw
+}
+
 func TestSetupRegisterCreatesHubSession(t *testing.T) {
 	CleanDB(t, db)
 
