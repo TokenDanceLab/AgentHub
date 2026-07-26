@@ -145,7 +145,7 @@ describe('createHubClient', () => {
     await client.pingExecutionTarget('target/id');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/execution-targets/target%2Fid:ping',
+      'https://hub.example.test/web/execution-targets/target%2Fid/ping',
       expect.objectContaining({
         method: 'POST',
       }),

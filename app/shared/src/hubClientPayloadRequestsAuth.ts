@@ -11,12 +11,10 @@ import {
   buildRefreshBody,
 } from './hubClientPayloadBodies';
 import {
-  buildLoginPath,
   buildLogoutPath,
   buildOidcAuthorizePath,
   buildOidcCallbackPath,
   buildRefreshPath,
-  buildRegisterPath,
   buildUpdateProfilePath,
 } from './hubClientPayloadPaths';
 import {
@@ -42,26 +40,6 @@ export function buildOidcAuthorizeRequest(body: HubOidcAuthorizeRequest): {
   return {
     path: buildOidcAuthorizePath(),
     init: buildJsonPostInit(buildOidcAuthorizeBody(body)),
-  };
-}
-
-export function buildRegisterRequest(body: unknown): {
-  path: string;
-  init: { method: 'POST'; body: string };
-} {
-  return {
-    path: buildRegisterPath(),
-    init: buildJsonPostInit(body),
-  };
-}
-
-export function buildLoginRequest(body: unknown): {
-  path: string;
-  init: { method: 'POST'; body: string };
-} {
-  return {
-    path: buildLoginPath(),
-    init: buildJsonPostInit(body),
   };
 }
 
