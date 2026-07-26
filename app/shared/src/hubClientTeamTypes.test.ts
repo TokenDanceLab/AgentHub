@@ -87,6 +87,11 @@ describe('hubClientTeamTypes (#767)', () => {
       action: 'continue',
       next_worker: 'executor',
       approved: true,
+      accepted: true,
+      subtask_id: 'tt-1',
+      parent_task_id: 'tt-0',
+      agent_id: 'm1',
+      reason: 'queued subtask',
     };
     const team: HubAgentTeam = { id: 'team-1', name: 'Alpha' };
     const member: HubAgentTeamMember = {
@@ -98,7 +103,8 @@ describe('hubClientTeamTypes (#767)', () => {
     const run: HubAgentTeamRun = {
       id: 'run-1',
       team_id: 'team-1',
-      status: 'queued',
+      mode: 'supervisor',
+      status: 'pending_review',
     };
     const assignment: HubAgentTeamAssignment = {
       id: 'as-1',
@@ -109,6 +115,7 @@ describe('hubClientTeamTypes (#767)', () => {
       id: 'tt-1',
       team_run_id: 'run-1',
       status: 'pending',
+      input_refs: '{}',
     };
     const teamEvent: HubAgentTeamEvent = {
       id: 'te-1',
@@ -127,17 +134,38 @@ describe('hubClientTeamTypes (#767)', () => {
       status: 'running',
       budget,
       route_log: [route],
+      dependencies: [{ task_id: 'tt-1', depends_on_task_id: 'tt-0', kind: 'parent_task' }],
+      route_audit_log: [
+        { status: 'accepted', action: 'delegate', subtask_id: 'tt-1', agent_id: 'm1' },
+        { status: 'rejected', action: 'delegate', reason: 'task limit reached' },
+      ],
+      reviews: [
+        {
+          review_id: 'run-1-review-1',
+          run_id: 'run-1',
+          action: 'approve',
+          comment: 'looks good',
+          changes: [{ field: 'instructions', value: 'Do the other thing' }],
+          created_at: 'now',
+        },
+      ],
     };
 
     expect(summary.task_id).toBe('t1');
     expect(event.event_type).toBe('step');
     expect(route.action).toBe('continue');
+    expect(route.subtask_id).toBe('tt-1');
     expect(detail.members?.[0]?.role).toBe('executor');
-    expect(run.status).toBe('queued');
+    expect(run.status).toBe('pending_review');
+    expect(run.mode).toBe('supervisor');
     expect(assignment.team_run_id).toBe('run-1');
     expect(task.status).toBe('pending');
+    expect(task.input_refs).toBe('{}');
     expect(teamEvent.seq).toBe(1);
     expect(state.budget?.remaining_tokens).toBe(900);
+    expect(state.dependencies?.[0]?.kind).toBe('parent_task');
+    expect(state.route_audit_log?.[1]?.status).toBe('rejected');
+    expect(state.reviews?.[0]?.action).toBe('approve');
   });
 
   it('keeps attachment / profile / document / approval DTO contracts stable', () => {
@@ -259,7 +287,7 @@ describe('hubClientTeamTypes (#767)', () => {
     const hubTeam: HubAgentTeam = team;
     const detail: AgentTeamDetail = { id: 'team-1', name: 'A', members: [] };
     const hubDetail: HubAgentTeamDetail = detail;
-    const run: AgentTeamRun = { id: 'r1', team_id: 'team-1', status: 'running' };
+    const run: AgentTeamRun = { id: 'r1', team_id: 'team-1', mode: 'compete', status: 'running' };
     const hubRun: HubAgentTeamRun = run;
     const route: CoordinatorRouteDecision = { action: 'stop' };
     const hubRoute: HubCoordinatorRouteDecision = route;
