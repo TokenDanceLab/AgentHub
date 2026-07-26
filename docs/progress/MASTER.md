@@ -55,7 +55,7 @@ Research off-repo: `D:\Code\Temp\codeg-research\`（含 SYNTHESIS）；**未进�
 
 ## Product tip & Visual QA
 
-**Gate**: **89**/100 SHIP（55→89）。Empty 5/6 · Type 9/10 · Motion 9/10 需交互/多态/CJK——**不追 89+**。  
+**Gate**: **89**/100 SHIP（55→89）。Empty 5/6 · Type 9/10 · Motion 9/10 需交互/多态/CJK——**不追 89+**。
 Refs: [scorecard](../analysis/visual-qa-scorecard.md) · [rescore-17](../analysis/visual-qa-score-2026-07-20-rescore-17-final.md)
 
 ## Infrastructure
