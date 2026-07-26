@@ -256,7 +256,7 @@ describe('hubClient helpers', () => {
       'http://hub.local/web/execution-targets',
       'http://hub.local/web/audit-events?pageSize=5',
       'http://hub.local/web/relay/commands',
-      'http://hub.local/web/relay/commands/relay-1:ack',
+      'http://hub.local/web/relay/commands/relay-1/ack',
     ]);
   });
 
