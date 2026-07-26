@@ -3,9 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MAX_PREVIEW_FILE_BYTES, TablePreview } from './TablePreview';
 
-/* Size guard tests — mitigation for unpatched xlsx@0.18.5 (issue #1358).
-   Oversized payloads must hit the existing error UI without ever reaching
-   XLSX.read; normal-sized files must keep parsing as before. */
+/* Size guard tests — defense-in-depth retained after the xlsx migration to
+   the official SheetJS source 0.20.3 (issue #1358). Oversized payloads must
+   hit the existing error UI without ever reaching XLSX.read; normal-sized
+   files must keep parsing as before. */
 
 describe('TablePreview size guard', () => {
   it('refuses files above MAX_PREVIEW_FILE_BYTES via the existing error state', async () => {
