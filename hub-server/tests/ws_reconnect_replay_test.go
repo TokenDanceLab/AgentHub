@@ -2,18 +2,16 @@ package tests
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
-	"math/big"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/middleware"
 	hubws "github.com/agenthub/hub-server/internal/ws"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -57,10 +55,9 @@ func TestWSReconnectReceivesMessages(t *testing.T) {
 	wsURL := newWSTestServer(t, manager)
 
 	// First connection: authenticate as user-recon-1.
-	conn1 := dialWS(t, wsURL)
+	conn1 := dialWS(t, wsURL, "user-recon-1")
 	defer conn1.Close(websocket.StatusNormalClosure, "")
 
-	writeWSAuthFrame(t, conn1, "user-recon-1")
 	frame := readWSFrame(t, conn1)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("conn1 auth: got %s, want auth.ok", frame.Type)
@@ -85,10 +82,9 @@ func TestWSReconnectReceivesMessages(t *testing.T) {
 	}
 
 	// Second connection: reconnect as same user+device.
-	conn2 := dialWS(t, wsURL)
+	conn2 := dialWS(t, wsURL, "user-recon-1")
 	defer conn2.Close(websocket.StatusNormalClosure, "")
 
-	writeWSAuthFrame(t, conn2, "user-recon-1")
 	frame = readWSFrame(t, conn2)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("conn2 auth: got %s, want auth.ok", frame.Type)
@@ -139,23 +135,21 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 	wsURL := newWSTestServer(t, manager)
 
 	// Connect as desktop.
-	connDesktop := dialWS(t, wsURL)
+	connDesktop := dialWS(t, wsURL, "user-multi-dev")
 	defer connDesktop.Close(websocket.StatusNormalClosure, "")
 
-	writeWSAuthFrame(t, connDesktop, "user-multi-dev")
 	frame := readWSFrame(t, connDesktop)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("desktop auth: got %s, want auth.ok", frame.Type)
 	}
 
 	// Connect as web.
-	connWeb := dialWS(t, wsURL)
+	connWeb := dialWS(t, wsURL, "user-multi-dev-web")
 	defer connWeb.Close(websocket.StatusNormalClosure, "")
 
 	// For the web connection we need a different accessToken claim to avoid
 	// route key collision. Use a second user for this multi-device test with
 	// separate manager routes.
-	writeWSAuthFrame(t, connWeb, "user-multi-dev-web")
 	frame = readWSFrame(t, connWeb)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("web auth: got %s, want auth.ok", frame.Type)
@@ -191,10 +185,9 @@ func TestWSHeartbeatKeepsConnection(t *testing.T) {
 
 	wsURL := newWSTestServer(t, manager)
 
-	conn := dialWS(t, wsURL)
+	conn := dialWS(t, wsURL, "user-heartbeat")
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	writeWSAuthFrame(t, conn, "user-heartbeat")
 	frame := readWSFrame(t, conn)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("auth: got %s, want auth.ok", frame.Type)
@@ -249,10 +242,9 @@ func TestWSPushToConnBufferFull(t *testing.T) {
 
 	wsURL := newWSTestServer(t, manager)
 
-	conn := dialWS(t, wsURL)
+	conn := dialWS(t, wsURL, "user-bufferfull")
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	writeWSAuthFrame(t, conn, "user-bufferfull")
 	frame := readWSFrame(t, conn)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("auth: got %s, want auth.ok", frame.Type)
@@ -289,124 +281,35 @@ func TestWSPushToConnBufferFull(t *testing.T) {
 	conn.Close(websocket.StatusNormalClosure, "")
 }
 
-// TestWSAuthBadToken verifies that an invalid token in the auth frame
-// results in an auth.fail response.
-func TestWSAuthBadToken(t *testing.T) {
-	manager := hubws.NewManager()
-	wsURL := newWSTestServer(t, manager)
-
-	conn := dialWS(t, wsURL)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	// Send an auth frame with a bad token.
-	badToken := "this-is-not-a-valid-jwt"
-	writeWSAuthFrame(t, conn, badToken)
-
-	frame := readWSFrame(t, conn)
-	if frame.Type != hubws.TypeAuthFail {
-		t.Fatalf("bad token auth: got %s, want auth.fail", frame.Type)
-	}
-}
-
-// TestWSAuthMissingToken verifies that sending a non-auth frame as the
-// first message results in auth.fail.
-func TestWSAuthMissingToken(t *testing.T) {
-	manager := hubws.NewManager()
-	wsURL := newWSTestServer(t, manager)
-
-	conn := dialWS(t, wsURL)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	// Send a typing frame instead of auth as the first message.
-	writeWSTypingFrame(t, conn, "sess-1")
-
-	frame := readWSFrame(t, conn)
-	if frame.Type != hubws.TypeAuthFail {
-		t.Fatalf("missing auth: got %s, want auth.fail", frame.Type)
-	}
-}
-
-// TestWSAuthExpiredToken verifies that an expired JWT in the auth frame
-// results in an auth.fail response.
-func TestWSAuthExpiredToken(t *testing.T) {
-	manager := hubws.NewManager()
-	wsURL := newWSTestServer(t, manager)
-
-	conn := dialWS(t, wsURL)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	// Generate a TokenDance-style token (wrong audience) for the WS auth.
-	// The WS handler validates the token using jwtutil.ParseToken which
-	// checks HS256 signature and iss/aud. A TD bearer token with RS256
-	// will fail.
-	tdToken := makeTokenDanceBearerToken(t)
-	writeWSAuthFrame(t, conn, tdToken)
-
-	frame := readWSFrame(t, conn)
-	if frame.Type != hubws.TypeAuthFail {
-		t.Fatalf("tokendance token on ws auth: got %s, want auth.fail", frame.Type)
-	}
-}
-
 // ── WebSocket test helpers ────────────────────────────────────────────────────
 
 func newWSTestServer(t *testing.T, manager *hubws.Manager) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewWebSocketHandler(manager, wsTestSecret, "")
-	r.GET("/client/ws", h.ServeWS)
+	h := handler.NewWebSocketHandler(manager, "")
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: wsTestSecret}}
+	r.GET("/client/ws", middleware.WSAuthMiddleware(cfg), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
 }
 
-func dialWS(t *testing.T, url string) *websocket.Conn {
+func dialWS(t *testing.T, url, userID string) *websocket.Conn {
 	t.Helper()
+	accessToken, err := generateWSAccessToken(userID, "web", "test-device-"+userID, wsTestSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate ws access token: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(ctx, url, nil)
+	conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + accessToken}},
+	})
 	if err != nil {
 		t.Fatalf("dial websocket: %v", err)
 	}
 	return conn
-}
-
-func writeWSAuthFrame(t *testing.T, conn *websocket.Conn, tokenOrUserID string) {
-	t.Helper()
-	// If the argument looks like a user ID (no dots), generate a real access token.
-	accessToken := tokenOrUserID
-	if !strings.Contains(tokenOrUserID, ".") {
-		var err error
-		accessToken, err = generateWSAccessToken(tokenOrUserID, "web", "test-device-"+tokenOrUserID, wsTestSecret, time.Hour)
-		if err != nil {
-			t.Fatalf("generate ws access token: %v", err)
-		}
-	}
-	frame := hubws.NewFrame(hubws.TypeAuth, map[string]string{"access_token": accessToken})
-	data, err := frame.Marshal()
-	if err != nil {
-		t.Fatalf("marshal ws auth frame: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
-		t.Fatalf("write ws auth frame: %v", err)
-	}
-}
-
-func writeWSTypingFrame(t *testing.T, conn *websocket.Conn, sessionID string) {
-	t.Helper()
-	frame := hubws.NewFrame(hubws.TypeTyping, map[string]string{"session_id": sessionID})
-	data, err := frame.Marshal()
-	if err != nil {
-		t.Fatalf("marshal ws typing frame: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
-		t.Fatalf("write ws typing frame: %v", err)
-	}
 }
 
 func readWSFrame(t *testing.T, conn *websocket.Conn) *hubws.Frame {
@@ -445,39 +348,4 @@ func generateWSAccessToken(userID, deviceType, deviceID, secret string, ttl time
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
-}
-
-func makeTokenDanceBearerToken(t *testing.T) string {
-	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate RSA key: %v", err)
-	}
-	kid := makeTokenDanceWSKID(&priv.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
-	_ = kid
-	_ = n
-	_ = e
-
-	now := time.Now()
-	claims := jwt.RegisteredClaims{
-		Issuer:    "https://id.example",
-		Subject:   "tokendance-ws-user",
-		Audience:  jwt.ClaimStrings{"agenthub-client"},
-		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-		IssuedAt:  jwt.NewNumericDate(now),
-	}
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	jwtToken.Header["kid"] = kid
-	signed, err := jwtToken.SignedString(priv)
-	if err != nil {
-		t.Fatalf("sign TokenDance token: %v", err)
-	}
-	return signed
-}
-
-func makeTokenDanceWSKID(pub *rsa.PublicKey) string {
-	hash := sha256.Sum256(pub.N.Bytes())
-	return base64.RawURLEncoding.EncodeToString(hash[:16])
 }

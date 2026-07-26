@@ -64,7 +64,7 @@ func BenchmarkFrameMarshalWithStringPayload(b *testing.B) {
 }
 
 func BenchmarkFrameParseEmpty(b *testing.B) {
-	data := []byte(`{"type":"auth"}`)
+	data := []byte(`{"type":"auth.ok"}`)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = ParseFrame(data)
@@ -73,7 +73,7 @@ func BenchmarkFrameParseEmpty(b *testing.B) {
 
 func BenchmarkFrameMarshalAllTypes(b *testing.B) {
 	types := []string{
-		TypeAuth, TypeTyping, TypeAuthOK, TypeAuthFail,
+		TypeTyping, TypeAuthOK,
 		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
 		TypeMessageReactionAdded, TypeMessageReactionRemoved, TypeMessageRead,
 		TypeSessionCreated, TypeSessionDissolved,

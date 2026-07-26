@@ -174,7 +174,6 @@ export function useHubEventStream(
       switch (type) {
         // ── Message events ──────────────────────
         case HUB_EVENTS.MESSAGE_NEW:
-        case HUB_EVENTS.MESSAGE_EDITED:
           if (payload) setLastMessage(payload as HubMessage);
           break;
 
@@ -252,21 +251,6 @@ export function useHubEventStream(
           // Processed by useHubIntegration — no state update needed here
           break;
 
-        case HUB_EVENTS.AGENT_REGENERATE:
-          if (payload) {
-            // Regenerate creates a new task referencing the old one
-            const newTaskId = readString(payload, 'new_task_id', 'newTaskId');
-            if (newTaskId) {
-              setLastAgentTask({
-                task_id: newTaskId,
-                session_id: readString(payload, 'session_id', 'sessionId') ?? '',
-                agent_instance_id: readString(payload, 'agent_instance_id', 'agentInstanceId') ?? '',
-                status: 'queued',
-              } as HubAgentTask);
-            }
-          }
-          break;
-
         // ── Device events ──────────────────────
         case HUB_EVENTS.DEVICE_ONLINE:
           if (payload) {
@@ -330,27 +314,8 @@ export function useHubEventStream(
           }
           break;
 
-        // ── Plan approval events ───────────────
-        case HUB_EVENTS.PLAN_PROPOSED:
-        case HUB_EVENTS.PLAN_APPROVED:
-        case HUB_EVENTS.PLAN_REJECTED:
-        case HUB_EVENTS.PLAN_EXPIRED:
-          // Plan lifecycle events — update state for plan-aware consumers
-          if (payload) {
-            setLastSessionEvent({ type, payload });
-          }
-          break;
-
-        // ── Sync / system events ───────────────
-        case HUB_EVENTS.SYNC_REQUEST:
-        case HUB_EVENTS.SYNC_EVENTS:
-          // Internal sync protocol — handled by the WS layer
-          break;
-
         // ── Auth events ────────────────────────
-        case HUB_EVENTS.AUTH:
         case HUB_EVENTS.AUTH_OK:
-        case HUB_EVENTS.AUTH_FAIL:
           // Auth lifecycle already handled by hubWS internals
           break;
       }
