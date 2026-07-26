@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"testing"
@@ -90,38 +91,24 @@ func TestAuthExpiredAccessTokenOnProtectedEndpoint(t *testing.T) {
 	}
 }
 
-// TestAuthWrongDeviceToken verifies that a request with a mismatched device
-// context (e.g. token issued for device A but requesting from device B) is
-// handled correctly. The JWT middleware validates the token but does not
-// cross-check device binding at the HTTP level; this test verifies that
-// both tokens for the same user are independently valid.
+// TestAuthWrongDeviceToken verifies that tokens scoped to different devices
+// of the same user are independently valid: the JWT middleware validates the
+// token but does not cross-check device binding at the HTTP level. Password
+// login used to mint the two device-scoped tokens; they are now minted
+// directly like register() does (#1367).
 func TestAuthWrongDeviceToken(t *testing.T) {
 	CleanDB(t, db)
 
-	// Register a user and get tokens for two different devices.
+	// register() mints a web-scoped token; mint a desktop-scoped one for a
+	// different device alongside it.
 	u := register(t, "twrongdev", "pass1234", "WrongDevice")
+	webToken := u.Token
 
-	// Login on desktop to get a desktop-scoped token.
-	desktopResp := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    u.Username,
-		"password":    u.Password,
-		"device_type": "desktop",
-		"device_id":   "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-	}))
-	mustOK(t, desktopResp, "desktop login")
-
-	desktopToken := extract(desktopResp.Data, "access_token")
-
-	// Login on web to get a web-scoped token.
-	webResp := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    u.Username,
-		"password":    u.Password,
-		"device_type": "web",
-		"device_id":   "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-	}))
-	mustOK(t, webResp, "web login")
-
-	webToken := extract(webResp.Data, "access_token")
+	desktopToken, err := jwtutil.GenerateAccessToken(u.ID, "desktop",
+		"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate desktop token: %v", err)
+	}
 
 	// Both tokens should work independently for /me.
 	for _, tc := range []struct {
@@ -140,22 +127,30 @@ func TestAuthWrongDeviceToken(t *testing.T) {
 
 	// Verify tokens are distinct (different devices, different tokens).
 	if desktopToken == webToken {
-		t.Fatal("expected different tokens for different device logins")
+		t.Fatal("expected different tokens for different devices")
 	}
 }
 
-// TestAuthConcurrentLogin verifies that multiple concurrent login attempts
-// for the same user on different desktop devices all succeed.
-func TestAuthConcurrentLogin(t *testing.T) {
+// TestAuthConcurrentRefresh verifies that concurrent refresh attempts for the
+// same user on different desktop devices all succeed with unique tokens.
+// Pre-OIDC this exercised concurrent password logins; POST /client/auth/refresh
+// is the surviving token-issuance endpoint (#1367, #1369).
+func TestAuthConcurrentRefresh(t *testing.T) {
 	CleanDB(t, db)
 
 	u := register(t, "tconcurrent", "pass1234", "ConcurrentUser")
 
 	const numConcurrent = 10
+	refreshTokens := make([]string, numConcurrent)
+	for i := 0; i < numConcurrent; i++ {
+		deviceID := fmt.Sprintf("cccccccc-cccc-4ccc-8ccc-%012d", i)
+		refreshTokens[i] = seedRefreshToken(t, u.ID, "desktop", deviceID)
+	}
+
 	type result struct {
-		deviceID string
-		token    string
-		err      string
+		idx   int
+		token string
+		err   string
 	}
 	results := make(chan result, numConcurrent)
 
@@ -164,17 +159,10 @@ func TestAuthConcurrentLogin(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			deviceID := testDeviceID(u.Username+"_conc", "desktop")
-			// Make deviceID unique by appending the index
-			deviceID = deviceID[:len(deviceID)-1] + string(rune('0'+idx%10))
-
-			resp := parse(post("/client/auth/login", map[string]interface{}{
-				"username":    u.Username,
-				"password":    u.Password,
-				"device_type": "desktop",
-				"device_id":   deviceID,
+			resp := parse(post("/client/auth/refresh", map[string]string{
+				"refresh_token": refreshTokens[idx],
 			}))
-			r := result{deviceID: deviceID}
+			r := result{idx: idx}
 			if resp.GetCode() != errcode.OK.Code {
 				r.err = resp.GetMsg()
 			} else {
@@ -192,12 +180,12 @@ func TestAuthConcurrentLogin(t *testing.T) {
 	for r := range results {
 		if r.err != "" {
 			failures++
-			t.Errorf("concurrent login failed for device %s: %s", r.deviceID, r.err)
+			t.Errorf("concurrent refresh failed for device %d: %s", r.idx, r.err)
 			continue
 		}
 		if r.token == "" {
 			failures++
-			t.Errorf("concurrent login empty token for device %s", r.deviceID)
+			t.Errorf("concurrent refresh returned empty token for device %d", r.idx)
 			continue
 		}
 		if tokens[r.token] {
@@ -207,7 +195,7 @@ func TestAuthConcurrentLogin(t *testing.T) {
 	}
 
 	if failures > 0 {
-		t.Fatalf("%d/%d concurrent logins failed", failures, numConcurrent)
+		t.Fatalf("%d/%d concurrent refreshes failed", failures, numConcurrent)
 	}
 	if len(tokens) != numConcurrent {
 		t.Errorf("expected %d unique tokens, got %d", numConcurrent, len(tokens))
@@ -215,83 +203,87 @@ func TestAuthConcurrentLogin(t *testing.T) {
 }
 
 // TestAuthRefreshAfterLogout verifies that a refresh token is rejected
-// after the user logs out.
+// after the user logs out. The session pair (access + refresh token) is
+// seeded directly for the same user/device the way the OIDC callback
+// would establish it (#1367).
 func TestAuthRefreshAfterLogout(t *testing.T) {
 	CleanDB(t, db)
 
-	// Create a login-capable user.
-	createLoginUser(t, "tlogoutrefresh", "pass1234", "LogoutRefresh")
+	u := register(t, "tlogoutrefresh", "pass1234", "LogoutRefresh")
+	deviceID := "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 
-	resp := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    "tlogoutrefresh",
-		"password":    "pass1234",
-		"device_type": "desktop",
-		"device_id":   "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-	}))
-	mustOK(t, resp, "login")
+	accessToken, err := jwtutil.GenerateAccessToken(u.ID, "desktop", deviceID,
+		testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate desktop token: %v", err)
+	}
+	refreshToken := seedRefreshToken(t, u.ID, "desktop", deviceID)
 
-	accessToken := extract(resp.Data, "access_token")
-	refreshToken := extract(resp.Data, "refresh_token")
-
-	// Verify tokens work.
+	// Verify the access token works.
 	mustOK(t, parse(get("/client/auth/me", accessToken)), "me before logout")
 
-	// Logout.
-	logoutResp := parse(postAuth("/client/auth/logout", accessToken, nil))
-	mustOK(t, logoutResp, "logout")
+	// Logout revokes refresh tokens for the user/device carried by the JWT.
+	mustOK(t, parse(postAuth("/client/auth/logout", accessToken, nil)), "logout")
 
-	// Verify access token is still valid (JWT is stateless).
-	// Actually, the JWT access token is stateless — it's still valid until expiry.
-	// But the refresh should be rejected.
-	refreshResp := parse(post("/client/auth/refresh", map[string]string{
+	// The refresh token must now be rejected.
+	mustCode(t, parse(post("/client/auth/refresh", map[string]string{
 		"refresh_token": refreshToken,
-	}))
-	if refreshResp.GetCode() == errcode.OK.Code {
-		t.Fatal("expected refresh after logout to be rejected")
-	}
+	})), errcode.AuthRefreshInvalid.Code, "refresh after logout")
 }
 
-// TestAuthConcurrentLoginSameDevice verifies that logging in on the same
-// device twice succeeds (re-login on same device).
-func TestAuthConcurrentLoginSameDevice(t *testing.T) {
+// TestAuthRefreshRotationSameDevice verifies that refreshing on the same
+// device rotates the pair: a new distinct access/refresh pair is issued each
+// time, the rotated refresh token keeps working, and consumed refresh tokens
+// are rejected (#134). Pre-OIDC this was covered as "re-login on the same
+// device"; refresh is the surviving re-issuance path (#1367, #1369).
+func TestAuthRefreshRotationSameDevice(t *testing.T) {
 	CleanDB(t, db)
 
-	createLoginUser(t, "trelogin", "pass1234", "ReLogin")
+	u := register(t, "trelogin", "pass1234", "ReLogin")
 	deviceID := "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	seeded := seedRefreshToken(t, u.ID, "desktop", deviceID)
 
-	// First login.
-	first := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    "trelogin",
-		"password":    "pass1234",
-		"device_type": "desktop",
-		"device_id":   deviceID,
-	}))
-	mustOK(t, first, "first login")
+	// First refresh: consumes the seeded token, issues a new pair.
+	first := parse(post("/client/auth/refresh", map[string]string{"refresh_token": seeded}))
+	mustOK(t, first, "first refresh")
 	firstAccess := extract(first.Data, "access_token")
 	firstRefresh := extract(first.Data, "refresh_token")
+	if firstRefresh == seeded {
+		t.Fatal("expected rotation to issue a new refresh token")
+	}
 
-	// Second login on same device.
-	second := parse(post("/client/auth/login", map[string]interface{}{
-		"username":    "trelogin",
-		"password":    "pass1234",
-		"device_type": "desktop",
-		"device_id":   deviceID,
-	}))
-	mustOK(t, second, "second login on same device")
+	// Second refresh with the rotated token succeeds and differs again.
+	second := parse(post("/client/auth/refresh", map[string]string{"refresh_token": firstRefresh}))
+	mustOK(t, second, "second refresh with rotated token")
 	secondAccess := extract(second.Data, "access_token")
 	secondRefresh := extract(second.Data, "refresh_token")
 
-	// Both access tokens should work.
+	if firstAccess == secondAccess {
+		t.Error("expected distinct access tokens for consecutive refreshes")
+	}
+	if firstRefresh == secondRefresh {
+		t.Error("expected distinct refresh tokens for consecutive refreshes")
+	}
+
+	// Both access tokens remain valid (stateless JWTs).
 	mustOK(t, parse(get("/client/auth/me", firstAccess)), "first access token")
 	mustOK(t, parse(get("/client/auth/me", secondAccess)), "second access token")
 
-	// Tokens should be distinct.
-	if firstAccess == secondAccess {
-		t.Error("expected distinct access tokens for re-login")
-	}
-	if firstRefresh == secondRefresh {
-		t.Error("expected distinct refresh tokens for re-login")
-	}
+	// The consumed refresh tokens are rejected: rotation revoked them.
+	mustCode(t, parse(post("/client/auth/refresh", map[string]string{"refresh_token": seeded})),
+		errcode.AuthRefreshInvalid.Code, "seeded token after rotation")
+	mustCode(t, parse(post("/client/auth/refresh", map[string]string{"refresh_token": firstRefresh})),
+		errcode.AuthRefreshInvalid.Code, "first rotated token after second rotation")
+}
+
+// TestAuthRefreshRejectsUnknownToken verifies that a refresh token that was
+// never issued is rejected.
+func TestAuthRefreshRejectsUnknownToken(t *testing.T) {
+	CleanDB(t, db)
+
+	mustCode(t, parse(post("/client/auth/refresh", map[string]string{
+		"refresh_token": "never-issued-refresh-token",
+	})), errcode.AuthRefreshInvalid.Code, "unknown refresh token")
 }
 
 // TestAuthMalformedToken verifies that a malformed (non-JWT) token is rejected.
@@ -319,25 +311,21 @@ func TestAuthMalformedToken(t *testing.T) {
 	}
 }
 
-// TestAuthLoginResponseShape verifies the login response contains all expected fields.
-func TestAuthLoginResponseShape(t *testing.T) {
+// TestAuthRefreshResponseShape verifies the refresh response contains all
+// expected fields — the same LoginResponse shape the OIDC callback returns.
+func TestAuthRefreshResponseShape(t *testing.T) {
 	CleanDB(t, db)
 
-	createLoginUser(t, "tshape", "pass1234", "ShapeUser")
+	u := register(t, "tshape", "pass1234", "ShapeUser")
+	seeded := seedRefreshToken(t, u.ID, "web", "ffffffff-ffff-4fff-8fff-ffffffffffff")
 
-	resp := post("/client/auth/login", map[string]interface{}{
-		"username":    "tshape",
-		"password":    "pass1234",
-		"device_type": "web",
-		"device_id":   "ffffffff-ffff-4fff-8fff-ffffffffffff",
-	})
-	r := parse(resp)
-	mustOK(t, r, "login")
+	r := parse(post("/client/auth/refresh", map[string]string{"refresh_token": seeded}))
+	mustOK(t, r, "refresh")
 
 	// Decode data into a map to check all fields.
 	var data map[string]interface{}
 	if err := json.Unmarshal(r.Data, &data); err != nil {
-		t.Fatalf("unmarshal login response data: %v", err)
+		t.Fatalf("unmarshal refresh response data: %v", err)
 	}
 
 	accessToken, ok := data["access_token"].(string)
@@ -353,6 +341,6 @@ func TestAuthLoginResponseShape(t *testing.T) {
 		t.Errorf("missing or invalid expires_in: %v", data["expires_in"])
 	}
 
-	// Verify the access token is valid.
-	mustOK(t, parse(get("/client/auth/me", accessToken)), "me with login token")
+	// Verify the freshly issued access token is valid.
+	mustOK(t, parse(get("/client/auth/me", accessToken)), "me with refreshed token")
 }
