@@ -43,6 +43,25 @@ async function getXLSX(): Promise<typeof import('xlsx')> {
   return xlsxModule;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Preview size guard — mitigation for unpatched xlsx@0.18.5 advisories
+// (prototype pollution / ReDoS; no fixed npm release available).
+// Caps the bytes handed to XLSX.read so an attacker-controlled download
+// cannot feed unbounded input to the parser. Guard runs BEFORE the lazy
+// xlsx import, so oversized files never even load the parser chunk.
+// Library replacement / official-source switch is tracked in issue #1358.
+// ═══════════════════════════════════════════════════════════════════════
+
+export const MAX_PREVIEW_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+function assertPreviewSizeAllowed(byteLength: number): void {
+  if (byteLength > MAX_PREVIEW_FILE_BYTES) {
+    const actualMb = (byteLength / (1024 * 1024)).toFixed(1);
+    const limitMb = MAX_PREVIEW_FILE_BYTES / (1024 * 1024);
+    throw new Error(`文件过大（${actualMb} MB，上限 ${limitMb} MB），出于安全限制不预览`);
+  }
+}
+
 export const TablePreview: React.FC<TablePreviewProps> = ({
   fileUrl,
   fileName,
@@ -106,6 +125,8 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         arrayBuffer = await response.arrayBuffer();
       }
 
+      assertPreviewSizeAllowed(arrayBuffer.byteLength);
+
       const XLSX = await getXLSX();
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const names = workbook.SheetNames;
@@ -166,6 +187,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     if (fileBlob) {
       /* Re-parse from the same blob — we already have it loaded */
       fileBlob.arrayBuffer().then(async (ab) => {
+        assertPreviewSizeAllowed(ab.byteLength);
         const XLSX = await getXLSX();
         const wb = XLSX.read(ab, { type: 'array' });
         parseSheet(wb, sheetName);
@@ -179,6 +201,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           return;
         }
         response.arrayBuffer().then(async (ab) => {
+          assertPreviewSizeAllowed(ab.byteLength);
           const XLSX = await getXLSX();
           const wb = XLSX.read(ab, { type: 'array' });
           parseSheet(wb, sheetName);
