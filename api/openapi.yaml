@@ -41,7 +41,7 @@ servers:
     description: Local Edge Server
   - url: http://localhost:8080
     description: Local Hub Server
-  - url: http://api.hub.vectorcontrol.tech
+  - url: https://hub.vectorcontrol.tech
     description: Production Hub Server
 tags:
   - name: Foundation

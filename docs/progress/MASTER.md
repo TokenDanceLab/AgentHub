@@ -2,7 +2,7 @@
 
 > **Task**: post-polish residual hardening — **complete** (docs authority + mobile hubClient strangler)
 > **Started**: 2026-07-16 (Visual polish); residual program 2026-07-20; closed 2026-07-21
-> **Last Updated**: 2026-07-21
+> **Last Updated**: 2026-07-26
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
@@ -40,7 +40,7 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 
 ## Product tip & Visual QA
 
-**Product tip**: `1ac86aa5` (post #1340–#1343)
+**Product tip**: 见 master（最近合并 #1353）
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
 **Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
