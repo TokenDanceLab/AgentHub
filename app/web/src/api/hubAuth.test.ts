@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchExecutionTargets } from './executionTargetQueries';
-import { getAuthorization } from './requestInitTestUtils';
+import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 const DEVICE_ID = '00000000-0000-0000-0000-00000000a101';
 
