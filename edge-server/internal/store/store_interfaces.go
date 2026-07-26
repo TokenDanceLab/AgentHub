@@ -44,7 +44,7 @@ type Writer interface {
 	CreateAgentProfile(profile AgentProfile) (AgentProfile, error)
 	UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error)
 	DeleteAgentProfile(id string) error
-	UpsertSettings(patch map[string]string) UserSettings
+	UpsertSettings(patch map[string]string) (UserSettings, error)
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
 }

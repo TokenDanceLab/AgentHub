@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -35,9 +36,13 @@ func TriggerAgentsAvailableError(listErr error, agentCount int) error {
 	return nil
 }
 
-// TriggerMemberActiveError returns SessionNotMember when the inviter is not an
-// active session member.
-func TriggerMemberActiveError(active bool) error {
+// TriggerMemberActiveError surfaces the membership lookup error when the check
+// itself failed — a DB fault must not be misread as "not a member" — and
+// returns SessionNotMember when the inviter is not an active session member.
+func TriggerMemberActiveError(checkErr error, active bool) error {
+	if checkErr != nil {
+		return fmt.Errorf("check session member active: %w", checkErr)
+	}
 	if !active {
 		return errcode.SessionNotMember
 	}

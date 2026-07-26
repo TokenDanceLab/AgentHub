@@ -69,8 +69,8 @@ func (w *stubTranscriptWriter) UpdateAgentProfile(id string, patch map[string]an
 	return store.AgentProfile{}, nil
 }
 func (w *stubTranscriptWriter) DeleteAgentProfile(id string) error { return nil }
-func (w *stubTranscriptWriter) UpsertSettings(patch map[string]string) store.UserSettings {
-	return store.UserSettings{}
+func (w *stubTranscriptWriter) UpsertSettings(patch map[string]string) (store.UserSettings, error) {
+	return store.UserSettings{}, nil
 }
 func (w *stubTranscriptWriter) SetRunEvidenceGate(id, result string) (store.Run, bool) {
 	return store.Run{}, false

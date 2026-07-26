@@ -51,10 +51,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Startup health verification: ping DB and Redis to confirm connectivity
 	// before registering routes or starting background goroutines.
-	if sqlDB, err := a.DB.DB(); err == nil {
-		if err := sqlDB.Ping(); err != nil {
-			return fmt.Errorf("database ping failed: %w", err)
-		}
+	sqlDB, err := a.DB.DB()
+	if err != nil {
+		return fmt.Errorf("database handle unavailable: %w", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
 	}
 	if err := a.CacheClient.GetRDB().Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("redis ping failed: %w", err)

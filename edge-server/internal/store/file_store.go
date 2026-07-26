@@ -486,8 +486,11 @@ func (f *FileStore) GetSettings() UserSettings {
 	return f.store.GetSettings()
 }
 
-func (f *FileStore) UpsertSettings(patch map[string]string) UserSettings {
-	result := f.store.UpsertSettings(patch)
+func (f *FileStore) UpsertSettings(patch map[string]string) (UserSettings, error) {
+	result, err := f.store.UpsertSettings(patch)
+	if err != nil {
+		return result, err
+	}
 	f.schedulePersist()
-	return result
+	return result, nil
 }
