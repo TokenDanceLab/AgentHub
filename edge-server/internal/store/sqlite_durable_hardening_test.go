@@ -222,3 +222,31 @@ func assertDurableSQLiteProjection(t *testing.T, s *SQLiteStore, runID, artifact
 		t.Fatalf("projected diff status = %q, want modified", diffStatus)
 	}
 }
+
+// TestSQLiteUpsertSettingsSurfacesPersistError pins the persistAfterSQLiteWrite
+// policy for settings: a failed persist must surface to the caller instead of
+// being silently dropped (previously `_ = s.syncPersist()`).
+func TestSQLiteUpsertSettingsSurfacesPersistError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-settings-persist-err.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+
+	if _, err := s.UpsertSettings(map[string]string{"theme": "dark"}); err != nil {
+		t.Fatalf("UpsertSettings healthy write returned error: %v", err)
+	}
+
+	// Break the persistence layer: close the underlying DB connection directly
+	// (same technique as the crash-recovery tests).
+	if err := s.db.Close(); err != nil {
+		t.Fatalf("db.Close returned error: %v", err)
+	}
+
+	if _, err := s.UpsertSettings(map[string]string{"theme": "light"}); err == nil {
+		t.Fatal("UpsertSettings after db close returned nil error, want persist error")
+	}
+	if s.LastPersistError() == nil {
+		t.Fatal("LastPersistError = nil, want recorded persist error")
+	}
+}
