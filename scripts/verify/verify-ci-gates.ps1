@@ -183,6 +183,8 @@ Assert-Contains $changes ([regex]::Escape("app/desktop/scripts/visual-qa*")) "ch
 Assert-Contains $changes ([regex]::Escape(".github/workflows/checks.yml")) "changes job must watch checks.yml"
 Assert-Contains $changes ([regex]::Escape("hub-server/**")) "changes job must watch hub-server paths"
 Assert-Contains $changes ([regex]::Escape("edge-server/**")) "changes job must watch edge-server paths"
+Assert-Contains $changes ([regex]::Escape("pkg/**")) "changes job must watch shared pkg module"
+Assert-Contains $changes ([regex]::Escape("go.work")) "changes job must watch go.work files"
 Assert-Contains $changes ([regex]::Escape("app/mobile-rn/**")) "changes job must watch mobile-rn paths"
 Assert-Contains $changes "(?m)^\s+mobile:\s*$" "changes job must expose mobile output"
 
