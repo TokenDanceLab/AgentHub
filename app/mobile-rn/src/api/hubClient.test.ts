@@ -162,15 +162,13 @@ describe('Mobile Hub client facade', () => {
   it('delegates to the shared Hub client for real API calls', async () => {
     const sessionsResponse = [
       { session_id: 's1', type: 'private', name: 'Test Chat', unread_count: 3 },
+      // Sessions without any id must be filtered out (no `id: ''` threads).
+      { type: 'private', name: 'No ID Session' },
     ];
-    const contactsResponse: Record<string, unknown>[] = [];
     const fetchImpl = vi.fn(async (url: string | Request | URL) => {
       const urlStr = String(url);
       if (urlStr.includes('/client/sessions')) {
         return new Response(JSON.stringify({ code: 'OK', data: sessionsResponse }), { status: 200 });
-      }
-      if (urlStr.includes('/client/contacts')) {
-        return new Response(JSON.stringify({ code: 'OK', data: contactsResponse }), { status: 200 });
       }
       return new Response(JSON.stringify({ code: 'OK', data: [] }), { status: 200 });
     });
@@ -186,9 +184,12 @@ describe('Mobile Hub client facade', () => {
     expect(snapshot.threads[0]?.id).toBe('s1');
     expect(snapshot.threads[0]?.title).toBe('Test Chat');
     expect(snapshot.threads[0]?.unread).toBe(3);
+    expect(snapshot.account.hubSession).toBe('active');
+    // Snapshot needs a single RTT: sessions only, no discarded contacts call.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to empty data when Hub API calls fail', async () => {
+  it('falls back to empty data and degraded account state when Hub API calls fail', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Network error');
     });
@@ -200,7 +201,10 @@ describe('Mobile Hub client facade', () => {
     const snapshot = await client.getMobileSnapshot();
 
     expect(snapshot.threads).toHaveLength(0);
-    expect(snapshot.account.hubSession).toBe('active');
+    // Account no longer claims an active session when the Hub is unreachable.
+    expect(snapshot.account.tokenDanceId).toBe('recovering');
+    expect(snapshot.account.hubSession).toBe('missing');
+    expect(snapshot.account.hubSync).toBe('offline');
   });
 
   it('preserves HubApiError and HubNetworkError classes', () => {
