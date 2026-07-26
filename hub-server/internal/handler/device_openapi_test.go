@@ -658,23 +658,26 @@ func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
 	wsGet := yamlMapField(t, yamlMapField(t, paths, "/client/ws", "paths./client/ws"), "get", "paths./client/ws.get")
 
 	description := yamlScalarField(t, wsGet, "description", "paths./client/ws.get.description")
-	for _, want := range []string{"HTTP upgrade", "WSAuthMiddleware", "TokenDance ID RS256 bearer tokens"} {
+	for _, want := range []string{"HTTP upgrade", "WSAuthMiddleware", "Sec-WebSocket-Protocol", "TokenDance ID RS256 bearer tokens"} {
 		if !strings.Contains(description, want) {
 			t.Fatalf("/client/ws description missing %q: %s", want, description)
 		}
 	}
 
 	security := yamlSequenceField(t, wsGet, "security", "paths./client/ws.get.security")
-	if !securityRequirementIncludes(security, "hubWebSocketQueryToken") {
-		t.Fatal("/client/ws security must include hubWebSocketQueryToken for browser upgrade auth")
+	if securityRequirementIncludes(security, "hubWebSocketQueryToken") {
+		t.Fatal("/client/ws security must not include hubWebSocketQueryToken: the server rejects query access_token (fail closed)")
 	}
 	if !securityRequirementIncludes(security, "bearerAuth") {
 		t.Fatal("/client/ws security must include bearerAuth for native Authorization header auth")
 	}
 
 	params := yamlSequenceField(t, wsGet, "parameters", "paths./client/ws.get.parameters")
-	if !parameterNamed(params, "access_token") {
-		t.Fatal("/client/ws parameters must document access_token query auth")
+	if parameterNamed(params, "access_token") {
+		t.Fatal("/client/ws parameters must not document access_token query auth: the server rejects it (fail closed)")
+	}
+	if !parameterNamed(params, "Sec-WebSocket-Protocol") {
+		t.Fatal("/client/ws parameters must document Sec-WebSocket-Protocol token carriage for browsers")
 	}
 }
 
