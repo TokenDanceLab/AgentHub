@@ -6,7 +6,7 @@ import {
   fetchAgentList,
   mapHubAgentProfileToAgentInfo,
 } from './agentQueries';
-import { getAuthorization } from './requestInitTestUtils';
+import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),

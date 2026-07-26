@@ -5,7 +5,7 @@ import {
   summarizeExecutionTargets,
   type ExecutionTargetInventoryItem,
 } from './executionTargetQueries';
-import { getAuthorization } from './requestInitTestUtils';
+import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),

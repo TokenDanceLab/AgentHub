@@ -5,6 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { useHubStore } from '@/stores/hubStore';
 
+/**
+ * These tests render the REAL shared v4 workbench (`@shared/workbench`).
+ * Only the data/network layer below App is mocked — Hub queries, the web
+ * workbench projection hook, web auth, and the auth modal.
+ *
+ * Previously this file replaced `@shared/workbench` with a ~50-line hand-written
+ * stub and then asserted against the DOM that stub itself rendered, which made
+ * every assertion vacuously true against the real shell. Keep the mock surface
+ * at the data layer; do not stub the workbench.
+ */
+
 const useAgentListMock = vi.hoisted(() => vi.fn());
 const useCreateAgentProfileMock = vi.hoisted(() => vi.fn());
 const useUpdateAgentProfileMock = vi.hoisted(() => vi.fn());
@@ -12,95 +23,28 @@ const useDeleteAgentProfileMock = vi.hoisted(() => vi.fn());
 const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
+const hubClientStub = vi.hoisted(() => ({
+  me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
+  listPublicSkills: vi.fn(async () => ({ items: [] })),
+  listPublicMCPServers: vi.fn(async () => ({ items: [] })),
+  createPrivateSession: vi.fn(async () => ({ session_id: 'session-1' })),
+  regenerateAgentTask: vi.fn(async () => undefined),
+}));
 const authPageSuccessUser = vi.hoisted(() => ({
   id: '00000000-0000-0000-0000-00000000b201',
   username: 'web-auth-user',
   nickname: 'Web Auth User',
   avatar_url: '',
 }));
-const capturedPlatformRef = vi.hoisted((): {
-  current: {
-    runs: {
-      submitComposerIntent: (intent: {
-        conversationId: string;
-        text: string;
-        mode: 'ask';
-        mentions: unknown[];
-        attachments: unknown[];
-        approvalMode: 'suggest';
-      }) => Promise<unknown>;
-    };
-  } | null;
-} => ({ current: null }));
 
-type CapturedPlatform = {
-  runs: {
-    submitComposerIntent: (intent: {
-      conversationId: string;
-      text: string;
-      mode: 'ask';
-      mentions: unknown[];
-      attachments: unknown[];
-      approvalMode: 'suggest';
-    }) => Promise<unknown>;
-  };
-};
-
-vi.mock('@shared/workbench', () => ({
-  AgentHubWorkbench: (props: {
-    activeConversationId?: string;
-    conversations?: Array<{ id: string; title: string }>;
-    platform?: CapturedPlatform;
-    showComposerAgentPicker?: boolean;
-    showComposerStatus?: boolean;
-    showMainchainStatus?: boolean;
-    transcript?: Array<{ text?: string }>;
-  }) => {
-    const activeConversation =
-      props.conversations?.find((conversation) => conversation.id === props.activeConversationId) ??
-      props.conversations?.[0];
-    capturedPlatformRef.current = props.platform ?? null;
-
-    return (
-      <>
-        <nav aria-label="Global rail" />
-        <main aria-label="Workspace" data-surface="web">
-          <div role="tablist" aria-label="Workspace tabs" />
-          <div role="tablist" aria-label="右侧工作区" />
-          <h1>{activeConversation?.title ?? 'AgentHub'}</h1>
-          <input placeholder={`发消息给 ${activeConversation?.title ?? 'AgentHub'}`} />
-          {props.showMainchainStatus !== false ? (
-            <div role="region" aria-label="Demo main chain status" />
-          ) : null}
-          {props.showComposerAgentPicker !== false ? (
-            <button type="button">@Agent</button>
-          ) : null}
-          {props.showComposerStatus !== false ? (
-            <div role="status">Data: auto Target: hidden</div>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              void props.platform?.runs.submitComposerIntent({
-                conversationId: activeConversation?.id ?? 'agent-collab',
-                text: '需要真实 Hub 会话',
-                mode: 'ask',
-                mentions: [],
-                attachments: [],
-                approvalMode: 'suggest',
-              }).catch(() => {});
-            }}
-          >
-            Submit Hub work
-          </button>
-          {props.transcript?.map((block, index) => (
-            <p key={index}>{block.text}</p>
-          ))}
-        </main>
-      </>
-    );
-  },
-}));
+// Real i18n is not bootstrapped in unit tests, so react-i18next echoes the key.
+// Accept the translated label or the raw key, same as the Desktop App test.
+const workspaceLabel = /^(Workspace|aria\.workspace)$/;
+const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
+const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
+const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
+const atAgentLabel = /^(@Agent|aria\.atAgent)$/;
 
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: useAgentListMock,
@@ -115,6 +59,10 @@ vi.mock('@/platform/useWebWorkbenchModel', () => ({
 
 vi.mock('@/hooks/useWebAuth', () => ({
   useWebAuth: useWebAuthMock,
+}));
+
+vi.mock('@/api/hubClient', () => ({
+  createHubClient: vi.fn(() => hubClientStub),
 }));
 
 vi.mock('@/components/AuthPage', () => ({
@@ -135,11 +83,14 @@ function visibleText(container: HTMLElement) {
   return clone.textContent ?? '';
 }
 
+function getComposerInput(): HTMLTextAreaElement {
+  return screen.getByLabelText(composerInputLabel) as HTMLTextAreaElement;
+}
+
 describe('Web app root', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    capturedPlatformRef.current = null;
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock });
     useHubStore.getState().clear();
@@ -185,27 +136,28 @@ describe('Web app root', () => {
     const text = visibleText(container);
 
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'web');
+    expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'web');
     expect(screen.queryByRole('group', { name: 'Window controls' })).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Desktop navigation controls' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '最小化' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: workspaceTabsLabel })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('发消息给 Agent 协作群')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
+    expect(getComposerInput()).toBeInTheDocument();
+    // showComposerAgentPicker / showMainchainStatus={false} prop gating, on the real shell.
+    // The real picker is a <select> (combobox), not the <button> the old stub invented.
+    expect(screen.getByRole('combobox', { name: atAgentLabel })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Data: auto');
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(text).not.toMatch(/shell\.(?:brand|toolbar|status|sidebar|statusPanel|workspace|page|source)/);
     expect(text).not.toMatch(/synced|marketplace connected|session active/i);
     expect(useAgentListMock).toHaveBeenCalledWith(true);
-    expect(useWebWorkbenchModelMock).toHaveBeenCalledTimes(1);
+    expect(useWebWorkbenchModelMock).toHaveBeenCalled();
   });
 
   it('renders Hub sessions and messages projected into the shared workbench', () => {
@@ -256,21 +208,28 @@ describe('Web app root', () => {
         ],
         page: { hasMore: false },
       },
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
     });
 
     render(<App />);
 
     expect(useAgentListMock).toHaveBeenCalledWith(true);
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
+    // The Hub profile reaches the real composer's agent picker as a selectable
+    // option, and is not silently pre-mentioned into the composer text.
+    const agentPicker = screen.getByRole('combobox', { name: atAgentLabel });
+    expect(agentPicker).toBeEnabled();
+    expect(screen.getByRole('option', { name: /Hub Builder/ })).toBeInTheDocument();
+    expect(getComposerInput()).toHaveValue('');
     expect(screen.queryByText('@Hub Builder')).not.toBeInTheDocument();
   });
 
   it('mounts Web auth bootstrap and renders the TokenDance ID auth modal from Hub state', async () => {
     render(<App />);
 
-    expect(useWebAuthMock).toHaveBeenCalledTimes(1);
-    expect(capturedPlatformRef.current).not.toBeNull();
+    expect(useWebAuthMock).toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'TokenDance ID login' })).not.toBeInTheDocument();
 
     act(() => {
@@ -294,10 +253,13 @@ describe('Web app root', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Hub work' }));
+    // Drive the real composer, so the auth gate is exercised through the real
+    // shared shell → web platform adapter path rather than a stub button.
+    fireEvent.change(getComposerInput(), { target: { value: '需要真实 Hub 会话' } });
+    fireEvent.click(screen.getByRole('button', { name: sendMessageLabel }));
 
     await waitFor(() => {
-      expect(ensureAuthMock).toHaveBeenCalledTimes(1);
+      expect(ensureAuthMock).toHaveBeenCalled();
       expect(screen.getByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
     });
   });
