@@ -1,7 +1,13 @@
 package handler_test
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -688,31 +694,63 @@ func TestOpenAPIHubWebSocketFrameSchemas(t *testing.T) {
 
 	frame := yamlMapField(t, schemas, "HubWebSocketFrame", "components.schemas.HubWebSocketFrame")
 	required := yamlStringSlice(t, yamlField(t, frame, "required", "HubWebSocketFrame.required"), "HubWebSocketFrame.required")
-	for _, field := range []string{"type", "payload"} {
-		if !containsString(required, field) {
-			t.Fatalf("HubWebSocketFrame.required = %v, want %q", required, field)
-		}
+	if len(required) != 1 || required[0] != "type" {
+		t.Fatalf("HubWebSocketFrame.required = %v, want only type because payload is omitted for auth.ok", required)
 	}
 	frameProps := yamlMapField(t, frame, "properties", "HubWebSocketFrame.properties")
 	frameType := yamlMapField(t, frameProps, "type", "HubWebSocketFrame.properties.type")
 	enum := yamlStringSlice(t, yamlField(t, frameType, "enum", "HubWebSocketFrame.properties.type.enum"), "HubWebSocketFrame.properties.type.enum")
-	for _, eventType := range []string{
-		"message.edited",
-		"message.reaction_added",
-		"message.reaction_removed",
-		"device.online",
-		"device.offline",
-		"team.run.started",
-		"team.assignment.done",
-		"team.assignment.failed",
-	} {
-		if !containsString(enum, eventType) {
-			t.Fatalf("HubWebSocketFrame type enum missing %q: %v", eventType, enum)
-		}
+	want := loadHubWebSocketFrameTypes(t)
+	sort.Strings(enum)
+	if strings.Join(enum, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("HubWebSocketFrame type enum = %v, want exact ws/frame.go constants %v", enum, want)
 	}
 
 	assertSchemaHasOnlyProperties(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
 	assertSchemaRequiredFields(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
+}
+
+func loadHubWebSocketFrameTypes(t *testing.T) []string {
+	t.Helper()
+
+	framePath := filepath.Join("..", "ws", "frame.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), framePath, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", framePath, err)
+	}
+
+	var eventTypes []string
+	for _, decl := range parsed.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for index, name := range valueSpec.Names {
+				if !strings.HasPrefix(name.Name, "Type") || index >= len(valueSpec.Values) {
+					continue
+				}
+				literal, ok := valueSpec.Values[index].(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					continue
+				}
+				value, err := strconv.Unquote(literal.Value)
+				if err != nil {
+					t.Fatalf("unquote %s.%s: %v", framePath, name.Name, err)
+				}
+				eventTypes = append(eventTypes, value)
+			}
+		}
+	}
+	if len(eventTypes) == 0 {
+		t.Fatalf("%s contains no Type* string constants", framePath)
+	}
+	sort.Strings(eventTypes)
+	return eventTypes
 }
 
 func assertSchemaRequiresUUIDDeviceID(t *testing.T, schemas *yaml.Node, schemaName string) {

@@ -33,8 +33,6 @@ export interface HubWSOptions {
   transport?: Transport;
   /** Called after the auth handshake succeeds. */
   onAuthSuccess?: () => void;
-  /** Called when the server rejects WebSocket authentication after upgrade. */
-  onAuthFail?: (reason: string) => void;
   /**
    * When true, also append access_token to the WS URL (legacy fallback).
    * Default false — browser path prefers Sec-WebSocket-Protocol only.
@@ -49,8 +47,6 @@ export interface HubWSHandle {
   send: (type: string, payload: unknown) => void;
   /** Send a typing indicator for a session. */
   sendTyping: (sessionId: string) => void;
-  /** Send a sync.request frame to request missed events after a given seq_id. */
-  sendSync: (afterSeqId: number) => void;
   /** Subscribe to events of a specific Hub type. Returns unsubscribe fn. */
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
   /** Subscribe to ALL events (after auth). Returns unsubscribe fn. */
@@ -161,16 +157,6 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       opts.onAuthSuccess?.();
       return;
     }
-    if (frameType === HUB_EVENTS.AUTH_FAIL) {
-      authenticated = false;
-      const reason =
-        typeof payload === 'object' && payload !== null
-          ? String((payload as Record<string, unknown>).reason ?? 'Unknown')
-          : 'Unknown';
-      opts.onAuthFail?.(reason);
-      return;
-    }
-
     // Drop application events before auth
     if (!authenticated) return;
 
@@ -208,11 +194,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     },
 
     sendTyping(sessionId: string): void {
-      transport.send({ type: 'typing', payload: { session_id: sessionId } });
-    },
-
-    sendSync(afterSeqId: number): void {
-      transport.send({ type: HUB_EVENTS.SYNC_REQUEST, payload: { after_seq_id: afterSeqId } });
+      transport.send({ type: HUB_EVENTS.TYPING, payload: { session_id: sessionId } });
     },
 
     on(type: HubEventType, handler: (payload: unknown) => void): () => void {

@@ -1,16 +1,20 @@
 // Hub WebSocket event type constants.
-// Mirrors the event types defined in hub-server/internal/ws/frame.go.
+// 1:1 mirror of the constants in hub-server/internal/ws/frame.go — every key
+// here MUST have a matching Type* constant there (and vice versa). Do not add
+// client-only event names: types without a server producer are dead protocol
+// surface (#1362 removed sync.request/sync.events, run.agent.plan_*,
+// agent.regenerate and message.edited for exactly that reason).
 // Every Hub WS frame is JSON: { type, payload, seq_id? }.
 
 export const HUB_EVENTS = {
-  // ── Auth frame types ──────────────────────────
-  AUTH: 'auth',
+  // ── Client→server frame types ─────────────────
+  TYPING: 'typing',
+
+  // ── Auth responses ────────────────────────────
   AUTH_OK: 'auth.ok',
-  AUTH_FAIL: 'auth.fail',
 
   // ── Message events ────────────────────────────
   MESSAGE_NEW: 'message.new',
-  MESSAGE_EDITED: 'message.edited',
   MESSAGE_RECALL: 'message.recall',
   MESSAGE_PIN: 'message.pin',
   MESSAGE_UNPIN: 'message.unpin',
@@ -37,28 +41,17 @@ export const HUB_EVENTS = {
   AGENT_FAILED: 'agent.failed',
   AGENT_CANCEL: 'agent.cancel',
   AGENT_CONTROL: 'agent.control',
-  AGENT_REGENERATE: 'agent.regenerate',
-
-  // ── Notification & social ─────────────────────
-  NOTIFICATION_NEW: 'notification.new',
-  FRIEND_REQUEST: 'friend.request',
-  FRIEND_ACCEPTED: 'friend.accepted',
-
-  // ── Sync / replay (reconnection gap fill) ────
-  SYNC_REQUEST: 'sync.request',
-  SYNC_EVENTS: 'sync.events',
-
-  // ── Plan approval gate (P0 #3) ──────────────
-  PLAN_PROPOSED: 'run.agent.plan_proposed',
-  PLAN_APPROVED: 'run.agent.plan_approved',
-  PLAN_REJECTED: 'run.agent.plan_rejected',
-  PLAN_EXPIRED:  'run.agent.plan_expired',
 
   // ── Team run events ───────────────────────────
   TEAM_RUN_STARTED: 'team.run.started',
   TEAM_EVENT: 'team.event',
   TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
   TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
+
+  // ── Notification & social ─────────────────────
+  NOTIFICATION_NEW: 'notification.new',
+  FRIEND_REQUEST: 'friend.request',
+  FRIEND_ACCEPTED: 'friend.accepted',
 } as const;
 
 export type HubEventType = (typeof HUB_EVENTS)[keyof typeof HUB_EVENTS];
