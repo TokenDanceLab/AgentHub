@@ -1,7 +1,13 @@
 import React from 'react';
 import { DesignNavIcon } from '../../designIcons';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
-import { EmptyState } from '../../../ui';
+import {
+  EmptyState,
+  resolveEmptyStateCopy,
+  type EmptyStateAction,
+  type EmptyStateCopyMatrix,
+  type EmptyStateKind,
+} from '../../../ui';
 import styles from '../AgentsPage.module.css';
 import { ConfigSummaryRow, formatList } from './shared';
 import {
@@ -137,16 +143,22 @@ export const MarketTemplateListRow: React.FC<{
 );
 
 export const MarketCompactEmpty: React.FC<{
-  title: string;
-  description: string;
-}> = ({ title, description }) => (
-  <EmptyState
-    title={title}
-    description={description}
-    titleLevel={3}
-    {...compactEmptyStateClassNames(styles)}
-  />
-);
+  kind: EmptyStateKind;
+  copy: EmptyStateCopyMatrix;
+  action?: EmptyStateAction | undefined;
+}> = ({ kind, copy, action }) => {
+  const resolvedCopy = resolveEmptyStateCopy(copy, kind);
+  return (
+    <EmptyState
+      kind={kind}
+      title={resolvedCopy.title}
+      description={resolvedCopy.description}
+      titleLevel={3}
+      {...(action ? { action } : {})}
+      {...compactEmptyStateClassNames(styles)}
+    />
+  );
+};
 
 export const SkillMarketItemRow: React.FC<{
   skill: SkillMarketItem;
