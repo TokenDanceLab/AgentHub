@@ -92,6 +92,32 @@ func GetTeamRunByID(db *gorm.DB, runID string) (*model.AgentTeamRun, error) {
 	return &r, err
 }
 
+// LockTeamRunForUpdate serializes check-then-write operations for one run.
+// PostgreSQL uses a row-level FOR UPDATE lock. The SQLite fallback performs a
+// no-op update so integration tests exercise a real write lock as well.
+func LockTeamRunForUpdate(db *gorm.DB, runID string) error {
+	if db.Dialector.Name() == "postgres" {
+		var id string
+		if err := db.Raw("SELECT id FROM agent_team_runs WHERE id = ? FOR UPDATE", runID).Scan(&id).Error; err != nil {
+			return err
+		}
+		if id == "" {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	}
+	result := db.Model(&model.AgentTeamRun{}).
+		Where("id = ?", runID).
+		UpdateColumn("updated_at", gorm.Expr("updated_at"))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func GetTeamRunBySessionID(db *gorm.DB, sessionID string) (*model.AgentTeamRun, error) {
 	var r model.AgentTeamRun
 	err := db.Where("session_id = ?", sessionID).Order("created_at DESC").First(&r).Error
@@ -155,11 +181,37 @@ func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string
 	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(updates).Error
 }
 
-func UpdateAssignmentDispatchBinding(db *gorm.DB, id, pendingTaskID string) error {
-	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status": model.AssignmentStatusDispatched,
-		"run_id": pendingTaskID,
-	}).Error
+// ClaimAssignmentForDispatch atomically transitions a pending assignment to
+// dispatched, but only when the current status is still 'pending' (CAS). The
+// run_id is bound separately after TriggerAgentTask returns a pending task ID.
+// Returns the number of rows updated: 1 on success, 0 when another caller
+// already claimed it. The caller must interpret 0 rows as "already dispatched".
+func ClaimAssignmentForDispatch(db *gorm.DB, id string) (int64, error) {
+	res := db.Model(&model.AgentTeamAssignment{}).
+		Where("id = ? AND status = ?", id, model.AssignmentStatusPending).
+		Update("status", model.AssignmentStatusDispatched)
+	return res.RowsAffected, res.Error
+}
+
+// ReleaseAssignmentDispatchClaim reverts a pre-trigger claim only while it is
+// still unbound. Once run_id is present the external trigger has succeeded and
+// must never be made dispatchable again.
+func ReleaseAssignmentDispatchClaim(db *gorm.DB, id string) (int64, error) {
+	res := db.Model(&model.AgentTeamAssignment{}).
+		Where("id = ? AND status = ? AND run_id IS NULL", id, model.AssignmentStatusDispatched).
+		Update("status", model.AssignmentStatusPending)
+	return res.RowsAffected, res.Error
+}
+
+// BindClaimedAssignmentDispatch binds the external task only for the caller
+// that owns an unbound dispatched claim. It leaves the assignment in the
+// existing dispatched state; runtime projection is responsible for showing
+// running once the pending task starts.
+func BindClaimedAssignmentDispatch(db *gorm.DB, id, pendingTaskID string) (int64, error) {
+	res := db.Model(&model.AgentTeamAssignment{}).
+		Where("id = ? AND status = ? AND run_id IS NULL", id, model.AssignmentStatusDispatched).
+		Update("run_id", pendingTaskID)
+	return res.RowsAffected, res.Error
 }
 
 func CountActiveAssignmentsByMember(db *gorm.DB, memberID string) (int64, error) {

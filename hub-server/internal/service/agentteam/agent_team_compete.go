@@ -74,6 +74,9 @@ func (s *AgentTeamService) HandleCompeteRouteDecision(ctx context.Context, userI
 	if run.TeamID != teamID {
 		return nil, errcode.AgentTaskNotFound
 	}
+	if isTerminalTeamRunStatus(run.Status) {
+		return nil, s.rejectRouteDecision(runID, decision, "team run already in terminal status "+run.Status)
+	}
 
 	decision.Action = "compete"
 	if strings.TrimSpace(decision.Instructions) == "" {
@@ -100,91 +103,111 @@ func (s *AgentTeamService) HandleCompeteRouteDecision(ctx context.Context, userI
 		return nil, s.rejectRouteDecision(runID, decision, "supervisor member is required")
 	}
 
-	// Guardrail checks (reuse existing limits).
-	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return nil, err
-	}
-	if taskCount+int64(len(workerIDs)) > s.guardrails.MaxTasksPerTeamRun {
-		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
-	}
-	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return nil, err
-	}
-	if activeCount+int64(len(workerIDs)) > s.guardrails.MaxActiveSubAgentsPerRun {
-		return nil, s.rejectRouteDecision(runID, decision, "active subagent limit reached")
-	}
-	budgetExceeded, err := s.teamRunBudgetExceeded(runID)
-	if err != nil {
-		return nil, err
-	}
-	if budgetExceeded {
-		return nil, s.rejectRouteDecision(runID, decision, "team run budget exceeded")
-	}
-
 	// Generate a correlation id to link this compete batch.
 	correlationID := decision.CorrelationID
 	if strings.TrimSpace(correlationID) == "" {
 		correlationID = newCorrelationID()
 	}
 	decision.CorrelationID = correlationID
-
-	assignments := make([]model.AgentTeamAssignment, 0, len(workerIDs))
-
-	for _, workerID := range workerIDs {
-		// Look up the worker member.
-		var worker *model.AgentTeamMember
-		for i := range members {
-			if members[i].ID == workerID {
-				worker = &members[i]
-				break
-			}
-		}
-		if worker == nil {
-			continue
-		}
-
-		assignment, err := s.CreateAssignment(ctx, userID, runID, supervisor.ID, worker.ID, model.AssignmentTypeCompete, decision.Instructions, decision.Context)
-		if err != nil {
-			// Record the failure but continue with other workers.
-			_ = s.appendRouteRejected(runID, decision, fmt.Sprintf("failed to create assignment for worker %s: %v", workerID, err))
-			continue
-		}
-		assignments = append(assignments, *assignment)
-
-		// Create a TeamTask for each assignment.
-		task := &model.AgentTeamTask{
-			TeamRunID:        runID,
-			AssignmentID:     &assignment.ID,
-			AssigneeMemberID: workerID,
-			Status:           model.TeamTaskStatusPending,
-			Objective:        decision.Instructions,
-			InputRefs:        "{}",
-			Attempt:          1,
-			RiskLevel:        model.TeamTaskRiskNormal,
-		}
-		if err := repository.CreateTeamTask(s.db, task); err != nil {
-			return nil, err
-		}
-	}
-
-	if len(assignments) == 0 {
-		return nil, s.rejectRouteDecision(runID, decision, "no compete assignments created")
-	}
-
 	decision.Accepted = true
 	decision.AgentID = strings.Join(workerIDs, ",")
 
-	_ = s.appendTeamEvent(runID, model.TeamEventCompeteDispatched, map[string]any{
-		"decision":       decision,
-		"worker_ids":     workerIDs,
-		"assignment_ids": assignmentIDs(assignments),
-		"correlation_id": correlationID,
+	// Serialize guardrail counting + all assignment creates inside a per-run
+	// row lock so two concurrent compete dispatches cannot both pass the check-
+	// then-act gap. A failed CreateTeamTask rolls back all preceding inserts
+	// (all-or-nothing per compete batch, #1383).
+	assignments := make([]model.AgentTeamAssignment, 0, len(workerIDs))
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, runID); err != nil {
+			return err
+		}
+		lockedRun, err := repository.GetTeamRunByID(tx, runID)
+		if err != nil {
+			return err
+		}
+		if isTerminalTeamRunStatus(lockedRun.Status) {
+			return rejectRoute("team run already in terminal status " + lockedRun.Status)
+		}
+		budgetExceeded, err := s.teamRunBudgetExceededDB(tx, runID)
+		if err != nil {
+			return err
+		}
+		if budgetExceeded {
+			return rejectRoute("team run budget exceeded")
+		}
+		taskCount, err := repository.CountAssignmentsByTeamRun(tx, runID)
+		if err != nil {
+			return err
+		}
+		if taskCount+int64(len(workerIDs)) > s.guardrails.MaxTasksPerTeamRun {
+			return rejectRoute("task limit reached")
+		}
+		activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, runID)
+		if err != nil {
+			return err
+		}
+		if activeCount+int64(len(workerIDs)) > s.guardrails.MaxActiveSubAgentsPerRun {
+			return rejectRoute("active subagent limit reached")
+		}
+
+		for _, workerID := range workerIDs {
+			var worker *model.AgentTeamMember
+			for i := range members {
+				if members[i].ID == workerID {
+					worker = &members[i]
+					break
+				}
+			}
+			if worker == nil {
+				continue
+			}
+
+			assignment, err := s.createAssignmentInTx(tx, ctx, userID, runID, supervisor.ID, worker.ID, model.AssignmentTypeCompete, decision.Instructions, decision.Context)
+			if err != nil {
+				return err
+			}
+			assignments = append(assignments, *assignment)
+
+			task := &model.AgentTeamTask{
+				TeamRunID:        runID,
+				AssignmentID:     &assignment.ID,
+				AssigneeMemberID: workerID,
+				Status:           model.TeamTaskStatusPending,
+				Objective:        decision.Instructions,
+				InputRefs:        "{}",
+				Attempt:          1,
+				RiskLevel:        model.TeamTaskRiskNormal,
+			}
+			if err := repository.CreateTeamTask(tx, task); err != nil {
+				return err
+			}
+		}
+		if len(assignments) == 0 {
+			return rejectRoute("no compete assignments created")
+		}
+		if err := s.appendTeamEventTx(tx, runID, model.TeamEventCompeteDispatched, map[string]any{
+			"decision":       decision,
+			"worker_ids":     workerIDs,
+			"assignment_ids": assignmentIDs(assignments),
+			"correlation_id": correlationID,
+		}); err != nil {
+			return err
+		}
+		if err := s.appendTeamEventTx(tx, runID, model.TeamEventRouteDecided, decision); err != nil {
+			return err
+		}
+		for i := range assignments {
+			if err := s.appendTeamEventTx(tx, runID, model.TeamEventAssignmentCreated, &assignments[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
-	_ = s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision)
-	for _, a := range assignments {
-		_ = s.appendTeamEvent(runID, model.TeamEventAssignmentCreated, a)
+	if err != nil {
+		if reason, rejected := routeRejectionReason(err); rejected {
+			return nil, s.rejectRouteDecision(runID, decision, reason)
+		}
+		return nil, err
 	}
 
 	return assignments, nil
