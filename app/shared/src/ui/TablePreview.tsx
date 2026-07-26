@@ -8,7 +8,7 @@
      onClose   — Called when the close button is clicked
 
    Fetches the file, parses via XLSX.read (dynamic import — lazy-loaded
-   to keep ~694 KB xlsx out of the main bundle), and renders as a
+   to keep ~1 MB xlsx out of the main bundle), and renders as a
    scrollable HTML table with sortable columns.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -31,7 +31,7 @@ interface SortState {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Lazy xlsx module loader — dynamic import keeps 694 KB out of main bundle
+// Lazy xlsx module loader — dynamic import keeps ~1 MB out of main bundle
 // ═══════════════════════════════════════════════════════════════════════
 
 let xlsxModule: typeof import('xlsx') | null = null;
@@ -44,12 +44,13 @@ async function getXLSX(): Promise<typeof import('xlsx')> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Preview size guard — mitigation for unpatched xlsx@0.18.5 advisories
-// (prototype pollution / ReDoS; no fixed npm release available).
-// Caps the bytes handed to XLSX.read so an attacker-controlled download
-// cannot feed unbounded input to the parser. Guard runs BEFORE the lazy
-// xlsx import, so oversized files never even load the parser chunk.
-// Library replacement / official-source switch is tracked in issue #1358.
+// Preview size guard — defense-in-depth for the SheetJS parser.
+// Originally added while xlsx@0.18.5 (npm, unpatched prototype pollution /
+// ReDoS advisories) was in use; xlsx now tracks the official SheetJS CDN
+// source (0.20.3, all known advisories fixed — issue #1358). The guard is
+// retained: it caps the bytes handed to XLSX.read so an attacker-controlled
+// download cannot feed unbounded input to the parser, and it runs BEFORE
+// the lazy xlsx import, so oversized files never even load the parser chunk.
 // ═══════════════════════════════════════════════════════════════════════
 
 export const MAX_PREVIEW_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
