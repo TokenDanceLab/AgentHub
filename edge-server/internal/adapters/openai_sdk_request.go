@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
 // Residual pure-helper peel #1152: OpenAI SDK HTTP request + message build helpers.
@@ -126,21 +128,26 @@ func (a *OpenAISDKAdapter) buildMessages(ctx RunProcessContext) []openaiChatMess
 
 	// Add thread history messages if present
 	for _, msg := range ctx.Messages {
-		role := msg.Role
+		sanitized, filtered := runnerctx.SanitizeMessage(msg)
+		if filtered {
+			slog.Warn("openai-sdk: sanitized message",
+				"role", msg.Role,
+				"originalLen", len(msg.Content),
+			)
+		}
+		role := sanitized.Role
 		if role == "system" {
 			continue
 		}
-		// Normalize roles to OpenAI's expected values
-		if role != "assistant" && role != "user" && role != "tool" {
-			if role == "agent" || role == "bot" {
-				role = "assistant"
-			} else {
-				role = "user"
-			}
+		// Normalize roles to OpenAI's expected values. SanitizeMessage
+		// guarantees the role is one of user/assistant/system/tool:
+		// assistant and tool pass through, anything else becomes user.
+		if role != "assistant" && role != "tool" {
+			role = "user"
 		}
 		messages = append(messages, openaiChatMessage{
 			Role:    role,
-			Content: msg.Content,
+			Content: sanitized.Content,
 		})
 	}
 
@@ -149,9 +156,15 @@ func (a *OpenAISDKAdapter) buildMessages(ctx RunProcessContext) []openaiChatMess
 	if prompt == "" {
 		prompt = "Continue."
 	}
+	sanitizedPrompt, filtered := runnerctx.SanitizeMessage(runnerctx.Message{Role: "user", Content: prompt})
+	if filtered {
+		slog.Warn("openai-sdk: sanitized prompt",
+			"originalLen", len(prompt),
+		)
+	}
 	messages = append(messages, openaiChatMessage{
 		Role:    "user",
-		Content: prompt,
+		Content: sanitizedPrompt.Content,
 	})
 
 	return messages
