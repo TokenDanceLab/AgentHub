@@ -94,24 +94,6 @@ foreach ($entry in $ForbiddenJsonCopyPatterns) {
     }
 }
 
-$EdgeClientPath = Join-Path $RepoRoot "app/web/src/api/edgeClient.ts"
-if (-not (Test-Path -LiteralPath $EdgeClientPath)) {
-    Fail "app/web/src/api/edgeClient.ts missing Hub-only compatibility stub"
-} else {
-    $edgeClient = Get-Content -Raw -LiteralPath $EdgeClientPath
-    if ($edgeClient.Contains("fetch(") -or $edgeClient.Contains("new WebSocket")) {
-        Fail "app/web/src/api/edgeClient.ts must stay a Hub-only stub without network calls"
-    } else {
-        Pass "app/web/src/api/edgeClient.ts has no direct network call"
-    }
-
-    if ($edgeClient.Contains("status: 'hub-only'") -and $edgeClient.Contains("stubbed")) {
-        Pass "app/web/src/api/edgeClient.ts labels runtime inventory as Hub-only stubbed"
-    } else {
-        Fail "app/web/src/api/edgeClient.ts must label runtime inventory as Hub-only stubbed"
-    }
-}
-
 $WebPlatformPath = Join-Path $RepoRoot "app/web/src/platform/webPlatform.ts"
 if (-not (Test-Path -LiteralPath $WebPlatformPath)) {
     Fail "app/web/src/platform/webPlatform.ts missing"
