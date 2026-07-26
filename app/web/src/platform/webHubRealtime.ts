@@ -4,6 +4,7 @@ import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
+import type { TransportStatus } from '@/api/transport';
 import { createHubClient } from '@/api/hubClient';
 import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -79,6 +80,8 @@ export interface WebHubRealtimeOptions {
   onReplayEvents?: (events: HubRuntimeEventTranscriptInput[], taskId: string) => void;
   createSocket?: CreateHubWS;
   getToken?: () => string | null;
+  /** Test/benchmark override; production uses one display-frame window. */
+  liveBatchWindowMs?: number;
 }
 
 export function useWebHubRealtime({
@@ -89,14 +92,24 @@ export function useWebHubRealtime({
   onReplayEvents,
   createSocket = createHubWS,
   getToken = getAccessToken,
+  liveBatchWindowMs = AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
 }: WebHubRealtimeOptions): void {
   const queryClient = useQueryClient();
   const runtimeSessionIdRef = useRef(runtimeSessionId);
   const runtimeTaskIdRef = useRef(runtimeTaskId);
   const onRuntimeEventRef = useRef(onRuntimeEvent);
   const onReplayEventsRef = useRef(onReplayEvents);
+  const liveBatcherRef = useRef<WebWorkbenchLiveEventBatcher | null>(null);
 
   useEffect(() => {
+    if (
+      runtimeSessionIdRef.current !== runtimeSessionId ||
+      runtimeTaskIdRef.current !== runtimeTaskId
+    ) {
+      // Drain the previous conversation before switching the refs used by the
+      // async timer callback. Otherwise a trailing frame can cross sessions.
+      liveBatcherRef.current?.flush();
+    }
     runtimeSessionIdRef.current = runtimeSessionId;
     runtimeTaskIdRef.current = runtimeTaskId;
     onRuntimeEventRef.current = onRuntimeEvent;
@@ -109,6 +122,21 @@ export function useWebHubRealtime({
     let replaying = false;
     const hubClient = createHubClient({ getToken });
     const invalidation = createWebWorkbenchHubInvalidationScheduler(queryClient);
+
+    // #1415: Bound live stream commits to one display-frame window. Every raw
+    // event is retained; React batches the callbacks from one timer turn.
+    let latestActivityPayload: unknown = null;
+    const liveBatcher = createWebWorkbenchLiveEventBatcher((events) => {
+      for (const event of events) {
+        onRuntimeEventRef.current?.(event);
+      }
+      const activityPayload = latestActivityPayload;
+      latestActivityPayload = null;
+      if (activityPayload !== null) {
+        getAgentActivityStore().handleEvent(HUB_EVENTS.AGENT_STREAM, activityPayload);
+      }
+    }, liveBatchWindowMs);
+    liveBatcherRef.current = liveBatcher;
 
     const socket = createSocket({
       getToken,
@@ -137,27 +165,71 @@ export function useWebHubRealtime({
     });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidation.notify(type, payload);
-      dispatchHubRuntimeEvent(
-        type,
-        payload,
-        runtimeSessionIdRef.current,
-        onRuntimeEventRef.current,
-        runtimeTaskIdRef.current,
-      );
+
+      if (type === HUB_EVENTS.AGENT_STREAM) {
+        // #1415: Route stream events through the micro-batch queue.
+        // Parse and session-filter inline (duplicates the head of
+        // dispatchHubRuntimeEvent) so the batcher only sees events
+        // that would actually reach the workbench model consumer.
+        const parsed = hubRuntimeEventFromPayload(payload);
+        const activeSessionId = runtimeSessionIdRef.current;
+        const event = activeSessionId
+          ? attachRuntimeSession(parsed, activeSessionId, runtimeTaskIdRef.current)
+          : null;
+        latestActivityPayload = payload;
+        if (
+          event &&
+          onRuntimeEventRef.current &&
+          event.session_id === activeSessionId
+        ) {
+          liveBatcher.push(event);
+        } else {
+          // Preserve global activity updates even when the stream belongs to a
+          // conversation other than the currently visible transcript.
+          liveBatcher.push();
+        }
+      } else {
+        // A terminal/session/etc. event stays immediate, but pending stream
+        // frames must reach both consumers first to preserve wire ordering.
+        liveBatcher.flush();
+        dispatchHubRuntimeEvent(
+          type,
+          payload,
+          runtimeSessionIdRef.current,
+          onRuntimeEventRef.current,
+          runtimeTaskIdRef.current,
+        );
+      }
+
       // Track seq_id from agent events for replay cursor.
       if (AGENT_EVENTS.has(type)) {
         trackSeqFromPayload(payload);
-        getAgentActivityStore().handleEvent(type, payload);
+        if (type !== HUB_EVENTS.AGENT_STREAM) {
+          // Non-stream agent events (dispatch/done/fail/cancel/control)
+          // are already handled immediately above; agent activity for
+          // AGENT_STREAM is synced once per batch inside the batcher.
+          getAgentActivityStore().handleEvent(type, payload);
+        }
+      }
+    });
+    const unsubscribeStatus = socket.onStatus((status: TransportStatus) => {
+      if (status === 'disconnected') {
+        liveBatcher.flush();
       }
     });
 
     socket.connect();
     return () => {
       unsubscribe();
+      unsubscribeStatus();
+      liveBatcher.dispose();
+      if (liveBatcherRef.current === liveBatcher) {
+        liveBatcherRef.current = null;
+      }
       invalidation.dispose();
       socket.close();
     };
-  }, [createSocket, enabled, getToken, queryClient]);
+  }, [createSocket, enabled, getToken, liveBatchWindowMs, queryClient]);
 }
 
 export function dispatchHubRuntimeEvent(
@@ -257,6 +329,9 @@ export function invalidateWebWorkbenchHubQueries(
 /** Trailing coalescing window for per-token AGENT_STREAM invalidation (#1352). */
 export const AGENT_STREAM_INVALIDATE_WINDOW_MS = 250;
 
+/** One display-frame window for live transcript commits (#1415). */
+export const AGENT_STREAM_LIVE_BATCH_WINDOW_MS = 16;
+
 export interface WebWorkbenchHubInvalidationScheduler {
   /** Route one realtime frame: AGENT_STREAM coalesced, everything else immediate. */
   notify: (eventType: string, payload: unknown) => void;
@@ -308,6 +383,68 @@ export function createWebWorkbenchHubInvalidationScheduler(
       }
     },
     dispose: flush,
+  };
+}
+
+// ── Live event micro-batch (#1415) ─────────────────────────────────────────
+
+/**
+ * Flush callback type for batched live events. Receives every original event
+ * so the hook can feed them into the workbench model consumer. Synchronous
+ * callbacks from the same timer turn are committed together by React.
+ */
+type LiveEventFlush = (events: HubRuntimeEventTranscriptInput[]) => void;
+
+export interface WebWorkbenchLiveEventBatcher {
+  /** Queue one stream event; undefined still schedules an activity-only flush. */
+  push: (event?: HubRuntimeEventTranscriptInput) => void;
+  /** Flush pending work without disposing the batcher. */
+  flush: () => void;
+  /** Flush pending work, clear the timer, and reject later pushes. */
+  dispose: () => void;
+}
+
+/**
+ * Live event micro-batch for AGENT_STREAM events dispatched to the workbench
+ * model consumer via onRuntimeEvent (#1415). The batcher never merges or drops
+ * events: IDs and sequence numbers must remain intact for replay deduplication.
+ * React batches all callbacks from one timer turn into one commit.
+ */
+export function createWebWorkbenchLiveEventBatcher(
+  flush: LiveEventFlush,
+  windowMs: number = AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
+): WebWorkbenchLiveEventBatcher {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending: HubRuntimeEventTranscriptInput[] = [];
+  let hasPending = false;
+  let disposed = false;
+
+  const doFlush = (): void => {
+    if (timer != null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    const batch = pending;
+    pending = [];
+    if (!hasPending) return;
+    hasPending = false;
+    flush(batch);
+  };
+
+  return {
+    push: (event) => {
+      if (disposed) return;
+      if (event) pending.push(event);
+      hasPending = true;
+      if (timer == null) {
+        timer = setTimeout(doFlush, windowMs);
+      }
+    },
+    flush: doFlush,
+    dispose: () => {
+      disposed = true;
+      doFlush();
+    },
   };
 }
 
