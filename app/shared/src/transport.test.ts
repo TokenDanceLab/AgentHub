@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WebSocketTransport, type TransportStatus } from '../api/transport';
+import { WebSocketTransport, type TransportStatus } from './transport';
 
 // Track WebSocket instances
 const instances: MockWebSocket[] = [];
@@ -35,7 +35,9 @@ class MockWebSocket {
 }
 
 function lastWs(): MockWebSocket {
-  return instances[instances.length - 1];
+  const ws = instances[instances.length - 1];
+  if (!ws) throw new Error('expected a WebSocket instance');
+  return ws;
 }
 
 /** Simulate a successful WebSocket connection opening. */
@@ -268,7 +270,7 @@ describe('WebSocketTransport', () => {
       vi.advanceTimersByTime(2000);
       expect(instances.length).toBe(2);
       // Fail again
-      instances[instances.length - 1].close();
+      lastWs().close();
       expect(t.getStatus()).toBe('reconnecting');
 
       // Retry 2: baseDelay * 2^1 = 2000ms. Should NOT fire at +1000ms
@@ -291,11 +293,11 @@ describe('WebSocketTransport', () => {
       expect(instances.length).toBe(2);
 
       // Reconnect succeeds
-      simulateOpen(instances[instances.length - 1]);
+      simulateOpen(lastWs());
       expect(t.getStatus()).toBe('connected');
 
       // Fail again — should start from base delay again
-      instances[instances.length - 1].close();
+      lastWs().close();
       expect(t.getStatus()).toBe('reconnecting');
       // retryCount was reset to 0, so next delay = 1000 * 2^0 = 1000ms
       vi.advanceTimersByTime(2000);
@@ -321,13 +323,13 @@ describe('WebSocketTransport', () => {
       expect(t.getStatus()).toBe('reconnecting');
 
       // Fail → retry 2
-      instances[instances.length - 1].close();
+      lastWs().close();
       expect(t.getStatus()).toBe('reconnecting');
 
       vi.advanceTimersByTime(5000);
       expect(instances.length).toBe(3);
       // retry 2 fires
-      instances[instances.length - 1].close();
+      lastWs().close();
 
       // Now retries exhausted (retryCount=2, maxRetries=2) — should stay disconnected
       vi.advanceTimersByTime(50000);
