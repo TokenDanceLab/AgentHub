@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -84,7 +85,9 @@ func (s *SQLiteStore) checkpointLoop(interval time.Duration) {
 		select {
 		case <-ticker.C:
 			if _, err := s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
-				// Non-fatal; the auto-checkpoint will still work.
+				// Non-fatal; the auto-checkpoint will still work, but the failure
+				// must be visible instead of silently swallowed.
+				slog.Warn("sqlite store: periodic wal checkpoint failed", "error", err)
 			}
 		case <-s.stopCheckpoint:
 			return
@@ -111,15 +114,25 @@ func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
 func (s *SQLiteStore) Close() {
 	s.closeOnce.Do(func() {
 		close(s.stopCheckpoint)
-		// Final checkpoint to shrink the WAL before close.
-		_, _ = s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
-		_ = s.syncPersist()
-		_ = s.db.Close()
+		// Final checkpoint to shrink the WAL before close. Failures are logged
+		// (not returned) to keep the shutdown signature; LastPersistError still
+		// reflects the final persist outcome.
+		if _, err := s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+			slog.Warn("sqlite store: final wal checkpoint failed on close", "error", err)
+		}
+		if err := s.syncPersist(); err != nil {
+			slog.Warn("sqlite store: final persist failed on close", "error", err)
+		}
+		if err := s.db.Close(); err != nil {
+			slog.Warn("sqlite store: db close failed", "error", err)
+		}
 	})
 }
 
 func (s *SQLiteStore) Flush() {
-	_ = s.syncPersist()
+	if err := s.syncPersist(); err != nil {
+		slog.Warn("sqlite store: flush persist failed", "error", err)
+	}
 }
 
 func (s *SQLiteStore) LastPersistError() error {
@@ -454,8 +467,7 @@ func (s *SQLiteStore) GetSettings() UserSettings {
 	return s.store.GetSettings()
 }
 
-func (s *SQLiteStore) UpsertSettings(patch map[string]string) UserSettings {
-	result := s.store.UpsertSettings(patch)
-	_ = s.syncPersist()
-	return result
+func (s *SQLiteStore) UpsertSettings(patch map[string]string) (UserSettings, error) {
+	result, err := s.store.UpsertSettings(patch)
+	return persistAfterSQLiteWrite(s, result, err)
 }

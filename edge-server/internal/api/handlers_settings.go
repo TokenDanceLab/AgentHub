@@ -34,7 +34,14 @@ func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("empty patch")))
 		return
 	}
-	settings := ensureStore(h).UpsertSettings(patch)
+	settings, err := ensureStore(h).UpsertSettings(patch)
+	if err != nil {
+		// Persist failure must not be reported as success — the caller would
+		// otherwise believe settings survived a restart when they did not.
+		slog.Error("failed to persist settings", "error", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to persist settings")))
+		return
+	}
 	writeSuccess(w, http.StatusOK, settings)
 }
 

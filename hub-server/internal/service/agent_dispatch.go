@@ -49,9 +49,9 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 		return nil, err
 	}
 
-	// check for active member
-	active, _ := repository.IsMemberActive(s.db, ai.SessionID, model.MemberTypeUser, userID)
-	if err := dispatch.TriggerMemberActiveError(active); err != nil {
+	// check for active member — a lookup failure must surface, not read as inactive.
+	active, err := repository.IsMemberActive(s.db, ai.SessionID, model.MemberTypeUser, userID)
+	if err := dispatch.TriggerMemberActiveError(err, active); err != nil {
 		return nil, err
 	}
 
@@ -126,7 +126,14 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 	))
 
 	// Record delivery in outbox before dispatching (AH-SR-049).
-	payload, _ := dispatch.MarshalPayload(dp)
+	payload, err := dispatch.MarshalPayload(dp)
+	if err != nil {
+		// A payload that cannot serialize cannot be dispatched on any route and
+		// must not produce a corrupt outbox record; the task stays queued until TTL.
+		slog.Error(dispatch.DispatchLogPayloadMarshalFailed,
+			"task_id", task.ID, "edge_device_id", task.EdgeDeviceID, "error", err)
+		return
+	}
 	deliveryID, err := s.recordDelivery(ctx, task.ID, string(payload), task.EdgeDeviceID)
 	if !dispatch.OutboxRecordSucceeded(err) {
 		// Still dispatch for availability, but durability is degraded until outbox is healthy.
@@ -151,7 +158,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
 			}
 			if dispatch.PlanLiveDispatchMark(deliveryID) {
-				_ = s.markDeliverySent(ctx, deliveryID)
+				if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+					slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+				}
 			}
 			return
 		}
@@ -165,7 +174,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				}
 				// Offline queue acceptance is not Edge receipt (#1031).
 				if dispatch.PlanOfflineDispatchMark(deliveryID) {
-					_ = s.markDeliverySent(ctx, deliveryID)
+					if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+						slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+					}
 				}
 				return
 			}
@@ -182,12 +193,16 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				}
 				// WS miss → offline queue only; outbox stays pending (#1031).
 				if dispatch.PlanUnboundInviterDesktopMark(false, deliveryID) {
-					_ = s.markDeliverySent(ctx, deliveryID)
+					if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+						slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+					}
 				}
 				return
 			}
 			if dispatch.PlanUnboundInviterDesktopMark(true, deliveryID) {
-				_ = s.markDeliverySent(ctx, deliveryID)
+				if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+					slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+				}
 			}
 			return
 		}
@@ -196,7 +211,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		}
 		// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
 		if dispatch.PlanOfflineDispatchMark(deliveryID) {
-			_ = s.markDeliverySent(ctx, deliveryID)
+			if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+				slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+			}
 		}
 		return
 
@@ -226,7 +243,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		// local_edge / remote_ssh / cloud_edge / tailscale / hub_relay without relay.
 		live := s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
 		if dispatch.PlanTargetBoundDeliveryMark(live, deliveryID) {
-			_ = s.markDeliverySent(ctx, deliveryID)
+			if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+				slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
+			}
 		}
 		return
 	}
