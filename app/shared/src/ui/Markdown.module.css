@@ -158,6 +158,10 @@
   background: var(--surface-high);
   font-family: var(--font-mono);
   font-size: 0.9em;
+
+  /* Give every visually wrapped fragment its own background and rounded edge. */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* ── Code block wrapper ─────────────────────── */
