@@ -2,6 +2,24 @@ import { type ReactNode } from 'react';
 import { cx } from './cx';
 import styles from './EmptyState.module.css';
 
+export const EMPTY_STATE_KINDS = ['blank', 'search', 'filter', 'error'] as const;
+export type EmptyStateKind = (typeof EMPTY_STATE_KINDS)[number];
+
+export interface EmptyStateCopy {
+  title: string;
+  description: string;
+}
+
+/** Translation-ready copy contract: every surface defines all four states. */
+export type EmptyStateCopyMatrix = Record<EmptyStateKind, EmptyStateCopy>;
+
+export function resolveEmptyStateCopy(
+  matrix: EmptyStateCopyMatrix,
+  kind: EmptyStateKind,
+): EmptyStateCopy {
+  return matrix[kind];
+}
+
 export interface EmptyStateAction {
   label: string;
   onClick: () => void;
@@ -20,6 +38,7 @@ export interface EmptyStateSuggestion {
 export interface EmptyStateProps {
   title: string;
   description?: string;
+  kind?: EmptyStateKind;
   icon?: ReactNode;
   action?: EmptyStateAction;
   suggestions?: EmptyStateSuggestion[];
@@ -38,6 +57,7 @@ export interface EmptyStateProps {
 export function EmptyState({
   title,
   description,
+  kind = 'blank',
   icon,
   action,
   suggestions,
@@ -54,7 +74,12 @@ export function EmptyState({
   const TitleTag = `h${titleLevel}` as 'h1' | 'h2' | 'h3';
 
   return (
-    <section className={cx(styles.container, className)} aria-label={title}>
+    <section
+      className={cx(styles.container, className)}
+      aria-label={title}
+      role={kind === 'error' ? 'alert' : 'region'}
+      data-empty-kind={kind}
+    >
       <div className={cx(styles.content, contentClassName)}>
         {icon ? (
           <div className={cx(styles.icon, iconClassName)} aria-hidden="true">
