@@ -68,6 +68,9 @@ export const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
 
       <MarketTemplatesList
         marketTemplates={marketTemplates}
+        marketSearchQuery={marketSearchQuery}
+        activeMarketCategory={activeMarketCategory}
+        onMarketSearchChange={onMarketSearchChange}
         onMarketInstall={onMarketInstall}
       />
     </main>
@@ -115,7 +118,10 @@ export const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
       <SkillMarketSection
         skillMarketItems={skillMarketItems}
         skillMarketLoading={skillMarketLoading}
+        skillMarketSearchQuery={skillMarketSearchQuery}
+        activeSkillTypeFilter={activeSkillTypeFilter}
         installedSkillIds={installedSkillIds}
+        onSkillMarketSearchChange={onSkillMarketSearchChange}
         onSkillInstall={onSkillInstall}
         onSkillUninstall={onSkillUninstall}
       />
@@ -164,7 +170,10 @@ export const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
       <McpMarketSection
         mcpMarketItems={mcpMarketItems}
         mcpMarketLoading={mcpMarketLoading}
+        mcpMarketSearchQuery={mcpMarketSearchQuery}
+        activeTransportFilter={activeTransportFilter}
         installedMcpIds={installedMcpIds}
+        onMcpMarketSearchChange={onMcpMarketSearchChange}
         onMcpInstall={onMcpInstall}
         onMcpUninstall={onMcpUninstall}
       />
