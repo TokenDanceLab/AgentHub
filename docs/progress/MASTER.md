@@ -2,7 +2,7 @@
 
 > **Task**: post-polish residual hardening — **complete** (docs authority + mobile hubClient strangler)
 > **Started**: 2026-07-16 (Visual polish); residual program 2026-07-20; closed 2026-07-21
-> **Last Updated**: 2026-07-26
+> **Last Updated**: 2026-07-27
 > **Mode**: `GITHUB_FULL`
 > **Repo**: `TokenDanceLab/AgentHub`
 
@@ -10,11 +10,12 @@
 
 | Item | Value |
 |---|---|
-| Active SPEC | **None** — residual Phases 79–80 closed; codebase audit sweep 2026-07-26 delivered (see below); pick next from [roadmap P0/P1](../roadmap.md) |
+| Active SPEC | **PROPOSAL open (do not implement until approved)** — #1412 WS 增量同步 · #1413 Desktop 签名发布 · #1414 IM 反向桥接 |
 | Closed residual analysis | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
 | Closed residual plan | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
 | Strategy (delivered) | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
 | Tracking | Issues **#1335–#1339** (closed) · GH milestones **98–99** (closed) · PRs **#1340** / **#1341** / **#1342** |
+| Live tip | master `45b6c697`（#1417 CJK） |
 
 ### Residual phases (closed 2026-07-21)
 
@@ -54,16 +55,32 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 | 仓库卫生 | #1381 #1350 #1364 | `edge.db-wal`(922KB)+`db-shm` 出库 + `.gitignore` 补模式 · CI go filter 补 `pkg/**`/`go.work*`（堵 CD 未测直推镜像窗口）· 死链与失效指针清理 |
 | 可观测 | #1378 | WS 帧填充 per-conn `seq_id`（gap 检测此前不可能）+ 丢帧采样日志 |
 
-### Open follow-ups（issue-tracked，不在本轮）
+### Closed after audit sweep（2026-07-26 → 2026-07-27）
 
-| 主题 | Issue |
+| 主题 | 结果 |
 |---|---|
-| agentteam check-then-act 并发家族（seq 层 #1401 已合；条件写/guardrail/compete 收口中） | #1383 · PR #1419（open） |
-| agentteam assignment 生命周期设计（running 态谁写、超时不终结、死枚举） | #1384 |
-| agentteam 投影层抽取（GetTeamRunState 读路径隐藏写） | #1385 |
-| WS 死协议面 / WS 鉴权只在 upgrade 校验 | #1362 · #1363 |
-| openapi query-token scheme 被测试钉死 / 悬空 `$ref` | #1387 · #1388 |
-| xlsx 换源决策 · 口令测试 OIDC 化重写 | #1358 · #1369 |
+| agentteam seq UNIQUE + 条件写 | **closed** · #1401 · #1419 · Closes #1383 |
+| hub tests 口令依赖 OIDC 化 | **closed** · #1402 · Closes #1369 |
+| openapi query-token / 悬空 `$ref` | **closed** · #1400 · #1387/#1388 |
+| transport 下沉 shared | **closed** · #1416 · Refs #1395（hooks 直测仍 open） |
+| 流式 16ms microbatch | **closed** · #1418 · Closes #1415 |
+| CJK Markdown 渲染 | **closed** · #1417 · Closes #1409 |
+
+### Open follow-ups（issue-tracked）
+
+| 主题 | Issue / PR | 状态 |
+|---|---|---|
+| Empty 四态矩阵接到市场真表面 | #1410 · PR #1420 | open / CI |
+| WS 死协议面 / logout 不杀 socket | #1362 · #1363 | open；worktree dirty，PR 收口中 |
+| agentteam assignment 生命周期 | #1384 | open |
+| agentteam 投影层抽取 | #1385 | open |
+| web hook 零直测残余 | #1395 | open（transport 已合，hooks 仍缺） |
+| ACP spike / Automations / @提及 / 观察池 | #1404 · #1405 · #1406 · #1407 | open（产品立项） |
+| PROPOSAL：WS 增量 / 签名发布 / IM 桥 | #1412 · #1413 · #1414 | open（不 merge 等批） |
+
+### Research artifacts（off-repo）
+
+- Codeg 竞品研究仍在 `D:\Code\Temp\codeg-research\`（9 份 md，含 SYNTHESIS）；**未进仓**，以 Issue/PR 跟踪落地项
 
 ### 审计澄清（推翻既有叙事）
 
@@ -132,3 +149,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 | 2026-07-21 | Closeout #1342 + SSOT sync #1343 · tip `1ac86aa5`; analysis inventory marked delivered |
 | 2026-07-21 | CI: mobile light path-filter + backend perf/leak `workflow_dispatch` (T5) |
 | 2026-07-26 | **Codebase audit sweep** — 9 份并行审计 → 18 PR 合入，净删 ~12,000 行；WS bearer 握手 / agentteam 审阅门 / web 已读 / openai sanitize 四处产品缺陷修复；~25 条依赖 alert 清理；922KB SQLite WAL 出库；未竟项落 #1358 #1362 #1363 #1369 #1383–#1385 #1387 #1388 |
+| 2026-07-26–27 | 审计 follow-up 合入：#1400 query-token · #1401 seq UNIQUE · #1402 OIDC 测试 · #1408 门禁 hotfix · #1416 transport shared · #1418 stream microbatch · #1419 agentteam 条件写 · #1417 CJK；Empty #1420 在飞；PROPOSAL #1412–#1414 等批 |
