@@ -246,7 +246,16 @@ func (s *AgentTeamService) appendTeamEventTx(tx *gorm.DB, runID, eventType strin
 }
 
 func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error) {
-	return s.createAssignmentInTx(s.db, ctx, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr)
+	var assignment *model.AgentTeamAssignment
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, teamRunID); err != nil {
+			return err
+		}
+		var err error
+		assignment, err = s.createAssignmentInTx(tx, ctx, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr)
+		return err
+	})
+	return assignment, err
 }
 
 // createAssignmentInTx is the transaction-aware core of CreateAssignment.

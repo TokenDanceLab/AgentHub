@@ -286,6 +286,25 @@ func TestAgentTeamService_HandleRouteDecisionConcurrentGuardrailDoesNotOverflow(
 	assertAssignmentAndTaskCounts(t, db, run.ID, 1, 1)
 }
 
+func TestAgentTeamService_CreateAssignmentConcurrentGuardrailDoesNotOverflow(t *testing.T) {
+	db := setupAgentTeamConcurrentSQLite(t)
+	guardrails := DefaultAgentTeamGuardrails()
+	guardrails.MaxTasksPerTeamRun = 1
+	guardrails.MaxActiveSubAgentsPerRun = 1
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	errs := runConcurrentRouteCalls(2, func() error {
+		_, err := svc.CreateAssignment(
+			context.Background(), "user-1", run.ID, supervisor.ID, executor.ID,
+			model.AssignmentTypeDelegate, "one direct assignment slot", "",
+		)
+		return err
+	})
+	assertOneSuccessOneBadRequest(t, errs)
+	assertAssignmentAndTaskCounts(t, db, run.ID, 1, 0)
+}
+
 func TestAgentTeamService_HandleCompeteConcurrentBatchesStayAtomicAndWithinLimit(t *testing.T) {
 	db := setupAgentTeamConcurrentSQLite(t)
 	guardrails := DefaultAgentTeamGuardrails()
