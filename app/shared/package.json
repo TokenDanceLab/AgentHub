@@ -10,6 +10,7 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
+    "./transport": "./src/transport.ts",
     "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
     "./theme": "./src/theme.ts",
