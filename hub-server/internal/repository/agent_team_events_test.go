@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // seedTeamEventRun creates the minimal team + run rows AppendTeamEvent needs.
@@ -152,6 +155,47 @@ func TestIsUniqueViolation(t *testing.T) {
 			assert.Equal(t, tc.want, isUniqueViolation(tc.err))
 		})
 	}
+}
+
+func TestLockTeamRunForEventAppendUsesPostgresRowLock(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		require.NoError(t, sqlDB.Close())
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+
+	mock.ExpectQuery(`SELECT id FROM agent_team_runs WHERE id = \$1 FOR UPDATE`).
+		WithArgs("run-locked").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("run-locked"))
+	require.NoError(t, lockTeamRunForEventAppend(db, "run-locked"))
+}
+
+func TestLockTeamRunForEventAppendRejectsMissingPostgresRun(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		require.NoError(t, sqlDB.Close())
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+
+	mock.ExpectQuery(`SELECT id FROM agent_team_runs WHERE id = \$1 FOR UPDATE`).
+		WithArgs("run-missing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	err = lockTeamRunForEventAppend(db, "run-missing")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 // TestAppendTeamEventConcurrentAppendsKeepSeqUniqueAndContiguous drives real

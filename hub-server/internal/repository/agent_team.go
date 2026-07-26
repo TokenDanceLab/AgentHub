@@ -270,10 +270,11 @@ func ListTeamArtifactsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamArt
 
 // AgentTeamEvent
 
-// appendTeamEventMaxAttempts bounds how often AppendTeamEvent retries after
-// losing the (team_run_id, seq) unique-index race (migration 0056) to a
-// concurrent append. Each attempt re-reads MAX(seq) inside a fresh
-// transaction, so a small bound is enough even under bursts.
+// appendTeamEventMaxAttempts bounds the defensive retry path after a
+// (team_run_id, seq) unique-index conflict. PostgreSQL writers are serialized
+// per run by lockTeamRunForEventAppend before reading MAX(seq), so ordinary
+// bursts do not consume this budget; the retry remains useful for callers
+// that bypassed the parent row lock and for other dialects.
 const appendTeamEventMaxAttempts = 5
 
 // isUniqueViolation reports whether err is a unique-constraint violation.
@@ -292,6 +293,28 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
 }
 
+// lockTeamRunForEventAppend serializes event sequence allocation for one run
+// in production PostgreSQL. Locking the stable parent row before MAX(seq)+1
+// prevents a burst of concurrent appenders from repeatedly colliding on the
+// unique index (where a fixed retry budget would otherwise shed writers).
+// SQLite tests skip row locking and retain the unique-index retry fallback.
+func lockTeamRunForEventAppend(tx *gorm.DB, teamRunID string) error {
+	if tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	var lockedID string
+	if err := tx.Raw(
+		"SELECT id FROM agent_team_runs WHERE id = ? FOR UPDATE",
+		teamRunID,
+	).Scan(&lockedID).Error; err != nil {
+		return err
+	}
+	if lockedID == "" {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 // AppendTeamEvent appends an event with the next per-run seq. The MAX(seq)+1
 // read and the insert run in one transaction, and the unique index on
 // (team_run_id, seq) turns a concurrent append racing the same seq into a
@@ -304,6 +327,9 @@ func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
 	var lastErr error
 	for attempt := 0; attempt < appendTeamEventMaxAttempts; attempt++ {
 		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := lockTeamRunForEventAppend(tx, event.TeamRunID); err != nil {
+				return err
+			}
 			var maxSeq int
 			if err := tx.Model(&model.AgentTeamEvent{}).
 				Where("team_run_id = ?", event.TeamRunID).
