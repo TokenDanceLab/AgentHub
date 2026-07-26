@@ -1,153 +1,179 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   EDGE INTEGRATION TEST HARNESS
-   simulates Edge Server event stream → TranscriptBlock[] → ChatView
+   EDGE INTEGRATION TEST
+   Feeds real Edge Server EventEnvelope streams through the PRODUCTION
+   normalizeEdgeEventsToTranscript → TranscriptBlock[] → ChatView adapter.
+
+   History: this file used to define its own in-test copy of a
+   `normalizeEdgeEventsToTranscript` function and asserted against that
+   mirror, so production regressions were invisible here. It now imports
+   the production normalizer (./normalizeEdgeEvents) directly.
    ══════════════════════════════════════════════════════════════════════ */
 
-import { describe, it, expect } from 'vitest'
-import type { TranscriptBlock } from '../transcript/types'
+import { describe, expect, it } from 'vitest'
+import type { EventEnvelope } from '../events'
+import { blocksToTranscriptItems } from '../chatview/adapter'
+import type { TranscriptAgentItem } from '../chatview/transcript-item'
+import { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents'
 
-/**
- * Simulates Edge Server event stream pattern.
- * Edge emits: think events → tool events → artifact events → result events
- * Each event has a status (pending → running → completed/failed)
- */
-interface EdgeEvent {
-  id: string
-  type: 'think' | 'tool_call' | 'tool_result' | 'file_change' | 'approval' | 'result'
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  agentId: string
-  agentName: string
-  timestamp: string
-  meta?: Record<string, unknown>
-}
-
-/**
- * Normalizes Edge events into TranscriptBlock[] format.
- * This mirrors what normalizeHubMessagesToTranscript does for Hub messages.
- */
-function normalizeEdgeEventsToTranscript(events: EdgeEvent[]): TranscriptBlock[] {
-  const blocks: TranscriptBlock[] = []
-
-  for (const event of events) {
-    const author = { id: event.agentId, name: event.agentName, role: 'agent' as const }
-
-    switch (event.type) {
-      case 'think':
-        blocks.push({
-          id: event.id, kind: 'thinking', createdAt: event.timestamp, author,
-          content: (event.meta?.content as string) || '',
-          isThinking: event.status === 'running' || event.status === 'pending',
-        } as TranscriptBlock)
-        break
-
-      case 'tool_call':
-        blocks.push({
-          id: event.id, kind: 'tool_call', createdAt: event.timestamp, author,
-          toolName: (event.meta?.toolName as string) || 'unknown',
-          status: event.status as 'pending' | 'running' | 'completed' | 'failed',
-          target: event.meta?.target as string | undefined,
-          summary: event.meta?.summary as string | undefined,
-        } as TranscriptBlock)
-        break
-
-      case 'tool_result':
-        blocks.push({
-          id: event.id, kind: 'tool_result', createdAt: event.timestamp, author,
-          toolName: (event.meta?.toolName as string) || 'unknown',
-          status: event.status,
-          summary: event.meta?.summary as string | undefined,
-        } as TranscriptBlock)
-        break
-
-      case 'file_change':
-        blocks.push({
-          id: event.id, kind: 'file_change', createdAt: event.timestamp, author,
-          path: (event.meta?.path as string) || '',
-          action: (event.meta?.action as 'created' | 'modified' | 'deleted') || 'modified',
-          additions: event.meta?.additions as number | undefined,
-          deletions: event.meta?.deletions as number | undefined,
-          patch: event.meta?.patch as string | undefined,
-        } as TranscriptBlock)
-        break
-
-      case 'approval':
-        blocks.push({
-          id: event.id, kind: 'approval', createdAt: event.timestamp, author,
-          title: (event.meta?.title as string) || 'Approval',
-          status: event.status,
-          reason: event.meta?.reason as string | undefined,
-        } as TranscriptBlock)
-        break
-
-      case 'result':
-        blocks.push({
-          id: event.id, kind: 'result', createdAt: event.timestamp, author,
-          success: event.status !== 'failed',
-          duration: event.meta?.duration as string | undefined,
-        } as TranscriptBlock)
-        break
-    }
+function edgeEvent(
+  id: string,
+  seq: number,
+  type: string,
+  payload: Record<string, unknown>,
+  sentAt = `2026-06-07T03:00:0${seq}Z`,
+): EventEnvelope {
+  return {
+    version: 'v1',
+    id,
+    seq,
+    type,
+    scope: {
+      threadId: 'thread-live',
+      runId: typeof payload.runId === 'string' ? payload.runId : undefined,
+    },
+    sentAt,
+    payload,
   }
-
-  return blocks
 }
 
 // ── Tests ──
 
 describe('Edge event → TranscriptBlock normalization', () => {
   it('normalizes think events through lifecycle', () => {
-    const events: EdgeEvent[] = [
-      { id: 'e1', type: 'think', status: 'running', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { content: 'analyzing...' } },
-      { id: 'e2', type: 'think', status: 'completed', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { content: 'analysis done' } },
-    ]
-    const blocks = normalizeEdgeEventsToTranscript(events)
-    expect(blocks).toHaveLength(2)
-    expect((blocks[0]! as any).isThinking).toBe(true)
-    expect((blocks[1]! as any).isThinking).toBe(false)
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('e1', 1, 'run.agent.thinking', {
+        runId: 'run-think',
+        content: 'analyzing...',
+        status: 'running',
+      }),
+      edgeEvent('e2', 2, 'run.agent.thinking', {
+        runId: 'run-think',
+        content: 'analysis done',
+        status: 'completed',
+      }),
+    ])
+
+    // Production merges consecutive same-author, same-run thinking deltas
+    // into a single block, and auto-completes it once thinking ends.
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      kind: 'thinking',
+      content: 'analyzing...analysis done',
+      isThinking: false,
+    }))
   })
 
   it('normalizes tool_call → tool_result pair', () => {
-    const events: EdgeEvent[] = [
-      { id: 'e1', type: 'tool_call', status: 'running', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { toolName: 'Read' } },
-      { id: 'e2', type: 'tool_result', status: 'completed', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { toolName: 'Read', summary: '42 lines' } },
-    ]
-    const blocks = normalizeEdgeEventsToTranscript(events)
-    expect(blocks[0]!.kind).toBe('tool_call')
-    expect(blocks[1]!.kind).toBe('tool_result')
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('e1', 1, 'run.agent.tool_call', {
+        runId: 'run-tools',
+        callId: 'call-read',
+        toolName: 'Read',
+        status: 'running',
+      }),
+      edgeEvent('e2', 2, 'run.agent.tool_result', {
+        runId: 'run-tools',
+        callId: 'call-read',
+        toolName: 'Read',
+        summary: '42 lines',
+      }),
+    ])
+
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      kind: 'tool_call',
+      toolName: 'Read',
+      status: 'running',
+    }))
+    expect(blocks[1]).toEqual(expect.objectContaining({
+      kind: 'tool_result',
+      toolName: 'Read',
+      status: 'completed',
+      summary: '42 lines',
+    }))
   })
 
   it('normalizes file_change with patch', () => {
-    const events: EdgeEvent[] = [
-      { id: 'e1', type: 'file_change', status: 'completed', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { path: 'src/user.ts', action: 'modified', additions: 5, deletions: 3, patch: '- old\n+ new' } },
-    ]
-    const blocks = normalizeEdgeEventsToTranscript(events)
-    expect(blocks[0]!.kind).toBe('file_change')
-    const fc = blocks[0] as any
-    expect(fc.path).toBe('src/user.ts')
-    expect(fc.patch).toBe('- old\n+ new')
+    const patch = '@@ -1 +1 @@\n-old\n+new'
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('e1', 1, 'run.agent.file_change', {
+        runId: 'run-file',
+        path: 'src/user.ts',
+        kind: 'modified',
+        diff: patch,
+      }),
+    ])
+
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      kind: 'file_change',
+      path: 'src/user.ts',
+      action: 'modified',
+      additions: 1,
+      deletions: 1,
+      patch,
+    }))
   })
 
   it('handles interleaved agents (Builder + Reviewer)', () => {
-    const events: EdgeEvent[] = [
-      { id: 'b1', type: 'think', status: 'running', agentId: 'builder', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { content: 'checking' } },
-      { id: 'r1', type: 'think', status: 'running', agentId: 'reviewer', agentName: 'Reviewer', timestamp: new Date().toISOString(), meta: { content: 'reviewing' } },
-    ]
-    const blocks = normalizeEdgeEventsToTranscript(events)
-    expect(blocks[0]!.author!.name).toBe('Builder')
-    expect(blocks[1]!.author!.name).toBe('Reviewer')
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('b1', 1, 'run.agent.thinking', {
+        runId: 'team-run',
+        agentId: 'builder',
+        agentName: 'Builder',
+        content: 'checking',
+      }),
+      edgeEvent('r1', 2, 'run.agent.thinking', {
+        runId: 'team-run',
+        agentId: 'reviewer',
+        agentName: 'Reviewer',
+        content: 'reviewing',
+      }),
+    ])
+
+    // Different authors never merge, even within the same run.
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]!.author).toEqual({ id: 'builder', name: 'Builder', role: 'agent' })
+    expect(blocks[1]!.author).toEqual({ id: 'reviewer', name: 'Reviewer', role: 'agent' })
+    // Builder is still thinking while Reviewer's thinking streams behind it;
+    // the trailing thinking block auto-completes.
+    expect(blocks[0]).toEqual(expect.objectContaining({ kind: 'thinking', isThinking: true }))
+    expect(blocks[1]).toEqual(expect.objectContaining({ kind: 'thinking', isThinking: false }))
   })
 
-  it('round-trips through adapter without data loss', async () => {
-    const { blocksToTranscriptItems } = await import('../chatview/adapter')
-    const events: EdgeEvent[] = [
-      { id: 'e1', type: 'think', status: 'completed', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { content: 'done' } },
-      { id: 'e2', type: 'tool_call', status: 'running', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { toolName: 'Read' } },
-      { id: 'e3', type: 'tool_result', status: 'completed', agentId: 'a1', agentName: 'Builder', timestamp: new Date().toISOString(), meta: { toolName: 'Read', summary: 'ok' } },
-    ]
-    const blocks = normalizeEdgeEventsToTranscript(events)
+  it('round-trips through adapter without data loss', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('e1', 1, 'run.agent.thinking', {
+        runId: 'run-rt',
+        content: 'done',
+        status: 'completed',
+      }),
+      edgeEvent('e2', 2, 'run.agent.tool_call', {
+        runId: 'run-rt',
+        callId: 'call-read',
+        toolName: 'Read',
+        status: 'running',
+      }),
+      edgeEvent('e3', 3, 'run.agent.tool_result', {
+        runId: 'run-rt',
+        callId: 'call-read',
+        toolName: 'Read',
+        summary: 'ok',
+      }),
+    ])
+    expect(blocks).toHaveLength(3)
+
     const items = blocksToTranscriptItems(blocks)
-    expect(items).toHaveLength(1) // all same agent → grouped
-    const agent = items[0] as any
-    expect(agent.rows).toHaveLength(2) // think + tool (result merged into tool_call)
+    expect(items).toHaveLength(1) // all same (default) agent author → grouped
+    const agent = items[0] as TranscriptAgentItem
+    expect(agent.rows).toHaveLength(2) // think + tool (result merged into tool_call row)
+    expect(agent.rows[0]).toEqual(expect.objectContaining({ type: 'think' }))
+    expect(agent.rows[1]).toEqual(expect.objectContaining({
+      type: 'tool',
+      label: 'Read',
+      toolCallId: 'call-read',
+      status: 'ok',
+      isResult: true, // tool_result replaced the pending tool_call row
+    }))
   })
 })
