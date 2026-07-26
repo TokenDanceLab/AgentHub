@@ -350,6 +350,8 @@ jobs:
             go:
               - 'hub-server/**'
               - 'edge-server/**'
+              - 'pkg/**'
+              - 'go.work*'
               - 'api/**'
               - 'scripts/verify/**'
               - '.github/workflows/checks.yml'
