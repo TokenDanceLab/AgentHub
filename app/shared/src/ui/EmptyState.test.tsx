@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyState } from './EmptyState';
+import { EMPTY_STATE_KINDS, EmptyState, resolveEmptyStateCopy, type EmptyStateCopyMatrix } from './EmptyState';
 
 describe('EmptyState', () => {
   it('renders title, description, and icon', () => {
@@ -76,5 +76,24 @@ describe('EmptyState', () => {
     expect(btn).toBeInTheDocument();
     expect(btn.querySelector('kbd')).toBeInTheDocument();
     expect(btn.querySelector('kbd')?.textContent).toBe('Ctrl+N');
+  });
+
+  it.each(EMPTY_STATE_KINDS)('exposes the %s state to behavior and visual gates', (kind) => {
+    render(<EmptyState kind={kind} title={`${kind} title`} description={`${kind} guidance`} />);
+
+    const state = screen.getByLabelText(`${kind} title`);
+    expect(state).toHaveAttribute('data-empty-kind', kind);
+    expect(state).toHaveAttribute('role', kind === 'error' ? 'alert' : 'region');
+  });
+
+  it('selects scenario copy from a complete translation-ready matrix', () => {
+    const matrix: EmptyStateCopyMatrix = {
+      blank: { title: 'No agents yet', description: 'Install an agent to get started.' },
+      search: { title: 'No search results', description: 'Try another keyword.' },
+      filter: { title: 'No filtered results', description: 'Clear one or more filters.' },
+      error: { title: 'Agents unavailable', description: 'Retry loading agents.' },
+    };
+
+    expect(resolveEmptyStateCopy(matrix, 'filter')).toEqual(matrix.filter);
   });
 });

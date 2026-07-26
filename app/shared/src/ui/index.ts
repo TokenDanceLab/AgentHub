@@ -7,7 +7,15 @@ export { TextShimmer } from './TextShimmer';
 export { Select } from './Select';
 export type { SelectProps } from './Select';
 export { EmptyState } from './EmptyState';
-export type { EmptyStateProps, EmptyStateAction, EmptyStateSuggestion } from './EmptyState';
+export { EMPTY_STATE_KINDS, resolveEmptyStateCopy } from './EmptyState';
+export type {
+  EmptyStateProps,
+  EmptyStateAction,
+  EmptyStateSuggestion,
+  EmptyStateKind,
+  EmptyStateCopy,
+  EmptyStateCopyMatrix,
+} from './EmptyState';
 export { SelectableRow } from './SelectableRow';
 export type { SelectableRowProps } from './SelectableRow';
 export { TokenDanceMark } from './TokenDanceMark';
