@@ -2622,6 +2622,43 @@ func TestHumanReviewGate(t *testing.T) {
 			}
 		}
 		assert.True(t, foundDecided, "expected team.review.decided event")
+
+		// The replay projection must leave the review gate too: before the
+		// ReviewDecided replay fix the client-facing GetTeamRunState stayed
+		// pending_review forever even though the DB row was already running.
+		runState, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model.TeamRunStatusRunning, runState.Status)
+		require.Len(t, runState.Reviews, 1)
+		assert.Equal(t, model.ReviewActionApprove, runState.Reviews[0].Action)
+	})
+
+	t.Run("decided review restores running in projection for discuss and modify", func(t *testing.T) {
+		for _, action := range []string{model.ReviewActionDiscuss, model.ReviewActionModify} {
+			db := setupAgentTeamStateSQLite(t)
+			svc := NewAgentTeamService(db, nil, nil)
+			svc.SetHumanReviewEnabled(true)
+			team, _, executor, run := seedAgentTeamRun(t, db)
+
+			_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+				Action:       "delegate",
+				NextWorker:   executor.ID,
+				Instructions: "Do the thing",
+			})
+			require.NoError(t, err)
+
+			_, err = svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+				Action:  action,
+				Comment: "not yet",
+			})
+			require.NoError(t, err)
+
+			// Write side sets the DB row back to running for every decided
+			// action; the projection must agree.
+			runState, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+			require.NoError(t, err)
+			assert.Equal(t, model.TeamRunStatusRunning, runState.Status, "action=%s", action)
+		}
 	})
 
 	t.Run("enabled discuss cancels pending assignments", func(t *testing.T) {
@@ -2752,4 +2789,161 @@ func TestHumanReviewGate(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, errcode.AgentTaskNotFound, err)
 	})
+}
+
+// ── State machine guards (terminal states & assignment reachability) ──
+
+// TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath drives
+// an assignment through the real production path (pending -> dispatched via
+// DispatchAssignment) and verifies CompleteAssignment succeeds without any raw
+// SQL status injection. Production never writes running (it only exists in the
+// read projection), so done must be reachable from dispatched.
+func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-complete-dispatched-1"}
+	svc := NewAgentTeamService(db, agentSvc, nil)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor.ID, executor.ID, model.AssignmentTypeDelegate, "Ship the feature", "")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.DispatchAssignment(context.Background(), "user-1", assignment.ID))
+
+	var dispatched model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", assignment.ID).First(&dispatched).Error)
+	require.Equal(t, model.AssignmentStatusDispatched, dispatched.Status)
+
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "shipped"))
+
+	var done model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", assignment.ID).First(&done).Error)
+	assert.Equal(t, model.AssignmentStatusDone, done.Status)
+	assert.Equal(t, "shipped", done.Result)
+}
+
+// TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun verifies that no
+// route decision (delegate or a repeated finish) can mutate a run that already
+// reached a terminal status, and that each rejection is audited.
+func TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	require.NoError(t, repository.UpdateTeamRunStatus(db, run.ID, model.TeamRunStatusCompleted))
+
+	// Delegate on a completed run must be rejected.
+	_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "Do more work",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+
+	// A repeated finish with blocked_reason must not downgrade completed to failed.
+	_, err = svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:        "finish",
+		BlockedReason: "should not overwrite",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+
+	gotRun, err := repository.GetTeamRunByID(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TeamRunStatusCompleted, gotRun.Status)
+
+	assignments, err := repository.ListAssignmentsByTeamRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Empty(t, assignments)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	rejected := 0
+	for _, e := range events {
+		if e.Type == model.TeamEventRouteRejected {
+			rejected++
+		}
+	}
+	assert.Equal(t, 2, rejected, "expected each terminal-run route decision to append team.route.rejected")
+}
+
+// TestAgentTeamService_FinishRouteDecisionDoesNotDowngradeTerminalRun calls
+// finishRouteDecision directly (bypassing the HandleRouteDecision entry guard,
+// as a racing finish would) and verifies the conditional status write keeps
+// the first terminal outcome and does not emit a conflicting run.failed event.
+func TestAgentTeamService_FinishRouteDecisionDoesNotDowngradeTerminalRun(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, _, _, run := seedAgentTeamRun(t, db)
+
+	require.NoError(t, svc.finishRouteDecision(run.ID, model.CoordinatorRouteDecision{
+		Action:  "finish",
+		Summary: "all done",
+	}))
+	gotRun, err := repository.GetTeamRunByID(db, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.TeamRunStatusCompleted, gotRun.Status)
+
+	require.NoError(t, svc.finishRouteDecision(run.ID, model.CoordinatorRouteDecision{
+		Action:        "finish",
+		BlockedReason: "late failure",
+	}))
+	gotRun, err = repository.GetTeamRunByID(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TeamRunStatusCompleted, gotRun.Status)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	completedEvents, failedEvents := 0, 0
+	for _, e := range events {
+		switch e.Type {
+		case model.TeamEventRunCompleted:
+			completedEvents++
+		case model.TeamEventRunFailed:
+			failedEvents++
+		}
+	}
+	assert.Equal(t, 1, completedEvents)
+	assert.Zero(t, failedEvents, "repeated finish must not append team.run.failed")
+}
+
+// TestAgentTeamService_FailAssignmentRejectsTerminalAssignment verifies that a
+// done/failed/cancelled assignment cannot be failed again, so repeated fails
+// can no longer rewrite the stored result or re-trigger fault escalation.
+func TestAgentTeamService_FailAssignmentRejectsTerminalAssignment(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	for _, status := range []string{
+		model.AssignmentStatusDone,
+		model.AssignmentStatusFailed,
+		model.AssignmentStatusCancelled,
+	} {
+		assignment := &model.AgentTeamAssignment{
+			TeamRunID:    run.ID,
+			FromMemberID: supervisor.ID,
+			ToMemberID:   executor.ID,
+			Type:         model.AssignmentTypeDelegate,
+			TaskPrompt:   "Ship it",
+			Status:       status,
+			Result:       "original outcome",
+		}
+		require.NoError(t, repository.CreateAssignment(db, assignment))
+
+		err := svc.FailAssignment(context.Background(), "user-1", assignment.ID, "[fault_escalation] retries=3 maxRetries=3 error=late")
+		require.Error(t, err, "status=%s", status)
+		assert.Equal(t, errcode.ErrBadRequest, err, "status=%s", status)
+
+		var reloaded model.AgentTeamAssignment
+		require.NoError(t, db.Where("id = ?", assignment.ID).First(&reloaded).Error)
+		assert.Equal(t, status, reloaded.Status, "terminal status must be preserved")
+		assert.Equal(t, "original outcome", reloaded.Result)
+	}
+
+	// The rejected fails must not have appended any team events (no repeated
+	// escalation side effects).
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Empty(t, events)
 }

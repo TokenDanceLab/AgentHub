@@ -120,6 +120,17 @@ func finishRouteOutcome(decision model.CoordinatorRouteDecision) (status, eventT
 	return status, eventType, payload
 }
 
+// isTerminalTeamRunStatus reports whether a team run status is terminal and
+// must never be overwritten by later route decisions or finish outcomes.
+func isTerminalTeamRunStatus(status string) bool {
+	switch status {
+	case model.TeamRunStatusCompleted, model.TeamRunStatusFailed, model.TeamRunStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 func assignmentDispatchPrompt(a *model.AgentTeamAssignment) string {
 	if a == nil {
 		return ""
