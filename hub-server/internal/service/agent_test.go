@@ -1534,6 +1534,48 @@ func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestTriggerAgentTask_MemberActiveLookupErrorSurfaces pins the honest error
+// path for the membership gate: a session_members lookup failure must surface
+// as an error to the caller instead of being misread as "not a member"
+// (previously `active, _ :=` collapsed DB faults into SessionNotMember).
+func TestTriggerAgentTask_MemberActiveLookupErrorSurfaces(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	triggerMsgID := "trigger-msg-member-err"
+	memberCheckErr := fmt.Errorf("session_members lookup failed")
+
+	// GetMessageByID
+	mock.ExpectQuery(`FROM "messages" WHERE id =`).
+		WithArgs(triggerMsgID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "sender_type", "sender_id", "content_type", "content", "seq_id", "client_msg_id"}).
+			AddRow(triggerMsgID, "session-live", "user", "user-1", "text", `{"text":"hello"}`, int64(1), "client-1"))
+
+	// GetSessionByID returns a live group session
+	mock.ExpectQuery(`FROM "sessions" WHERE id =`).
+		WithArgs("session-live", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("session-live", "group", false, "owner-1"))
+
+	// ListAgentInstancesByInviter returns one agent so selection succeeds
+	mock.ExpectQuery(`FROM "agent_instances" WHERE session_id =`).
+		WithArgs("session-live", "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
+			AddRow("agent-1", "claude-code", "session-live", "user-1", "Agent One"))
+
+	// IsMemberActive fails at the DB layer
+	mock.ExpectQuery(`FROM "session_members" WHERE session_id =`).
+		WithArgs("session-live", "user", "user-1").
+		WillReturnError(memberCheckErr)
+
+	svc := &AgentService{db: db}
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "", "")
+	require.ErrorIs(t, err, memberCheckErr)
+	require.NotErrorIs(t, err, errcode.SessionNotMember)
+	// No further queries: the task must not be created after a failed member check.
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestTriggerAgentTaskRejectsTargetOwnedByAnotherUser(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}

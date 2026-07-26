@@ -303,8 +303,12 @@ func TestTriggerGuards(t *testing.T) {
 	require.ErrorIs(t, TriggerAgentsAvailableError(nil, 0), errcode.AgentNotFound)
 	require.NoError(t, TriggerAgentsAvailableError(nil, 2))
 
-	require.ErrorIs(t, TriggerMemberActiveError(false), errcode.SessionNotMember)
-	require.NoError(t, TriggerMemberActiveError(true))
+	require.ErrorIs(t, TriggerMemberActiveError(nil, false), errcode.SessionNotMember)
+	require.NoError(t, TriggerMemberActiveError(nil, true))
+	memberCheckErr := errors.New("db down")
+	require.ErrorIs(t, TriggerMemberActiveError(memberCheckErr, false), memberCheckErr)
+	require.ErrorIs(t, TriggerMemberActiveError(memberCheckErr, true), memberCheckErr)
+	require.NotErrorIs(t, TriggerMemberActiveError(memberCheckErr, false), errcode.SessionNotMember)
 }
 
 func TestTargetBoundAndOutboxHelpers(t *testing.T) {
@@ -478,6 +482,8 @@ func TestDispatchLogConstantsAndPorts(t *testing.T) {
 	assert.Equal(t, DispatchLogTargetBoundQueued, "queued target-bound agent task")
 	assert.Equal(t, DispatchLogTargetBoundMarkFailed, "failed to mark target-bound agent task dispatched")
 	assert.Equal(t, DispatchLogTargetBoundWSNotQueued, "target-bound agent task websocket dispatch not queued; preserving pending task")
+	assert.Equal(t, DispatchLogPayloadMarshalFailed, "agent dispatch payload marshal failed; task not dispatched")
+	assert.Equal(t, DispatchLogMarkDeliverySentFailed, "failed to mark delivery sent; outbox row stays pending")
 	assert.Equal(t, CapabilityMintFailedLog, "AH-SR-046 failed to issue capability token")
 
 	assert.True(t, RelayPortAvailable(true))

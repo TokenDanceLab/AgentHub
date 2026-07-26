@@ -16,6 +16,9 @@ const (
 	DispatchLogRelayOfflinePushFailed  = "failed to push hub_relay task to offline queue"
 	DispatchLogMarkHubRelayDispatched  = "failed to mark hub_relay task dispatched"
 
+	DispatchLogPayloadMarshalFailed   = "agent dispatch payload marshal failed; task not dispatched"
+	DispatchLogMarkDeliverySentFailed = "failed to mark delivery sent; outbox row stays pending"
+
 	DispatchLogTargetBoundOfflinePushFailed = "failed to push target-bound agent task to offline queue"
 	DispatchLogTargetBoundQueued            = "queued target-bound agent task"
 	DispatchLogTargetBoundMarkFailed        = "failed to mark target-bound agent task dispatched"

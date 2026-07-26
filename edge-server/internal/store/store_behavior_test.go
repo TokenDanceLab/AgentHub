@@ -831,11 +831,14 @@ func TestStoreCreateUserProfileIdempotent(t *testing.T) {
 
 func TestStoreUpsertSettingsSkipsEmptyKey(t *testing.T) {
 	s := New()
-	result := s.UpsertSettings(map[string]string{
+	result, err := s.UpsertSettings(map[string]string{
 		"":      "empty-key-value",
 		"valid": "value",
 		"  ":    "whitespace-key",
 	})
+	if err != nil {
+		t.Fatalf("UpsertSettings returned error: %v", err)
+	}
 	if len(result.Values) != 1 || result.Values["valid"] != "value" {
 		t.Fatalf("UpsertSettings values = %#v, want only valid key", result.Values)
 	}
