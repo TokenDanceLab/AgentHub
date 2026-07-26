@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ProjectDraft } from '@shared/workbench';
 import {
@@ -102,7 +102,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
 
-  const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
+  const conversations = useMemo(
+    () => resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode),
+    [sessions.data, hubReady, dataMode],
+  );
   // Prefer explicit selection. Fall back to first conversation only when none selected.
   // Keep a parent-provided id even if it is temporarily absent from the list (#1010).
   const activeConversationId = selectedConversationId
@@ -333,16 +336,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     },
   });
 
-  // Auto mark-as-read when user opens a session
-  useEffect(() => {
-    if (!hubReady || !activeHubSessionId) return;
-    const currentMessages = messages.data;
-    if (!currentMessages || currentMessages.length === 0) return;
-    const lastSeq = currentMessages[currentMessages.length - 1]?.seq_id;
-    if (lastSeq == null) return;
-    markReadMut.mutate({ sessionId: activeHubSessionId, lastReadSeq: lastSeq });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubReady, activeHubSessionId]);
+  // Auto mark-as-read when user opens a session (#1352). The messages query
+  // keeps the previous session's rows visible through placeholderData during a
+  // session switch, so the derived seq is null until the loaded data actually
+  // belongs to activeHubSessionId — no cross-session markRead with a stale
+  // seq — and re-fires once the session's own messages arrive or grow.
+  useWebSessionAutoMarkRead(
+    hubReady,
+    activeHubSessionId,
+    resolveWebSessionLastReadSeq(messages.isPlaceholderData, messages.data),
+    markReadMut.mutate,
+  );
 
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
@@ -360,43 +364,69 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         };
       })
     : undefined;
-  const executionTargetStatus = resolveWebExecutionTargetStatus({
-    hubReady,
-    dataMode,
-    isFetching: executionTargets.isFetching,
-    error: executionTargets.error,
-    targets: executionTargets.data?.items,
-  });
+  const executionTargetStatus = useMemo(
+    () => resolveWebExecutionTargetStatus({
+      hubReady,
+      dataMode,
+      isFetching: executionTargets.isFetching,
+      error: executionTargets.error,
+      targets: executionTargets.data?.items,
+    }),
+    [hubReady, dataMode, executionTargets.isFetching, executionTargets.error, executionTargets.data],
+  );
 
-  const resolvedConversations = hubReady && activeHubSessionId
-    ? conversations.map((conversation) =>
-      conversation.id === activeHubSessionId
-        ? webConversationWithPinnedMessages(conversation, pinnedMessages.data)
-        : conversation,
-    )
-    : conversations;
+  // Transcript normalization pipeline (#1352): every step below is pure and
+  // recomputed over the full message/event lists, so memoize each step on its
+  // actual inputs to avoid full recomputation on unrelated high-frequency
+  // re-renders (e.g. per-token agent activity updates while streaming).
+  const resolvedConversations = useMemo(
+    () => (hubReady && activeHubSessionId
+      ? conversations.map((conversation) =>
+        conversation.id === activeHubSessionId
+          ? webConversationWithPinnedMessages(conversation, pinnedMessages.data)
+          : conversation,
+      )
+      : conversations),
+    [hubReady, activeHubSessionId, conversations, pinnedMessages.data],
+  );
 
-  const mergedRuntimeEvents = mergeHubTaskContractEvents(
-    mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents),
-    activeAgentTaskApprovals.data,
-    activeAgentTaskArtifacts.data,
+  const mergedRuntimeEvents = useMemo(
+    () => mergeHubTaskContractEvents(
+      mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents),
+      activeAgentTaskApprovals.data,
+      activeAgentTaskArtifacts.data,
+    ),
+    [replayedRuntimeEvents.data, liveRuntimeEvents, activeAgentTaskApprovals.data, activeAgentTaskArtifacts.data],
   );
-  const transcript = resolveWebWorkbenchTranscript(
-    hubReady,
-    activeHubSessionId,
-    messages.data,
-    mergedRuntimeEvents,
-    dataMode,
-    selectedConversationId,
+  const transcript = useMemo(
+    () => resolveWebWorkbenchTranscript(
+      hubReady,
+      activeHubSessionId,
+      messages.data,
+      mergedRuntimeEvents,
+      dataMode,
+      selectedConversationId,
+    ),
+    [hubReady, activeHubSessionId, messages.data, mergedRuntimeEvents, dataMode, selectedConversationId],
   );
-  const taskContractStatusBlocks = resolveWebTaskContractStatusBlocks(
-    activeAgentTaskId,
-    activeAgentTaskApprovals.error,
-    activeAgentTaskArtifacts.error,
+  const taskContractStatusBlocks = useMemo(
+    () => resolveWebTaskContractStatusBlocks(
+      activeAgentTaskId,
+      activeAgentTaskApprovals.error,
+      activeAgentTaskArtifacts.error,
+    ),
+    [activeAgentTaskId, activeAgentTaskApprovals.error, activeAgentTaskArtifacts.error],
   );
-  const surfacedTranscript = executionTargetStatus.block
-    ? [executionTargetStatus.block, ...taskContractStatusBlocks, ...transcript]
-    : [...taskContractStatusBlocks, ...transcript];
+  const surfacedTranscript = useMemo(
+    () => (executionTargetStatus.block
+      ? [executionTargetStatus.block, ...taskContractStatusBlocks, ...transcript]
+      : [...taskContractStatusBlocks, ...transcript]),
+    [executionTargetStatus.block, taskContractStatusBlocks, transcript],
+  );
+  const runtimeEvidence = useMemo(
+    () => resolveWebRuntimeEvidence(surfacedTranscript),
+    [surfacedTranscript],
+  );
 
   return {
     activeConversationId,
@@ -466,7 +496,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     onApprovalDecision: hubReady
       ? (action: ApprovalDecisionAction) => decideApproval.mutateAsync(action)
       : undefined,
-    runtimeEvidence: resolveWebRuntimeEvidence(surfacedTranscript),
+    runtimeEvidence,
     workbenchStatus: {
       dataMode: dataModeContract.statusLabel,
       targetState: executionTargetStatus.state,
@@ -497,6 +527,43 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     transcript: surfacedTranscript,
     agentActivity,
   };
+}
+
+/**
+ * Derive the seq to auto mark-as-read for the active session (#1352).
+ * Returns null while the messages query is showing placeholderData — during a
+ * session switch that data still belongs to the previous session, so a stale
+ * seq must never be written to the new session.
+ */
+export function resolveWebSessionLastReadSeq(
+  isPlaceholderData: boolean,
+  messages: ReadonlyArray<{ seq_id?: number | null }> | undefined,
+): number | null {
+  if (isPlaceholderData || !messages || messages.length === 0) return null;
+  return messages[messages.length - 1]?.seq_id ?? null;
+}
+
+/**
+ * Fire markRead once a session's own messages are visible, and again whenever
+ * a newer seq arrives (#1352). markRead is kept in a ref because the
+ * react-query mutation result object is recreated on every render — putting it
+ * in the effect deps would loop, and freezing the first closure could go stale.
+ */
+export function useWebSessionAutoMarkRead(
+  hubReady: boolean,
+  sessionId: string | null,
+  lastReadSeq: number | null,
+  markRead: (input: { sessionId: string; lastReadSeq: number }) => void,
+): void {
+  const markReadRef = useRef(markRead);
+  useEffect(() => {
+    markReadRef.current = markRead;
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!hubReady || !sessionId || lastReadSeq == null) return;
+    markReadRef.current({ sessionId, lastReadSeq });
+  }, [hubReady, sessionId, lastReadSeq]);
 }
 
 // Stable public re-exports (tests + external consumers)
