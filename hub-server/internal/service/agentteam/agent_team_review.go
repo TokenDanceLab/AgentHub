@@ -146,6 +146,12 @@ func replayReviewEvents(events []model.AgentTeamEvent, state *model.TeamRunState
 			var review model.HumanReviewState
 			if err := json.Unmarshal([]byte(event.Payload), &review); err == nil && review.Action != "" {
 				state.Reviews = append(state.Reviews, review)
+				// Mirror the write side (ReviewDagPlan): every decided action
+				// (approve/discuss/modify) sets the run back to running in the
+				// DB, so the projection must leave the review gate as well.
+				if state.Status == model.TeamRunStatusPendingReview {
+					state.Status = model.TeamRunStatusRunning
+				}
 			}
 		case model.TeamEventReviewPending:
 			// Mark the run as awaiting review so the caller can detect it.
