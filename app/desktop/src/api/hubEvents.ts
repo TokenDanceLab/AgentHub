@@ -1,7 +1,10 @@
 // Hub WebSocket protocol constants and payload types.
-// Canonical event type constants are in @shared/hubEvents.
+// Canonical event type constants are in @shared/hubEvents (which mirrors
+// hub-server/internal/ws/frame.go 1:1 — the SSOT).
 // This module adds desktop-specific payload interfaces and the legacy
 // per-constant re-exports for backward compatibility.
+
+import { HUB_EVENTS as E } from '@shared/hubEvents';
 
 // ── Re-export canonical constants ────────────────
 export { HUB_EVENTS } from '@shared/hubEvents';
@@ -12,49 +15,9 @@ export {
   HUB_EVENTS as default,
 } from '@shared/hubEvents';
 
-// Re-export every constant individually so existing imports don't break.
-const E = {
-  AUTH: 'auth',
-  AUTH_OK: 'auth.ok',
-  AUTH_FAIL: 'auth.fail',
-  MESSAGE_NEW: 'message.new',
-  MESSAGE_EDITED: 'message.edited',
-  MESSAGE_RECALL: 'message.recall',
-  MESSAGE_PIN: 'message.pin',
-  MESSAGE_UNPIN: 'message.unpin',
-  MESSAGE_REACTION_ADDED: 'message.reaction_added',
-  MESSAGE_REACTION_REMOVED: 'message.reaction_removed',
-  MESSAGE_READ: 'message.read',
-  SESSION_CREATED: 'session.created',
-  SESSION_DISSOLVED: 'session.dissolved',
-  SESSION_MEMBER_JOINED: 'session.member_joined',
-  SESSION_MEMBER_LEFT: 'session.member_left',
-  SESSION_INFO_UPDATED: 'session.info_updated',
-  DEVICE_ONLINE: 'device.online',
-  DEVICE_OFFLINE: 'device.offline',
-  DEVICE_KICKED: 'device.kicked',
-  AGENT_DISPATCH: 'agent.dispatch',
-  AGENT_STREAM: 'agent.stream',
-  AGENT_DONE: 'agent.done',
-  AGENT_FAILED: 'agent.failed',
-  AGENT_CANCEL: 'agent.cancel',
-  AGENT_CONTROL: 'agent.control',
-  AGENT_REGENERATE: 'agent.regenerate',
-  NOTIFICATION_NEW: 'notification.new',
-  FRIEND_REQUEST: 'friend.request',
-  FRIEND_ACCEPTED: 'friend.accepted',
-  TEAM_RUN_STARTED: 'team.run.started',
-  TEAM_EVENT: 'team.event',
-  TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
-  TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
-} as const;
-
-export const TYPE_AUTH = E.AUTH;
 export const TYPE_AUTH_OK = E.AUTH_OK;
-export const TYPE_AUTH_FAIL = E.AUTH_FAIL;
-export const TYPE_TYPING = 'typing';
+export const TYPE_TYPING = E.TYPING;
 export const TYPE_MESSAGE_NEW = E.MESSAGE_NEW;
-export const TYPE_MESSAGE_EDITED = E.MESSAGE_EDITED;
 export const TYPE_MESSAGE_RECALL = E.MESSAGE_RECALL;
 export const TYPE_MESSAGE_PIN = E.MESSAGE_PIN;
 export const TYPE_MESSAGE_UNPIN = E.MESSAGE_UNPIN;
@@ -75,7 +38,6 @@ export const TYPE_AGENT_DONE = E.AGENT_DONE;
 export const TYPE_AGENT_FAILED = E.AGENT_FAILED;
 export const TYPE_AGENT_CANCEL = E.AGENT_CANCEL;
 export const TYPE_AGENT_CONTROL = E.AGENT_CONTROL;
-export const TYPE_AGENT_REGENERATE = E.AGENT_REGENERATE;
 export const TYPE_NOTIFICATION_NEW = E.NOTIFICATION_NEW;
 export const TYPE_FRIEND_REQUEST = E.FRIEND_REQUEST;
 export const TYPE_FRIEND_ACCEPTED = E.FRIEND_ACCEPTED;
@@ -87,9 +49,7 @@ export const TYPE_TEAM_ASSIGNMENT_FAILED = E.TEAM_ASSIGNMENT_FAILED;
 /** All server-to-client event frame types (including auth responses). */
 export const SERVER_EVENT_TYPES = new Set([
   TYPE_AUTH_OK,
-  TYPE_AUTH_FAIL,
   TYPE_MESSAGE_NEW,
-  TYPE_MESSAGE_EDITED,
   TYPE_MESSAGE_RECALL,
   TYPE_MESSAGE_PIN,
   TYPE_MESSAGE_UNPIN,
@@ -110,7 +70,6 @@ export const SERVER_EVENT_TYPES = new Set([
   TYPE_AGENT_FAILED,
   TYPE_AGENT_CANCEL,
   TYPE_AGENT_CONTROL,
-  TYPE_AGENT_REGENERATE,
   TYPE_NOTIFICATION_NEW,
   TYPE_FRIEND_REQUEST,
   TYPE_FRIEND_ACCEPTED,
@@ -164,8 +123,6 @@ export interface HubSessionMember {
 
 export interface HubDevicePresence {
   user_id: string;
-  device_type: string;
-  device_id: string;
 }
 
 export interface HubAgentTask {

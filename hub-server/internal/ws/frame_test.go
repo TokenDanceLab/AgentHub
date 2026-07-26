@@ -85,8 +85,7 @@ func TestMarshalOmitempty(t *testing.T) {
 
 func TestAllFrameTypes(t *testing.T) {
 	types := []string{
-		TypeAuth, TypeTyping,
-		TypeAuthOK, TypeAuthFail,
+		TypeTyping, TypeAuthOK,
 		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
 		TypeMessageReactionAdded, TypeMessageReactionRemoved,
 		TypeMessageRead, TypeSessionCreated, TypeSessionDissolved,
@@ -136,7 +135,7 @@ func TestAgentTeamFrameTypes(t *testing.T) {
 }
 
 func TestMarshalWithNilPayload(t *testing.T) {
-	f := Frame{Type: TypeAuth, SeqID: 1}
+	f := Frame{Type: TypeAuthOK, SeqID: 1}
 	data, err := f.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal failed: %v", err)
@@ -145,7 +144,7 @@ func TestMarshalWithNilPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseFrame failed: %v", err)
 	}
-	if parsed.Type != TypeAuth {
+	if parsed.Type != TypeAuthOK {
 		t.Fatalf("Type = %q", parsed.Type)
 	}
 	if parsed.SeqID != 1 {

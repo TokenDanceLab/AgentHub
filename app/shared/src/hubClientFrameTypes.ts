@@ -16,8 +16,6 @@ import type {
 
 export interface HubDevicePresencePayload {
   user_id: string;
-  device_type: string;
-  device_id: string;
 }
 
 export interface HubDeviceKickedPayload {
@@ -65,13 +63,6 @@ export interface HubAgentCancelPayload {
   task_id: string;
 }
 
-export interface HubAgentRegeneratePayload {
-  original_task_id: string;
-  new_task_id: string;
-  trigger_message_id: string;
-  agent_instance_id: string;
-}
-
 export interface HubFriendEventPayload {
   request_id?: string;
   user_id?: string;
@@ -90,15 +81,7 @@ export interface HubFrame<TPayload = unknown, TType extends string = string> {
   payload?: TPayload;
 }
 
-export type HubAuthFrame = HubFrame<
-  { access_token: string },
-  typeof HUB_EVENTS.AUTH
->;
 export type HubAuthOkFrame = HubFrame<unknown, typeof HUB_EVENTS.AUTH_OK>;
-export type HubAuthFailFrame = HubFrame<
-  { code?: string; message?: string },
-  typeof HUB_EVENTS.AUTH_FAIL
->;
 export type HubMessageNewFrame = HubFrame<
   HubMessage,
   typeof HUB_EVENTS.MESSAGE_NEW
@@ -143,10 +126,6 @@ export type HubAgentCancelFrame = HubFrame<
   HubAgentCancelPayload,
   typeof HUB_EVENTS.AGENT_CANCEL
 >;
-export type HubAgentRegenerateFrame = HubFrame<
-  HubAgentRegeneratePayload,
-  typeof HUB_EVENTS.AGENT_REGENERATE
->;
 export type HubDeviceOnlineFrame = HubFrame<
   HubDevicePresencePayload,
   typeof HUB_EVENTS.DEVICE_ONLINE
@@ -173,21 +152,6 @@ export type HubFriendAcceptedFrame = HubFrame<
 >;
 
 // ── WS frame types matching hub-server/internal/ws/frame.go ──
-
-export interface HubMessageEditedPayload {
-  id: string;
-  session_id: string;
-  seq_id: number;
-  content_type: string;
-  content: string;
-  edited: boolean;
-  edited_at?: string;
-}
-
-export type HubMessageEditedFrame = HubFrame<
-  HubMessageEditedPayload,
-  typeof HUB_EVENTS.MESSAGE_EDITED
->;
 
 export interface HubMessagePinPayload {
   session_id: string;
@@ -247,11 +211,8 @@ export type HubSessionMemberLeftFrame = HubFrame<
 >;
 
 export type HubKnownFrame =
-  | HubAuthFrame
   | HubAuthOkFrame
-  | HubAuthFailFrame
   | HubMessageNewFrame
-  | HubMessageEditedFrame
   | HubMessageRecallFrame
   | HubMessagePinFrame
   | HubMessageUnpinFrame
@@ -268,7 +229,6 @@ export type HubKnownFrame =
   | HubAgentDoneFrame
   | HubAgentFailedFrame
   | HubAgentCancelFrame
-  | HubAgentRegenerateFrame
   | HubDeviceOnlineFrame
   | HubDeviceOfflineFrame
   | HubDeviceKickedFrame

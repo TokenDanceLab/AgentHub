@@ -164,21 +164,6 @@ describe('createHubWS', () => {
     expect(ok).toBe(true);
   });
 
-  it('calls onAuthFail on auth.fail', () => {
-    let reason = '';
-    t = mockTransport();
-    h = createHubWS({
-      transport: t as unknown as Transport,
-      getToken: token(),
-      onAuthFail: (r) => {
-        reason = r;
-      },
-    });
-    h.connect();
-    t._deliverMessage({ type: HUB_EVENTS.AUTH_FAIL, payload: { reason: 'expired' } });
-    expect(reason).toBe('expired');
-  });
-
   it('routes typed events to on() handlers', () => {
     init();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
@@ -188,6 +173,16 @@ describe('createHubWS', () => {
     });
     t._deliverMessage({ type: HUB_EVENTS.MESSAGE_NEW, payload: { content: 'hi' } });
     expect(payload).toEqual({ content: 'hi' });
+  });
+
+  it('sends typing through the only implemented client frame', () => {
+    init();
+
+    h.sendTyping('session-1');
+
+    expect(t._sent).toEqual([
+      { type: HUB_EVENTS.TYPING, payload: { session_id: 'session-1' } },
+    ]);
   });
 
   it('drops app events before auth.ok', () => {
