@@ -143,6 +143,12 @@ foreach ($job in @(
     Assert-Contains $job.Body ([regex]::Escape($job.Lockfile)) "$($job.Name) must cache the correct pnpm lockfile"
 }
 
+# Shared declares 60% coverage thresholds; keep a CI job actually running them
+# so the thresholds cannot silently go dead again.
+Assert-Contains $desktop "Shared coverage \(60% thresholds\)" "frontend-desktop must run the shared coverage gate"
+Assert-Contains $desktop ([regex]::Escape("pnpm --filter @agenthub/shared exec vitest run --coverage")) "frontend-desktop shared coverage must run vitest with --coverage"
+Assert-StepContinueOnError $desktop "Shared coverage (60% thresholds)" $false
+
 Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
 Assert-Contains $validate "scripts/verify/verify-ci-gates\.ps1" "validate job must call scripts/verify/verify-ci-gates.ps1"
 Assert-Contains $validate "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"

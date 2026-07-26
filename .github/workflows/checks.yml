@@ -364,10 +364,11 @@ jobs:
               - '.github/workflows/checks.yml'
 
   # ── Frontend: Desktop ────────────────────────
-  # Known debt: 15 pre-existing test failures (97.8% pass rate: 679/694).
-  # Tracked in docs/audit/comprehensive-audit-2026-06-17.md, Test Quality section.
-  # Failures are in desktop integration/edge-real tests and a few component tests.
-  # These are low-priority pre-existing issues, not regressions.
+  # test:ci (4 sequential vitest configs, memory workaround) is fully green on
+  # master — no known pre-existing failures. The old "15 pre-existing failures
+  # (97.8%: 679/694)" note dated from when edge-real integration specs ran here;
+  # those specs are excluded by the CI configs (src/__tests__/integration/**)
+  # and the audit doc that tracked them (docs/audit/) has been removed.
   frontend-desktop:
     needs: changes
     if: >-
@@ -407,6 +408,16 @@ jobs:
 
       - name: Test Desktop
         run: pnpm test:ci
+
+      # app/shared/vitest.config.ts declares 60% coverage thresholds, but until
+      # now no CI job ran the frontend with --coverage, so the gate was dead.
+      # Measured on this branch: statements 69.78% / branches 65.73% /
+      # functions 69.49% / lines 71.16% — all clear 60%, so this is blocking.
+      # hookTimeout is raised because v8 instrumentation pushes the shared
+      # setup preload past vitest's 30s default on cold runners.
+      - name: Shared coverage (60% thresholds)
+        working-directory: app
+        run: pnpm --filter @agenthub/shared exec vitest run --coverage --hookTimeout=120000
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
