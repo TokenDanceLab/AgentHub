@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -2018,11 +2019,24 @@ func readAgentTeamEvent(t *testing.T, events <-chan service.Event) service.Event
 
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	return setupAgentTeamStateSQLiteDSN(t, ":memory:", 1)
+}
+
+func setupAgentTeamConcurrentSQLite(t *testing.T) *gorm.DB {
+	t.Helper()
+	path := filepath.ToSlash(filepath.Join(t.TempDir(), "agentteam-concurrency.db"))
+	dsn := fmt.Sprintf("file:%s?cache=shared&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)", path)
+	return setupAgentTeamStateSQLiteDSN(t, dsn, 8)
+}
+
+func setupAgentTeamStateSQLiteDSN(t *testing.T, dsn string, maxOpenConns int) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	sqlDB.SetMaxOpenConns(maxOpenConns)
 	tables := []string{
 		`CREATE TABLE agent_teams (
 			id TEXT PRIMARY KEY,
@@ -2556,7 +2570,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",
@@ -2588,7 +2602,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",
@@ -2665,7 +2679,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",
@@ -2704,7 +2718,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",
@@ -2741,7 +2755,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",
@@ -2774,7 +2788,7 @@ func TestHumanReviewGate(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
 		svc := NewAgentTeamService(db, nil, nil)
 		svc.SetHumanReviewEnabled(true)
-		team, _ , executor, run := seedAgentTeamRun(t, db)
+		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
 			Action:       "delegate",

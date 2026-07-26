@@ -151,32 +151,61 @@ func TestAgentTeamRepo_CountActiveAssignmentsByTeamRun(t *testing.T) {
 	assert.Equal(t, int64(2), count)
 }
 
-func TestAgentTeamRepo_UpdateAssignmentDispatchBinding(t *testing.T) {
+func TestAgentTeamRepo_AssignmentDispatchClaimLifecycleIsConditional(t *testing.T) {
 	db := setupSQLite(t)
-
-	team := &model.AgentTeam{OwnerID: "user-1", Name: "DispatchAssign"}
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Conditional Dispatch"}
 	require.NoError(t, CreateTeam(db, team))
-
-	agentID := "a1"
-	m1 := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &agentID, Role: model.TeamMemberRoleSupervisor}
-	m2 := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &agentID, Role: model.TeamMemberRoleExecutor}
-	require.NoError(t, AddTeamMember(db, m1))
-	require.NoError(t, AddTeamMember(db, m2))
-
+	profileID := "profile-1"
+	supervisor := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &profileID, Role: model.TeamMemberRoleSupervisor}
+	executor := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &profileID, Role: model.TeamMemberRoleExecutor}
+	require.NoError(t, AddTeamMember(db, supervisor))
+	require.NoError(t, AddTeamMember(db, executor))
 	run := &model.AgentTeamRun{TeamID: team.ID, TriggerUserID: "user-1", Status: model.TeamRunStatusRunning}
 	require.NoError(t, CreateTeamRun(db, run))
 
-	a := &model.AgentTeamAssignment{TeamRunID: run.ID, FromMemberID: m1.ID, ToMemberID: m2.ID, Type: model.AssignmentTypeDelegate, TaskPrompt: "X"}
-	require.NoError(t, CreateAssignment(db, a))
+	newAssignment := func(prompt string) *model.AgentTeamAssignment {
+		a := &model.AgentTeamAssignment{
+			TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+			Type: model.AssignmentTypeDelegate, TaskPrompt: prompt, Status: model.AssignmentStatusPending,
+		}
+		require.NoError(t, CreateAssignment(db, a))
+		return a
+	}
 
-	err := UpdateAssignmentDispatchBinding(db, a.ID, "task-42")
+	boundAssignment := newAssignment("bind once")
+	claimed, err := ClaimAssignmentForDispatch(db, boundAssignment.ID)
 	require.NoError(t, err)
+	assert.Equal(t, int64(1), claimed)
+	claimed, err = ClaimAssignmentForDispatch(db, boundAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), claimed)
 
-	got, err := GetAssignmentByID(db, a.ID)
+	bound, err := BindClaimedAssignmentDispatch(db, boundAssignment.ID, "external-task-1")
 	require.NoError(t, err)
-	assert.Equal(t, model.AssignmentStatusDispatched, got.Status)
-	require.NotNil(t, got.RunID)
-	assert.Equal(t, "task-42", *got.RunID)
+	assert.Equal(t, int64(1), bound)
+	bound, err = BindClaimedAssignmentDispatch(db, boundAssignment.ID, "external-task-2")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), bound)
+	released, err := ReleaseAssignmentDispatchClaim(db, boundAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), released, "a bound claim must never become dispatchable again")
+	stored, err := GetAssignmentByID(db, boundAssignment.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.RunID)
+	assert.Equal(t, "external-task-1", *stored.RunID)
+	assert.Equal(t, model.AssignmentStatusDispatched, stored.Status)
+
+	retryableAssignment := newAssignment("release before trigger")
+	claimed, err = ClaimAssignmentForDispatch(db, retryableAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), claimed)
+	released, err = ReleaseAssignmentDispatchClaim(db, retryableAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), released)
+	stored, err = GetAssignmentByID(db, retryableAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.AssignmentStatusPending, stored.Status)
+	assert.Nil(t, stored.RunID)
 }
 
 func TestAgentTeamRepo_GetAssignmentByToMember(t *testing.T) {
