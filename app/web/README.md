@@ -1,6 +1,6 @@
 # AgentHub Web
 
-最后更新：2026-06-27
+最后更新：2026-07-26
 
 `app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
 
@@ -61,7 +61,7 @@ pwsh ./scripts/verify/verify-web-hub-boundary.ps1
 Visual QA:
 
 ```powershell
-corepack.cmd pnpm --filter agenthub-web visual:qa
+corepack.cmd pnpm --filter agenthub-web visual:qa:shell
 ```
 
 Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Use [../../.agents/skills/real-e2e-acceptance/SKILL.md](../../.agents/skills/real-e2e-acceptance/SKILL.md) for evidence labels.

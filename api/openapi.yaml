@@ -41,7 +41,7 @@ servers:
     description: Local Edge Server
   - url: http://localhost:8080
     description: Local Hub Server
-  - url: http://api.hub.example.invalid
+  - url: https://hub.example.invalid
     description: Production Hub Server
 tags:
   - name: Foundation
