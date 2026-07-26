@@ -33,8 +33,6 @@ export interface HubWSOptions {
   transport?: Transport;
   /** Called after the auth handshake succeeds. */
   onAuthSuccess?: () => void;
-  /** Called when the server rejects WebSocket authentication after upgrade. */
-  onAuthFail?: (reason: string) => void;
   /**
    * When true, also append access_token to the WS URL (legacy fallback).
    * Default false — desktop path prefers Sec-WebSocket-Protocol only.
@@ -159,16 +157,6 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       opts.onAuthSuccess?.();
       return;
     }
-    if (frameType === HUB_EVENTS.AUTH_FAIL) {
-      authenticated = false;
-      const reason =
-        typeof payload === 'object' && payload !== null
-          ? String((payload as Record<string, unknown>).reason ?? 'Unknown')
-          : 'Unknown';
-      opts.onAuthFail?.(reason);
-      return;
-    }
-
     // Drop application events before auth
     if (!authenticated) return;
 
@@ -206,7 +194,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     },
 
     sendTyping(sessionId: string): void {
-      transport.send({ type: 'typing', payload: { session_id: sessionId } });
+      transport.send({ type: HUB_EVENTS.TYPING, payload: { session_id: sessionId } });
     },
 
     on(type: HubEventType, handler: (payload: unknown) => void): () => void {

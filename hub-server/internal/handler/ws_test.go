@@ -26,41 +26,23 @@ import (
 
 const testWSSecret = "test-ws-secret-32-characters-long"
 
-func TestWebSocketAuthAcceptsHubLocalSessionToken(t *testing.T) {
-	token, err := jwtutil.GenerateAccessToken("user-ws-1", "desktop", testDeviceID, testWSSecret, time.Hour)
-	if err != nil {
-		t.Fatalf("generate access token: %v", err)
-	}
-
+func TestWebSocketHandlerRejectsMissingAuthenticatedContextBeforeUpgrade(t *testing.T) {
 	manager := hubws.NewManager()
 	wsURL := newWebSocketTestServer(t, manager)
-	conn := dialWebSocket(t, wsURL)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	writeAuthFrame(t, conn, token)
-	frame := readFrame(t, conn)
-	if frame.Type != hubws.TypeAuthOK {
-		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, resp, err := websocket.Dial(ctx, wsURL, nil)
+	if conn != nil {
+		conn.Close(websocket.StatusNormalClosure, "")
 	}
-	if got := manager.FindByUserDevice("user-ws-1", "desktop"); got == nil {
-		t.Fatal("expected Hub-local session token to register desktop WebSocket route")
+	if err == nil {
+		t.Fatal("expected handler without authenticated middleware context to reject upgrade")
 	}
-}
-
-func TestWebSocketAuthRejectsTokenDanceBearerToken(t *testing.T) {
-	token := makeTokenDanceWebSocketToken(t)
-	manager := hubws.NewManager()
-	wsURL := newWebSocketTestServer(t, manager)
-	conn := dialWebSocket(t, wsURL)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	writeAuthFrame(t, conn, token)
-	frame := readFrame(t, conn)
-	if frame.Type != hubws.TypeAuthFail {
-		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthFail)
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("response = %#v, want HTTP %d", resp, http.StatusUnauthorized)
 	}
-	if got := manager.FindByUserDevice("tokendance-user-ws", "desktop"); got != nil {
-		t.Fatal("TokenDance bearer must not register as a Hub desktop WebSocket session")
+	if manager.Count() != 0 {
+		t.Fatalf("manager count = %d, want no unauthenticated connection", manager.Count())
 	}
 }
 
@@ -256,15 +238,16 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 		return nil
 	}
 	called := make(chan map[string]string, 1)
-	wsURL := newWebSocketTestServerWithHandler(t, manager, func(h *handler.WebSocketHandler) {
+	wsURL := newConfiguredMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	}, func(h *handler.WebSocketHandler) {
 		h.SetOnTyping(func(userID, sessionID string) {
 			called <- map[string]string{"user_id": userID, "session_id": sessionID}
 		})
 	})
-	conn := dialWebSocket(t, wsURL)
+	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	writeAuthFrame(t, conn, token)
 	if frame := readFrame(t, conn); frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
 	}
@@ -294,15 +277,16 @@ func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
 		return nil
 	}
 	called := make(chan struct{}, 1)
-	wsURL := newWebSocketTestServerWithHandler(t, manager, func(h *handler.WebSocketHandler) {
+	wsURL := newConfiguredMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	}, func(h *handler.WebSocketHandler) {
 		h.SetOnTyping(func(userID, sessionID string) {
 			called <- struct{}{}
 		})
 	})
-	conn := dialWebSocket(t, wsURL)
+	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	writeAuthFrame(t, conn, token)
 	if frame := readFrame(t, conn); frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
 	}
@@ -316,17 +300,10 @@ func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
 }
 
 func newWebSocketTestServer(t *testing.T, manager *hubws.Manager) string {
-	return newWebSocketTestServerWithHandler(t, manager, nil)
-}
-
-func newWebSocketTestServerWithHandler(t *testing.T, manager *hubws.Manager, configure func(*handler.WebSocketHandler)) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewWebSocketHandler(manager, testWSSecret, "")
-	if configure != nil {
-		configure(h)
-	}
+	h := handler.NewWebSocketHandler(manager, "")
 	r.GET("/client/ws", h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
@@ -334,39 +311,34 @@ func newWebSocketTestServerWithHandler(t *testing.T, manager *hubws.Manager, con
 }
 
 func newMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config) string {
+	return newConfiguredMiddlewareWebSocketTestServer(t, manager, cfg, nil)
+}
+
+func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config, configure func(*handler.WebSocketHandler)) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewWebSocketHandler(manager, testWSSecret, "")
+	h := handler.NewWebSocketHandler(manager, "")
+	if configure != nil {
+		configure(h)
+	}
 	r.GET("/client/ws", middleware.WSAuthMiddleware(cfg), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
 }
 
-func dialWebSocket(t *testing.T, url string) *websocket.Conn {
+func dialWebSocketWithBearer(t *testing.T, url, token string) *websocket.Conn {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(ctx, url, nil)
+	conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
+	})
 	if err != nil {
 		t.Fatalf("dial websocket: %v", err)
 	}
 	return conn
-}
-
-func writeAuthFrame(t *testing.T, conn *websocket.Conn, token string) {
-	t.Helper()
-	frame := hubws.NewFrame(hubws.TypeAuth, map[string]string{"access_token": token})
-	data, err := frame.Marshal()
-	if err != nil {
-		t.Fatalf("marshal auth frame: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
-		t.Fatalf("write auth frame: %v", err)
-	}
 }
 
 func writeTypingFrame(t *testing.T, conn *websocket.Conn, sessionID string) {
@@ -396,12 +368,6 @@ func readFrame(t *testing.T, conn *websocket.Conn) *hubws.Frame {
 		t.Fatalf("parse frame: %v", err)
 	}
 	return frame
-}
-
-func makeTokenDanceWebSocketToken(t *testing.T) string {
-	t.Helper()
-	token, _, _, _ := makeTokenDanceWebSocketTokenWithJWKS(t)
-	return token
 }
 
 func makeTokenDanceWebSocketTokenWithJWKS(t *testing.T) (token, issuer, audience, jwks string) {

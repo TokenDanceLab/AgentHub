@@ -23,7 +23,6 @@ const SESSION_EVENTS = new Set<string>([
 
 const MESSAGE_EVENTS = new Set<string>([
   HUB_EVENTS.MESSAGE_NEW,
-  HUB_EVENTS.MESSAGE_EDITED,
   HUB_EVENTS.MESSAGE_RECALL,
   HUB_EVENTS.MESSAGE_PIN,
   HUB_EVENTS.MESSAGE_UNPIN,
@@ -39,7 +38,6 @@ const AGENT_EVENTS = new Set<string>([
   HUB_EVENTS.AGENT_FAILED,
   HUB_EVENTS.AGENT_CANCEL,
   HUB_EVENTS.AGENT_CONTROL,
-  HUB_EVENTS.AGENT_REGENERATE,
 ]);
 
 const DEVICE_EVENTS = new Set<string>([
@@ -62,13 +60,6 @@ const TEAM_EVENTS = new Set<string>([
   HUB_EVENTS.TEAM_EVENT,
   HUB_EVENTS.TEAM_ASSIGNMENT_DONE,
   HUB_EVENTS.TEAM_ASSIGNMENT_FAILED,
-]);
-
-const PLAN_EVENTS = new Set<string>([
-  HUB_EVENTS.PLAN_PROPOSED,
-  HUB_EVENTS.PLAN_APPROVED,
-  HUB_EVENTS.PLAN_REJECTED,
-  HUB_EVENTS.PLAN_EXPIRED,
 ]);
 
 export interface WebHubRealtimeOptions {
@@ -153,7 +144,6 @@ export function useWebHubRealtime({
         }
         store.setReconnecting(false);
         void replayMissedEvents({
-          socket,
           hubClient,
           getActiveTaskId: () => runtimeTaskIdRef.current ?? undefined,
           onReplayEvents: (events, tid) => {
@@ -315,14 +305,6 @@ export function invalidateWebWorkbenchHubQueries(
     }
     void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-teams'] });
     void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
-  }
-
-  // ── Plan events ────────────────────────────────
-  if (PLAN_EVENTS.has(eventType)) {
-    const taskId = readString(payload, 'task_id', 'taskId');
-    if (taskId) {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
-    }
   }
 }
 

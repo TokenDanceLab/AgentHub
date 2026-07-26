@@ -138,7 +138,7 @@ Edge EventStore（本机持久化）
 - Hub frame（`{type, seq_id?, payload?}`）与 Edge `EventEnvelope`（含 version/id/seq/type/scope/traceId/sentAt/payload）是不同的协议对象。进入 shared transcript 前需经 Hub runtime/message normalizer 转换。参见 [events.md](../api/events.md) L51-62。
 - Hub-Edge delivery 缺少 durable end-to-end delivery contract 是当前 High 风险（AH-SR-049）。需要 Edge outbox/journal、event sequence、idempotent ack、replay/cursor、reconciliation。参见 [security-risk-register.md](../docs/governance/security-risk-register.md) L25。
 
-**事件族（同步相关）**：`auth.ok`, `message.new`, `message.edited`, `message.reaction_added`, `session.created`, `device.online`。参见 [events.md](../api/events.md) L72。
+**事件族（同步相关）**：`auth.ok`, `message.new`, `message.recall`, `message.reaction_added`, `session.created`, `device.online`。参见 [events.md](../api/events.md)。
 
 ## 流之间的交叉约束
 

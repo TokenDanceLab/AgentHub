@@ -9,12 +9,8 @@ import type {
   HubAgentDonePayload,
   HubAgentFailedFrame,
   HubAgentFailedPayload,
-  HubAgentRegenerateFrame,
-  HubAgentRegeneratePayload,
   HubAgentStreamFrame,
   HubAgentStreamPayload,
-  HubAuthFailFrame,
-  HubAuthFrame,
   HubAuthOkFrame,
   HubDeviceKickedFrame,
   HubDeviceKickedPayload,
@@ -26,8 +22,6 @@ import type {
   HubFriendEventPayload,
   HubFriendRequestFrame,
   HubKnownFrame,
-  HubMessageEditedFrame,
-  HubMessageEditedPayload,
   HubMessageNewFrame,
   HubMessagePinFrame,
   HubMessagePinPayload,
@@ -56,8 +50,6 @@ describe('hubClientFrameTypes (#788)', () => {
   it('keeps device / agent / friend payload field contracts stable', () => {
     const presence: HubDevicePresencePayload = {
       user_id: 'u1',
-      device_type: 'web',
-      device_id: 'd1',
     };
     const kicked: HubDeviceKickedPayload = {
       device_id: 'd1',
@@ -89,39 +81,23 @@ describe('hubClientFrameTypes (#788)', () => {
       run_id: 'r2',
     };
     const cancel: HubAgentCancelPayload = { task_id: 't3' };
-    const regenerate: HubAgentRegeneratePayload = {
-      original_task_id: 't1',
-      new_task_id: 't4',
-      trigger_message_id: 'm2',
-      agent_instance_id: 'ai1',
-    };
     const friend: HubFriendEventPayload = {
       request_id: 'fr1',
       user_id: 'u2',
       nickname: 'Bob',
     };
 
-    expect(presence.device_type).toBe('web');
+    expect(presence.user_id).toBe('u1');
     expect(kicked.reason).toBe('duplicate_login');
     expect(dispatch.display_name).toBe('Helper');
     expect(stream.content).toBe('chunk');
     expect(done.status).toBe('done');
     expect(failed.error_message).toBe('boom');
     expect(cancel.task_id).toBe('t3');
-    expect(regenerate.new_task_id).toBe('t4');
     expect(friend.nickname).toBe('Bob');
   });
 
-  it('keeps message edit / pin / reaction / member payload contracts stable', () => {
-    const edited: HubMessageEditedPayload = {
-      id: 'm1',
-      session_id: 's1',
-      seq_id: 3,
-      content_type: 'text',
-      content: '{"text":"hi"}',
-      edited: true,
-      edited_at: '2026-01-01T00:00:00Z',
-    };
+  it('keeps message pin / reaction / member payload contracts stable', () => {
     const pin: HubMessagePinPayload = {
       session_id: 's1',
       message_id: 'm1',
@@ -146,7 +122,6 @@ describe('hubClientFrameTypes (#788)', () => {
       member_type: 'user',
     };
 
-    expect(edited.edited).toBe(true);
     expect(pin.pinned_by_user_id).toBe('u1');
     expect(unpin.message_id).toBe('m1');
     expect(reaction.count).toBe(1);
@@ -154,15 +129,7 @@ describe('hubClientFrameTypes (#788)', () => {
   });
 
   it('binds typed frames to HUB_EVENTS constants', () => {
-    const auth: HubAuthFrame = {
-      type: HUB_EVENTS.AUTH,
-      payload: { access_token: 'token' },
-    };
     const authOk: HubAuthOkFrame = { type: HUB_EVENTS.AUTH_OK };
-    const authFail: HubAuthFailFrame = {
-      type: HUB_EVENTS.AUTH_FAIL,
-      payload: { code: 'invalid_token', message: 'bad token' },
-    };
     const messageNew: HubMessageNewFrame = {
       type: HUB_EVENTS.MESSAGE_NEW,
       payload: {
@@ -173,17 +140,6 @@ describe('hubClientFrameTypes (#788)', () => {
         sender_id: 'u1',
         content_type: 'text',
         content: '{"text":"hi"}',
-      },
-    };
-    const messageEdited: HubMessageEditedFrame = {
-      type: HUB_EVENTS.MESSAGE_EDITED,
-      payload: {
-        id: 'm1',
-        session_id: 's1',
-        seq_id: 1,
-        content_type: 'text',
-        content: '{"text":"edited"}',
-        edited: true,
       },
     };
     const messageRecall: HubMessageRecallFrame = {
@@ -277,22 +233,13 @@ describe('hubClientFrameTypes (#788)', () => {
       type: HUB_EVENTS.AGENT_CANCEL,
       payload: { task_id: 't3' },
     };
-    const agentRegenerate: HubAgentRegenerateFrame = {
-      type: HUB_EVENTS.AGENT_REGENERATE,
-      payload: {
-        original_task_id: 't1',
-        new_task_id: 't4',
-        trigger_message_id: 'm2',
-        agent_instance_id: 'ai1',
-      },
-    };
     const deviceOnline: HubDeviceOnlineFrame = {
       type: HUB_EVENTS.DEVICE_ONLINE,
-      payload: { user_id: 'u1', device_type: 'desktop', device_id: 'd1' },
+      payload: { user_id: 'u1' },
     };
     const deviceOffline: HubDeviceOfflineFrame = {
       type: HUB_EVENTS.DEVICE_OFFLINE,
-      payload: { user_id: 'u1', device_type: 'desktop', device_id: 'd1' },
+      payload: { user_id: 'u1' },
     };
     const deviceKicked: HubDeviceKickedFrame = {
       type: HUB_EVENTS.DEVICE_KICKED,
@@ -317,18 +264,15 @@ describe('hubClientFrameTypes (#788)', () => {
       type: HUB_EVENTS.FRIEND_ACCEPTED,
       payload: { user_id: 'u2', friend_id: 'u1' },
     };
-    const generic: HubFrame<{ ok: boolean }, typeof HUB_EVENTS.SYNC_REQUEST> = {
-      type: HUB_EVENTS.SYNC_REQUEST,
+    const generic: HubFrame<{ ok: boolean }, typeof HUB_EVENTS.TYPING> = {
+      type: HUB_EVENTS.TYPING,
       payload: { ok: true },
       seq_id: 12,
     };
 
     const known: HubKnownFrame[] = [
-      auth,
       authOk,
-      authFail,
       messageNew,
-      messageEdited,
       messageRecall,
       messagePin,
       messageUnpin,
@@ -345,7 +289,6 @@ describe('hubClientFrameTypes (#788)', () => {
       agentDone,
       agentFailed,
       agentCancel,
-      agentRegenerate,
       deviceOnline,
       deviceOffline,
       deviceKicked,
@@ -356,11 +299,8 @@ describe('hubClientFrameTypes (#788)', () => {
     ];
 
     expect(known.map((frame) => frame.type)).toEqual([
-      'auth',
       'auth.ok',
-      'auth.fail',
       'message.new',
-      'message.edited',
       'message.recall',
       'message.pin',
       'message.unpin',
@@ -377,14 +317,13 @@ describe('hubClientFrameTypes (#788)', () => {
       'agent.done',
       'agent.failed',
       'agent.cancel',
-      'agent.regenerate',
       'device.online',
       'device.offline',
       'device.kicked',
       'notification.new',
       'friend.request',
       'friend.accepted',
-      'sync.request',
+      'typing',
     ]);
     expect(generic.seq_id).toBe(12);
   });

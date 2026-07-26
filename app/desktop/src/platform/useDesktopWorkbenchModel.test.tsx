@@ -56,10 +56,6 @@ vi.mock('./useDesktopEdgeEvents', () => ({
   useDesktopEdgeEvents: vi.fn(() => []),
 }));
 
-vi.mock('@/hooks/useHubWebSocket', () => ({
-  useHubWebSocket: vi.fn(() => ({ lastEvent: null })),
-}));
-
 vi.mock('@/api/edgeClient', () => ({
   fetchHealth: vi.fn(() => Promise.reject(new Error('Edge not available'))),
 }));

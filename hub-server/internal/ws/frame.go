@@ -9,14 +9,11 @@ type Frame struct {
 }
 
 const (
-	TypeAuth   = "auth"
 	TypeTyping = "typing"
 
-	TypeAuthOK   = "auth.ok"
-	TypeAuthFail = "auth.fail"
+	TypeAuthOK = "auth.ok"
 
 	TypeMessageNew             = "message.new"
-	TypeMessageEdited          = "message.edited"
 	TypeMessageRecall          = "message.recall"
 	TypeMessagePin             = "message.pin"
 	TypeMessageUnpin           = "message.unpin"

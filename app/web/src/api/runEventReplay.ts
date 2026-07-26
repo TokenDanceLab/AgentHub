@@ -6,13 +6,11 @@
 // reconnect fetches missed events from the REST API
 // (`GET /web/agent-tasks/:id/events?after_seq=<lastSeq>`) to fill the gap.
 
-import type { HubWSHandle } from '@/api/hubWS';
 import type { HubClient } from '@/api/hubClient';
 import type { HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { useConnectionStore, type RecoveryState } from '@/stores/connectionStore';
 
 export interface ReplayControllerOptions {
-  socket: HubWSHandle;
   hubClient: HubClient;
   /** Currently active agent task ID (may change over time). */
   getActiveTaskId: () => string | undefined;
@@ -38,16 +36,13 @@ export function trackEventSeq(taskId: string | undefined, eventSeq: number | und
  * Returns the number of events replayed, or 0 if none were needed.
  */
 export async function replayMissedEvents(opts: ReplayControllerOptions): Promise<number> {
-  const { socket, hubClient, getActiveTaskId, onReplayEvents } = opts;
+  const { hubClient, getActiveTaskId, onReplayEvents } = opts;
   const taskId = getActiveTaskId();
   if (!taskId) return 0;
 
   const store = useConnectionStore.getState();
   const lastSeq = store.lastEventSeq[taskId];
   if (lastSeq == null || lastSeq <= 0) return 0;
-
-  // Also try the WS sync frame as a hint; the REST fallback is the reliable path.
-  socket.sendSync(lastSeq);
 
   store.setRecoveryState('recovering');
   store.setRecoveryError(null);

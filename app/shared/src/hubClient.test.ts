@@ -265,8 +265,6 @@ describe('hubClient helpers', () => {
       type: HUB_EVENTS.DEVICE_ONLINE,
       payload: {
         user_id: 'u1',
-        device_type: 'desktop',
-        device_id: '018f86aa-2f93-7cc0-9c39-000000000001',
       },
     };
     const deviceKicked: HubDeviceKickedFrame = {

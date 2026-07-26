@@ -105,7 +105,7 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("NewBus failed: %v", err))
 	}
 	bus = b
-	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret, cfg.Server.Env)
+	wsHandler := handler.NewWebSocketHandler(mgr, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceService := service.NewDeviceService(db, nil)
@@ -117,8 +117,8 @@ func TestMain(m *testing.M) {
 	messageService := message.NewService(db, bus, cacheClient)
 	messageReactionService := messagereaction.NewService(db, bus)
 	messageHandler := handler.NewMessageHandler(testMessageServiceWithReactions{
-		Service: messageService,
-		reactions:      messageReactionService,
+		Service:   messageService,
+		reactions: messageReactionService,
 	})
 	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
 	agentHandler := handler.NewAgentHandler(agentService)
