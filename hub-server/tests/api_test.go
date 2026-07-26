@@ -5,52 +5,22 @@ import (
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
+// TestAuth covers the /client/auth routes that survived the OIDC migration
+// (client/auth is now refresh + oidc/* + me/logout/profile only; see router.go).
+//
+// The pre-OIDC Register/LoginAndMe/WrongPassword/RefreshToken/ChangePassword
+// subtests were removed in #1367: /client/auth/register|login|password no
+// longer exist and any non -short run failed with NotFound. Endpoint-level
+// coverage for POST /client/auth/refresh under the OIDC flow (the removed
+// RefreshToken subtest obtained its token via password login) is tracked in #1369.
 func TestAuth(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	t.Run("Register", func(t *testing.T) {
-		w := post("/client/auth/register", map[string]string{
-			"username": "ta01", "password": "pass1234", "nickname": "A1",
-		})
-		mustOK(t, parse(w), "register")
-		w = post("/client/auth/register", map[string]string{
-			"username": "ta01", "password": "pass1234", "nickname": "A1",
-		})
-		mustCode(t, parse(w), errcode.UserUsernameTaken.Code, "duplicate")
-	})
-
-	t.Run("LoginAndMe", func(t *testing.T) {
-		post("/client/auth/register", map[string]string{"username": "ta02", "password": "pass1234", "nickname": "A2"})
-		w := post("/client/auth/login", map[string]interface{}{"username": "ta02", "password": "pass1234", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000a001"})
-		r := parse(w)
-		mustOK(t, r, "login")
-		tok := extract(r.Data, "access_token")
-		mustOK(t, parse(get("/client/auth/me", tok)), "me")
-	})
-
-	t.Run("WrongPassword", func(t *testing.T) {
-		w := post("/client/auth/login", map[string]interface{}{"username": "ta02", "password": "wrong", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000a002"})
-		mustCode(t, parse(w), errcode.AuthInvalidCredentials.Code, "wrong pw")
-	})
 
 	t.Run("NoToken", func(t *testing.T) {
 		mustCode(t, parse(get("/client/auth/me", "")), errcode.AuthInvalidToken.Code, "no token")
-	})
-
-	t.Run("RefreshToken", func(t *testing.T) {
-		w := post("/client/auth/login", map[string]interface{}{"username": "ta02", "password": "pass1234", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000a003"})
-		rt := extract(parse(w).Data, "refresh_token")
-		mustOK(t, parse(post("/client/auth/refresh", map[string]string{"refresh_token": rt})), "refresh")
-	})
-
-	t.Run("ChangePassword", func(t *testing.T) {
-		post("/client/auth/register", map[string]string{"username": "ta03", "password": "pass1234", "nickname": "A3"})
-		w := post("/client/auth/login", map[string]interface{}{"username": "ta03", "password": "pass1234", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000b001"})
-		tok := extract(parse(w).Data, "access_token")
-		mustOK(t, parse(put("/client/auth/password", tok, map[string]string{"old_password": "pass1234", "new_password": "newpass5678"})), "change pw")
-		w = post("/client/auth/login", map[string]interface{}{"username": "ta03", "password": "newpass5678", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000b002"})
-		mustOK(t, parse(w), "login new pw")
 	})
 
 	t.Run("UpdateProfile", func(t *testing.T) {
@@ -59,9 +29,10 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("Logout", func(t *testing.T) {
-		w := post("/client/auth/login", map[string]interface{}{"username": "ta02", "password": "pass1234", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000a009"})
-		tok := extract(parse(w).Data, "access_token")
-		mustOK(t, parse(postAuth("/client/auth/logout", tok, nil)), "logout")
+		// AuthService.Logout is documented idempotent for manually-issued JWTs
+		// without a stored refresh token — exactly what register() mints.
+		u := register(t, "ta05", "pass1234", "A5")
+		mustOK(t, parse(postAuth("/client/auth/logout", u.Token, nil)), "logout")
 	})
 }
 
@@ -229,12 +200,18 @@ func TestCustomAgent(t *testing.T) {
 
 func TestEdgeDevice(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	register(t, "ted1", "pass1234", "Edge")
+	u := register(t, "ted1", "pass1234", "Edge")
 
-	w := post("/client/auth/login", map[string]interface{}{"username": "ted1", "password": "pass1234", "device_type": "desktop", "device_id": "dddddddd-dddd-dddd-dddd-dddddddddd01"})
-	tok := extract(parse(w).Data, "access_token")
+	// /edge/* requires a desktop-type token (DeviceTypeCheck middleware). The
+	// password login that used to produce one was removed with the OIDC
+	// migration (#1367), so mint the desktop JWT directly like register() does.
+	deviceID := "dddddddd-dddd-dddd-dddd-dddddddddd01"
+	tok, err := jwtutil.GenerateAccessToken(u.ID, "desktop", deviceID, testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate desktop token: %v", err)
+	}
 
 	t.Run("RegisterDevice", func(t *testing.T) {
-		mustOK(t, parse(postAuth("/edge/devices/register", tok, map[string]interface{}{"device_id": "dddddddd-dddd-dddd-dddd-dddddddddd01", "app_version": "1.0", "capabilities": []string{"claude-code"}})), "register device")
+		mustOK(t, parse(postAuth("/edge/devices/register", tok, map[string]interface{}{"device_id": deviceID, "app_version": "1.0", "capabilities": []string{"claude-code"}})), "register device")
 	})
 }
