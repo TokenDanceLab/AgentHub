@@ -197,6 +197,51 @@ func TestWebSocketRouteAcceptsSubprotocolTokenBeforeUpgrade(t *testing.T) {
 	}
 }
 
+func TestWebSocketRouteNegotiatesBearerSubprotocol(t *testing.T) {
+	// #1360: the Accept layer must select the fixed bearer marker when the
+	// client offers "agenthub.bearer.v1, <jwt>" (the preferred browser path).
+	// Per RFC 6455 §4.1 a client that offered subprotocols MUST fail the
+	// WebSocket connection when the server selects none, so an empty
+	// negotiation breaks browser bearer auth at the handshake. The raw JWT
+	// must never be echoed back in Sec-WebSocket-Protocol.
+	token, err := jwtutil.GenerateAccessToken("user-ws-marker", "web", "device-ws-marker", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, resp, dialErr := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		// Preferred browser carriage: fixed marker + raw JWT.
+		Subprotocols: []string{middleware.WSBearerSubprotocol, token},
+	})
+	if dialErr != nil {
+		t.Fatalf("dial websocket with bearer subprotocol: %v", dialErr)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	if got := conn.Subprotocol(); got != middleware.WSBearerSubprotocol {
+		t.Fatalf("negotiated subprotocol = %q, want %q (browsers fail the connection when the offer is not answered)",
+			got, middleware.WSBearerSubprotocol)
+	}
+	if proto := resp.Header.Get("Sec-WebSocket-Protocol"); proto != middleware.WSBearerSubprotocol {
+		t.Fatalf("Sec-WebSocket-Protocol response header = %q, want %q (the JWT must never be echoed back)",
+			proto, middleware.WSBearerSubprotocol)
+	}
+
+	frame := readFrame(t, conn)
+	if frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	}
+	if got := manager.FindByUserDevice("user-ws-marker", "web"); got == nil {
+		t.Fatal("expected bearer-subprotocol token to register WebSocket session")
+	}
+}
+
 func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 	token, err := jwtutil.GenerateAccessToken("user-ws-typing", "desktop", "device-ws-typing", testWSSecret, time.Hour)
 	if err != nil {

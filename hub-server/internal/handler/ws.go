@@ -48,7 +48,16 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
 }
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
-	opts := &websocket.AcceptOptions{}
+	// Negotiate the fixed bearer marker for the preferred browser auth path
+	// (Sec-WebSocket-Protocol: agenthub.bearer.v1, <hub-jwt>). Per RFC 6455
+	// §4.1 a client that offered subprotocols MUST fail the WebSocket
+	// connection when the server selects none, so without this the browser
+	// bearer path breaks at the handshake. Only the fixed marker is listed —
+	// never the JWT — so the token is not echoed back in the response (see
+	// middleware.WSBearerSubprotocol / tokenFromWSSubprotocols).
+	opts := &websocket.AcceptOptions{
+		Subprotocols: []string{middleware.WSBearerSubprotocol},
+	}
 	if !h.isProductionEnv() {
 		// Dev: allow loopback origins (localhost / 127.0.0.1 / ::1 on any port).
 		// This replaces the previous InsecureSkipVerify (which disabled ALL origin
@@ -271,7 +280,9 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	select {
 	case conn.Send <- data:
 	default:
-		metrics.WSDroppedFrames.Inc()
+		if metrics.WSDroppedFrames != nil {
+			metrics.WSDroppedFrames.Inc()
+		}
 		slog.Warn("ws frame dropped: send buffer full", "conn_id", conn.ID, "user_id", conn.UserID)
 	}
 }
