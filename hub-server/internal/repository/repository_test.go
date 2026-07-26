@@ -363,6 +363,9 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			payload TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
+		// Mirrors migration 0056: seq must be unique per run so concurrent
+		// appends surface as unique violations instead of silent duplicates.
+		`CREATE UNIQUE INDEX uq_agent_team_events_run_seq ON agent_team_events(team_run_id, seq)`,
 		`CREATE TABLE agent_profiles (
 			id TEXT PRIMARY KEY,
 			owner_id TEXT NOT NULL,
