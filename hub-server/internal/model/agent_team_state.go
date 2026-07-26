@@ -218,7 +218,7 @@ type TeamBudget struct {
 
 // ── Compete mode types ────────────────────────────────────────────
 
-// CompeteSummaryRequest is the request body for POST /client/team-runs/{id}/compete-summary.
+// CompeteSummaryRequest is the optional request body for GET /web/team-runs/{id}/compete-summary.
 type CompeteSummaryRequest struct {
 	// Prompt is an optional user-supplied prompt for the comparison LLM.
 	Prompt string `json:"prompt,omitempty"`
@@ -250,7 +250,7 @@ const (
 
 // ── Human Review Gate (ADR-008) ──────────────────────────────────
 
-// HumanReviewDecision is the request body for POST /client/team-runs/{id}/review-decision.
+// HumanReviewDecision is the request body for POST /web/team-runs/{id}/review-decision.
 type HumanReviewDecision struct {
 	Action  string              `json:"action"` // "approve" | "discuss" | "modify"
 	Comment string              `json:"comment,omitempty"`
