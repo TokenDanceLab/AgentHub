@@ -108,6 +108,7 @@ export function useWebHubRealtime({
 
     let replaying = false;
     const hubClient = createHubClient({ getToken });
+    const invalidation = createWebWorkbenchHubInvalidationScheduler(queryClient);
 
     const socket = createSocket({
       getToken,
@@ -135,7 +136,7 @@ export function useWebHubRealtime({
       },
     });
     const unsubscribe = socket.onAny((type, payload) => {
-      invalidateWebWorkbenchHubQueries(queryClient, type, payload);
+      invalidation.notify(type, payload);
       dispatchHubRuntimeEvent(
         type,
         payload,
@@ -153,6 +154,7 @@ export function useWebHubRealtime({
     socket.connect();
     return () => {
       unsubscribe();
+      invalidation.dispose();
       socket.close();
     };
   }, [createSocket, enabled, getToken, queryClient]);
@@ -250,6 +252,63 @@ export function invalidateWebWorkbenchHubQueries(
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
     }
   }
+}
+
+/** Trailing coalescing window for per-token AGENT_STREAM invalidation (#1352). */
+export const AGENT_STREAM_INVALIDATE_WINDOW_MS = 250;
+
+export interface WebWorkbenchHubInvalidationScheduler {
+  /** Route one realtime frame: AGENT_STREAM coalesced, everything else immediate. */
+  notify: (eventType: string, payload: unknown) => void;
+  /** Flush any pending stream invalidation and clear the timer. */
+  dispose: () => void;
+}
+
+/**
+ * Query invalidation scheduler for realtime Hub frames (#1352).
+ *
+ * AGENT_STREAM frames arrive per token, and each invalidateWebWorkbenchHubQueries
+ * call costs ~6 cache operations — api/events.md:47 requires stream output to be
+ * batched instead of refreshing the UI per line. Stream frames therefore collapse
+ * into one trailing flush per window (the last frame always flushes: via timer,
+ * via the next non-stream frame, or via dispose). Non-stream frames invalidate
+ * immediately, flushing any pending stream frame first so cache writes keep the
+ * original event order (a coalesced `running` task-index write must not land
+ * after a terminal AGENT_DONE/FAILED write).
+ */
+export function createWebWorkbenchHubInvalidationScheduler(
+  queryClient: QueryClient,
+  windowMs: number = AGENT_STREAM_INVALIDATE_WINDOW_MS,
+): WebWorkbenchHubInvalidationScheduler {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending: { eventType: string; payload: unknown } | null = null;
+
+  const flush = (): void => {
+    if (timer != null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    const frame = pending;
+    pending = null;
+    if (frame) {
+      invalidateWebWorkbenchHubQueries(queryClient, frame.eventType, frame.payload);
+    }
+  };
+
+  return {
+    notify: (eventType, payload) => {
+      if (eventType !== HUB_EVENTS.AGENT_STREAM) {
+        flush();
+        invalidateWebWorkbenchHubQueries(queryClient, eventType, payload);
+        return;
+      }
+      pending = { eventType, payload };
+      if (timer == null) {
+        timer = setTimeout(flush, windowMs);
+      }
+    },
+    dispose: flush,
+  };
 }
 
 function recordRealtimeAgentTaskIndex(

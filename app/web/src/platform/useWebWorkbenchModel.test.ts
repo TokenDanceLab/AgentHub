@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
 import {
   appendHubRuntimeEvent,
   mergeHubRuntimeEvents,
@@ -18,7 +19,11 @@ import {
   resolveWebWorkbenchProjects,
   workspaceProjectToProjectInfo,
 } from './webWorkbenchProjects';
-import { resolveWebWorkbenchContacts } from './useWebWorkbenchModel';
+import {
+  resolveWebSessionLastReadSeq,
+  resolveWebWorkbenchContacts,
+  useWebSessionAutoMarkRead,
+} from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
 import { errorMessage } from './webWorkbenchError';
 
@@ -1003,5 +1008,92 @@ describe('useWebWorkbenchModel helpers', () => {
       expect.objectContaining({ id: 'evt-replay-1', payload: { content: 'from replay' } }),
       expect.objectContaining({ id: 'evt-terminal', payload: { content: 'fresh terminal', success: true } }),
     ]);
+  });
+});
+
+describe('web session auto mark-read (#1352)', () => {
+  it('derives the last read seq only from non-placeholder session messages', () => {
+    // Placeholder window: the rows still belong to the previous session.
+    expect(resolveWebSessionLastReadSeq(true, [{ seq_id: 9 }])).toBeNull();
+    expect(resolveWebSessionLastReadSeq(false, undefined)).toBeNull();
+    expect(resolveWebSessionLastReadSeq(false, [])).toBeNull();
+    expect(resolveWebSessionLastReadSeq(false, [{ seq_id: 3 }, {}])).toBeNull();
+    expect(resolveWebSessionLastReadSeq(false, [{ seq_id: 3 }, { seq_id: 7 }])).toBe(7);
+  });
+
+  it('does not mark read during the placeholder window and marks with the session own seq once loaded', () => {
+    const markRead = vi.fn();
+    const { rerender } = renderHook(
+      ({ sessionId, lastSeq }: { sessionId: string | null; lastSeq: number | null }) =>
+        useWebSessionAutoMarkRead(true, sessionId, lastSeq, markRead),
+      { initialProps: { sessionId: 'session-b' as string | null, lastSeq: null as number | null } },
+    );
+
+    // While messages are placeholder data the derived seq is null → no markRead.
+    expect(markRead).not.toHaveBeenCalled();
+
+    // Session B's own messages arrive.
+    rerender({ sessionId: 'session-b', lastSeq: 42 });
+    expect(markRead).toHaveBeenCalledTimes(1);
+    expect(markRead).toHaveBeenCalledWith({ sessionId: 'session-b', lastReadSeq: 42 });
+  });
+
+  it('re-marks when newer messages arrive and stays quiet on unrelated re-renders', () => {
+    const markRead = vi.fn();
+    const { rerender } = renderHook(
+      ({ lastSeq }: { lastSeq: number | null }) =>
+        useWebSessionAutoMarkRead(true, 'session-a', lastSeq, markRead),
+      { initialProps: { lastSeq: 10 as number | null } },
+    );
+    expect(markRead).toHaveBeenCalledWith({ sessionId: 'session-a', lastReadSeq: 10 });
+
+    // Unrelated re-render with the same seq → no duplicate markRead.
+    rerender({ lastSeq: 10 });
+    expect(markRead).toHaveBeenCalledTimes(1);
+
+    // A newer message arrives → unread cleared again with the new seq.
+    rerender({ lastSeq: 11 });
+    expect(markRead).toHaveBeenCalledTimes(2);
+    expect(markRead).toHaveBeenLastCalledWith({ sessionId: 'session-a', lastReadSeq: 11 });
+  });
+
+  it('never writes the previous session seq across a session switch', () => {
+    const markRead = vi.fn();
+    const { rerender } = renderHook(
+      ({ sessionId, lastSeq }: { sessionId: string | null; lastSeq: number | null }) =>
+        useWebSessionAutoMarkRead(true, sessionId, lastSeq, markRead),
+      { initialProps: { sessionId: 'session-a' as string | null, lastSeq: 100 as number | null } },
+    );
+    expect(markRead).toHaveBeenLastCalledWith({ sessionId: 'session-a', lastReadSeq: 100 });
+
+    // Switch to session B: messages query flips to placeholder data → seq null.
+    rerender({ sessionId: 'session-b', lastSeq: null });
+    expect(markRead).toHaveBeenCalledTimes(1); // no markRead(session-b, 100)
+
+    // Session B data lands → marked with its own seq.
+    rerender({ sessionId: 'session-b', lastSeq: 5 });
+    expect(markRead).toHaveBeenCalledTimes(2);
+    expect(markRead).toHaveBeenLastCalledWith({ sessionId: 'session-b', lastReadSeq: 5 });
+  });
+
+  it('uses the latest markRead callback without re-firing the effect', () => {
+    const firstMarkRead = vi.fn();
+    const secondMarkRead = vi.fn();
+    const { rerender } = renderHook(
+      ({ markRead, lastSeq }: { markRead: (input: { sessionId: string; lastReadSeq: number }) => void; lastSeq: number | null }) =>
+        useWebSessionAutoMarkRead(true, 'session-a', lastSeq, markRead),
+      { initialProps: { markRead: firstMarkRead, lastSeq: 1 as number | null } },
+    );
+    expect(firstMarkRead).toHaveBeenCalledTimes(1);
+
+    // A recreated mutation object (new markRead identity) must not re-fire…
+    rerender({ markRead: secondMarkRead, lastSeq: 1 });
+    expect(secondMarkRead).not.toHaveBeenCalled();
+
+    // …but the next seq change goes through the latest callback.
+    rerender({ markRead: secondMarkRead, lastSeq: 2 });
+    expect(secondMarkRead).toHaveBeenCalledTimes(1);
+    expect(secondMarkRead).toHaveBeenCalledWith({ sessionId: 'session-a', lastReadSeq: 2 });
+    expect(firstMarkRead).toHaveBeenCalledTimes(1);
   });
 });
