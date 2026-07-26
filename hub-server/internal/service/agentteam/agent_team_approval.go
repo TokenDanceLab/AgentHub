@@ -9,6 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"gorm.io/gorm"
 )
 
 func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error) {
@@ -69,34 +70,59 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 		DecidedAt:    now,
 		EdgeControl:  edgeControl,
 	}
-	if err := s.appendTeamEvent(runID, model.TeamEventApprovalDecided, record); err != nil {
+
+	// Serialize via per-run row lock: projection check → append event inside
+	// one transaction. The first decision wins; a concurrent retry of the same
+	// decision reuses the durable record, while an opposite decision conflicts.
+	recorded := record
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, runID); err != nil {
+			return err
+		}
+		existing, err := s.findApprovalDecision(tx, runID, record.ApprovalID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			if existing.Decision != record.Decision {
+				return errcode.ErrBadRequest
+			}
+			recorded = *existing
+			return nil
+		}
+		return s.appendTeamEventTx(tx, runID, model.TeamEventApprovalDecided, record)
+	}); err != nil {
 		return nil, err
 	}
+
+	// Edge delivery is kept after the transaction commits so a delivery
+	// failure does not roll back the already-persisted decision event.
 	if s.controlSvc != nil {
 		if err := s.controlSvc.DeliverToDesktopDevice(ctx, userID, edgeDeviceID, model.AgentControlPayload{
 			Kind:         model.AgentControlKindPermissionDecide,
-			AgentTaskID:  record.AgentTaskID,
+			AgentTaskID:  recorded.AgentTaskID,
 			TargetID:     targetID,
 			EdgeDeviceID: edgeDeviceID,
 			TeamID:       teamID,
 			TeamRunID:    runID,
-			TeamTaskID:   record.TeamTaskID,
-			AssignmentID: record.AssignmentID,
-			MemberID:     record.MemberID,
-			ApprovalID:   record.ApprovalID,
-			EdgeControl:  edgeControl,
+			TeamTaskID:   recorded.TeamTaskID,
+			AssignmentID: recorded.AssignmentID,
+			MemberID:     recorded.MemberID,
+			ApprovalID:   recorded.ApprovalID,
+			EdgeControl:  recorded.EdgeControl,
 		}); err != nil {
 			return nil, err
 		}
 	}
 
 	decided := *approval
-	decided.ApprovalID = record.ApprovalID
-	decided.Status = record.Decision
-	decided.Reason = record.Reason
-	decided.DecidedBy = record.DecidedBy
-	decided.DecidedAt = &now
-	decided.EdgeControl = edgeControl
+	decided.ApprovalID = recorded.ApprovalID
+	decided.Status = recorded.Decision
+	decided.Reason = recorded.Reason
+	decided.DecidedBy = recorded.DecidedBy
+	decidedAt := recorded.DecidedAt
+	decided.DecidedAt = &decidedAt
+	decided.EdgeControl = recorded.EdgeControl
 	return &decided, nil
 }
 
@@ -184,9 +210,25 @@ func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, 
 	now := time.Now().UTC()
 	resolution.ResolvedBy = userID
 	resolution.ResolvedAt = now
-	if err := s.appendTeamEvent(runID, model.TeamEventConflictResolved, resolution); err != nil {
+
+	// Serialize via per-run row lock (#1383): two concurrent ResolveConflict
+	// calls for the same conflict must not both write team.conflict.resolved.
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, runID); err != nil {
+			return err
+		}
+		existing, err := s.findConflictResolution(tx, runID, resolution.ConflictID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return errcode.ErrBadRequest
+		}
+		return s.appendTeamEventTx(tx, runID, model.TeamEventConflictResolved, resolution)
+	}); err != nil {
 		return nil, err
 	}
+
 	resolved := *conflict
 	resolved.Status = model.TeamConflictStatusResolved
 	resolved.Resolution = resolution.Resolution
@@ -572,3 +614,48 @@ func stringInSlice(values []string, value string) bool {
 	return false
 }
 
+func (s *AgentTeamService) findApprovalDecision(tx *gorm.DB, runID, approvalID string) (*model.TeamApprovalDecision, error) {
+	if approvalID == "" {
+		return nil, nil
+	}
+	events, err := repository.ListTeamEventsByRun(tx, runID)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		if e.Type != model.TeamEventApprovalDecided {
+			continue
+		}
+		var record model.TeamApprovalDecision
+		if err := json.Unmarshal([]byte(e.Payload), &record); err != nil {
+			continue
+		}
+		if record.ApprovalID == approvalID {
+			return &record, nil
+		}
+	}
+	return nil, nil
+}
+
+func (s *AgentTeamService) findConflictResolution(tx *gorm.DB, runID, conflictID string) (*model.TeamConflictResolution, error) {
+	if conflictID == "" {
+		return nil, nil
+	}
+	events, err := repository.ListTeamEventsByRun(tx, runID)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		if e.Type != model.TeamEventConflictResolved {
+			continue
+		}
+		var resolution model.TeamConflictResolution
+		if err := json.Unmarshal([]byte(e.Payload), &resolution); err != nil {
+			continue
+		}
+		if resolution.ConflictID == conflictID {
+			return &resolution, nil
+		}
+	}
+	return nil, nil
+}

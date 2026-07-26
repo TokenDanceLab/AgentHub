@@ -58,7 +58,7 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 
 | 主题 | Issue |
 |---|---|
-| agentteam check-then-act 并发家族（seq 无 UNIQUE、approval 双决策、dispatch 双触发） | #1383 |
+| agentteam check-then-act 并发家族（seq 层 #1401 已合；条件写/guardrail/compete 收口中） | #1383 · PR #1419（open） |
 | agentteam assignment 生命周期设计（running 态谁写、超时不终结、死枚举） | #1384 |
 | agentteam 投影层抽取（GetTeamRunState 读路径隐藏写） | #1385 |
 | WS 死协议面 / WS 鉴权只在 upgrade 校验 | #1362 · #1363 |

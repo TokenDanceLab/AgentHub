@@ -8,6 +8,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"gorm.io/gorm"
 )
 
 func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
@@ -237,20 +238,28 @@ func assignmentStatusFromPending(status string) string {
 
 // ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
 func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, error) {
+	return s.hasTimedOutActiveAssignmentDB(s.db, runID)
+}
+
+func (s *AgentTeamService) hasTimedOutActiveAssignmentDB(db *gorm.DB, runID string) (bool, error) {
 	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
-	return repository.HasTimedOutActiveAssignment(s.db, runID, deadline)
+	return repository.HasTimedOutActiveAssignment(db, runID, deadline)
 }
 
 func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {
-	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
+	return s.teamRunBudgetExceededDB(s.db, runID)
+}
+
+func (s *AgentTeamService) teamRunBudgetExceededDB(db *gorm.DB, runID string) (bool, error) {
+	assignments, err := repository.ListAssignmentsByTeamRun(db, runID)
 	if err != nil {
 		return false, err
 	}
-	tasks, err := repository.ListTeamTasksByRun(s.db, runID)
+	tasks, err := repository.ListTeamTasksByRun(db, runID)
 	if err != nil {
 		return false, err
 	}
-	events, err := repository.ListAgentRunEventsByTaskIDs(s.db, teamAgentTaskIDs(assignments, tasks))
+	events, err := repository.ListAgentRunEventsByTaskIDs(db, teamAgentTaskIDs(assignments, tasks))
 	if err != nil {
 		return false, err
 	}
@@ -291,4 +300,3 @@ func payloadString(payload string, keys ...string) string {
 	}
 	return ""
 }
-
