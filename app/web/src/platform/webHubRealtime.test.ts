@@ -1,7 +1,12 @@
 import { QueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
-import { describe, expect, it, vi } from 'vitest';
-import { dispatchHubRuntimeEvent, invalidateWebWorkbenchHubQueries } from './webHubRealtime';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  AGENT_STREAM_INVALIDATE_WINDOW_MS,
+  createWebWorkbenchHubInvalidationScheduler,
+  dispatchHubRuntimeEvent,
+  invalidateWebWorkbenchHubQueries,
+} from './webHubRealtime';
 
 describe('webHubRealtime', () => {
   it('invalidates Hub sessions and the active session messages for message events', () => {
@@ -145,5 +150,112 @@ describe('webHubRealtime', () => {
       },
       created_at: '2026-06-07T05:00:02Z',
     });
+  });
+});
+
+describe('createWebWorkbenchHubInvalidationScheduler (#1352)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const sessionsKeyCalls = (invalidateQueries: { mock: { calls: unknown[][] } }) =>
+    invalidateQueries.mock.calls.filter(([filters]) =>
+      JSON.stringify((filters as { queryKey?: unknown } | undefined)?.queryKey)
+        === JSON.stringify(['web-v4', 'hub-sessions']),
+    );
+
+  it('coalesces per-token AGENT_STREAM invalidations into a single trailing flush', () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const scheduler = createWebWorkbenchHubInvalidationScheduler(queryClient);
+
+    for (let seq = 1; seq <= 5; seq += 1) {
+      scheduler.notify(HUB_EVENTS.AGENT_STREAM, {
+        task_id: 'task-stream',
+        session_id: 'hub-session-1',
+        event_seq: seq,
+        event_type: 'run.agent.text_delta',
+      });
+    }
+
+    // No cache traffic while the stream window is open.
+    expect(invalidateQueries).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
+
+    // Five frames → exactly one flush.
+    expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(1);
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['web-v4', 'hub-messages', 'hub-session-1'],
+    });
+
+    scheduler.dispose();
+  });
+
+  it('opens a new window for stream frames arriving after a flush', () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const scheduler = createWebWorkbenchHubInvalidationScheduler(queryClient);
+
+    scheduler.notify(HUB_EVENTS.AGENT_STREAM, { task_id: 'task-stream', session_id: 'hub-session-1', event_seq: 1 });
+    vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
+    scheduler.notify(HUB_EVENTS.AGENT_STREAM, { task_id: 'task-stream', session_id: 'hub-session-1', event_seq: 2 });
+    vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
+
+    expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(2);
+
+    scheduler.dispose();
+  });
+
+  it('keeps non-stream events immediate and flushes the pending stream frame first', () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const scheduler = createWebWorkbenchHubInvalidationScheduler(queryClient);
+
+    scheduler.notify(HUB_EVENTS.AGENT_STREAM, {
+      task_id: 'task-1',
+      session_id: 'hub-session-1',
+      event_seq: 1,
+    });
+    scheduler.notify(HUB_EVENTS.AGENT_DONE, {
+      task_id: 'task-1',
+      session_id: 'hub-session-1',
+      result_summary: 'done',
+    });
+
+    // AGENT_DONE invalidated without waiting for the window…
+    expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(2);
+    // …and the pending stream frame flushed BEFORE it, so the terminal
+    // task-index status wins and is not overwritten by a late `running` write.
+    expect(queryClient.getQueryData(['web-v4', 'agent-task-index', 'task-1'])).toMatchObject({
+      status: 'completed',
+    });
+
+    vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
+    expect(queryClient.getQueryData(['web-v4', 'agent-task-index', 'task-1'])).toMatchObject({
+      status: 'completed',
+    });
+
+    scheduler.dispose();
+  });
+
+  it('flushes the trailing stream frame on dispose', () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const scheduler = createWebWorkbenchHubInvalidationScheduler(queryClient);
+
+    scheduler.notify(HUB_EVENTS.AGENT_STREAM, { task_id: 'task-1', session_id: 'hub-session-1', event_seq: 1 });
+    expect(invalidateQueries).not.toHaveBeenCalled();
+
+    scheduler.dispose();
+
+    expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(1);
+    // Timer was cleared — nothing double-flushes afterwards.
+    vi.advanceTimersByTime(AGENT_STREAM_INVALIDATE_WINDOW_MS);
+    expect(sessionsKeyCalls(invalidateQueries)).toHaveLength(1);
   });
 });
