@@ -20,7 +20,6 @@ import {
   createHubClient as createSharedHubClient,
   type HubClient as SharedHubClient,
   type HubClientOptions,
-  type HubContactInfo,
   type HubSession,
 } from '@agenthub/shared/hubClient';
 
@@ -314,12 +313,17 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     getMobileSnapshot: async () => {
       await ensureToken();
 
-      const [sessions, contacts] = await Promise.all([
-        shared.listSessions().catch(() => [] as HubSession[]),
-        shared.listContacts().catch(() => [] as HubContactInfo[]),
-      ]);
+      // Contacts were previously fetched and discarded — sessions are the only
+      // input the mobile fixture needs, so a single RTT is enough.
+      let sessions: HubSession[] = [];
+      let sessionsOk = true;
+      try {
+        sessions = await shared.listSessions();
+      } catch {
+        sessionsOk = false;
+      }
 
-      return mapSessionsToMobileFixture(sessions, contacts);
+      return mapSessionsToMobileFixture(sessions, sessionsOk);
     },
   });
 }
@@ -354,29 +358,43 @@ export function createHubWsUrl(baseUrl: string, options: HubWsUrlOptions = {}): 
 
 function mapSessionsToMobileFixture(
   sessions: HubSession[],
-  _contacts: HubContactInfo[],
+  sessionsOk: boolean,
 ): MobileAppFixture {
   return {
-    threads: sessions.map((session) => ({
-      id: session.session_id ?? session.id ?? '',
-      title: session.name ?? '',
-      subtitle: session.last_message?.content ?? '',
-      initials: extractInitials(session.name ?? ''),
-      unread: session.unread_count ?? 0,
-      muted: session.muted ?? false,
-      participantKind: (session.type === 'group' ? 'group' : 'agent') as 'agent' | 'group',
-      status: 'online' as const,
-      lastActivity: session.last_message_at ?? session.updated_at ?? new Date().toISOString(),
-    })),
+    threads: sessions
+      // Sessions without any id would produce unusable `id: ''` threads.
+      .filter((session) => Boolean(session.session_id ?? session.id))
+      .map((session) => ({
+        id: session.session_id ?? session.id ?? '',
+        title: session.name ?? '',
+        subtitle: session.last_message?.content ?? '',
+        initials: extractInitials(session.name ?? ''),
+        unread: session.unread_count ?? 0,
+        muted: session.muted ?? false,
+        participantKind: (session.type === 'group' ? 'group' : 'agent') as 'agent' | 'group',
+        status: 'online' as const,
+        lastActivity: session.last_message_at ?? session.updated_at ?? new Date().toISOString(),
+      })),
     runs: [],
     transcript: {},
-    account: {
-      tokenDanceId: 'signed_in',
-      hubSession: 'active',
-      notification: 'granted',
-      hubSync: 'active',
-      deviceLabel: 'AgentHub Mobile',
-    },
+    // Account state mirrors the real listSessions outcome instead of always
+    // claiming an active signed-in Hub session. Degraded literals follow the
+    // offline fixture scenario (data/mobileFixtures.ts).
+    account: sessionsOk
+      ? {
+          tokenDanceId: 'signed_in',
+          hubSession: 'active',
+          notification: 'granted',
+          hubSync: 'active',
+          deviceLabel: 'AgentHub Mobile',
+        }
+      : {
+          tokenDanceId: 'recovering',
+          hubSession: 'missing',
+          notification: 'prompt',
+          hubSync: 'offline',
+          deviceLabel: 'AgentHub Mobile',
+        },
   };
 }
 

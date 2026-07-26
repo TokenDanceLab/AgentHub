@@ -211,16 +211,6 @@ function parseHubWsEvent(data: unknown): ParsedHubEvent {
   }
 
   // Server frames: { type: string, payload?: unknown, seq_id?: number }
-  if (!Object.hasOwn(body.value, 'payload') && !Object.hasOwn(body.value, 'type')) {
-    return {
-      kind: 'error',
-      error: {
-        kind: 'invalid_event',
-        message: 'Hub WebSocket event is missing required fields',
-      },
-    };
-  }
-
   return {
     kind: 'event',
     event: {
