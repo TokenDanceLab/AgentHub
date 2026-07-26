@@ -266,11 +266,14 @@ func (s *Store) GetSettings() UserSettings {
 	return cloneUserSettings(s.settings, s.settingsMtime)
 }
 
-func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
+// UpsertSettings merges patch into the in-memory settings map. The in-memory
+// write itself cannot fail; the error slot exists so persistence-backed
+// implementations (SQLite/File) can surface persist failures to callers.
+func (s *Store) UpsertSettings(patch map[string]string) (UserSettings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	var view UserSettings
 	s.settings, s.settingsMtime, view = upsertSettingsInMaps(s.settings, patch, nowString())
-	return view
+	return view, nil
 }
