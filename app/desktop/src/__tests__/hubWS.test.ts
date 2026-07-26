@@ -125,10 +125,7 @@ describe("createHubWS", () => {
     init();
     expect(String(t._urls[0])).toBe("ws://hub.example/client/ws");
     expect(String(t._urls[0])).not.toContain("access_token=");
-    const authFrames = t._sent.filter(
-      (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
-    );
-    expect(authFrames.length).toBe(0);
+    expect(t._sent).toEqual([]);
   });
 
   it("can still append query access_token when fallback is enabled", () => {
@@ -159,19 +156,6 @@ describe("createHubWS", () => {
     expect(ok).toBe(true);
   });
 
-  it("calls onAuthFail on auth.fail", () => {
-    let reason = "";
-    t = mockTransport();
-    h = createHubWS({
-      transport: t as unknown as Transport,
-      getToken: token(),
-      onAuthFail: (r) => { reason = r; },
-    });
-    h.connect();
-    t._deliverMessage({ type: HUB_EVENTS.AUTH_FAIL, payload: { reason: "expired" } });
-    expect(reason).toBe("expired");
-  });
-
   it("routes typed events to on() handlers", () => {
     init();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
@@ -179,6 +163,16 @@ describe("createHubWS", () => {
     h.on(HUB_EVENTS.MESSAGE_NEW, (p) => { payload = p; });
     t._deliverMessage({ type: HUB_EVENTS.MESSAGE_NEW, payload: { content: "hi" } });
     expect(payload).toEqual({ content: "hi" });
+  });
+
+  it("sends typing through the only implemented client frame", () => {
+    init();
+
+    h.sendTyping("session-1");
+
+    expect(t._sent).toEqual([
+      { type: HUB_EVENTS.TYPING, payload: { session_id: "session-1" } },
+    ]);
   });
 
   it("routes events to onAny()", () => {

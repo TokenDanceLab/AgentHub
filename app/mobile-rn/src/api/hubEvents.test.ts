@@ -134,6 +134,36 @@ describe('Mobile Hub event stream', () => {
     expect(errors).toEqual([]);
   });
 
+  it('discards removed Hub WS event names', () => {
+    const socket = new FakeSocket();
+    const events: unknown[] = [];
+
+    createHubEventStream({
+      baseUrl: 'http://127.0.0.1:8080',
+      createWebSocket: () => socket,
+      onEvent: (event) => events.push(event),
+    });
+
+    for (const type of [
+      'auth',
+      'auth.fail',
+      'error',
+      'sync.request',
+      'sync.events',
+      'agent.regenerate',
+      'message.edited',
+      'agent.timeout',
+      'run.agent.plan_proposed',
+      'run.agent.plan_approved',
+      'run.agent.plan_rejected',
+      'run.agent.plan_expired',
+    ]) {
+      socket.emitMessage(JSON.stringify({ type, payload: { should_not_arrive: true } }));
+    }
+
+    expect(events).toEqual([]);
+  });
+
   it('reports parse and socket errors', () => {
     const socket = new FakeSocket();
     const statuses: string[] = [];

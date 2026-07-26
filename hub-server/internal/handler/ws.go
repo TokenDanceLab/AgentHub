@@ -3,14 +3,13 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -18,13 +17,12 @@ import (
 
 type WebSocketHandler struct {
 	manager     *ws.Manager
-	jwtSecret   string
 	env         string
 	onTyping    func(userID, sessionID string)
 	userLimiter *middleware.WSUserConnLimiter
 }
 
-func NewWebSocketHandler(manager *ws.Manager, jwtSecret string, env string) *WebSocketHandler {
+func NewWebSocketHandler(manager *ws.Manager, env string) *WebSocketHandler {
 	limiter := middleware.NewWSUserConnLimiter(func(connID string) {
 		// Kick the oldest connection by closing it. The writeLoop/readLoop
 		// goroutines will detect the closure and unregister.
@@ -37,7 +35,6 @@ func NewWebSocketHandler(manager *ws.Manager, jwtSecret string, env string) *Web
 	})
 	return &WebSocketHandler{
 		manager:     manager,
-		jwtSecret:   jwtSecret,
 		env:         env,
 		userLimiter: limiter,
 	}
@@ -48,6 +45,15 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
 }
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
+	// Authentication is an HTTP-upgrade invariant. Fail closed here as
+	// defense-in-depth if a future route forgets WSAuthMiddleware; never fall
+	// back to an in-band token frame that bypasses blacklist/session gates.
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	// Negotiate the fixed bearer marker for the preferred browser auth path
 	// (Sec-WebSocket-Protocol: agenthub.bearer.v1, <hub-jwt>). Per RFC 6455
 	// §4.1 a client that offered subprotocols MUST fail the WebSocket
@@ -86,19 +92,11 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 		return
 	}
 
-	// #82: If middleware already authenticated the upgrade request,
-	// use the Gin context values directly and skip in-protocol auth frame.
-	if userID := c.GetString("user_id"); userID != "" {
-		h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
-		h.userLimiter.Acquire(userID, conn.ID)
-		go h.writeLoop(conn)
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
-		go h.authenticatedReadLoop(conn)
-		return
-	}
-
+	h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
+	h.userLimiter.Acquire(userID, conn.ID)
 	go h.writeLoop(conn)
-	go h.readLoop(conn)
+	h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
+	go h.authenticatedReadLoop(conn)
 }
 
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
@@ -118,61 +116,8 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 	}
 }
 
-func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
-	defer h.cleanupConn(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, data, err := conn.W.Read(ctx)
-	if err != nil {
-		slog.Info("ws auth timeout or read error", "conn_id", conn.ID, "error", err)
-		return
-	}
-
-	frame, err := ws.ParseFrame(data)
-	if err != nil || frame.Type != ws.TypeAuth {
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "first frame must be auth"}))
-		time.Sleep(100 * time.Millisecond)
-		conn.Close()
-		return
-	}
-
-	payload, ok := frame.Payload.(map[string]interface{})
-	if !ok {
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "invalid payload"}))
-		time.Sleep(100 * time.Millisecond)
-		conn.Close()
-		return
-	}
-
-	accessToken, ok := payload["access_token"].(string)
-	if !ok || accessToken == "" {
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "missing access_token"}))
-		time.Sleep(100 * time.Millisecond)
-		conn.Close()
-		return
-	}
-
-	claims, err := jwtutil.ParseToken(accessToken, h.jwtSecret)
-	if err != nil {
-		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "invalid token"}))
-		time.Sleep(100 * time.Millisecond)
-		conn.Close()
-		return
-	}
-
-	h.manager.SetAuth(conn.ID, claims.UserID, claims.DeviceType, claims.DeviceID)
-	h.userLimiter.Acquire(claims.UserID, conn.ID)
-
-	h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
-
-	h.processIncoming(conn)
-}
-
-// authenticatedReadLoop reads messages from an already-authenticated WebSocket connection.
-// It is used when the upgrade request was already authenticated by middleware,
-// so no in-protocol auth frame exchange is needed.
+// authenticatedReadLoop reads messages after the HTTP upgrade middleware has
+// authenticated and authorized the Hub session.
 func (h *WebSocketHandler) authenticatedReadLoop(conn *ws.Conn) {
 	defer h.cleanupConn(conn)
 	h.processIncoming(conn)

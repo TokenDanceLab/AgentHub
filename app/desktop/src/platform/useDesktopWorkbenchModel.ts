@@ -43,9 +43,6 @@ import {
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
-import { useHubWebSocket } from '@/hooks/useHubWebSocket';
-import { useQueryClient } from '@tanstack/react-query';
-import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { fetchHealth } from '@/api/edgeClient';
 import { HEALTH_POLL_MS } from '@/config';
 
@@ -160,17 +157,11 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     getAgentActivityStore().getSnapshot,
   );
 
-  // Hub WebSocket — establish connection for real-time event ingestion.
-  // Cache invalidation on reconnect fills the WS disconnection gap.
-  // Per-event invalidation is handled by the central hubEventBridge.
-  const queryClient = useQueryClient();
-  useHubWebSocket({
-    enabled: hubReady,
-    onReconnect: () => {
-      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
-      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
-    },
-  });
+  // Hub WS real-time ingestion for the workbench runs through
+  // DesktopHubTaskBridge → useHubEventStream (api/hubWS subprotocol auth);
+  // per-event cache invalidation is handled by the central hubEventBridge.
+  // (The former useHubWebSocket ?token= stack never authenticated and was
+  // removed in #1363.)
 
   // Hub data queries — only active in live mode when Hub is authenticated.
   const contactsQuery = useHubContacts({ enabled: hubReady });

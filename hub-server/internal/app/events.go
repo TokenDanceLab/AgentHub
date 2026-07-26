@@ -40,7 +40,7 @@ func (a *App) setupWSManager() {
 	}
 
 	// WebSocket handler (created once here; reused by routes)
-	a.WebSocketHandler = handler.NewWebSocketHandler(a.mgr, a.Config.JWT.Secret, a.Config.Server.Env)
+	a.WebSocketHandler = handler.NewWebSocketHandler(a.mgr, a.Config.Server.Env)
 	a.WebSocketHandler.SetOnTyping(func(userID, sessionID string) {
 		frame := ws.NewFrame(ws.TypeTyping, map[string]interface{}{
 			"user_id":    userID,

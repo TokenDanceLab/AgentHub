@@ -22,6 +22,7 @@ import {
   type HubClientOptions,
   type HubSession,
 } from '@agenthub/shared/hubClient';
+import type { HubEventType } from '@agenthub/shared/hubEvents';
 
 import { mobileFixture } from '@/data/mobileFixtures';
 import type { MobileAppFixture } from '@/types';
@@ -68,48 +69,17 @@ export class HubNetworkError extends Error {
 // ── WebSocket event types (aligned with hub-server WS frames) ──
 // Includes legacy mobile-only types for UI layer backward compatibility.
 
-export type HubWsEventType =
-  // Real Hub server events (from hub-server/internal/ws/frame.go)
-  // Aligned with app/shared/src/hubEvents.ts HUB_EVENTS constants.
-  | 'auth'
-  | 'auth.ok'
-  | 'auth.fail'
-  | 'message.new'
-  | 'message.recall'
-  | 'message.pin'
-  | 'message.unpin'
-  | 'message.read'
-  | 'session.created'
-  | 'session.dissolved'
-  | 'session.member_joined'
-  | 'session.member_left'
-  | 'session.info_updated'
-  | 'device.online'
-  | 'device.offline'
-  | 'device.kicked'
-  | 'agent.dispatch'
-  | 'agent.stream'
-  | 'agent.done'
-  | 'agent.failed'
-  | 'agent.cancel'
-  | 'agent.control'
-  | 'agent.regenerate'
-  | 'notification.new'
-  | 'friend.request'
-  | 'friend.accepted'
-  | 'sync.request'
-  | 'sync.events'
-  | 'run.agent.plan_proposed'
-  | 'run.agent.plan_approved'
-  | 'run.agent.plan_rejected'
-  | 'run.agent.plan_expired'
-  | 'error'
-  // Legacy mobile-only event types (referenced by App.tsx UI layer)
+/** Legacy mobile-only event types (referenced by App.tsx UI layer). */
+export type HubWsLegacyEventType =
   | 'snapshot.updated'
   | 'thread.updated'
   | 'run.updated'
   | 'approval.updated'
   | 'presence.updated';
+
+// Real Hub server event names derive from @agenthub/shared/hubEvents
+// (SSOT mirroring hub-server/internal/ws/frame.go) — no parallel copy here.
+export type HubWsEventType = HubEventType | HubWsLegacyEventType;
 
 export interface HubWsEvent<TPayload = unknown> {
   type: HubWsEventType;

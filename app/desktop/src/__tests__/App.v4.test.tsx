@@ -147,10 +147,6 @@ vi.mock('@/stores/hubStore', () => ({
   useHubStore: vi.fn(() => ({})),
 }));
 
-vi.mock('@/hooks/useHubWebSocket', () => ({
-  useHubWebSocket: vi.fn(() => null),
-}));
-
 vi.mock('@/stores/toastStore', () => ({
   useToastStore: vi.fn(() => ({ showToast: vi.fn() })),
 }));

@@ -18,7 +18,7 @@ func TestSendFrameBufferFullWithoutMetricsRegistered(t *testing.T) {
 		t.Skip("metrics already registered in this test binary; nil-guard path not exercisable")
 	}
 
-	h := NewWebSocketHandler(ws.NewManager(), "test-secret-32-characters-long!!", "")
+	h := NewWebSocketHandler(ws.NewManager(), "")
 	conn := ws.NewConn(nil)
 	// Fill the send buffer so sendFrame takes the drop branch.
 	for i := 0; i < cap(conn.Send); i++ {

@@ -5827,18 +5827,15 @@ components:
           description: Alias for run_id for explicit Hub persistence.
     HubWebSocketFrame:
       type: object
-      required: [type, payload]
+      required: [type]
       description: Hub WebSocket frame envelope. Event-specific payload contracts are documented in api/events.md.
       properties:
         type:
           type: string
           enum:
-            - auth
             - auth.ok
-            - auth.fail
             - typing
             - message.new
-            - message.edited
             - message.recall
             - message.pin
             - message.unpin
@@ -5859,7 +5856,6 @@ components:
             - agent.failed
             - agent.cancel
             - agent.control
-            - agent.timeout
             - team.run.started
             - team.event
             - team.assignment.done

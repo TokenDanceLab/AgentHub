@@ -15,12 +15,10 @@ import type {
   HubAgentDonePayload,
   HubAgentFailedPayload,
   HubAgentCancelPayload,
-  HubAgentRegeneratePayload,
   HubMessage,
   HubNotification,
   HubSession,
   HubFriendEventPayload,
-  HubDevicePresencePayload,
   HubDeviceKickedPayload,
 } from '@shared/hubClient';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
@@ -73,14 +71,6 @@ function onMessageNew(qc: QueryClient, payload: unknown) {
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
     invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
-  }
-}
-
-function onMessageEdited(qc: QueryClient, payload: unknown) {
-  const data = payload as { session_id?: string; message_id?: string };
-  const sessionId = str(data?.session_id);
-  if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
   }
 }
 
@@ -258,36 +248,6 @@ function onAgentControl(_qc: QueryClient, _payload: unknown) {
   // are processed by useHubIntegration — no cache invalidation needed
 }
 
-function onAgentRegenerate(qc: QueryClient, payload: unknown) {
-  const data = payload as HubAgentRegeneratePayload;
-
-  const newTask: AgentTask = {
-    taskId: str(data?.new_task_id),
-    agentId: str(data?.agent_instance_id),
-    prompt: '',
-    status: 'queued',
-    dispatchPayload: (isObj(data) ? data : {}) as Record<string, unknown>,
-    createdAt: new Date().toISOString(),
-  };
-
-  if (newTask.taskId) {
-    getTaskBridge().addTask(newTask);
-  }
-
-  // Find the thread from the original task for targeted invalidation
-  const originalTaskId = str(data?.original_task_id);
-  const originalTask = originalTaskId
-    ? getTaskBridge().tasks.find((t) => t.taskId === originalTaskId)
-    : undefined;
-  const threadId = originalTask?.threadId;
-  if (threadId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(threadId));
-    invalidateQuery(qc, hubQueryKeys.threads.messages(threadId));
-  }
-
-  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-}
-
 // ── Notification & social events ───────────────────────────────
 
 function onNotificationNew(qc: QueryClient, payload: unknown) {
@@ -351,24 +311,6 @@ function onDeviceKicked(_qc: QueryClient, _payload: unknown) {
   // Device kicked — auth middleware clears the session
 }
 
-// ── Plan approval events ──────────────────────────────────────
-
-function onPlanProposed(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-}
-
-function onPlanApproved(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-}
-
-function onPlanRejected(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-}
-
-function onPlanExpired(qc: QueryClient, _payload: unknown) {
-  invalidateAllWithPrefix(qc, hubQueryKeys.agentTeams.root);
-}
-
 // ── Team run events ────────────────────────────────────────────
 
 function onTeamRunStarted(qc: QueryClient, _payload: unknown) {
@@ -393,7 +335,6 @@ type HubEventHandler = (qc: QueryClient, payload: unknown) => void;
 
 const HUB_EVENT_HANDLERS: Record<string, HubEventHandler> = {
   [HUB_EVENTS.MESSAGE_NEW]: onMessageNew,
-  [HUB_EVENTS.MESSAGE_EDITED]: onMessageEdited,
   [HUB_EVENTS.MESSAGE_RECALL]: onMessageRecall,
   [HUB_EVENTS.MESSAGE_PIN]: onMessagePin,
   [HUB_EVENTS.MESSAGE_UNPIN]: onMessageUnpin,
@@ -411,17 +352,12 @@ const HUB_EVENT_HANDLERS: Record<string, HubEventHandler> = {
   [HUB_EVENTS.AGENT_FAILED]: onAgentFailed,
   [HUB_EVENTS.AGENT_CANCEL]: onAgentCancel,
   [HUB_EVENTS.AGENT_CONTROL]: onAgentControl,
-  [HUB_EVENTS.AGENT_REGENERATE]: onAgentRegenerate,
   [HUB_EVENTS.NOTIFICATION_NEW]: onNotificationNew,
   [HUB_EVENTS.FRIEND_REQUEST]: onFriendRequest,
   [HUB_EVENTS.FRIEND_ACCEPTED]: onFriendAccepted,
   [HUB_EVENTS.DEVICE_ONLINE]: onDeviceOnline,
   [HUB_EVENTS.DEVICE_OFFLINE]: onDeviceOffline,
   [HUB_EVENTS.DEVICE_KICKED]: onDeviceKicked,
-  [HUB_EVENTS.PLAN_PROPOSED]: onPlanProposed,
-  [HUB_EVENTS.PLAN_APPROVED]: onPlanApproved,
-  [HUB_EVENTS.PLAN_REJECTED]: onPlanRejected,
-  [HUB_EVENTS.PLAN_EXPIRED]: onPlanExpired,
   [HUB_EVENTS.TEAM_RUN_STARTED]: onTeamRunStarted,
   [HUB_EVENTS.TEAM_EVENT]: onTeamEvent,
   [HUB_EVENTS.TEAM_ASSIGNMENT_DONE]: onTeamAssignmentDone,
