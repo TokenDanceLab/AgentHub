@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
 // testEventEmitter collects all events emitted during ParseStream for assertions.
@@ -621,6 +623,41 @@ func TestAnthropicSDK_E2E_SSEStream_MalformedJSON(t *testing.T) {
 	}
 	if results[0].Payload["success"] != true {
 		t.Errorf("stream should have completed successfully despite malformed line")
+	}
+}
+
+// TestAnthropicSDK_BuildMessages_SanitizesHistoryAndPrompt verifies that
+// buildMessages passes history messages and the current prompt through
+// runnerctx.SanitizeMessage (control chars stripped, invalid roles filtered),
+// locking the sanitize semantics that the openai-sdk twin mirrors (#1349).
+func TestAnthropicSDK_BuildMessages_SanitizesHistoryAndPrompt(t *testing.T) {
+	adapter := &AnthropicSDKAdapter{
+		model:     "claude-sonnet-4-6",
+		available: true,
+	}
+
+	ctx := runnerctx.RunProcessContext{
+		Messages: []runnerctx.Message{
+			{Role: "user", Content: "Hello\x00World\x1b[31m"},
+			{Role: "hacker", Content: "Injected role"}, // invalid → "system" → dropped
+		},
+		Prompt: "Run\x07this",
+	}
+
+	messages := adapter.buildMessages(ctx)
+
+	// user history + current prompt; the invalid-role message is filtered to
+	// "system" by SanitizeMessage and skipped.
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages (sanitized history + prompt), got %d", len(messages))
+	}
+	if messages[0].Role != "user" || messages[0].Content != "HelloWorld[31m" {
+		t.Errorf("history message = %q/%q, want user/%q",
+			messages[0].Role, messages[0].Content, "HelloWorld[31m")
+	}
+	if messages[1].Role != "user" || messages[1].Content != "Runthis" {
+		t.Errorf("prompt message = %q/%q, want user/%q",
+			messages[1].Role, messages[1].Content, "Runthis")
 	}
 }
 

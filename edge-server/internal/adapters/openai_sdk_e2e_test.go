@@ -845,8 +845,12 @@ func TestOpenAISDK_BuildMessages_WithHistory(t *testing.T) {
 	}
 }
 
-// TestOpenAISDK_BuildMessages_RoleNormalization verifies that non-standard
-// roles are normalized to OpenAI's expected values.
+// TestOpenAISDK_BuildMessages_RoleNormalization verifies that history roles
+// are sanitized against the runnerctx allowlist before conversion, matching
+// the anthropic-sdk twin (#1349): roles outside {user, assistant, system,
+// tool} are rewritten to "system" by SanitizeMessage and therefore dropped
+// with the other system history messages; "tool" is kept because the OpenAI
+// message shape supports it natively.
 func TestOpenAISDK_BuildMessages_RoleNormalization(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
@@ -855,29 +859,32 @@ func TestOpenAISDK_BuildMessages_RoleNormalization(t *testing.T) {
 
 	ctx := runnerctx.RunProcessContext{
 		Messages: []runnerctx.Message{
-			{Role: "agent", Content: "Agent says hello"},    // "agent" → "assistant"
-			{Role: "bot", Content: "Bot says hi"},            // "bot" → "assistant"
+			{Role: "agent", Content: "Agent says hello"},     // invalid → filtered to "system" → dropped
+			{Role: "bot", Content: "Bot says hi"},            // invalid → filtered to "system" → dropped
 			{Role: "system", Content: "Should be skipped"},   // system messages in history are skipped
 			{Role: "tool", Content: "Tool result goes here"}, // "tool" stays "tool"
-			{Role: "unknown", Content: "Unknown role"},       // unknown → "user"
+			{Role: "unknown", Content: "Unknown role"},       // invalid → filtered to "system" → dropped
 		},
 		Prompt: "Continue",
 	}
 
 	messages := adapter.buildMessages(ctx)
 
-	// Expected: system skipped, so 4 history + 1 current = 5 messages (no system prompt set).
-	if len(messages) != 5 {
-		t.Fatalf("expected 5 messages (no system + 4 history + 1 prompt), got %d", len(messages))
+	// Expected: agent/bot/unknown are sanitized to "system" and skipped along
+	// with the real system message, so only tool + current prompt remain
+	// (no system prompt set).
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages (tool + prompt), got %d", len(messages))
 	}
 
-	// Check role normalization.
-	expectedRoles := []string{"assistant", "assistant", "tool", "user", "user"}
+	expectedRoles := []string{"tool", "user"}
 	for i, expected := range expectedRoles {
 		if messages[i].Role != expected {
-			t.Errorf("messages[%d].Role = %q (from %q), want %q",
-				i, messages[i].Role, ctx.Messages[i].Role, expected)
+			t.Errorf("messages[%d].Role = %q, want %q", i, messages[i].Role, expected)
 		}
+	}
+	if messages[0].Content != "Tool result goes here" {
+		t.Errorf("messages[0].Content = %q, want %q", messages[0].Content, "Tool result goes here")
 	}
 }
 
@@ -903,6 +910,42 @@ func TestOpenAISDK_BuildMessages_ReturnType(t *testing.T) {
 	}
 	if messages[0].Content != "Continue." {
 		t.Errorf("messages[0].Content = %q, want %q", messages[0].Content, "Continue.")
+	}
+}
+
+// TestOpenAISDK_BuildMessages_SanitizesHistoryAndPrompt verifies that history
+// messages and the current prompt pass through runnerctx.SanitizeMessage
+// before entering the outgoing payload, locking parity with the anthropic-sdk
+// twin (#1349): ASCII control characters are stripped and invalid roles are
+// filtered out.
+func TestOpenAISDK_BuildMessages_SanitizesHistoryAndPrompt(t *testing.T) {
+	adapter := &OpenAISDKAdapter{
+		model:     "gpt-5.5",
+		available: true,
+	}
+
+	ctx := runnerctx.RunProcessContext{
+		Messages: []runnerctx.Message{
+			{Role: "user", Content: "Hello\x00World\x1b[31m"},
+			{Role: "hacker", Content: "Injected role"}, // invalid → "system" → dropped
+		},
+		Prompt: "Run\x07this",
+	}
+
+	messages := adapter.buildMessages(ctx)
+
+	// user history + current prompt; the invalid-role message is filtered to
+	// "system" by SanitizeMessage and skipped.
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages (sanitized history + prompt), got %d", len(messages))
+	}
+	if messages[0].Role != "user" || messages[0].Content != "HelloWorld[31m" {
+		t.Errorf("history message = %q/%q, want user/%q",
+			messages[0].Role, messages[0].Content, "HelloWorld[31m")
+	}
+	if messages[1].Role != "user" || messages[1].Content != "Runthis" {
+		t.Errorf("prompt message = %q/%q, want user/%q",
+			messages[1].Role, messages[1].Content, "Runthis")
 	}
 }
 
