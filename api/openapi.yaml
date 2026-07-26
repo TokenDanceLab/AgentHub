@@ -1304,24 +1304,50 @@ paths:
       operationId: hubWebSocket
       summary: Hub WebSocket — real-time IM + agent dispatch.
       description: >
-        Main Hub WebSocket route. The production route validates a Hub-issued
-        HS256 access token during HTTP upgrade, using either `access_token` query
-        auth for browser clients or `Authorization: Bearer <token>` for native
-        clients. TokenDance ID RS256 bearer tokens and TokenDance API keys are
-        not Hub WebSocket credentials. The legacy first-frame `auth` event is
-        only for tests and compatibility entries that do not install
-        WSAuthMiddleware. See api/events.md for Hub event types.
+        Main Hub WebSocket route. WSAuthMiddleware validates a Hub-issued HS256
+        access token during HTTP upgrade and resolves that token from exactly
+        two sources, in priority order: (1) `Authorization: Bearer <token>` for
+        native clients that can set headers, (2) the `Sec-WebSocket-Protocol`
+        request header for browsers, carried either as
+        `agenthub.bearer.v1, <hub-jwt>` (preferred two-token form; only the
+        fixed marker is negotiated back so the token is never echoed) or as the
+        single-token `access_token.<hub-jwt>` form. The `access_token` query
+        parameter is deliberately rejected (fail closed) because query strings
+        leak into proxy logs, browser history, and Referer headers — see
+        middleware.extractWSToken. The `hubWebSocketQueryToken` scheme and the
+        `access_token` query parameter documented below are retained only as
+        deprecated compatibility surface and authenticate nothing. TokenDance ID
+        RS256 bearer tokens and TokenDance API keys are not Hub WebSocket
+        credentials. The legacy first-frame `auth` event is only for tests and
+        compatibility entries that do not install WSAuthMiddleware. See
+        api/events.md for Hub event types.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security:
+        # hubWebSocketQueryToken is fail-closed on the server; retained as
+        # deprecated documentation only. Real upgrades use bearerAuth or the
+        # Sec-WebSocket-Protocol token carriage described above.
         - hubWebSocketQueryToken: []
         - bearerAuth: []
       parameters:
         - name: access_token
           in: query
           required: false
+          deprecated: true
           schema: { type: string }
-          description: Hub-issued HS256 access token for browser WebSocket upgrade authentication.
+          description: >
+            NOT ACCEPTED. Hub deliberately ignores this query parameter and
+            fails the upgrade closed. Browsers must carry the Hub-issued HS256
+            access token in Sec-WebSocket-Protocol instead.
+        - name: Sec-WebSocket-Protocol
+          in: header
+          required: false
+          schema: { type: string }
+          description: >
+            Preferred browser token carriage. Send
+            `agenthub.bearer.v1, <hub-jwt>` (Hub negotiates back only the fixed
+            `agenthub.bearer.v1` marker) or the single-token form
+            `access_token.<hub-jwt>`.
       responses:
         "101":
           description: Switching Protocols.
@@ -2338,6 +2364,67 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /client/settings:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetSettings
+      summary: Get every stored key-value setting for the authenticated user.
+      description: Returns a flat string-to-string map. An empty object is returned when the user has no stored settings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Settings map for the authenticated user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    type: object
+                    additionalProperties: { type: string }
+        "401":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubPatchSettings
+      summary: Upsert key-value settings for the authenticated user.
+      description: Partial upsert — keys present in values are inserted or overwritten, keys omitted are left untouched. Responds with the full settings map after the upsert.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        "200":
+          description: Full settings map after the upsert.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    type: object
+                    additionalProperties: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
   # ── Custom Agents ──
 
   /web/agent-profiles:
@@ -2655,6 +2742,38 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+
+  /web/agent-tasks/{id}/regenerate:
+    x-agenthub-device-type: web
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegenerateTask
+      summary: Re-dispatch an agent task, producing a new pending task.
+      description: Creates and dispatches a fresh PendingAgentTask derived from the referenced task. The original task is left as-is; the response carries the newly created task.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The newly created pending agent task.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubPendingAgentTask"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
 
   # ── Auth (routes from router.go not yet documented) ──
 
@@ -3448,6 +3567,183 @@ paths:
 
   # ── Audit Events ──
 
+  # ── Documents (Docs Hub) ──
+
+  /web/documents:
+    x-agenthub-device-type: web
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListDocuments
+      summary: List cloud documents owned by the authenticated user.
+      description: Query filters are bound from the query string; unparsable values are ignored rather than rejected. Returns an items array that is an empty list when nothing matches.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: after
+          in: query
+          required: false
+          schema: { type: string }
+          description: Cursor — return documents after this document id.
+        - name: source
+          in: query
+          required: false
+          schema: { type: string }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lightweight document list items (document content is omitted).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/HubDocumentListItem"
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateDocument
+      summary: Create a cloud document.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                type:
+                  type: string
+                  description: Document format such as md. Hub defaults to md when omitted.
+                tag:
+                  type: string
+                  nullable: true
+                location:
+                  type: string
+                  description: Library/folder label. Hub applies its default library when omitted.
+                content:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: The created document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubDocument"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /web/documents/{id}:
+    x-agenthub-device-type: web
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetDocument
+      summary: Get one owner-scoped cloud document including its content.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The requested document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubDocument"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateDocument
+      summary: Partially update a cloud document.
+      description: Only the fields present in the body are applied; omitted fields keep their stored value.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, nullable: true }
+                type: { type: string, nullable: true }
+                tag: { type: string, nullable: true }
+                content: { type: string, nullable: true }
+      responses:
+        "200":
+          description: The updated document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubDocument"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteDocument
+      summary: Delete a cloud document.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
   /web/audit-events:
     x-agenthub-device-type: web
     get:
@@ -4074,6 +4370,88 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+
+  # ── Team run compete summary / human review gate ──
+  # Mounted flat under /web/team-runs (not under /web/agent-teams/{id}/runs).
+
+  /web/team-runs/{id}/compete-summary:
+    x-agenthub-device-type: web
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: TeamRun id (not the AgentTeam id).
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubTeamRunCompeteSummary
+      summary: Generate the compete-mode comparison summary for a team run.
+      description: >
+        Aggregates every competing member's assignment result for the run and
+        returns an LLM comparison summary. The handler tolerates an optional
+        JSON body with a `prompt` string to steer the comparison and falls back
+        to an empty request when the body is absent or unparsable, so callers
+        that cannot attach a body to GET still work.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Compete comparison summary for the run.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubCompeteSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /web/team-runs/{id}/review-decision:
+    x-agenthub-device-type: web
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: TeamRun id (not the AgentTeam id).
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTeamRunReviewDecision
+      summary: Record a human review decision on a team run DAG plan (ADR-008).
+      description: Applies the reviewer's approve/discuss/modify decision to the pending review gate and returns the recorded review state.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubHumanReviewDecision"
+      responses:
+        "200":
+          description: The recorded human review state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/HubHumanReviewState"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 
   # ── Legacy / Planned (not yet implemented) ──────────────────
 
@@ -4965,10 +5343,19 @@ components:
       type: apiKey
       in: query
       name: access_token
+      x-deprecated: true
+      x-agenthub-server-behavior: rejected
       description: >
-        Hub-issued HS256 access token used by browser clients during /client/ws
-        HTTP upgrade. TokenDance ID bearer tokens and TokenDance API keys are
-        not accepted.
+        DEPRECATED — NOT ACCEPTED BY THE SERVER. Historically documented as the
+        browser transport for a Hub-issued HS256 access token during /client/ws
+        HTTP upgrade. Hub middleware (WSAuthMiddleware / extractWSToken)
+        deliberately ignores the access_token query parameter and fails closed,
+        because query strings leak into proxy logs, browser history, and Referer
+        headers. Browsers must carry the Hub JWT in Sec-WebSocket-Protocol
+        (`agenthub.bearer.v1, <hub-jwt>` or `access_token.<hub-jwt>`); native
+        clients use Authorization: Bearer. This scheme grants no access and is
+        retained only so the existing Hub OpenAPI contract test keeps resolving
+        it; remove it together with that assertion.
   parameters:
     PageSize:
       name: pageSize
@@ -6748,6 +7135,128 @@ components:
         details: { type: object }
         client_ip: { type: string }
         created_at: { type: string, format: date-time }
+
+    HubPendingAgentTask:
+      type: object
+      required: [id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, created_at, expire_at]
+      properties:
+        id: { type: string, format: uuid }
+        agent_instance_id: { type: string, format: uuid }
+        triggered_by_user_id: { type: string, format: uuid }
+        trigger_message_id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        status: { type: string }
+        edge_run_id: { type: string }
+        edge_device_id: { type: string, format: uuid }
+        error_message: { type: string }
+        created_at: { type: string, format: date-time }
+        dispatched_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        expire_at: { type: string, format: date-time }
+
+    HubDocument:
+      type: object
+      required: [id, owner_id, title, type, source, location, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        title: { type: string }
+        type:
+          type: string
+          description: Document format such as md.
+        source: { type: string }
+        source_ref: { type: string }
+        tag: { type: string }
+        location:
+          type: string
+          description: Library/folder label the document belongs to.
+        content: { type: string }
+        status: { type: string }
+        metadata:
+          type: string
+          description: JSON-encoded metadata blob; serialized as a string, not a nested object.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    HubDocumentListItem:
+      type: object
+      required: [id, owner_id, title, type, source, location, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        title: { type: string }
+        type: { type: string }
+        source: { type: string }
+        source_ref: { type: string }
+        tag: { type: string }
+        location: { type: string }
+        status: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    HubCompeteSummaryResponse:
+      type: object
+      required: [team_run_id, summary, entries, created_at]
+      properties:
+        team_run_id: { type: string, format: uuid }
+        summary: { type: string }
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/HubCompeteSummaryEntry"
+        created_at: { type: string, format: date-time }
+
+    HubCompeteSummaryEntry:
+      type: object
+      required: [member_id, assignment_id, result, status]
+      properties:
+        member_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        task_id: { type: string }
+        agent_task_id: { type: string, format: uuid }
+        result: { type: string }
+        status: { type: string }
+
+    HubHumanReviewDecision:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [approve, discuss, modify]
+        comment: { type: string }
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/HubHumanReviewChange"
+
+    HubHumanReviewChange:
+      type: object
+      required: [field, value]
+      properties:
+        field:
+          type: string
+          description: Plan field being modified, for example instructions or next_worker.
+        value: { type: string }
+
+    HubHumanReviewState:
+      type: object
+      required: [review_id, run_id, action, created_at]
+      properties:
+        review_id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        action:
+          type: string
+          enum: [approve, discuss, modify]
+        comment: { type: string }
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/HubHumanReviewChange"
+        decided_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
 
     AgentTeam:
       type: object
