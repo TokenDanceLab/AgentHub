@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
 func TestPinAndForward(t *testing.T) {
@@ -331,11 +332,13 @@ func TestAgentTaskCallbacks(t *testing.T) {
 		return
 	}
 
-	deskLogin := parse(post("/client/auth/login", map[string]interface{}{
-		"username": "tagtcb1", "password": "pass1234",
-		"device_type": "desktop", "device_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01",
-	}))
-	deskTok := extract(deskLogin.Data, "access_token")
+	// /edge/* requires a desktop-type token (DeviceTypeCheck middleware); mint
+	// it directly like TestEdgeDevice does (password login was removed in #1367).
+	deskTok, err := jwtutil.GenerateAccessToken(alice.ID, "desktop",
+		"eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01", testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate desktop token: %v", err)
+	}
 
 	t.Run("TaskAck", func(t *testing.T) {
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/ack", deskTok, nil))
