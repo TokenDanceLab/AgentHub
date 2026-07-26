@@ -4,10 +4,6 @@
  */
 
 import { buildOptionalJsonBody } from './hubClientPayloadBodies';
-import {
-  buildChangePasswordFallbackPath,
-  buildChangePasswordPath,
-} from './hubClientPayloadPaths';
 
 export function buildJsonPostInit(body: unknown): { method: 'POST'; body: string } {
   return { method: 'POST', body: JSON.stringify(body) };
@@ -47,26 +43,6 @@ export function buildPostWithOptionalJsonBody(
   return {
     ...buildPostInit(),
     ...buildOptionalJsonBody(payload),
-  };
-}
-
-/** Primary change-password attempt (POST /change-password). */
-export function buildChangePasswordPrimary(
-  body: unknown,
-): { path: string; init: { method: 'POST'; body: string } } {
-  return {
-    path: buildChangePasswordPath(),
-    init: buildJsonPostInit(body),
-  };
-}
-
-/** Fallback change-password attempt (PUT /password) for older hubs. */
-export function buildChangePasswordFallback(
-  body: unknown,
-): { path: string; init: { method: 'PUT'; body: string } } {
-  return {
-    path: buildChangePasswordFallbackPath(),
-    init: buildJsonPutInit(body),
   };
 }
 

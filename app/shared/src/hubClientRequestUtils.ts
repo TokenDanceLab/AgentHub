@@ -28,14 +28,6 @@ export function shouldContinueRouteFallback(
 }
 
 /**
- * Change-password dual-route: primary POST may 404/405 on older hubs → PUT fallback.
- * Pure residual of the changePassword peel (methods differ, so not requestWithFallback).
- */
-export function shouldUseChangePasswordFallback(error: unknown): boolean {
-  return isRouteFallbackError(error);
-}
-
-/**
  * Final unresolved error after requestWithFallback exhausts paths.
  * Pure residual so the loop body stays a thin orchestration peel.
  */
@@ -88,25 +80,6 @@ export async function runRequestWithRouteFallback<T>(
   }
 
   throw unresolvedRouteFallbackError(fallbackError);
-}
-
-/**
- * Residual dual-route peel for changePassword (#990).
- * Primary POST may 404/405 on older hubs → PUT fallback (methods differ).
- */
-export async function runChangePasswordWithFallback(
-  request: (path: string, init: RequestInit) => Promise<void>,
-  primary: { path: string; init: RequestInit },
-  fallback: { path: string; init: RequestInit },
-): Promise<void> {
-  try {
-    return await request(primary.path, primary.init);
-  } catch (error) {
-    if (shouldUseChangePasswordFallback(error)) {
-      return request(fallback.path, fallback.init);
-    }
-    throw error;
-  }
 }
 
 // ── Residual pure peels (#1023) ───────────────────────────────────────────────

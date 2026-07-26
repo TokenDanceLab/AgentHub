@@ -36,12 +36,9 @@ import type {
 
 import type {
   HubClientOptions,
-  HubRegisterRequest,
-  HubLoginRequest,
   HubAuthResponse,
   HubUserProfile,
   HubUpdateProfileRequest,
-  HubChangePasswordRequest,
   HubOidcAuthorizeRequest,
   HubOidcAuthorizeResponse,
   HubOidcCallbackRequest,
@@ -91,7 +88,6 @@ import {
   invokePathFormDataUpload,
   invokePathInitRequest,
   invokePathsInitRequest,
-  runChangePasswordWithFallback,
   runNormalizedExecutionTargetsListRequest,
 } from './hubClientRequestUtils';
 import {
@@ -113,10 +109,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
   return {
     request,
 
-    register: (body: HubRegisterRequest) =>
-      invokePathInitRequest((path, init) => request<{ user_id: string }>(path, init), hubPayload.buildRegisterRequest(body)),
-    login: (body: HubLoginRequest) =>
-      invokePathInitRequest((path, init) => request<HubAuthResponse>(path, init), hubPayload.buildLoginRequest(body)),
     refresh: (refreshToken: string) =>
       invokePathInitRequest((path, init) => request<HubAuthResponse>(path, init), hubPayload.buildRefreshRequest(refreshToken)),
     logout: () =>
@@ -124,12 +116,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
     me: () => request<HubUserProfile>(hubPayload.buildMePath()),
     updateProfile: (body: HubUpdateProfileRequest) =>
       invokePathInitRequest((path, init) => request<HubUserProfile>(path, init), hubPayload.buildUpdateProfileRequest(body)),
-    changePassword: (body: HubChangePasswordRequest) =>
-      runChangePasswordWithFallback(
-        (path, init) => request<void>(path, init),
-        hubPayload.buildChangePasswordPrimary(body),
-        hubPayload.buildChangePasswordFallback(body),
-      ),
     oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
       invokePathInitRequest((path, init) => request<HubOidcAuthorizeResponse>(path, init), hubPayload.buildOidcAuthorizeRequest(body)),
     oidcCallback: (body: HubOidcCallbackRequest) =>
