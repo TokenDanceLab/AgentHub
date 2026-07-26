@@ -32,6 +32,12 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	}
 
 	decision.Action = normalizeRouteAction(decision.Action)
+	// Terminal-state guard: no route decision (delegate/review/approve/compete/
+	// finish) may mutate a run that already reached a terminal status. This
+	// also protects finishRouteDecision from downgrading completed to failed.
+	if isTerminalTeamRunStatus(run.Status) {
+		return nil, s.rejectRouteDecision(runID, decision, "team run already in terminal status "+run.Status)
+	}
 	if !model.ValidActions()[decision.Action] {
 		return nil, s.rejectRouteDecision(runID, decision, "invalid action")
 	}
@@ -150,8 +156,15 @@ func (s *AgentTeamService) finishRouteDecision(runID string, decision model.Coor
 		return err
 	}
 	status, eventType, payload := finishRouteOutcome(decision)
-	if err := repository.UpdateTeamRunStatus(s.db, runID, status); err != nil {
+	updated, err := repository.UpdateTeamRunStatusIfNotTerminal(s.db, runID, status)
+	if err != nil {
 		return err
+	}
+	if updated == 0 {
+		// The run already reached a terminal status (e.g. a concurrent or
+		// repeated finish): keep the first terminal outcome and skip the
+		// conflicting run.completed/run.failed event so replay stays honest.
+		return nil
 	}
 	return s.appendTeamEvent(runID, eventType, payload)
 }
@@ -453,7 +466,10 @@ func (s *AgentTeamService) CompleteAssignment(ctx context.Context, userID, assig
 		return errcode.AgentTaskNotFound
 	}
 
-	if a.Status != model.AssignmentStatusRunning {
+	// Production writes dispatched (UpdateAssignmentDispatchBinding); running
+	// currently only exists in the read projection (assignmentStatusFromPending).
+	// Accept both so a dispatched assignment can actually reach done.
+	if a.Status != model.AssignmentStatusDispatched && a.Status != model.AssignmentStatusRunning {
 		return errcode.ErrBadRequest
 	}
 
@@ -485,6 +501,12 @@ func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmen
 	}
 	if run.TriggerUserID != userID {
 		return errcode.AgentTaskNotFound
+	}
+
+	// Terminal assignments (done/failed/cancelled) must not be failed again:
+	// repeated fails would rewrite the result and re-trigger fault escalation.
+	if !isActiveAssignmentStatus(a.Status) {
+		return errcode.ErrBadRequest
 	}
 
 	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusFailed, reason); err != nil {

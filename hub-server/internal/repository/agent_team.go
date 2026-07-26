@@ -106,6 +106,21 @@ func UpdateTeamRunStatus(db *gorm.DB, runID, status string) error {
 	return db.Model(&model.AgentTeamRun{}).Where("id = ?", runID).Update("status", status).Error
 }
 
+// UpdateTeamRunStatusIfNotTerminal transitions a run's status only when the
+// current status is not terminal (completed/failed/cancelled). The conditional
+// WHERE makes the check-and-write atomic so a repeated or racing finish cannot
+// downgrade a terminal outcome. Returns the number of rows updated (0 when the
+// run was already terminal or does not exist).
+func UpdateTeamRunStatusIfNotTerminal(db *gorm.DB, runID, status string) (int64, error) {
+	res := db.Model(&model.AgentTeamRun{}).
+		Where("id = ? AND status NOT IN (?, ?, ?)", runID,
+			model.TeamRunStatusCompleted,
+			model.TeamRunStatusFailed,
+			model.TeamRunStatusCancelled).
+		Update("status", status)
+	return res.RowsAffected, res.Error
+}
+
 // AgentTeamAssignment
 
 func CreateAssignment(db *gorm.DB, a *model.AgentTeamAssignment) error {
