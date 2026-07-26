@@ -67,7 +67,7 @@ const (
 	TeamRunStatusCancelled     = "cancelled"
 )
 
-// HumanReviewAction constants for POST /client/team-runs/{id}/review-decision.
+// HumanReviewAction constants for POST /web/team-runs/{id}/review-decision.
 const (
 	ReviewActionApprove = "approve"
 	ReviewActionDiscuss = "discuss"
