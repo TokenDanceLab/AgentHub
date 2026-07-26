@@ -10,7 +10,7 @@
 
 | Item | Value |
 |---|---|
-| Active SPEC | **None** — residual Phases 79–80 closed; pick next from [roadmap P0/P1](../roadmap.md) |
+| Active SPEC | **None** — residual Phases 79–80 closed; codebase audit sweep 2026-07-26 delivered (see below); pick next from [roadmap P0/P1](../roadmap.md) |
 | Closed residual analysis | [post-polish-project-overview](../analysis/post-polish-project-overview.md) · [module-inventory](../analysis/post-polish-module-inventory.md) · [risk-assessment](../analysis/post-polish-risk-assessment.md) |
 | Closed residual plan | [task-breakdown](../plan/post-polish-task-breakdown.md) · [dependency-graph](../plan/post-polish-dependency-graph.md) · [milestones](../plan/post-polish-milestones.md) |
 | Strategy (delivered) | Strangler Fig — thin mobile hubClient + docs authority; **no** big-bang rewrite; **no** static Visual QA chase past 89 |
@@ -38,9 +38,42 @@ Historical cleanup-baseline plan under `docs/plan/task-breakdown.md` (and siblin
 
 **No open residual-program phases.** Next work: pick from roadmap P0/P1 (E2E contract, chat reliability, deploy-only security evidence) — not static Visual QA past 89.
 
+## Codebase audit sweep (2026-07-26)
+
+9 份并行审计（mobile / Go 后端 / docs-CI / 前端 / WS / 依赖 / agentteam / 跨切面架构 / 测试真实性）驱动的 in-repo 清理，当日交付 **18 个 PR**，净删约 **12,000 行**。不是新 SPEC program，是一次性清扫；未竟项全部落 issue。
+
+### Delivered
+
+| 类别 | PR | 结果 |
+|---|---|---|
+| 死代码 | #1374 | web 前 Workbench 层 68 文件 / 10,673 LOC（IM 目录、13 个遗留组件、wsEventBridge/hubAdapters 旧管线） |
+| 产品缺陷 | #1368 #1376 #1380 #1355 | WS Accept 层未协商 bearer subprotocol（浏览器首选鉴权路径握手即坏）· agentteam approve 后投影永久卡 `pending_review` + 终态可覆写 + CompleteAssignment 不可达 · web 已读跨会话写错 seq 且未读永不清 · openai adapter 漏 `SanitizeMessage`（anthropic 孪生已有） |
+| 诚实性 | #1366 #1373 | 启动健康门 `DB()` 错误静默跳过仍报 ok · outbox 7 处投递吞错 · SQLite persist 吞错（PatchSettings 不再假 200）· 删除 OIDC 迁移后打向已删路由的口令测试 |
+| 契约 | #1381 #1382 #1386 | `:ping`/`:ack` 必 404 路径修正 + 死 auth surface 清除 · agentteam TS 补 `pending_review`/`mode`/`route_audit_log`/`reviews` · openapi 补 9 个 operation 并据实改写 `/client/ws` 认证描述 |
+| 供应链 | #1370 #1377 #1346 #1351 | dompurify 死依赖清除 + 6 组 pnpm overrides + vite 6.4.3（清 ~23 条 alert）· TablePreview 文件大小上限缓解 xlsx · 2 条 Go alert 经 `go mod why` 证据 dismiss |
+| 仓库卫生 | #1381 #1350 #1364 | `edge.db-wal`(922KB)+`db-shm` 出库 + `.gitignore` 补模式 · CI go filter 补 `pkg/**`/`go.work*`（堵 CD 未测直推镜像窗口）· 死链与失效指针清理 |
+| 可观测 | #1378 | WS 帧填充 per-conn `seq_id`（gap 检测此前不可能）+ 丢帧采样日志 |
+
+### Open follow-ups（issue-tracked，不在本轮）
+
+| 主题 | Issue |
+|---|---|
+| agentteam check-then-act 并发家族（seq 无 UNIQUE、approval 双决策、dispatch 双触发） | #1383 |
+| agentteam assignment 生命周期设计（running 态谁写、超时不终结、死枚举） | #1384 |
+| agentteam 投影层抽取（GetTeamRunState 读路径隐藏写） | #1385 |
+| WS 死协议面 / WS 鉴权只在 upgrade 校验 | #1362 · #1363 |
+| openapi query-token scheme 被测试钉死 / 悬空 `$ref` | #1387 · #1388 |
+| xlsx 换源决策 · 口令测试 OIDC 化重写 | #1358 · #1369 |
+
+### 审计澄清（推翻既有叙事）
+
+- Desktop「15 个 pre-existing 测试失败」是**过期叙事**：CI 实测 225 文件 / 1927 tests 全绿，注释引用的清单文档早已删除。
+- 前端三包**无 coverage 门禁**：shared 声明 60% thresholds 但 CI 无任何 `--coverage` 运行，"Coverage Enforced" 不成立。
+- Web/Desktop/Shared **未患** mobile 的 replicated-helper 病，251 个测试文件仅一处同构病灶。
+
 ## Product tip & Visual QA
 
-**Product tip**: 见 master（最近合并 #1353）
+**Product tip**: 见 master（最近合并 #1386）
 **Gate**: **89**/100 — 🟢🟢🟢 **SHIP**
 **Gate history**: 55 → 76 → 79 → 82 → 84 → 85 → 87 → 88 → **89**
 
@@ -98,3 +131,4 @@ Optional future: wire script as `workflow_dispatch` only — not every PR (see r
 | 2026-07-21 | Residual program delivered: Phase 79 #1340 + Phase 80 #1341; milestones 98–99 closed; hubClient ~342 LOC |
 | 2026-07-21 | Closeout #1342 + SSOT sync #1343 · tip `1ac86aa5`; analysis inventory marked delivered |
 | 2026-07-21 | CI: mobile light path-filter + backend perf/leak `workflow_dispatch` (T5) |
+| 2026-07-26 | **Codebase audit sweep** — 9 份并行审计 → 18 PR 合入，净删 ~12,000 行；WS bearer 握手 / agentteam 审阅门 / web 已读 / openai sanitize 四处产品缺陷修复；~25 条依赖 alert 清理；922KB SQLite WAL 出库；未竟项落 #1358 #1362 #1363 #1369 #1383–#1385 #1387 #1388 |
