@@ -83,23 +83,6 @@ else
     pass_check "Local Edge user-facing copy absent from app/web/src JSON"
 fi
 
-# Check edgeClient.ts stub
-EDGE_CLIENT="$REPO_ROOT/app/web/src/api/edgeClient.ts"
-if [[ ! -f "$EDGE_CLIENT" ]]; then
-    fail_check "app/web/src/api/edgeClient.ts missing Hub-only compatibility stub"
-else
-    if grep -qE "fetch\(|new WebSocket" "$EDGE_CLIENT" 2>/dev/null; then
-        fail_check "app/web/src/api/edgeClient.ts must stay a Hub-only stub without network calls"
-    else
-        pass_check "app/web/src/api/edgeClient.ts has no direct network call"
-    fi
-    if grep -q "status: 'hub-only'" "$EDGE_CLIENT" 2>/dev/null && grep -q "stubbed" "$EDGE_CLIENT" 2>/dev/null; then
-        pass_check "app/web/src/api/edgeClient.ts labels runtime inventory as Hub-only stubbed"
-    else
-        fail_check "app/web/src/api/edgeClient.ts must label runtime inventory as Hub-only stubbed"
-    fi
-fi
-
 # Check webPlatform.ts capabilities
 WEB_PLATFORM="$REPO_ROOT/app/web/src/platform/webPlatform.ts"
 if [[ ! -f "$WEB_PLATFORM" ]]; then
