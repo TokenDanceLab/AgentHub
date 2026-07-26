@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -79,64 +80,84 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		return nil, s.rejectRouteDecision(runID, decision, "next_worker is not a team member")
 	}
 
-	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return nil, err
-	}
-	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
-		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
-	}
-	timedOut, err := s.hasTimedOutActiveAssignment(runID)
-	if err != nil {
-		return nil, err
-	}
-	if timedOut {
-		return nil, s.rejectRouteDecision(runID, decision, "assignment timeout reached")
-	}
-	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return nil, err
-	}
-	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
-		return nil, s.rejectRouteDecision(runID, decision, "active subagent limit reached")
-	}
-	repeatCount, err := s.countMatchingRouteDecisions(runID, decision)
-	if err != nil {
-		return nil, err
-	}
-	if repeatCount >= s.guardrails.MaxRouteRepeats {
-		return nil, s.rejectRouteDecision(runID, decision, "route repeat limit reached")
-	}
-	budgetExceeded, err := s.teamRunBudgetExceeded(runID)
-	if err != nil {
-		return nil, err
-	}
-	if budgetExceeded {
-		return nil, s.rejectRouteDecision(runID, decision, "team run budget exceeded")
-	}
+	// Serialize guardrail counting + assignment creation + task creation
+	// inside a per-run row lock so two concurrent route decisions cannot
+	// both pass the check-then-act gap (#1383).
+	var assignment *model.AgentTeamAssignment
+	var task *model.AgentTeamTask
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, runID); err != nil {
+			return err
+		}
+		lockedRun, err := repository.GetTeamRunByID(tx, runID)
+		if err != nil {
+			return err
+		}
+		if isTerminalTeamRunStatus(lockedRun.Status) {
+			return rejectRoute("team run already in terminal status " + lockedRun.Status)
+		}
+		timedOut, err := s.hasTimedOutActiveAssignmentDB(tx, runID)
+		if err != nil {
+			return err
+		}
+		if timedOut {
+			return rejectRoute("assignment timeout reached")
+		}
+		repeatCount, err := s.countMatchingRouteDecisionsDB(tx, runID, decision)
+		if err != nil {
+			return err
+		}
+		if repeatCount >= s.guardrails.MaxRouteRepeats {
+			return rejectRoute("route repeat limit reached")
+		}
+		budgetExceeded, err := s.teamRunBudgetExceededDB(tx, runID)
+		if err != nil {
+			return err
+		}
+		if budgetExceeded {
+			return rejectRoute("team run budget exceeded")
+		}
+		taskCount, err := repository.CountAssignmentsByTeamRun(tx, runID)
+		if err != nil {
+			return err
+		}
+		if taskCount >= s.guardrails.MaxTasksPerTeamRun {
+			return rejectRoute("task limit reached")
+		}
+		activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, runID)
+		if err != nil {
+			return err
+		}
+		if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
+			return rejectRoute("active subagent limit reached")
+		}
+		assignment, err = s.createAssignmentInTx(tx, ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
+		if err != nil {
+			return err
+		}
+		task = newTeamTaskFromRoute(runID, assignment.ID, worker.ID, decision)
+		if err := repository.CreateTeamTask(tx, task); err != nil {
+			return err
+		}
+		decision.Accepted = true
+		decision.SubtaskID = firstNonEmptyString(decision.SubtaskID, task.ID)
+		decision.AgentID = firstNonEmptyString(decision.AgentID, worker.ID)
 
-	assignment, err := s.CreateAssignment(ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
+		if err := s.appendTeamEventTx(tx, runID, model.TeamEventRouteDecided, decision); err != nil {
+			return err
+		}
+		if err := s.appendTeamEventTx(tx, runID, model.TeamEventAssignmentCreated, assignment); err != nil {
+			return err
+		}
+		return s.appendTeamEventTx(tx, runID, model.TeamEventTaskCreated, task)
+	})
 	if err != nil {
+		if reason, rejected := routeRejectionReason(err); rejected {
+			return nil, s.rejectRouteDecision(runID, decision, reason)
+		}
 		if appendErr := s.appendRouteRejected(runID, decision, err.Error()); appendErr != nil {
 			return nil, appendErr
 		}
-		return nil, err
-	}
-	task := newTeamTaskFromRoute(runID, assignment.ID, worker.ID, decision)
-	if err := repository.CreateTeamTask(s.db, task); err != nil {
-		return nil, err
-	}
-	decision.Accepted = true
-	decision.SubtaskID = firstNonEmptyString(decision.SubtaskID, task.ID)
-	decision.AgentID = firstNonEmptyString(decision.AgentID, worker.ID)
-
-	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
-		return nil, err
-	}
-	if err := s.appendTeamEvent(runID, model.TeamEventAssignmentCreated, assignment); err != nil {
-		return nil, err
-	}
-	if err := s.appendTeamEvent(runID, model.TeamEventTaskCreated, task); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +208,11 @@ func (s *AgentTeamService) appendRouteRejected(runID string, decision model.Coor
 }
 
 func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
-	events, err := repository.ListTeamEventsByRun(s.db, runID)
+	return s.countMatchingRouteDecisionsDB(s.db, runID, decision)
+}
+
+func (s *AgentTeamService) countMatchingRouteDecisionsDB(db *gorm.DB, runID string, decision model.CoordinatorRouteDecision) (int, error) {
+	events, err := repository.ListTeamEventsByRun(db, runID)
 	if err != nil {
 		return 0, err
 	}
@@ -206,7 +231,37 @@ func (s *AgentTeamService) appendTeamEvent(runID, eventType string, payload any)
 	})
 }
 
+// appendTeamEventTx is the transaction-aware variant used inside per-run
+// serialized blocks (DecideApproval, ResolveConflict).
+func (s *AgentTeamService) appendTeamEventTx(tx *gorm.DB, runID, eventType string, payload any) error {
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return repository.AppendTeamEvent(tx, &model.AgentTeamEvent{
+		TeamRunID: runID,
+		Type:      eventType,
+		Payload:   string(payloadBytes),
+	})
+}
+
 func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error) {
+	var assignment *model.AgentTeamAssignment
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.LockTeamRunForUpdate(tx, teamRunID); err != nil {
+			return err
+		}
+		var err error
+		assignment, err = s.createAssignmentInTx(tx, ctx, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr)
+		return err
+	})
+	return assignment, err
+}
+
+// createAssignmentInTx is the transaction-aware core of CreateAssignment.
+// It uses tx for all DB operations so callers can serialize guardrail
+// counting + insert inside a per-run row lock (#1383).
+func (s *AgentTeamService) createAssignmentInTx(tx *gorm.DB, ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error) {
 	if taskPrompt == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -215,7 +270,7 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	}
 
 	// 1. Query TeamRun and verify trigger user.
-	run, err := repository.GetTeamRunByID(s.db, teamRunID)
+	run, err := repository.GetTeamRunByID(tx, teamRunID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.AgentTaskNotFound
@@ -227,7 +282,7 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	}
 
 	// 2. Query fromMember and verify role is supervisor.
-	fromMember, err := repository.GetTeamMemberByID(s.db, fromMemberID)
+	fromMember, err := repository.GetTeamMemberByID(tx, fromMemberID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.AgentNotFound
@@ -239,7 +294,7 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	}
 
 	// 3. Query toMember and verify same team.
-	toMember, err := repository.GetTeamMemberByID(s.db, toMemberID)
+	toMember, err := repository.GetTeamMemberByID(tx, toMemberID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.AgentNotFound
@@ -263,7 +318,7 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 			return nil, errcode.ErrBadRequest
 		}
 		visitedAncestors[parentID] = struct{}{}
-		parentAssignment, aErr := repository.GetAssignmentByToMember(s.db, teamRunID, parentID)
+		parentAssignment, aErr := repository.GetAssignmentByToMember(tx, teamRunID, parentID)
 		if aErr != nil {
 			if errors.Is(aErr, gorm.ErrRecordNotFound) {
 				break // root of chain
@@ -283,14 +338,14 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	}
 
 	// 5. Check total and active assignment limits for this team run.
-	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, teamRunID)
+	taskCount, err := repository.CountAssignmentsByTeamRun(tx, teamRunID)
 	if err != nil {
 		return nil, err
 	}
 	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
 		return nil, errcode.ErrBadRequest
 	}
-	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, teamRunID)
+	activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, teamRunID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,13 +371,18 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 		Status:       model.AssignmentStatusPending,
 		Depth:        newDepth,
 	}
-	if err := repository.CreateAssignment(s.db, assignment); err != nil {
+	if err := repository.CreateAssignment(tx, assignment); err != nil {
 		return nil, err
 	}
 	return assignment, nil
 }
 
 // DispatchAssignment dispatches a pending assignment to the target agent.
+// The flow is CAS-claim-first to prevent dual dispatch (#1383):
+//  1. validate the immutable routing inputs
+//  2. CAS claim pending → dispatched; only one caller wins
+//  3. create local dispatch records and trigger the external task
+//  4. bind run_id conditionally, or release the unbound claim on failure
 func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assignmentID string) error {
 	// 1. Query assignment and verify team run owner.
 	a, err := repository.GetAssignmentByID(s.db, assignmentID)
@@ -368,27 +428,48 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return errcode.AgentNotFound
 	}
 
-	teamTask, err := s.ensureTeamTaskForAssignment(a)
+	// Claim before creating the TeamTask/message so a losing concurrent caller
+	// has no local or external side effects.
+	claimed, err := repository.ClaimAssignmentForDispatch(s.db, assignmentID)
 	if err != nil {
 		return err
+	}
+	if claimed == 0 {
+		current, getErr := repository.GetAssignmentByID(s.db, assignmentID)
+		if getErr != nil {
+			return getErr
+		}
+		if current.Status == model.AssignmentStatusDispatched || assignmentAlreadyBound(current) {
+			return nil
+		}
+		return errcode.ErrBadRequest
+	}
+
+	teamTask, err := s.ensureTeamTaskForAssignment(a)
+	if err != nil {
+		return s.releaseDispatchClaim(assignmentID, err)
 	}
 
 	triggerMessageID, err := s.createAssignmentDispatchMessage(ctx, userID, run.SessionID, a)
 	if err != nil {
-		return err
+		return s.releaseDispatchClaim(assignmentID, err)
 	}
 
 	pendingTask, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, targetAIID, "", "", "", teamRunTargetID(run))
 	if triggerErr != nil {
 		slog.Error("failed to trigger dispatch for assignment", "assignment_id", assignmentID, "error", triggerErr)
-		return triggerErr
+		return s.releaseDispatchClaim(assignmentID, triggerErr)
 	}
 	if pendingTask == nil || pendingTask.ID == "" {
-		return errcode.ErrInternal
+		return s.releaseDispatchClaim(assignmentID, errcode.ErrInternal)
 	}
 
-	if err := repository.UpdateAssignmentDispatchBinding(s.db, assignmentID, pendingTask.ID); err != nil {
+	bound, err := repository.BindClaimedAssignmentDispatch(s.db, assignmentID, pendingTask.ID)
+	if err != nil {
 		return err
+	}
+	if bound != 1 {
+		return fmt.Errorf("bind dispatch claim for assignment %s: %w", assignmentID, errcode.ErrInternal)
 	}
 	if err := repository.UpdateTeamTaskDispatchBinding(s.db, teamTask.ID, pendingTask.ID); err != nil {
 		return err
@@ -398,6 +479,37 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 	}
 
 	return nil
+}
+
+type routeDecisionRejection struct {
+	reason string
+}
+
+func (e *routeDecisionRejection) Error() string {
+	return e.reason
+}
+
+func rejectRoute(reason string) error {
+	return &routeDecisionRejection{reason: reason}
+}
+
+func routeRejectionReason(err error) (string, bool) {
+	var rejection *routeDecisionRejection
+	if !errors.As(err, &rejection) {
+		return "", false
+	}
+	return rejection.reason, true
+}
+
+func (s *AgentTeamService) releaseDispatchClaim(assignmentID string, cause error) error {
+	released, err := repository.ReleaseAssignmentDispatchClaim(s.db, assignmentID)
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("release dispatch claim: %w", err))
+	}
+	if released != 1 {
+		return errors.Join(cause, fmt.Errorf("release dispatch claim: %w", errcode.ErrInternal))
+	}
+	return cause
 }
 
 func (s *AgentTeamService) ensureTeamTaskForAssignment(a *model.AgentTeamAssignment) (*model.AgentTeamTask, error) {
