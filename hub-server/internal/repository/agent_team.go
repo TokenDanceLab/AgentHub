@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -268,21 +270,59 @@ func ListTeamArtifactsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamArt
 
 // AgentTeamEvent
 
+// appendTeamEventMaxAttempts bounds how often AppendTeamEvent retries after
+// losing the (team_run_id, seq) unique-index race (migration 0056) to a
+// concurrent append. Each attempt re-reads MAX(seq) inside a fresh
+// transaction, so a small bound is enough even under bursts.
+const appendTeamEventMaxAttempts = 5
+
+// isUniqueViolation reports whether err is a unique-constraint violation.
+// Postgres surfaces SQLSTATE 23505 as "duplicate key value violates unique
+// constraint"; SQLite (unit tests) reports "UNIQUE constraint failed". The
+// substring match follows the existing isDuplicateKeyError convention in
+// service/message.
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
+}
+
+// AppendTeamEvent appends an event with the next per-run seq. The MAX(seq)+1
+// read and the insert run in one transaction, and the unique index on
+// (team_run_id, seq) turns a concurrent append racing the same seq into a
+// unique violation instead of a silent duplicate; losing appenders retry with
+// a freshly read MAX(seq).
 func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
 	if event.Payload == "" {
 		event.Payload = "{}"
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		var maxSeq int
-		if err := tx.Model(&model.AgentTeamEvent{}).
-			Where("team_run_id = ?", event.TeamRunID).
-			Select("COALESCE(MAX(seq), 0)").
-			Scan(&maxSeq).Error; err != nil {
+	var lastErr error
+	for attempt := 0; attempt < appendTeamEventMaxAttempts; attempt++ {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var maxSeq int
+			if err := tx.Model(&model.AgentTeamEvent{}).
+				Where("team_run_id = ?", event.TeamRunID).
+				Select("COALESCE(MAX(seq), 0)").
+				Scan(&maxSeq).Error; err != nil {
+				return err
+			}
+			event.Seq = maxSeq + 1
+			return tx.Create(event).Error
+		})
+		if err == nil {
+			return nil
+		}
+		if !isUniqueViolation(err) {
 			return err
 		}
-		event.Seq = maxSeq + 1
-		return tx.Create(event).Error
-	})
+		lastErr = err
+	}
+	return lastErr
 }
 
 // maxTeamEventsPerRun caps the number of team events returned by
