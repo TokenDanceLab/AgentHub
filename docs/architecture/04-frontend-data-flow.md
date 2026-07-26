@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-27
+> 最后更新：2026-07-27
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
@@ -94,6 +94,8 @@ Hub WS event
   -> transcript normalization
   -> shared renderer
 ```
+
+Web live `AGENT_STREAM` transcript commits use a one-display-frame (16 ms) microbatch: every original event ID and sequence remains intact and ordered while React commits burst arrivals together. A non-stream frame, transport disconnect, conversation switch, or effect cleanup flushes pending stream events first. React Query invalidation is a separate 250 ms trailing window.
 
 Desktop may also consume Local Edge EventStore / Run lifecycle events through the Desktop adapter. The UI layer only sees normalized transcript blocks and evidence refs.
 
