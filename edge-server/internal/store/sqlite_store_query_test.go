@@ -637,9 +637,11 @@ func TestSQLiteResidualPureHelpers1032(t *testing.T) {
 	if !shouldSyncAfterCleanup(RunCleanupResult{RemovedRuns: 1}) || !shouldSyncAfterCleanup(RunCleanupResult{RemovedItems: 2}) {
 		t.Fatal("cleanup sync")
 	}
-	empty := finalizeSQLiteCleanupAfterPersist(RunCleanupResult{RemovedRuns: 3}, errors.New("p"))
-	if empty.RemovedRuns != 0 {
-		t.Fatalf("cleanup persist fail = %#v", empty)
+	// Persist failure still returns the in-memory cleanup counts; LastPersistError
+	// is the durable honesty signal (no false "nothing cleaned" zeroing).
+	failed := finalizeSQLiteCleanupAfterPersist(RunCleanupResult{RemovedRuns: 3}, errors.New("p"))
+	if failed.RemovedRuns != 3 {
+		t.Fatalf("cleanup persist fail = %#v, want RemovedRuns retained", failed)
 	}
 	kept := finalizeSQLiteCleanupAfterPersist(RunCleanupResult{RemovedRuns: 3}, nil)
 	if kept.RemovedRuns != 3 {

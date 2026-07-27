@@ -78,6 +78,7 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	defer s.mu.Unlock()
 
 	s.projects, s.threads, s.runs, s.items, s.pins, s.diffs, s.artifacts, s.previews, s.userProfiles, s.agentProfiles,
-		s.projectOrder, s.threadOrder, s.runOrder, s.itemOrder, s.pinOrder, s.diffOrder, s.artifactOrder, s.previewOrder, s.userProfileOrder, s.agentProfileOrder =
+		s.projectOrder, s.threadOrder, s.runOrder, s.itemOrder, s.pinOrder, s.diffOrder, s.artifactOrder, s.previewOrder, s.userProfileOrder, s.agentProfileOrder,
+		s.settings, s.settingsMtime =
 		materializeFileSnapshot(snapshot)
 }

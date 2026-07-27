@@ -84,11 +84,12 @@ func shouldSyncAfterCleanup(result RunCleanupResult) bool {
 }
 
 // finalizeSQLiteCleanupAfterPersist maps a cleanup result + persist outcome.
-// On persist failure the public API returns an empty result (same as before).
+// Persist failures are recorded on the store via lastErr; the in-memory cleanup
+// counts are still returned so callers do not treat a durable failure as a no-op
+// while memory has already dropped the terminal runs. LastPersistError remains
+// the durable status signal for honesty checks.
 func finalizeSQLiteCleanupAfterPersist(result RunCleanupResult, persistErr error) RunCleanupResult {
-	if persistErr != nil {
-		return RunCleanupResult{}
-	}
+	_ = persistErr
 	return result
 }
 

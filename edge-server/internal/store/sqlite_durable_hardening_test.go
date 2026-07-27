@@ -3,9 +3,12 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -248,5 +251,184 @@ func TestSQLiteUpsertSettingsSurfacesPersistError(t *testing.T) {
 	}
 	if s.LastPersistError() == nil {
 		t.Fatal("LastPersistError = nil, want recorded persist error")
+	}
+}
+
+// TestSQLiteSettingsSurviveReopen pins the durable settings path: settings live
+// only in the snapshot payload, so applySnapshot must restore Settings/SettingsMtime
+// or reopen silently drops them (false success on persistence).
+func TestSQLiteSettingsSurviveReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-settings-reopen.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	if _, err := s.UpsertSettings(map[string]string{"theme": "dark", "locale": "zh-CN"}); err != nil {
+		t.Fatalf("UpsertSettings returned error: %v", err)
+	}
+	before := s.GetSettings()
+	if before.Values["theme"] != "dark" || before.Values["locale"] != "zh-CN" || before.UpdatedAt == "" {
+		t.Fatalf("GetSettings before close = %#v, want dark/zh-CN with mtime", before)
+	}
+	s.Close()
+
+	restored, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite reopen returned error: %v", err)
+	}
+	defer restored.Close()
+
+	got := restored.GetSettings()
+	if got.Values["theme"] != "dark" || got.Values["locale"] != "zh-CN" {
+		t.Fatalf("GetSettings after reopen = %#v, want durable theme/locale", got)
+	}
+	if got.UpdatedAt == "" {
+		t.Fatal("GetSettings after reopen missing UpdatedAt")
+	}
+}
+
+// TestSQLiteBoolWriteSurfacesPersistFailure ensures SetRunStatus does not report
+// ok=true when the durable write fails (no false success on bool writers).
+func TestSQLiteBoolWriteSurfacesPersistFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-bool-persist-err.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	project, err := s.CreateProject("proj_bool_persist", "Bool Persist", "")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := s.CreateThread("thread_bool_persist", project.ID, "Thread", "", "", "")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_bool_persist", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if err := s.db.Close(); err != nil {
+		t.Fatalf("db.Close returned error: %v", err)
+	}
+
+	if _, ok := s.SetRunStatus(run.ID, "started"); ok {
+		t.Fatal("SetRunStatus after db close returned ok=true, want false on persist failure")
+	}
+	if s.LastPersistError() == nil {
+		t.Fatal("LastPersistError = nil after bool write persist failure")
+	}
+}
+
+// TestSQLiteCleanupRunsSurfacesPersistFailure keeps cleanup counts honest when
+// memory already dropped terminal runs but the durable write failed.
+func TestSQLiteCleanupRunsSurfacesPersistFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-cleanup-persist-err.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	project, err := s.CreateProject("proj_cleanup_persist", "Cleanup Persist", "")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := s.CreateThread("thread_cleanup_persist", project.ID, "Thread", "", "", "")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_cleanup_persist", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := s.SetRunStatus(run.ID, "finished"); !ok {
+		t.Fatal("SetRunStatus finished returned false")
+	}
+	if _, err := s.CreateItem(Item{
+		ID:        "item_cleanup_persist_run",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "event",
+		Role:      "assistant",
+		Status:    "created",
+		Content:   "bound to finished run",
+	}); err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+
+	if err := s.db.Close(); err != nil {
+		t.Fatalf("db.Close returned error: %v", err)
+	}
+
+	result := s.CleanupRuns(RunCleanupOptions{
+		Now:                      time.Now().UTC().Add(48 * time.Hour),
+		TerminalTTL:              time.Hour,
+		MaxTerminalRunsPerThread: 0,
+	})
+	if result.RemovedRuns != 1 {
+		t.Fatalf("CleanupRuns after db close = %#v, want RemovedRuns=1 (memory already cleaned)", result)
+	}
+	if s.LastPersistError() == nil {
+		t.Fatal("LastPersistError = nil after cleanup persist failure")
+	}
+}
+
+// TestSQLiteConcurrentWritersSerializeThroughPersistMutex verifies concurrent
+// writers do not corrupt durable state under the single-connection + persistMu boundary.
+func TestSQLiteConcurrentWritersSerializeThroughPersistMutex(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-concurrent-persist.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	project, err := s.CreateProject("proj_concurrent_persist", "Concurrent Persist", "")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := s.CreateThread("thread_concurrent_persist", project.ID, "Thread", "", "", "")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+
+	const writers = 24
+	var wg sync.WaitGroup
+	errCh := make(chan error, writers)
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			runID := fmt.Sprintf("run_concurrent_persist_%d", idx)
+			if _, err := s.CreateRun(runID, project.ID, thread.ID); err != nil {
+				errCh <- err
+				return
+			}
+			if _, ok := s.SetRunStatus(runID, "started"); !ok {
+				errCh <- fmt.Errorf("SetRunStatus(%s) returned false", runID)
+				return
+			}
+			if _, err := s.CreateThreadMessage(fmt.Sprintf("item_concurrent_persist_%d", idx), thread.ID, "assistant", "ok"); err != nil {
+				errCh <- err
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent writer error: %v", err)
+	}
+	if err := s.LastPersistError(); err != nil {
+		t.Fatalf("LastPersistError after concurrent writes: %v", err)
+	}
+	s.Close()
+
+	restored, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite reopen returned error: %v", err)
+	}
+	defer restored.Close()
+	if got := restored.ListRuns(thread.ID); len(got) != writers {
+		t.Fatalf("restored runs = %d, want %d", len(got), writers)
+	}
+	if got := restored.ListThreadItems(thread.ID); len(got) != writers {
+		t.Fatalf("restored items = %d, want %d", len(got), writers)
 	}
 }
