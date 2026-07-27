@@ -909,7 +909,8 @@ func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
 	snap.ProjectOrder = []string{"missing", "p1"}
 	snap.Projects["p2"] = Project{ID: "p2", Name: "Extra"}
 	gotProjects, gotThreads, gotRuns, gotItems, gotPins, gotDiffs, gotArtifacts, gotPreviews, gotUsers, gotAgents,
-		projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userOrder, agentOrder :=
+		projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userOrder, agentOrder,
+		gotSettings, gotSettingsMtime :=
 		materializeFileSnapshot(snap)
 	if len(gotProjects) != 2 || gotProjects["p1"].Name != "Local" || gotProjects["p2"].Name != "Extra" {
 		t.Fatalf("materialize projects = %#v", gotProjects)
@@ -928,6 +929,14 @@ func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
 	}
 	if len(diffOrder) != 1 || len(artifactOrder) != 1 || len(previewOrder) != 1 || len(userOrder) != 1 || len(agentOrder) != 1 {
 		t.Fatalf("materialize residual orders unexpected")
+	}
+	if gotSettingsMtime != "mtime" || gotSettings["theme"] != "dark" {
+		t.Fatalf("materialize settings = %#v mtime=%q, want theme=dark mtime=mtime", gotSettings, gotSettingsMtime)
+	}
+	// Settings isolation on materialize.
+	snap.Settings["theme"] = "mutated"
+	if gotSettings["theme"] != "dark" {
+		t.Fatalf("materializeFileSnapshot failed to clone settings: %#v", gotSettings)
 	}
 	// Artifact content source isolation on materialize.
 	snap.Artifacts["a1"].ContentSource.Path = "again.txt"

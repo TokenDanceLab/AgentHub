@@ -218,6 +218,70 @@ func TestSQLiteStoreCreatesNestedWindowsStylePath(t *testing.T) {
 	}
 }
 
+// TestSQLiteMigrationUsesDedicatedConnection ensures readiness/migration helpers
+// open an independent connection (MaxOpenConns=1, busy_timeout set) so they do
+// not share the live store handle and create flaky lock races.
+func TestSQLiteMigrationUsesDedicatedConnection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-migration-dedicated.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	defer s.Close()
+
+	applied, err := SQLiteAppliedMigrations(path)
+	if err != nil {
+		t.Fatalf("SQLiteAppliedMigrations on live store path returned error: %v", err)
+	}
+	if got, want := migrationVersions(applied), "1,2,3,4"; got != want {
+		t.Fatalf("applied migrations via dedicated connection = %s, want %s", got, want)
+	}
+
+	manifest, err := SQLiteReadinessManifestForPath(path)
+	if err != nil {
+		t.Fatalf("SQLiteReadinessManifestForPath on live store path returned error: %v", err)
+	}
+	if manifest.Status != "ready" || manifest.MigrationStatus != "current" {
+		t.Fatalf("readiness via dedicated connection = status=%q migration=%q, want ready/current", manifest.Status, manifest.MigrationStatus)
+	}
+}
+
+// TestOpenSQLiteDatabaseConfiguresHardenedPRAGMAs pins the migration/open path
+// busy_timeout + single-connection readiness contract used to avoid flaky locks.
+func TestOpenSQLiteDatabaseConfiguresHardenedPRAGMAs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-pragma.db")
+	db, err := openSQLiteDatabase(path)
+	if err != nil {
+		t.Fatalf("openSQLiteDatabase returned error: %v", err)
+	}
+	defer db.Close()
+
+	if got := db.Stats().MaxOpenConnections; got != 1 {
+		t.Fatalf("MaxOpenConnections = %d, want 1 (migration/store dedicated connection)", got)
+	}
+	var busyTimeout int
+	if err := db.QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
+		t.Fatalf("PRAGMA busy_timeout returned error: %v", err)
+	}
+	if busyTimeout < 5000 {
+		t.Fatalf("busy_timeout = %d, want >= 5000", busyTimeout)
+	}
+	var journalMode string
+	if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&journalMode); err != nil {
+		t.Fatalf("PRAGMA journal_mode returned error: %v", err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		t.Fatalf("journal_mode = %q, want wal", journalMode)
+	}
+	var foreignKeys int
+	if err := db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
+		t.Fatalf("PRAGMA foreign_keys returned error: %v", err)
+	}
+	if foreignKeys != 1 {
+		t.Fatalf("foreign_keys = %d, want 1", foreignKeys)
+	}
+}
+
 func TestSQLiteStoreWaitsForTransientDatabaseLock(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "edge-store.db")
 	s, err := NewSQLite(path)

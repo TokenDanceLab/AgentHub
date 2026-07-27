@@ -98,8 +98,13 @@ func (f *FileStore) Close() {
 }
 
 // Flush writes the current in-memory state to disk synchronously.
+// Failures are retained on LastPersistError; callers that need durability
+// honesty must check that API rather than treat Flush as infallible.
 func (f *FileStore) Flush() {
-	_ = f.syncPersist()
+	if err := f.syncPersist(); err != nil {
+		// Keep the existing Flush() signature; surface the failure via lastErr.
+		return
+	}
 }
 
 func (f *FileStore) LastPersistError() error {
@@ -465,6 +470,11 @@ func saveFileSnapshot(path string, snapshot fileSnapshot) error {
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(snapshot); err != nil {
 		return fmt.Errorf("encode store snapshot: %w", err)
+	}
+	// Durable stage-swap: fsync the temp payload before rename so a crash between
+	// write and replace cannot leave a zero-length/partial target after promotion.
+	if err := temp.Sync(); err != nil {
+		return fmt.Errorf("sync store snapshot temp: %w", err)
 	}
 	// Close before rename — required on Windows where open handles block os.Rename.
 	if err := temp.Close(); err != nil {
