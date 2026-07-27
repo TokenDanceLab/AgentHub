@@ -47,6 +47,7 @@ func buildFileSnapshot(
 
 // materializeFileSnapshot copies snapshot maps and normalizes order slices.
 // Caller assigns the returned values under the store mutex.
+// Settings are restored from the durable snapshot; a nil settings map becomes empty.
 func materializeFileSnapshot(snapshot fileSnapshot) (
 	projects map[string]Project,
 	threads map[string]Thread,
@@ -59,6 +60,8 @@ func materializeFileSnapshot(snapshot fileSnapshot) (
 	userProfiles map[string]UserProfile,
 	agentProfiles map[string]AgentProfile,
 	projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userProfileOrder, agentProfileOrder []string,
+	settings map[string]string,
+	settingsMtime string,
 ) {
 	projects = copyMap(snapshot.Projects)
 	threads = copyMap(snapshot.Threads)
@@ -80,5 +83,7 @@ func materializeFileSnapshot(snapshot fileSnapshot) (
 	previewOrder = normalizeOrder(snapshot.PreviewOrder, previews)
 	userProfileOrder = normalizeOrder(snapshot.UserProfileOrder, userProfiles)
 	agentProfileOrder = normalizeOrder(snapshot.AgentProfileOrder, agentProfiles)
+	settings = ensureSettingsMap(copyMap(snapshot.Settings))
+	settingsMtime = snapshot.SettingsMtime
 	return
 }

@@ -307,6 +307,8 @@ func (s *SQLiteStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	if !shouldSyncAfterCleanup(result) {
 		return result
 	}
+	// Persist failures stay on LastPersistError. Still return the in-memory
+	// cleanup counts so callers can see what memory already dropped.
 	return finalizeSQLiteCleanupAfterPersist(result, s.syncPersist())
 }
 
