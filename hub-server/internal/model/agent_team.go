@@ -58,6 +58,11 @@ func (AgentTeamMember) TableName() string {
 }
 
 // AgentTeamRun status constants.
+//
+// TeamRunStatusCancelled is retained as a terminal status token for
+// isTerminalTeamRunStatus / UpdateTeamRunStatusIfNotTerminal guards, but there
+// is no public CancelTeamRun API yet. Existing rows and openapi enum stay valid;
+// do not invent a cancel write path without an API contract (#1384).
 const (
 	TeamRunStatusQueued        = "queued"
 	TeamRunStatusRunning       = "running"

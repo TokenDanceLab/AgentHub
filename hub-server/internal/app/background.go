@@ -67,6 +67,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 }
 
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
+// It also terminates timed-out agentteam assignments so they do not remain active forever.
 func (a *App) startTaskScheduler(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(config.PendingTaskScanInterval)
@@ -77,16 +78,34 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				tasks, err := a.AgentService.ScanExpiredTasks()
 				if err != nil {
 					slog.Warn("failed to scan expired agent tasks", "error", err)
-					continue
+				} else {
+					for _, task := range tasks {
+						a.publishExpiredTaskTimeout(ctx, task)
+					}
 				}
-				for _, task := range tasks {
-					a.publishExpiredTaskTimeout(ctx, task)
-				}
+				a.failTimedOutTeamAssignments(ctx)
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
+}
+
+// failTimedOutTeamAssignments is the write-side counterpart of the route
+// guardrail hasTimedOutActiveAssignment: active assignments past the timeout
+// are marked failed and emit assignment.failed events.
+func (a *App) failTimedOutTeamAssignments(ctx context.Context) {
+	if a.AgentTeamService == nil {
+		return
+	}
+	n, err := a.AgentTeamService.FailTimedOutAssignments(ctx)
+	if err != nil {
+		slog.Warn("failed to scan timed-out team assignments", "error", err)
+		return
+	}
+	if n > 0 {
+		slog.Info("terminated timed-out team assignments", "count", n)
+	}
 }
 
 func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingAgentTask) {

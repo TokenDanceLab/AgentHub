@@ -104,8 +104,14 @@ func (s *AgentTeamService) cancelPendingAssignmentsForReview(runID, reason strin
 	}
 	for _, a := range assignments {
 		if a.Status == model.AssignmentStatusPending || a.Status == model.AssignmentStatusDispatched {
-			if err := repository.UpdateAssignmentStatus(s.db, a.ID, model.AssignmentStatusCancelled, reason); err != nil {
+			updated, err := repository.UpdateAssignmentStatusIf(s.db, a.ID,
+				[]string{model.AssignmentStatusPending, model.AssignmentStatusDispatched},
+				model.AssignmentStatusCancelled, reason)
+			if err != nil {
 				return err
+			}
+			if updated == 0 {
+				continue
 			}
 			if err := s.appendTeamEvent(runID, model.TeamEventAssignmentCancelled, map[string]string{
 				"assignment_id": a.ID,
@@ -125,7 +131,7 @@ func (s *AgentTeamService) setRunPendingReview(runID string, latestDecision mode
 		return err
 	}
 	return s.appendTeamEvent(runID, model.TeamEventReviewPending, map[string]any{
-		"decision": latestDecision,
+		"decision":     latestDecision,
 		"submitted_at": time.Now(),
 	})
 }
