@@ -64,16 +64,13 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 	}
 
-	// Find the supervisor: first member with role=supervisor, or first member.
-	var supervisorMember *model.AgentTeamMember
-	for i := range members {
-		if members[i].Role == model.TeamMemberRoleSupervisor {
-			supervisorMember = &members[i]
-			break
-		}
-	}
+	// Resolve supervisor with members[0] fallback (see resolveTeamSupervisor).
+	// Follow-up (#1385): StartTeamRun is still a large orchestration function
+	// (auth + session/member/agent create + persist + async trigger + bus);
+	// leave that split out of this projection PR.
+	supervisorMember := resolveTeamSupervisor(members)
 	if supervisorMember == nil {
-		supervisorMember = &members[0]
+		return nil, errcode.ErrBadRequest
 	}
 
 	// Create a group session owned by the user.
@@ -443,9 +440,8 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents, taskRefs)
 	state.Conflicts = projectTeamConflicts(state.Artifacts)
-	if err := s.refreshTeamArtifactIndex(runID, state.Artifacts); err != nil {
-		return nil, err
-	}
+	// Best-effort index refresh: never fail the read projection on delete+insert.
+	s.tryRefreshTeamArtifactIndex(runID, state.Artifacts)
 	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
@@ -556,8 +552,6 @@ func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, r
 	return events, nil
 }
 
-// HandleRouteDecision consumes a typed supervisor route decision and records
-// the accepted or rejected route in the TeamEvent log.
 func optionalTeamRunTargetID(targetID string) *string {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
@@ -573,10 +567,6 @@ func teamRunTargetID(run *model.AgentTeamRun) string {
 	return strings.TrimSpace(*run.TargetID)
 }
 
-// --- TeamAssignment ---
-
-// CreateAssignment creates a new team assignment (delegation) from a supervisor
-// member to an executor member.
 func (s *AgentTeamService) publishTeamEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
 	if s.bus == nil {
 		return
@@ -586,5 +576,3 @@ func (s *AgentTeamService) publishTeamEvent(ctx context.Context, eventType strin
 		Payload: payload,
 	})
 }
-
-// ListAssignments returns all assignments for a team run, verifying owner access.
