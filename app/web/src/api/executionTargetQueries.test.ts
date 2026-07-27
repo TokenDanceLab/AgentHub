@@ -137,4 +137,44 @@ describe('web execution target queries', () => {
       },
     });
   });
+
+  it('surfaces 401 unauthorized from execution target inventory as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
+      { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
+      code: 'unauthorized',
+      message: 'bad token',
+      status: 401,
+    });
+  });
+
+  it('surfaces 404 from execution target inventory as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'NOT_FOUND', message: 'targets missing' }),
+      { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  it('surfaces 500 from execution target inventory as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }),
+      { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      status: 500,
+    });
+  });
 });
