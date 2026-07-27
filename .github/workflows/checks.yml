@@ -754,6 +754,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-doc-ssot.ps1
 
+      - name: Verify Web Hub-only boundary
+        shell: pwsh
+        run: ./scripts/verify/verify-web-hub-boundary.ps1
+
       - name: Verify real E2E contract
         shell: pwsh
         run: ./scripts/verify/verify-real-e2e-contract.ps1
