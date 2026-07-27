@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -471,6 +472,12 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 	if bound != 1 {
 		return fmt.Errorf("bind dispatch claim for assignment %s: %w", assignmentID, errcode.ErrInternal)
 	}
+	// Task is bound and delivered to Edge: advance dispatched → running so
+	// the DB status matches the projection layer (#1384). CompleteAssignment
+	// still accepts dispatched for the #1376 compatibility path.
+	if _, err := repository.MarkAssignmentRunningIfDispatched(s.db, assignmentID); err != nil {
+		return err
+	}
 	if err := repository.UpdateTeamTaskDispatchBinding(s.db, teamTask.ID, pendingTask.ID); err != nil {
 		return err
 	}
@@ -560,7 +567,9 @@ func (s *AgentTeamService) createAssignmentDispatchMessage(ctx context.Context, 
 	return msg.ID, nil
 }
 
-// CompleteAssignment marks a running assignment as done with the given result.
+// CompleteAssignment marks a running (or still-dispatched) assignment as done.
+// Dispatched remains accepted so Completes that race the running write, or
+// legacy rows from before #1384, still reach a terminal status (#1376).
 func (s *AgentTeamService) CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error {
 	a, err := repository.GetAssignmentByID(s.db, assignmentID)
 	if err != nil {
@@ -578,14 +587,25 @@ func (s *AgentTeamService) CompleteAssignment(ctx context.Context, userID, assig
 		return errcode.AgentTaskNotFound
 	}
 
-	// Production writes dispatched (UpdateAssignmentDispatchBinding); running
-	// currently only exists in the read projection (assignmentStatusFromPending).
-	// Accept both so a dispatched assignment can actually reach done.
 	if a.Status != model.AssignmentStatusDispatched && a.Status != model.AssignmentStatusRunning {
 		return errcode.ErrBadRequest
 	}
 
-	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDone, result); err != nil {
+	updated, err := repository.UpdateAssignmentStatusIf(s.db, assignmentID,
+		[]string{model.AssignmentStatusDispatched, model.AssignmentStatusRunning},
+		model.AssignmentStatusDone, result)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		// Lost a race to complete/fail/timeout; surface as bad request rather
+		// than re-publishing completion side effects.
+		return errcode.ErrBadRequest
+	}
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentCompleted, map[string]string{
+		"assignment_id": assignmentID,
+		"result":        result,
+	}); err != nil {
 		return err
 	}
 	s.publishTeamEvent(ctx, "team.assignment.completed", map[string]interface{}{
@@ -621,7 +641,23 @@ func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmen
 		return errcode.ErrBadRequest
 	}
 
-	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusFailed, reason); err != nil {
+	updated, err := repository.UpdateAssignmentStatusIf(s.db, assignmentID,
+		[]string{
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning,
+		},
+		model.AssignmentStatusFailed, reason)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return errcode.ErrBadRequest
+	}
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentFailed, map[string]string{
+		"assignment_id": assignmentID,
+		"reason":        reason,
+	}); err != nil {
 		return err
 	}
 	s.publishTeamEvent(ctx, "team.assignment.failed", map[string]interface{}{
@@ -638,6 +674,49 @@ func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmen
 	}
 
 	return nil
+}
+
+// FailTimedOutAssignments scans for active assignments past the guardrail
+// timeout and terminates each with failed + assignment.failed event. This is
+// the write-side counterpart of hasTimedOutActiveAssignment, which only blocks
+// new routes. Returns the number of assignments successfully terminated.
+func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, error) {
+	_ = ctx
+	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
+	assignments, err := repository.ListTimedOutActiveAssignments(s.db, deadline, 0)
+	if err != nil {
+		return 0, err
+	}
+	failed := 0
+	for i := range assignments {
+		a := &assignments[i]
+		reason := "assignment timeout reached"
+		updated, err := repository.UpdateAssignmentStatusIf(s.db, a.ID,
+			[]string{
+				model.AssignmentStatusPending,
+				model.AssignmentStatusDispatched,
+				model.AssignmentStatusRunning,
+			},
+			model.AssignmentStatusFailed, reason)
+		if err != nil {
+			slog.Warn("failed to terminate timed-out assignment",
+				"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
+			continue
+		}
+		if updated == 0 {
+			continue
+		}
+		if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentFailed, map[string]string{
+			"assignment_id": a.ID,
+			"reason":        reason,
+		}); err != nil {
+			slog.Warn("failed to append timeout event for assignment",
+				"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
+			// Status already failed; keep counting so the scan reports progress.
+		}
+		failed++
+	}
+	return failed, nil
 }
 
 // handleFaultEscalation processes Layer 2 (AI review) and Layer 3 (replan)
