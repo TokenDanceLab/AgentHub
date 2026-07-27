@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -284,7 +285,15 @@ func (s *AgentTeamService) GenerateCompeteSummary(ctx context.Context, userID, r
 		Entries:   entries,
 	}
 
-	_ = s.appendTeamEvent(runID, model.TeamEventCompeteAggregated, resp)
+	if err := s.appendTeamEvent(runID, model.TeamEventCompeteAggregated, resp); err != nil {
+		// Summary already computed; keep returning it but surface the
+		// durability failure so operators can diagnose missing events.
+		slog.Error("failed to append team.compete.aggregated event",
+			"run_id", runID,
+			"error", err,
+		)
+		return resp, err
+	}
 
 	return resp, nil
 }

@@ -58,8 +58,15 @@ func TestFindTeamSupervisor(t *testing.T) {
 	sup := findTeamSupervisor(members)
 	require.NotNil(t, sup)
 	assert.Equal(t, "m2", sup.ID)
-	assert.Nil(t, findTeamSupervisor([]model.AgentTeamMember{{ID: "m1", Role: model.TeamMemberRoleExecutor}}))
+
+	// Unified fallback (#1385): no explicit supervisor → first member.
+	onlyWorkers := []model.AgentTeamMember{{ID: "m1", Role: model.TeamMemberRoleExecutor}}
+	fallback := findTeamSupervisor(onlyWorkers)
+	require.NotNil(t, fallback)
+	assert.Equal(t, "m1", fallback.ID)
+
 	assert.Nil(t, findTeamSupervisor(nil))
+	assert.Nil(t, resolveTeamSupervisor(nil))
 }
 
 func TestRouteAuditStateFromDecision(t *testing.T) {
