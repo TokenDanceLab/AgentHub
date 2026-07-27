@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { HUB_EVENTS, type HubEventType } from './hubEvents';
 
+const repoRoot = resolve(process.cwd(), '../..');
+
 describe('HUB_EVENTS', () => {
   it('exports the Hub-to-Edge agent control event type', () => {
     const eventType: HubEventType = HUB_EVENTS.AGENT_CONTROL;
@@ -14,7 +16,7 @@ describe('HUB_EVENTS', () => {
 
   it('matches every Go Hub frame constant exactly', () => {
     const frameSource = readFileSync(
-      resolve(process.cwd(), '../../hub-server/internal/ws/frame.go'),
+      resolve(repoRoot, 'hub-server/internal/ws/frame.go'),
       'utf8',
     );
     const goFrameTypes = [...frameSource.matchAll(/^\s*Type\w+\s*=\s*"([^"]+)"/gm)]
@@ -42,5 +44,33 @@ describe('HUB_EVENTS', () => {
         'run.agent.plan_expired',
       ]),
     );
+  });
+
+  it('documents duplicate-delivery semantics for every live Hub WS type in api/events.md', () => {
+    const eventsDoc = readFileSync(resolve(repoRoot, 'api/events.md'), 'utf8');
+    const tableStart = eventsDoc.indexOf('## Hub WS 事件：重复投递 / 幂等语义');
+    expect(tableStart).toBeGreaterThanOrEqual(0);
+    const removedStart = eventsDoc.indexOf('## Removed Hub WS Dead Surface', tableStart);
+    const semanticsSection =
+      removedStart >= 0
+        ? eventsDoc.slice(tableStart, removedStart)
+        : eventsDoc.slice(tableStart);
+
+    // Dead surface must stay out of the live semantics table (and HUB_EVENTS).
+    for (const dead of [
+      'sync.request',
+      'sync.events',
+      'agent.regenerate',
+      'message.edited',
+      'agent.timeout',
+      'auth.fail',
+    ]) {
+      expect(semanticsSection).not.toContain(`| \`${dead}\``);
+    }
+
+    const missing = Object.values(HUB_EVENTS).filter(
+      (type) => !semanticsSection.includes(`| \`${type}\``),
+    );
+    expect(missing).toEqual([]);
   });
 });
