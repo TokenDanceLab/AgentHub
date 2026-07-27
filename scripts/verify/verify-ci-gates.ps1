@@ -155,6 +155,8 @@ Assert-Contains $validate "Verify project skill whitelist" "validate job must ru
 Assert-Contains $validate "scripts/verify/verify-project-skills\.ps1" "validate job must call scripts/verify/verify-project-skills.ps1"
 Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT verifier"
 Assert-Contains $validate "scripts/verify/verify-doc-ssot\.ps1" "validate job must call scripts/verify/verify-doc-ssot.ps1"
+Assert-Contains $validate "Verify Web Hub-only boundary" "validate job must run the Web Hub-only boundary verifier"
+Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.ps1" "validate job must call scripts/verify/verify-web-hub-boundary.ps1"
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
