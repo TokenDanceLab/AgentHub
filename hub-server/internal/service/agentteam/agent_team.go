@@ -13,7 +13,8 @@ import (
 
 // This file is the thin facade. Logic split into:
 //   agent_team_crud.go, agent_team_member.go, agent_team_routing.go,
-//   agent_team_approval.go, agent_team_guard.go, agent_team_run.go
+//   agent_team_approval.go, agent_team_guard.go, agent_team_run.go,
+//   agent_team_projection.go (pure TeamRunState projection helpers).
 
 type agentTeamAgentSvc interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
@@ -30,15 +31,15 @@ type agentTeamControlSvc interface {
 }
 
 type AgentTeamService struct {
-	db                  *gorm.DB
-	agentSvc            agentTeamAgentSvc
-	cacheClient         agentTeamCache
-	controlSvc          agentTeamControlSvc
-	bus                 *service.Bus
-	guardrails          AgentTeamGuardrails
-	competeAggregator   CompeteAggregator
-	competeMaxAgents    int
-	humanReviewEnabled  bool
+	db                 *gorm.DB
+	agentSvc           agentTeamAgentSvc
+	cacheClient        agentTeamCache
+	controlSvc         agentTeamControlSvc
+	bus                *service.Bus
+	guardrails         AgentTeamGuardrails
+	competeAggregator  CompeteAggregator
+	competeMaxAgents   int
+	humanReviewEnabled bool
 }
 
 type AgentTeamGuardrails struct {
