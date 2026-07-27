@@ -181,6 +181,23 @@ func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string
 	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdateAssignmentStatusIf transitions an assignment only when its current
+// status is one of fromStatuses (CAS). Returns rows affected so callers can
+// treat 0 as a lost race / already-terminal outcome (#1419).
+func UpdateAssignmentStatusIf(db *gorm.DB, id string, fromStatuses []string, status string, result string) (int64, error) {
+	if len(fromStatuses) == 0 {
+		return 0, nil
+	}
+	updates := map[string]interface{}{
+		"status": status,
+		"result": result,
+	}
+	res := db.Model(&model.AgentTeamAssignment{}).
+		Where("id = ? AND status IN ?", id, fromStatuses).
+		Updates(updates)
+	return res.RowsAffected, res.Error
+}
+
 // ClaimAssignmentForDispatch atomically transitions a pending assignment to
 // dispatched, but only when the current status is still 'pending' (CAS). The
 // run_id is bound separately after TriggerAgentTask returns a pending task ID.
@@ -204,13 +221,23 @@ func ReleaseAssignmentDispatchClaim(db *gorm.DB, id string) (int64, error) {
 }
 
 // BindClaimedAssignmentDispatch binds the external task only for the caller
-// that owns an unbound dispatched claim. It leaves the assignment in the
-// existing dispatched state; runtime projection is responsible for showing
-// running once the pending task starts.
+// that owns an unbound dispatched claim. Status stays dispatched until
+// MarkAssignmentRunningIfDispatched records that the task was handed off.
 func BindClaimedAssignmentDispatch(db *gorm.DB, id, pendingTaskID string) (int64, error) {
 	res := db.Model(&model.AgentTeamAssignment{}).
 		Where("id = ? AND status = ? AND run_id IS NULL", id, model.AssignmentStatusDispatched).
 		Update("run_id", pendingTaskID)
+	return res.RowsAffected, res.Error
+}
+
+// MarkAssignmentRunningIfDispatched advances a successfully bound assignment
+// from dispatched → running. Requires run_id so an unbound claim cannot jump
+// ahead of TriggerAgentTask. Returns rows affected (0 when already advanced
+// or no longer dispatched).
+func MarkAssignmentRunningIfDispatched(db *gorm.DB, id string) (int64, error) {
+	res := db.Model(&model.AgentTeamAssignment{}).
+		Where("id = ? AND status = ? AND run_id IS NOT NULL", id, model.AssignmentStatusDispatched).
+		Update("status", model.AssignmentStatusRunning)
 	return res.RowsAffected, res.Error
 }
 
@@ -261,6 +288,30 @@ func HasTimedOutActiveAssignment(db *gorm.DB, teamRunID string, deadline time.Ti
 		Limit(1).
 		Count(&count).Error
 	return count > 0, err
+}
+
+// maxTimedOutAssignmentScan caps one background timeout sweep so a backlog
+// cannot monopolize the scanner tick.
+const maxTimedOutAssignmentScan = 200
+
+// ListTimedOutActiveAssignments returns active assignments whose created_at is
+// older than deadline, oldest first. Used by the background timeout terminator
+// (the symmetric write-side of HasTimedOutActiveAssignment).
+func ListTimedOutActiveAssignments(db *gorm.DB, deadline time.Time, limit int) ([]model.AgentTeamAssignment, error) {
+	if limit <= 0 || limit > maxTimedOutAssignmentScan {
+		limit = maxTimedOutAssignmentScan
+	}
+	var assignments []model.AgentTeamAssignment
+	err := db.Model(&model.AgentTeamAssignment{}).
+		Where("status IN (?, ?, ?) AND created_at < ?",
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning,
+			deadline).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&assignments).Error
+	return assignments, err
 }
 
 // AgentTeamTask

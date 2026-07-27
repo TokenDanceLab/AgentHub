@@ -264,7 +264,7 @@ func TestAgentTeamService_DispatchAssignmentTriggerFailureReleasesClaim(t *testi
 	require.NoError(t, svc.DispatchAssignment(context.Background(), "user-1", assignment.ID))
 	reloaded, err = repository.GetAssignmentByID(db, assignment.ID)
 	require.NoError(t, err)
-	assert.Equal(t, model.AssignmentStatusDispatched, reloaded.Status)
+	assert.Equal(t, model.AssignmentStatusRunning, reloaded.Status)
 	require.NotNil(t, reloaded.RunID)
 	assert.Equal(t, "external-task-retry", *reloaded.RunID)
 }

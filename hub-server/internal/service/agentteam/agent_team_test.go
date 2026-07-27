@@ -544,6 +544,16 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	// Transaction: Commit
 	mock.ExpectCommit()
 
+	// AppendTeamEvent(team.run.started) after successful trigger.
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM agent_team_runs WHERE id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("run-placeholder"))
+	mock.ExpectQuery(`COALESCE(MAX(seq)`).
+		WillReturnRows(sqlmock.NewRows([]string{"coalesce"}).AddRow(0))
+	mock.ExpectExec(`INSERT INTO "agent_team_events"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
 	run, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "")
 	require.NoError(t, err)
 	assert.NotNil(t, run)
@@ -599,6 +609,15 @@ func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO "messages"`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(`INSERT INTO "agent_team_runs"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM agent_team_runs WHERE id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("run-placeholder"))
+	mock.ExpectQuery(`COALESCE(MAX(seq)`).
+		WillReturnRows(sqlmock.NewRows([]string{"coalesce"}).AddRow(0))
+	mock.ExpectExec(`INSERT INTO "agent_team_events"`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -1215,7 +1234,7 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	var reloadedAssignment model.AgentTeamAssignment
 	require.NoError(t, db.Where("id = ?", assignment.ID).First(&reloadedAssignment).Error)
 	require.NotNil(t, reloadedAssignment.RunID)
-	assert.Equal(t, model.AssignmentStatusDispatched, reloadedAssignment.Status)
+	assert.Equal(t, model.AssignmentStatusRunning, reloadedAssignment.Status)
 
 	// Seed the pending task that the mock agent service would have created.
 	triggerMsgID := "msg-trigger-dispatch"
@@ -2808,10 +2827,10 @@ func TestHumanReviewGate(t *testing.T) {
 // ── State machine guards (terminal states & assignment reachability) ──
 
 // TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath drives
-// an assignment through the real production path (pending -> dispatched via
-// DispatchAssignment) and verifies CompleteAssignment succeeds without any raw
-// SQL status injection. Production never writes running (it only exists in the
-// read projection), so done must be reachable from dispatched.
+// an assignment through the real production path (pending -> dispatched ->
+// running via DispatchAssignment) and verifies CompleteAssignment succeeds
+// without raw SQL status injection. CompleteAssignment also still accepts a
+// legacy dispatched row for #1376 compatibility.
 func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-complete-dispatched-1"}
@@ -2824,9 +2843,9 @@ func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *
 
 	require.NoError(t, svc.DispatchAssignment(context.Background(), "user-1", assignment.ID))
 
-	var dispatched model.AgentTeamAssignment
-	require.NoError(t, db.Where("id = ?", assignment.ID).First(&dispatched).Error)
-	require.Equal(t, model.AssignmentStatusDispatched, dispatched.Status)
+	var running model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", assignment.ID).First(&running).Error)
+	require.Equal(t, model.AssignmentStatusRunning, running.Status)
 
 	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "shipped"))
 
@@ -2834,6 +2853,17 @@ func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *
 	require.NoError(t, db.Where("id = ?", assignment.ID).First(&done).Error)
 	assert.Equal(t, model.AssignmentStatusDone, done.Status)
 	assert.Equal(t, "shipped", done.Result)
+
+	// Legacy dispatched row (pre-#1384) must still complete.
+	legacy := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "legacy complete", Status: model.AssignmentStatusDispatched,
+	}
+	require.NoError(t, repository.CreateAssignment(db, legacy))
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", legacy.ID, "legacy shipped"))
+	var legacyDone model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", legacy.ID).First(&legacyDone).Error)
+	assert.Equal(t, model.AssignmentStatusDone, legacyDone.Status)
 }
 
 // TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun verifies that no
@@ -2960,4 +2990,121 @@ func TestAgentTeamService_FailAssignmentRejectsTerminalAssignment(t *testing.T) 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
 	require.NoError(t, err)
 	assert.Empty(t, events)
+}
+
+// ── Assignment lifecycle (#1384) ──────────────────────────────────────────────
+
+func TestAgentTeamService_FailTimedOutAssignmentsTerminatesActiveAndIsIdempotent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	guardrails := DefaultAgentTeamGuardrails()
+	guardrails.AssignmentTimeout = time.Minute
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	old := time.Now().Add(-2 * time.Hour)
+	fresh := time.Now()
+	timedOut := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "stale work", Status: model.AssignmentStatusRunning,
+		CreatedAt: old, UpdatedAt: old,
+	}
+	freshA := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "fresh work", Status: model.AssignmentStatusPending,
+		CreatedAt: fresh, UpdatedAt: fresh,
+	}
+	require.NoError(t, repository.CreateAssignment(db, timedOut))
+	require.NoError(t, repository.CreateAssignment(db, freshA))
+	// Force created_at past the guardrail (GORM autoCreateTime may overwrite on insert).
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", timedOut.ID).Update("created_at", old).Error)
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", freshA.ID).Update("created_at", fresh).Error)
+
+	n, err := svc.FailTimedOutAssignments(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	reloaded, err := repository.GetAssignmentByID(db, timedOut.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.AssignmentStatusFailed, reloaded.Status)
+	assert.Equal(t, "assignment timeout reached", reloaded.Result)
+
+	stillFresh, err := repository.GetAssignmentByID(db, freshA.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.AssignmentStatusPending, stillFresh.Status)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventAssignmentFailed, events[0].Type)
+
+	// Second scan must not rewrite or re-emit.
+	n, err = svc.FailTimedOutAssignments(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+	events, err = repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
+}
+
+func TestAgentTeamService_CompleteAssignmentConcurrentOnlyOneWins(t *testing.T) {
+	db := setupAgentTeamConcurrentSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "race complete", Status: model.AssignmentStatusRunning,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	errs := runConcurrentRouteCalls(2, func() error {
+		return svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "winner")
+	})
+	successes, bad := 0, 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case err == errcode.ErrBadRequest:
+			bad++
+		default:
+			require.NoError(t, err)
+		}
+	}
+	assert.Equal(t, 1, successes)
+	assert.Equal(t, 1, bad)
+
+	done, err := repository.GetAssignmentByID(db, assignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.AssignmentStatusDone, done.Status)
+	assert.Equal(t, "winner", done.Result)
+}
+
+func TestAgentTeamService_GetTeamRunStateKeepsTerminalAssignmentOverPendingProjection(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+	pendingID := "pending-task-terminal-1"
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "already failed", Status: model.AssignmentStatusFailed,
+		Result: "assignment timeout reached", RunID: &pendingID,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+	require.NoError(t, db.Exec(
+		"INSERT INTO pending_agent_tasks (id, agent_instance_id, trigger_message_id, triggered_by_user_id, status, expire_at) VALUES (?, ?, ?, ?, ?, ?)",
+		pendingID, "agent-executor", "msg-1", "user-1", model.TaskStatusRunning, time.Now().Add(time.Hour),
+	).Error)
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Assignments, 1)
+	assert.Equal(t, model.AssignmentStatusFailed, state.Assignments[0].Status)
+}
+
+func TestIsTerminalTeamRunStatusIncludesCancelledWithoutCancelAPI(t *testing.T) {
+	// Documented dead write-path: cancelled is a terminal guard token only.
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusCancelled))
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusCompleted))
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusFailed))
+	assert.False(t, isTerminalTeamRunStatus(model.TeamRunStatusRunning))
 }
