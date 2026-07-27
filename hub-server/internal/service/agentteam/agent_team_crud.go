@@ -113,7 +113,6 @@ func (s *AgentTeamService) DeleteTeam(ctx context.Context, userID, teamID string
 	return repository.DeleteTeam(s.db, teamID)
 }
 
-// AddTeamMember adds an agent profile to a team with a given role.
 type TeamDetail = model.TeamDetail
 
 // GetTeamWithMembers returns a team along with its member list.
@@ -134,6 +133,3 @@ func (s *AgentTeamService) GetTeamWithMembers(ctx context.Context, userID, teamI
 		Members:   members,
 	}, nil
 }
-
-// StartTeamRun creates a group session, adds all team members as agent
-// instances, triggers the supervisor agent, and records the run.
