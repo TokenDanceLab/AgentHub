@@ -42,31 +42,39 @@ func routeAssignmentType(action string) string {
 	}
 }
 
-func findSupervisorAndWorker(members []model.AgentTeamMember, workerID string) (*model.AgentTeamMember, *model.AgentTeamMember) {
-	var supervisor *model.AgentTeamMember
-	var worker *model.AgentTeamMember
-	for i := range members {
-		member := &members[i]
-		if supervisor == nil && member.Role == model.TeamMemberRoleSupervisor {
-			supervisor = member
-		}
-		if member.ID == workerID {
-			worker = member
-		}
-	}
-	if supervisor == nil && len(members) > 0 {
-		supervisor = &members[0]
-	}
-	return supervisor, worker
-}
-
-func findTeamSupervisor(members []model.AgentTeamMember) *model.AgentTeamMember {
+// resolveTeamSupervisor returns the first member with role=supervisor.
+// Fallback: when no explicit supervisor role exists and members is non-empty,
+// returns &members[0]. This unifies the three historical variants (#1385):
+// StartTeamRun (fallback), findSupervisorAndWorker (fallback), and the old
+// findTeamSupervisor (no fallback) used by fault escalation.
+func resolveTeamSupervisor(members []model.AgentTeamMember) *model.AgentTeamMember {
 	for i := range members {
 		if members[i].Role == model.TeamMemberRoleSupervisor {
 			return &members[i]
 		}
 	}
+	if len(members) > 0 {
+		return &members[0]
+	}
 	return nil
+}
+
+// findTeamSupervisor is kept as a thin alias for resolveTeamSupervisor so
+// existing call sites and tests keep working with the unified fallback.
+func findTeamSupervisor(members []model.AgentTeamMember) *model.AgentTeamMember {
+	return resolveTeamSupervisor(members)
+}
+
+func findSupervisorAndWorker(members []model.AgentTeamMember, workerID string) (*model.AgentTeamMember, *model.AgentTeamMember) {
+	supervisor := resolveTeamSupervisor(members)
+	var worker *model.AgentTeamMember
+	for i := range members {
+		if members[i].ID == workerID {
+			worker = &members[i]
+			break
+		}
+	}
+	return supervisor, worker
 }
 
 func routeAuditStateFromDecision(status string, decision model.CoordinatorRouteDecision, fallbackReason string, createdAt time.Time) model.TeamRouteAuditState {

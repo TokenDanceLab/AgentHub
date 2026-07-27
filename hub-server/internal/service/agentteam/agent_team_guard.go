@@ -11,92 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
-	if runCount == 0 && len(runEvents) == 0 {
-		return nil
-	}
-	budget := &model.TeamBudget{RunCount: runCount}
-	observedTokensByTask := map[string]int64{}
-	limitByTask := map[string]int64{}
-	for _, event := range runEvents {
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
-			continue
-		}
-		switch event.EventType {
-		case "run.agent.context_warning":
-			budget.ContextWarnings++
-		case "run.agent.context_compaction":
-			budget.Compactions++
-		}
-
-		input, output, total := teamEventTokenUsage(payload)
-		budget.InputTokens += input
-		budget.OutputTokens += output
-		budget.TotalTokensUsed += total
-
-		if used := firstJSONInt(payload, "tokensUsed", "tokens_used"); used > observedTokensByTask[event.TaskID] {
-			observedTokensByTask[event.TaskID] = used
-		}
-		if limit := firstJSONInt(payload, "tokenLimit", "token_limit", "contextLimit", "context_limit", "maxTokens", "max_tokens"); limit > limitByTask[event.TaskID] {
-			limitByTask[event.TaskID] = limit
-		}
-		if remaining := firstJSONInt(payload, "tokensRemaining", "tokens_remaining", "remainingTokens", "remaining_tokens"); remaining > 0 {
-			if budget.RemainingTokens == 0 || remaining < budget.RemainingTokens {
-				budget.RemainingTokens = remaining
-			}
-		}
-		if usagePercent := firstJSONFloat(payload, "usagePercent", "usage_percent"); usagePercent > budget.UsagePercent {
-			budget.UsagePercent = usagePercent
-		}
-	}
-
-	var observedTotal int64
-	for _, tokens := range observedTokensByTask {
-		observedTotal += tokens
-	}
-	if observedTotal > budget.TotalTokensUsed {
-		budget.TotalTokensUsed = observedTotal
-	}
-	for _, limit := range limitByTask {
-		budget.TokenLimit += limit
-	}
-	return budget
-}
-
-func teamEventTokenUsage(payload map[string]any) (input, output, total int64) {
-	sawNestedUsage := false
-	for _, key := range []string{"tokenUsage", "token_usage", "usage"} {
-		if nested, ok := payload[key].(map[string]any); ok {
-			sawNestedUsage = true
-			nestedInput, nestedOutput, nestedTotal := tokenUsageFields(nested)
-			input += nestedInput
-			output += nestedOutput
-			total += nestedTotal
-		}
-	}
-	if !sawNestedUsage {
-		directInput, directOutput, directTotal := tokenUsageFields(payload)
-		input += directInput
-		output += directOutput
-		total += directTotal
-	}
-	if total == 0 && (input > 0 || output > 0) {
-		total = input + output
-	}
-	return input, output, total
-}
-
-func tokenUsageFields(values map[string]any) (input, output, total int64) {
-	input = firstJSONInt(values, "input", "inputTokens", "input_tokens")
-	output = firstJSONInt(values, "output", "outputTokens", "output_tokens")
-	total = firstJSONInt(values, "total", "totalTokens", "total_tokens")
-	if total == 0 && (input > 0 || output > 0) {
-		total = input + output
-	}
-	return input, output, total
-}
-
 func firstJSONString(values map[string]any, keys ...string) string {
 	for _, key := range keys {
 		value, ok := values[key]
@@ -236,7 +150,6 @@ func assignmentStatusFromPending(status string) string {
 	}
 }
 
-// ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
 func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, error) {
 	return s.hasTimedOutActiveAssignmentDB(s.db, runID)
 }
