@@ -2,6 +2,7 @@ package repository
 
 import (
 	"testing"
+	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -195,6 +196,25 @@ func TestAgentTeamRepo_AssignmentDispatchClaimLifecycleIsConditional(t *testing.
 	assert.Equal(t, "external-task-1", *stored.RunID)
 	assert.Equal(t, model.AssignmentStatusDispatched, stored.Status)
 
+	running, err := MarkAssignmentRunningIfDispatched(db, boundAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), running)
+	running, err = MarkAssignmentRunningIfDispatched(db, boundAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), running)
+	stored, err = GetAssignmentByID(db, boundAssignment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.AssignmentStatusRunning, stored.Status)
+
+	updated, err := UpdateAssignmentStatusIf(db, boundAssignment.ID,
+		[]string{model.AssignmentStatusRunning}, model.AssignmentStatusDone, "ok")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), updated)
+	updated, err = UpdateAssignmentStatusIf(db, boundAssignment.ID,
+		[]string{model.AssignmentStatusRunning, model.AssignmentStatusDispatched}, model.AssignmentStatusDone, "again")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), updated)
+
 	retryableAssignment := newAssignment("release before trigger")
 	claimed, err = ClaimAssignmentForDispatch(db, retryableAssignment.ID)
 	require.NoError(t, err)
@@ -283,4 +303,37 @@ func TestAgentTeamRepo_GetTeamRunBySessionID(t *testing.T) {
 	got, err := GetTeamRunBySessionID(db, sessID)
 	require.NoError(t, err)
 	assert.Equal(t, run.ID, got.ID)
+}
+
+func TestAgentTeamRepo_ListTimedOutActiveAssignments(t *testing.T) {
+	db := setupSQLite(t)
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Timeout Scan"}
+	require.NoError(t, CreateTeam(db, team))
+	profileID := "profile-1"
+	supervisor := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &profileID, Role: model.TeamMemberRoleSupervisor}
+	executor := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &profileID, Role: model.TeamMemberRoleExecutor}
+	require.NoError(t, AddTeamMember(db, supervisor))
+	require.NoError(t, AddTeamMember(db, executor))
+	run := &model.AgentTeamRun{TeamID: team.ID, TriggerUserID: "user-1", Status: model.TeamRunStatusRunning}
+	require.NoError(t, CreateTeamRun(db, run))
+
+	old := time.Now().Add(-2 * time.Hour)
+	fresh := time.Now()
+	stale := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "stale", Status: model.AssignmentStatusDispatched,
+	}
+	alive := &model.AgentTeamAssignment{
+		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,
+		Type: model.AssignmentTypeDelegate, TaskPrompt: "alive", Status: model.AssignmentStatusPending,
+	}
+	require.NoError(t, CreateAssignment(db, stale))
+	require.NoError(t, CreateAssignment(db, alive))
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", stale.ID).Update("created_at", old).Error)
+	require.NoError(t, db.Model(&model.AgentTeamAssignment{}).Where("id = ?", alive.ID).Update("created_at", fresh).Error)
+
+	list, err := ListTimedOutActiveAssignments(db, time.Now().Add(-time.Hour), 10)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, stale.ID, list[0].ID)
 }
