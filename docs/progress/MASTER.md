@@ -12,7 +12,7 @@
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · [inventory](../analysis/post-polish-module-inventory.md) · [risk](../analysis/post-polish-risk-assessment.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
 | Tracking | Issues #1335–#1339 closed · milestones 98–99 · PRs #1340/#1341/#1342 |
-| Live tip | master `7a6746dd`（#1422 WS 死面） |
+| Live tip | master `58d09fde`（#1427 agentteam 生命周期） |
 
 Phases 73–78 polish + 79–80 residual **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**. Next: roadmap P0/P1, not static QA past 89.
 
@@ -31,17 +31,20 @@ Phases 73–78 polish + 79–80 residual **closed**. Historical `docs/plan/task-
 | 主题 | 结果 |
 |---|---|
 | agentteam 并发 | **closed** · #1401 · #1419 · #1383 |
+| agentteam 生命周期 | **closed** · #1384 · #1427 |
 | OIDC 测试 / query-token | **closed** · #1402 · #1400 · #1369/#1387/#1388 |
 | transport shared / stream microbatch / CJK | **closed** · #1416 · #1418 · #1417 |
 | Empty 四态市场真表面 | **closed** · #1410 · #1420 |
 | WS 死协议面 / logout 不杀 socket | **closed** · #1362 · #1363 · #1422 |
+| edge 存储持久化/迁移 | **closed** · #1424 · #1426 |
+| web hooks 直测（#1395 部分） | **closed** · #1425 |
 
 ### Open follow-ups
 
 | 主题 | Issue / PR |
 |---|---|
-| agentteam 生命周期 / 投影层 | #1384 · #1385 |
-| web hook 零直测残余 | #1395（transport 已合） |
+| agentteam 投影层 | #1385 |
+| web hook 零直测残余 | #1395（partial · #1425 hooks/query 已合） |
 | ACP / Automations / @提及 / 观察池 | #1404 · #1405 · #1406 · #1407 |
 | 签名发布 / WS 增量 SPEC 排队 | #1403 · #1411 |
 | PROPOSAL（不 merge 等批） | #1412 · #1413 · #1414 |
@@ -73,3 +76,4 @@ Refs: [scorecard](../analysis/visual-qa-scorecard.md) · [rescore-17](../analysi
 | 2026-07-26 | audit sweep ~18 PR；未竟落 #1358 #1362 #1363 #1369 #1383–#1385 #1387 #1388 |
 | 2026-07-26–27 | #1400–#1402 #1408 #1416–#1419 合入；#1420 Empty / #1422 WS 在飞；PROPOSAL #1412–#1414 |
 | 2026-07-27 | tip `7a6746dd`；#1420 Empty · #1422 WS 收口；open 仅 #1384/#1385/#1395 立项与 PROPOSAL |
+| 2026-07-27 | tip `58d09fde`；#1425 hooks · #1424+#1426 edge 存储 · #1384+#1427 生命周期；open #1385 · #1395 partial · PROPOSAL |
