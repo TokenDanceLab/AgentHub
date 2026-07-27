@@ -2,18 +2,25 @@
 // 1:1 mirror of the constants in hub-server/internal/ws/frame.go — every key
 // here MUST have a matching Type* constant there (and vice versa). Do not add
 // client-only event names: types without a server producer are dead protocol
-// surface (#1362 removed sync.request/sync.events, run.agent.plan_*,
-// agent.regenerate and message.edited for exactly that reason).
+// surface (#1362 / #1422 removed sync.request/sync.events, run.agent.plan_*,
+// agent.regenerate, message.edited, agent.timeout wire, auth/auth.fail).
 // Every Hub WS frame is JSON: { type, payload, seq_id? }.
+//
+// seq_id is per-connection delivery order only. Business duplicate-delivery
+// semantics (UPSERT by id / idempotent on apply / watermark / ephemeral) are
+// the contract in api/events.md — required before any WS incremental replay.
 
 export const HUB_EVENTS = {
   // ── Client→server frame types ─────────────────
+  // ephemeral fanout; no durable idempotency key
   TYPING: 'typing',
 
   // ── Auth responses ────────────────────────────
+  // idempotent handshake ack per connection
   AUTH_OK: 'auth.ok',
 
   // ── Message events ────────────────────────────
+  // UPSERT / idempotent by message id; MESSAGE_READ is last_read_seq watermark
   MESSAGE_NEW: 'message.new',
   MESSAGE_RECALL: 'message.recall',
   MESSAGE_PIN: 'message.pin',
@@ -23,6 +30,7 @@ export const HUB_EVENTS = {
   MESSAGE_READ: 'message.read',
 
   // ── Session events ────────────────────────────
+  // UPSERT / terminal by session_id (+ member_id)
   SESSION_CREATED: 'session.created',
   SESSION_DISSOLVED: 'session.dissolved',
   SESSION_MEMBER_JOINED: 'session.member_joined',
@@ -30,11 +38,13 @@ export const HUB_EVENTS = {
   SESSION_INFO_UPDATED: 'session.info_updated',
 
   // ── Device events ─────────────────────────────
+  // presence UPSERT by user_id; kicked terminal per conn
   DEVICE_ONLINE: 'device.online',
   DEVICE_OFFLINE: 'device.offline',
   DEVICE_KICKED: 'device.kicked',
 
   // ── Agent events ──────────────────────────────
+  // UPSERT / terminal by task_id; STREAM also watermarks event_seq
   AGENT_DISPATCH: 'agent.dispatch',
   AGENT_STREAM: 'agent.stream',
   AGENT_DONE: 'agent.done',
@@ -43,12 +53,14 @@ export const HUB_EVENTS = {
   AGENT_CONTROL: 'agent.control',
 
   // ── Team run events ───────────────────────────
+  // UPSERT / terminal by run_id or assignment id (see api/events.md)
   TEAM_RUN_STARTED: 'team.run.started',
   TEAM_EVENT: 'team.event',
   TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
   TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
 
   // ── Notification & social ─────────────────────
+  // UPSERT by notification / request / user id
   NOTIFICATION_NEW: 'notification.new',
   FRIEND_REQUEST: 'friend.request',
   FRIEND_ACCEPTED: 'friend.accepted',
