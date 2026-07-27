@@ -225,4 +225,44 @@ describe('web agent profile queries', () => {
 
     expect(req.description).toBe('Reviews risky patches');
   });
+
+  it('surfaces 401 unauthorized from agent profile list as AppError (fail-closed)', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
+      { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchAgentList(true)).rejects.toMatchObject({
+      code: 'unauthorized',
+      message: 'bad token',
+      status: 401,
+    });
+  });
+
+  it('surfaces 404 from agent profile list as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'NOT_FOUND', message: 'profiles missing' }),
+      { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchAgentList(true)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  it('surfaces 500 from agent profile list as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }),
+      { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchAgentList(true)).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      status: 500,
+    });
+  });
 });

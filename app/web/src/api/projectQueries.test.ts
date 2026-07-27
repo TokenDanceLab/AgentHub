@@ -301,4 +301,52 @@ describe('web project queries', () => {
     expect(threads).toEqual([]);
     expect(messages).toEqual([]);
   });
+
+  it('surfaces 401 unauthorized from project list as AppError (fail-closed)', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
+      { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchWorkspaceProjects(true)).rejects.toMatchObject({
+      code: 'unauthorized',
+      message: 'bad token',
+      status: 401,
+    });
+  });
+
+  it('surfaces 404 from project detail as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'NOT_FOUND', message: 'project missing' }),
+      { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchWorkspaceProject('project/id')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  it('surfaces 500 from project list as AppError', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }),
+      { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    await expect(fetchWorkspaceProjects(true)).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      status: 500,
+    });
+  });
+
+  it('rejects project create without a Hub session token', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(createWorkspaceProject({ name: 'x' })).rejects.toThrow('Hub session is required');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
