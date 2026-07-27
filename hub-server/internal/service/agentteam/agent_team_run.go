@@ -225,6 +225,16 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
 		return run, err
 	}
+	// Persist durable TeamEvent so GetTeamRunState replay can derive running
+	// from the event log (not only the live bus fan-out).
+	if err := s.appendTeamEvent(run.ID, model.TeamEventRunStarted, map[string]string{
+		"team_id":    teamID,
+		"run_id":     run.ID,
+		"session_id": session.ID,
+		"user_id":    userID,
+	}); err != nil {
+		slog.Warn("failed to append team.run.started event", "run_id", run.ID, "error", err)
+	}
 	s.publishTeamEvent(ctx, "team.run.started", map[string]interface{}{
 		"team_id":    teamID,
 		"run_id":     run.ID,
@@ -340,10 +350,15 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		if assignment.RunID != nil {
 			runIDValue = *assignment.RunID
 		}
+		// Prefer durable DB status; only overlay pending-task projection when
+		// the assignment is still active so terminal outcomes (timeout/fail/
+		// complete) are never masked by a stale edge snapshot (#1384).
 		status := assignment.Status
 		edgeRunID := ""
 		if pending, ok := pendingTaskByID[runIDValue]; ok {
-			status = assignmentStatusFromPending(pending.Status)
+			if isActiveAssignmentStatus(assignment.Status) {
+				status = assignmentStatusFromPending(pending.Status)
+			}
 			edgeRunID = pending.EdgeRunID
 		}
 		state.Assignments = append(state.Assignments, model.TeamAssignmentState{
