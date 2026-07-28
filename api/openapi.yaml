@@ -1222,6 +1222,45 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateSession
+      summary: Create a session by type (dispatches to private or group creation).
+      description: >
+        Generic session-create dispatcher. The request body carries a `type`
+        field (`private` or `group`); the handler delegates to the same
+        private/group creation path used by `POST /client/sessions/private`
+        and `POST /client/sessions/group`. Typed variants are preferred for
+        new clients; this generic route remains implemented for backwards
+        compatibility.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [private, group]
+                target_user_id:
+                  type: string
+                  format: uuid
+                  description: Required when type is private.
+                name:
+                  type: string
+                  description: Required when type is group.
+                member_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                  description: Member IDs for group sessions.
+      responses:
+        "200":
+          description: Session created.
 
   /client/sessions/private:
     post:
