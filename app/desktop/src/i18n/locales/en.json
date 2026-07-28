@@ -277,6 +277,7 @@
   "error.activeRunExists": "This thread already has a running agent task. Opened the active run instead.",
   "error.startRunFailed": "Failed to start the agent run. Check Edge connectivity and agent authentication.",
   "error.streamError": "Event stream error: {{message}}",
+  "error.turnInProgress": "This agent already has a task in progress. Please wait for it to complete before sending another.",
   "errorBoundary.chunkLoadDesc": "A new version of the app is available. Please reload to continue.",
   "errorBoundary.chunkLoadTitle": "Update Required",
   "errorBoundary.crashDesc": "The agent runtime encountered an unexpected error. Restart the agent to continue.",

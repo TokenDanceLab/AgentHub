@@ -9,6 +9,7 @@ import {
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
+import { isTurnInProgressError } from '@shared/errors';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
@@ -258,7 +259,20 @@ export async function submitWebComposerIntent(
     return { intentId: message.message_id };
   }
 
-  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, enrichedIntent);
+  // The Hub message is already sent & confirmed at this point. If task dispatch
+  // hits a recoverable 409 turn_in_progress (agent instance has a non-terminal
+  // task, #1430), don't surface as a hard error — the message is persisted
+  // (SendMessage is independent). Return the message id with turnInProgress so
+  // the shell can show an info toast and restore the composer to idle.
+  let task: PendingAgentTask;
+  try {
+    task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, enrichedIntent);
+  } catch (error) {
+    if (isTurnInProgressError(error)) {
+      return { intentId: message.message_id, turnInProgress: true };
+    }
+    throw error;
+  }
   if (task.id) {
     const targetId = task.target_id ?? dispatchTarget?.id;
     recordWebAgentTaskIndex(options.queryClient, {

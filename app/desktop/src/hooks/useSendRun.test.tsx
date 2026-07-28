@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { useSendRun, type UseSendRunDeps } from './useSendRun';
 
@@ -87,5 +88,80 @@ describe('useSendRun', () => {
       threadId: 'thread-edge',
     }));
     expect(startRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
+  });
+
+  it('treats startRun 409 turn_in_progress as recoverable (info toast, no error toast, #1438)', async () => {
+    const setOptimisticRun = vi.fn();
+    const addToast = vi.fn();
+    const { result } = renderHook(() => useSendRun(createDeps({
+      setOptimisticRun,
+      addToast,
+    })));
+
+    const turnInProgressError = new AppError(
+      {
+        error: {
+          code: 'turn_in_progress',
+          message: 'agent instance already has a non-terminal task',
+        },
+      },
+      409,
+    );
+    startRun.mockRejectedValue(turnInProgressError);
+
+    let succeeded: boolean | undefined;
+    await act(async () => {
+      succeeded = await result.current.handleSend('trigger while agent busy');
+    });
+
+    expect(succeeded).toBe(false);
+    // Info toast (not error) — recoverable 409.
+    expect(addToast).toHaveBeenCalledWith({ type: 'info', message: 'error.turnInProgress' });
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', message: 'error.startRunFailed' }),
+    );
+    // No optimistic run switched to (unlike active_run_exists).
+    expect(setOptimisticRun).toHaveBeenCalledWith(null);
+  });
+
+  it('still handles Edge 409 active_run_exists alongside turn_in_progress (coexistence, #1438)', async () => {
+    const setOptimisticRun = vi.fn();
+    const addToast = vi.fn();
+    const { result } = renderHook(() => useSendRun(createDeps({
+      setOptimisticRun,
+      addToast,
+    })));
+
+    const activeRunExistsError = new AppError(
+      {
+        error: {
+          code: 'active_run_exists',
+          message: 'thread already has a running agent task',
+          details: { runId: 'run-conflict-1' },
+        },
+      },
+      409,
+    );
+    startRun.mockRejectedValue(activeRunExistsError);
+
+    let succeeded: boolean | undefined;
+    await act(async () => {
+      succeeded = await result.current.handleSend('trigger while edge busy');
+    });
+
+    expect(succeeded).toBe(false);
+    // active_run_exists path: switches optimistic run to the conflict run + info toast.
+    expect(setOptimisticRun).toHaveBeenCalledWith({
+      runId: 'run-conflict-1',
+      status: 'running',
+      outputText: '',
+      toolCalls: [],
+      changedFiles: [],
+    });
+    expect(addToast).toHaveBeenCalledWith({ type: 'info', message: 'error.activeRunExists' });
+    // turn_in_progress path NOT triggered — the two 409 codes coexist without shadowing.
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'error.turnInProgress' }),
+    );
   });
 });
