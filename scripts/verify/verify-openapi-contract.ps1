@@ -104,10 +104,27 @@ for path, node in paths.items():
 print(json.dumps(sorted(out)))
 '@
 
-$tmp = New-Item -ItemType File -Path (Join-Path $env:TEMP "agenthub-openapi-extract-$([guid]::NewGuid()).py") -Force
+# Cross-platform temp dir (Linux runners do not set $env:TEMP).
+$tempDir = $env:TEMP
+if ([string]::IsNullOrWhiteSpace($tempDir)) { $tempDir = $env:TMPDIR }
+if ([string]::IsNullOrWhiteSpace($tempDir)) { $tempDir = [System.IO.Path]::GetTempPath() }
+# Ensure PyYAML is available (Linux runners have python3 but not PyYAML by default).
+$pyCheck = & python -c "import yaml; print('ok')" 2>$null
+if ($LASTEXITCODE -ne 0 -or $pyCheck -neq 'ok') {
+    & python -m pip install --quiet --disable-pip-version-check PyYAML 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        & python3 -m pip install --quiet --disable-pip-version-check PyYAML 2>$null
+    }
+}
+$tmp = New-Item -ItemType File -Path (Join-Path $tempDir "agenthub-openapi-extract-$([guid]::NewGuid()).py") -Force
 try {
     Set-Content -LiteralPath $tmp.FullName -Value $pyScript -Encoding utf8
-    $json = & python $tmp.FullName $OpenApiPath
+    $pyExe = 'python'
+    $json = & $pyExe $tmp.FullName $OpenApiPath
+    if ($LASTEXITCODE -ne 0) {
+        $pyExe = 'python3'
+        $json = & $pyExe $tmp.FullName $OpenApiPath
+    }
     if ($LASTEXITCODE -ne 0) {
         Fail "python OpenAPI extraction failed (exit $LASTEXITCODE). Ensure PyYAML is installed: python -m pip install PyYAML"
     }
