@@ -20,6 +20,14 @@ var (
 	EventBusPanics                         prometheus.Counter
 	TeamFaultEscalationReviewEventFailures prometheus.Counter
 
+	// WSSendFrameBypass counts WebSocket frames sent via handler.sendFrame,
+	// which bypasses Manager.PushToConn and therefore the per-connection
+	// seq_id stamping contract (G12 KNOWN DEFECT). The frame_type label
+	// carries the ws.Frame.Type value so operators can see which frame
+	// types escape seq_id stamping. Observability-only: this metric does
+	// not change the bypass control flow.
+	WSSendFrameBypass *prometheus.CounterVec
+
 	once sync.Once
 )
 
@@ -105,6 +113,14 @@ func Register() {
 			},
 		)
 
+		WSSendFrameBypass = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "ws_sendframe_bypass_total",
+				Help: "Total WebSocket frames sent via handler.sendFrame, bypassing Manager.PushToConn seq_id stamping (G12).",
+			},
+			[]string{"frame_type"},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -116,6 +132,7 @@ func Register() {
 		prometheus.MustRegister(EventBusQueueLen)
 		prometheus.MustRegister(EventBusPanics)
 		prometheus.MustRegister(TeamFaultEscalationReviewEventFailures)
+		prometheus.MustRegister(WSSendFrameBypass)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
