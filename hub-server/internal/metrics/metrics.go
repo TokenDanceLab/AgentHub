@@ -8,16 +8,17 @@ import (
 )
 
 var (
-	HTTPRequestsTotal *prometheus.CounterVec
-	HTTPDuration      *prometheus.HistogramVec
-	WSConnections     prometheus.Gauge
-	WSDroppedFrames   prometheus.Counter
-	WSRateLimitedMsgs prometheus.Counter
-	WSKickedConns     prometheus.Counter
-	DBPoolInUse       prometheus.Gauge
-	RedisPoolHits     prometheus.Gauge
-	EventBusQueueLen  prometheus.Gauge
-	EventBusPanics    prometheus.Counter
+	HTTPRequestsTotal                      *prometheus.CounterVec
+	HTTPDuration                           *prometheus.HistogramVec
+	WSConnections                          prometheus.Gauge
+	WSDroppedFrames                        prometheus.Counter
+	WSRateLimitedMsgs                      prometheus.Counter
+	WSKickedConns                          prometheus.Counter
+	DBPoolInUse                            prometheus.Gauge
+	RedisPoolHits                          prometheus.Gauge
+	EventBusQueueLen                       prometheus.Gauge
+	EventBusPanics                         prometheus.Counter
+	TeamFaultEscalationReviewEventFailures prometheus.Counter
 
 	once sync.Once
 )
@@ -97,6 +98,13 @@ func Register() {
 			},
 		)
 
+		TeamFaultEscalationReviewEventFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "team_fault_escalation_review_event_failures_total",
+				Help: "Total number of team.escalation.review events that failed to append during fault escalation handling.",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -107,6 +115,7 @@ func Register() {
 		prometheus.MustRegister(RedisPoolHits)
 		prometheus.MustRegister(EventBusQueueLen)
 		prometheus.MustRegister(EventBusPanics)
+		prometheus.MustRegister(TeamFaultEscalationReviewEventFailures)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
