@@ -217,10 +217,32 @@ func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (ok bool) 
 	return false
 }
 
+// sendFrame writes a frame directly to conn.Send, bypassing Manager.PushToConn
+// and therefore the per-connection seq_id stamping contract documented at
+// manager.go:362-369 ("every delivery attempt that reaches the connection is
+// stamped with the connection's monotonic seq_id"). Frames sent here reach the
+// wire with SeqID=0, which frame.go's json "omitempty" tag drops entirely, so
+// clients cannot detect loss of these frames via seq_id gaps.
+//
+// G12 KNOWN DEFECT (characterization, not fixed here): the only production
+// caller is ServeWS (ws.go:98) sending the TypeAuthOK handshake ack. Practical
+// impact is limited because auth.ok is a one-shot control frame with no
+// business payload, but the contract violation is real. Recommended fix
+// (operator decision, NOT applied in this PR): route auth.ok through
+// Manager.PushToConn to unify seq_id stamping — this would give auth.ok
+// seq_id=1 and shift subsequent data frames by 1 (wire-visible, M-grade).
+//
+// ws_sendframe_bypass_total{frame_type} observes the bypass traffic rate so
+// operators can see the volume of frames escaping seq_id stamping. The counter
+// is nil-guarded to align with #1441 (builds that never call metrics.Register
+// must not panic).
 func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	data, err := frame.Marshal()
 	if err != nil {
 		return
+	}
+	if metrics.WSSendFrameBypass != nil {
+		metrics.WSSendFrameBypass.WithLabelValues(frame.Type).Inc()
 	}
 	select {
 	case conn.Send <- data:
