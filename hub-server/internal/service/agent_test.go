@@ -1803,3 +1803,85 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 		"target-other", "other-user", "Other target", "local_edge", `["/workspace"]`, "local", "unknown", "{}", "{}").Error)
 	return db
 }
+
+// ==================== B6: #1430 TurnInProgress per-agent_instance gate ====================
+
+// TestTriggerAgentTaskTurnInProgressRejectsActiveTask seeds an active (queued)
+// task for agent-1 and verifies a second trigger for the same agent_instance is
+// rejected with errcode.TurnInProgress (HTTP 409). The already-persisted
+// trigger message is not rolled back (SendMessage is independent — IM model).
+func TestTriggerAgentTaskTurnInProgressRejectsActiveTask(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	// Pre-seed an active queued task so the gate fires without spawning a
+	// dispatch goroutine for the first task.
+	activeTask := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-active",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(activeTask).Error)
+
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "agent-1", "", "", "", "")
+
+	require.ErrorIs(t, err, errcode.TurnInProgress)
+	var count int64
+	require.NoError(t, db.Table("pending_agent_tasks").Where("agent_instance_id = ?", "agent-1").Count(&count).Error)
+	require.Equal(t, int64(1), count, "second trigger must not create a duplicate task")
+}
+
+// TestTriggerAgentTaskTurnInProgressDifferentAgentInstanceNotBlocked verifies
+// that the gate is per agent_instance: an active task for agent-1 must not
+// block a trigger for agent-2 in the same session.
+func TestTriggerAgentTaskTurnInProgressDifferentAgentInstanceNotBlocked(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-2", "claude-code", "sess-1", "user-1", "Claude").Error)
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	activeTask := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-active",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(activeTask).Error)
+
+	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "agent-2", "", "", "", "")
+
+	require.NoError(t, err)
+	require.Equal(t, "agent-2", task.AgentInstanceID)
+	require.NotEqual(t, activeTask.ID, task.ID)
+
+	var count int64
+	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
+	require.Equal(t, int64(2), count, "agent-1 active + agent-2 new task")
+}
+
+// TestTriggerAgentTaskTurnInProgressTerminalTaskDoesNotBlock verifies that a
+// terminal (done) task does not block a new trigger for the same agent_instance.
+func TestTriggerAgentTaskTurnInProgressTerminalTaskDoesNotBlock(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	doneTask := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-done",
+		Status:            model.TaskStatusDone,
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(doneTask).Error)
+
+	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "agent-1", "", "", "", "")
+
+	require.NoError(t, err)
+	require.NotEqual(t, doneTask.ID, task.ID)
+}
