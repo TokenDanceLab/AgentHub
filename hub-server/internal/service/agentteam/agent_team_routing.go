@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
@@ -753,7 +754,12 @@ func (s *AgentTeamService) handleFaultEscalation(ctx context.Context, a *model.A
 		return
 	}
 
-	_ = s.appendTeamEvent(run.ID, "team.escalation.review", faultEscalationReviewEventPayload(a.ID, escalationCtx))
+	if err := s.appendTeamEvent(run.ID, "team.escalation.review", faultEscalationReviewEventPayload(a.ID, escalationCtx)); err != nil {
+		slog.Warn("team.escalation.review event append failed", "run_id", run.ID, "err", err)
+		if metrics.TeamFaultEscalationReviewEventFailures != nil {
+			metrics.TeamFaultEscalationReviewEventFailures.Inc()
+		}
+	}
 
 	slog.Warn("fault escalation: AI review triggered",
 		"teamRunId", run.ID,
