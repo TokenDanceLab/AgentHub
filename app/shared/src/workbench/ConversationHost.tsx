@@ -136,8 +136,16 @@ export const ConversationHost = React.memo(function ConversationHost({
       }
       const finalIntent = enrichedAttachments.length > 0 ? { ...intentWithLiveText, attachments: enrichedAttachments } : intentWithLiveText;
       const submitPayload = { ...finalIntent, ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}) };
-      await platform.runs.submitComposerIntent(submitPayload);
+      const submitResult = await platform.runs.submitComposerIntent(submitPayload);
       dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
+      // Recoverable 409 turn_in_progress: the Hub message was sent (SendMessage
+      // is independent) but task dispatch was rejected because the agent instance
+      // already has a non-terminal task (#1430). Keep the optimistic user block
+      // (the message is real), restore the composer to idle, and surface an
+      // info toast rather than a hard error (#1438).
+      if (submitResult.turnInProgress) {
+        onToast(t('toast.turnInProgress'));
+      }
     } catch (err) {
       if (optimisticId) {
         setPendingUserBlocks((current) => current.filter((pending) => pending.id !== optimisticId));
@@ -146,7 +154,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       setUploadProgresses({});
       onToast(err instanceof Error ? err.message : '提交失败，请重试');
     } finally { isSubmittingRef.current = false; }
-  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, transcript]);
+  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, t, transcript]);
 
   const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
   const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);

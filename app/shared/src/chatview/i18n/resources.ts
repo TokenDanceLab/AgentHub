@@ -136,6 +136,7 @@ export const chatviewResources = {
 
     // ═══ Toast notifications ═══
     'toast.requestRunning': '已有正在运行的请求，请等待完成后再试。',
+    'toast.turnInProgress': '该 Agent 已有进行中的任务，消息已发送，请等待当前任务完成后再触发。',
     'toast.noDmSession': '还没有 {name} 的私聊会话',
     'toast.agentConfigOpened': '已打开 {name} 配置',
     'toast.deployPreviewOpened': '已打开部署预览',
@@ -535,6 +536,7 @@ export const chatviewResources = {
 
     // ═══ Toast notifications ═══
     'toast.requestRunning': 'A request is already running. Please wait for it to complete.',
+    'toast.turnInProgress': 'This agent already has a task in progress. Your message was sent — retry after the current task completes.',
     'toast.noDmSession': 'No DM session with {name} yet',
     'toast.agentConfigOpened': 'Opened {name} configuration',
     'toast.deployPreviewOpened': 'Opened deploy preview',
