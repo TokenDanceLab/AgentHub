@@ -1377,6 +1377,18 @@ paths:
       responses:
         "200":
           description: Task dispatched.
+        "409":
+          description: Turn in progress — the agent instance already has a non-terminal (queued/dispatched/running) task. The trigger message itself is already persisted and is not rolled back. The web client treats this as a recoverable condition (keep draft / optimistic message, show an info toast) rather than a hard error. Granularity is per `agent_instance_id`, not per session; a different agent instance in the same session is not blocked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                turn_in_progress:
+                  value:
+                    error:
+                      code: turn_in_progress
+                      message: agent instance already has an active task
 
   /web/agent-tasks/{id}/events:
     x-agenthub-device-type: web

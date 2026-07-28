@@ -49,6 +49,18 @@ export function isErrorResponse(body: unknown): body is ErrorBody {
   return typeof e.code === 'string' && typeof e.message === 'string';
 }
 
+/**
+ * True when the error is a recoverable TurnInProgress 409 — the agent instance
+ * already has a non-terminal task (queued/dispatched/running, #1430).
+ *
+ * The frontend treats this as recoverable: keep the draft / optimistic message
+ * (it is already persisted — SendMessage is independent), show an info toast
+ * rather than a hard error. Granularity is per agent_instance, not per session.
+ */
+export function isTurnInProgressError(error: unknown): boolean {
+  return error instanceof AppError && error.status === 409 && error.code === 'turn_in_progress';
+}
+
 export async function parseError(response: Response): Promise<AppError> {
   try {
     const body = await response.json();
