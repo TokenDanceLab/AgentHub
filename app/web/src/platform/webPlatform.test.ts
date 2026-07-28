@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { createWorkbenchDemoRuntimeStore } from '@shared/demo';
+import { AppError } from '@shared/errors';
 import type { AgentInfo } from '@shared/types';
 import {
   agentInfoToWorkbenchAgent,
@@ -742,6 +743,84 @@ describe('webPlatform workbench agent mapping', () => {
       target_id: 'target-local-edge-dispatch-failed',
       model_params: expect.any(String),
     });
+  });
+
+  it('treats triggerAgentTask 409 turn_in_progress as recoverable (keeps confirmed message, no hard error, #1438)', async () => {
+    const queryClient = new QueryClient();
+    const turnInProgressError = new AppError(
+      {
+        error: {
+          code: 'turn_in_progress',
+          message: 'agent instance already has a non-terminal task',
+        },
+      },
+      409,
+    );
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-turn-in-progress',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn().mockResolvedValue({
+        message_id: 'hub-message-turn-in-progress',
+        seq_id: 61,
+        created_at: '2026-06-07T00:00:09Z',
+      }),
+      triggerAgentTask: vi.fn().mockRejectedValue(turnInProgressError),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-turn-in-progress',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      queryClient,
+      createClientMessageId: () => 'client-message-turn-in-progress',
+      now: () => '2026-06-07T00:00:09Z',
+    });
+
+    // Should resolve (not reject) with turnInProgress: true — the Hub message
+    // was already sent & confirmed; only task dispatch hit the 409.
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
+      conversationId: 'hub-session-1',
+      text: '该 Agent 已有进行中任务',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    }, 'target-local-edge-turn-in-progress'))).resolves.toEqual({
+      intentId: 'hub-message-turn-in-progress',
+      turnInProgress: true,
+    });
+
+    // The confirmed Hub message stays in the cache — draft/optimistic preserved.
+    expect(hubMessages(queryClient)).toEqual([
+      expect.objectContaining({
+        id: 'hub-message-turn-in-progress',
+        client_msg_id: 'client-message-turn-in-progress',
+        seq_id: 61,
+        content: '该 Agent 已有进行中任务',
+      }),
+    ]);
+    // triggerAgentTask was called but the 409 was swallowed (recoverable).
+    expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-turn-in-progress', {
+      agent_instance_id: 'agent-instance-turn-in-progress',
+      target_id: 'target-local-edge-turn-in-progress',
+      model_params: expect.any(String),
+    });
+    // No task index recorded (dispatch was rejected).
+    expect(queryClient.getQueryData(['web-v4', 'active-agent-task', 'hub-session-1'])).toBeUndefined();
   });
 
   it('rejects real Hub agent task dispatch when no online local_edge target is available', async () => {
