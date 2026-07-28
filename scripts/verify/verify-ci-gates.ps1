@@ -169,6 +169,9 @@ Assert-Contains $validate "Verify real E2E contract" "validate job must run the 
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
+Assert-Contains $validate "Verify coverage baseline" "validate job must run the coverage baseline gate"
+Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.ps1" "validate job must call scripts/verify/verify-coverage-baseline.ps1"
+Assert-StepContinueOnError $validate "Verify coverage baseline" $false
 
 Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"
 Assert-Contains (Get-StepBlock $mobile "Screenshot visual QA (mobile)") "(?m)^\s+timeout-minutes:\s+12\s*$" "mobile visual QA must have a hard timeout"
