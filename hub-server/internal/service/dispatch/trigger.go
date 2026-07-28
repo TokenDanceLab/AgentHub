@@ -49,6 +49,18 @@ func TriggerMemberActiveError(checkErr error, active bool) error {
 	return nil
 }
 
+// TurnInProgressError returns TurnInProgress (HTTP 409) when the create reported
+// an active task for the same agent instance; other errors pass through
+// unchanged. active is true when createErr is repository.ErrTurnInProgressActive
+// (the caller owns the errors.Is check so this package stays free of gorm).
+// Granularity is per agent_instance, not per session (#1430).
+func TurnInProgressError(createErr error, active bool) error {
+	if active {
+		return errcode.TurnInProgress
+	}
+	return createErr
+}
+
 // ApplyValidatedTarget maps a validated TargetSnapshot onto trigger task fields.
 // When target is nil (no target requested / validation no-op), all returns are empty.
 func ApplyValidatedTarget(target *TargetSnapshot) (targetID, targetType, edgeDeviceID string) {

@@ -12,6 +12,12 @@ import (
 
 var ErrRunEventLimitExceeded = errors.New("run event limit exceeded for task")
 
+// ErrTurnInProgressActive signals that a CreatePendingTaskUnlessActive call
+// found an existing non-terminal task for the same agent instance. The service
+// maps it to errcode.TurnInProgress (HTTP 409) so the frontend can recover
+// (keep draft / optimistic message) instead of showing a hard error (#1430).
+var ErrTurnInProgressActive = errors.New("active task already exists for agent instance")
+
 // maxAgentEventsPerQuery caps the number of agent run events returned per query
 // to prevent unbounded memory consumption on tasks with many events.
 const maxAgentEventsPerQuery = 2000
@@ -210,6 +216,74 @@ func CancelTasksByAgentInstance(db *gorm.DB, agentInstanceID string) error {
 	return db.Model(&model.PendingAgentTask{}).
 		Where("agent_instance_id = ? AND status IN ?", agentInstanceID, []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).
 		Updates(map[string]interface{}{"status": model.TaskStatusCancelled, "finished_at": &now}).Error
+}
+
+// FindActivePendingTaskByAgentInstance returns the most recent non-terminal
+// (queued/dispatched/running) pending task for the given agent instance, or
+// gorm.ErrRecordNotFound when none is active. Used by the TurnInProgress gate
+// in TriggerAgentTask (#1430).
+func FindActivePendingTaskByAgentInstance(db *gorm.DB, agentInstanceID string) (*model.PendingAgentTask, error) {
+	var task model.PendingAgentTask
+	err := db.Where("agent_instance_id = ? AND status IN ?", agentInstanceID,
+		[]string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning},
+	).Order("created_at DESC").First(&task).Error
+	return &task, err
+}
+
+// LockAgentInstanceForUpdate serializes concurrent TriggerAgentTask calls for
+// one agent instance (per-agent_instance mutex, #1430). PostgreSQL uses a
+// row-level FOR UPDATE lock; the SQLite fallback performs a no-op write so
+// integration tests exercise a real write lock. Mirrors LockTeamRunForUpdate (#1383).
+func LockAgentInstanceForUpdate(db *gorm.DB, agentInstanceID string) error {
+	if db.Dialector.Name() == "postgres" {
+		var id string
+		if err := db.Raw("SELECT id FROM agent_instances WHERE id = ? FOR UPDATE", agentInstanceID).Scan(&id).Error; err != nil {
+			return err
+		}
+		if id == "" {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	}
+	result := db.Model(&model.AgentInstance{}).
+		Where("id = ?", agentInstanceID).
+		UpdateColumn("display_name", gorm.Expr("display_name"))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// CreatePendingTaskUnlessActive atomically creates a pending task unless the
+// agent instance already has a non-terminal (queued/dispatched/running) task.
+// It locks the agent_instance row, checks for an active task, and creates the
+// new task inside one transaction to close the check-then-create TOCTOU window
+// (#1430). On conflict it returns the existing active task and
+// ErrTurnInProgressActive so the service can surface a 409 without rolling back
+// the already-persisted trigger message. Granularity is per agent_instance.
+func CreatePendingTaskUnlessActive(db *gorm.DB, task *model.PendingAgentTask) (*model.PendingAgentTask, error) {
+	var existing model.PendingAgentTask
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := LockAgentInstanceForUpdate(tx, task.AgentInstanceID); err != nil {
+			return err
+		}
+		active, err := FindActivePendingTaskByAgentInstance(tx, task.AgentInstanceID)
+		if err == nil {
+			existing = *active
+			return ErrTurnInProgressActive
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		return tx.Create(task).Error
+	})
+	if err != nil {
+		return &existing, err
+	}
+	return task, nil
 }
 
 // BumpRunningTaskExpireAt extends the expire_at timestamp for a running task,

@@ -50,8 +50,13 @@ var (
 	AgentTaskNotFound  = New("agent_task_not_found", "agent task not found", http.StatusNotFound)
 	AgentTaskCancelled = New("agent_task_cancelled", "task has been cancelled", http.StatusGone)
 	AgentTaskTimeout   = New("agent_task_timeout", "task has timed out", http.StatusGone)
-	TargetNotFound     = New("target_not_found", "execution target not found", http.StatusNotFound)
-	TargetNotRoutable  = New("target_not_routable", "execution target is not routable", http.StatusConflict)
+	// TurnInProgress signals that the agent instance already has a non-terminal
+	// task (queued/dispatched/running). The frontend treats this 409 as
+	// recoverable: keep the draft / optimistic message, do not show a hard
+	// error toast. Granularity is per agent_instance, not per session (#1430).
+	TurnInProgress    = New("turn_in_progress", "agent instance already has an active task", http.StatusConflict)
+	TargetNotFound    = New("target_not_found", "execution target not found", http.StatusNotFound)
+	TargetNotRoutable = New("target_not_routable", "execution target is not routable", http.StatusConflict)
 
 	GroupNotOwner         = New("group_not_owner", "only group owner can perform this action", http.StatusForbidden)
 	GroupOwnerCannotLeave = New("group_owner_cannot_leave", "group owner cannot leave, transfer or dissolve first", http.StatusBadRequest)
@@ -85,6 +90,6 @@ var (
 	DocNotFound       = New("doc_not_found", "document not found", http.StatusNotFound)
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)
 
-		ErrUnauthorized = sharederr.ErrUnauthorized
+	ErrUnauthorized = sharederr.ErrUnauthorized
 	ErrForbidden    = sharederr.ErrForbidden
 )

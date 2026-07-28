@@ -65,9 +65,16 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 		ai.ID, userID, triggerMessageID, targetID, edgeDeviceID,
 		time.Now().Add(config.PendingTaskTTL),
 	)
-	if err := repository.CreatePendingTask(s.db, task); err != nil {
+	// #1430: per-agent_instance TurnInProgress gate. Rejects a second concurrent
+	// trigger while one task is non-terminal (queued/dispatched/running). The
+	// check-then-create runs inside a transaction with a row lock so concurrent
+	// triggers for the same agent_instance serialize; the already-persisted
+	// trigger message is not rolled back (IM model — SendMessage is independent).
+	created, createErr := repository.CreatePendingTaskUnlessActive(s.db, task)
+	if err := dispatch.TurnInProgressError(createErr, errors.Is(createErr, repository.ErrTurnInProgressActive)); err != nil {
 		return nil, err
 	}
+	task = created
 
 	// Pre-query the CustomAgent to avoid a DB query inside the dispatch goroutine.
 	var customAgent *model.CustomAgent
