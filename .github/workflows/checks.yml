@@ -779,6 +779,29 @@ jobs:
           python -m pip install --quiet PyYAML
           python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 
+      # ── Frontend coverage baseline gate (baseline must not regress) ──
+      # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
+      # if any coverage metric drops below scripts/verify/coverage-baseline.json
+      # or if any test is skipped (.skip / .todo anti-cheat). v8 coverage is
+      # execution-path based so numbers are cross-platform deterministic; a
+      # small tolerance field in the baseline absorbs run-to-run async noise.
+      - name: Setup pnpm (coverage gate)
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node (coverage gate)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install frontend deps (coverage gate)
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+      - name: Verify coverage baseline
+        shell: pwsh
+        run: ./scripts/verify/verify-coverage-baseline.ps1
+
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:
     name: Vuln scan (pnpm audit --prod)
