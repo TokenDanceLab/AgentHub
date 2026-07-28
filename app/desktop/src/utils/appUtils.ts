@@ -35,6 +35,19 @@ export function getActiveRunConflictId(error: unknown): string | undefined {
   return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
 }
 
+/**
+ * True when the error is a recoverable Hub 409 `turn_in_progress` — the agent
+ * instance already has a non-terminal task (#1430). Parallels the Edge
+ * `active_run_exists` recoverable path in useSendRun: the run did not start,
+ * so surface an info toast (not error) and let the user retry after the
+ * current task completes. Duck-typed to match getActiveRunConflictId's style
+ * (no static import → no circular-dep risk).
+ */
+export function isTurnInProgressConflict(error: unknown): boolean {
+  const e = error as { status?: number; code?: string };
+  return e.status === 409 && e.code === 'turn_in_progress';
+}
+
 // ── DOM helpers ──
 
 export function isEditableShortcutTarget(target: EventTarget | null): boolean {
