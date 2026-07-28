@@ -31,7 +31,7 @@ func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 		AuthInvalidToken, AuthInvalidCredentials, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
 		MsgNotFound, MsgRecallTimeout, MsgPinLimitExceeded, MsgBlockedByReceiver,
 		SessionNotFound, SessionDissolved, SessionNotMember,
-		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TargetNotFound, TargetNotRoutable,
+		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TurnInProgress, TargetNotFound, TargetNotRoutable,
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
 		FriendAlready, FriendBlocked, FriendRequestNotFound, FriendRemarkNoRow, FriendNotFriend,

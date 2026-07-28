@@ -309,6 +309,13 @@ func TestTriggerGuards(t *testing.T) {
 	require.ErrorIs(t, TriggerMemberActiveError(memberCheckErr, false), memberCheckErr)
 	require.ErrorIs(t, TriggerMemberActiveError(memberCheckErr, true), memberCheckErr)
 	require.NotErrorIs(t, TriggerMemberActiveError(memberCheckErr, false), errcode.SessionNotMember)
+
+	// #1430: TurnInProgress gate — active=true → 409; other errors pass through.
+	require.ErrorIs(t, TurnInProgressError(nil, true), errcode.TurnInProgress)
+	require.NoError(t, TurnInProgressError(nil, false))
+	turnDBErr := errors.New("db down")
+	require.ErrorIs(t, TurnInProgressError(turnDBErr, false), turnDBErr)
+	require.NotErrorIs(t, TurnInProgressError(turnDBErr, false), errcode.TurnInProgress)
 }
 
 func TestTargetBoundAndOutboxHelpers(t *testing.T) {
