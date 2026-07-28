@@ -157,6 +157,9 @@ Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT 
 Assert-Contains $validate "scripts/verify/verify-doc-ssot\.ps1" "validate job must call scripts/verify/verify-doc-ssot.ps1"
 Assert-Contains $validate "Verify Web Hub-only boundary" "validate job must run the Web Hub-only boundary verifier"
 Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.ps1" "validate job must call scripts/verify/verify-web-hub-boundary.ps1"
+Assert-Contains $validate "Verify Hub pure package imports" "validate job must run the Hub pure package import verifier"
+Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.ps1" "validate job must call scripts/verify/verify-hub-pure-packages.ps1"
+Assert-StepContinueOnError $validate "Verify Hub pure package imports" $false
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
