@@ -110,7 +110,7 @@ if ([string]::IsNullOrWhiteSpace($tempDir)) { $tempDir = $env:TMPDIR }
 if ([string]::IsNullOrWhiteSpace($tempDir)) { $tempDir = [System.IO.Path]::GetTempPath() }
 # Ensure PyYAML is available (Linux runners have python3 but not PyYAML by default).
 $pyCheck = & python -c "import yaml; print('ok')" 2>$null
-if ($LASTEXITCODE -ne 0 -or $pyCheck -neq 'ok') {
+if ($LASTEXITCODE -ne 0 -or $pyCheck -ne 'ok') {
     & python -m pip install --quiet --disable-pip-version-check PyYAML 2>$null
     if ($LASTEXITCODE -ne 0) {
         & python3 -m pip install --quiet --disable-pip-version-check PyYAML 2>$null
