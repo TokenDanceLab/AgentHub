@@ -162,6 +162,9 @@ Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.ps1" "valida
 Assert-StepContinueOnError $validate "Verify Hub pure package imports" $false
 Assert-Contains $validate "Verify Mobile Hub-only boundary" "validate job must run the Mobile Hub-only boundary verifier"
 Assert-Contains $validate "scripts/verify/verify-mobile-hub-boundary\.ps1" "validate job must call scripts/verify/verify-mobile-hub-boundary.ps1"
+Assert-Contains $validate "Verify Design token SSOT" "validate job must run the design token SSOT verifier"
+Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.ps1" "validate job must call scripts/verify/verify-design-token-ssot.ps1"
+Assert-StepContinueOnError $validate "Verify Design token SSOT" $false
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
