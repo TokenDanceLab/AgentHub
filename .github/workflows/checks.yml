@@ -762,6 +762,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-hub-pure-packages.ps1
 
+      - name: Verify Mobile Hub-only boundary
+        shell: pwsh
+        run: ./scripts/verify/verify-mobile-hub-boundary.ps1
+
       - name: Verify real E2E contract
         shell: pwsh
         run: ./scripts/verify/verify-real-e2e-contract.ps1
