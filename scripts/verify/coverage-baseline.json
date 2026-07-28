@@ -1,0 +1,61 @@
+{
+  "$schema": "coverage-baseline.v1",
+  "measuredAt": "2026-07-29",
+  "masterSha": "77178992cd124cf1abe00d0fe4f8b8b752a84ffb",
+  "masterShaShort": "77178992",
+  "measuredOn": "Windows (worktree ci/coverage-baseline, pnpm install --frozen-lockfile relink)",
+  "ciPlatform": "ubuntu-latest (v8 coverage is execution-path based; numbers are cross-platform deterministic)",
+  "policy": "Coverage baseline gate — numbers must not regress. If a metric drops below the value recorded here (minus the v8 run-to-run tolerance), the gate fails (exit 1). A second assertion requires skipped tests == 0 so .skip / .todo cannot silently mask a regression. To raise the bar, update this file with freshly measured numbers + a new measuredAt/masterSha; never lower a number without an explicit baseline re-baseline decision.",
+  "tolerance": 0.08,
+  "toleranceNote": "v8 coverage is execution-path based and mostly cross-platform deterministic, but a few async setup/teardown paths execute non-deterministically between runs. On @agenthub/shared two stable states were observed (lines 71.57 vs 71.59, a 2-statement / 1-function delta); web and desktop were bit-identical across runs. The 0.08pp tolerance absorbs this run-to-run variance with margin while still catching any deleted test that covers more than a handful of unique statements (a real cheat), which moves coverage by well over 0.08pp. If CI shows larger drift, raise this field — do not lower baseline numbers.",
+  "packages": {
+    "@agenthub/shared": {
+      "dir": "app/shared",
+      "coverage": {
+        "lines": 71.57,
+        "statements": 70.21,
+        "functions": 69.71,
+        "branches": 66.18
+      },
+      "coverageNote": "Two stable v8 states observed locally: lines 71.57 (2 of 3 runs) and 71.59 (1 of 3). Baseline pinned to the conservative floor. tolerance field above absorbs the delta.",
+      "tests": {
+        "total": 1303,
+        "passed": 1303,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "agenthub-web": {
+      "dir": "app/web",
+      "coverage": {
+        "lines": 63.61,
+        "statements": 62.19,
+        "functions": 53.42,
+        "branches": 59.48
+      },
+      "tests": {
+        "total": 182,
+        "passed": 182,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "agenthub-desktop": {
+      "dir": "app/desktop",
+      "config": "vitest.desktop-ci.config.ts",
+      "configNote": "Default vitest.config.ts includes src/__tests__/integration/edge-real.test.ts which needs a live edge-server binary; vitest.desktop-ci.config.ts excludes src/__tests__/integration/** — the same desktop unit subset CI runs via test:ci. Using this subset keeps the baseline honest and reproducible without a real Edge process.",
+      "coverage": {
+        "lines": 67.13,
+        "statements": 63.72,
+        "functions": 61.8,
+        "branches": 55.35
+      },
+      "tests": {
+        "total": 601,
+        "passed": 601,
+        "failed": 0,
+        "skipped": 0
+      }
+    }
+  }
+}
