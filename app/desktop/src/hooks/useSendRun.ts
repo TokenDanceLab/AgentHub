@@ -14,7 +14,7 @@ import type { ChatMessage } from '@shared/types/chat';
 import type { AddToastInput } from '@/stores/toastStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { findRetryPrompt } from '@/utils/messageActions';
-import { getActiveRunConflictId } from '@/utils/appUtils';
+import { getActiveRunConflictId, isTurnInProgressConflict } from '@/utils/appUtils';
 import {
   buildAutomaticThreadTitle,
   canAutoRenameThreadTitle,
@@ -217,6 +217,14 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
       if (activeRunId) {
         setOptimisticRun({ runId: activeRunId, status: 'running', outputText: '', toolCalls: [], changedFiles: [] });
         addToast({ type: 'info', message: t('error.activeRunExists') });
+        return false;
+      }
+      // Hub 409 turn_in_progress: agent instance already has a non-terminal task
+      // (#1430). Recoverable — the run did not start. Coexists with the Edge
+      // active_run_exists path above without shadowing it (#1438).
+      if (isTurnInProgressConflict(e)) {
+        setOptimisticRun(null);
+        addToast({ type: 'info', message: t('error.turnInProgress') });
         return false;
       }
       setOptimisticRun(null);

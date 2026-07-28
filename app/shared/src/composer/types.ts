@@ -89,6 +89,14 @@ export interface ComposerIntent {
 
 export interface ComposerSubmitResult {
   intentId: string;
+  /**
+   * Present when the Hub returned a recoverable 409 `turn_in_progress` — the
+   * agent instance already has a non-terminal task (#1430). The composer
+   * message was already sent (SendMessage is independent); only task dispatch
+   * was rejected. The shell should treat this as recoverable: restore the
+   * composer to idle (not error) and surface an info toast, not a hard error.
+   */
+  turnInProgress?: boolean;
 }
 
 export type ComposerAction =
