@@ -779,6 +779,10 @@ jobs:
           python -m pip install --quiet PyYAML
           python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 
+      - name: Verify OpenAPI↔hub router contract
+        shell: pwsh
+        run: ./scripts/verify/verify-openapi-contract.ps1
+
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
       # if any coverage metric drops below scripts/verify/coverage-baseline.json
