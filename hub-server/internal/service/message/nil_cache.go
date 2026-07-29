@@ -1,30 +1,14 @@
 package message
 
-import (
-	"reflect"
+import "github.com/agenthub/hub-server/internal/cache"
 
-	"github.com/agenthub/hub-server/internal/cache"
-)
-
-// resolveCache falls back to cache.NoOpCache when the injected Cache is nil
-// (including typed-nil interface values). Package-local copy of the flat
-// service isNilCache pattern — do not import flat service to avoid cycles.
+// resolveCache returns c, falling back to cache.NoOpCache when c is nil or a
+// typed-nil cache port. Thin type-bridge over cache.ResolveCache so call sites
+// stay on the package-local Cache interface; the nil-detection logic lives in
+// the shared internal/cache helper (Audit-D §4 cluster 2). Kept package-local
+// rather than calling cache.ResolveCache directly at each call site because the
+// message Cache interface is package-local and Go cannot infer the generic
+// type parameter from a mix of the interface port and the NoOpCache fallback.
 func resolveCache(c Cache) Cache {
-	if isNilCache(c) {
-		return cache.NoOpCache{}
-	}
-	return c
-}
-
-func isNilCache(c any) bool {
-	if c == nil {
-		return true
-	}
-	v := reflect.ValueOf(c)
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return v.IsNil()
-	default:
-		return false
-	}
+	return cache.ResolveCache[Cache](c, cache.NoOpCache{})
 }
