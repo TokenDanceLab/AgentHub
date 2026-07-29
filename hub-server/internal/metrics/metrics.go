@@ -63,6 +63,19 @@ var (
 	// G10 — Admin server up gauge (1 = running, 0 = not started / failed).
 	AdminServerUp prometheus.Gauge
 
+	// G8 — DB slow-query / error counters. The slow-query counter increments
+	// for every slow query regardless of rows-affected; the slog Warn is
+	// silenced when rows==0 (to avoid log flooding) but the metric is not —
+	// operators must see slow-query rate even for empty result sets.
+	DBErrors      prometheus.Counter
+	DBSlowQueries prometheus.Counter
+
+	// G8 — Optional DB pool idle gauge, set periodically in
+	// app.startMetricsCollector alongside DBPoolInUse.
+	// NOTE: sql.DBStats has no StaleConns field (that is a Redis pool
+	// concept); only db_pool_idle is exposed for the DB pool.
+	DBPoolIdle prometheus.Gauge
+
 	once sync.Once
 )
 
@@ -288,6 +301,29 @@ func Register() {
 			},
 		)
 
+		// G8 — DB slow-query / error counters.
+		DBErrors = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "db_errors_total",
+				Help: "Total number of database errors surfaced by the GORM logger Trace error branch.",
+			},
+		)
+		DBSlowQueries = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "db_slow_queries_total",
+				Help: "Total number of slow database queries (elapsed > SlowThreshold). Increments regardless of rows-affected; the slog Warn is silenced when rows==0 but the metric is not.",
+			},
+		)
+
+		// G8 — Optional DB pool idle gauge (set periodically in app.startMetricsCollector).
+		// sql.DBStats has no StaleConns; only idle is exposed for the DB pool.
+		DBPoolIdle = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "db_pool_idle",
+				Help: "Number of idle database connections in the pool.",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -317,6 +353,9 @@ func Register() {
 		prometheus.MustRegister(TeamAssignmentStateTransitionFailures)
 		prometheus.MustRegister(EventBusSubmitFailures)
 		prometheus.MustRegister(AdminServerUp)
+		prometheus.MustRegister(DBErrors)
+		prometheus.MustRegister(DBSlowQueries)
+		prometheus.MustRegister(DBPoolIdle)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

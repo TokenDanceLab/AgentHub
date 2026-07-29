@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -80,6 +81,9 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 
 	switch {
 	case err != nil && l.LogLevel >= gormlogger.Error && (!l.IgnoreRecordNotFoundError || !errors.Is(err, gorm.ErrRecordNotFound)):
+		if metrics.DBErrors != nil {
+			metrics.DBErrors.Inc()
+		}
 		sql, rows := fc()
 		sql = scrubSQLContent(sql)
 		slog.Error("gorm error",
@@ -89,9 +93,16 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 			"error", err,
 		)
 	case elapsed > l.SlowThreshold && l.SlowThreshold > 0 && l.LogLevel >= gormlogger.Warn:
+		// G8: the slow-query metric counts EVERY slow query regardless of
+		// rows-affected. The slog.Warn below is silenced when rows==0 (early
+		// return) to avoid log flooding, but the metric is NOT silenced —
+		// operators must see slow-query rate even for empty result sets.
+		if metrics.DBSlowQueries != nil {
+			metrics.DBSlowQueries.Inc()
+		}
 		sql, rows := fc()
 		if rows == 0 {
-			return // empty result set — slow is almost certainly steal, not a query problem
+			return // empty result set — slow is almost certainly steal, not a query problem (log silenced; metric already counted above)
 		}
 		sql = scrubSQLContent(sql)
 		slog.Warn("slow query",
