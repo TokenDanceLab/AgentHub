@@ -14,8 +14,9 @@ verify-mobile-hub-boundary.ps1) scan only platform src/ — they do NOT cover
 app/shared/src/. This gate closes that gap (audit-A Scope 4 NEW finding).
 
 Known defects allowlist (current violations accepted as documented debt):
-  - FilePreviewRouter.tsx — imports Edge REST apply fns from apiClient + comment
-    mentions /v1/runs. Drift: should route through PreviewPort (audit-A P).
+  - FilePreviewRouter.tsx — declares local Edge REST helpers (applyRunDiff /
+    applyAllRunDiffs) that call /v1/runs. apiClient.ts removed per RFC A-V3 §4.1;
+    local helpers kept for compilability until PreviewPort migration (audit-A P).
   - RuntimeEvidenceHelpers.ts — constructs Edge content paths /v1/runs/.../content
     for artifact/preview URL building. Known Edge-path coupling.
   - RuntimeEvidenceHelpers.test.ts — test data with Edge content paths.
@@ -77,8 +78,8 @@ $ForbiddenPatterns = @(
 # still fails. Adding an Edge reference to any other file always fails.
 $KnownDefects = @(
     @{ File = "app/shared/src/workbench/inspector/FilePreviewRouter.tsx";
-       Exempt = @("apiClient", "/v1/runs");
-       Reason = "imports Edge REST apply fns + comment /v1/runs — drift, route via PreviewPort (audit-A P)" },
+       Exempt = @("/v1/runs");
+       Reason = "local Edge REST helpers + comment /v1/runs — drift, route via PreviewPort (audit-A P)" },
     @{ File = "app/shared/src/workbench/inspector/RuntimeEvidenceHelpers.ts";
        Exempt = @("/v1/runs");
        Reason = "constructs Edge content paths /v1/runs/.../content — known Edge-path coupling" },
