@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `50de712f`（D-V1 Step 2 collectAndWaitOutput 提取） |
+| Live tip | master `9f046720`（会话收束：D-V1 -41% + god function 全仓扫描） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -113,3 +113,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **D-V3 完成**（#1470）：startEventSubscriptions 239 行拆为 5 域方法（message/agent/team/contact/session），主函数退化为 7 行分发器。**D-V2 评估**：PostRuns 357 行实为清晰线性 pipeline，非 god function，审计高估——跳过低价值重构。**D-V1 评估**：edge run() 418 行含会话重试循环 + fault escalation 交接 + 多并发原语，高价值但高风险，需深入理解 #867 语义后专项设计 |
 | 2026-07-30 | **D-V1 Step 1**：buildAndStartProcess 138 行提取到 process_executor_build.go（新文件），run() 从 418→281 行（-33%）。提取的是循环体中最机械的构建+启动阶段，每条错误路径自己发事件，调用者仅需 return。控制流决策（continue/break）未提取，留待后续步骤。lifecycle tests 全过。 |
 | 2026-07-30 | **D-V1 Step 2**：collectAndWaitOutput 40 行提取到 process_executor_build.go，run() 从 281→246 行。循环体现在是清晰的 3 阶段管道：(1) buildAndStart → (2) collectAndWait → (3) evaluate+finish。累计 418→246 行（-41%）。lifecycle tests 全过。 |
+| 2026-07-30 | **God function 全仓扫描**：扫出 19 个 >150 行函数。3 个真正 god function 评估：PostRuns 358 行（HTTP handler，长但线性，跳过）、StartTeamRun 226 行（已标 #1385）、HandleSubAgentFailure 158 行（已结构化 Step 0-6，委托子函数，跳过）。其余 16 个为长但线性的路由/注册/wiring/parser。D-V1 仍是唯一高价值重构——已完成（-41%）。|
