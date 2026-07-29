@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `8915c1c6`（#1465 agentteam payload 去重） |
+| Live tip | master `54c21867`（#1468 A-V2 shared-UI hubClient 门禁） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -76,7 +76,7 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 ### 审计澄清
 
 - Desktop「15 pre-existing fail」过期；CI 全绿
-- A7 候选余量：hubClient thin-shell / shared UI hubClient（policy-first，未做）
+- A7 候选余量：hubClient thin-shell / shared UI hubClient（**A-V2 已由 #1468 合入**，全闭环）
 
 ## Product tip & Visual QA
 
@@ -84,10 +84,10 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 
 ## Infrastructure
 
-- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot · shared-boundary · shared-barrel · hub-layering · conventions · shared-rest-contract · shared-ui-hubclient（14 层；A-V2 #1468 待 CI 后合入即 14）
+- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot · shared-boundary · shared-barrel · hub-layering · conventions · shared-rest-contract · shared-ui-hubclient（**14 层全部合入**）
 - 观测：`/metrics`（admin server，basic auth）+ 36 Prometheus counter（11 基线 + 25 新增）
 - 供应链：Dependabot 0 open（brace-expansion fix #1370/#1397 + alert #43 dismissed）
-- 综合审计 off-repo：`agenthub-comprehensive-audit-2026-07-29.md`（D 32 + T 13 + A 17，top 10 落地 5/10）
+- 综合审计 off-repo：`agenthub-comprehensive-audit-2026-07-29.md`（D 32 + T 13 + A 17，top 10 落地 **6/10**：#1461/#1462/#1463/#1464/#1465 + A-V2 #1468）
 - residual out of scope: live OIDC evidence · full Mobile redesign · QA>89
 
 ## Session Log
@@ -100,3 +100,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 | 2026-07-29 | P2 收口：A#3 Hub 契约门禁合并（#1467 → master 6d3875cb；A#4/A#5 已在 #1463）。P3 裁决：8 项实测，D-V1 受 #867 硬阻塞 DEFER；D-V2/D-V3/A-V1/A-V3/A-V4 转 PLAN issue #1469–#1473；A-V5 已采纳 |
 | 2026-07-29 | A-V2 澄清修正：非「由 #1463 覆盖」——p2 关门前补 A-V2 专属门禁 PR #1468（shared-UI 禁运行时 import hubClient，类型导入放行；与 #1463「平台↛共享Edge」是依赖图相反两侧的互补面，master 上 0 违规）。#1468 rebase 至最新 master 解 checks.yml/verify-ci-gates.ps1 加法冲突，本地 anti-cheat 通过，MERGEABLE 待 CI |
 | 2026-07-29 | MASTER 同步：A-V2 澄清 + #1468 门禁入 14 层索引；live tip `6d3875cb`（#1467），#1468 待 CI 后合 |
+| 2026-07-29 | #1468 合入 master `54c21867`（A-V2 闭环）；MASTER tip 同步至 #1468，14 层门禁全部合入；综合审计 top10 落地 6/10 |
