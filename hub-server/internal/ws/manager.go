@@ -314,6 +314,11 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 
 	m.mu.Unlock()
 
+	if oldConnID != "" {
+		if metrics.WSReconnects != nil {
+			metrics.WSReconnects.Inc()
+		}
+	}
 	if m.OnRouteSet != nil {
 		m.OnRouteSet(userID, deviceType, deviceID, connID, oldConnID, wasOffline)
 	}
@@ -355,6 +360,9 @@ func (m *Manager) Unregister(connID string) {
 	}
 
 	c.closeSend()
+	if metrics.WSDisconnects != nil {
+		metrics.WSDisconnects.Inc()
+	}
 	slog.Info("ws disconnected", "conn_id", connID, "user_id", c.UserID)
 }
 
@@ -372,21 +380,33 @@ func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
 	c, ok := m.conns[connID]
 	m.mu.RUnlock()
 	if !ok {
+		if metrics.WSDeliveryFailures != nil {
+			metrics.WSDeliveryFailures.WithLabelValues("conn_not_found").Inc()
+		}
 		return DeliveryResult{Status: DeliveryStatusConnNotFound, Err: ErrDeliveryConnNotFound}
 	}
 	if c.closed.Load() {
+		if metrics.WSDeliveryFailures != nil {
+			metrics.WSDeliveryFailures.WithLabelValues("conn_closed").Inc()
+		}
 		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
 	}
 
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
 	if c.closed.Load() {
+		if metrics.WSDeliveryFailures != nil {
+			metrics.WSDeliveryFailures.WithLabelValues("conn_closed").Inc()
+		}
 		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
 	}
 
 	frame.SeqID = c.seq.Add(1)
 	data, err := frame.Marshal()
 	if err != nil {
+		if metrics.WSDeliveryFailures != nil {
+			metrics.WSDeliveryFailures.WithLabelValues("marshal_error").Inc()
+		}
 		return DeliveryResult{Status: DeliveryStatusMarshalError, Err: errors.Join(ErrDeliveryMarshalError, err)}
 	}
 
@@ -553,6 +573,9 @@ func (m *Manager) pingAll() {
 			missed := c.missedPong.Add(1)
 			slog.Warn("ws ping failed", "conn_id", c.ID, "missed", missed)
 			if missed >= config.WSMaxMissedPongs {
+				if metrics.WSStaleClose != nil {
+					metrics.WSStaleClose.Inc()
+				}
 				slog.Info("ws closing stale connection", "conn_id", c.ID)
 				c.Close()
 				m.Unregister(c.ID)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -14,6 +15,9 @@ import (
 func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) bool {
 	queueTargetTask := func(reason string, err error) {
 		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
+			if metrics.AgentDispatchOfflinePushFailures != nil {
+				metrics.AgentDispatchOfflinePushFailures.WithLabelValues("target_bound").Inc()
+			}
 			slog.Error(dispatch.DispatchLogTargetBoundOfflinePushFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
 			return
 		}
