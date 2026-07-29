@@ -25,7 +25,6 @@
     "./workbenchState": "./src/workbenchState.ts",
     "./tree": "./src/tree.ts",
     "./diff": "./src/diff.ts",
-    "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
     "./mock": "./src/mock.ts",
     "./stores/queryKeys": "./src/stores/queryKeys.ts",

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { applyAllRunDiffs, applyRunDiff } from '../../apiClient';
+import { parseError } from '../../errors';
 import type { FileDiff } from '../../types/chat';
 import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../../ui/DiffReviewPanel';
 import { DocxPreview } from '../../ui/DocxPreview';
@@ -83,6 +83,42 @@ function extractFileUrl(content: string | undefined): string {
     return content;
   }
   return '';
+}
+
+/** Replaces the now-deleted shared Edge REST client apply fns (RFC A-V3 §4.1 —
+ *  zero external consumers, stored in shared/src as dead surface).  edgeBaseUrl is unconfigured here
+ *  because the shared package has no Local Edge; Desktop drives the Edge
+ *  connection through its own wrappers.  InteractiveDiffPreview was already
+ *  a known defect per verify-shared-boundary.ps1 (audit-A P → PreviewPort). */
+let edgeBaseUrl = '';
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  if (!edgeBaseUrl) {
+    throw new Error('Edge base URL not configured — route through PreviewPort instead');
+  }
+  const res = await fetch(`${edgeBaseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function applyRunDiff(
+  runId: string,
+  body: { file_path: string; hunk_index: number; accepted: boolean; workDir: string },
+): Promise<{ code: string; data: unknown }> {
+  return postJson(`/v1/runs/${encodeURIComponent(runId)}/apply`, body);
+}
+
+async function applyAllRunDiffs(
+  runId: string,
+  body: { decisions: Array<{ file_path: string; hunk_index: number; accepted: boolean }>; workDir: string },
+): Promise<{ code: string; data: unknown }> {
+  return postJson(`/v1/runs/${encodeURIComponent(runId)}/apply-all`, body);
 }
 
 /** Interactive diff preview with hunk accept/reject that writes back to the workdir via Edge API. */
