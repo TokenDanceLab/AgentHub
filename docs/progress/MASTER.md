@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `1117d8a0`（#1450 DB metrics） |
+| Live tip | master `c9300ebf`（#1452 hubClient thin-shell 门禁） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -28,6 +28,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | Design token re-export | #1440 | styles 仅 @import shared |
 | 前端 coverage 基线不可退 | #1443 | shared 71.57/web 63.61/desktop 67.13 |
 | OpenAPI↔hub 路由契约 | #1444 | 152/155 + 3 admin 白名单 |
+| hubClient thin-shell SSOT | #1452 | web 59/desktop 212/mobile 378 行，禁 `/client/` 新字面量 |
 
 ### 观测波（12 缺口全闭环，Prometheus 11→32 counter）
 | 缺口 | PR | metric |
@@ -77,8 +78,9 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 
 ## Infrastructure
 
-- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract
+- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot（8 层）
 - 观测：`/metrics`（admin server，basic auth）+ 32 Prometheus counter（11 基线 + 21 新增）
+- 供应链：Dependabot 0 open（brace-expansion fix #1370/#1397 + alert #43 dismissed）
 - residual out of scope: live OIDC evidence · full Mobile redesign · QA>89
 
 ## Session Log
@@ -86,4 +88,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 | Date | Summary |
 |:-----|:--------|
 | 2026-07-27 | #1420–#1433 波；#1385/#1395 closed；A10=#1430；PROPOSAL 三审 NEEDS_FIX |
-| 2026-07-29 | 强制门禁波（#1435-#1445）+ 观测波 12 缺口闭环（#1441/#1446/#1447/#1449/#1450）；A10 全链路；32 metrics |
+| 2026-07-29 | 强制门禁波（#1435-#1445）+ 观测波 12 缺口闭环（#1441/#1446/#1447/#1449/#1450）+ hubClient 门禁（#1452）；A10 全链路；32 metrics；Dependabot 0 open |
