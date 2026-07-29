@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
@@ -88,53 +87,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var lastWaitErr error
 	var lastOutStore *runnerctx.RunOutputStore
 	for attempt := 0; attempt < maxSessionRetries; attempt++ {
+		// Phase 1 — Build & start the subprocess.
 		proc, err := e.buildAndStartProcess(ctx, run, runCtx, adapter, adapterLabel, metricsPlan, &runStartTime, attempt)
 		if err != nil {
 			return
 		}
 
-		// Create temp file for run output persistence and replay
-		outStore, err := runnerctx.NewRunOutputStore(run.ID)
-		outTrack := planRunOutputStoreTrack(err)
-		if outTrack.LogFailure {
-			slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
-		} else if outTrack.Track {
-			e.mu.Lock()
-			e.runOutputs[run.ID] = outStore
-			e.mu.Unlock()
-		}
-
-		var wg sync.WaitGroup
-		outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
-		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr)
-
-		// Inject context budget for token tracking in stream parsers.
-		// Also inject RunProcessContext unconditionally — SDK adapters
-		// (anthropic-sdk, openai-sdk) need prompt, model, and messages
-		// regardless of whether a WorkDir is set.
-		parserCtx := withParserContextValues(ctx, runCtx)
-
-		var parseErr error
-		if proc.buildPlan.UseStructuredParser {
-			wg.Add(1)
-			go e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr)
-		} else {
-			// Raw capture: stdout goes to run.output.batch events
-			wg.Add(1)
-			go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout)
-		}
-
-		// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
-		// descriptors; otherwise structured parsers can race with Wait and see
-		// transient "file already closed" read errors.
-		wg.Wait()
-		// Stop the context watcher before Wait so it cannot race with reaping.
-		close(proc.watchStop)
-		lastWaitErr = proc.cmd.Wait()
+		// Phase 2 — Collect output and wait for process exit.
+		outStore, waitErr, parseErr := e.collectAndWaitOutput(ctx, run, runCtx, proc, adapter)
+		lastWaitErr = waitErr
 		lastOutStore = outStore
 		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
 
+		// Phase 3 — Decide: context checks, session retry, parse error, evidence gate, finish.
 		// Context budget compaction check: after the stream completes, evaluate
 		// whether the context budget exceeded the auto-compaction threshold.
 		// When triggered, we log the budget state and emit a compaction event

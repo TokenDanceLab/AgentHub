@@ -5,9 +5,11 @@ import (
 	"io"
 	"log/slog"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -178,4 +180,62 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		workDir:         workDir,
 		buildPlan:       cmdPlan,
 	}, nil
+}
+
+// collectAndWaitOutput launches stderr/stdout collection goroutines, waits for
+// them to complete, closes the context watcher, and waits for the subprocess
+// to exit.
+//
+// It returns the output store (for session-conflict diagnostics and terminal
+// error reporting), the subprocess wait error, and any structured parse
+// error encountered by the adapter.
+//
+// The caller is responsible for logging the exit and assigning the returned
+// values to the loop-scoped lastWaitErr/lastOutStore variables.
+func (e *ProcessExecutor) collectAndWaitOutput(
+	ctx context.Context,
+	run store.Run,
+	runCtx RunProcessContext,
+	proc *startedProcess,
+	adapter adapters.AgentAdapter,
+) (outStore *runnerctx.RunOutputStore, waitErr error, parseErr error) {
+	var err error
+	outStore, err = runnerctx.NewRunOutputStore(run.ID)
+	outTrack := planRunOutputStoreTrack(err)
+	if outTrack.LogFailure {
+		slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
+	} else if outTrack.Track {
+		e.mu.Lock()
+		e.runOutputs[run.ID] = outStore
+		e.mu.Unlock()
+	}
+
+	var wg sync.WaitGroup
+	outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
+	wg.Add(1)
+	go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr)
+
+	// Inject context budget for token tracking in stream parsers.
+	// Also inject RunProcessContext unconditionally — SDK adapters
+	// (anthropic-sdk, openai-sdk) need prompt, model, and messages
+	// regardless of whether a WorkDir is set.
+	parserCtx := withParserContextValues(ctx, runCtx)
+
+	if proc.buildPlan.UseStructuredParser {
+		wg.Add(1)
+		go e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr)
+	} else {
+		// Raw capture: stdout goes to run.output.batch events
+		wg.Add(1)
+		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout)
+	}
+
+	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
+	// descriptors; otherwise structured parsers can race with Wait and see
+	// transient "file already closed" read errors.
+	wg.Wait()
+	// Stop the context watcher before Wait so it cannot race with reaping.
+	close(proc.watchStop)
+	waitErr = proc.cmd.Wait()
+	return
 }
