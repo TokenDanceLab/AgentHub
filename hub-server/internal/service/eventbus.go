@@ -1,22 +1,22 @@
 package service
 
 import (
-	"context"
-	"log/slog"
-	"runtime/debug"
-	"sync"
-	"sync/atomic"
-
-	"github.com/agenthub/hub-server/internal/config"
-	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/panjf2000/ants/v2"
 )
 
-type Event struct {
-	Type    string
-	Payload interface{}
-}
+// Bus is a type alias for bus.Bus. It exists for backward compatibility —
+// new code should import internal/bus directly.
+type Bus = bus.Bus
+
+// Event is a type alias for bus.Event.
+type Event = bus.Event
+
+// EventHandler is a type alias for bus.EventHandler.
+type EventHandler = bus.EventHandler
+
+// NewBus delegates to bus.New. Prefer bus.New in new code.
+var NewBus = bus.New
 
 // RouteDecisionPayload carries the data needed to process a coordinator route
 // decision emitted by a supervisor agent stream.
@@ -25,74 +25,4 @@ type RouteDecisionPayload struct {
 	TeamID   string                         `json:"team_id"`
 	RunID    string                         `json:"run_id"`
 	Decision model.CoordinatorRouteDecision `json:"decision"`
-}
-
-type EventHandler func(ctx context.Context, event Event)
-
-type Bus struct {
-	mu       sync.RWMutex
-	handlers map[string][]EventHandler
-	pending  atomic.Int64
-	pool     *ants.Pool
-}
-
-func NewBus() (*Bus, error) {
-	pool, err := ants.NewPool(config.EventBusPoolSize,
-		ants.WithNonblocking(false),
-		ants.WithPanicHandler(func(p interface{}) {
-			if metrics.EventBusPanics != nil {
-				metrics.EventBusPanics.Inc()
-			}
-			slog.Error("eventbus panic recovered", "error", p, "stack", string(debug.Stack()))
-		}),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}, nil
-}
-
-func (b *Bus) Pending() int64 { return b.pending.Load() }
-func (b *Bus) Running() int   { return b.pool.Running() }
-
-func (b *Bus) Subscribe(eventType string, handler EventHandler) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.handlers[eventType] = append(b.handlers[eventType], handler)
-}
-
-func (b *Bus) Publish(ctx context.Context, event Event) {
-	b.mu.RLock()
-	handlers := make([]EventHandler, 0)
-	handlers = append(handlers, b.handlers[event.Type]...)
-	handlers = append(handlers, b.handlers["*"]...)
-	b.mu.RUnlock()
-
-	for _, h := range handlers {
-		h := h
-		b.pending.Add(1)
-		err := b.pool.Submit(func() {
-			defer func() {
-				if r := recover(); r != nil {
-					if metrics.EventBusPanics != nil {
-						metrics.EventBusPanics.Inc()
-					}
-					slog.Error("eventbus panic recovered", "error", r, "stack", string(debug.Stack()))
-				}
-				b.pending.Add(-1)
-			}()
-			h(ctx, event)
-		})
-		if err != nil {
-			b.pending.Add(-1)
-			if metrics.EventBusSubmitFailures != nil {
-				metrics.EventBusSubmitFailures.Inc()
-			}
-			slog.Error("eventbus submit failed", "error", err)
-		}
-	}
-}
-
-func (b *Bus) Close() {
-	b.pool.Release()
 }
