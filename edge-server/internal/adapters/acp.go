@@ -138,14 +138,50 @@ func (a *AcpAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io
 			continue
 		}
 
-		// STUB: classify and handle the message
-		_ = msg
+		// Phase 2 prep: translate notifications and responses into Edge
+		// run.agent.* events via the pure mapper. Requests (permission, fs,
+		// terminal) are not handled here yet — they need a blocking stdin
+		// round-trip which requires the full handshake (Phase 2).
+		switch {
+		case msg.isNotification() && msg.Method == "session/update":
+			var updates []acpSessionUpdateEvent
+			if err := json.Unmarshal(msg.Params, &updates); err != nil {
+				slog.Warn("acp: failed to decode session/update params", "error", err)
+				continue
+			}
+			for _, u := range updates {
+				for _, ev := range mapACPUpdate(u) {
+					emitter.Emit(ev.EventType, acpRunScope(run), ev.Payload)
+				}
+			}
+
+		case msg.isResponse():
+			if ev := mapACPPromptResult(msg.Result); ev != nil {
+				emitter.Emit(ev.EventType, acpRunScope(run), ev.Payload)
+			}
+
+		case msg.isRequest():
+			// Blocking request (session/request_permission, fs/*, terminal/*).
+			// Phase 2 will emit a permission_requested event and await the
+			// response on stdin; for now we log so the spike is observable.
+			slog.Debug("acp: unhandled JSON-RPC request (Phase 2)", "method", msg.Method, "id", string(msg.ID))
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: stdout scan error: %w", err))
 	}
 	return nil
+}
+
+// acpRunScope builds the bus event scope for an ACP run. Mirrors the
+// lifecycle.runScope shape so downstream consumers see the same fields.
+func acpRunScope(run store.Run) map[string]any {
+	return map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}
 }
 
 // jsonRPCMessage is a minimal JSON-RPC 2.0 envelope for message
