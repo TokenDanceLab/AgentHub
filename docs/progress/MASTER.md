@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `31c482cc`（#1476 dispatch 成功路径单测 + #1475 oidc tautology 修正） |
+| Live tip | master `6f1edda2`（docs: 清理 off-repo 引用） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -69,11 +69,14 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 主题 | Issue / PR |
 |---|---|
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
-| ACP / Automations / @提及 / 观察池 | #1404 · #1405 · #1406 · #1407 |
+| ACP spike（紧迫度↑：codeg v0.22.1 已落地子 agent 直播 + 自定义 agent 平台） | #1404 |
+| agentteam 子任务直播（新——codeg c612e6c2 对标） | 待立 issue |
+| @agent 派单（方向调整：不走 @session 引用，走 IM 群聊 @agent 派单） | #1406 |
+| Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**NEEDS_FIX**，不 merge） | #1412 · #1413 · #1414 |
 
-Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告及 a7/a10 小研究已被综合/证伪，已清理）。
+Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基准）+ v0.22.1-DELTA.md（45 commits 增量分析）。综合审计：`agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告已被综合/证伪，已清理）。
 
 ### 审计澄清
 
@@ -104,3 +107,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-comprehensive-audi
 | 2026-07-29 | MASTER 同步：A-V2 澄清 + #1468 门禁入 14 层索引；live tip `6d3875cb`（#1467），#1468 待 CI 后合 |
 | 2026-07-29 | #1468 合入 master `54c21867`（A-V2 闭环）；MASTER tip 同步至 #1468，14 层门禁全部合入；综合审计 top10 落地 6/10 |
 | 2026-07-30 | fable 并行 lane 收口：Lane A #1476（TriggerAgentTask 成功 + 4 错误路径 + #1430 TurnInProgress gate 直测，320 行）/ Lane B #1475（全仓扫仅 1 处真 TS tautology，审计「52 处」高估→澄清）合入 master `31c482cc`。综合审计 top10 **10/10** 全落地 + T-M1 覆盖缺口闭环 |
+| 2026-07-30 | 基线清理：分支 103→8，stash 20→0（已在之前会话清完）。codeg v0.22.1 竞品增量分析完成：45 commits 6 簇，3 个竞争信号（子 agent 直播/自定义 agent 平台/@session 提及）。产出 `v0.22.1-DELTA.md`。#1404 ACP spike 紧迫度升级，#1406 方向调整为 @agent 派单，agentteam 子任务直播待立 issue |
