@@ -1,6 +1,6 @@
 # API Conventions
 
-最后更新：2026-06-27
+最后更新：2026-07-29
 
 本文定义 AgentHub REST API 和 WebSocket typed events 的通用规则。完整路径/schema 以 `api/openapi.yaml` 为准；事件合同入口见 `api/events.md`；错误码源头见 `pkg/errcode`、`edge-server/internal/errcode/` 和 `hub-server/internal/errcode/`。
 
@@ -20,6 +20,7 @@
 |---|---|
 | `GET` | 查询资源或列表 |
 | `POST` | 创建资源，或执行无法自然表达为 CRUD 的动作 |
+| `PUT` | 整体替换或覆盖更新资源 |
 | `PATCH` | 局部更新资源 |
 | `DELETE` | 删除、解绑或归档资源 |
 
