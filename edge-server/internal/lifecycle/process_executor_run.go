@@ -2,9 +2,7 @@ package lifecycle
 
 import (
 	"context"
-	"io"
 	"log/slog"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -90,145 +88,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var lastWaitErr error
 	var lastOutStore *runnerctx.RunOutputStore
 	for attempt := 0; attempt < maxSessionRetries; attempt++ {
-		var cmdPath string
-		var args, env []string
-		var workDir string
-		adapterCtx := adapters.RunProcessContext(runCtx)
-		cmdPlan := planCommandBuild(adapter != nil)
-
-		if cmdPlan.UseAdapter {
-			// Adapter mode: BuildCommand provides full command configuration
-			cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
-		} else {
-			// Profile mode: use configured command template
-			var err error
-			args, env, err = e.profile.Template.Expand(runCtx)
-			if planCommandBuildFailure(err).Fail {
-				e.publishFailed(run, err)
-				return
-			}
-			cmdPath = e.profile.Command
-			workDir = e.profile.WorkDir
-		}
-		if cmdPlan.PublishCLIPlan {
-			plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
-			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
-		}
-
-		// Pre-run workdir snapshot for auto-surface.
-		if planWorkdirTrack(workDir).Track {
-			snapshot := adapters.TakeWorkdirSnapshot(workDir)
-			e.mu.Lock()
-			e.workDirs[run.ID] = workDir
-			e.surfacers[run.ID] = snapshot
-			e.mu.Unlock()
-		}
-
-		_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-		if planCommandBuildFailure(err).Fail {
-			e.publishFailed(run, err)
+		proc, err := e.buildAndStartProcess(ctx, run, runCtx, adapter, adapterLabel, metricsPlan, &runStartTime, attempt)
+		if err != nil {
 			return
 		}
-		// Use Command (not CommandContext) so cancelling the run context does not
-		// immediately SIGKILL the child and defeat Cancel's grace escalation (#988).
-		// Process lifetime is managed explicitly: Cancel arms a grace path, and
-		// watchRunProcess force-kills on timeout when no grace path is active.
-		cmd := exec.Command(cmdPath, args...)
-		cmd.Dir = workDir
-		// Adapter mode overlays auth env onto a sanitized base; profile mode
-		// uses the administrator-configured env base. See envForAdapterOrProfile.
-		cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
-		stdout, err := cmd.StdoutPipe()
-		if planPipeFailure(err).Fail {
-			e.publishFailed(run, pipeOpenError("stdout", err))
-			return
-		}
-		stderr, err := cmd.StderrPipe()
-		if planPipeFailure(err).Fail {
-			e.publishFailed(run, pipeOpenError("stderr", err))
-			return
-		}
-		var stdin io.WriteCloser
-		if planStdinPipeOpen(adapter).Open {
-			stdin, err = cmd.StdinPipe()
-			if planPipeFailure(err).Fail {
-				e.publishFailed(run, pipeOpenError("stdin", err))
-				return
-			}
-			e.mu.Lock()
-			e.stdins[run.ID] = stdin
-			e.mu.Unlock()
-		}
-		setResourceLimits(cmd)
-		slog.Debug("executor.subprocess.starting", subprocessStartingLogArgs(run.ID, cmdPath, args, attempt)...)
-		subprocessStart := time.Now()
-		startErr := cmd.Start()
-		switch classifyCmdStartOutcome(startErr, ctx.Err()) {
-		case cmdStartCancelled:
-			if planCmdStartCancelWait(cmd.Process).Wait {
-				_, _ = cmd.Process.Wait()
-			}
-			e.publishCancelled(run)
-			return
-		case cmdStartFailed:
-			e.publishFailed(run, startErr)
-			return
-		}
-		// Post-start cancel kill/wait plan. Kill uses killProcessTree so
-		// process-group teardown from #988 remains intact.
-		if cancelPlan := planPostStartCancel(ctx.Err(), cmd.Process); cancelPlan.Cancel {
-			if cancelPlan.Kill {
-				_ = killProcessTree(cmd.Process)
-				if cancelPlan.Wait {
-					_, _ = cmd.Process.Wait()
-				}
-			}
-			e.publishCancelled(run)
-			return
-		}
-
-		slog.Debug("executor.subprocess.started", subprocessStartedLogArgs(run.ID, cmd.Process)...)
-
-		// Track process for graceful shutdown signals (SIGTERM on Unix).
-		// watchStop is always created so close(watchStop) after Wait is safe even
-		// when the process handle is not tracked.
-		watchStop := make(chan struct{})
-		if planTrackStartedProcess(cmd.Process).Track {
-			e.mu.Lock()
-			e.processes[run.ID] = cmd.Process
-			e.mu.Unlock()
-			// Ensure run-timeout / non-Cancel context cancellation still
-			// terminates the child now that CommandContext is not used.
-			go e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop)
-		}
-
-		// Eager-close stdin when adapter/decision-loop do not need the pipe.
-		// An open pipe with no data causes CLI agents (Claude Code) to wait
-		// ~3s and warn "no stdin data", so we close it eagerly when neither
-		// control protocol nor DecisionLoop requires stdin.
-		stdinPlan := planEagerStdinClose(stdin != nil, planStdinPipeOpen(adapter).Open, e.decisionLoopFactory != nil)
-		if stdinPlan.ClosePipe {
-			_ = stdin.Close()
-		}
-		if stdinPlan.ClearMap {
-			e.mu.Lock()
-			delete(e.stdins, run.ID)
-			e.mu.Unlock()
-		}
-
-		// Record metrics: run has started successfully
-		if metricsPlan.RecordStart {
-			e.metrics.RecordRunStart(adapterLabel)
-			runStartTime = time.Now()
-		}
-
-		started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-		if planPublishStatus(ok).Publish {
-			e.bus.Publish("run.started", runScope(started), RunResponse(started))
-			// Fire Hub TaskAck callback (Edge→Hub direct bridge)
-			e.fireHubAck(run.ID)
-		}
-		e.checkPersistError(run.ID)
 
 		// Create temp file for run output persistence and replay
 		outStore, err := runnerctx.NewRunOutputStore(run.ID)
@@ -244,7 +107,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		var wg sync.WaitGroup
 		outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
 		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
+		go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr)
 
 		// Inject context budget for token tracking in stream parsers.
 		// Also inject RunProcessContext unconditionally — SDK adapters
@@ -253,13 +116,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		parserCtx := withParserContextValues(ctx, runCtx)
 
 		var parseErr error
-		if cmdPlan.UseStructuredParser {
+		if proc.buildPlan.UseStructuredParser {
 			wg.Add(1)
-			go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
+			go e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr)
 		} else {
 			// Raw capture: stdout goes to run.output.batch events
 			wg.Add(1)
-			go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
+			go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout)
 		}
 
 		// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
@@ -267,8 +130,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// transient "file already closed" read errors.
 		wg.Wait()
 		// Stop the context watcher before Wait so it cannot race with reaping.
-		close(watchStop)
-		lastWaitErr = cmd.Wait()
+		close(proc.watchStop)
+		lastWaitErr = proc.cmd.Wait()
 		lastOutStore = outStore
 		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
 
@@ -296,7 +159,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		if planOutputStoreCapture(outStore != nil).Read {
 			stderrCapture, _ = outStore.ReadAll()
 		}
-		sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(subprocessStart), outStore != nil)
+		sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(proc.subprocessStart), outStore != nil)
 		if sessionPlan.Retry {
 			newSession := newRandomSessionID()
 			slog.Warn("process: session conflict detected, retrying with fresh session ID", "runId", run.ID, "oldSessionId", runCtx.SessionID, "newSessionId", newSession, "error", lastWaitErr)
@@ -340,10 +203,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		// TypeScript typecheck+test, generic file existence) against the workDir.
 		// If verification fails, the run is marked as completed_with_issues instead
 		// of finished, and the full evidence output is stored in run metadata.
-		attempt := planEvidenceGateAttempt(isEvidenceGateEnabledForRun(e.evidenceGateCfg, workDir))
+		attempt := planEvidenceGateAttempt(isEvidenceGateEnabledForRun(e.evidenceGateCfg, proc.workDir))
 		finalStatus := attempt.FinalStatus
 		if attempt.RunGate {
-			evidenceResult := runEvidenceGate(workDir)
+			evidenceResult := runEvidenceGate(proc.workDir)
 			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
 			evidencePlan := planEvidenceGateResult(evidenceResult.Passed)
 			finalStatus = evidencePlan.FinalStatus
