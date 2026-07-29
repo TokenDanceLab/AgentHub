@@ -38,14 +38,39 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 	if DBPoolInUse == nil {
 		t.Error("DBPoolInUse 在 Register() 后不应为 nil")
 	}
-	if RedisPoolHits == nil {
-		t.Error("RedisPoolHits 在 Register() 后不应为 nil")
+	if RedisPoolHitsTotal == nil {
+		t.Error("RedisPoolHitsTotal 在 Register() 后不应为 nil")
 	}
 	if EventBusQueueLen == nil {
 		t.Error("EventBusQueueLen 在 Register() 后不应为 nil")
 	}
 	if EventBusPanics == nil {
 		t.Error("EventBusPanics 在 Register() 后不应为 nil")
+	}
+	// G3/G4/G9 新增 counter nil 检查（#1441 nil-guard 模式：单测不调 Register 时为 nil）
+	if DeliveryOutboxRetryAttempts == nil {
+		t.Error("DeliveryOutboxRetryAttempts 在 Register() 后不应为 nil")
+	}
+	if DeliveryOutboxDeadLetters == nil {
+		t.Error("DeliveryOutboxDeadLetters 在 Register() 后不应为 nil")
+	}
+	if DeliveryOutboxRedispatchFailures == nil {
+		t.Error("DeliveryOutboxRedispatchFailures 在 Register() 后不应为 nil")
+	}
+	if DeliveryOutboxScanFailures == nil {
+		t.Error("DeliveryOutboxScanFailures 在 Register() 后不应为 nil")
+	}
+	if AgentDispatchEdgeHTTPFailures == nil {
+		t.Error("AgentDispatchEdgeHTTPFailures 在 Register() 后不应为 nil")
+	}
+	if JWTVerificationFailures == nil {
+		t.Error("JWTVerificationFailures 在 Register() 后不应为 nil")
+	}
+	if WSAuthFailures == nil {
+		t.Error("WSAuthFailures 在 Register() 后不应为 nil")
+	}
+	if JTIBlacklistCheckErrors == nil {
+		t.Error("JTIBlacklistCheckErrors 在 Register() 后不应为 nil")
 	}
 }
 
@@ -73,6 +98,11 @@ func TestRegisteredMetricsAccessible(t *testing.T) {
 	// 使用 _test_access 前缀避免污染其他测试的断言值
 	HTTPRequestsTotal.WithLabelValues("_test_access_", "/_access_check", "000").Inc()
 	HTTPDuration.WithLabelValues("_test_access_", "/_access_check", "000").Observe(0.001)
+	// G3/G4/G9 新增 CounterVec 各创建一条观测记录以暴露 metric family
+	DeliveryOutboxDeadLetters.WithLabelValues("_test_access_").Inc()
+	AgentDispatchEdgeHTTPFailures.WithLabelValues("_test_access_").Inc()
+	JWTVerificationFailures.WithLabelValues("_test_access_").Inc()
+	WSAuthFailures.WithLabelValues("_test_access_").Inc()
 
 	// 使用 Gather 获取所有注册的指标
 	metricFamilies, err := prometheus.DefaultGatherer.Gather()
@@ -93,9 +123,15 @@ func TestRegisteredMetricsAccessible(t *testing.T) {
 		"ws_connections",
 		"ws_dropped_frames_total",
 		"db_pool_in_use",
-		"redis_pool_hits",
+		"redis_pool_hits_total",
 		"eventbus_queue_length",
 		"eventbus_panics_total",
+		// G3 plain Counters
+		"delivery_outbox_retry_attempts_total",
+		"delivery_outbox_redispatch_failures_total",
+		"delivery_outbox_scan_failures_total",
+		// G9 plain Counter
+		"jti_blacklist_check_errors_total",
 	}
 	for _, name := range expectedNames {
 		if !names[name] {

@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
@@ -231,6 +232,9 @@ func (o *DeliveryOutbox) claimDeliveryRetrying(ctx context.Context, deliveryID, 
 			"max_attempts", maxAttempts,
 			"last_error", lastError,
 		)
+		if metrics.DeliveryOutboxDeadLetters != nil {
+			metrics.DeliveryOutboxDeadLetters.WithLabelValues("max_attempts").Inc()
+		}
 		return false, nil
 	}
 
@@ -260,6 +264,9 @@ func (o *DeliveryOutbox) claimDeliveryRetrying(ctx context.Context, deliveryID, 
 		"max_attempts", maxAttempts,
 		"next_retry_at", nextRetry.Format(time.RFC3339),
 	)
+	if metrics.DeliveryOutboxRetryAttempts != nil {
+		metrics.DeliveryOutboxRetryAttempts.Inc()
+	}
 	return true, nil
 }
 
@@ -277,6 +284,9 @@ func (o *DeliveryOutbox) MoveDeliveryToDeadLetter(ctx context.Context, deliveryI
 		"delivery_id", deliveryID,
 		"last_error", lastError,
 	)
+	if metrics.DeliveryOutboxDeadLetters != nil {
+		metrics.DeliveryOutboxDeadLetters.WithLabelValues("explicit").Inc()
+	}
 	return nil
 }
 
