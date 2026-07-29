@@ -445,39 +445,8 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
-		switch event.Type {
-		case model.TeamEventRouteDecided:
-			var decision model.CoordinatorRouteDecision
-			if err := json.Unmarshal([]byte(event.Payload), &decision); err == nil && decision.Action != "" {
-				state.RouteLog = append(state.RouteLog, decision)
-				state.RouteAuditLog = append(state.RouteAuditLog, routeAuditStateFromDecision("accepted", decision, "", event.CreatedAt))
-			}
-		case model.TeamEventRouteRejected:
-			var payload struct {
-				Decision model.CoordinatorRouteDecision `json:"decision"`
-				Reason   string                         `json:"reason"`
-			}
-			if err := json.Unmarshal([]byte(event.Payload), &payload); err == nil && payload.Decision.Action != "" {
-				state.RouteAuditLog = append(state.RouteAuditLog, routeAuditStateFromDecision("rejected", payload.Decision, payload.Reason, event.CreatedAt))
-			}
-		case model.TeamEventRunStarted:
-			state.Status = model.TeamRunStatusRunning
-		case model.TeamEventRunCompleted:
-			state.Status = model.TeamRunStatusCompleted
-			state.TerminalReason = payloadString(event.Payload, "summary", "reason")
-		case model.TeamEventRunFailed:
-			state.Status = model.TeamRunStatusFailed
-			state.TerminalReason = payloadString(event.Payload, "reason", "blocked_reason")
-		case model.TeamEventConflictResolved:
-			var resolution model.TeamConflictResolution
-			if err := json.Unmarshal([]byte(event.Payload), &resolution); err == nil {
-				applyConflictResolution(state.Conflicts, resolution)
-			}
-		case model.TeamEventApprovalDecided:
-			var decision model.TeamApprovalDecision
-			if err := json.Unmarshal([]byte(event.Payload), &decision); err == nil {
-				applyApprovalDecision(state.Approvals, decision)
-			}
+		if handler, ok := teamStateReplayHandlers[event.Type]; ok {
+			handler(state, event)
 		}
 	}
 
