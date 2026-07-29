@@ -119,8 +119,9 @@ test.describe('OIDC Login — Desktop', () => {
       expect(url.searchParams.get('scope')).toContain('openid');
     } else {
       // Login button may not be visible if already on a different page;
-      // this is fine — we just verify the app loads
-      expect(true).toBe(true);
+      // this is fine — we just verify the app rendered without crashing.
+      await expect(page.locator('#root')).toBeAttached();
+      await expect(page.locator('#root > *').first()).toBeVisible();
     }
   });
 
