@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `9f046720`（会话收束：D-V1 -41% + god function 全仓扫描） |
+| Live tip | master `5e17bb07`（ACP Phase 2 prep：pure 事件映射器 + 单测） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -69,12 +69,12 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 主题 | Issue / PR |
 |---|---|
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
-| ACP spike（紧迫度↑：codeg v0.22.1 已落地子 agent 直播 + 自定义 agent 平台） | #1404 |
-| agentteam 子任务直播（新——codeg c612e6c2 对标） | 待立 issue |
+| ACP spike（紧迫度↑：Phase 2 prep 已落地——pure ACP→Edge 事件映射器 + 单测，待真 binary 集成） | #1404 |
+| agentteam 子任务直播（新——codeg c612e6c2 对标；#1478 已立，SPEC 设计待写） | #1478 |
 | @agent 派单（方向调整：不走 @session 引用，走 IM 群聊 @agent 派单） | #1406 |
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
-| PROPOSAL（**NEEDS_FIX**，不 merge） | #1412 · #1413 · #1414 |
+| PROPOSAL（**CLOSED 未合并** 2026-07-29，提案文档归档可查） | #1412 · #1413 · #1414 |
 | P3 裁决项（A-V4/D-V3 closed；D-V2 评估为低价值；D-V1 Step 2 完成 run() 418→246 -41%；A-V1/A-V3 需管理员定档） | #1469 · #1470 · #1471 · #1472 |
 | D-V1 edge run() 持续重构（Step 2: collectAndWaitOutput 40 行提取，累计 418→246 行 -41%） | 进行中 |
 
@@ -114,3 +114,5 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **D-V1 Step 1**：buildAndStartProcess 138 行提取到 process_executor_build.go（新文件），run() 从 418→281 行（-33%）。提取的是循环体中最机械的构建+启动阶段，每条错误路径自己发事件，调用者仅需 return。控制流决策（continue/break）未提取，留待后续步骤。lifecycle tests 全过。 |
 | 2026-07-30 | **D-V1 Step 2**：collectAndWaitOutput 40 行提取到 process_executor_build.go，run() 从 281→246 行。循环体现在是清晰的 3 阶段管道：(1) buildAndStart → (2) collectAndWait → (3) evaluate+finish。累计 418→246 行（-41%）。lifecycle tests 全过。 |
 | 2026-07-30 | **God function 全仓扫描**：扫出 19 个 >150 行函数。3 个真正 god function 评估：PostRuns 358 行（HTTP handler，长但线性，跳过）、StartTeamRun 226 行（已标 #1385）、HandleSubAgentFailure 158 行（已结构化 Step 0-6，委托子函数，跳过）。其余 16 个为长但线性的路由/注册/wiring/parser。D-V1 仍是唯一高价值重构——已完成（-41%）。|
+| 2026-07-30 | **ACP Spike Phase 2 prep**：把 ACP session/update → run.agent.* 翻译提取为纯映射器 `acp_events.go`（无 I/O、无状态、前向兼容），ParseStream 接线通知/响应，阻塞请求留 Phase 2。8 个单测覆盖全部映射类型 + 3 个有意不映射类型 + prompt-result 边界。adapters 全测试过。|
+| 2026-07-30 | **PROPOSAL 状态澄清**：#1412/#1413/#1414 经查于 2026-07-29 CLOSED 未合并（非永久挂起）。MASTER open 表从「NEEDS_FIX 不 merge」更正为「CLOSED 未合并，归档可查」。|
