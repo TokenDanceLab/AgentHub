@@ -21,9 +21,9 @@ type Event struct {
 // RouteDecisionPayload carries the data needed to process a coordinator route
 // decision emitted by a supervisor agent stream.
 type RouteDecisionPayload struct {
-	UserID   string                       `json:"user_id"`
-	TeamID   string                       `json:"team_id"`
-	RunID    string                       `json:"run_id"`
+	UserID   string                         `json:"user_id"`
+	TeamID   string                         `json:"team_id"`
+	RunID    string                         `json:"run_id"`
 	Decision model.CoordinatorRouteDecision `json:"decision"`
 }
 
@@ -85,6 +85,9 @@ func (b *Bus) Publish(ctx context.Context, event Event) {
 		})
 		if err != nil {
 			b.pending.Add(-1)
+			if metrics.EventBusSubmitFailures != nil {
+				metrics.EventBusSubmitFailures.Inc()
+			}
 			slog.Error("eventbus submit failed", "error", err)
 		}
 	}
