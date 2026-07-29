@@ -135,6 +135,10 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 				if sqlDB, err := a.DB.DB(); err == nil {
 					stats := sqlDB.Stats()
 					metrics.DBPoolInUse.Set(float64(stats.InUse))
+					// G8: optional pool saturation gauge.
+					if metrics.DBPoolIdle != nil {
+						metrics.DBPoolIdle.Set(float64(stats.Idle))
+					}
 				}
 				if a.mgr != nil {
 					metrics.WSConnections.Set(float64(a.mgr.Count()))
