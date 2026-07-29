@@ -787,6 +787,27 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-openapi-contract.ps1
 
+      # ── Architecture boundary gates (audit-A gate-ifiable candidates) ──
+      # Shared workbench/chatview/ui must stay free of Edge client imports;
+      # shared barrel must not leak Edge exports to platform apps; handler
+      # must not import repository directly; router methods must be documented
+      # in conventions.md.
+      - name: Verify Shared Edge-free boundary
+        shell: pwsh
+        run: ./scripts/verify/verify-shared-boundary.ps1
+
+      - name: Verify Shared barrel Edge-export ban
+        shell: pwsh
+        run: ./scripts/verify/verify-shared-barrel.ps1
+
+      - name: Verify Hub handler layering
+        shell: pwsh
+        run: ./scripts/verify/verify-hub-layering.ps1
+
+      - name: Verify Conventions method SSOT
+        shell: pwsh
+        run: ./scripts/verify/verify-conventions.ps1
+
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
       # if any coverage metric drops below scripts/verify/coverage-baseline.json
