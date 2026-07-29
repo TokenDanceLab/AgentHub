@@ -2,7 +2,6 @@ package agentteam
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -149,8 +148,8 @@ func replayReviewEvents(events []model.AgentTeamEvent, state *model.TeamRunState
 	for _, event := range events {
 		switch event.Type {
 		case model.TeamEventReviewDecided:
-			var review model.HumanReviewState
-			if err := json.Unmarshal([]byte(event.Payload), &review); err == nil && review.Action != "" {
+			review, ok := decodeTeamEventPayload[model.HumanReviewState](event)
+			if ok && review.Action != "" {
 				state.Reviews = append(state.Reviews, review)
 				// Mirror the write side (ReviewDagPlan): every decided action
 				// (approve/discuss/modify) sets the run back to running in the

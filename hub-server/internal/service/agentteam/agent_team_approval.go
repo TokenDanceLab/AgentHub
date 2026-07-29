@@ -2,7 +2,6 @@ package agentteam
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -366,19 +365,15 @@ func (s *AgentTeamService) findApprovalDecision(tx *gorm.DB, runID, approvalID s
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range events {
-		if e.Type != model.TeamEventApprovalDecided {
-			continue
-		}
-		var record model.TeamApprovalDecision
-		if err := json.Unmarshal([]byte(e.Payload), &record); err != nil {
-			continue
-		}
+	var found *model.TeamApprovalDecision
+	scanTeamEventPayloads[model.TeamApprovalDecision](events, model.TeamEventApprovalDecided, func(record model.TeamApprovalDecision, _ model.AgentTeamEvent) bool {
 		if record.ApprovalID == approvalID {
-			return &record, nil
+			found = &record
+			return true
 		}
-	}
-	return nil, nil
+		return false
+	})
+	return found, nil
 }
 
 func (s *AgentTeamService) findConflictResolution(tx *gorm.DB, runID, conflictID string) (*model.TeamConflictResolution, error) {
@@ -389,17 +384,13 @@ func (s *AgentTeamService) findConflictResolution(tx *gorm.DB, runID, conflictID
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range events {
-		if e.Type != model.TeamEventConflictResolved {
-			continue
-		}
-		var resolution model.TeamConflictResolution
-		if err := json.Unmarshal([]byte(e.Payload), &resolution); err != nil {
-			continue
-		}
+	var found *model.TeamConflictResolution
+	scanTeamEventPayloads[model.TeamConflictResolution](events, model.TeamEventConflictResolved, func(resolution model.TeamConflictResolution, _ model.AgentTeamEvent) bool {
 		if resolution.ConflictID == conflictID {
-			return &resolution, nil
+			found = &resolution
+			return true
 		}
-	}
-	return nil, nil
+		return false
+	})
+	return found, nil
 }

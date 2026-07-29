@@ -100,18 +100,12 @@ func routeDecisionMatches(previous, target model.CoordinatorRouteDecision) bool 
 // match action + next_worker + instructions (used for MaxRouteRepeats guardrails).
 func countMatchingRouteDecisionsInEvents(events []model.AgentTeamEvent, decision model.CoordinatorRouteDecision) int {
 	count := 0
-	for _, event := range events {
-		if event.Type != model.TeamEventRouteDecided {
-			continue
-		}
-		var previous model.CoordinatorRouteDecision
-		if err := json.Unmarshal([]byte(event.Payload), &previous); err != nil {
-			continue
-		}
+	scanTeamEventPayloads[model.CoordinatorRouteDecision](events, model.TeamEventRouteDecided, func(previous model.CoordinatorRouteDecision, _ model.AgentTeamEvent) bool {
 		if routeDecisionMatches(previous, decision) {
 			count++
 		}
-	}
+		return false
+	})
 	return count
 }
 
