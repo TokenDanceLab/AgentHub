@@ -76,6 +76,17 @@ var (
 	// concept); only db_pool_idle is exposed for the DB pool.
 	DBPoolIdle prometheus.Gauge
 
+	// Audit-D (2026-07-29) — Swallowed-error observability for the three
+	// error-swallowing sites flagged by Audit-D §1.1: dead-letter move,
+	// notification delivery, running-task heartbeat, and session touch.
+	// These do NOT change control flow; they only make previously silent
+	// best-effort failures visible. Distinct from G3
+	// delivery_outbox_dead_letter_total (which counts successful moves).
+	DispatchDeadLetterMoveFailures prometheus.Counter
+	NotificationDeliveryFailures   *prometheus.CounterVec
+	AgentHeartbeatFailures         prometheus.Counter
+	SessionTouchFailures           prometheus.Counter
+
 	once sync.Once
 )
 
@@ -324,6 +335,38 @@ func Register() {
 			},
 		)
 
+		// Audit-D — Swallowed-error counters for dead-letter move, notification
+		// delivery, running-task heartbeat, and session touch failures.
+		// Observability-only; no control-flow change at the call sites.
+		DispatchDeadLetterMoveFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "dispatch_dead_letter_move_failures_total",
+				Help: "Total number of delivery dead-letter move failures swallowed by DispatchService.moveDeliveryToDeadLetter (distinct from delivery_outbox_dead_letter_total, which counts successful moves).",
+			},
+		)
+
+		NotificationDeliveryFailures = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "notification_delivery_failures_total",
+				Help: "Total number of swallowed notification delivery failures by reason (agent_done, friend_request).",
+			},
+			[]string{"reason"},
+		)
+
+		AgentHeartbeatFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "agent_heartbeat_failures_total",
+				Help: "Total number of swallowed running-task heartbeat (BumpRunningTaskExpireAt) failures.",
+			},
+		)
+
+		SessionTouchFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "session_touch_failures_total",
+				Help: "Total number of swallowed session last_message_at touch (TouchSessionLastMessage) failures.",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -356,6 +399,10 @@ func Register() {
 		prometheus.MustRegister(DBErrors)
 		prometheus.MustRegister(DBSlowQueries)
 		prometheus.MustRegister(DBPoolIdle)
+		prometheus.MustRegister(DispatchDeadLetterMoveFailures)
+		prometheus.MustRegister(NotificationDeliveryFailures)
+		prometheus.MustRegister(AgentHeartbeatFailures)
+		prometheus.MustRegister(SessionTouchFailures)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

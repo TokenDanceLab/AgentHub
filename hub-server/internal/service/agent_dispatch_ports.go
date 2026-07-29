@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"log/slog"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -171,5 +173,14 @@ func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, delivery
 	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
 		return
 	}
-	_ = s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError)
+	if err := s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError); err != nil {
+		slog.Warn("dispatch: failed to move delivery to dead-letter",
+			"delivery_id", deliveryID,
+			"last_error", lastError,
+			"error", err,
+		)
+		if metrics.DispatchDeadLetterMoveFailures != nil {
+			metrics.DispatchDeadLetterMoveFailures.Inc()
+		}
+	}
 }
