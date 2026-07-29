@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `c9300ebf`（#1452 hubClient thin-shell 门禁） |
+| Live tip | master `8915c1c6`（#1465 agentteam payload 去重） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -29,6 +29,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 前端 coverage 基线不可退 | #1443 | shared 71.57/web 63.61/desktop 67.13 |
 | OpenAPI↔hub 路由契约 | #1444 | 152/155 + 3 admin 白名单 |
 | hubClient thin-shell SSOT | #1452 | web 59/desktop 212/mobile 378 行，禁 `/client/` 新字面量 |
+| shared 边界 / barrel / handler 分层 / conventions | #1463 | 4 门禁扩展（A #1/#2/#4/#5） |
 
 ### 观测波（12 缺口全闭环，Prometheus 11→32 counter）
 | 缺口 | PR | metric |
@@ -45,6 +46,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | G7 eventbus submit 失败 | #1449 | counter |
 | G10 admin server up | #1449 | Gauge |
 | G8 DB 慢查询/错误 | #1450 | 2 counter + db_pool_idle（rows==0 metric 仍计） |
+| notification/heartbeat/dead-letter-move | #1462 | 4 counter（dispatch_dead_letter_move / notification / heartbeat / session_touch） |
 
 ### correctness
 | 主题 | 结果 |
@@ -55,6 +57,8 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | WS 死面 / 幂等语义 | **closed** · #1422 #1433 |
 | edge 存储 | **closed** · #1424 #1426 |
 | #1395 测试残余 | **closed** · #1425 #1432 |
+| 删 2 处过时 skip 恢复覆盖 | **closed** · #1461 |
+| resolveCache 三包提取 / agentteam payload 去重 | **closed** · #1464 #1465（8/10 统一，#1385 投影不重做） |
 
 ### Open follow-ups
 
@@ -78,9 +82,10 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 
 ## Infrastructure
 
-- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot（8 层）
-- 观测：`/metrics`（admin server，basic auth）+ 32 Prometheus counter（11 基线 + 21 新增）
+- `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot · shared-boundary · shared-barrel · hub-layering · conventions（12 层）
+- 观测：`/metrics`（admin server，basic auth）+ 36 Prometheus counter（11 基线 + 25 新增）
 - 供应链：Dependabot 0 open（brace-expansion fix #1370/#1397 + alert #43 dismissed）
+- 综合审计 off-repo：`agenthub-comprehensive-audit-2026-07-29.md`（D 32 + T 13 + A 17，top 10 落地 5/10）
 - residual out of scope: live OIDC evidence · full Mobile redesign · QA>89
 
 ## Session Log
@@ -89,3 +94,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 |:-----|:--------|
 | 2026-07-27 | #1420–#1433 波；#1385/#1395 closed；A10=#1430；PROPOSAL 三审 NEEDS_FIX |
 | 2026-07-29 | 强制门禁波（#1435-#1445）+ 观测波 12 缺口闭环（#1441/#1446/#1447/#1449/#1450）+ hubClient 门禁（#1452）；A10 全链路；32 metrics；Dependabot 0 open |
+| 2026-07-29 | 综合审计三维度（D/T/A 62 条）→ 快修波（#1461 删skip/#1462 counter/#1463 4门禁）+ 重构波（#1464 resolveCache/#1465 agentteam payload）；12 门禁/36 metrics |
