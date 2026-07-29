@@ -70,7 +70,18 @@ func (a *App) setupWSManager() {
 }
 
 // startEventSubscriptions subscribes to all bus events for WebSocket push.
-func (a *App) startEventSubscriptions(ctx context.Context) {
+// Each event domain is extracted to its own method for readability.
+func (a *App) startEventSubscriptions(_ context.Context) {
+	a.subscribeMessageEvents()
+	a.subscribeAgentEvents()
+	a.subscribeTeamEvents()
+	a.subscribeContactEvents()
+	a.subscribeSessionEvents()
+}
+
+// ── Message events ──────────────────────────────────────────────────────
+
+func (a *App) subscribeMessageEvents() {
 	a.bus.Subscribe("message.new", func(ctx context.Context, event service.Event) {
 		msg, ok := event.Payload.(*model.Message)
 		if !ok {
@@ -140,7 +151,11 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		sessionID, _ := payload["session_id"].(string)
 		a.mgr.PushToSession(sessionID, frame)
 	})
+}
 
+// ── Agent stream events ─────────────────────────────────────────────────
+
+func (a *App) subscribeAgentEvents() {
 	a.bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event service.Event) {
 		runEvent, ok := event.Payload.(*model.AgentRunEvent)
 		if !ok {
@@ -210,7 +225,11 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		sessionID := payload["session_id"]
 		a.mgr.PushToSession(sessionID, frame)
 	})
+}
 
+// ── Team events ─────────────────────────────────────────────────────────
+
+func (a *App) subscribeTeamEvents() {
 	for _, teamEvent := range []struct {
 		eventType        string
 		frameType        string
@@ -241,7 +260,11 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 			}
 		})
 	}
+}
 
+// ── Contact / social events ─────────────────────────────────────────────
+
+func (a *App) subscribeContactEvents() {
 	a.bus.Subscribe("friend.request", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
@@ -272,7 +295,11 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		}
 		a.mgr.PushToUser(userID, ws.NewFrame(ws.TypeFriendAccepted, payload))
 	})
+}
 
+// ── Session lifecycle events ────────────────────────────────────────────
+
+func (a *App) subscribeSessionEvents() {
 	a.bus.Subscribe(ws.TypeSessionCreated, func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
