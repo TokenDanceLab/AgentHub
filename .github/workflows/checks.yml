@@ -812,6 +812,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-shared-rest-contract.ps1
 
+      - name: Verify Shared UI hubClient gate
+        shell: pwsh
+        run: ./scripts/verify/verify-shared-ui-hubclient.ps1
+
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
       # if any coverage metric drops below scripts/verify/coverage-baseline.json
