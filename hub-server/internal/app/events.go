@@ -8,6 +8,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -162,11 +163,20 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		if taskID != "" {
 			task, err := a.AgentService.GetPendingTaskByID(taskID)
 			if err == nil && task != nil {
-				_ = a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
+				if err := a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
 					"task_id":           payload["task_id"],
 					"agent_instance_id": payload["agent_instance_id"],
 					"session_id":        payload["session_id"],
-				})
+				}); err != nil {
+					slog.Warn("failed to notify agent.done",
+						"task_id", taskID,
+						"triggered_by_user_id", task.TriggeredByUserID,
+						"error", err,
+					)
+					if metrics.NotificationDeliveryFailures != nil {
+						metrics.NotificationDeliveryFailures.WithLabelValues("agent_done").Inc()
+					}
+				}
 			}
 		}
 	})
@@ -239,7 +249,15 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		}
 		receiverID, _ := payload["receiver_id"].(string)
 		if receiverID != "" {
-			_ = a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload)
+			if err := a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload); err != nil {
+				slog.Warn("failed to notify friend.request",
+					"receiver_id", receiverID,
+					"error", err,
+				)
+				if metrics.NotificationDeliveryFailures != nil {
+					metrics.NotificationDeliveryFailures.WithLabelValues("friend_request").Inc()
+				}
+			}
 		}
 	})
 
