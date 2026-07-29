@@ -8,7 +8,6 @@ package session
 
 import (
 	"context"
-	"reflect"
 
 	"gorm.io/gorm"
 
@@ -70,24 +69,12 @@ func (s *Service) SetCache(cacheClient Cache) {
 	s.cacheClient = resolveCache(cacheClient)
 }
 
+// resolveCache returns c, falling back to cache.NoOpCache when c is nil or a
+// typed-nil cache port. Thin type-bridge over cache.ResolveCache so call sites
+// stay on the package-local Cache interface; the nil-detection logic lives in
+// the shared internal/cache helper (Audit-D §4 cluster 2).
 func resolveCache(c Cache) Cache {
-	if isNilCache(c) {
-		return cache.NoOpCache{}
-	}
-	return c
-}
-
-func isNilCache(c any) bool {
-	if c == nil {
-		return true
-	}
-	v := reflect.ValueOf(c)
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return v.IsNil()
-	default:
-		return false
-	}
+	return cache.ResolveCache[Cache](c, cache.NoOpCache{})
 }
 
 // publishEvent is a nil-safe wrapper over the bus port.
