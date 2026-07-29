@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -478,16 +478,16 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
 	svc := NewAgentTeamService(db, agentSvc, nil)
-	bus, err := service.NewBus()
+	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
-	events := make(chan service.Event, 1)
-	bus.Subscribe("team.run.started", func(ctx context.Context, event service.Event) {
+	t.Cleanup(eventBus.Close)
+	events := make(chan bus.Event, 1)
+	eventBus.Subscribe("team.run.started", func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
-	svc.SetBus(bus)
+	svc.SetBus(eventBus)
 
 	now := time.Now()
 	agentProfileID := "agent-1"
@@ -632,16 +632,16 @@ func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus, err := service.NewBus()
+	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
-	events := make(chan service.Event, 1)
-	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event service.Event) {
+	t.Cleanup(eventBus.Close)
+	events := make(chan bus.Event, 1)
+	eventBus.Subscribe("team.assignment.completed", func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
-	svc.SetBus(bus)
+	svc.SetBus(eventBus)
 
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	assignment := &model.AgentTeamAssignment{
@@ -669,16 +669,16 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
-	bus, err := service.NewBus()
+	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
-	events := make(chan service.Event, 1)
-	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event service.Event) {
+	t.Cleanup(eventBus.Close)
+	events := make(chan bus.Event, 1)
+	eventBus.Subscribe("team.assignment.failed", func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
-	svc.SetBus(bus)
+	svc.SetBus(eventBus)
 
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	assignment := &model.AgentTeamAssignment{
@@ -2025,7 +2025,7 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
-func readAgentTeamEvent(t *testing.T, events <-chan service.Event) service.Event {
+func readAgentTeamEvent(t *testing.T, events <-chan bus.Event) bus.Event {
 	t.Helper()
 	select {
 	case event := <-events:
@@ -2033,7 +2033,7 @@ func readAgentTeamEvent(t *testing.T, events <-chan service.Event) service.Event
 	case <-time.After(time.Second):
 		t.Fatal("agent team event was not published")
 	}
-	return service.Event{}
+	return bus.Event{}
 }
 
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {

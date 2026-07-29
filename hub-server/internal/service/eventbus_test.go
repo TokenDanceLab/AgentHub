@@ -179,7 +179,7 @@ func TestBusClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.Close()
-	if !b.pool.IsClosed() {
+	if !b.IsClosed() {
 		t.Fatal("expected pool to be closed after Close()")
 	}
 }
