@@ -11,6 +11,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/agentevent"
@@ -182,7 +183,15 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	}
 
 	// #132: bump expire_at to keep running task alive while activity continues
-	_ = repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL)
+	if err := repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL); err != nil {
+		slog.Warn("failed to bump running task heartbeat expire_at",
+			"task_id", taskID,
+			"error", err,
+		)
+		if metrics.AgentHeartbeatFailures != nil {
+			metrics.AgentHeartbeatFailures.Inc()
+		}
+	}
 
 	runEvent := &model.AgentRunEvent{
 		TaskID:          taskID,
@@ -230,7 +239,15 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	}
 
 	// #154: update session last_message_at when agent stream creates a message
-	_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
+	if err := repository.TouchSessionLastMessage(s.db, ai.SessionID); err != nil {
+		slog.Warn("failed to touch session last_message_at",
+			"session_id", ai.SessionID,
+			"error", err,
+		)
+		if metrics.SessionTouchFailures != nil {
+			metrics.SessionTouchFailures.Inc()
+		}
+	}
 
 	// #1000: first authorized stream proves Edge received the task — ack outbox
 	// so SentTimeout does not redispatch while Edge is already executing.
@@ -368,7 +385,15 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 
 	if msg != nil {
 		// #154: update session last_message_at when agent done creates a message
-		_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
+		if err := repository.TouchSessionLastMessage(s.db, ai.SessionID); err != nil {
+			slog.Warn("failed to touch session last_message_at",
+				"session_id", ai.SessionID,
+				"error", err,
+			)
+			if metrics.SessionTouchFailures != nil {
+				metrics.SessionTouchFailures.Inc()
+			}
+		}
 		if s.bus != nil {
 			s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 		}
