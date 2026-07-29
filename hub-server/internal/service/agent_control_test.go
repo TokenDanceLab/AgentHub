@@ -16,7 +16,6 @@ import (
 )
 
 func TestAgentControlServiceDeliversToExactDesktopDevice(t *testing.T) {
-	t.Skip("requires real websocket connection — nil conn panics after ws.NewConn hardening in SUPER P2")
 	ctx := context.Background()
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
