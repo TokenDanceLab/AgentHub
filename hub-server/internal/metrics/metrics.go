@@ -42,6 +42,27 @@ var (
 	WSAuthFailures          *prometheus.CounterVec
 	JTIBlacklistCheckErrors prometheus.Counter
 
+	// G1 — WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
+	WSDeliveryFailures *prometheus.CounterVec
+
+	// G2 — WS disconnect / reconnect / stale-close counters.
+	WSDisconnects prometheus.Counter
+	WSReconnects  prometheus.Counter
+	WSStaleClose  prometheus.Counter
+
+	// G5 — Agent dispatch offline push failures (6 routes).
+	AgentDispatchOfflinePushFailures *prometheus.CounterVec
+
+	// G6 — Team assignment timeout + state-transition failure counters.
+	TeamAssignmentTimeouts                prometheus.Counter
+	TeamAssignmentStateTransitionFailures *prometheus.CounterVec
+
+	// G7 — EventBus submit failures (pool full / closed).
+	EventBusSubmitFailures prometheus.Counter
+
+	// G10 — Admin server up gauge (1 = running, 0 = not started / failed).
+	AdminServerUp prometheus.Gauge
+
 	once sync.Once
 )
 
@@ -198,6 +219,75 @@ func Register() {
 			},
 		)
 
+		// G1 — WS non-buffer-full delivery failures by reason.
+		WSDeliveryFailures = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "ws_delivery_failures_total",
+				Help: "Total number of WebSocket delivery failures (non-buffer-full): marshal_error, conn_closed, conn_not_found.",
+			},
+			[]string{"reason"},
+		)
+
+		// G2 — WS disconnect / reconnect / stale-close counters.
+		WSDisconnects = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_disconnects_total",
+				Help: "Total number of WebSocket disconnections (Unregister).",
+			},
+		)
+		WSReconnects = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_reconnects_total",
+				Help: "Total number of WebSocket reconnects detected via SetAuth oldConnID replacement.",
+			},
+		)
+		WSStaleClose = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_stale_close_total",
+				Help: "Total number of WebSocket connections closed as stale (max missed pongs reached).",
+			},
+		)
+
+		// G5 — Agent dispatch offline push failures by route.
+		AgentDispatchOfflinePushFailures = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "agent_dispatch_offline_push_failures_total",
+				Help: "Total number of agent dispatch offline-queue push failures by route.",
+			},
+			[]string{"route"},
+		)
+
+		// G6 — Team assignment timeout + state-transition failure counters.
+		TeamAssignmentTimeouts = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "team_assignment_timeouts_total",
+				Help: "Total number of timed-out team assignments successfully terminated to failed.",
+			},
+		)
+		TeamAssignmentStateTransitionFailures = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "team_assignment_state_transition_failures_total",
+				Help: "Total number of team assignment dispatched→failed state-transition failures by phase.",
+			},
+			[]string{"phase"},
+		)
+
+		// G7 — EventBus submit failures (pool full / closed).
+		EventBusSubmitFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "eventbus_submit_failures_total",
+				Help: "Total number of EventBus pool Submit failures (pool full or closed).",
+			},
+		)
+
+		// G10 — Admin server up gauge.
+		AdminServerUp = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "admin_server_up",
+				Help: "1 if the admin server (pprof /metrics /debug) is running, 0 if not started or failed.",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -218,6 +308,15 @@ func Register() {
 		prometheus.MustRegister(JWTVerificationFailures)
 		prometheus.MustRegister(WSAuthFailures)
 		prometheus.MustRegister(JTIBlacklistCheckErrors)
+		prometheus.MustRegister(WSDeliveryFailures)
+		prometheus.MustRegister(WSDisconnects)
+		prometheus.MustRegister(WSReconnects)
+		prometheus.MustRegister(WSStaleClose)
+		prometheus.MustRegister(AgentDispatchOfflinePushFailures)
+		prometheus.MustRegister(TeamAssignmentTimeouts)
+		prometheus.MustRegister(TeamAssignmentStateTransitionFailures)
+		prometheus.MustRegister(EventBusSubmitFailures)
+		prometheus.MustRegister(AdminServerUp)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

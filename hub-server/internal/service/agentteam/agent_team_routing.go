@@ -700,6 +700,9 @@ func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, er
 			},
 			model.AssignmentStatusFailed, reason)
 		if err != nil {
+			if metrics.TeamAssignmentStateTransitionFailures != nil {
+				metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("status_update").Inc()
+			}
 			slog.Warn("failed to terminate timed-out assignment",
 				"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
 			continue
@@ -711,9 +714,15 @@ func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, er
 			"assignment_id": a.ID,
 			"reason":        reason,
 		}); err != nil {
+			if metrics.TeamAssignmentStateTransitionFailures != nil {
+				metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("event_append").Inc()
+			}
 			slog.Warn("failed to append timeout event for assignment",
 				"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
 			// Status already failed; keep counting so the scan reports progress.
+		}
+		if metrics.TeamAssignmentTimeouts != nil {
+			metrics.TeamAssignmentTimeouts.Inc()
 		}
 		failed++
 	}
