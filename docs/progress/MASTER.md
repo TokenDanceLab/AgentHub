@@ -30,6 +30,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | OpenAPI↔hub 路由契约 | #1444 | 152/155 + 3 admin 白名单 |
 | hubClient thin-shell SSOT | #1452 | web 59/desktop 212/mobile 378 行，禁 `/client/` 新字面量 |
 | shared 边界 / barrel / handler 分层 / conventions | #1463 | 4 门禁扩展（A #1/#2/#4/#5） |
+| Hub 客户端↔Hub router REST 契约 | #1467 | A#3 契约门禁（verify-shared-rest-contract.ps1，0 drift；Edge 面未纳入） |
 
 ### 观测波（12 缺口全闭环，Prometheus 11→32 counter）
 | 缺口 | PR | metric |
@@ -95,3 +96,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-ga
 | 2026-07-27 | #1420–#1433 波；#1385/#1395 closed；A10=#1430；PROPOSAL 三审 NEEDS_FIX |
 | 2026-07-29 | 强制门禁波（#1435-#1445）+ 观测波 12 缺口闭环（#1441/#1446/#1447/#1449/#1450）+ hubClient 门禁（#1452）；A10 全链路；32 metrics；Dependabot 0 open |
 | 2026-07-29 | 综合审计三维度（D/T/A 62 条）→ 快修波（#1461 删skip/#1462 counter/#1463 4门禁）+ 重构波（#1464 resolveCache/#1465 agentteam payload）；12 门禁/36 metrics |
+| 2026-07-29 | P2 收口：A#3 Hub 契约门禁合并（#1467 → master 6d3875cb；A#4/A#5 已在 #1463）。P3 裁决：8 项实测，D-V1 受 #867 硬阻塞 DEFER；D-V2/D-V3/A-V1/A-V3/A-V4 转 PLAN issue #1469–#1473；A-V2 由 #1463 覆盖、A-V5 已采纳 |
