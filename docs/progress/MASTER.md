@@ -11,7 +11,7 @@
 | Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `c006e9f8`（A-V4 #1473 Bus 提取到 internal/bus） |
+| Live tip | master `d54e1302`（D-V3 #1470 event subscriptions 拆分） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -75,8 +75,8 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**NEEDS_FIX**，不 merge） | #1412 · #1413 · #1414 |
-| P3 裁决项（D-V2/D-V3/A-V1/A-V3，需管理员定档） | #1469 · #1470 · #1471 · #1472 |
-| D-V1 edge run() 重裁（#867 已 CLOSED，DEFER 理由过时） | 待重评估 |
+| P3 裁决项（A-V4/D-V3 closed；D-V2 评估为低价值；D-V1 高风险高价值需规划；A-V1/A-V3 需管理员定档） | #1469 · #1470 · #1471 · #1472 |
+| D-V1 edge run() 418 行重裁（#867 已 CLOSED，阻塞解除；需深入理解 fault escalation 语义后重设计） | 待规划 |
 
 Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基准）+ v0.22.1-DELTA.md（45 commits 增量分析）。综合审计：`agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告已被综合/证伪，已清理）。
 
@@ -110,4 +110,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-29 | #1468 合入 master `54c21867`（A-V2 闭环）；MASTER tip 同步至 #1468，14 层门禁全部合入；综合审计 top10 落地 6/10 |
 | 2026-07-30 | fable 并行 lane 收口：Lane A #1476（TriggerAgentTask 成功 + 4 错误路径 + #1430 TurnInProgress gate 直测，320 行）/ Lane B #1475（全仓扫仅 1 处真 TS tautology，审计「52 处」高估→澄清）合入 master `31c482cc`。综合审计 top10 **10/10** 全落地 + T-M1 覆盖缺口闭环 |
 | 2026-07-30 | 基线清理：分支 103→8，stash 20→0（已在之前会话清完）。codeg v0.22.1 竞品增量分析完成：45 commits 6 簇，3 个竞争信号（子 agent 直播/自定义 agent 平台/@session 提及）。产出 `v0.22.1-DELTA.md`。#1404 ACP spike 紧迫度升级，#1406 方向调整为 @agent 派单，agentteam 子任务直播待立 issue |
-| 2026-07-30 | **A-V4 完成**（#1473）：Bus/Event/EventHandler 提取到 `internal/bus` 叶子包，service 层 type alias 保持全向后兼容。agentteam 解除对父包 service 的反向依赖。P3 裁决项中唯一不需 RFC 的已闭环，#1469–#1472 仍需管理员定档 |
+| 2026-07-30 | **D-V3 完成**（#1470）：startEventSubscriptions 239 行拆为 5 域方法（message/agent/team/contact/session），主函数退化为 7 行分发器。**D-V2 评估**：PostRuns 357 行实为清晰线性 pipeline，非 god function，审计高估——跳过低价值重构。**D-V1 评估**：edge run() 418 行含会话重试循环 + fault escalation 交接 + 多并发原语，高价值但高风险，需深入理解 #867 语义后专项设计 |
