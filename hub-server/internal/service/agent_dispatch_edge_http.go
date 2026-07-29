@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
@@ -24,16 +25,25 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	if insecure {
 		// AH-SR-053: non-loopback cleartext rejected.
 		slog.Error(dispatch.EdgeHTTPLogInsecureCleartext, "edge_url", parts.EdgeURL)
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("insecure_cleartext").Inc()
+		}
 		return ""
 	}
 	if err != nil {
 		slog.Error(dispatch.EdgeHTTPLogMarshalFailed, "task_id", task.ID, "error", err)
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("marshal_failed").Inc()
+		}
 		return ""
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, parts.RunsURL, bytes.NewReader(parts.Body))
 	if err != nil {
 		slog.Error(dispatch.EdgeHTTPLogCreateReqFailed, "task_id", task.ID, "error", err)
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("req_create_failed").Inc()
+		}
 		return ""
 	}
 	httpReq.Header = parts.Headers
@@ -41,7 +51,12 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	client := &http.Client{Timeout: parts.Timeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		slog.Debug(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", err)
+		// G4: Edge unreachable is a classic silent-outage scenario; raised from
+		// Debug to Warn so production can see it (#audit-G4). Counter quantifies rate.
+		slog.Warn(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", err)
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("unreachable").Inc()
+		}
 		return ""
 	}
 	defer resp.Body.Close()
@@ -50,10 +65,16 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	plan := dispatch.PlanEdgeHTTPClientResponse(resp.StatusCode, respBody)
 	if plan.NonSuccess {
 		slog.Warn(plan.LogMessage, "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("non_success").Inc()
+		}
 		return ""
 	}
 	if plan.DecodeFail {
 		slog.Warn(plan.LogMessage, "task_id", task.ID, "error", plan.DecodeErr)
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("decode_fail").Inc()
+		}
 		return ""
 	}
 	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", task.ID, "edge_run_id", plan.RunID, "url", parts.RunsURL)

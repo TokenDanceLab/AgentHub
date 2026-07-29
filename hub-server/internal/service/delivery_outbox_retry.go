@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/agenthub/hub-server/internal/metrics"
 )
 
 // ── Retry loop orchestration ───────────────────────────────────────────────
@@ -32,6 +34,9 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 	records, err := o.ScanRetryableDeliveries(ctx)
 	if err != nil {
 		slog.Warn("failed to scan retryable deliveries", "error", err)
+		if metrics.DeliveryOutboxScanFailures != nil {
+			metrics.DeliveryOutboxScanFailures.Inc()
+		}
 		return
 	}
 
@@ -63,6 +68,9 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 				"task_id", rec.TaskID,
 				"error", err,
 			)
+			if metrics.DeliveryOutboxRedispatchFailures != nil {
+				metrics.DeliveryOutboxRedispatchFailures.Inc()
+			}
 			continue
 		}
 		// Success: retrying→sent so the ack-timeout window (not retry
