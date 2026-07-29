@@ -766,6 +766,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-mobile-hub-boundary.ps1
 
+      - name: Verify hubClient thin-shell SSOT
+        shell: pwsh
+        run: ./scripts/verify/verify-hubclient-ssot.ps1
+
       - name: Verify Design token SSOT
         shell: pwsh
         run: ./scripts/verify/verify-design-token-ssot.ps1
