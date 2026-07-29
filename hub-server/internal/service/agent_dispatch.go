@@ -12,6 +12,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -177,6 +178,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			conn := s.mgr.FindByConnID(connID)
 			if !dispatch.InviterDesktopConnPresent(conn != nil) {
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
+					if metrics.AgentDispatchOfflinePushFailures != nil {
+						metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_inviter_desktop").Inc()
+					}
 					slog.Error(dispatch.DispatchLogOfflinePushConnNil, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 				}
 				// Offline queue acceptance is not Edge receipt (#1031).
@@ -196,6 +200,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			if !dispatch.UnboundInviterDesktopWSQueued(result.Queued) {
 				slog.Warn(dispatch.DispatchLogWSNotQueuedPreserve, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
 				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
+					if metrics.AgentDispatchOfflinePushFailures != nil {
+						metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_ws_miss").Inc()
+					}
 					slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
 				}
 				// WS miss → offline queue only; outbox stays pending (#1031).
@@ -214,6 +221,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 			return
 		}
 		if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
+			if metrics.AgentDispatchOfflinePushFailures != nil {
+				metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_only").Inc()
+			}
 			slog.Error(dispatch.DispatchLogOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		}
 		// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
@@ -234,6 +244,9 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 		if !dispatch.HubRelayCreateSucceeded(err) {
 			slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
+				if metrics.AgentDispatchOfflinePushFailures != nil {
+					metrics.AgentDispatchOfflinePushFailures.WithLabelValues("hub_relay").Inc()
+				}
 				slog.Error(dispatch.DispatchLogRelayOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
 			}
 			return
@@ -391,6 +404,9 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 	}
 
 	if err := cacheClient.PushPendingTask(ctx, task.TriggeredByUserID, string(newPayload)); err != nil {
+		if metrics.AgentDispatchOfflinePushFailures != nil {
+			metrics.AgentDispatchOfflinePushFailures.WithLabelValues("redispatch").Inc()
+		}
 		slog.Error(dispatch.RedispatchOfflinePushFailedLogMessage(preferDevice),
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "error", err)
 		// Soft offline-queue failure: return error so callers do not false-mark sent (#999).

@@ -26,6 +26,9 @@ func (a *App) startAdminServer() {
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
 	if pprofUser == "" || pprofPass == "" {
 		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
+		if metrics.AdminServerUp != nil {
+			metrics.AdminServerUp.Set(0)
+		}
 		return
 	}
 
@@ -64,8 +67,14 @@ func (a *App) startAdminServer() {
 		slog.Info("admin server starting", "addr", a.AdminServer.Addr)
 		if err := a.AdminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("admin server failed", "error", err)
+			if metrics.AdminServerUp != nil {
+				metrics.AdminServerUp.Set(0)
+			}
 		}
 	}()
+	if metrics.AdminServerUp != nil {
+		metrics.AdminServerUp.Set(1)
+	}
 }
 
 func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
