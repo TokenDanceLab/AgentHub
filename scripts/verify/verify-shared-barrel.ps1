@@ -4,7 +4,7 @@ Verify that platform apps (Web, Desktop, Mobile) do not import Local Edge
 client exports from the @agenthub/shared barrel.
 
 The shared barrel (app/shared/src/index.ts) re-exports both Hub clients
-(hubClient.ts) and Edge clients (apiClient.ts REST + eventClient.ts WS).
+(hubClient.ts) and Edge clients (eventClient.ts WS).
 This is a latent leak: the barrel makes Edge clients available to Hub-only
 platforms (Web, Mobile) that have no Local Edge. The leak is not active
 today — no platform imports Edge exports — but there is no gate preventing
@@ -12,9 +12,9 @@ it (audit-A Scope 1 E finding).
 
 This gate has two checks:
   1. Sub-path ban — platform src must not import Edge client modules
-     directly (e.g. @shared/apiClient, @agenthub/shared/eventClient).
+     directly (e.g. @agenthub/shared/eventClient).
   2. Barrel name ban — platform src must not import Edge export names
-     (apiClient functions, EventClient) from the root barrel
+     (EventClient) from the root barrel
      (@shared or @agenthub/shared without a sub-path).
 
 Desktop owns the Local Edge bridge, but it should still route through its
@@ -58,27 +58,16 @@ $PlatformDirs = @(
 # ── Edge client module names (sub-path ban) ──────────
 # Importing these sub-paths from the shared package pulls in Edge clients.
 $EdgeSubPaths = @(
-    "apiClient",
     "eventClient",
     "edgeClient"
 )
 
 # ── Edge export names (barrel name ban) ──────────────
 # Names re-exported from the shared barrel (index.ts) that originate from
-# apiClient.ts (Edge REST) or eventClient.ts (Edge WS). If any of these
+# eventClient.ts (Edge WS). If any of these
 # appear in a barrel import (@shared or @agenthub/shared root), it is a
 # platform pulling Edge clients through the shared barrel.
 $EdgeExportNames = @(
-    # apiClient.ts exports (Edge REST)
-    "setBaseUrl", "getBaseUrl", "getHealth", "listProjects", "getProject",
-    "createProject", "getProjectMemory", "listThreads", "getThread",
-    "createThread", "updateThread", "archiveThread", "listThreadItems",
-    "createThreadMessage", "listRunners", "getRunner", "pingRunner",
-    "listRuns", "getRun", "startRun", "cancelRun", "listRunItems",
-    "getRunLogs", "getRunDiff", "listApprovals", "getApproval",
-    "decideApproval", "listArtifacts", "getArtifact", "getArtifactContent",
-    "applyArtifact", "discardArtifact", "listPreviews", "getPreview",
-    "createPreview", "getWorkspace", "listWorkspaceFiles", "readWorkspaceFile",
     # eventClient.ts exports (Edge WS)
     "EventClient", "EventClientOptions", "EventConnectionListener",
     "EventConnectionStatus", "EventListener"
@@ -120,7 +109,7 @@ foreach ($file in $Files) {
 }
 
 if ($subPathViolations -eq 0) {
-    Pass "no Edge client sub-path imports (@shared/apiClient, @agenthub/shared/eventClient, etc.)"
+    Pass "no Edge client sub-path imports (@agenthub/shared/eventClient, etc.)"
 }
 
 # ── Check 2: Barrel Edge export name ban ─────────────

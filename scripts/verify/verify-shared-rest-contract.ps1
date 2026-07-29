@@ -23,10 +23,8 @@ Known-defect allowlist: empty on master. The gate is clean today (0 drift);
 its value is preventing future client<->server contract regressions.
 
 Scope note: this gate covers the Hub-frontend hubClient module against the Hub
-server surface. The Edge-facing apiClient (edge /v1 surface, served by
-edge-server via a net/http mux with wildcard sub-paths and gateway rewriting)
-is a separate, higher-effort contract check and is intentionally out of scope
-here (see PR body / leader report for the recommendation).
+server surface. The Edge-facing REST surface (apiClient.ts, removed per
+RFC A-V3 §4.1) was a separate concern and is intentionally out of scope.
 #>
 
 [CmdletBinding()]
