@@ -73,7 +73,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**NEEDS_FIX**，不 merge） | #1412 · #1413 · #1414 |
 
-Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-a7-architecture-gates.md` / `agenthub-a10-turn-in-progress.md` / `agenthub-observability-audit.md`。
+Research off-repo: `D:\Code\Temp\codeg-research\` + `agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告及 a7/a10 小研究已被综合/证伪，已清理）。
 
 ### 审计澄清
 
