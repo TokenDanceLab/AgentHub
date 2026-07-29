@@ -8,10 +8,10 @@
 
 | Item | Value |
 |---|---|
-| Active SPEC | **PROPOSAL open (NEEDS_FIX, do not merge/implement)** — #1412 WS · #1413 签名 · #1414 IM |
+| Active SPEC | **3 P3 RFC DRAFT** (#1478 直播 / A-V1 #1471 / A-V3 #1472) — 待管理员定档 · PROPOSAL #1412/#1413/#1414 CLOSED 未合并 |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `5e17bb07`（ACP Phase 2 prep：pure 事件映射器 + 单测） |
+| Live tip | master `41309678`（leader wave：3 RFC + A-V3 quick-win + A-V1 preflight + ACP vocab lock） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -26,7 +26,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | Mobile Hub-only boundary | #1436 | mobile 禁 3210/v1 events|runs/edgeAuth |
 | Hub pure packages import | #1435 | dispatch/outbox/im/agentevent 无 DB/WS/cache |
 | Design token re-export | #1440 | styles 仅 @import shared |
-| 前端 coverage 基线不可退 | #1443 | shared 71.57/web 63.61/desktop 67.13 |
+| 前端 coverage 基线不可退 | #1443 | shared 72.07/web 63.61/desktop 67.13（A-V3 后重测，shared +0.5pp） |
 | OpenAPI↔hub 路由契约 | #1444 | 152/155 + 3 admin 白名单 |
 | hubClient thin-shell SSOT | #1452 | web 59/desktop 212/mobile 378 行，禁 `/client/` 新字面量 |
 | shared 边界 / barrel / handler 分层 / conventions | #1463 | 4 门禁扩展（A #1/#2/#4/#5） |
@@ -70,12 +70,12 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 |---|---|
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
 | ACP spike（紧迫度↑：Phase 2 prep 已落地——pure ACP→Edge 事件映射器 + 单测，待真 binary 集成） | #1404 |
-| agentteam 子任务直播（新——codeg c612e6c2 对标；#1478 已立，SPEC 设计待写） | #1478 |
+| agentteam 子任务直播（#1478 已立，**SPEC 设计已写** `docs/plan/agentteam-live-streaming.md`，3 阶段 A/B/C，待管理员 sign-off） | #1478 |
 | @agent 派单（方向调整：不走 @session 引用，走 IM 群聊 @agent 派单） | #1406 |
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**CLOSED 未合并** 2026-07-29，提案文档归档可查） | #1412 · #1413 · #1414 |
-| P3 裁决项（A-V4/D-V3 closed；D-V2 评估为低价值；D-V1 Step 2 完成 run() 418→246 -41%；A-V1/A-V3 需管理员定档） | #1469 · #1470 · #1471 · #1472 |
+| P3 裁决项（A-V4/D-V3 closed；D-V2 评估为低价值；D-V1 -41% 完成；A-V1/A-V3 **RFC 已写**，待管理员定档） | #1469 · #1470 · #1471 · #1472 |
 | D-V1 edge run() 持续重构（Step 2: collectAndWaitOutput 40 行提取，累计 418→246 行 -41%） | 进行中 |
 
 Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基准）+ v0.22.1-DELTA.md（45 commits 增量分析）。综合审计：`agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告已被综合/证伪，已清理）。
@@ -116,3 +116,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **God function 全仓扫描**：扫出 19 个 >150 行函数。3 个真正 god function 评估：PostRuns 358 行（HTTP handler，长但线性，跳过）、StartTeamRun 226 行（已标 #1385）、HandleSubAgentFailure 158 行（已结构化 Step 0-6，委托子函数，跳过）。其余 16 个为长但线性的路由/注册/wiring/parser。D-V1 仍是唯一高价值重构——已完成（-41%）。|
 | 2026-07-30 | **ACP Spike Phase 2 prep**：把 ACP session/update → run.agent.* 翻译提取为纯映射器 `acp_events.go`（无 I/O、无状态、前向兼容），ParseStream 接线通知/响应，阻塞请求留 Phase 2。8 个单测覆盖全部映射类型 + 3 个有意不映射类型 + prompt-result 边界。adapters 全测试过。|
 | 2026-07-30 | **PROPOSAL 状态澄清**：#1412/#1413/#1414 经查于 2026-07-29 CLOSED 未合并（非永久挂起）。MASTER open 表从「NEEDS_FIX 不 merge」更正为「CLOSED 未合并，归档可查」。|
+| 2026-07-30 | **leader wave（fable 深拆 + opus 执行）**：3 RFC 落地——#1478 agentteam 直播 SPEC（对标 codeg live subagent，3 阶段 A/B/C，edge 零改）；A-V1 #1471（驳回 lifecycle 拆分+adapters 全量叶子化，采纳定向 adapters/orchestrator 抽取，preflight 已捕获 PlanTask/TaskStatus 导入环）；A-V3 #1472（驳回 shared 三分，采纳定向剔除 apiClient+硬化 edge 隔离）。safe quick-win 执行：删 shared/apiClient（454 行零消费）+ web/desktop workspace 依赖声明 + edge-surface-isolation 软门禁 + coverage 重测（shared +0.5pp）。ACP 词汇锁测试防 §3 映射漂移。全本地验证：build/test/3 门禁/coverage gate 全过。|
