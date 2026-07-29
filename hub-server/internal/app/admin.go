@@ -117,6 +117,9 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
+		// G11: redis.PoolStats().Hits is a cumulative monotonic counter; we track
+		// the delta per tick and Add() to the Counter (was incorrectly Set on a Gauge).
+		var prevRedisPoolHits uint32
 		for {
 			select {
 			case <-ticker.C:
@@ -128,7 +131,13 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 					metrics.WSConnections.Set(float64(a.mgr.Count()))
 				}
 				if a.CacheClient != nil {
-					metrics.RedisPoolHits.Set(float64(a.CacheClient.PoolStats().Hits))
+					hits := a.CacheClient.PoolStats().Hits
+					if delta := hits - prevRedisPoolHits; delta > 0 {
+						if metrics.RedisPoolHitsTotal != nil {
+							metrics.RedisPoolHitsTotal.Add(float64(delta))
+						}
+					}
+					prevRedisPoolHits = hits
 				}
 				if a.bus != nil {
 					metrics.EventBusQueueLen.Set(float64(a.bus.Running()))

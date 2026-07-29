@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -95,6 +96,14 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractWSToken(c)
 		if tokenStr == "" {
+			// G9: WS auth path previously had no audit log and no metric.
+			auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+				"reason": "missing_token",
+				"path":   c.FullPath(),
+			}, c.ClientIP())
+			if metrics.WSAuthFailures != nil {
+				metrics.WSAuthFailures.WithLabelValues("missing_token").Inc()
+			}
 			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
@@ -105,6 +114,14 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		// handshake by authenticating at the upgrade middleware layer.
 		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 		if err != nil {
+			// G9: WS auth path previously had no audit log and no metric.
+			auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+				"reason": "invalid_token",
+				"path":   c.FullPath(),
+			}, c.ClientIP())
+			if metrics.WSAuthFailures != nil {
+				metrics.WSAuthFailures.WithLabelValues("invalid_token").Inc()
+			}
 			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
@@ -195,6 +212,9 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 			"reason": "invalid_token",
 			"path":   c.FullPath(),
 		}, c.ClientIP())
+		if metrics.JWTVerificationFailures != nil {
+			metrics.JWTVerificationFailures.WithLabelValues("invalid_token").Inc()
+		}
 		fail(c, errcode.AuthInvalidToken)
 		c.Abort()
 		return
@@ -250,6 +270,9 @@ func enforceHubSession(c *gin.Context) bool {
 		"reason":      reason,
 		"path":        c.FullPath(),
 	}, c.ClientIP())
+	if metrics.JWTVerificationFailures != nil {
+		metrics.JWTVerificationFailures.WithLabelValues("hub_session_reject").Inc()
+	}
 	fail(c, errcode.ErrForbidden)
 	c.Abort()
 	return false
@@ -265,6 +288,10 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 			"device_id", claims.DeviceID,
 			"path", c.FullPath(),
 		)
+		// G9: track legacy (non-revocable) token volume for migration monitoring.
+		if metrics.JWTVerificationFailures != nil {
+			metrics.JWTVerificationFailures.WithLabelValues("legacy_no_jti").Inc()
+		}
 		return true
 	}
 	if accessTokenBlacklist == nil {
@@ -274,6 +301,10 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 	if err != nil {
 		// Checker already fail-opens on Redis errors; treat residual errors as open.
 		slog.Warn("access jti blacklist check error, fail-open", "jti", claims.ID, "error", err)
+		// G9: fail-open Redis error — security-relevant, must be visible in Grafana.
+		if metrics.JTIBlacklistCheckErrors != nil {
+			metrics.JTIBlacklistCheckErrors.Inc()
+		}
 		return true
 	}
 	if blacklisted {
@@ -281,6 +312,9 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 			"reason": "access_jti_blacklisted",
 			"path":   c.FullPath(),
 		}, c.ClientIP())
+		if metrics.JWTVerificationFailures != nil {
+			metrics.JWTVerificationFailures.WithLabelValues("jti_blacklisted").Inc()
+		}
 		fail(c, errcode.AuthInvalidToken)
 		c.Abort()
 		return false
