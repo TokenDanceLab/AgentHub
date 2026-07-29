@@ -222,7 +222,6 @@ func TestOIDCSmoke(t *testing.T) {
 }
 
 func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
-	t.Skip("requires real websocket connection — nil conn panics after ws.NewConn hardening in SUPER P2")
 	mgr := ws.NewManager()
 	mgr.ResolveMembers = func(sessionID string) []string {
 		if sessionID == "sess-1" {
