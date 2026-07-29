@@ -116,6 +116,9 @@ importers:
 
   desktop:
     dependencies:
+      '@agenthub/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@lobehub/icons':
         specifier: ^5.10.0
         version: 5.10.0(@lobehub/ui@5.15.1)(@types/react@19.2.15)(antd@6.4.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -404,6 +407,9 @@ importers:
 
   web:
     dependencies:
+      '@agenthub/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@lobehub/icons':
         specifier: ^5.10.0
         version: 5.10.0(@lobehub/ui@5.15.1)(@types/react@19.2.15)(antd@6.4.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

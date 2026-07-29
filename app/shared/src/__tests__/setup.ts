@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { beforeAll, vi } from 'vitest';
 
-// Shared fetch mock for apiClient / eventClient tests.
+// Shared fetch mock for eventClient tests (apiClient.ts removed per RFC A-V3 §4.1).
 // Tests can reset/override this per-suite via vi.mocked(fetch).mockImplementation.
 globalThis.fetch = vi.fn();
 
