@@ -12,14 +12,14 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/middleware"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/gin-gonic/gin"
 )
 
-// OIDCService is the subset of *service.OIDCService used by OIDCHandler.
+// OIDCService is the subset of *oidc.Service used by OIDCHandler.
 type OIDCService interface {
-	GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error)
-	HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error)
+	GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error)
+	HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error)
 }
 
 type OIDCHandler struct {

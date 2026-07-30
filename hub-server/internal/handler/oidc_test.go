@@ -10,26 +10,26 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 )
 
 type mockOIDCService struct {
-	authorizeFn func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error)
-	callbackFn  func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error)
+	authorizeFn func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error)
+	callbackFn  func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error)
 }
 
-func (m *mockOIDCService) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+func (m *mockOIDCService) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 	return m.authorizeFn(ctx, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI)
 }
 
-func (m *mockOIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+func (m *mockOIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 	return m.callbackFn(ctx, code, state, codeVerifier, deviceType, deviceID, redirectURI)
 }
 
 func TestOIDCHandler_PostOIDCAuthorize_Success(t *testing.T) {
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
-			return &service.AuthorizationResult{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
+			return &oidc.AuthorizationResult{
 				State:            "test-state-123",
 				AuthorizationURL: "https://id.example.com/oidc/auth?response_type=code",
 			}, nil
@@ -59,7 +59,7 @@ func TestOIDCHandler_PostOIDCAuthorize_Success(t *testing.T) {
 
 func TestOIDCHandler_PostOIDCAuthorize_MissingFields(t *testing.T) {
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			return nil, errcode.ErrInternal
 		},
 	}
@@ -79,9 +79,9 @@ func TestOIDCHandler_PostOIDCAuthorize_MissingFields(t *testing.T) {
 func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceIDDoesNotCallService(t *testing.T) {
 	called := false
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			called = true
-			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+			return &oidc.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -105,9 +105,9 @@ func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceIDDoesNotCallService(t *test
 func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceTypeDoesNotCallService(t *testing.T) {
 	called := false
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			called = true
-			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+			return &oidc.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -130,8 +130,8 @@ func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceTypeDoesNotCallService(t *te
 
 func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
-			return &service.CallbackResult{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
+			return &oidc.CallbackResult{
 				AccessToken:  "access-token-xxx",
 				RefreshToken: "refresh-token-xxx",
 				ExpiresIn:    900,
@@ -201,9 +201,9 @@ func TestOIDCHandler_GetOIDCCallback_SuccessPageRedactsCodeAndState(t *testing.T
 func TestOIDCHandler_PostOIDCCallback_InvalidDeviceIDDoesNotCallService(t *testing.T) {
 	called := false
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 			called = true
-			return &service.CallbackResult{AccessToken: "bad"}, nil
+			return &oidc.CallbackResult{AccessToken: "bad"}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -227,7 +227,7 @@ func TestOIDCHandler_PostOIDCCallback_InvalidDeviceIDDoesNotCallService(t *testi
 
 func TestOIDCHandler_PostOIDCCallback_InvalidState(t *testing.T) {
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 			return nil, errcode.OIDCInvalidState
 		},
 	}
@@ -255,7 +255,7 @@ func TestOIDCHandler_PostOIDCCallback_DoesNotLeakTokenEndpointBody(t *testing.T)
 	t.Cleanup(func() { slog.SetDefault(previousLogger) })
 
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 			return nil, errcode.OIDCCodeExchangeFailed.WithMessage(rawProviderBody)
 		},
 	}
@@ -295,7 +295,7 @@ func TestOIDCHandler_PostOIDCCallback_DoesNotLeakTokenEndpointBody(t *testing.T)
 
 func TestOIDCHandler_PostOIDCCallback_MissingFields(t *testing.T) {
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 			return nil, errcode.ErrInternal
 		},
 	}
@@ -332,9 +332,9 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_NotAllowed(t *testing.T) {
 
 	called := false
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			called = true
-			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+			return &oidc.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -363,11 +363,11 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_Allowed_ExactMatch(t *testing
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback,http://127.0.0.1/callback")
 
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			if redirectURI != "https://hub.example.com/auth/tokendance/callback" {
 				t.Errorf("service received redirect_uri=%q, want %q", redirectURI, "https://hub.example.com/auth/tokendance/callback")
 			}
-			return &service.AuthorizationResult{
+			return &oidc.AuthorizationResult{
 				State:            "test-state",
 				AuthorizationURL: "https://id.example.com/oidc/auth",
 			}, nil
@@ -393,8 +393,8 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_Allowed_LoopbackDesktop(t *te
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "http://127.0.0.1/callback")
 
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
-			return &service.AuthorizationResult{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
+			return &oidc.AuthorizationResult{
 				State:            "test-state",
 				AuthorizationURL: "https://id.example.com/oidc/auth",
 			}, nil
@@ -422,9 +422,9 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_LoopbackRejectedForWeb(t *tes
 
 	called := false
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			called = true
-			return &service.AuthorizationResult{}, nil
+			return &oidc.AuthorizationResult{}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -454,8 +454,8 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_IncludesFallback(t *testing.T
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "http://127.0.0.1/callback")
 
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
-			return &service.AuthorizationResult{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
+			return &oidc.AuthorizationResult{
 				State:            "test-state",
 				AuthorizationURL: "https://id.example.com/oidc/auth",
 			}, nil
@@ -482,9 +482,9 @@ func TestOIDCHandler_PostOIDCCallback_RedirectURI_NotAllowed(t *testing.T) {
 
 	called := false
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
 			called = true
-			return &service.CallbackResult{AccessToken: "bad"}, nil
+			return &oidc.CallbackResult{AccessToken: "bad"}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -514,8 +514,8 @@ func TestOIDCHandler_PostOIDCCallback_RedirectURI_Allowed(t *testing.T) {
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example.com/auth/tokendance/callback")
 
 	svc := &mockOIDCService{
-		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
-			return &service.CallbackResult{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
+			return &oidc.CallbackResult{
 				AccessToken:  "access-token",
 				RefreshToken: "refresh-token",
 				ExpiresIn:    900,
@@ -544,9 +544,9 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_InvalidURL(t *testing.T) {
 
 	called := false
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			called = true
-			return &service.AuthorizationResult{}, nil
+			return &oidc.AuthorizationResult{}, nil
 		},
 	}
 	h := handler.NewOIDCHandler(svc)
@@ -572,11 +572,11 @@ func TestOIDCHandler_PostOIDCAuthorize_RedirectURI_EmptyAllowed(t *testing.T) {
 	// Empty redirect_uri should always pass through (service applies fallback).
 	// No env var set — defer to service layer behavior.
 	svc := &mockOIDCService{
-		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
 			if redirectURI != "" {
 				t.Errorf("service received redirect_uri=%q, want empty", redirectURI)
 			}
-			return &service.AuthorizationResult{
+			return &oidc.AuthorizationResult{
 				State:            "test-state",
 				AuthorizationURL: "https://id.example.com/oidc/auth",
 			}, nil

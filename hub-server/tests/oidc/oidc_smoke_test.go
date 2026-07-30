@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -32,15 +32,15 @@ type mockOIDCService struct {
 	user         *model.User
 }
 
-func (m *mockOIDCService) GenerateAuthorizationURL(_ context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error) {
-	return &service.AuthorizationResult{
+func (m *mockOIDCService) GenerateAuthorizationURL(_ context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*oidc.AuthorizationResult, error) {
+	return &oidc.AuthorizationResult{
 		State:            m.state,
 		AuthorizationURL: m.authorizeURL,
 	}, nil
 }
 
-func (m *mockOIDCService) HandleCallback(_ context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
-	return &service.CallbackResult{
+func (m *mockOIDCService) HandleCallback(_ context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*oidc.CallbackResult, error) {
+	return &oidc.CallbackResult{
 		AccessToken:  m.accessToken,
 		RefreshToken: m.refreshToken,
 		ExpiresIn:    900,
