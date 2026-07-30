@@ -11,7 +11,7 @@
 | Active SPEC | **3 P3 RFC DRAFT** (#1478 直播 / A-V1 #1471 / A-V3 #1472) — 待管理员定档 · PROPOSAL #1412/#1413/#1414 CLOSED 未合并 |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `5b836599`（leader wave v4 收口：E3+S1+S2+H2+S3 think 卡+H3 GetTeamRunState+#1406 Phase 1 @agent 派单，7 commit 落地） |
+| Live tip | master `05032e41`（wave v4 收口：E3+S1+S2+H2+S3+H3+#1406 P1+P2+S4，9 commit 落地） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -71,7 +71,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
 | ACP spike（紧迫度↑：Phase 2 prep 已落地——pure ACP→Edge 事件映射器 + 单测，待真 binary 集成） | #1404 |
 | agentteam 子任务直播（#1478 Phase A 已合入 `d4270360`：后端归属 + bus fan-out；**Phase C 前端起点 S1 已落地** `bef0a5f8`：SubagentStreamStore + webHubRealtime handler + 测试，前端零消费→有消费；Phase B/C DRAFT 待定档） | #1478 |
-| @agent 派单（产品 RFC top 1，**不碰协议**；**Phase 1 已落地** `5b836599`：ComposerMention dispatchRole + @浮层 dispatch 标记 + submit 触发 triggerAgentTask + 消息 metadata JSON 包装，5 文件 187 test 全过；Phase 2 委派卡消费 S1 SubagentStreamStore 待启动；Phase 3 群聊钻取） | #1406 |
+| @agent 派单（产品 RFC top 1，不碰协议；Phase 1 已落地 `5b836599`：ComposerMention dispatchRole + submit 触发 triggerAgentTask + metadata；**Phase 2 已落地** `05032e41`：SubagentStreamOverlay 浮层栈 + 状态卡 + fold chip，14 test，消费 S1 store+已有帧；Phase 3 群聊钻取） | #1406 |
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**CLOSED 未合并** 2026-07-29，提案文档归档可查） | #1412 · #1413 · #1414 |
@@ -122,3 +122,4 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **#1478 Phase A 合入** `d4270360`：team.subagent.stream 后端事件归属 + bus fan-out。HandleTaskStream 在 agent.stream 之外多发一条 team 域 bus 事件，经 dbTeamRunLookup（GetTeamRunBySessionID+ListAssignmentsByTeamRun+ListTeamTasksByRun，按 RunID 反查 pending task）+ 1024 条 LRU 缓存解析归属，app/events.go 订阅并 PushToSession。新增 1 个 WS 帧常量 TypeTeamSubagentStream（frame.go↔hubEvents.ts↔openapi.yaml↔events.md 1:1 同步；activity/batch/subscribe 留待有 wire producer 再加，遵守死面禁令）。edge 零改、前端未改也能观测。9 个测试（LRU/归属/缓存命中/双投递/非 team run/可注入）。build/vet/service+app tests/shared-rest-contract/ci-gates/hubEvents 契约全过。Phase B/C DRAFT 待定档。|
 | 2026-07-30 | **leader wave v4 落地**（codeg 对标全栈并行，4 commit push master）：3 份设计报告（UIUX 差距分析 6 sonnet 卡+11 QW+2 RFC / 产品 RFC 8 裁决+#1406 不碰协议确认 / 后端扫描 H3 GetTeamRunState+E3 dispatch+H2 App.Run 三目标）。E3 opencode dispatch 委托化 `f3e44ddc`（140→17 行主分派器+8 handler，emit 语义零变更，adapters 88s test 全过）；S1 team.subagent.stream 前端订阅 stub `bef0a5f8`（SubagentStreamStore byTaskId+event_seq 幂等 UPSERT + webHubRealtime handler + 4 测试，#1478 Phase C 前端起点/前端零消费→有消费）；S2 fail 态自动展开 `bef0a5f8`（RowItem useRef once + useEffect fail 态自动展开跳过 approval/tool/sub，shared 1303 test 全过）；H2 App.Run 四阶段 `9b2cc0d8`（216→15 行 + initInfra/initServices/initHandlers/startServer，new 顺序一字不变零功能变更，app test 全过）。**commit 卫生注**：S1+S2 同 commit `bef0a5f8`（message 只提 S2，S1 文件被 S2 commit 纳入），未来独立改动应分开 commit。**子代理报告可信度教训**：opus/fable 报告行数/函数边界准确但"case 数/已做项"常高估/漏看（E3 实际 8 case 非 20+；QW-3 OIDC 脱敏已实现；H3 派生投影已委托 #1385 做过一轮），执行前必须主线程交叉验证；子代理"已完成+push"报告须亲自 git log/ls 确认产物在 master（S1 曾误报"已 push"实被 S2 commit 纳入）。|
 | 2026-07-30 | **wave v4 续**：S3 think 卡 1s 收起 `a0d3ed67`（RowItem useEffect running→展开/非running→1s 收起+once 语义，1306 test 全过）；H3 GetTeamRunState 4 循环提取 `7b5df11d`（185→78 行 -58%，projectTeamMembers/Assignments/Tasks/RunEvents 跨循环依赖返回值传递，agentteam test 0.348s）；**#1406 Phase 1** `5b836599`（ComposerMention dispatchRole + submit 触发 triggerAgentTask + 消息 metadata JSON 包装，不碰协议，187 test 全过）。累计 7 commit + 3 报告 + SSOT+memory，wave v4 收口。|
+| 2026-07-30 | **wave v4 续2**：S4 anti-FOUC 预水合 `2d0b8113`（web index.html inline 脚本首帧前写 theme dataset + matchMedia，tsc/test/build 全过）；**#1406 Phase 2** `05032e41`（SubagentStreamOverlay 浮层栈：固定右下角 + 5 色状态边框 + active→展开/done→3s 折叠 + event_seq 排序 + maxVisible 3+N badge，14 test，消费已有 WS 帧+S1 store 不碰协议）。累计 9 commit。|
