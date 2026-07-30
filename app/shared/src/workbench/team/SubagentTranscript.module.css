@@ -17,21 +17,6 @@
   color: var(--td-ink, #e3e4e6);
 }
 
-/* ── Scrollbar ────────────────────────────────────────────────────────────── */
-
-.transcript::-webkit-scrollbar {
-  width: 4px;
-}
-
-.transcript::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.transcript::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
-}
-
 /* ── Individual entry ─────────────────────────────────────────────────────── */
 
 .entry {

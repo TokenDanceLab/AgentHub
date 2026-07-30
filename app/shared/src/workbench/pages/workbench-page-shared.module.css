@@ -21,7 +21,7 @@
   background: var(--surface-low);
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--text-3) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 
 .wbNavTitle {
   padding: 0 12px 18px;
