@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import type { TranscriptAgentItem } from '../transcript-item';
 import { AgentGroup } from './AgentGroup';
 
@@ -97,5 +97,110 @@ describe('AgentGroup rendering', () => {
     const row = container.querySelector('[data-block-id="preview-fail"]');
     expect(row).not.toBeNull();
     expect(row!.classList.contains('open')).toBe(true);
+  });
+
+  it('auto-opens think card when status is running', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-think-open',
+      agent: 'Agent',
+      role: 'agent',
+      time: '',
+      rows: [
+        { id: 'think-open', type: 'think', label: '思考', status: 'running', collapsible: true, content: '…' },
+      ],
+      standaloneRows: [],
+      runs: [],
+      bubbles: [],
+    };
+    const { container } = render(<AgentGroup item={item} chatMode="group" />);
+    const row = container.querySelector('[data-block-id="think-open"]');
+    expect(row).not.toBeNull();
+    expect(row!.classList.contains('open')).toBe(true);
+  });
+
+  it('auto-collapses think card 1s after status changes from running to ok', () => {
+    vi.useFakeTimers();
+    try {
+      const runningItem: TranscriptAgentItem = {
+        id: 'agent-think-delay',
+        agent: 'Agent',
+        role: 'agent',
+        time: '',
+        rows: [
+          { id: 'think-delay', type: 'think', label: '思考', status: 'running', collapsible: true, content: '…' },
+        ],
+        standaloneRows: [],
+        runs: [],
+        bubbles: [],
+      };
+      const { container, rerender } = render(<AgentGroup item={runningItem} chatMode="group" />);
+      const row = container.querySelector('[data-block-id="think-delay"]');
+      expect(row!.classList.contains('open')).toBe(true);
+
+      // Change to ok — should stay open within 1s delay
+      const okItem: TranscriptAgentItem = {
+        ...runningItem,
+        rows: [
+          { id: 'think-delay', type: 'think', label: '思考', status: 'ok', collapsible: true, content: 'done' },
+        ],
+      };
+      rerender(<AgentGroup item={okItem} chatMode="group" />);
+      expect(row!.classList.contains('open')).toBe(true);
+
+      // Advance past 1s threshold (wrapped in act to flush React state)
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(row!.classList.contains('open')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not auto-collapse think card after user manual toggle (once semantics)', () => {
+    vi.useFakeTimers();
+    try {
+      const runningItem: TranscriptAgentItem = {
+        id: 'agent-think-once',
+        agent: 'Agent',
+        role: 'agent',
+        time: '',
+        rows: [
+          { id: 'think-once', type: 'think', label: '思考', status: 'running', collapsible: true, content: '…' },
+        ],
+        standaloneRows: [],
+        runs: [],
+        bubbles: [],
+      };
+      const { container, rerender } = render(<AgentGroup item={runningItem} chatMode="group" />);
+      const row = container.querySelector('[data-block-id="think-once"]');
+      expect(row!.classList.contains('open')).toBe(true);
+
+      // Change to ok — user clicks manually within 1s window
+      const okItem: TranscriptAgentItem = {
+        ...runningItem,
+        rows: [
+          { id: 'think-once', type: 'think', label: '思考', status: 'ok', collapsible: true, content: 'done' },
+        ],
+      };
+      rerender(<AgentGroup item={okItem} chatMode="group" />);
+      expect(row!.classList.contains('open')).toBe(true);
+
+      // User clicks the header (manual toggle — now allowed since not running)
+      const header = row!.querySelector('.row-hd');
+      expect(header).not.toBeNull();
+      fireEvent.click(header!);
+
+      // Card should be closed now (user toggled)
+      expect(row!.classList.contains('open')).toBe(false);
+
+      // User re-opens
+      fireEvent.click(header!);
+      expect(row!.classList.contains('open')).toBe(true);
+
+      // Advance past 1s — should NOT auto-collapse because once semantics
+      act(() => { vi.advanceTimersByTime(2000); });
+      expect(row!.classList.contains('open')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

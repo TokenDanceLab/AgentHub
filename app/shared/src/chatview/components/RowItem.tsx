@@ -79,10 +79,19 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const userToggledRef = useRef(false)
   const isOpen = item.type === 'route' ? true : open
 
-  // Think cards: auto-open when running, auto-collapse when done
+  // Think cards: auto-open when running, auto-collapse 1s after done
+  // (once semantics: once user manually toggles, never auto-collapse)
   useEffect(() => {
     if (item.type !== 'think' || !item.collapsible) return
-    setOpen(item.status === 'running')
+    if (userToggledRef.current) return
+    if (item.status === 'running') {
+      setOpen(true)
+    } else {
+      const timer = setTimeout(() => {
+        if (!userToggledRef.current) setOpen(false)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
   }, [item.status, item.type, item.collapsible])
 
   // Fail cards: auto-expand when status becomes 'fail' (once semantics —
