@@ -38,11 +38,15 @@ const AGENT_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
   },
   filter: {
     title: '当前分类下没有模板',
-    description: '切换到“推荐”或其他分类，或清空筛选后再试。',
+    description: '切换到”推荐”或其他分类，或清空筛选后再试。',
   },
   error: {
     title: 'Agent 模板暂时不可用',
     description: '市场数据加载失败。恢复后可重试浏览与安装。',
+  },
+  noPermission: {
+    title: '无权限访问 Agent 市场',
+    description: '你没有访问此市场的权限，请联系管理员开通。',
   },
 };
 
@@ -57,11 +61,15 @@ const SKILL_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
   },
   filter: {
     title: '当前类型下没有 Skill',
-    description: '切换到“全部”或其他 Skill 类型后再试。',
+    description: '切换到”全部”或其他 Skill 类型后再试。',
   },
   error: {
     title: 'Skill 市场暂时不可用',
     description: '公共 Skill 列表加载失败。恢复后可重试浏览与安装。',
+  },
+  noPermission: {
+    title: '无权限访问 Skill 市场',
+    description: '你没有访问此市场的权限，请联系管理员开通。',
   },
 };
 
@@ -76,11 +84,15 @@ const MCP_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
   },
   filter: {
     title: '当前传输方式下没有 MCP',
-    description: '切换到“全部”或其他 transport 后再试。',
+    description: '切换到”全部”或其他 transport 后再试。',
   },
   error: {
     title: 'MCP 市场暂时不可用',
     description: '公共 MCP 列表加载失败。恢复后可重试浏览与安装。',
+  },
+  noPermission: {
+    title: '无权限访问 MCP 市场',
+    description: '你没有访问此市场的权限，请联系管理员开通。',
   },
 };
 
