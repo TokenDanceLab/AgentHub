@@ -289,6 +289,16 @@
   --glass-card-shadow: var(--glass-elev-2);
   --glass-card-radius: var(--radius-xl, 0.75rem);
 
+  /* Content-anchored surfaces (dual-layer separation from panel glass)
+     Message bubbles and inline content surfaces are ANCHORED — they use
+     fixed alpha values and do NOT track the panel-level --glass-bg-* slider.
+     Only chrome/panels track adjustable glass.
+     The --chat-* tokens in presets-base.css / themes.css are the concrete
+     instances of this family. */
+  --td-glass-content-bg: var(--surface-raised);               /* anchored, tracks theme surface */
+  --td-glass-content-border: var(--bdr, rgba(0,0,0,0.14));   /* anchored hairline with fallback */
+  --td-glass-content-text-muted: var(--text-2, rgba(255,255,255,0.5));
+
   /* Light page fill (light-theme opaque panels) */
   --glass-light-fill: rgba(250, 250, 251, 0.92);
 
