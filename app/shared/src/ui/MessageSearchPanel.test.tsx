@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import MessageSearchPanel from './MessageSearchPanel';
 import type { ChatMessage } from '../types/chat';
 
@@ -143,5 +143,50 @@ describe('MessageSearchPanel', () => {
     fireEvent.change(input, { target: { value: 'Indexing project' } });
 
     expect(await screen.findByText(/Indexing project/)).toBeInTheDocument();
+  });
+
+  // ── Debounce tests ─────────────────────────────────────
+
+  it('debounces search results by ~300ms', async () => {
+    vi.useFakeTimers();
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+
+    // Type immediately — no results should appear yet
+    fireEvent.change(input, { target: { value: 'auth module' } });
+
+    // Before debounce completes, there should be no results
+    expect(screen.queryByText(/auth module/)).not.toBeInTheDocument();
+
+    // Advance past debounce threshold
+    act(() => { vi.advanceTimersByTime(350); });
+
+    // Now results should appear
+    expect(screen.queryByText(/auth module/)).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it('cancels previous debounce on rapid typing', async () => {
+    vi.useFakeTimers();
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+
+    // Type intermediate query then quickly type matching query
+    fireEvent.change(input, { target: { value: 'xyz' } });
+    act(() => { vi.advanceTimersByTime(100); });
+
+    fireEvent.change(input, { target: { value: 'auth module' } });
+
+    // Should not have results for the intermediate query
+    expect(screen.queryByText(/auth module/)).not.toBeInTheDocument();
+
+    // Advance past debounce
+    act(() => { vi.advanceTimersByTime(350); });
+
+    // Now should have results for the final query
+    expect(screen.queryByText(/auth module/)).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

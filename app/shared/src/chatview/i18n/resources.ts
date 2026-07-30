@@ -50,6 +50,13 @@ export const chatviewResources = {
     'empty.contactsEmpty': '暂无联系人',
     'empty.contactsEmpty.desc': '还没有联系人，添加后可以开始协作。',
 
+
+    // ═══ Typing indicator ═══
+    'typing.dm': '正在输入...',
+    'typing.single': '{{name}} 正在输入...',
+    'typing.double': '{{name1}} 和 {{name2}} 正在输入...',
+    'typing.multiple': '有 {{count}} 人正在输入...',
+
     // ═══ Card labels — status-aware ═══
     'card.think.running': '正在思考',
     'card.think.done': '思考完成',
@@ -176,6 +183,8 @@ export const chatviewResources = {
     'toast.exportDraft': '已导出到云文档草稿',
     'toast.appsOpened': '已打开快捷应用',
     'toast.deleteQueued': '已标记删除',
+    'toast.editStarted': '开始编辑消息',
+    'toast.editFailed': '编辑失败，请重试',
     'toast.actionRecorded': '操作已记录',
     'toast.multiCopy': '已复制 {count} 项',
     'toast.multiForward': '已准备转发 {count} 项',
@@ -221,6 +230,7 @@ export const chatviewResources = {
     'action.regenerating': '正在重新生成',
     'action.startAgentTask': '启动 Agent 任务',
     'action.removeMention': '移除 @{label}',
+    'action.stopRun': '停止运行',
     'action.removeAttachment': '移除 {name}',
 
     // ═══ Mainchain labels ═══
@@ -258,6 +268,7 @@ export const chatviewResources = {
     'context.exportDoc': '导出到文档',
     'context.apps': '快捷应用',
     'context.delete': '删除',
+    'context.edit': '编辑',
 
     // ═══ Multi-select bar ═══
     'bar.selectAll': '全选',
@@ -266,6 +277,7 @@ export const chatviewResources = {
 
     // ═══ Profile pane ═══
     'profile.sendMessage': '发送消息',
+    'composer.editingMessage': '正在编辑消息',
     'profile.agentConfig': 'Agent 配置',
     'profile.role': '职责',
     'profile.engine': '引擎',
@@ -370,6 +382,8 @@ export const chatviewResources = {
     'aria.backToOverview': '返回概览',
     'aria.cancelReply': '取消回复',
     'aria.cancelQuote': '取消引用',
+    'aria.cancelEdit': '取消编辑',
+    'aria.stopRun': '停止运行',
     'aria.agentMainChain': '@Agent main chain',
     'aria.atAgent': '@Agent',
     'aria.close': '关闭',
@@ -475,6 +489,13 @@ export const chatviewResources = {
     'empty.filesEmpty.desc': 'No files here yet.',
     'empty.contactsEmpty': 'No contacts yet',
     'empty.contactsEmpty.desc': 'No contacts yet. Add someone to start collaborating.',
+
+
+    // ═══ Typing indicator ═══
+    'typing.dm': 'Typing...',
+    'typing.single': '{{name}} is typing...',
+    'typing.double': '{{name1}} and {{name2}} are typing...',
+    'typing.multiple': '{{count}} people are typing...',
 
     'card.think.running': 'Thinking...',
     'card.think.done': 'Thinking done',
@@ -601,6 +622,8 @@ export const chatviewResources = {
     'toast.exportDraft': 'Exported to cloud doc draft',
     'toast.appsOpened': 'Opened quick apps',
     'toast.deleteQueued': 'Marked for deletion',
+    'toast.editStarted': 'Editing message',
+    'toast.editFailed': 'Edit failed, please retry',
     'toast.actionRecorded': 'Action recorded',
     'toast.multiCopy': '{count} item(s) copied',
     'toast.multiForward': '{count} item(s) queued for forwarding',
@@ -646,6 +669,7 @@ export const chatviewResources = {
     'action.regenerating': 'Regenerating',
     'action.startAgentTask': 'Start agent task',
     'action.removeMention': 'Remove @{label}',
+    'action.stopRun': 'Stop',
     'action.removeAttachment': 'Remove {name}',
 
     // ═══ Mainchain labels ═══
@@ -683,6 +707,7 @@ export const chatviewResources = {
     'context.exportDoc': 'Export to document',
     'context.apps': 'Quick apps',
     'context.delete': 'Delete',
+    'context.edit': 'Edit',
 
     // ═══ Multi-select bar ═══
     'bar.selectAll': 'Select all',
@@ -691,6 +716,7 @@ export const chatviewResources = {
 
     // ═══ Profile pane ═══
     'profile.sendMessage': 'Send message',
+    'composer.editingMessage': 'Editing message',
     'profile.agentConfig': 'Agent configuration',
     'profile.role': 'Role',
     'profile.engine': 'Engine',
@@ -795,6 +821,8 @@ export const chatviewResources = {
     'aria.backToOverview': 'Back to overview',
     'aria.cancelReply': 'Cancel reply',
     'aria.cancelQuote': 'Cancel quote',
+    'aria.cancelEdit': 'Cancel edit',
+    'aria.stopRun': 'Stop run',
     'aria.agentMainChain': '@Agent main chain',
     'aria.atAgent': '@Agent',
     'aria.close': 'Close',
@@ -867,3 +895,4 @@ export const chatviewResources = {
     'oidc.loginSuccess.closeHint': 'You may close this page and return to the AgentHub desktop app.',
   },
 }
+

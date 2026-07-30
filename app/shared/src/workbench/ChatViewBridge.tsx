@@ -13,6 +13,7 @@ import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
 import type { TranscriptUserItem } from '../chatview/transcript-item';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { useTypingPresence } from '../chatview/typingPresence';
 import { SubagentStreamOverlay } from './team/SubagentStreamOverlay';
 import { InlineDelegationCard } from './team/InlineDelegationCard';
 
@@ -109,14 +110,17 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   }, [activeConversation, dismissedPinnedIds, onToast]);
 
   // #1406 Phase 3: mount the inline delegation card below each user message.
-  // The card self-gates — it renders null when MessageDelegationStore has no
-  // entries for that message id (i.e. the message did not trigger a dispatch),
-  // so it is safe to mount below every user message. The callback is stable so
-  // ChatViewTranscript's memo is not defeated by a fresh function each render.
   const renderUserFooter = useCallback(
     (item: TranscriptUserItem) => <InlineDelegationCard messageId={item.id} />,
     [],
   );
+
+  // ── Typing indicator ───────────────────────────────────
+  const typingUserIds = useTypingPresence(activeConversation?.id);
+  const typingUserNames = useMemo<string[]>(() => {
+    if (typingUserIds.length === 0 || chatMode === 'dm') return [];
+    return typingUserIds;
+  }, [typingUserIds, chatMode]);
 
   return (
     <>
@@ -137,6 +141,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         onHighlightEnd={onHighlightEnd}
         pinnedAnnouncement={pinnedAnnouncement}
         connectionStatus={connectionStatus}
+        typingUserNames={typingUserNames}
         renderUserFooter={renderUserFooter}
       />
       <SubagentStreamOverlay />
