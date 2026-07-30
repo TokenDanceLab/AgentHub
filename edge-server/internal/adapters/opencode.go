@@ -277,137 +277,169 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 
 	switch evt.Type {
 	case "step_start":
-		payload := map[string]any{
-			"sessionId": evt.SessionID,
-		}
-		if evt.Model != "" {
-			payload["model"] = evt.Model
-		}
-		if evt.Provider != "" {
-			payload["provider"] = evt.Provider
-		}
-		if len(evt.Tools) > 0 {
-			payload["tools"] = evt.Tools
-		}
-		emitter.Emit(BusEventSessionInit, scope, payload)
-		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
-			"state": "busy",
-		})
+		a.handleOpenCodeStepStart(scope, emitter, evt)
 	case "text":
-		if evt.Part != nil {
-			emitter.Emit(BusEventTextDelta, scope, map[string]any{
-				"content": evt.Part.Text,
-			})
-		}
+		a.handleOpenCodeText(scope, emitter, evt)
 	case "tool_use":
-		if evt.Part != nil && evt.Part.State != nil {
-			toolName := evt.Part.Tool
-			state := evt.Part.State
-			toolCallPayload := map[string]any{
-				"callId":   evt.Part.CallID,
-				"toolName": toolName,
-				"input":    state.Input,
-				"status":   state.Status,
-			}
-			// Emit tool call event (start notification)
-			emitter.Emit(BusEventToolCall, scope, toolCallPayload)
-			// Emit dedicated MCP tool call event for MCP-sourced tools
-			if IsMCPToolCall(toolName) {
-				emitter.Emit(BusEventMCPToolCall, scope, toolCallPayload)
-			}
-			// Emit tool result event (completion/error)
-			resultPayload := map[string]any{
-				"callId":   evt.Part.CallID,
-				"toolName": toolName,
-				"status":   state.Status,
-			}
-			if state.Status == "error" {
-				resultPayload["error"] = state.Error
-			} else {
-				resultPayload["output"] = state.Output
-			}
-			emitter.Emit(BusEventToolResult, scope, resultPayload)
-			// Emit file change event for file-modifying tools
-			if isFileModifyingTool(toolName) {
-				emitter.Emit(BusEventFileChange, scope, map[string]any{
-					"callId":   evt.Part.CallID,
-					"toolName": toolName,
-					"content":  state.Output,
-				})
-			}
-		}
+		a.handleOpenCodeToolUse(scope, emitter, evt)
 	case "reasoning":
-		if evt.Part != nil {
-			emitter.Emit(BusEventThinking, scope, map[string]any{
-				"content": evt.Part.Text,
+		a.handleOpenCodeReasoning(scope, emitter, evt)
+	case "permission.asked":
+		a.handleOpenCodePermissionAsked(scope, emitter, evt)
+	case "step_finish":
+		a.handleOpenCodeStepFinish(scope, emitter, evt)
+	case "error":
+		a.handleOpenCodeError(scope, emitter, evt)
+	default:
+		a.handleOpenCodeDefault(scope, emitter, evt)
+	}
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeStepStart(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	payload := map[string]any{
+		"sessionId": evt.SessionID,
+	}
+	if evt.Model != "" {
+		payload["model"] = evt.Model
+	}
+	if evt.Provider != "" {
+		payload["provider"] = evt.Provider
+	}
+	if len(evt.Tools) > 0 {
+		payload["tools"] = evt.Tools
+	}
+	emitter.Emit(BusEventSessionInit, scope, payload)
+	emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+		"state": "busy",
+	})
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeText(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	if evt.Part != nil {
+		emitter.Emit(BusEventTextDelta, scope, map[string]any{
+			"content": evt.Part.Text,
+		})
+	}
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeToolUse(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	if evt.Part != nil && evt.Part.State != nil {
+		toolName := evt.Part.Tool
+		state := evt.Part.State
+		toolCallPayload := map[string]any{
+			"callId":   evt.Part.CallID,
+			"toolName": toolName,
+			"input":    state.Input,
+			"status":   state.Status,
+		}
+		// Emit tool call event (start notification)
+		emitter.Emit(BusEventToolCall, scope, toolCallPayload)
+		// Emit dedicated MCP tool call event for MCP-sourced tools
+		if IsMCPToolCall(toolName) {
+			emitter.Emit(BusEventMCPToolCall, scope, toolCallPayload)
+		}
+		// Emit tool result event (completion/error)
+		resultPayload := map[string]any{
+			"callId":   evt.Part.CallID,
+			"toolName": toolName,
+			"status":   state.Status,
+		}
+		if state.Status == "error" {
+			resultPayload["error"] = state.Error
+		} else {
+			resultPayload["output"] = state.Output
+		}
+		emitter.Emit(BusEventToolResult, scope, resultPayload)
+		// Emit file change event for file-modifying tools
+		if isFileModifyingTool(toolName) {
+			emitter.Emit(BusEventFileChange, scope, map[string]any{
+				"callId":   evt.Part.CallID,
+				"toolName": toolName,
+				"content":  state.Output,
 			})
 		}
-	case "permission.asked":
-		emitter.Emit(BusEventPermissionRequested, scope, map[string]any{
-			"adapterId":      "opencode",
-			"requestId":      evt.RequestID,
-			"callId":         evt.CallID,
-			"toolName":       evt.ToolName,
-			"riskLevel":      evt.RiskLevel,
-			"reason":         evt.Reason,
-			"input":          evt.Input,
-			"decisionBridge": "blocked",
-			"nonInteractive": true,
+	}
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeReasoning(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	if evt.Part != nil {
+		emitter.Emit(BusEventThinking, scope, map[string]any{
+			"content": evt.Part.Text,
 		})
-	case "step_finish":
-		result := map[string]any{"success": true}
-		if evt.Part != nil {
-			result["success"] = evt.Part.Reason == "stop" || evt.Part.Reason == ""
-			result["reason"] = evt.Part.Reason
-			if evt.Part.Tokens != nil {
-				usageMap := map[string]any{
-					"inputTokens":      evt.Part.Tokens.Input,
-					"outputTokens":     evt.Part.Tokens.Output,
-					"reasoningTokens":  evt.Part.Tokens.Reasoning,
-					"totalTokens":      evt.Part.Tokens.Total,
-					"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
-					"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
-				}
-				result["usage"] = usageMap
-				// Emit context usage metrics so budgeting and dashboards can track token burn.
-				emitter.Emit(BusEventContextUsage, scope, usageMap)
-				// Track cumulative token consumption for context budget.
-				if a.budget != nil {
-					a.budget.Track(evt.Part.Tokens.Input + evt.Part.Tokens.Output)
-				}
+	}
+}
+
+func (a *OpenCodeAdapter) handleOpenCodePermissionAsked(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	emitter.Emit(BusEventPermissionRequested, scope, map[string]any{
+		"adapterId":      "opencode",
+		"requestId":      evt.RequestID,
+		"callId":         evt.CallID,
+		"toolName":       evt.ToolName,
+		"riskLevel":      evt.RiskLevel,
+		"reason":         evt.Reason,
+		"input":          evt.Input,
+		"decisionBridge": "blocked",
+		"nonInteractive": true,
+	})
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeStepFinish(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	result := map[string]any{"success": true}
+	if evt.Part != nil {
+		result["success"] = evt.Part.Reason == "stop" || evt.Part.Reason == ""
+		result["reason"] = evt.Part.Reason
+		if evt.Part.Tokens != nil {
+			usageMap := map[string]any{
+				"inputTokens":      evt.Part.Tokens.Input,
+				"outputTokens":     evt.Part.Tokens.Output,
+				"reasoningTokens":  evt.Part.Tokens.Reasoning,
+				"totalTokens":      evt.Part.Tokens.Total,
+				"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
+				"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
 			}
-			if evt.Part.Cost > 0 {
-				result["cost"] = evt.Part.Cost
+			result["usage"] = usageMap
+			// Emit context usage metrics so budgeting and dashboards can track token burn.
+			emitter.Emit(BusEventContextUsage, scope, usageMap)
+			// Track cumulative token consumption for context budget.
+			if a.budget != nil {
+				a.budget.Track(evt.Part.Tokens.Input + evt.Part.Tokens.Output)
 			}
 		}
-		emitter.Emit(BusEventResult, scope, result)
-		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
-			"state": "idle",
-		})
-	case "error":
-		result := map[string]any{
-			"success": false,
+		if evt.Part.Cost > 0 {
+			result["cost"] = evt.Part.Cost
 		}
-		// OpenCode errors can be either a plain string or an object like
-		// { name: "AuthError", data: { message: "details" } }.
-		switch e := evt.Error.(type) {
-		case string:
-			result["error"] = e
-		case map[string]any:
-			if msg, ok := e["message"].(string); ok && msg != "" {
-				result["error"] = msg
-			} else if name, ok := e["name"].(string); ok {
-				result["error"] = name + ": " + extractErrorDataMessage(e)
-			} else {
-				result["error"] = "unknown error"
-			}
-		default:
+	}
+	emitter.Emit(BusEventResult, scope, result)
+	emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+		"state": "idle",
+	})
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeError(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	result := map[string]any{
+		"success": false,
+	}
+	// OpenCode errors can be either a plain string or an object like
+	// { name: "AuthError", data: { message: "details" } }.
+	switch e := evt.Error.(type) {
+	case string:
+		result["error"] = e
+	case map[string]any:
+		if msg, ok := e["message"].(string); ok && msg != "" {
+			result["error"] = msg
+		} else if name, ok := e["name"].(string); ok {
+			result["error"] = name + ": " + extractErrorDataMessage(e)
+		} else {
 			result["error"] = "unknown error"
 		}
-		emitter.Emit(BusEventResult, scope, result)
 	default:
-		slog.Debug("opencode: unhandled event type", "type", evt.Type)
+		result["error"] = "unknown error"
 	}
+	emitter.Emit(BusEventResult, scope, result)
+}
+
+func (a *OpenCodeAdapter) handleOpenCodeDefault(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	slog.Debug("opencode: unhandled event type", "type", evt.Type)
 }
 
 // --- OpenCode JSON event schemas ---
