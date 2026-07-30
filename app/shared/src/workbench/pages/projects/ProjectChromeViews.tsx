@@ -9,6 +9,10 @@ import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { DesignNavIcon } from '../../designIcons';
+import {
+  FOLDER_THEME_COLORS,
+  FOLDER_THEME_COLOR_META,
+} from '../../../folderThemeColors';
 import styles from '../ProjectsPage.module.css';
 import type {
   ProjectDraft,
@@ -143,6 +147,37 @@ export function ProjectEditor({
           />
         </label>
       </div>
+      <fieldset className={styles.editorThemeColor}>
+        <legend className={styles.editorThemeColorLegend}>主题色</legend>
+        <div className={styles.themeSwatchRow} role="radiogroup" aria-label="主题色">
+          {FOLDER_THEME_COLORS.map((color) => {
+            const meta = FOLDER_THEME_COLOR_META[color];
+            const selected = draft.themeColor === color;
+            return (
+              <button
+                key={color}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={meta.label}
+                title={meta.label}
+                className={`${styles.themeSwatch} ${selected ? styles.themeSwatchActive : ''}`}
+                style={{
+                  '--swatch-dark': meta.dark,
+                  '--swatch-light': meta.light,
+                } as React.CSSProperties}
+                onClick={() => {
+                  const isSelected = draft.themeColor === color;
+                  const { themeColor: _omit, ...rest } = draft;
+                  void _omit;
+                  onDraftChange(isSelected ? rest : { ...rest, themeColor: color });
+                }}
+                disabled={saving}
+              />
+            );
+          })}
+        </div>
+      </fieldset>
       {error ? <div className={styles.editorError} role="alert">{error}</div> : null}
       <div className={styles.editorActions}>
         <button type="button" className={styles.editorCancelBtn} onClick={onCancel} disabled={saving}>
