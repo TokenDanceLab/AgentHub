@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { cx } from './cx';
 import styles from './EmptyState.module.css';
 
-export const EMPTY_STATE_KINDS = ['blank', 'search', 'filter', 'error'] as const;
+export const EMPTY_STATE_KINDS = ['blank', 'search', 'filter', 'error', 'noPermission'] as const;
 export type EmptyStateKind = (typeof EMPTY_STATE_KINDS)[number];
 
 export interface EmptyStateCopy {
