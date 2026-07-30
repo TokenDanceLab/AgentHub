@@ -11,7 +11,7 @@
 | Active SPEC | **3 P3 RFC DRAFT** (#1478 直播 / A-V1 #1471 / A-V3 #1472) — 待管理员定档 · PROPOSAL #1412/#1413/#1414 CLOSED 未合并 |
 | Closed residual | [overview](../analysis/post-polish-project-overview.md) · plan trio under `docs/plan/post-polish-*` |
 | Strategy | Strangler Fig; **no** Visual QA chase past 89 |
-| Live tip | master `41309678`（leader wave：3 RFC + A-V3 quick-win + A-V1 preflight + ACP vocab lock） |
+| Live tip | master `d4270360`（#1478 Phase A：team.subagent.stream 后端归属 + bus fan-out，edge 零改） |
 
 Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORICAL only**.
 
@@ -70,7 +70,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 |---|---|
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
 | ACP spike（紧迫度↑：Phase 2 prep 已落地——pure ACP→Edge 事件映射器 + 单测，待真 binary 集成） | #1404 |
-| agentteam 子任务直播（#1478 已立，**SPEC 设计已写** `docs/plan/agentteam-live-streaming.md`，3 阶段 A/B/C，待管理员 sign-off） | #1478 |
+| agentteam 子任务直播（#1478 **Phase A 已合入** `d4270360`：team.subagent.stream 后端归属 + bus fan-out，edge 零改；Phase B/C DRAFT 待定档） | #1478 |
 | @agent 派单（方向调整：不走 @session 引用，走 IM 群聊 @agent 派单） | #1406 |
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
@@ -118,3 +118,5 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **ACP Spike Phase 2 prep**：把 ACP session/update → run.agent.* 翻译提取为纯映射器 `acp_events.go`（无 I/O、无状态、前向兼容），ParseStream 接线通知/响应，阻塞请求留 Phase 2。8 个单测覆盖全部映射类型 + 3 个有意不映射类型 + prompt-result 边界。adapters 全测试过。|
 | 2026-07-30 | **PROPOSAL 状态澄清**：#1412/#1413/#1414 经查于 2026-07-29 CLOSED 未合并（非永久挂起）。MASTER open 表从「NEEDS_FIX 不 merge」更正为「CLOSED 未合并，归档可查」。|
 | 2026-07-30 | **leader wave（fable 深拆 + opus 执行）**：3 RFC 落地——#1478 agentteam 直播 SPEC（对标 codeg live subagent，3 阶段 A/B/C，edge 零改）；A-V1 #1471（驳回 lifecycle 拆分+adapters 全量叶子化，采纳定向 adapters/orchestrator 抽取，preflight 已捕获 PlanTask/TaskStatus 导入环）；A-V3 #1472（驳回 shared 三分，采纳定向剔除 apiClient+硬化 edge 隔离）。safe quick-win 执行：删 shared/apiClient（454 行零消费）+ web/desktop workspace 依赖声明 + edge-surface-isolation 软门禁 + coverage 重测（shared +0.5pp）。ACP 词汇锁测试防 §3 映射漂移。全本地验证：build/test/3 门禁/coverage gate 全过。|
+| 2026-07-30 | **D-V1 Step 3**：completeRunAttempt（Phase 3 决策/完成）+ handleFaultEscalation（循环后 #867 后继交接）提取到 process_executor_build.go。引入 attemptOutcome 枚举（done/retry/break）驱动调用者控制流，runCtx 改指针以便会话重试就地重写。run() 循环体现为 switch+goto escalate 单标签。run() 246→115 行，累计 418→115（-73%）。lifecycle tests + adapters tests 全过，go vet clean。master `5184f523`。|
+| 2026-07-30 | **#1478 Phase A 合入** `d4270360`：team.subagent.stream 后端事件归属 + bus fan-out。HandleTaskStream 在 agent.stream 之外多发一条 team 域 bus 事件，经 dbTeamRunLookup（GetTeamRunBySessionID+ListAssignmentsByTeamRun+ListTeamTasksByRun，按 RunID 反查 pending task）+ 1024 条 LRU 缓存解析归属，app/events.go 订阅并 PushToSession。新增 1 个 WS 帧常量 TypeTeamSubagentStream（frame.go↔hubEvents.ts↔openapi.yaml↔events.md 1:1 同步；activity/batch/subscribe 留待有 wire producer 再加，遵守死面禁令）。edge 零改、前端未改也能观测。9 个测试（LRU/归属/缓存命中/双投递/非 team run/可注入）。build/vet/service+app tests/shared-rest-contract/ci-gates/hubEvents 契约全过。Phase B/C DRAFT 待定档。|
