@@ -19,8 +19,7 @@ export interface SkeletonBarProps {
 
 
 /** Structural skeleton placeholder with reduced-motion support.
- *  Use TextShimmer for text-specific loading; use SkeletonBar for
- *  card, row, and structural shapes. */
+ *  Use SkeletonBar for card, row, and structural shapes. */
 export function SkeletonBar({
   width = '100%',
   height = '1em',

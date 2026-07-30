@@ -1,9 +1,7 @@
-// Internal (not consumed by any platform — available for adoption)
-export { SkeletonLine, SkeletonBlock, SkeletonCircle } from './Skeleton';
+// Shared UI primitives consumed across desktop/web/mobile-rn workbench surfaces.
 export { default as Modal } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
 export type { DiffReviewFile, DiffReviewLabels, DiffHunkDecision, DiffReviewPanelProps } from './DiffReviewPanel';
-export { TextShimmer } from './TextShimmer';
 export { Select } from './Select';
 export type { SelectProps } from './Select';
 export { EmptyState } from './EmptyState';
@@ -36,8 +34,6 @@ export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps, SectionHeaderAction } from './SectionHeader';
 export { StatusNotice } from './StatusNotice';
 export type { StatusNoticeProps } from './StatusNotice';
-export { BottomSheet } from './BottomSheet';
-export type { BottomSheetProps } from './BottomSheet';
 export { RecoveryPanel } from './RecoveryPanel';
 export type { RecoveryPanelProps } from './RecoveryPanel';
 export { ActionList } from './ActionList';
