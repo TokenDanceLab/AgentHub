@@ -450,15 +450,15 @@ body {
    Existing per-component scrollbar-width:thin declarations remain authoritative
    for their scope; this is the global baseline. */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track, transparent); }
 ::-webkit-scrollbar-thumb {
-  background: var(--td-glass-content-border, rgba(0, 0, 0, 0.14));
+  background: var(--scrollbar-thumb, rgba(0, 0, 0, 0.14));
   border-radius: var(--r-full, 9999px);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--glass-border-strong, rgba(0, 0, 0, 0.2));
+  background: var(--scrollbar-thumb-hover, rgba(0, 0, 0, 0.2));
 }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-corner { background: var(--scrollbar-track, transparent); }
 
 /* Adaptive chrome hairline upgrade — color-mix() auto-inverts across light/dark
    themes and stays visible on frosted glass veils where a fixed --border washes out.
