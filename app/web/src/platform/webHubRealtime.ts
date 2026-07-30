@@ -3,7 +3,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
-import { getSubagentStreamStore } from '@shared/workbench';
+import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
 import type { TransportStatus } from '@/api/transport';
 import { createHubClient } from '@/api/hubClient';
@@ -209,6 +209,11 @@ export function useWebHubRealtime({
           // AGENT_STREAM is synced once per batch inside the batcher.
           getAgentActivityStore().handleEvent(type, payload);
         }
+        // #1406 Phase 3: feed agent.* frames to the message-delegation
+        // store so inline delegation cards can subscribe by
+        // trigger_message_id. The store no-ops on per-token AGENT_STREAM
+        // after the first streaming transition, so direct feed is safe.
+        getMessageDelegationStore().handleEvent(type, payload);
       }
     });
     const unsubscribeStatus = socket.onStatus((status: TransportStatus) => {

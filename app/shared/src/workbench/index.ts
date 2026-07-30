@@ -217,3 +217,16 @@ export {
   type TeamSubagentStreamEvent,
   type SubagentStreamOverlayProps,
 } from './team';
+
+/* ═══ Inline message delegation (#1406 Phase 3) ═══ */
+export {
+  InlineDelegationCard,
+  type InlineDelegationCardProps,
+  createMessageDelegationStore,
+  getMessageDelegationStore,
+  type MessageDelegationStore,
+  type MessageDelegationState,
+  type DelegationEntry,
+  type DelegationStatus,
+  type MessageDelegationListener,
+} from './team';

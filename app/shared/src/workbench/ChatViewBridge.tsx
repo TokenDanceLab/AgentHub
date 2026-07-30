@@ -5,14 +5,16 @@
    construction and chatMode derivation.
    ══════════════════════════════════════════════════════════════════════ */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock } from '../transcript';
 import type { WorkbenchConversation } from '../platform';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
+import type { TranscriptUserItem } from '../chatview/transcript-item';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import { SubagentStreamOverlay } from './team/SubagentStreamOverlay';
+import { InlineDelegationCard } from './team/InlineDelegationCard';
 
 export interface ChatViewBridgeProps {
   /** Filtered + optimistic transcript blocks to render. */
@@ -106,6 +108,16 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
     };
   }, [activeConversation, dismissedPinnedIds, onToast]);
 
+  // #1406 Phase 3: mount the inline delegation card below each user message.
+  // The card self-gates — it renders null when MessageDelegationStore has no
+  // entries for that message id (i.e. the message did not trigger a dispatch),
+  // so it is safe to mount below every user message. The callback is stable so
+  // ChatViewTranscript's memo is not defeated by a fresh function each render.
+  const renderUserFooter = useCallback(
+    (item: TranscriptUserItem) => <InlineDelegationCard messageId={item.id} />,
+    [],
+  );
+
   return (
     <>
       <ChatViewTranscript
@@ -125,6 +137,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         onHighlightEnd={onHighlightEnd}
         pinnedAnnouncement={pinnedAnnouncement}
         connectionStatus={connectionStatus}
+        renderUserFooter={renderUserFooter}
       />
       <SubagentStreamOverlay />
     </>
