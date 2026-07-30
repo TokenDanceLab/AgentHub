@@ -1,5 +1,6 @@
 /* AgentHub Desktop Presets — imports shared base + opaque UI border overrides */
 @import '@shared/styles/presets-base.css';
+@import '@shared/styles/folder-colors.css';
 
 [data-preset="tokendance"]:root { --border: rgba(0, 0, 0, 0.16); }
 [data-preset="tokendance"]:root { --color-border: rgba(0, 0, 0, 0.16); }

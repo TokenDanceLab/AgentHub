@@ -450,6 +450,61 @@
   font-family: inherit;
 }
 
+/* ── Per-folder theme color picker ── */
+.editorThemeColor {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--sp-xs);
+}
+
+.editorThemeColorLegend {
+  padding: 0;
+  color: var(--text-2);
+  font: 600 0.75rem var(--font-sans);
+}
+
+.themeSwatchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+}
+
+.themeSwatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--swatch-dark, var(--primary)) 42%, var(--surface));
+  background-color: var(--swatch-dark, var(--primary));
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+:global([data-theme='light']) .themeSwatch {
+  background-color: var(--swatch-light, var(--swatch-dark, var(--primary)));
+  border-color: color-mix(in srgb, var(--swatch-light, var(--swatch-dark, var(--primary))) 42%, var(--surface));
+}
+
+.themeSwatch:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+
+.themeSwatch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.themeSwatchActive {
+  box-shadow: 0 0 0 2px var(--surface-low), 0 0 0 4px var(--swatch-dark, var(--primary));
+}
+
+:global([data-theme='light']) .themeSwatchActive {
+  box-shadow: 0 0 0 2px var(--surface-low), 0 0 0 4px var(--swatch-light, var(--swatch-dark, var(--primary)));
+}
+
 /* ── Tabs ── */
 .tabs {
   height: 38px;
