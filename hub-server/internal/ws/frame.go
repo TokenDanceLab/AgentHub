@@ -59,6 +59,13 @@ const (
 	TypeTeamAssignmentDone   = "team.assignment.done"
 	TypeTeamAssignmentFailed = "team.assignment.failed"
 
+	// Team subagent live-stream family (#1478 Phase A).
+	// UPSERT by (agent_task_id, event_seq) + event_seq watermark — same semantics
+	// as agent.stream, aggregated into the team-run view. Only team.subagent.stream
+	// ships in Phase A; activity/batch/subscribe gain producers in later phases
+	// (no dead protocol surface — #1362/#1422).
+	TypeTeamSubagentStream = "team.subagent.stream"
+
 	// Social: notification UPSERT by id; friend.* by request/user id.
 	TypeNotificationNew = "notification.new"
 	TypeFriendRequest   = "friend.request"

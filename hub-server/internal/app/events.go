@@ -239,6 +239,7 @@ func (a *App) subscribeTeamEvents() {
 		{eventType: "team.event", frameType: ws.TypeTeamEvent},
 		{eventType: "team.assignment.completed", frameType: ws.TypeTeamAssignmentDone},
 		{eventType: "team.assignment.failed", frameType: ws.TypeTeamAssignmentFailed},
+		{eventType: service.BusEventTeamSubagentStream, frameType: ws.TypeTeamSubagentStream},
 	} {
 		teamEvent := teamEvent
 		a.bus.Subscribe(teamEvent.eventType, func(ctx context.Context, event service.Event) {
