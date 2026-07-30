@@ -1,0 +1,168 @@
+/* InlineDelegationCard — #1406 Phase 3
+   Inline (in-flow) delegation status card mounted below a user message.
+   Mirrors the SubagentStreamOverlay glass-card tokens, but inline
+   (no fixed positioning): the card stacks in the normal transcript flow. */
+
+/* ── Stack container (one per user message, holds N cards) ───────────────── */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+  width: 100%;
+  max-width: 520px;
+  /* Inline cards sit to the left of the right-aligned user bubble so the
+     status reads as a follow-up to the dispatch instruction. */
+  margin-right: auto;
+  margin-left: 0;
+}
+
+/* ── Card (collapsed) ─────────────────────────────────────────────────────── */
+
+.card {
+  border: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  border-radius: var(--td-radius-control, 8px);
+  background: var(--td-surface, rgba(37, 37, 45, 0.82));
+  box-shadow: var(--td-glass-elev, 0 10px 28px rgba(15, 23, 42, 0.08));
+  backdrop-filter: blur(var(--td-glass-blur, 28px));
+  -webkit-backdrop-filter: blur(var(--td-glass-blur, 28px));
+  overflow: hidden;
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  color: var(--td-ink, #e3e4e6);
+  transition: border-color 0.2s ease;
+}
+
+/* ── Color borders (status → left accent) ────────────────────────────────── */
+
+.colorBlue   { border-left: 3px solid #5b9bd5; }
+.colorPurple { border-left: 3px solid #a78bfa; }
+.colorGreen  { border-left: 3px solid var(--td-moss, #69c967); }
+.colorRed    { border-left: 3px solid var(--td-danger, #ff7e78); }
+.colorGray   { border-left: 3px solid var(--td-ink-muted, #a0a1aa); }
+
+/* ── Card header button ──────────────────────────────────────────────────── */
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cardHeader:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cardHeader:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--td-plum, #5d68cc);
+}
+
+/* ── Avatar ───────────────────────────────────────────────────────────────── */
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--td-plum, #5d68cc);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.avatarPulse {
+  animation: inlineDelegationAvatarPulse 2s ease-in-out infinite;
+}
+
+@keyframes inlineDelegationAvatarPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── Card body (label + status) ──────────────────────────────────────────── */
+
+.cardBody {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--td-ink, #e3e4e6);
+}
+
+.cardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.statusIcon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.9;
+}
+
+/* ── Card detail (expanded) ───────────────────────────────────────────────── */
+
+.cardDetail {
+  border-top: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  padding: 6px 10px;
+}
+
+.detailHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 0.6875rem;
+  color: var(--td-ink-muted, #a0a1aa);
+}
+
+.detailHintIcon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+/* ── Responsive: narrow viewport ─────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .stack {
+    max-width: 100%;
+    margin-right: 0;
+  }
+
+  .card {
+    border-radius: 6px;
+  }
+
+  .cardHeader {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+}

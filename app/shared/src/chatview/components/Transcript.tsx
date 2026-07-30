@@ -1,5 +1,5 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
-import type { TranscriptItem, TranscriptAgentItem, BlockActionCallback } from '../transcript-item'
+import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
 import { UserMessage } from './UserMessage'
 import { AgentGroup } from './AgentGroup'
 import { DateDivider } from './DateDivider'
@@ -20,6 +20,13 @@ interface Props {
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
   actionedBlockIds?: Set<string>
+  /**
+   * Optional render slot rendered immediately below each user message.
+   * Used by #1406 Phase 3 to mount the inline delegation card below a
+   * dispatch-triggering user message. Returns null/undefined when no
+   * footer is needed for that item.
+   */
+  renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
 }
 
 function isUser(item: TranscriptItem): item is Extract<TranscriptItem, { type: 'user' }> {
@@ -127,7 +134,7 @@ function partitionWithDates(items: TranscriptItem[]): TranscriptSegment[] {
   return segments
 }
 
-export const Transcript = memo(function Transcript({ items, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds }: Props) {
+export const Transcript = memo(function Transcript({ items, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter }: Props) {
   const segments = useMemo(() => partitionWithDates(items), [items])
   const transcriptRef = useRef<HTMLDivElement>(null)
   const shouldAutoFollowRef = useRef(true)
@@ -171,7 +178,16 @@ export const Transcript = memo(function Transcript({ items, chatMode, onAgentCli
         if (seg.kind === 'divider') return <DateDivider key={seg.key} date={seg.date} />
 
         const item = seg.item
-        if (isUser(item)) return <UserMessage key={item.id ?? item.text + (item.name || '')} item={item} chatMode={chatMode} />
+        if (isUser(item)) {
+          const userKey = item.id ?? item.text + (item.name || '')
+          const footer = renderUserFooter?.(item)
+          return (
+            <Fragment key={userKey}>
+              <UserMessage item={item} chatMode={chatMode} />
+              {footer ?? null}
+            </Fragment>
+          )
+        }
         if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
         return null
       })}
