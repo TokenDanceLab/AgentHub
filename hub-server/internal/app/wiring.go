@@ -47,6 +47,22 @@ func (s messageServiceWithReactions) ListMessageReactions(ctx context.Context, u
 
 // Run starts the Hub Server and blocks until a shutdown signal is received.
 func (a *App) Run(ctx context.Context) error {
+	defer log.Sync()
+
+	if err := a.initInfra(ctx); err != nil {
+		return err
+	}
+	if err := a.initServices(ctx); err != nil {
+		return err
+	}
+	if err := a.initHandlers(ctx); err != nil {
+		return err
+	}
+	return a.startServer(ctx)
+}
+
+// initInfra initializes infrastructure: health checks, logging, WebSocket manager, and event bus.
+func (a *App) initInfra(ctx context.Context) error {
 	a.startTime = time.Now()
 
 	// Startup health verification: ping DB and Redis to confirm connectivity
@@ -70,7 +86,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	log.Init(&a.Config.Server)
-	defer log.Sync()
+	// Note: defer log.Sync() is in Run() so it fires at shutdown, not after initInfra.
 
 	// Initialize TokenDance ID JWKS URI for JWT validation.
 	if a.Config.TokenDanceID.JWKSURI != "" {
@@ -90,6 +106,11 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.bus = bus
 
+	return nil
+}
+
+// initServices constructs all service-layer components and their inline handlers.
+func (a *App) initServices(ctx context.Context) error {
 	// Service layer
 	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
 	a.NotificationService = service.NewNotificationService(a.DB, a.mgr)
@@ -187,6 +208,11 @@ func (a *App) Run(ctx context.Context) error {
 		a.OIDCHandler = handler.NewOIDCHandler(a.OIDCService)
 	}
 
+	return nil
+}
+
+// initHandlers constructs the handler-layer components.
+func (a *App) initHandlers(_ context.Context) error {
 	// Handler layer
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
 	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
@@ -205,6 +231,11 @@ func (a *App) Run(ctx context.Context) error {
 	pubStatsSvc := service.NewPublicStatsService(a.DB)
 	a.PublicHandler = handler.NewPublicHandler(pubStatsSvc, a.startTime)
 
+	return nil
+}
+
+// startServer configures the router, starts background services, and blocks until shutdown.
+func (a *App) startServer(ctx context.Context) error {
 	// Router
 	r, err := a.setupRouter()
 	if err != nil {
