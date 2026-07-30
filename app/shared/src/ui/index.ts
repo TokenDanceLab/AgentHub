@@ -108,4 +108,6 @@ export { default as MarkdownContent } from './Markdown';
 export type { MarkdownContentProps } from './Markdown';
 export { StepCard } from './StepCard';
 export type { StepCardProps, StepCardSubStep, StepCardStatus, SubStepKind } from './StepCard';
+export { RiskBadge } from './RiskBadge';
+export type { RiskBadgeProps, RiskLevel } from './RiskBadge';
 export { cx } from './cx';

@@ -4,6 +4,7 @@ import { Shield, Check, X, Clock, AlertTriangle, User, Wrench } from 'lucide-rea
 import { useToastStore } from '@/stores/toastStore';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { RiskBadge } from '@agenthub/shared/ui';
 import styles from './ApprovalCard.module.css';
 
 type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
@@ -131,8 +132,6 @@ export default function ApprovalCard(props: ApprovalCardProps) {
     [teamId, runId, approvalId, hubClient, addToast, t],
   );
 
-  const riskClass = styles[`risk${riskLevel.charAt(0).toUpperCase()}${riskLevel.slice(1)}`] ?? '';
-
   return (
     <div
       className={`${styles.card} ${styles[`status${localStatus.charAt(0).toUpperCase()}${localStatus.slice(1)}`] ?? ''}`}
@@ -144,9 +143,7 @@ export default function ApprovalCard(props: ApprovalCardProps) {
           <Shield size={16} />
         </span>
         <span className={styles.title}>{t('approval.title')}</span>
-        <span className={`${styles.riskBadge} ${riskClass}`}>
-          {riskLabel(riskLevel, t)}
-        </span>
+        <RiskBadge level={riskLevel}>{riskLabel(riskLevel, t)}</RiskBadge>
         <span className={`${styles.statusBadge} ${styles[`status${localStatus.charAt(0).toUpperCase()}${localStatus.slice(1)}`] ?? ''}`}>
           {statusLabel(localStatus, t)}
         </span>
