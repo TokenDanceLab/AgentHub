@@ -1,4 +1,4 @@
-package service
+package oidc
 
 import (
 	"bytes"
@@ -83,7 +83,7 @@ func setupOIDCDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func setupOIDCTest(t *testing.T) (*OIDCService, *gorm.DB, *miniredis.Miniredis) {
+func setupOIDCTest(t *testing.T) (*Service, *gorm.DB, *miniredis.Miniredis) {
 	t.Helper()
 
 	db := setupOIDCDB(t)
@@ -114,7 +114,7 @@ func setupOIDCTest(t *testing.T) (*OIDCService, *gorm.DB, *miniredis.Miniredis) 
 	// will fail first or we stop before token validation)
 	jwtutil.SetJWKSURI("https://id.example.com/oidc/jwks")
 
-	svc := NewOIDCService(db, oidcCfg, jwtCfg, cacheClient)
+	svc := NewService(db, oidcCfg, jwtCfg, cacheClient)
 	return svc, db, mr
 }
 
@@ -287,7 +287,7 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 
 	jwtutil.SetJWKSURI("")
 	jwtutil.ResetJWKSCache()
-	svc := NewOIDCService(db, config.TokenDanceIDConfig{
+	svc := NewService(db, config.TokenDanceIDConfig{
 		IssuerURL:    server.URL,
 		JWKSURI:      server.URL + "/oidc/jwks",
 		ClientID:     "agenthub-client",
@@ -348,7 +348,7 @@ func TestHandleCallback_TokenEndpointErrorDoesNotLogProviderRawBody(t *testing.T
 
 	jwtutil.SetJWKSURI("")
 	jwtutil.ResetJWKSCache()
-	svc := NewOIDCService(db, config.TokenDanceIDConfig{
+	svc := NewService(db, config.TokenDanceIDConfig{
 		IssuerURL:    server.URL,
 		ClientID:     "agenthub-client",
 		ClientSecret: "agenthub-secret",

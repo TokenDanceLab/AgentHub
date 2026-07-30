@@ -1,4 +1,4 @@
-package service
+package oidc
 
 import (
 	"context"
@@ -29,8 +29,8 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
-// OIDCService handles TokenDance ID OIDC Authorization Code + PKCE login flow.
-type OIDCService struct {
+// Service handles TokenDance ID OIDC Authorization Code + PKCE login flow.
+type Service struct {
 	db     *gorm.DB
 	cfg    config.TokenDanceIDConfig
 	jwtCfg config.JWTConfig
@@ -41,14 +41,14 @@ var validDeviceTypes = []string{"desktop", "web", "cli"}
 
 const oidcStateTTL = 10 * time.Minute
 
-// NewOIDCService creates a new OIDCService.
-func NewOIDCService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *OIDCService {
+// NewService creates a new OIDC Service.
+func NewService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *Service {
 	if cfg.JWKSURI != "" {
 		jwtutil.SetJWKSURI(cfg.JWKSURI)
 	} else if cfg.IssuerURL != "" {
 		jwtutil.SetJWKSURI(strings.TrimRight(cfg.IssuerURL, "/") + "/oidc/jwks")
 	}
-	return &OIDCService{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache}
+	return &Service{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache}
 }
 
 // AuthorizationResult is returned from GenerateAuthorizationURL.
@@ -77,7 +77,7 @@ type stateEntry struct {
 
 // GenerateAuthorizationURL creates a random state, stores PKCE parameters in Redis,
 // and returns the full TokenDance ID authorization URL.
-func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*AuthorizationResult, error) {
+func (s *Service) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*AuthorizationResult, error) {
 	if codeChallenge == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -149,7 +149,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 
 // HandleCallback validates the OIDC callback, exchanges the authorization code,
 // validates the ID token, maps the TokenDance sub to a Hub user, and issues Hub tokens.
-func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*CallbackResult, error) {
+func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*CallbackResult, error) {
 	var err error
 	deviceType, deviceID, err = normalizeOIDCDevice(deviceType, deviceID)
 	if err != nil {
@@ -263,7 +263,7 @@ type tokenEndpointResponse struct {
 }
 
 // exchangeCode POSTs the authorization code to TokenDance ID's token endpoint.
-func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redirectURI string) (*tokenEndpointResponse, error) {
+func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirectURI string) (*tokenEndpointResponse, error) {
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)

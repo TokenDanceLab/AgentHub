@@ -27,7 +27,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/glebarez/sqlite"
 )
 
@@ -183,7 +183,7 @@ func setupE2EDB(t *testing.T) *gorm.DB {
 }
 
 // setupE2EService creates a full OIDC service wired to a mock TokenDance ID server.
-func setupE2EService(t *testing.T) (*service.OIDCService, *httptest.Server, *rsa.PrivateKey, *gorm.DB, *miniredis.Miniredis) {
+func setupE2EService(t *testing.T) (*oidc.Service, *httptest.Server, *rsa.PrivateKey, *gorm.DB, *miniredis.Miniredis) {
 	t.Helper()
 
 	// 1. Start mock TokenDance ID server
@@ -220,7 +220,7 @@ func setupE2EService(t *testing.T) (*service.OIDCService, *httptest.Server, *rsa
 		RefreshTTL: 720 * time.Hour,
 	}
 
-	svc := service.NewOIDCService(db, oidcCfg, jwtCfg, cacheClient)
+	svc := oidc.NewService(db, oidcCfg, jwtCfg, cacheClient)
 	return svc, mockServer, privKey, db, mr
 }
 
@@ -560,7 +560,7 @@ func TestTokenDanceOIDC_E2E_TokenEndpointErrors(t *testing.T) {
 		RefreshTTL: 720 * time.Hour,
 	}
 
-	svc := service.NewOIDCService(db, oidcCfg, jwtCfg, cacheClient)
+	svc := oidc.NewService(db, oidcCfg, jwtCfg, cacheClient)
 	ctx := context.Background()
 
 	verifier := "e2e-token-error-test-verifier-43-chars-here"
