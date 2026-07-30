@@ -140,6 +140,12 @@ export const DESKTOP_GLASS_SURFACE_RULES = [
     appliesTo: ['desktop', 'web', 'mobile'],
     rule: 'Glass cards use --glass-card-* + --glass-backdrop-filter tokens (white frosted light / translucent frosted dark). Prefer Card variant="glass" over raw rgba/blur hardcodes.',
   },
+  {
+    id: 'content-anchored',
+    label: 'Content surfaces anchored',
+    appliesTo: ['desktop', 'web', 'mobile'],
+    rule: 'Message bubbles and inline content surfaces use --td-glass-content-* (fixed alpha, not frosted) and do NOT track the panel-level --glass-bg-* slider. Only chrome/panels track adjustable glass.',
+  },
 ] as const satisfies readonly DesignSurfaceRule[];
 
 export function getGlassTokenAlias(alias: string): GlassTokenAlias | undefined {
