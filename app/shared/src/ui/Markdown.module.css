@@ -173,8 +173,16 @@
   max-width: 100%;
 }
 
+/* ADR: The PreTag <div> receives inline `overflow: auto` from oneDark's
+   pre[class*="language-"] style (react-syntax-highlighter useInlineStyles=true
+   applies theme values as inline styles, not a <style> tag). Inline
+   overflow:auto already sets overflow-x:auto — same value as this rule, so
+   no !important needed. This selector's real job is max-width:100% (no inline
+   competitor). If a future theme swap or customStyle change diverges the
+   inline overflow, re-add !important — inline specificity (1,0,0,0) is
+   unbeatable by selectors. */
 .codeBlockWrapper > div {
-  overflow-x: auto !important;
+  overflow-x: auto;
   max-width: 100%;
 }
 
