@@ -48,6 +48,9 @@ export function useProjectEditor({
     setDraft({
       name: activeProject.name,
       description: activeProject.description,
+      ...(activeProject.themeColor
+        ? { themeColor: activeProject.themeColor }
+        : {}),
     });
   }, [activeProject, editorMode]);
 
@@ -64,6 +67,7 @@ export function useProjectEditor({
     setDraft({
       name: project.name,
       description: project.description,
+      ...(project.themeColor ? { themeColor: project.themeColor } : {}),
     });
     setLocalActionError(undefined);
     setEditorMode('update');
@@ -80,9 +84,10 @@ export function useProjectEditor({
   }
 
   async function submitProjectEdit(): Promise<void> {
-    const nextDraft = {
+    const nextDraft: ProjectDraft = {
       name: draft.name.trim(),
       description: draft.description.trim(),
+      ...(draft.themeColor ? { themeColor: draft.themeColor } : {}),
     };
     if (!nextDraft.name) return;
 

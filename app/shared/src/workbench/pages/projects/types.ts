@@ -61,6 +61,13 @@ export interface ProjectInfo {
 export interface ProjectDraft {
   name: string;
   description: string;
+  /**
+   * Per-folder accent color chosen in the editor palette picker. Carried
+   * through the create/update draft so the owning shell can persist it onto
+   * ProjectInfo.themeColor. Undefined falls back to the product default
+   * (--primary). See folderThemeColors.ts SSOT.
+   */
+  themeColor?: FolderThemeColor;
 }
 
 export type ProjectFilter = 'all' | 'running' | 'completed' | 'archived';

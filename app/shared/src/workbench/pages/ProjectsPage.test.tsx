@@ -184,3 +184,80 @@ describe('ProjectsPage per-folder theme color', () => {
     expect(document.documentElement.hasAttribute('data-folder-accent')).toBe(false);
   });
 });
+
+describe('ProjectsPage theme color picker', () => {
+  function enterCreateEditor() {
+    const onProjectCreate = vi.fn(async () => undefined);
+    const onNewProject = vi.fn();
+
+    render(
+      <ProjectsPage
+        {...baseProps({
+          onProjectCreate,
+          onNewProject,
+        })}
+      />,
+    );
+
+    const emptyState = screen.getByRole('region', { name: '暂无项目' });
+    fireEvent.click(within(emptyState).getByRole('button', { name: '创建第一个项目' }));
+    return { onProjectCreate };
+  }
+
+  it('renders one swatch per palette color in the create editor', () => {
+    enterCreateEditor();
+
+    const swatches = screen.getAllByRole('radio', { name: /Plum|Blue|Emerald|Amber|Rose|Violet|Cyan|Orange/ });
+    expect(swatches).toHaveLength(8);
+    // No swatch is selected when the create draft starts empty.
+    for (const swatch of swatches) {
+      expect(swatch).toHaveAttribute('aria-checked', 'false');
+    }
+  });
+
+  it('selects a swatch on click and reflects it in the draft', () => {
+    enterCreateEditor();
+
+    const blue = screen.getByRole('radio', { name: 'Blue' });
+    fireEvent.click(blue);
+
+    expect(blue).toHaveAttribute('aria-checked', 'true');
+    // Every other swatch stays unselected.
+    const others = screen.getAllByRole('radio', { name: /Plum|Emerald|Amber|Rose|Violet|Cyan|Orange/ });
+    for (const swatch of others) {
+      expect(swatch).toHaveAttribute('aria-checked', 'false');
+    }
+  });
+
+  it('deselects the active swatch when it is clicked again', () => {
+    enterCreateEditor();
+
+    const amber = screen.getByRole('radio', { name: 'Amber' });
+    fireEvent.click(amber);
+    expect(amber).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(amber);
+    expect(amber).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('pre-selects the active project themeColor when editing', () => {
+    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const [first] = projects;
+    const onProjectUpdate = vi.fn(async () => undefined);
+
+    render(
+      <ProjectsPage
+        {...baseProps({
+          projects,
+          activeProjectId: first!.id,
+          onProjectUpdate,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑项目' }));
+
+    // DEFAULT_PROJECTS[0].themeColor === 'emerald'
+    expect(screen.getByRole('radio', { name: 'Emerald' })).toHaveAttribute('aria-checked', 'true');
+  });
+});
