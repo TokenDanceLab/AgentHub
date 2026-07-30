@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -63,29 +62,8 @@ func NewOpenCodeAdapter(binaryPath string) *OpenCodeAdapter {
 }
 
 // resolveOpenCodeCommand handles Windows .cmd shim bypass for the opencode CLI.
-// Mirrors the same pattern used for Claude Code and Codex adapters.
 func resolveOpenCodeCommand(binaryPath string, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error), goos string) (string, []string, bool) {
-	resolved, err := lookPath(binaryPath)
-	if err != nil {
-		return binaryPath, nil, false
-	}
-
-	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
-		return resolved, nil, true
-	}
-
-	// The npm opencode.cmd shim may corrupt multiline prompts via %* forwarding.
-	// Call the Node entrypoint directly for reliable argv passing.
-	script := filepath.Join(filepath.Dir(resolved), "node_modules", "opencode", "bin", "opencode.js")
-	info, err := stat(script)
-	if err != nil || info.IsDir() {
-		return resolved, nil, true
-	}
-	nodePath, err := lookPath("node")
-	if err != nil {
-		return resolved, nil, true
-	}
-	return nodePath, []string{script}, true
+	return resolveNodeCLICommand(binaryPath, "node_modules/opencode/bin/opencode.js", lookPath, stat, goos)
 }
 
 func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
