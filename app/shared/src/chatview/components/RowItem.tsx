@@ -10,6 +10,7 @@ import {
 } from './Icons'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
+import MarkdownContent from '../../ui/Markdown'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -52,6 +53,46 @@ function stableInteractionId(item: RowItemType): string {
   return item.type === 'tool' && item.toolCallId ? `call-${item.toolCallId}` : item.id
 }
 
+/** Approval request kind inferred from payload structure. */
+type ApKind = 'command' | 'diff' | 'plan' | 'allowed_prompts' | 'web' | 'json'
+
+interface ParsedAp {
+  kind: ApKind
+  command?: string
+  cwd?: string
+  diffText?: string
+  planMarkdown?: string
+  planEntries?: { text: string; status?: string }[]
+  allowedPrompts?: { tool?: string; prompt: string }[]
+  url?: string
+  query?: string
+  jsonPreview?: string
+  textContent?: string
+}
+
+/** Parse apReason to determine approval kind and extract structured data.
+ *  Priority: 1) explicit `apKind` field  2) infer from JSON shape  3) plain text. */
+function parseApKind(item: RowItemType): ParsedAp {
+  if (item.apKind) {
+    const kind = item.apKind.toLowerCase() as ApKind
+    if (['command', 'diff', 'plan', 'allowed_prompts', 'web', 'json'].includes(kind)) {
+      return { kind }
+    }
+  }
+  if (!item.apReason) return { kind: 'json', textContent: '' }
+  try {
+    const p = JSON.parse(item.apReason)
+    if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('not obj')
+    if (p.command) return { kind: 'command', command: p.command, cwd: p.cwd }
+    if (p.diff) return { kind: 'diff', diffText: p.diff }
+    if (p.plan || p.plan_markdown || p.plan_entries) return { kind: 'plan', planMarkdown: p.plan || p.plan_markdown, planEntries: p.plan_entries || p.planEntries }
+    if (p.allowed_prompts || p.allowedPrompts) return { kind: 'allowed_prompts', allowedPrompts: p.allowed_prompts || p.allowedPrompts }
+    if (p.url) return { kind: 'web', url: p.url, query: p.query }
+    return { kind: 'json', jsonPreview: JSON.stringify(p, null, 2) }
+  } catch { /* not JSON */ }
+  return { kind: 'json', textContent: item.apReason }
+}
+
 interface Props {
   item: RowItemType
   onToggle?: (id: string) => void
@@ -77,16 +118,24 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const userToggledRef = useRef(false)
+  const thinkStartRef = useRef<number | null>(null)
+  const [thinkDuration, setThinkDuration] = useState<number | undefined>(undefined)
   const isOpen = item.type === 'route' ? true : open
 
   // Think cards: auto-open when running, auto-collapse 1s after done
   // (once semantics: once user manually toggles, never auto-collapse)
+  // Also tracks think duration for "Thought for Ns" display (QW6).
   useEffect(() => {
     if (item.type !== 'think' || !item.collapsible) return
     if (userToggledRef.current) return
     if (item.status === 'running') {
       setOpen(true)
+      if (thinkStartRef.current === null) thinkStartRef.current = Date.now()
     } else {
+      if (thinkStartRef.current !== null) {
+        setThinkDuration(Math.ceil((Date.now() - thinkStartRef.current) / 1000))
+        thinkStartRef.current = null
+      }
       const timer = setTimeout(() => {
         if (!userToggledRef.current) setOpen(false)
       }, 1000)
@@ -157,6 +206,13 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               </span>
             )}
             </>
+          ) : item.type === 'think' ? (
+            <>
+              <span className={item.status === 'running' ? 'think-shimmer' : ''}>{labelText}</span>
+              {item.status !== 'running' && item.status !== 'fail' && thinkDuration != null && (
+                <span className="think-duration">{t('card.think.thoughtFor', { duration: String(thinkDuration) })}</span>
+              )}
+            </>
           ) : labelText}
         </span>
         {item.extra && <span className="row-extra">{item.extra}</span>}
@@ -184,10 +240,71 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               <div className="code-lines">{item.diffLines.map((l,i) => <div key={i} className={`code-line ${l.type}`}><span className="code-text">{l.text}</span></div>)}</div>
             </div>
           )}
-          {item.apReason && (<>
-            <div className="ap-reason">{item.apReason}</div>
-            {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" aria-label={t('card.approval.approve')} onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" aria-label={t('card.approval.deny')} onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
-          </>)}
+          {item.apReason && (() => {
+            const ap = parseApKind(item)
+            return (
+              <div className="ap-scroll">
+                {ap.kind === 'command' && (
+                  <div className="ap-section">
+                    <div className="ap-cmd">
+                      <div className="ap-cmd-head"><IconTerminal size={12} /><span>{t('card.approval.title')}</span></div>
+                      {ap.command && <div className="ap-cmd-body">{ap.command}</div>}
+                      {ap.cwd && <div className="ap-cwd">cwd: {ap.cwd}</div>}
+                    </div>
+                  </div>
+                )}
+                {ap.kind === 'diff' && (
+                  <div className="ap-section">
+                    <div className="code-block">
+                      <div className="code-head"><span className="code-head-left"><FileTypeIcon item={item} /><span>{t('card.approval.title')}</span></span></div>
+                      <div className="code-lines">
+                        {(ap.diffText || '').split('\n').map((line, i) => {
+                          const t2 = line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx'
+                          return <div key={i} className={`code-line ${t2}`}><span className="code-num">{i + 1}</span><span className="code-text">{line}</span></div>
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {ap.kind === 'plan' && (
+                  <div className="ap-section ap-plan">
+                    {ap.planMarkdown ? <MarkdownContent content={ap.planMarkdown} /> : null}
+                    {ap.planEntries && ap.planEntries.length > 0 && (
+                      <div className="ap-allowed-list">
+                        {ap.planEntries.map((e, i) => (
+                          <span key={i} className="ap-pill">{e.text}{e.status ? ` (${e.status})` : ''}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {ap.kind === 'allowed_prompts' && (
+                  <div className="ap-section">
+                    <div className="ap-allowed-list">
+                      {ap.allowedPrompts?.map((item2, i) => (
+                        <span key={i} className="ap-pill">
+                          {item2.tool && <span className="ap-pill-tool">{item2.tool}</span>}
+                          <span>{item2.prompt}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {ap.kind === 'web' && (
+                  <div className="ap-section ap-web">
+                    {ap.url ? <a href={ap.url} target="_blank" rel="noopener noreferrer">{ap.url}</a> : null}
+                    {ap.query && <div className="ap-json">{ap.query}</div>}
+                  </div>
+                )}
+                {ap.kind === 'json' && (
+                  <div className="ap-section">
+                    <div className="ap-json">{ap.jsonPreview || ap.textContent || ''}</div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+          {item.apReason && item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" aria-label={t('card.approval.approve')} onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" aria-label={t('card.approval.deny')} onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           {item.type === 'preview' && item.url && (
             <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
               <div className="preview-thumb" aria-hidden="true">
