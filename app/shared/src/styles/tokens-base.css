@@ -443,6 +443,23 @@ body {
   }
 }
 
+/* ── Global thin scrollbar theme (codeg os-theme-codeg parity) ──────────
+   Webkit/Chromium uses ::-webkit-scrollbar; Firefox uses scrollbar-width/color
+   declared in :root above. 6px default, glass-tinted, theme-adaptive via
+   --td-glass-content-border (dark theme keeps black edge — "never white outlines").
+   Existing per-component scrollbar-width:thin declarations remain authoritative
+   for their scope; this is the global baseline. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--td-glass-content-border, rgba(0, 0, 0, 0.14));
+  border-radius: var(--r-full, 9999px);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--glass-border-strong, rgba(0, 0, 0, 0.2));
+}
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* Adaptive chrome hairline upgrade — color-mix() auto-inverts across light/dark
    themes and stays visible on frosted glass veils where a fixed --border washes out.
    Falls back to --bdr (set in :root above) where color-mix() is unsupported. */
