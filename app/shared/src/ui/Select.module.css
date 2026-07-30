@@ -92,16 +92,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-3) 28%, transparent) transparent;
-}
-
-.dropdown::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dropdown::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-3) 22%, transparent);
-  border-radius: 2px;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .dropdownUp {
@@ -195,10 +186,6 @@
     0 24px 68px -28px rgba(0, 0, 0, 0.72),
     0 12px 30px -18px rgba(0, 0, 0, 0.56),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-[data-theme='dark'] .dropdown::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme='dark'] .option:hover,
