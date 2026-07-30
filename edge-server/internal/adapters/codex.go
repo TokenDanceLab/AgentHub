@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -50,32 +49,8 @@ func NewCodexAdapter(binaryPath, model string) *CodexAdapter {
 	}
 }
 
-type fileStatFunc func(string) (os.FileInfo, error)
-type lookPathFunc func(string) (string, error)
-
-func resolveCodexCommand(binaryPath string, lookPath lookPathFunc, stat fileStatFunc, goos string) (string, []string, bool) {
-	resolved, err := lookPath(binaryPath)
-	if err != nil {
-		return binaryPath, nil, false
-	}
-
-	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
-		return resolved, nil, true
-	}
-
-	// The npm codex.cmd shim forwards args through %*, which corrupts multiline
-	// prompts when Edge launches it via os/exec. Call the Node entrypoint
-	// directly so prompts are passed as real argv values.
-	script := filepath.Join(filepath.Dir(resolved), "node_modules", "@openai", "codex", "bin", "codex.js")
-	info, err := stat(script)
-	if err != nil || info.IsDir() {
-		return resolved, nil, true
-	}
-	nodePath, err := lookPath("node")
-	if err != nil {
-		return resolved, nil, true
-	}
-	return nodePath, []string{script}, true
+func resolveCodexCommand(binaryPath string, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error), goos string) (string, []string, bool) {
+	return resolveNodeCLICommand(binaryPath, "node_modules/@openai/codex/bin/codex.js", lookPath, stat, goos)
 }
 
 func (a *CodexAdapter) Metadata() AdapterMetadata {
