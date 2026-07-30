@@ -164,6 +164,23 @@ func TestMigration0047ExecutionTargetsCreatesActiveLocalEdgeDeviceUniqueness(t *
 	requireSQL(t, normalizedDown, "drop index if exists idx_execution_targets_active_local_edge_device_unique")
 }
 
+func TestMigration0057DevicesRestoresPrimaryKey(t *testing.T) {
+	up := readMigration(t, "0057_devices_primary_key.up.sql")
+	down := readMigration(t, "0057_devices_primary_key.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	requireSQL(t, normalizedUp, "from pg_constraint")
+	requireSQL(t, normalizedUp, "where conrelid = 'devices'::regclass")
+	requireSQL(t, normalizedUp, "and contype = 'p'")
+	requireSQL(t, normalizedUp, "alter table devices add constraint devices_pkey primary key (id)")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "select 1")
+	if strings.Contains(normalizedDown, "drop constraint") {
+		t.Fatal("0057 down migration must not remove the foundational devices primary key")
+	}
+}
+
 func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 
