@@ -58,6 +58,13 @@ export interface UnifiedComposerProps {
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   inputRef?: Ref<HTMLTextAreaElement>;
   targetLabel?: string | undefined;
+  /**
+   * Whether an agent run is currently active. When true (and `onCancel` is
+   * provided) the send button morphs into a stop button (#1462 CF13).
+   */
+  isRunning?: boolean | undefined;
+  /** Cancel the active agent run (stop button handler). */
+  onCancel?: (() => void) | undefined;
 }
 
 export interface ComposerChromeVisibility {

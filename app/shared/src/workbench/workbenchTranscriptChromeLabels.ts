@@ -109,6 +109,7 @@ export function cardActionLabel(
     export: t('toast.exportDraft'),
     apps: t('toast.appsOpened'),
     delete: t('toast.deleteQueued'),
+    edit: t('toast.editStarted'),
   };
   return labels[action] ?? t('toast.actionRecorded');
 }

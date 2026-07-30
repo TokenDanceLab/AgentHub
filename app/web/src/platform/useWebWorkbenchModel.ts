@@ -274,6 +274,23 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     },
   });
 
+  // Cancel the active agent task (#1462 CF13). The Hub broadcasts an
+  // `agent.cancel` WS frame on success; the realtime layer then clears the
+  // agent-activity store and flips the task status to `cancelled`, so we only
+  // need to fire the REST here and refresh the task caches on settle.
+  const cancelAgentTaskMut = useMutation({
+    mutationFn: (taskId: string) => hubClient.cancelAgentTask(taskId),
+    onSettled: () => {
+      if (activeHubSessionId) {
+        void queryClient.invalidateQueries({ queryKey: webActiveAgentTaskQueryKey(activeHubSessionId) });
+      }
+      if (activeAgentTaskId) {
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId] });
+      }
+    },
+  });
+
   const pinMessageMut = useMutation({
     mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
       hubClient.pinMessage(messageId, sessionId),
@@ -428,8 +445,28 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     [surfacedTranscript],
   );
 
+  // An agent run is "active" while any tracked agent is dispatching / thinking
+  // / streaming, or the recorded task status is still `running` (#1462 CF13).
+  // The agent-activity store is the live signal (fed by WS events); the task
+  // status covers the brief window before the first activity event lands.
+  const isAgentRunning =
+    agentActivity.activeAgents.some(
+      (agent) =>
+        agent.status === 'dispatching' ||
+        agent.status === 'thinking' ||
+        agent.status === 'streaming',
+    ) || activeAgentTask.data?.status === 'running';
+
+  const onCancelRun = useCallback(() => {
+    const taskId = activeAgentTask.data?.taskId;
+    if (!taskId) return;
+    void cancelAgentTaskMut.mutateAsync(taskId).catch(() => {});
+  }, [activeAgentTask.data?.taskId, cancelAgentTaskMut]);
+
   return {
     activeConversationId,
+    isAgentRunning,
+    onCancelRun,
     contacts: resolveHubContacts(contacts.data as HubContactLike[] | undefined, hubReady, dataMode),
     contactsActions: hubReady ? {
       onSearchUser: (query: string) => searchUser.mutateAsync(query),

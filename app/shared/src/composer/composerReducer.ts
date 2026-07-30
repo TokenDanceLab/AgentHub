@@ -12,6 +12,7 @@ export function createInitialComposerState(conversationId: string): ComposerStat
     submitState: 'idle',
     replyTo: null,
     quote: null,
+    editingMessageId: null,
   };
 }
 
@@ -27,6 +28,8 @@ export function composerReducer(
             ...state,
             conversationId: action.conversationId,
             submitState: 'idle',
+            // A stale edit context must not survive a conversation switch (#1462).
+            editingMessageId: null,
           };
     case 'setText':
       return {
@@ -75,6 +78,14 @@ export function composerReducer(
         ...state,
         quote: action.quote,
       };
+    case 'setEditingMessage':
+      return {
+        ...state,
+        editingMessageId: action.messageId,
+        // Clearing an in-flight edit must restore idle submit chrome; setting a
+        // new edit target must not inherit a stale error state.
+        submitState: state.submitState === 'error' ? 'idle' : state.submitState,
+      };
     case 'addAttachment':
       if (state.attachments.some((attachment) => attachment.id === action.attachment.id)) {
         return state;
@@ -96,7 +107,8 @@ export function composerReducer(
         attachments: [],
         submitState: 'idle',
         replyTo: null,
-      quote: null,
+        quote: null,
+        editingMessageId: null,
       };
     default:
       return state;
@@ -118,5 +130,6 @@ export function buildComposerIntent(state: ComposerState): ComposerIntent {
     ...(state.workDir.trim() ? { workDir: state.workDir.trim() } : {}),
     ...(state.replyTo ? { replyTo: state.replyTo } : {}),
     ...(state.quote ? { quote: state.quote } : {}),
+    ...(state.editingMessageId ? { editingMessageId: state.editingMessageId } : {}),
   };
 }

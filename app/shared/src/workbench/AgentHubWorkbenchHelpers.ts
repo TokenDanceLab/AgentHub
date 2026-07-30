@@ -260,6 +260,9 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'highlightedBlockId', props.highlightedBlockId);
   assignDefined(frameProps, 'onHighlightEnd', props.onHighlightEnd);
   assignDefined(frameProps, 'connectionStatus', props.connectionStatus);
+  assignDefined(frameProps, 'isAgentRunning', props.isAgentRunning);
+  assignDefined(frameProps, 'onCancelRun', props.onCancelRun);
+  assignDefined(frameProps, 'onEditMessage', props.onEditMessage);
   assignDefined(frameProps, 'children', children);
 
   return frameProps;

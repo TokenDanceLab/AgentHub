@@ -90,11 +90,33 @@ export function ComposerTargetPicker({
 export function ComposerSendButton({
   hasMentions,
   submitDisabled,
+  isRunning,
+  onCancel,
 }: {
   hasMentions: boolean;
   submitDisabled: boolean;
+  /**
+   * When true (and `onCancel` is provided) the send button morphs into a stop
+   * button that cancels the active agent run (#1462 CF13). Reuses the send
+   * button chrome so the hit target stays stable across the morph.
+   */
+  isRunning?: boolean | undefined;
+  onCancel?: (() => void) | undefined;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  if (isRunning && onCancel) {
+    return (
+      <button
+        aria-label={t('action.stopRun')}
+        className={styles.sendButton}
+        data-running="true"
+        type="button"
+        onClick={onCancel}
+      >
+        <DesignNavIcon name="stop" />
+      </button>
+    );
+  }
   return (
     <button
       aria-label={hasMentions ? t('action.startAgentTask') : t('profile.sendMessage')}
