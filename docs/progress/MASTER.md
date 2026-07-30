@@ -76,7 +76,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 签名发布 / WS 增量 SPEC | #1403 · #1411 |
 | PROPOSAL（**CLOSED 未合并** 2026-07-29，提案文档归档可查） | #1412 · #1413 · #1414 |
 | P3 裁决项（A-V4/D-V3 closed；D-V2 评估为低价值；D-V1 -41% 完成；A-V1/A-V3 **RFC 已写**，待管理员定档） | #1469 · #1470 · #1471 · #1472 |
-| D-V1 edge run() 持续重构（Step 2: collectAndWaitOutput 40 行提取，累计 418→246 行 -41%） | 进行中 |
+| D-V1 edge run() 持续重构（Step 3: completeRunAttempt + handleFaultEscalation 提取，累计 418→115 行 -73%，三阶段管道 + outcome 枚举 + goto escalate） | 进行中 |
 
 Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基准）+ v0.22.1-DELTA.md（45 commits 增量分析）。综合审计：`agenthub-comprehensive-audit-2026-07-29.md` / `agenthub-observability-audit.md`（A/D/T 源报告已被综合/证伪，已清理）。
 
@@ -113,6 +113,7 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 | 2026-07-30 | **D-V3 完成**（#1470）：startEventSubscriptions 239 行拆为 5 域方法（message/agent/team/contact/session），主函数退化为 7 行分发器。**D-V2 评估**：PostRuns 357 行实为清晰线性 pipeline，非 god function，审计高估——跳过低价值重构。**D-V1 评估**：edge run() 418 行含会话重试循环 + fault escalation 交接 + 多并发原语，高价值但高风险，需深入理解 #867 语义后专项设计 |
 | 2026-07-30 | **D-V1 Step 1**：buildAndStartProcess 138 行提取到 process_executor_build.go（新文件），run() 从 418→281 行（-33%）。提取的是循环体中最机械的构建+启动阶段，每条错误路径自己发事件，调用者仅需 return。控制流决策（continue/break）未提取，留待后续步骤。lifecycle tests 全过。 |
 | 2026-07-30 | **D-V1 Step 2**：collectAndWaitOutput 40 行提取到 process_executor_build.go，run() 从 281→246 行。循环体现在是清晰的 3 阶段管道：(1) buildAndStart → (2) collectAndWait → (3) evaluate+finish。累计 418→246 行（-41%）。lifecycle tests 全过。 |
+| 2026-07-30 | **D-V1 Step 3**：completeRunAttempt（Phase 3 决策/完成）+ handleFaultEscalation（循环后 #867 后继交接）提取到 process_executor_build.go。引入 attemptOutcome 枚举（done/retry/break）驱动调用者控制流，runCtx 改指针以便会话重试就地重写。run() 循环体现为 switch+goto escalate 单标签。run() 246→115 行，累计 418→115（-73%）。lifecycle tests + adapters tests 全过，go vet clean。|
 | 2026-07-30 | **God function 全仓扫描**：扫出 19 个 >150 行函数。3 个真正 god function 评估：PostRuns 358 行（HTTP handler，长但线性，跳过）、StartTeamRun 226 行（已标 #1385）、HandleSubAgentFailure 158 行（已结构化 Step 0-6，委托子函数，跳过）。其余 16 个为长但线性的路由/注册/wiring/parser。D-V1 仍是唯一高价值重构——已完成（-41%）。|
 | 2026-07-30 | **ACP Spike Phase 2 prep**：把 ACP session/update → run.agent.* 翻译提取为纯映射器 `acp_events.go`（无 I/O、无状态、前向兼容），ParseStream 接线通知/响应，阻塞请求留 Phase 2。8 个单测覆盖全部映射类型 + 3 个有意不映射类型 + prompt-result 边界。adapters 全测试过。|
 | 2026-07-30 | **PROPOSAL 状态澄清**：#1412/#1413/#1414 经查于 2026-07-29 CLOSED 未合并（非永久挂起）。MASTER open 表从「NEEDS_FIX 不 merge」更正为「CLOSED 未合并，归档可查」。|
