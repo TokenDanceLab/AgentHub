@@ -1,5 +1,6 @@
-import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
+import { ArrowDown } from 'lucide-react'
 import { UserMessage } from './UserMessage'
 import { AgentGroup } from './AgentGroup'
 import { DateDivider } from './DateDivider'
@@ -142,13 +143,15 @@ export const Transcript = memo(function Transcript({ items, chatMode, onAgentCli
   const previousIdentitiesRef = useRef<string[]>([])
   const followAfterUserSubmitRef = useRef(false)
   const itemsIdentity = useMemo(() => items.map(itemIdentity).join('\n'), [items])
+  const [nearBottom, setNearBottom] = useState(true)
 
   const handleScroll = useCallback(() => {
     const element = transcriptRef.current
     if (!element) return
-    const nearBottom = isNearBottom(element)
-    shouldAutoFollowRef.current = nearBottom
-    if (!nearBottom) followAfterUserSubmitRef.current = false
+    const nb = isNearBottom(element)
+    setNearBottom(nb)
+    shouldAutoFollowRef.current = nb
+    if (!nb) followAfterUserSubmitRef.current = false
   }, [])
 
   useLayoutEffect(() => {
@@ -191,6 +194,17 @@ export const Transcript = memo(function Transcript({ items, chatMode, onAgentCli
         if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
         return null
       })}
+      {/* Scroll-to-bottom button — appears when user has scrolled up */}
+      {!nearBottom && (
+        <button
+          className="scroll-to-bottom-btn"
+          onClick={() => scrollToBottom(transcriptRef.current!)}
+          aria-label="回到底部"
+          type="button"
+        >
+          <ArrowDown size={18} />
+        </button>
+      )}
     </div>
   )
 })

@@ -1,0 +1,42 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   TYPING INDICATOR — ephemeral "X is typing..." bar
+   ══════════════════════════════════════════════════════════════════════ */
+
+.typingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font: 400 0.75rem/1.4 var(--font-sans);
+  color: var(--text-3);
+  animation: typingFadeIn 0.2s ease-out;
+  flex-shrink: 0;
+}
+
+.typingDots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.typingDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: typingBounce 1.4s ease-in-out infinite both;
+}
+
+.typingDot:nth-child(1) { animation-delay: 0s; }
+.typingDot:nth-child(2) { animation-delay: 0.2s; }
+.typingDot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
