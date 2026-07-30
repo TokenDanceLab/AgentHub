@@ -45,6 +45,12 @@ vi.mock('react-i18next', () => ({
         'card.preview.ready': 'Preview',
         'card.preview.running': 'Preview loading',
         'card.preview.fail': 'Preview failed',
+        'card.approval.confirmApprove': 'Confirm approve?',
+        'card.approval.risk.low': 'Low risk',
+        'card.approval.risk.medium': 'Medium risk',
+        'card.approval.risk.high': 'High risk',
+        'card.approval.risk.critical': 'Critical risk',
+        'card.approval.kbdHint': 'A Approve · R Deny · Esc Collapse',
       };
       let result = resources[key] ?? key;
       if (options) {
@@ -286,5 +292,150 @@ describe('RowItem approval card (QW4)', () => {
     };
     const { container } = render(<RowItem item={item} />);
     expect(container.querySelector('.ap-scroll')).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T16: keyboard shortcuts (A/R/Esc) + critical second-confirm + risk badge
+// ---------------------------------------------------------------------------
+describe('RowItem approval card (T16)', () => {
+  const baseWaiting = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'ap-t16', type: 'approval', label: 'approval', status: 'waiting',
+    collapsible: true, open: true, apReason: 'test',
+    ...overrides,
+  });
+
+  // ── Risk badge ───────────────────────────────────────────────
+  it('renders RiskBadge when riskLevel is present', () => {
+    const { container } = render(<RowItem item={baseWaiting({ riskLevel: 'high' })} />);
+    // RiskBadge uses CSS-module hashed classes; we pass a stable global
+    // `ap-risk-badge` class from RowItem so it's queryable here.
+    const badge = container.querySelector('.ap-actions .ap-risk-badge');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toContain('High risk');
+  });
+
+  it('does not render a badge when riskLevel is absent', () => {
+    const { container } = render(<RowItem item={baseWaiting()} />);
+    expect(container.querySelector('.ap-risk-badge')).toBeNull();
+  });
+
+  // ── Keyboard: A / R / Esc (non-critical) ─────────────────────
+  it('A key approves on non-critical approval', () => {
+    const onApprove = vi.fn();
+    const { container } = render(<RowItem item={baseWaiting()} onApprove={onApprove} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'a' });
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+  });
+
+  it('uppercase A approves too (case-insensitive)', () => {
+    const onApprove = vi.fn();
+    const { container } = render(<RowItem item={baseWaiting()} onApprove={onApprove} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'A' });
+    expect(onApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it('R key denies', () => {
+    const onReject = vi.fn();
+    const { container } = render(<RowItem item={baseWaiting()} onReject={onReject} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'r' });
+    expect(onReject).toHaveBeenCalledTimes(1);
+    expect(onReject).toHaveBeenCalledWith('ap-t16');
+  });
+
+  it('Escape collapses the approval card', () => {
+    const { container } = render(<RowItem item={baseWaiting()} />);
+    // row-bd present while open
+    expect(container.querySelector('.row-bd')).not.toBeNull();
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'Escape' });
+    expect(container.querySelector('.row-bd')).toBeNull();
+  });
+
+  it('modifier combos are ignored (Ctrl+R does not deny)', () => {
+    const onReject = vi.fn();
+    const { container } = render(<RowItem item={baseWaiting()} onReject={onReject} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'r', ctrlKey: true });
+    expect(onReject).not.toHaveBeenCalled();
+  });
+
+  it('ignores keys when status is not waiting', () => {
+    const onApprove = vi.fn();
+    const { container } = render(
+      <RowItem item={baseWaiting({ status: 'ok' })} onApprove={onApprove} />,
+    );
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'a' });
+    expect(onApprove).not.toHaveBeenCalled();
+  });
+
+  // ── critical second-confirm (mouse) ──────────────────────────
+  it('critical: first click arms confirm, second click fires approve', () => {
+    const onApprove = vi.fn();
+    const { container } = render(
+      <RowItem item={baseWaiting({ riskLevel: 'critical' })} onApprove={onApprove} />,
+    );
+    const approveBtn = container.querySelector('.ap-approve')!;
+    // critical approve button is red
+    expect(approveBtn.classList.contains('critical')).toBe(true);
+    // first click arms — no approve fired, button flips to confirm text
+    fireEvent.click(approveBtn);
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(approveBtn.classList.contains('confirming')).toBe(true);
+    expect(approveBtn.textContent).toContain('Confirm approve?');
+    // second click fires
+    fireEvent.click(approveBtn);
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+  });
+
+  // ── critical second-confirm (keyboard) ───────────────────────
+  it('critical: A key arms, second A fires approve', () => {
+    const onApprove = vi.fn();
+    const { container } = render(
+      <RowItem item={baseWaiting({ riskLevel: 'critical' })} onApprove={onApprove} />,
+    );
+    const root = container.querySelector('.row-item')!;
+    fireEvent.keyDown(root, { key: 'a' });
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(container.querySelector('.ap-approve')!.classList.contains('confirming')).toBe(true);
+    fireEvent.keyDown(root, { key: 'a' });
+    expect(onApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it('critical: R cancels confirm state and denies', () => {
+    const onReject = vi.fn();
+    const { container } = render(
+      <RowItem item={baseWaiting({ riskLevel: 'critical' })} onReject={onReject} />,
+    );
+    // arm confirm
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'a' });
+    expect(container.querySelector('.ap-approve')!.classList.contains('confirming')).toBe(true);
+    // R cancels + denies
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'r' });
+    expect(container.querySelector('.ap-approve')!.classList.contains('confirming')).toBe(false);
+    expect(onReject).toHaveBeenCalledTimes(1);
+  });
+
+  // ── non-critical single click ────────────────────────────────
+  it('non-critical: single click fires approve immediately', () => {
+    const onApprove = vi.fn();
+    const { container } = render(
+      <RowItem item={baseWaiting({ riskLevel: 'medium' })} onApprove={onApprove} />,
+    );
+    const btn = container.querySelector('.ap-approve')!;
+    // medium risk approve button stays green (not critical)
+    expect(btn.classList.contains('critical')).toBe(false);
+    fireEvent.click(btn);
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+  });
+
+  // ── keyboard hint rendered ───────────────────────────────────
+  it('renders keyboard hint text', () => {
+    const { container } = render(<RowItem item={baseWaiting()} />);
+    const hint = container.querySelector('.ap-kbd-hint');
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent).toContain('A');
+    expect(hint!.textContent).toContain('R');
   });
 });
