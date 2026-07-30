@@ -121,6 +121,12 @@ export interface AgentHubWorkbenchProps {
   onHighlightEnd?: (() => void) | undefined;
   /** Called when the user requests regeneration of an agent message. Receives the block ID. */
   onRegenerate?: ((blockId: string) => void) | undefined;
+  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  isAgentRunning?: boolean | undefined;
+  /** Cancel the active agent run (stop button handler). */
+  onCancelRun?: (() => void) | undefined;
+  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
+  onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: ConnectionStatusKind | undefined;
 }

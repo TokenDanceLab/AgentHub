@@ -215,6 +215,18 @@ function WebWorkbenchRoot() {
           const messageId = blockId.replace(/^hub-message-/, '');
           void createHubClient({ getToken: getAccessToken }).regenerateAgentTask(messageId).catch(() => {});
         }}
+        isAgentRunning={workbench.isAgentRunning}
+        onCancelRun={workbench.onCancelRun}
+        onEditMessage={
+          workbench.chatActions
+            ? async (blockId: string, content: string) => {
+                await workbench.chatActions!.onEditMessage(
+                  blockId.replace(/^hub-message-/, ''),
+                  content,
+                );
+              }
+            : undefined
+        }
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker

@@ -44,6 +44,21 @@ export function cancelQuoteAction(): Extract<ComposerAction, { type: 'setQuote' 
   return { type: 'setQuote', quote: null };
 }
 
+/**
+ * Enter edit mode for an already-sent message (#1462 CF16). Carries the
+ * transcript block id of the message being edited.
+ */
+export function setEditingMessageAction(
+  messageId: string,
+): Extract<ComposerAction, { type: 'setEditingMessage' }> {
+  return { type: 'setEditingMessage', messageId };
+}
+
+/** Cancel the edit bar → clear editingMessageId. */
+export function cancelEditAction(): Extract<ComposerAction, { type: 'setEditingMessage' }> {
+  return { type: 'setEditingMessage', messageId: null };
+}
+
 /** Remove a mention chip. */
 export function removeMentionAction(
   mentionId: string,

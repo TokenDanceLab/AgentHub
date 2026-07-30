@@ -21,6 +21,7 @@ vi.mock('react-i18next', () => ({
       const resources: Record<string, string> = {
         'action.removeMention': 'Remove @{label}',
         'action.startAgentTask': 'Start agent task',
+        'action.stopRun': 'Stop',
         'action.removeAttachment': 'Remove {name}',
         'aria.composerInput': 'Composer input',
         'aria.atAgent': '@Agent',
@@ -30,8 +31,11 @@ vi.mock('react-i18next', () => ({
         'aria.agentMainChain': '@Agent main chain',
         'aria.cancelReply': 'Cancel reply',
         'aria.cancelQuote': 'Cancel quote',
+        'aria.cancelEdit': 'Cancel edit',
+        'aria.stopRun': 'Stop run',
         'aria.addAttachment': 'Add attachment',
         'profile.sendMessage': 'Send message',
+        'composer.editingMessage': 'Editing message',
       };
       let result = resources[key] ?? key;
       if (options) {
@@ -55,6 +59,7 @@ const mentionedComposer: ComposerState = {
   submitState: 'idle',
   replyTo: null,
   quote: null,
+  editingMessageId: null,
 };
 
 describe('UnifiedComposer execution target selection', () => {
@@ -136,5 +141,41 @@ describe('UnifiedComposer execution target selection', () => {
     expect(screen.getByRole('status')).toHaveTextContent('数据：真实数据');
     expect(screen.getByRole('status')).toHaveTextContent('目标：就绪 · Alpha Desktop');
     expect(screen.getByRole('status')).toHaveTextContent('Hub replay: 2 runtime events observed');
+  });
+
+  it('morphs the send button into a stop button while an agent run is active', () => {
+    const onCancel = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={mentionedComposer}
+        dispatchComposer={vi.fn()}
+        onSubmit={vi.fn()}
+        isRunning
+        onCancel={onCancel}
+      />,
+    );
+
+    const stopButton = screen.getByRole('button', { name: 'Stop' });
+    expect(stopButton).toHaveAttribute('type', 'button');
+    expect(stopButton).toHaveAttribute('data-running', 'true');
+    // The submit send button is replaced while running.
+    expect(screen.queryByRole('button', { name: 'Start agent task' })).toBeNull();
+    fireEvent.click(stopButton);
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it('shows an edit bar while editing a sent message and cancels on click', () => {
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={{ ...mentionedComposer, editingMessageId: 'hub-message-42' }}
+        dispatchComposer={dispatchComposer}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Editing message')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel edit' }));
+    expect(dispatchComposer).toHaveBeenCalledWith({ type: 'setEditingMessage', messageId: null });
   });
 });
