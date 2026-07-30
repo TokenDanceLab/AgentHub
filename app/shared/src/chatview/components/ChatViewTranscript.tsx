@@ -11,7 +11,7 @@ import { ExternalLink, Pin, X } from 'lucide-react'
 import { Transcript } from './Transcript'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
-import type { BlockActionCallback } from '../transcript-item'
+import type { BlockActionCallback, TranscriptUserItem } from '../transcript-item'
 
 // Load ChatView design tokens — scoped to .chatview, no :root pollution
 import '../design/tokens.css'
@@ -45,6 +45,12 @@ interface Props {
   } | undefined
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: 'connected' | 'connecting' | 'disconnected' | 'error' | undefined
+  /**
+   * Optional render slot rendered immediately below each user message.
+   * Used by #1406 Phase 3 to mount the inline delegation card below a
+   * dispatch-triggering user message.
+   */
+  renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
 }
 
 function EmptyState() {
@@ -78,7 +84,7 @@ class TranscriptErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, renderUserFooter }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -176,7 +182,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyState />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript items={items} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
+          <Transcript items={items} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
         </TranscriptErrorBoundary>
       )}
     </div>
