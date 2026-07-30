@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import styles from './ProjectsPage.module.css';
+import { applyFolderThemeColor } from '../../folderThemeColors';
 import {
   DEFAULT_PROJECTS,
   ProjectMain,
@@ -58,6 +59,18 @@ export function ProjectsPage({
   onArtifactClick,
 }: ProjectsPageProps): React.ReactElement {
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
+
+  // Per-folder theme color: apply the active folder's accent to <html> so the
+  // --td-accent token family (chrome/border/badge tint) tracks the active
+  // folder. Reverts to default (--primary) on unmount or when no folder.
+  const folderThemeColor = activeProject?.themeColor;
+  useEffect(() => {
+    applyFolderThemeColor(folderThemeColor);
+    return () => {
+      applyFolderThemeColor(undefined);
+    };
+  }, [folderThemeColor]);
+
   const {
     editorMode,
     draft,

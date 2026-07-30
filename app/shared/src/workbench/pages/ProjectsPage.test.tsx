@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import { ProjectsPage } from './ProjectsPage';
 import { DEFAULT_PROJECTS } from './projects';
@@ -112,5 +112,75 @@ describe('ProjectsPage detail tabs', () => {
     expect(screen.getByText('项目公告')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /运行/ }));
     expect(onTabChange).toHaveBeenCalledWith('runs');
+  });
+});
+
+describe('ProjectsPage per-folder theme color', () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-folder-accent');
+  });
+
+  it('applies the active folder accent token on render', () => {
+    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const [first] = projects;
+    expect(first?.themeColor).toBe('emerald');
+
+    const { unmount } = render(
+      <ProjectsPage
+        {...baseProps({
+          projects,
+          activeProjectId: first!.id,
+        })}
+      />,
+    );
+
+    expect(document.documentElement.getAttribute('data-folder-accent')).toBe('emerald');
+    unmount();
+    // cleanup reverts to default (no accent attribute)
+    expect(document.documentElement.hasAttribute('data-folder-accent')).toBe(false);
+  });
+
+  it('switches --td-accent token when the active folder changes', () => {
+    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const [first, second] = projects;
+    expect(first?.themeColor).toBe('emerald');
+    expect(second?.themeColor).toBe('amber');
+
+    const { rerender } = render(
+      <ProjectsPage
+        {...baseProps({
+          projects,
+          activeProjectId: first!.id,
+        })}
+      />,
+    );
+    expect(document.documentElement.getAttribute('data-folder-accent')).toBe('emerald');
+
+    rerender(
+      <ProjectsPage
+        {...baseProps({
+          projects,
+          activeProjectId: second!.id,
+        })}
+      />,
+    );
+    expect(document.documentElement.getAttribute('data-folder-accent')).toBe('amber');
+  });
+
+  it('leaves no accent attribute when the active folder has no themeColor', () => {
+    const projects: ProjectInfo[] = [
+      { ...DEFAULT_PROJECTS[0]!, id: 'plain', themeColor: undefined },
+    ];
+
+    render(
+      <ProjectsPage
+        {...baseProps({
+          projects,
+          activeProjectId: 'plain',
+        })}
+      />,
+    );
+
+    expect(document.documentElement.hasAttribute('data-folder-accent')).toBe(false);
   });
 });
