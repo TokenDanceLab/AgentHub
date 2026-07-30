@@ -92,8 +92,10 @@ describe('EmptyState', () => {
       search: { title: 'No search results', description: 'Try another keyword.' },
       filter: { title: 'No filtered results', description: 'Clear one or more filters.' },
       error: { title: 'Agents unavailable', description: 'Retry loading agents.' },
+      noPermission: { title: 'No permission', description: 'Contact admin for access.' },
     };
 
     expect(resolveEmptyStateCopy(matrix, 'filter')).toEqual(matrix.filter);
+    expect(resolveEmptyStateCopy(matrix, 'noPermission')).toEqual(matrix.noPermission);
   });
 });
