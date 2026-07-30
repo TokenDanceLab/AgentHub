@@ -92,7 +92,8 @@
   cursor: pointer;
   font-family: inherit;
   transition: background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .navRow:hover {
@@ -102,7 +103,7 @@
 
 .navRowActive {
   background: var(--surface-high);
-  border-color: var(--bdr);
+  border-color: var(--td-accent);
   box-shadow: none;
   color: var(--text-1);
 }
@@ -122,8 +123,8 @@
 }
 
 .navRowActive .navRowIcon {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--td-accent-soft);
+  color: var(--td-accent);
 }
 
 .navRowIcon svg {
@@ -319,10 +320,13 @@
 .statusBadge {
   padding: 4px 9px;
   border-radius: var(--r-full);
-  color: var(--primary);
-  background: var(--primary-light);
+  color: var(--td-accent);
+  background: var(--td-accent-soft);
   font: 600 0.75rem var(--font-sans);
   white-space: nowrap;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .newProjectBtn {

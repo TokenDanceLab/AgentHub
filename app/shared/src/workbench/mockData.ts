@@ -183,6 +183,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     description: '深度研究团队 · 5 人',
     status: '研究中',
     meta: '3 runs',
+    themeColor: 'emerald',
     members: ['Delicious233', 'Johnny', 'Trump', 'Builder', 'Researcher'],
     announcement: '题材方向已收敛到二次元卡牌 Roguelite，下一步生成 prototype checklist。',
     runs: [
@@ -207,6 +208,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     description: '产物归档完成',
     status: '待归档确认',
     meta: '12 docs',
+    themeColor: 'amber',
     members: ['Delicious233', 'Johnny', 'Reviewer'],
     announcement: 'README、roadmap、handoff 已完成，Reviewer 正在做最终归档确认。',
     runs: [
