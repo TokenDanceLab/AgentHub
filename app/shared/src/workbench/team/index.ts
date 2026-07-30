@@ -6,3 +6,8 @@ export {
   type SubagentStreamListener,
   type TeamSubagentStreamEvent,
 } from './SubagentStreamStore';
+
+export {
+  SubagentStreamOverlay,
+  type SubagentStreamOverlayProps,
+} from './SubagentStreamOverlay';

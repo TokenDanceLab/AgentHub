@@ -206,12 +206,14 @@ export * from './auxPanel';
 
 export * from './sessionImport';
 
-/* ═══ Team subagent stream (#1478 Phase C) ═══ */
+/* ═══ Team subagent stream (#1478 Phase C / #1406 Phase 2) ═══ */
 export {
   createSubagentStreamStore,
   getSubagentStreamStore,
+  SubagentStreamOverlay,
   type SubagentStreamState,
   type SubagentStreamStore,
   type SubagentStreamListener,
   type TeamSubagentStreamEvent,
+  type SubagentStreamOverlayProps,
 } from './team';
