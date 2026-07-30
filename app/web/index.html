@@ -6,6 +6,19 @@
     <title>AgentHub Web</title>
     <meta name="theme-color" content="#0071BC" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      (function(){
+        try {
+          var t = localStorage.getItem('agenthub-v4-theme');
+          if (t === 'dark') { document.documentElement.dataset.theme = 'dark'; }
+          else if (t === 'light') { document.documentElement.dataset.theme = 'light'; }
+          else if (t === 'system') {
+            document.documentElement.dataset.theme =
+              window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+        } catch(e){}
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/agenthub-icon-rounded-32.png" />
     <link rel="apple-touch-icon" href="/agenthub-icon-rounded-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
