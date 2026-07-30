@@ -79,4 +79,23 @@ describe('AgentGroup rendering', () => {
     expect(getByText('@Agent running')).toBeInTheDocument();
     expect(getByText('我会检查这次 Desktop/Web 聊天流。')).toBeInTheDocument();
   });
+
+  it('auto-expands fail cards for collapsible non-tool/non-approval/non-sub types', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-fail',
+      agent: 'Agent',
+      role: 'agent',
+      time: '',
+      rows: [
+        { id: 'preview-fail', type: 'preview', label: 'Deploy', status: 'fail', collapsible: true, content: '部署失败', extra: 'prod.example.com', url: 'https://prod.example.com', previewDomain: 'example.com', previewTitle: 'Example' },
+      ],
+      standaloneRows: [],
+      runs: [],
+      bubbles: ['处理失败。'],
+    };
+    const { container } = render(<AgentGroup item={item} chatMode="group" />);
+    const row = container.querySelector('[data-block-id="preview-fail"]');
+    expect(row).not.toBeNull();
+    expect(row!.classList.contains('open')).toBe(true);
+  });
 });
