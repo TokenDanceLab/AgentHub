@@ -77,4 +77,37 @@ describe('composerReducer', () => {
     expect(state.mentions).toEqual([]);
     expect(state.submitState).toBe('idle');
   });
+
+  it('enters edit mode for an already-sent message and carries the id in the intent', () => {
+    const base = composerReducer(createInitialComposerState('team'), { type: 'setText', text: 'draft' });
+    const editing = composerReducer(base, { type: 'setEditingMessage', messageId: 'hub-message-42' });
+    expect(editing.editingMessageId).toBe('hub-message-42');
+    expect(buildComposerIntent(editing).editingMessageId).toBe('hub-message-42');
+
+    const cleared = composerReducer(editing, { type: 'setEditingMessage', messageId: null });
+    expect(cleared.editingMessageId).toBeNull();
+    expect(buildComposerIntent(cleared).editingMessageId).toBeUndefined();
+  });
+
+  it('clears the edit context on submit reset and on conversation switch', () => {
+    const editing = composerReducer(
+      composerReducer(createInitialComposerState('team'), { type: 'setEditingMessage', messageId: 'hub-message-42' }),
+      { type: 'setText', text: 'edited' },
+    );
+    expect(editing.editingMessageId).toBe('hub-message-42');
+
+    const afterReset = composerReducer(editing, { type: 'resetAfterSubmit' });
+    expect(afterReset.editingMessageId).toBeNull();
+    expect(afterReset.text).toBe('');
+
+    const reEdit = composerReducer(afterReset, { type: 'setEditingMessage', messageId: 'hub-message-42' });
+    const afterSwitch = composerReducer(reEdit, { type: 'setConversationId', conversationId: 'other' });
+    expect(afterSwitch.editingMessageId).toBeNull();
+  });
+
+  it('restores idle submit chrome when entering edit mode from an error state', () => {
+    const errored = composerReducer(createInitialComposerState('team'), { type: 'setSubmitState', submitState: 'error' });
+    const editing = composerReducer(errored, { type: 'setEditingMessage', messageId: 'hub-message-1' });
+    expect(editing.submitState).toBe('idle');
+  });
 });

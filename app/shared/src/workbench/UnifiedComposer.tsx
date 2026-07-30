@@ -7,6 +7,7 @@ import {
   ComposerAgentPicker,
   ComposerAttachButton,
   ComposerAttachmentBar,
+  ComposerEditBar,
   ComposerMainchainStrip,
   ComposerMentionChips,
   ComposerQuoteBar,
@@ -17,6 +18,7 @@ import {
 } from './UnifiedComposerParts';
 import {
   buildUnifiedComposerHostState,
+  cancelEditAction,
   cancelQuoteAction,
   cancelReplyAction,
   dispatchComposerAttachmentAdds,
@@ -51,6 +53,8 @@ export function UnifiedComposer({
   submitBehavior,
   targetLabel,
   uploadProgresses,
+  isRunning,
+  onCancel,
 }: UnifiedComposerProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { runtime, view } = buildUnifiedComposerHostState({
@@ -142,6 +146,12 @@ export function UnifiedComposer({
           quote={chromeModel.quote}
         />
       )}
+      {composer.editingMessageId && (
+        <ComposerEditBar
+          isSubmitting={view.isSubmitting}
+          onCancel={() => dispatchComposer(cancelEditAction())}
+        />
+      )}
       {chromeModel.mentions && (
         <ComposerMentionChips
           isSubmitting={view.isSubmitting}
@@ -199,6 +209,8 @@ export function UnifiedComposer({
         )}
         <ComposerSendButton
           hasMentions={view.hasMentions}
+          isRunning={isRunning}
+          onCancel={onCancel}
           submitDisabled={view.submitDisabled}
         />
       </div>

@@ -89,6 +89,19 @@ export function planContextAction(options: {
       focusComposer: true,
     });
   }
+  // Edit an already-sent user message (#1462 CF16): backfill the composer with
+  // the message text and mark it as editing so submit routes to `editMessage`
+  // instead of sending a new message.
+  if (action === 'edit' && block && block.kind === 'text' && block.author.role === 'human') {
+    effects.push({
+      type: 'composer',
+      actions: [
+        { type: 'setText', text: block.text },
+        { type: 'setEditingMessage', messageId: block.id },
+      ],
+      focusComposer: true,
+    });
+  }
   if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
     effects.push(
       { type: 'softHide', blockIds: [block.id] },
@@ -274,6 +287,7 @@ export function buildTranscriptContextMenuGroups({
 }: BuildTranscriptContextMenuGroupsOptions): Array<Array<ContextMenuItem>> {
   const block = transcript.find((item) => item.id === blockId);
   const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
+  const isUserText = block?.kind === 'text' && block.author.role === 'human';
   const isTextBlock = block?.kind === 'text';
   return [
     [
@@ -281,6 +295,7 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.react'), icon: 'star', chevron: true, onClick: () => onAction('react', blockId) },
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
+      ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),
       { label: t('context.forward'), icon: 'external', onClick: () => onAction('forward', blockId) },
     ],
     [

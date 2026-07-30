@@ -77,6 +77,9 @@ export function WorkbenchFrame({
   highlightedBlockId,
   onHighlightEnd,
   connectionStatus,
+  isAgentRunning,
+  onCancelRun,
+  onEditMessage,
   setActivePage,
   children,
 }: WorkbenchFrameProps): React.ReactElement {
@@ -199,6 +202,9 @@ export function WorkbenchFrame({
             showComposerStatus={showComposerStatus}
             highlightedBlockId={highlightedBlockId}
             onHighlightEnd={onHighlightEnd}
+            isAgentRunning={isAgentRunning}
+            onCancelRun={onCancelRun}
+            onEditMessage={onEditMessage}
           />
         ) : (
           <WorkbenchRoutesFrame

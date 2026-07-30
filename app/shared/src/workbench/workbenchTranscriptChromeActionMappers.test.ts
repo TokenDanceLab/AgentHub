@@ -119,4 +119,42 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('y');
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
   });
+
+  it('plans an edit action that backfills the composer and marks the message editing', () => {
+    const transcript = [
+      textBlock({ id: 'user-1', text: '请帮我重构', author: { id: 'u', role: 'human', name: 'You' } }),
+    ];
+    const effects = planContextAction({ action: 'edit', blockId: 'user-1', transcript, t });
+    const composer = effects.find((e) => e.type === 'composer');
+    expect(composer).toBeDefined();
+    if (composer && composer.type === 'composer') {
+      expect(composer.actions).toEqual([
+        { type: 'setText', text: '请帮我重构' },
+        { type: 'setEditingMessage', messageId: 'user-1' },
+      ]);
+      expect(composer.focusComposer).toBe(true);
+    }
+  });
+
+  it('offers an edit menu item for user text blocks but not for agent text blocks', () => {
+    const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
+    const agentBlock = textBlock({ id: 'a' });
+    const userMenu = buildTranscriptContextMenuGroups({
+      blockId: 'u',
+      transcript: [userBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    expect(userMenu.flat().map((i) => i.label)).toContain('context.edit');
+
+    const agentMenu = buildTranscriptContextMenuGroups({
+      blockId: 'a',
+      transcript: [agentBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.edit');
+  });
 });

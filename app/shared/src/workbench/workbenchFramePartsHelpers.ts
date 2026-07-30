@@ -144,6 +144,9 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'highlightedBlockId', highlightedBlockId);
   assignIfDefined(hostProps, 'onHighlightEnd', onHighlightEnd);
   assignIfDefined(hostProps, 'composerExecutionTargets', composerExecutionTargets);
+  assignIfDefined(hostProps, 'isAgentRunning', props.isAgentRunning);
+  assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
+  assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
 
   return hostProps;
 }

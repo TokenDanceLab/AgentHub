@@ -58,9 +58,11 @@ export {
   composerAttachmentAddActions,
   cancelReplyAction,
   cancelQuoteAction,
+  cancelEditAction,
   removeMentionAction,
   removeAttachmentAction,
   setComposerTextAction,
+  setEditingMessageAction,
   dispatchComposerAttachmentAdds,
 } from './unifiedComposerHostActions';
 

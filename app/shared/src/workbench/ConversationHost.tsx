@@ -50,6 +50,16 @@ export interface ConversationHostProps {
   /** Search panel open/close control (owned by shell for Ctrl+F handler). */
   searchOpen: boolean;
   onSearchOpenChange: (open: boolean) => void;
+  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  isAgentRunning?: boolean | undefined;
+  /** Cancel the active agent run (stop button handler). */
+  onCancelRun?: (() => void) | undefined;
+  /**
+   * Edit an already-sent message (#1462 CF16). Receives the transcript block
+   * id of the message being edited plus the new content. The shell strips the
+   * `hub-message-` prefix and calls `editMessage` REST.
+   */
+  onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -68,6 +78,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   currentConversationId, platform,
   composer, dispatchComposer, composerInputRef,
   searchOpen, onSearchOpenChange,
+  isAgentRunning, onCancelRun, onEditMessage,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -98,6 +109,26 @@ export const ConversationHost = React.memo(function ConversationHost({
     const capturedConversationId = currentConversationId;
     isSubmittingRef.current = true;
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
+
+    // Edit-mode branch (#1462 CF16): route submit to editMessage instead of
+    // sending a new message. No optimistic pending block — the server returns
+    // the updated HubMessage and the shell invalidates the messages query.
+    if (composer.editingMessageId && onEditMessage) {
+      const editingBlockId = composer.editingMessageId;
+      const editedText = liveText.trim();
+      try {
+        await onEditMessage(editingBlockId, editedText);
+        dispatchComposer({ type: 'resetAfterSubmit' });
+        dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
+      } catch (err) {
+        dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
+        onToast(err instanceof Error ? err.message : t('toast.editFailed'));
+      } finally {
+        isSubmittingRef.current = false;
+      }
+      return;
+    }
+
     let optimisticId: string | undefined;
     try {
       const intent = buildComposerIntent(composer);
@@ -154,7 +185,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       setUploadProgresses({});
       onToast(err instanceof Error ? err.message : '提交失败，请重试');
     } finally { isSubmittingRef.current = false; }
-  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, t, transcript]);
+  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, t, transcript, onEditMessage]);
 
   const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
   const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);
@@ -185,7 +216,8 @@ export const ConversationHost = React.memo(function ConversationHost({
           inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
           onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
           onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
-          submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses} />
+          submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
+          isRunning={isAgentRunning} onCancel={onCancelRun} />
       )}
     </>
   );
