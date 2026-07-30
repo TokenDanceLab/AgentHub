@@ -59,6 +59,13 @@ export const HUB_EVENTS = {
   TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
   TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
 
+  // ── Team subagent live-stream (#1478 Phase A) ──
+  // UPSERT by (agent_task_id, event_seq) + event_seq watermark; aggregates
+  // per-task run.agent.* flow into the team-run view. Phase A ships only the
+  // single-event stream frame; activity/batch/subscribe arrive later — do NOT
+  // add them until they have a wire producer (#1362/#1422 dead-surface ban).
+  TEAM_SUBAGENT_STREAM: 'team.subagent.stream',
+
   // ── Notification & social ─────────────────────
   // UPSERT by notification / request / user id
   NOTIFICATION_NEW: 'notification.new',
