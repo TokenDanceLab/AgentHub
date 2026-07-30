@@ -34,6 +34,10 @@ export interface RowItem {
    *  When absent the component infers kind from `apReason` JSON shape.
    *  Values: "command" | "diff" | "plan" | "allowed_prompts" | "web" | "json" */
   apKind?: string
+  /** Risk severity for approval cards. When present, a RiskBadge renders in the
+   *  actions row; critical level triggers a second-confirm on the approve
+   *  button and the approve button turns red (T16). */
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical'
   standalone?: boolean
   url?: string
   deployMeta?: string

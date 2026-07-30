@@ -686,6 +686,7 @@ describe('blocksToTranscriptItems', () => {
     expect(row.apReason).toContain('Write')
     expect(row.apReason).toContain('medium')
     expect(row.apReason).toContain('Writing to /etc/config')
+    expect(row.riskLevel).toBe('medium')
   })
 
   it('maps permission_result to standalone approval RowItem', () => {

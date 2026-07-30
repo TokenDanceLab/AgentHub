@@ -133,12 +133,26 @@
 .think-shimmer { background:linear-gradient(90deg, var(--text-2) 0%, var(--text-1) 48%, var(--text-2) 52%, var(--text-2) 100%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:thinkShimmer 2s linear infinite }
 @keyframes thinkShimmer { 0% { background-position: 100% center } 100% { background-position: -100% center } }
 .think-duration { color:var(--text-3); font:var(--label-xs); font-weight:400; margin-left:var(--sp-xxs) }
-.ap-actions { display:flex; gap:var(--sp-sm) }
-.ap-actions button { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:none; transition:opacity var(--dur) }
+.ap-actions { display:flex; align-items:center; gap:var(--sp-sm); flex-wrap:wrap }
+.ap-actions.has-risk { padding-top:var(--sp-2) }
+.ap-actions button { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:none; transition:opacity var(--dur), box-shadow var(--dur) }
 .ap-actions button:hover { opacity:0.85 }
 .ap-actions button:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .ap-approve { background:var(--success); color:var(--on-primary) }
 .ap-deny { background:var(--surface); color:var(--danger); border:1px solid var(--danger-bg) }
+/* ── T16: risk badge + keyboard hint + critical second-confirm ── */
+.ap-kbd-hint { font:var(--label-xs); color:var(--text-3); margin-left:auto; user-select:none; opacity:0.85 }
+.ap-approve.critical { background:var(--danger); color:var(--on-primary, #fff) }
+.ap-approve.critical:hover { opacity:0.9 }
+.ap-approve.critical.confirming {
+  background:var(--danger); color:var(--on-primary, #fff);
+  box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--danger);
+  animation:apConfirmPulse 1.2s ease-in-out infinite;
+}
+@keyframes apConfirmPulse {
+  0%, 100% { box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--danger) }
+  50% { box-shadow:0 0 0 2px var(--surface), 0 0 0 6px var(--danger) }
+}
 
 /* ── Retry bar (card-level, visible even when collapsed) ────────── */
 .retry-bar { display:flex; padding:var(--sp-xs) var(--sp-10) var(--sp-xs) var(--sp-10); border-top:1px solid var(--danger-bg) }
