@@ -59,33 +59,8 @@ func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeA
 }
 
 // resolveClaudeCommand handles Windows .cmd shim bypass for the claude CLI.
-// On Windows, npm installs a claude.cmd shim that forwards args via %*,
-// which corrupts multiline prompts when launched via os/exec. This function
-// resolves the underlying Node.js entrypoint and returns it with the node
-// binary path so prompts are passed as real argv values.
 func resolveClaudeCommand(binaryPath string, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error), goos string) (string, []string, bool) {
-	resolved, err := lookPath(binaryPath)
-	if err != nil {
-		return binaryPath, nil, false
-	}
-
-	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
-		return resolved, nil, true
-	}
-
-	// The npm claude.cmd shim forwards args through %*, which corrupts multiline
-	// prompts when Edge launches it via os/exec. Call the Node entrypoint
-	// directly so prompts are passed as real argv values.
-	script := filepath.Join(filepath.Dir(resolved), "node_modules", "@anthropic-ai", "claude-code", "cli.js")
-	info, err := stat(script)
-	if err != nil || info.IsDir() {
-		return resolved, nil, true
-	}
-	nodePath, err := lookPath("node")
-	if err != nil {
-		return resolved, nil, true
-	}
-	return nodePath, []string{script}, true
+	return resolveNodeCLICommand(binaryPath, "node_modules/@anthropic-ai/claude-code/cli.js", lookPath, stat, goos)
 }
 
 func (a *ClaudeCodeAdapter) Metadata() AdapterMetadata {
