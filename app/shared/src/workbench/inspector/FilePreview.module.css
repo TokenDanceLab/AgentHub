@@ -130,7 +130,7 @@
   background: color-mix(in srgb, var(--surface) 94%, var(--surface-low) 6%);
   box-shadow: var(--e-3);
   scrollbar-width: thin;
-  scrollbar-color: var(--text-3) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   opacity: 0;
   transform: translateY(4px) scale(0.985);
   animation: fileMenuIn var(--dur-medium) var(--ease-panel) forwards;
@@ -326,7 +326,7 @@
   font: 400 0.6875rem/1.45 var(--font-mono);
   tab-size: 2;
   scrollbar-width: thin;
-  scrollbar-color: var(--text-3) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .code:focus-visible {
@@ -422,7 +422,7 @@
   font: var(--body);
   line-height: 1.48;
   scrollbar-width: thin;
-  scrollbar-color: var(--text-3) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .markdownPreview h1 {
