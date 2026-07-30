@@ -160,6 +160,7 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         status: st,
         collapsible: true, standalone: true,
         apReason: parts.filter(Boolean).join(SEP),
+        riskLevel: 'risk' in a && a.risk ? a.risk : undefined,
       } as RowItem
     }
 
