@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { RowItem as RowItemType } from '../types'
@@ -76,12 +76,22 @@ interface Props {
 export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
+  const userToggledRef = useRef(false)
   const isOpen = item.type === 'route' ? true : open
 
   // Think cards: auto-open when running, auto-collapse when done
   useEffect(() => {
     if (item.type !== 'think' || !item.collapsible) return
     setOpen(item.status === 'running')
+  }, [item.status, item.type, item.collapsible])
+
+  // Fail cards: auto-expand when status becomes 'fail' (once semantics —
+  // once user manually toggles, never auto-reopen)
+  useEffect(() => {
+    if (item.type === 'approval' || item.type === 'tool' || item.type === 'sub') return
+    if (item.status === 'fail' && item.collapsible && !userToggledRef.current) {
+      setOpen(true)
+    }
   }, [item.status, item.type, item.collapsible])
 
   // Icon: file cards use extension-based icon; others use toolName or type
@@ -98,6 +108,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const handleClick = (e: React.MouseEvent) => {
     if (item.status === 'running' || !item.collapsible) return
     e.stopPropagation()
+    userToggledRef.current = true
     setOpen(!open); onToggle?.(item.id)
   }
 

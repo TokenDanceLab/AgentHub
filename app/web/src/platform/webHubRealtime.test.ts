@@ -2,6 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { getAgentActivityStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
+import { getSubagentStreamStore } from '@shared/workbench';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HubWSHandle, HubWSOptions } from '@/api/hubWS';
@@ -390,6 +391,7 @@ describe('useWebHubRealtime live event ordering (#1415)', () => {
 
   afterEach(() => {
     getAgentActivityStore().reset();
+    getSubagentStreamStore().reset();
     vi.useRealTimers();
   });
 
@@ -454,6 +456,160 @@ describe('useWebHubRealtime live event ordering (#1415)', () => {
     harness.emit(HUB_EVENTS.AGENT_STREAM, nextEvent);
     vi.advanceTimersByTime(AGENT_STREAM_LIVE_BATCH_WINDOW_MS);
     expect(harness.delivered).toEqual([streamEvent(1), nextEvent]);
+    harness.unmount();
+    harness.clear();
+  });
+});
+
+describe('team.subagent.stream dispatch (#1478 Phase C)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    getSubagentStreamStore().reset();
+    vi.useRealTimers();
+  });
+
+  it('routes team.subagent.stream frames to SubagentStreamStore byTaskId', () => {
+    const harness = mountRealtimeHarness();
+    const store = getSubagentStreamStore();
+
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      assignment_id: 'assign-1',
+      team_task_id: 'tt-1',
+      member_id: 'member-1',
+      agent_task_id: 'agent-task-1',
+      agent_instance_id: 'agent-1',
+      edge_run_id: 'edge-run-1',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'hello' },
+      created_at: '2026-07-30T00:00:00Z',
+    });
+
+    const events = store.state.byTaskId['agent-task-1']!;
+    expect(events).toBeDefined();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.event_seq).toBe(1);
+    expect(events[0]!.event_type).toBe('run.agent.text_delta');
+
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('deduplicates events with the same (agent_task_id, event_seq)', () => {
+    const harness = mountRealtimeHarness();
+    const store = getSubagentStreamStore();
+    const payload = {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      agent_task_id: 'agent-task-1',
+      agent_instance_id: 'agent-1',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'first' },
+      created_at: '2026-07-30T00:00:00Z',
+    };
+
+    // First delivery.
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, payload);
+    const events1 = store.state.byTaskId['agent-task-1'];
+    if (!events1) throw new Error('expected events');
+    expect(events1[0]!.payload).toEqual({ content: 'first' });
+
+    // Duplicate delivery with same event_seq — must be a no-op.
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      ...payload,
+      payload: { content: 'second (should be ignored)' },
+    });
+    const events2 = store.state.byTaskId['agent-task-1'];
+    expect(events2).toHaveLength(1);
+    if (!events2) throw new Error('expected events');
+    // Original payload preserved.
+    expect(events2[0]!.payload).toEqual({ content: 'first' });
+
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('appends new event_seq values and maintains ordering', () => {
+    const harness = mountRealtimeHarness();
+    const store = getSubagentStreamStore();
+
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      agent_task_id: 'agent-task-1',
+      agent_instance_id: 'agent-1',
+      event_seq: 2,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'second' },
+      created_at: '2026-07-30T00:00:01Z',
+    });
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      agent_task_id: 'agent-task-1',
+      agent_instance_id: 'agent-1',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'first' },
+      created_at: '2026-07-30T00:00:00Z',
+    });
+
+    // Two events, sorted by event_seq.
+    const ordering = store.state.byTaskId['agent-task-1']!;
+    expect(ordering).toHaveLength(2);
+    expect(ordering[0]!.event_seq).toBe(1);
+    expect(ordering[0]!.payload).toEqual({ content: 'first' });
+    expect(ordering[1]!.event_seq).toBe(2);
+    expect(ordering[1]!.payload).toEqual({ content: 'second' });
+
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('tracks multiple tasks independently', () => {
+    const harness = mountRealtimeHarness();
+    const store = getSubagentStreamStore();
+
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      agent_task_id: 'task-a',
+      agent_instance_id: 'agent-1',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'a1' },
+      created_at: '2026-07-30T00:00:00Z',
+    });
+    harness.emit(HUB_EVENTS.TEAM_SUBAGENT_STREAM, {
+      team_run_id: 'team-run-1',
+      team_id: 'team-1',
+      session_id: 'hub-session-1',
+      agent_task_id: 'task-b',
+      agent_instance_id: 'agent-2',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      payload: { content: 'b1' },
+      created_at: '2026-07-30T00:00:00Z',
+    });
+
+    const aEvents = store.state.byTaskId['task-a']!;
+    const bEvents = store.state.byTaskId['task-b']!;
+    expect(aEvents).toHaveLength(1);
+    expect(bEvents).toHaveLength(1);
+    expect(aEvents[0]!.payload).toEqual({ content: 'a1' });
+    expect(bEvents[0]!.payload).toEqual({ content: 'b1' });
+
     harness.unmount();
     harness.clear();
   });
