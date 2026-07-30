@@ -9,12 +9,12 @@ import React, {
   useRef,
   useState,
   useSyncExternalStore,
-  type ReactNode,
 } from 'react';
 import {
   getSubagentStreamStore,
   type TeamSubagentStreamEvent,
 } from './SubagentStreamStore';
+import { SubagentTranscript } from './SubagentTranscript';
 import { Icon } from '../../ui/Icon';
 import styles from './SubagentStreamOverlay.module.css';
 
@@ -156,19 +156,6 @@ function buildStreamEntries(
   });
 }
 
-// ── Event type icon ─────────────────────────────────────────────────────────
-
-function eventTypeIcon(eventType: string): string {
-  const et = eventType.toLowerCase();
-  if (et.includes('think')) return 'psychology';
-  if (et.includes('tool') || et.includes('function')) return 'build';
-  if (et.includes('text') || et.includes('delta') || et.includes('stream')) return 'text_fields';
-  if (et.includes('done') || et.includes('result') || et.includes('complete')) return 'check_circle';
-  if (et.includes('fail') || et.includes('error')) return 'error';
-  if (et.includes('cancel')) return 'cancel';
-  return 'circle';
-}
-
 // ── Status color ────────────────────────────────────────────────────────────
 
 function statusColor(status: StreamStatus): string {
@@ -248,23 +235,9 @@ function SubagentStreamChip({ entry, defaultExpanded }: SubagentStreamChipProps)
         <Icon name={expanded ? 'expand_more' : 'expand_less'} size={16} />
       </button>
 
-      {/* ── Expanded event stream ── */}
+      {/* ── Expanded transcript (#1406 Phase 3) ── */}
       {expanded ? (
-        <div className={styles.events}>
-          {entry.events.map((event) => (
-            <div key={event.event_seq} className={styles.eventRow}>
-              <Icon
-                name={eventTypeIcon(event.event_type)}
-                size={14}
-                className={styles.eventIcon}
-              />
-              <span className={styles.eventType}>{event.event_type}</span>
-              <span className={styles.eventText}>
-                {formatEventPayload(event)}
-              </span>
-            </div>
-          ))}
-        </div>
+        <SubagentTranscript events={entry.events} />
       ) : null}
     </div>
   );
@@ -318,45 +291,4 @@ export function SubagentStreamOverlay({
 
 function truncate(text: string, maxLen: number): string {
   return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
-}
-
-function formatEventPayload(event: TeamSubagentStreamEvent): ReactNode {
-  const payload = event.payload as Record<string, unknown> | undefined;
-  if (!payload) return null;
-
-  // Render text content for text_delta events.
-  if (event.event_type.toLowerCase().includes('text') || event.event_type.toLowerCase().includes('delta')) {
-    const text = payload.text ?? payload.content ?? payload.delta ?? payload.message;
-    if (typeof text === 'string') return <span className={styles.textDelta}>{truncate(text, 120)}</span>;
-  }
-
-  // Render tool call info.
-  if (event.event_type.toLowerCase().includes('tool')) {
-    const toolName = payload.tool_name ?? payload.name ?? payload.function;
-    const toolInput = payload.input ?? payload.arguments;
-    return (
-      <span className={styles.toolCall}>
-        <code>{typeof toolName === 'string' ? toolName : 'tool'}</code>
-        {typeof toolInput === 'string' ? ` ${truncate(toolInput, 80)}` : ''}
-      </span>
-    );
-  }
-
-  // Render result/error.
-  if (event.event_type.toLowerCase().includes('result') || event.event_type.toLowerCase().includes('done')) {
-    const summary = payload.summary ?? payload.result ?? payload.content;
-    if (typeof summary === 'string') return <span className={styles.result}>{truncate(summary, 120)}</span>;
-  }
-
-  if (event.event_type.toLowerCase().includes('error') || event.event_type.toLowerCase().includes('fail')) {
-    const error = payload.error ?? payload.message ?? payload.reason;
-    if (typeof error === 'string') return <span className={styles.error}>{truncate(error, 120)}</span>;
-  }
-
-  // Generic fallback: JSON stringify.
-  try {
-    return <span className={styles.generic}>{truncate(JSON.stringify(payload), 120)}</span>;
-  } catch {
-    return null;
-  }
 }

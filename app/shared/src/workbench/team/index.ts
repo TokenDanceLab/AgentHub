@@ -11,3 +11,8 @@ export {
   SubagentStreamOverlay,
   type SubagentStreamOverlayProps,
 } from './SubagentStreamOverlay';
+
+export {
+  SubagentTranscript,
+  type SubagentTranscriptProps,
+} from './SubagentTranscript';
