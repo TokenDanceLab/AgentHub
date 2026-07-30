@@ -89,6 +89,18 @@ export type {
   AgentHubThemeMode,
 } from './theme';
 
+export {
+  FOLDER_THEME_COLORS,
+  FOLDER_THEME_COLOR_META,
+  applyFolderThemeColor,
+  getFolderThemeColorMeta,
+  isFolderThemeColor,
+} from './folderThemeColors';
+export type {
+  FolderThemeColor,
+  FolderThemeColorMeta,
+} from './folderThemeColors';
+
 export { normalizeDiffs, parseUnifiedDiff } from './diff';
 export type { DiffFile, DiffHunk, DiffLine } from './diff';
 

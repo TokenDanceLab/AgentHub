@@ -1,0 +1,129 @@
+/* ═════════════════════════════════════════════════════════════════════
+   AgentHub Per-Folder Theme Colors — 多项目工作台视觉分区
+   选择器: [data-folder-accent="名称"][data-theme="light"] (浅色)
+           [data-folder-accent="名称"]:not([data-theme="light"]) (深色)
+   默认不设置 data-folder-accent 时 --td-accent 系列回退到 --primary
+   对标 codeg theme-presets.ts:24-60（per-folder 主题色）
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── Default fallback (no folder accent set) ───────────────────────────
+   --td-accent 默认跟随 --primary，未设 folder 时不改变视觉。
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --td-accent: var(--primary);
+  --td-accent-foreground: var(--primary-foreground);
+  --td-accent-soft: var(--primary-light);
+  --td-accent-ring: var(--ring);
+}
+
+/* ── Plum ─────────────────────────────────────────────────────────────── */
+[data-folder-accent='plum']:not([data-theme='light']) {
+  --td-accent: #7c89e6;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(124, 137, 230, 0.14);
+  --td-accent-ring: rgba(124, 137, 230, 0.42);
+}
+[data-folder-accent='plum'][data-theme='light'] {
+  --td-accent: #5d68cc;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(93, 104, 204, 0.10);
+  --td-accent-ring: rgba(93, 104, 204, 0.30);
+}
+
+/* ── Blue ─────────────────────────────────────────────────────────────── */
+[data-folder-accent='blue']:not([data-theme='light']) {
+  --td-accent: #3b82f6;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(59, 130, 246, 0.14);
+  --td-accent-ring: rgba(59, 130, 246, 0.42);
+}
+[data-folder-accent='blue'][data-theme='light'] {
+  --td-accent: #2563eb;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(37, 99, 235, 0.10);
+  --td-accent-ring: rgba(37, 99, 235, 0.25);
+}
+
+/* ── Emerald ───────────────────────────────────────────────────────────── */
+[data-folder-accent='emerald']:not([data-theme='light']) {
+  --td-accent: #34d399;
+  --td-accent-foreground: #06281d;
+  --td-accent-soft: rgba(52, 211, 153, 0.14);
+  --td-accent-ring: rgba(52, 211, 153, 0.42);
+}
+[data-folder-accent='emerald'][data-theme='light'] {
+  --td-accent: #10b981;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(16, 185, 129, 0.10);
+  --td-accent-ring: rgba(16, 185, 129, 0.25);
+}
+
+/* ── Amber ─────────────────────────────────────────────────────────────── */
+[data-folder-accent='amber']:not([data-theme='light']) {
+  --td-accent: #f59e0b;
+  --td-accent-foreground: #2a1a02;
+  --td-accent-soft: rgba(245, 158, 11, 0.16);
+  --td-accent-ring: rgba(245, 158, 11, 0.42);
+}
+[data-folder-accent='amber'][data-theme='light'] {
+  --td-accent: #d97706;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(217, 119, 6, 0.10);
+  --td-accent-ring: rgba(217, 119, 6, 0.25);
+}
+
+/* ── Rose ──────────────────────────────────────────────────────────────── */
+[data-folder-accent='rose']:not([data-theme='light']) {
+  --td-accent: #fb7185;
+  --td-accent-foreground: #2a060d;
+  --td-accent-soft: rgba(251, 113, 133, 0.14);
+  --td-accent-ring: rgba(251, 113, 133, 0.42);
+}
+[data-folder-accent='rose'][data-theme='light'] {
+  --td-accent: #e11d48;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(225, 29, 72, 0.10);
+  --td-accent-ring: rgba(225, 29, 72, 0.25);
+}
+
+/* ── Violet ────────────────────────────────────────────────────────────── */
+[data-folder-accent='violet']:not([data-theme='light']) {
+  --td-accent: #a78bfa;
+  --td-accent-foreground: #1a0f2e;
+  --td-accent-soft: rgba(167, 139, 250, 0.14);
+  --td-accent-ring: rgba(167, 139, 250, 0.42);
+}
+[data-folder-accent='violet'][data-theme='light'] {
+  --td-accent: #7c3aed;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(124, 58, 237, 0.10);
+  --td-accent-ring: rgba(124, 58, 237, 0.25);
+}
+
+/* ── Cyan ───────────────────────────────────────────────────────────────── */
+[data-folder-accent='cyan']:not([data-theme='light']) {
+  --td-accent: #22d3ee;
+  --td-accent-foreground: #04252e;
+  --td-accent-soft: rgba(34, 211, 238, 0.14);
+  --td-accent-ring: rgba(34, 211, 238, 0.42);
+}
+[data-folder-accent='cyan'][data-theme='light'] {
+  --td-accent: #0891b2;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(8, 145, 178, 0.10);
+  --td-accent-ring: rgba(8, 145, 178, 0.25);
+}
+
+/* ── Orange ─────────────────────────────────────────────────────────────── */
+[data-folder-accent='orange']:not([data-theme='light']) {
+  --td-accent: #fb923c;
+  --td-accent-foreground: #2a1402;
+  --td-accent-soft: rgba(251, 146, 60, 0.14);
+  --td-accent-ring: rgba(251, 146, 60, 0.42);
+}
+[data-folder-accent='orange'][data-theme='light'] {
+  --td-accent: #ea580c;
+  --td-accent-foreground: #ffffff;
+  --td-accent-soft: rgba(234, 88, 12, 0.10);
+  --td-accent-ring: rgba(234, 88, 12, 0.25);
+}
