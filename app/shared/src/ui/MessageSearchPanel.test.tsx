@@ -48,6 +48,22 @@ const defaultProps = {
   noResultsLabel: 'No results found',
 };
 
+/**
+ * Flush the 300ms search debounce deterministically.
+ *
+ * The component debounces `immediateQuery → query` via setTimeout(300ms). Tests
+ * that assert on search results must wait past the debounce threshold under
+ * `act` so React flushes the state update and re-renders synchronously. Using
+ * `findByText`'s internal 1000ms retry instead races against the debounced
+ * state update under concurrent test execution and flakes. Awaiting this
+ * helper then doing a synchronous `getBy*` assertion removes the race.
+ */
+async function flushDebounce() {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 350));
+  });
+}
+
 describe('MessageSearchPanel', () => {
   it('renders nothing when closed', () => {
     const { container } = render(
@@ -65,24 +81,24 @@ describe('MessageSearchPanel', () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'auth module' } });
-
-    expect(await screen.findByText(/auth module/)).toBeInTheDocument();
+    await flushDebounce();
+    expect(screen.getByText(/auth module/)).toBeInTheDocument();
   });
 
   it('shows no results for unmatched query', async () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'xyznonexistent' } });
-
-    expect(await screen.findByText('No results found')).toBeInTheDocument();
+    await flushDebounce();
+    expect(screen.getByText('No results found')).toBeInTheDocument();
   });
 
   it('highlights matching text with mark tag', async () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'auth' } });
-
-    const marks = await screen.findAllByText('auth', { selector: 'mark' });
+    await flushDebounce();
+    const marks = screen.getAllByText('auth', { selector: 'mark' });
     expect(marks.length).toBeGreaterThanOrEqual(1);
     expect(marks[0].tagName).toBe('MARK');
   });
@@ -92,10 +108,9 @@ describe('MessageSearchPanel', () => {
     render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'auth module' } });
-
-    const results = await screen.findAllByText(/auth module/);
+    await flushDebounce();
+    const results = screen.getAllByText(/auth module/);
     fireEvent.click(results[0].closest('button')!);
-
     expect(onJump).toHaveBeenCalledWith(expect.any(String), expect.any(Number));
   });
 
@@ -104,7 +119,6 @@ describe('MessageSearchPanel', () => {
     render(<MessageSearchPanel {...defaultProps} onClose={onClose} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.keyDown(input, { key: 'Escape' });
-
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -115,7 +129,6 @@ describe('MessageSearchPanel', () => {
       .closest('[class*="panel"]')
       ?.parentElement!;
     fireEvent.click(overlay);
-
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -124,7 +137,6 @@ describe('MessageSearchPanel', () => {
       <MessageSearchPanel {...defaultProps} open={false} />,
     );
     rerender(<MessageSearchPanel {...defaultProps} open={true} />);
-
     const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
     expect(input.value).toBe('');
   });
@@ -133,16 +145,16 @@ describe('MessageSearchPanel', () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'issue' } });
-
-    expect(await screen.findByText('Claude Code')).toBeInTheDocument();
+    await flushDebounce();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
   });
 
   it('searches visible status blocks', async () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'Indexing project' } });
-
-    expect(await screen.findByText(/Indexing project/)).toBeInTheDocument();
+    await flushDebounce();
+    expect(screen.getByText(/Indexing project/)).toBeInTheDocument();
   });
 
   // ── Debounce tests ─────────────────────────────────────
