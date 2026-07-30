@@ -1,0 +1,273 @@
+/* SubagentStreamOverlay — #1406 Phase 2 */
+/* Fixed corner stack of subagent stream chips/cards with glass-card tokens. */
+
+/* ── Overlay container ──────────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  bottom: 80px;
+  z-index: var(--z-demo-toast, 999);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.positionRight {
+  right: 16px;
+}
+
+.positionLeft {
+  left: 16px;
+}
+
+/* ── Stacked badge ──────────────────────────────────────────────────────── */
+
+.stackedBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--td-ink-muted, #a0a1aa);
+  background: var(--td-surface, rgba(37, 37, 45, 0.82));
+  border: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  border-radius: var(--td-radius-control, 8px);
+  backdrop-filter: blur(var(--td-glass-blur, 28px));
+  -webkit-backdrop-filter: blur(var(--td-glass-blur, 28px));
+  pointer-events: auto;
+}
+
+/* ── Chip (collapsed) ───────────────────────────────────────────────────── */
+
+.chip {
+  border: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  border-radius: var(--td-radius-control, 8px);
+  background: var(--td-surface, rgba(37, 37, 45, 0.82));
+  box-shadow: var(--td-glass-elev, 0 10px 28px rgba(15, 23, 42, 0.08));
+  backdrop-filter: blur(var(--td-glass-blur, 28px));
+  -webkit-backdrop-filter: blur(var(--td-glass-blur, 28px));
+  overflow: hidden;
+  pointer-events: auto;
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  color: var(--td-ink, #e3e4e6);
+  transition: border-color 0.2s ease;
+}
+
+.chipExpanded {
+  border-color: color-mix(in oklch, var(--td-plum, #5d68cc) 32%, var(--td-line, rgba(255, 255, 255, 0.075)));
+}
+
+/* ── Color borders ──────────────────────────────────────────────────────── */
+
+.colorBlue  { border-left: 3px solid #5b9bd5; }
+.colorPurple  { border-left: 3px solid #a78bfa; }
+.colorOrange { border-left: 3px solid #f59e0b; }
+.colorGreen  { border-left: 3px solid var(--td-moss, #69c967); }
+.colorRed    { border-left: 3px solid var(--td-danger, #ff7e78); }
+
+/* ── Chip header button ─────────────────────────────────────────────────── */
+
+.chipHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chipHeader:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chipHeader:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--td-plum, #5d68cc);
+}
+
+/* ── Avatar ─────────────────────────────────────────────────────────────── */
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--td-plum, #5d68cc);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.avatarPulse {
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── Chip body ──────────────────────────────────────────────────────────── */
+
+.chipBody {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chipLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--td-ink, #e3e4e6);
+}
+
+.chipStatus {
+  font-size: 0.625rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chipPreview {
+  font-size: 0.6875rem;
+  color: var(--td-ink-muted, #a0a1aa);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  flex-shrink: 1;
+}
+
+/* ── Events timeline ────────────────────────────────────────────────────── */
+
+.events {
+  border-top: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.eventRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.eventIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--td-ink-muted, #a0a1aa);
+  opacity: 0.7;
+}
+
+.eventType {
+  font-weight: 600;
+  color: var(--td-ink-muted, #a0a1aa);
+  white-space: nowrap;
+  text-transform: lowercase;
+  font-variant: small-caps;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.eventText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--td-ink, #e3e4e6);
+}
+
+.textDelta {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.toolCall {
+  color: var(--td-ink-muted, #a0a1aa);
+}
+
+.toolCall code {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.625rem;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.result {
+  color: var(--td-moss, #69c967);
+}
+
+.error {
+  color: var(--td-danger, #ff7e78);
+}
+
+.generic {
+  color: var(--td-ink-muted, #a0a1aa);
+  font-size: 0.625rem;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+
+.events::-webkit-scrollbar {
+  width: 4px;
+}
+
+.events::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.events::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+/* ── Responsive: narrow viewport ────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .overlay {
+    bottom: 72px;
+    max-width: 100%;
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  .chip {
+    border-radius: 6px;
+  }
+
+  .chipHeader {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .chipPreview {
+    display: none; /* hide text preview on narrow screens */
+  }
+}
