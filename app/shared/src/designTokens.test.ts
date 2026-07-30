@@ -40,6 +40,7 @@ describe('designTokens', () => {
       'dense-operational-copy',
       'mobile-touch-targets',
       'frosted-glass-material',
+      'content-anchored',
     ]);
 
     expect(getSurfaceRulesForPlatform('web').map((rule) => rule.id)).toContain('no-gradient-surfaces');
@@ -47,6 +48,7 @@ describe('designTokens', () => {
     expect(getSurfaceRulesForPlatform('desktop').map((rule) => rule.id)).toEqual([
       'dense-operational-copy',
       'frosted-glass-material',
+      'content-anchored',
     ]);
   });
 
