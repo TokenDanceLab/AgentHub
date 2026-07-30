@@ -231,15 +231,19 @@ export async function submitWebComposerIntent(
     : intent.attachments;
   const enrichedIntent = { ...intent, attachments: enrichedAttachments };
 
-  const mention = enrichedIntent.mentions[0];
-  if (mention && !mention.runtimeId) {
-    throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
+  // #1406 @agent 派单：选取 dispatchRole !== 'context' 的第一个 mention 作为派单目标。
+  // backward-compat：已有 mention（无 dispatchRole）视为可派单；显式 'context' 跳过。
+  const dispatchMention = enrichedIntent.mentions.find(
+    (m) => m.dispatchRole !== 'context',
+  );
+  if (dispatchMention && !dispatchMention.runtimeId) {
+    throw new Error(`Mentioned Hub agent "${dispatchMention.label}" is missing a runtime id.`);
   }
-  const dispatchTarget = mention
+  const dispatchTarget = dispatchMention
     ? await resolveWebDispatchTarget(hubClient, (enrichedIntent as WebComposerIntent).executionTargetId)
     : undefined;
-  const agentInstance = mention
-    ? await ensureMentionedAgentInstance(hubClient, enrichedIntent.conversationId, mention, options.queryClient)
+  const agentInstance = dispatchMention
+    ? await ensureMentionedAgentInstance(hubClient, enrichedIntent.conversationId, dispatchMention, options.queryClient)
     : undefined;
 
   const clientMessageId = createClientMessageId();
@@ -255,7 +259,7 @@ export async function submitWebComposerIntent(
     throw error;
   }
 
-  if (!mention) {
+  if (!dispatchMention) {
     return { intentId: message.message_id };
   }
 
