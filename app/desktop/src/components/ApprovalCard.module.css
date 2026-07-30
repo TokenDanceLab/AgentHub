@@ -55,45 +55,6 @@
   color: var(--text-1);
 }
 
-.riskBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: var(--r-full);
-  font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-.riskBadge .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.riskLow {
-  background: var(--success-bg));
-  color: var(--success);
-}
-
-.riskMedium {
-  background: var(--warning-bg));
-  color: var(--warning);
-}
-
-.riskHigh {
-  background: var(--danger-bg));
-  color: var(--danger);
-}
-
-.riskCritical {
-  background: var(--danger-bg));
-  color: var(--danger);
-  border: 1px solid var(--danger);
-}
-
 .statusBadge {
   display: inline-flex;
   align-items: center;
