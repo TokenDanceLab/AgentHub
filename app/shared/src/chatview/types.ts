@@ -30,6 +30,10 @@ export interface RowItem {
   diffLines?: { type: 'add' | 'del' | 'ctx'; text: string }[]
   fileOp?: 'cr' | 'mod' | 'del'
   apReason?: string
+  /** Explicit kind marker for approval-card structured rendering.
+   *  When absent the component infers kind from `apReason` JSON shape.
+   *  Values: "command" | "diff" | "plan" | "allowed_prompts" | "web" | "json" */
+  apKind?: string
   standalone?: boolean
   url?: string
   deployMeta?: string

@@ -102,6 +102,37 @@
 .row-item.approval.ok > .row-bd { border-left-color:var(--success) }
 .row-item.approval.fail > .row-bd { border-left-color:var(--danger) }
 .ap-reason { font:var(--label); color:var(--text-2) }
+/* ── Approval structured preview (QW4: six-type render by request kind) ── */
+.ap-scroll { max-height:min(36vh, 18rem); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--text-3) transparent }
+.ap-section { margin-top:var(--sp-xs) }
+.ap-section:first-child { margin-top:0 }
+
+/* command kind */
+.ap-cmd { border:1px solid var(--bdr); border-radius:var(--r-sm); overflow:hidden }
+.ap-cmd-head { display:flex; align-items:center; gap:var(--sp-xxs); padding:5px var(--sp-md); font:var(--label-xs); color:var(--text-2); background:var(--surface-low); border-bottom:1px solid var(--bdr) }
+.ap-cmd-body { font:var(--label); font-family:var(--font-mono); padding:var(--sp-sm) var(--sp-md); line-height:1.7; white-space:pre; overflow-x:auto }
+.ap-cwd { font:var(--label-xs); color:var(--text-3); padding:var(--sp-2) var(--sp-md) var(--sp-sm) }
+
+/* plan kind */
+.ap-plan { font:var(--body); color:var(--text-2); line-height:1.55 }
+
+/* allowed-prompts kind */
+.ap-allowed-list { display:flex; flex-wrap:wrap; gap:6px }
+.ap-pill { display:inline-flex; align-items:center; gap:3px; font:var(--label-xs); padding:2px 8px; border-radius:var(--r-full, 9999px); background:var(--surface-low); color:var(--text-1); border:1px solid var(--bdr) }
+.ap-pill-tool { color:var(--primary); font-weight:600 }
+
+/* web kind */
+.ap-web { font:var(--label); font-family:var(--font-mono); color:var(--primary); word-break:break-all }
+.ap-web a { color:inherit; text-decoration:underline; text-underline-offset:2px }
+.ap-web a:hover { color:var(--primary-hover, var(--primary)) }
+
+/* fallback JSON */
+.ap-json { font:var(--label); font-family:var(--font-mono); white-space:pre-wrap; word-break:break-all; color:var(--text-2); background:var(--surface-low); padding:var(--sp-sm) var(--sp-md); border-radius:var(--r-sm); border:1px solid var(--bdr); overflow-x:auto }
+
+/* Think shimmer (QW6) */
+.think-shimmer { background:linear-gradient(90deg, var(--text-2) 0%, var(--text-1) 48%, var(--text-2) 52%, var(--text-2) 100%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:thinkShimmer 2s linear infinite }
+@keyframes thinkShimmer { 0% { background-position: 100% center } 100% { background-position: -100% center } }
+.think-duration { color:var(--text-3); font:var(--label-xs); font-weight:400; margin-left:var(--sp-xxs) }
 .ap-actions { display:flex; gap:var(--sp-sm) }
 .ap-actions button { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:none; transition:opacity var(--dur) }
 .ap-actions button:hover { opacity:0.85 }
