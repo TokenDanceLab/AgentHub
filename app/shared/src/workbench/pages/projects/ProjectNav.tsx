@@ -5,7 +5,7 @@
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { StatusNotice } from '../../../ui';
@@ -26,6 +26,12 @@ export type ProjectNavProps = {
   onFilterChange: (filter: ProjectFilter) => void;
   canCreateProject: boolean;
   onStartCreate: () => void;
+  /** Whether more projects are available via pagination. */
+  hasMore?: boolean | undefined;
+  /** Whether a load-more page fetch is in flight. */
+  loadingMore?: boolean | undefined;
+  /** Triggered when the scroll sentinel enters the viewport. */
+  onLoadMore?: (() => void) | undefined;
 };
 
 export function ProjectNav({
@@ -40,8 +46,33 @@ export function ProjectNav({
   onFilterChange,
   canCreateProject,
   onStartCreate,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: ProjectNavProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+
+  // ── Infinite-scroll sentinel ──
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMoreRef.current?.();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore]);
 
   return (
     <aside className={`${styles.nav} workbench-nav project-nav`}>
@@ -96,6 +127,22 @@ export function ProjectNav({
       ))}
       <div className={styles.navCaption}>视图</div>
       <FilterList activeFilter={activeFilter} onFilterChange={onFilterChange} />
+      {/* Infinite-scroll sentinel: triggers loadMore when within 200px of viewport. */}
+      <div
+        ref={sentinelRef}
+        className={styles.sentinel}
+        role="status"
+        aria-label={loadingMore ? t('projects.loading') : undefined}
+      />
+      {loadingMore ? (
+        <StatusNotice
+          {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
+          icon={<DesignNavIcon name="running" size={14} />}
+          role="status"
+        >
+          {t('projects.loading')}
+        </StatusNotice>
+      ) : null}
     </aside>
   );
 }

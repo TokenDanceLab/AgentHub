@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { HubClient } from '../hubClient';
 import type {
   ProjectArtifact,
@@ -48,6 +48,12 @@ export interface WorkbenchProjectsRoute {
   handleProjectCreate: (draft: ProjectDraft) => Promise<ProjectInfo | void>;
   handleProjectUpdate: (projectId: string, draft: ProjectDraft) => Promise<ProjectInfo | void>;
   openArtifactPreview: (projectId: string, artifact: ProjectArtifact) => void;
+  /** Triggered when the user scrolls near the bottom of the project list. */
+  loadMore: (() => void) | undefined;
+  /** Whether more pages of projects are available. */
+  hasMore: boolean;
+  /** Whether a load-more page fetch is in flight. */
+  loadingMore: boolean;
 }
 
 export function useWorkbenchProjectsRoute({
@@ -65,16 +71,57 @@ export function useWorkbenchProjectsRoute({
   const [hubProjectsStatus, setHubProjectsStatus] = useState<WorkbenchProjectsStatus>({});
   const hubProjectsEnabled = Boolean(hubClient) && !projects;
 
+  // ── Pagination state (consumes pageCursor returned by the API) ──
+  const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Refs keep loadMore stable while avoiding stale-closure issues.
+  const hasMoreRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const pageCursorRef = useRef<string | undefined>(undefined);
+
   const loadHubProjects = useCallback(async () => {
     if (!hubClient) return;
     setHubProjectsStatus((prev) => ({ ...prev, loading: true, error: undefined }));
     try {
       const response = await hubClient.listWorkspaceProjects({ pageSize: 50 });
       setHubProjects((response.items ?? []).map(workspaceProjectToProjectInfo));
+      const nextCursor = response.page?.nextCursor;
+      const more = response.page?.hasMore ?? false;
+      setPageCursor(nextCursor);
+      pageCursorRef.current = nextCursor;
+      setHasMore(more);
+      hasMoreRef.current = more;
       setHubProjectsStatus((prev) => ({ ...prev, loading: false }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load projects';
       setHubProjectsStatus((prev) => ({ ...prev, loading: false, error: message }));
+    }
+  }, [hubClient]);
+
+  // ── Infinite-scroll load-more (consumes pageCursor from the API) ──
+  const loadMore = useCallback(async () => {
+    if (!hubClient || !hasMoreRef.current || loadingMoreRef.current) return;
+    const cursor = pageCursorRef.current;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const response = await hubClient.listWorkspaceProjects({ pageSize: 50, pageCursor: cursor });
+      setHubProjects((prev) => [
+        ...prev,
+        ...(response.items ?? []).map(workspaceProjectToProjectInfo),
+      ]);
+      const nextCursor = response.page?.nextCursor;
+      const more = response.page?.hasMore ?? false;
+      pageCursorRef.current = nextCursor;
+      setPageCursor(nextCursor);
+      hasMoreRef.current = more;
+      setHasMore(more);
+    } catch {
+      // Silently ignore load-more errors; the sentinel retries on next scroll.
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
   }, [hubClient]);
 
@@ -175,5 +222,8 @@ export function useWorkbenchProjectsRoute({
     handleProjectCreate,
     handleProjectUpdate,
     openArtifactPreview,
+    loadMore: hubProjectsEnabled ? loadMore : undefined,
+    hasMore,
+    loadingMore,
   };
 }
