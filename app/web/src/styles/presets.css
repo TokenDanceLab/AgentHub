@@ -1,5 +1,6 @@
 /* AgentHub Web Presets — imports shared base + glass UI border overrides */
 @import '@shared/styles/presets-base.css';
+@import '@shared/styles/folder-colors.css';
 
 [data-preset="tokendance"]:root { --border: rgba(255, 255, 255, 0.065); }
 [data-preset="tokendance"]:root { --color-border: rgba(255, 255, 255, 0.05); }

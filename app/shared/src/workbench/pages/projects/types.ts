@@ -4,6 +4,7 @@
 
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { DesignNavIconName } from '../../designIcons';
+import type { FolderThemeColor } from '../../../folderThemeColors';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 
 export type ProjectRunStatus =
@@ -43,6 +44,13 @@ export interface ProjectInfo {
   status: string;
   /** Supplementary meta: "3 runs", "12 docs" etc. */
   meta: string;
+  /**
+   * Per-folder accent color key. When set, the active folder drives the
+   * `--td-accent` token family (chrome/border/badge tint) via the
+   * `data-folder-accent` attribute on <html>. Undefined falls back to the
+   * product default (--primary). See folderThemeColors.ts SSOT.
+   */
+  themeColor?: FolderThemeColor;
   members: string[];
   announcement: string;
   runs: ProjectRun[];
@@ -122,6 +130,7 @@ export const DEFAULT_PROJECTS: ProjectInfo[] = [
     description: '深度研究团队 · 5 人',
     status: '研究中',
     meta: '3 runs',
+    themeColor: 'emerald',
     members: ['当前用户', 'Johnny', 'Trump', 'Builder', 'Researcher'],
     announcement:
       '题材方向已收敛到二次元卡牌 Roguelite，下一步生成 prototype checklist。',
@@ -147,6 +156,7 @@ export const DEFAULT_PROJECTS: ProjectInfo[] = [
     description: '产物归档完成',
     status: '待归档确认',
     meta: '12 docs',
+    themeColor: 'amber',
     members: ['当前用户', 'Johnny', 'Reviewer'],
     announcement:
       'README、roadmap、handoff 已完成，Reviewer 正在做最终归档确认。',
