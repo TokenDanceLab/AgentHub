@@ -108,7 +108,7 @@ func TestOIDCSmoke(t *testing.T) {
 	jwtSecret := "test-secret-at-least-32-bytes-long!!"
 
 	mockSvc := &mockOIDCService{
-		authorizeURL: "https://id.vectorcontrol.tech/oidc/authorize",
+		authorizeURL: "https://id.tokendancelab.com/oidc/authorize",
 		state:        "test-state-" + uuid.NewString(),
 		accessToken:  "",
 		refreshToken: "mock-refresh-" + uuid.NewString(),
