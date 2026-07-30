@@ -91,10 +91,12 @@ describe('workbenchSessionChromeHelpers', () => {
         model: 'gpt',
         provider: 'openai',
         runtimeId: 'codex',
+        dispatchRole: 'dispatch',
       },
       {
         id: 'agent-2',
         label: 'Sparse',
+        dispatchRole: 'dispatch',
       },
     ]);
     expect(mapAgentsToComposerMentions(undefined)).toEqual([]);
