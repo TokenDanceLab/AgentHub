@@ -51,6 +51,13 @@ type EdgeCallbackService struct {
 	bus    edgeCallbackBus
 	seq    edgeCallbackSeq
 	outbox edgeCallbackOutbox
+	// ctxCache memoizes team-run ownership per pending task so the
+	// team.subagent.stream fan-out (#1478 Phase A) does not re-run three DB
+	// lookups per per-token run.agent.* event. Lazily allocated.
+	ctxCache *teamRunContextCache
+	// ctxLookup resolves a pending task's team-run ownership; overridable in
+	// tests via SetSubagentStreamLookup. Lazily backed by dbTeamRunLookup.
+	ctxLookup subagentStreamLookup
 }
 
 // NewEdgeCallbackService constructs an EdgeCallbackService.
@@ -257,6 +264,10 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 		s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
+		// #1478 Phase A: fan the same run event into the team-run view when the
+		// run belongs to a team run. No-op when the session is not a team run;
+		// never fails the chat-side stream path that already succeeded above.
+		s.publishTeamSubagentStream(ctx, runEvent, taskID)
 	}
 	s.tryAutoParseRouteDecision(ctx, ai.SessionID, runEvent.Payload)
 

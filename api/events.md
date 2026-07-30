@@ -67,7 +67,7 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 ## Hub WS 事件：重复投递 / 幂等语义
 
-SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（30 个；#1362/#1422 死面禁止写回）。
+SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 个；#1362/#1422 死面禁止写回）。
 
 | type | 方向 | 幂等键 | 重复投递语义 | 备注 |
 |---|---|---|---|---|
@@ -98,6 +98,7 @@ SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（30 �
 | `team.event` | S→C | payload 实体 id / invalidate | **UPSERT** 或 invalidate→REST | 多走 RQ invalidation |
 | `team.assignment.done` | S→C | assignment / task id | **UPSERT** / 终端 **idempotent** | bus `team.assignment.completed` → wire |
 | `team.assignment.failed` | S→C | assignment / task id | **UPSERT** / 终端 **idempotent** | |
+| `team.subagent.stream` | S→C | `(agent_task_id, event_seq)` | **UPSERT** + **水位** | 与 `agent.stream` 同语义，team 域聚合；#1478 Phase A（edge 零改，前端不消费也能观测） |
 | `notification.new` | S→C | `notification.id` | **UPSERT by id** | `Notify()` 落库后推 |
 | `friend.request` | S→C（声明） | `request_id` / 双方 user | **UPSERT by id** | 常经 `notification.new`；常量保留对齐 OpenAPI |
 | `friend.accepted` | S→C | `request_id` / `user_id` | **UPSERT** 或 invalidate | 直接 `PushToUser` |
@@ -113,7 +114,7 @@ SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（30 �
 | Runtime adapter | `run.agent.text_delta`, `run.agent.thinking`, `run.agent.tool_call`, `run.agent.tool_result`, `run.agent.file_change`, `run.agent.permission_requested`, `run.agent.permission_decided`, `run.agent.result` | adapters + transcript tests |
 | Artifact / preview | `artifact.created`, `preview.ready`, `preview.stopped` | Edge evidence/preview tests |
 | Hub IM | `auth.ok`, `message.new`, `message.recall`, `message.reaction_added`, `session.created`, `device.online` | `frame.go`, Hub WS tests |
-| Hub Agent/Team | `agent.dispatch`, `agent.stream`, `agent.done`, `agent.control`, `team.run.started`, `team.event` | Hub service/TeamRun tests |
+| Hub Agent/Team | `agent.dispatch`, `agent.stream`, `agent.done`, `agent.control`, `team.run.started`, `team.event`, `team.subagent.stream` | Hub service/TeamRun tests |
 | Edge common | `error`, `system.gap` | Shared parser/reconnect tests |
 
 `event_contract_test.go` 把文档覆盖当源码合同；runtime 清单：

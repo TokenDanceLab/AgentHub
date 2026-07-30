@@ -5911,6 +5911,7 @@ components:
             - team.event
             - team.assignment.done
             - team.assignment.failed
+            - team.subagent.stream
             - notification.new
             - friend.request
             - friend.accepted
