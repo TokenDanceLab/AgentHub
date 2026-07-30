@@ -11,6 +11,8 @@ import {
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
 import MarkdownContent from '../../ui/Markdown'
+import { RiskBadge } from '../../ui/RiskBadge'
+import type { RiskLevel } from '../../ui/RiskBadge'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -120,6 +122,8 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const userToggledRef = useRef(false)
   const thinkStartRef = useRef<number | null>(null)
   const [thinkDuration, setThinkDuration] = useState<number | undefined>(undefined)
+  // T16: critical approval second-confirm — first click arms, second click fires.
+  const [confirmingApprove, setConfirmingApprove] = useState(false)
   const isOpen = item.type === 'route' ? true : open
 
   // Think cards: auto-open when running, auto-collapse 1s after done
@@ -152,6 +156,13 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     }
   }, [item.status, item.type, item.collapsible])
 
+  // T16: reset critical second-confirm whenever the approval card's status or
+  // identity changes (decided → idle, or a new request replaces this card).
+  useEffect(() => {
+    if (item.type !== 'approval') return
+    setConfirmingApprove(false)
+  }, [item.id, item.status, item.type])
+
   // Icon: file cards use extension-based icon; others use toolName or type
   const IconComp = item.type === 'file' ? fileIcon(item)
     : iconOverride[toolKey(item)] || iconMap[item.type] || IconFileText
@@ -178,11 +189,62 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     onBlockSelect?.(interactionId, e.shiftKey)
   }
 
+  // T16: critical approvals require a second-confirm — the first click arms
+  // (button flips to "确认批准？" + red highlight), the second click fires.
+  // Non-critical approvals fire onApprove immediately.
+  const handleApproveClick = () => {
+    if (item.riskLevel === 'critical') {
+      if (!confirmingApprove) {
+        setConfirmingApprove(true)
+        return
+      }
+      setConfirmingApprove(false)
+    }
+    onApprove?.(item.id)
+  }
+
+  const handleRejectClick = () => {
+    setConfirmingApprove(false)
+    onReject?.(item.id)
+  }
+
+  // T16: keyboard shortcuts on approval cards — A approve / R deny / Esc collapse.
+  // Letters are case-insensitive; modifier combos (Cmd+A, Ctrl+R) pass through so
+  // browser/OS shortcuts still work; ignored inside editable fields so typing
+  // isn't hijacked. Mirrors codeg keyboard-shortcuts normalization spirit.
+  const handleApprovalKey = (e: React.KeyboardEvent) => {
+    if (item.type !== 'approval' || item.status !== 'waiting') return
+    const target = e.target as HTMLElement | null
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const key = e.key
+    if (key === 'Escape') {
+      e.preventDefault()
+      setConfirmingApprove(false)
+      userToggledRef.current = true
+      setOpen(false)
+      onToggle?.(item.id)
+      return
+    }
+    const lower = key.length === 1 ? key.toLowerCase() : key
+    if (lower === 'a') {
+      e.preventDefault()
+      handleApproveClick()
+      return
+    }
+    if (lower === 'r') {
+      e.preventDefault()
+      handleRejectClick()
+      return
+    }
+  }
+
   return (
     <div
       className={cls}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
       onClick={onBlockSelect ? handleSelectClick : undefined}
+      onKeyDown={item.type === 'approval' && item.status === 'waiting' ? handleApprovalKey : undefined}
       data-block-id={interactionId}
       data-row-id={item.id}
       data-selectable-card={interactionId}
@@ -304,7 +366,24 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               </div>
             )
           })()}
-          {item.apReason && item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" aria-label={t('card.approval.approve')} onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" aria-label={t('card.approval.deny')} onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
+          {item.apReason && item.status==='waiting' && (
+            <div className={`ap-actions${item.riskLevel ? ' has-risk' : ''}`}>
+              {item.riskLevel && (
+                <RiskBadge level={item.riskLevel as RiskLevel} className="ap-risk-badge">
+                  {t(`card.approval.risk.${item.riskLevel}`)}
+                </RiskBadge>
+              )}
+              <button
+                className={`ap-approve${item.riskLevel === 'critical' ? ' critical' : ''}${confirmingApprove ? ' confirming' : ''}`}
+                aria-label={confirmingApprove ? t('card.approval.confirmApprove') : t('card.approval.approve')}
+                onClick={handleApproveClick}
+              >
+                {confirmingApprove ? t('card.approval.confirmApprove') : t('card.approval.approve')}
+              </button>
+              <button className="ap-deny" aria-label={t('card.approval.deny')} onClick={handleRejectClick}>{t('card.approval.deny')}</button>
+              <span className="ap-kbd-hint">{t('card.approval.kbdHint')}</span>
+            </div>
+          )}
           {item.type === 'preview' && item.url && (
             <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
               <div className="preview-thumb" aria-hidden="true">
