@@ -24,6 +24,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
@@ -204,7 +205,7 @@ func (a *App) initServices(ctx context.Context) error {
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
-		a.OIDCService = service.NewOIDCService(a.DB, a.Config.TokenDanceID, a.Config.JWT, a.CacheClient)
+		a.OIDCService = oidc.NewService(a.DB, a.Config.TokenDanceID, a.Config.JWT, a.CacheClient)
 		a.OIDCHandler = handler.NewOIDCHandler(a.OIDCService)
 	}
 

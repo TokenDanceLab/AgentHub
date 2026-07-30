@@ -16,6 +16,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -51,7 +52,7 @@ type App struct {
 	DocumentService        *service.DocumentService
 
 	// OIDC (optional — only when TokenDance ID is configured)
-	OIDCService *service.OIDCService
+	OIDCService *oidc.Service
 	OIDCHandler *handler.OIDCHandler
 
 	// Handler layer

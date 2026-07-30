@@ -32,6 +32,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -131,7 +132,7 @@ func TestMain(m *testing.M) {
 	publicHandler := handler.NewPublicHandler(service.NewPublicStatsService(db), time.Now())
 
 	// Phase 1-7 handlers
-	oidcService := service.NewOIDCService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
+	oidcService := oidc.NewService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
 	oidcHandler := handler.NewOIDCHandler(oidcService)
 	profileService := service.NewAgentProfileService(db)
 	agentProfileHandler := handler.NewAgentProfileHandler(profileService)
