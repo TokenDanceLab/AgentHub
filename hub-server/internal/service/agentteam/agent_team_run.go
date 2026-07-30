@@ -328,6 +328,29 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		RouteAuditLog: []model.TeamRouteAuditState{},
 	}
 
+	memberIndex := s.projectTeamMembers(state, members)
+	s.projectTeamAssignments(state, assignments, pendingTaskByID, memberIndex)
+	taskRefs := s.projectTeamTasks(state, tasks, pendingTaskByID)
+	s.projectTeamRunEvents(state, runEvents)
+	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents, taskRefs)
+	state.Conflicts = projectTeamConflicts(state.Artifacts)
+	// Best-effort index refresh: never fail the read projection on delete+insert.
+	s.tryRefreshTeamArtifactIndex(runID, state.Artifacts)
+	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
+
+	for _, event := range events {
+		if handler, ok := teamStateReplayHandlers[event.Type]; ok {
+			handler(state, event)
+		}
+	}
+
+	// Replay human review events to populate the Reviews slice.
+	replayReviewEvents(events, state)
+
+	return state, nil
+}
+
+func (s *AgentTeamService) projectTeamMembers(state *model.TeamRunState, members []model.AgentTeamMember) map[string]int {
 	memberIndex := make(map[string]int, len(members))
 	for _, member := range members {
 		agentProfileID := ""
@@ -341,7 +364,10 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			Role:           member.Role,
 		})
 	}
+	return memberIndex
+}
 
+func (s *AgentTeamService) projectTeamAssignments(state *model.TeamRunState, assignments []model.AgentTeamAssignment, pendingTaskByID map[string]model.PendingAgentTask, memberIndex map[string]int) {
 	for _, assignment := range assignments {
 		runIDValue := ""
 		if assignment.RunID != nil {
@@ -378,7 +404,9 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			}
 		}
 	}
+}
 
+func (s *AgentTeamService) projectTeamTasks(state *model.TeamRunState, tasks []model.AgentTeamTask, pendingTaskByID map[string]model.PendingAgentTask) map[string]teamRuntimeTaskRef {
 	taskRefs := make(map[string]teamRuntimeTaskRef, len(tasks))
 	for _, task := range tasks {
 		assignmentID := ""
@@ -427,7 +455,10 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			})
 		}
 	}
+	return taskRefs
+}
 
+func (s *AgentTeamService) projectTeamRunEvents(state *model.TeamRunState, runEvents []model.AgentRunEvent) {
 	for _, event := range runEvents {
 		state.RunEvents = append(state.RunEvents, model.TeamRunEventState{
 			AgentTaskID: event.TaskID,
@@ -438,22 +469,6 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			CreatedAt:   event.CreatedAt,
 		})
 	}
-	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents, taskRefs)
-	state.Conflicts = projectTeamConflicts(state.Artifacts)
-	// Best-effort index refresh: never fail the read projection on delete+insert.
-	s.tryRefreshTeamArtifactIndex(runID, state.Artifacts)
-	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
-
-	for _, event := range events {
-		if handler, ok := teamStateReplayHandlers[event.Type]; ok {
-			handler(state, event)
-		}
-	}
-
-	// Replay human review events to populate the Reviews slice.
-	replayReviewEvents(events, state)
-
-	return state, nil
 }
 
 func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
