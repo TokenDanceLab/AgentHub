@@ -144,17 +144,53 @@ export const sharedWorkbenchResources = {
         description: '创建第一个项目以开始协作。',
         createFirst: '创建第一个项目',
       },
+      emptySearch: {
+        title: '没有匹配的项目',
+        description: '换个关键词试试，或创建新项目。',
+      },
+      emptyFilter: {
+        title: '当前筛选下没有项目',
+        description: '尝试调整筛选条件或切换到其他标签。',
+      },
+      noPermission: {
+        title: '无权限查看项目',
+        description: '你没有查看此项目的权限，请联系项目管理员。',
+      },
     },
     contacts: {
       nav: { internal: '组织内联系人', external: '外部联系人', newFriend: '新的朋友' },
       search: { placeholder: '搜索联系人' },
       empty: { title: '暂无联系人', description: '添加联系人开始协作' },
+      emptySearch: {
+        title: '没有匹配的联系人',
+        description: '换个关键词试试，或添加新联系人。',
+      },
+      emptyFilter: {
+        title: '当前筛选下没有联系人',
+        description: '尝试调整筛选条件或切换到其他分组。',
+      },
+      noPermission: {
+        title: '无权限查看联系人',
+        description: '你没有查看此联系人信息的权限。',
+      },
     },
     docs: {
       tab: { recent: '最近访问', mine: '归我所有', shared: '与我共享', starred: '收藏' },
       search: { placeholder: '搜索云文档' },
       newDoc: '新建文档',
       empty: { title: '暂无文档', description: '创建或上传文档' },
+      emptySearch: {
+        title: '没有找到相关文档',
+        description: '换个关键词试试，或新建文档。',
+      },
+      emptyFilter: {
+        title: '当前标签下没有文档',
+        description: '尝试调整筛选条件或切换到其他标签。',
+      },
+      noPermission: {
+        title: '无权限访问文档',
+        description: '你没有查看此文档的权限，请联系文档所有者。',
+      },
     },
     agents: {
       nav: { installed: '已安装', market: 'Agent 市场' },
@@ -165,6 +201,18 @@ export const sharedWorkbenchResources = {
         workspaceTrust: '工作目录信任', memory: '记忆', mcp: 'MCP 服务',
       },
       market: { title: 'Agent 市场', search: '搜索 Agent', install: '安装', installed: '已安装' },
+      emptySearch: {
+        title: '没有匹配的 Agent',
+        description: '换个关键词试试，或安装新 Agent。',
+      },
+      emptyFilter: {
+        title: '当前分类下没有 Agent',
+        description: '尝试调整筛选条件或查看全部 Agent。',
+      },
+      noPermission: {
+        title: '无权限访问 Agent',
+        description: '你没有访问此 Agent 的权限。',
+      },
     },
     tasks: {
       nav: { all: '全部任务', assigned: '分配给我', created: '我创建的', watching: '我关注的' },
@@ -172,6 +220,18 @@ export const sharedWorkbenchResources = {
       newTask: '新建任务',
       status: { pending: '待执行', active: '进行中', done: '已完成', failed: '失败', cancelled: '已取消' },
       empty: { title: '暂无任务', description: '创建任务分派给 Agent 队友' },
+      emptySearch: {
+        title: '没有匹配的任务',
+        description: '换个关键词试试，或新建任务。',
+      },
+      emptyFilter: {
+        title: '当前筛选下没有任务',
+        description: '尝试调整筛选条件或切换到其他视图。',
+      },
+      noPermission: {
+        title: '无权限查看任务',
+        description: '你没有查看此任务的权限。',
+      },
     },
     profilePopover: {
       sendMessage: '发送消息', editProfile: '编辑资料', copyLink: '复制链接',
@@ -338,17 +398,53 @@ export const sharedWorkbenchResources = {
         description: 'Create your first project to start collaborating.',
         createFirst: 'Create first project',
       },
+      emptySearch: {
+        title: 'No matching projects',
+        description: 'Try a different keyword, or create a new project.',
+      },
+      emptyFilter: {
+        title: 'No projects match the current filter',
+        description: 'Try adjusting filters or switching to another tab.',
+      },
+      noPermission: {
+        title: 'No permission to view projects',
+        description: 'You don\'t have permission to view this project. Contact the project admin.',
+      },
     },
     contacts: {
       nav: { internal: 'Internal contacts', external: 'External contacts', newFriend: 'New friends' },
       search: { placeholder: 'Search contacts' },
       empty: { title: 'No contacts yet', description: 'Add contacts to start collaborating' },
+      emptySearch: {
+        title: 'No matching contacts',
+        description: 'Try a different keyword, or add a new contact.',
+      },
+      emptyFilter: {
+        title: 'No contacts match the current filter',
+        description: 'Try adjusting filters or switching to another group.',
+      },
+      noPermission: {
+        title: 'No permission to view contacts',
+        description: 'You don\'t have permission to view this contact\'s information.',
+      },
     },
     docs: {
       tab: { recent: 'Recent', mine: 'Mine', shared: 'Shared with me', starred: 'Starred' },
       search: { placeholder: 'Search docs' },
       newDoc: 'New document',
       empty: { title: 'No documents yet', description: 'Create or upload a document' },
+      emptySearch: {
+        title: 'No matching documents found',
+        description: 'Try a different keyword, or create a new document.',
+      },
+      emptyFilter: {
+        title: 'No documents match the current tab',
+        description: 'Try adjusting filters or switching to another tab.',
+      },
+      noPermission: {
+        title: 'No permission to access document',
+        description: 'You don\'t have permission to view this document. Contact the document owner.',
+      },
     },
     agents: {
       nav: { installed: 'Installed', market: 'Agent marketplace' },
@@ -359,6 +455,18 @@ export const sharedWorkbenchResources = {
         workspaceTrust: 'Workspace trust', memory: 'Memory', mcp: 'MCP services',
       },
       market: { title: 'Agent marketplace', search: 'Search agents', install: 'Install', installed: 'Installed' },
+      emptySearch: {
+        title: 'No matching agents',
+        description: 'Try a different keyword, or install a new agent.',
+      },
+      emptyFilter: {
+        title: 'No agents match the current category',
+        description: 'Try adjusting filters or viewing all agents.',
+      },
+      noPermission: {
+        title: 'No permission to access agent',
+        description: 'You don\'t have permission to access this agent.',
+      },
     },
     tasks: {
       nav: { all: 'All tasks', assigned: 'Assigned to me', created: 'Created by me', watching: 'Watching' },
@@ -366,6 +474,18 @@ export const sharedWorkbenchResources = {
       newTask: 'New task',
       status: { pending: 'Pending', active: 'Active', done: 'Done', failed: 'Failed', cancelled: 'Cancelled' },
       empty: { title: 'No tasks yet', description: 'Create tasks for Agent teammates' },
+      emptySearch: {
+        title: 'No matching tasks',
+        description: 'Try a different keyword, or create a new task.',
+      },
+      emptyFilter: {
+        title: 'No tasks match the current filter',
+        description: 'Try adjusting filters or switching to another view.',
+      },
+      noPermission: {
+        title: 'No permission to view tasks',
+        description: 'You don\'t have permission to view this task.',
+      },
     },
     profilePopover: {
       sendMessage: 'Send message', editProfile: 'Edit profile', copyLink: 'Copy link',
