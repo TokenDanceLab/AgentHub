@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { ExternalLink, Pin, X } from 'lucide-react'
 
 import { Transcript } from './Transcript'
+import { TypingIndicator } from './TypingIndicator'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
 import type { BlockActionCallback, TranscriptUserItem } from '../transcript-item'
@@ -46,9 +47,15 @@ interface Props {
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: 'connected' | 'connecting' | 'disconnected' | 'error' | undefined
   /**
+   * Display names of users currently typing in this session.
+   * When non-empty, a typing indicator bar is shown below the transcript.
+   */
+  typingUserNames?: string[] | undefined
+  /**
    * Optional render slot rendered immediately below each user message.
    * Used by #1406 Phase 3 to mount the inline delegation card below a
-   * dispatch-triggering user message.
+   * dispatch-triggering user message. Returns null/undefined when no
+   * footer is needed for that item.
    */
   renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
 }
@@ -84,7 +91,7 @@ class TranscriptErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, renderUserFooter }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -183,6 +190,10 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
       ) : (
         <TranscriptErrorBoundary>
           <Transcript items={items} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
+          {/* Ephemeral typing indicator — shown when other session members are typing */}
+          {typingUserNames && typingUserNames.length > 0 && (
+            <TypingIndicator names={typingUserNames} chatMode={chatMode} />
+          )}
         </TranscriptErrorBoundary>
       )}
     </div>

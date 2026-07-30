@@ -4,6 +4,7 @@ import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
+import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
 import type { TransportStatus } from '@/api/transport';
 import { createHubClient } from '@/api/hubClient';
@@ -156,6 +157,20 @@ export function useWebHubRealtime({
     });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidation.notify(type, payload);
+
+      // ── Typing indicator — inbound ─────────
+      if (type === HUB_EVENTS.TYPING) {
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          const rec = payload as Record<string, unknown>;
+          const sessionId = typeof rec.session_id === 'string' ? rec.session_id : undefined;
+          const userId = typeof rec.user_id === 'string' ? rec.user_id : undefined;
+          if (sessionId && userId) {
+            handleIncomingTyping(sessionId, userId);
+          }
+        }
+        // Ephemeral frame — no invalidation or runtime event needed.
+        return;
+      }
 
       if (type === HUB_EVENTS.AGENT_STREAM) {
         // #1415: Route stream events through the micro-batch queue.

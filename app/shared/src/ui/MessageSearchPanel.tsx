@@ -1,7 +1,9 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage } from '../types/chat';
 import type { TranscriptBlock } from '../transcript';
 import styles from './MessageSearchPanel.module.css';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface SearchResult {
   messageId: string;
@@ -22,9 +24,7 @@ interface SearchableItem {
 }
 
 interface Props {
-  /** Legacy ChatMessage items. */
   messages?: ChatMessage[];
-  /** TranscriptBlock items (takes precedence over messages when both provided). */
   transcriptBlocks?: TranscriptBlock[];
   open: boolean;
   onClose: () => void;
@@ -119,7 +119,9 @@ export default function MessageSearchPanel({
   searchPlaceholder,
   noResultsLabel,
 }: Props) {
+  const [immediateQuery, setImmediateQuery] = useState('');
   const [query, setQuery] = useState('');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
 
   const searchableItems = useMemo(
@@ -133,6 +135,7 @@ export default function MessageSearchPanel({
 
   useEffect(() => {
     if (open) {
+      setImmediateQuery('');
       setQuery('');
       const timer = setTimeout(() => {
         const el = inputRef[0];
@@ -141,6 +144,18 @@ export default function MessageSearchPanel({
       return () => clearTimeout(timer);
     }
   }, [open]);
+
+  // Debounce: sync immediateQuery → query after SEARCH_DEBOUNCE_MS of inactivity.
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setQuery(immediateQuery);
+      debounceTimerRef.current = null;
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [immediateQuery]);
 
   useEffect(() => {
     if (!highlightMessageId) return;
@@ -193,6 +208,7 @@ export default function MessageSearchPanel({
 
   const handleResultClick = useCallback(
     (result: SearchResult) => {
+      setImmediateQuery('');
       setQuery('');
       onJumpToMessage(result.messageId, result.messageIndex);
     },
@@ -224,8 +240,8 @@ export default function MessageSearchPanel({
             ref={setInputRef}
             className={styles.input}
             type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={immediateQuery}
+            onChange={(e) => setImmediateQuery(e.target.value)}
             placeholder={searchPlaceholder}
             aria-label={searchLabel}
           />
