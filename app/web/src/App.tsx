@@ -29,15 +29,19 @@ import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
 import { useWebAuth } from '@/hooks/useWebAuth';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { ToastContainer } from '@/components/Toast';
 import styles from './App.module.css';
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <WebWorkbenchRoot />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <WebWorkbenchRoot />
+        </ThemeProvider>
+      </QueryClientProvider>
+      <ToastContainer />
+    </>
   );
 }
 
