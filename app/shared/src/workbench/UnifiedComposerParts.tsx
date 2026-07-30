@@ -11,6 +11,7 @@ export {
   ComposerMentionChips,
   ComposerQuoteBar,
   ComposerReplyBar,
+  ComposerEditBar,
   ComposerStatusStrip,
 } from './ComposerContextParts';
 

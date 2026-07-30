@@ -112,6 +112,12 @@ export interface WorkbenchFrameProps {
   mcpMarketLoading?: boolean | undefined;
   highlightedBlockId?: string | undefined;
   onHighlightEnd?: (() => void) | undefined;
+  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  isAgentRunning?: boolean | undefined;
+  /** Cancel the active agent run (stop button handler). */
+  onCancelRun?: (() => void) | undefined;
+  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
+  onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
   connectionStatus?: ConnectionStatusKind | undefined;
   setActivePage: (page: GlobalRailPage) => void;
   children?: React.ReactNode;
@@ -162,6 +168,12 @@ export interface ChatConversationHostFrameProps {
   showComposerStatus: boolean;
   highlightedBlockId?: string | undefined;
   onHighlightEnd?: (() => void) | undefined;
+  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  isAgentRunning?: boolean | undefined;
+  /** Cancel the active agent run (stop button handler). */
+  onCancelRun?: (() => void) | undefined;
+  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
+  onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {

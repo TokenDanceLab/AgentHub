@@ -80,6 +80,12 @@ export interface ComposerState {
   submitState: ComposerSubmitState;
   replyTo: ReplyToContext | null;
   quote: QuoteContext | null;
+  /**
+   * When non-null, the composer is editing an already-sent message (block id)
+   * instead of composing a new one. Submit then routes to `editMessage`
+   * (#1462 CF16) rather than `submitComposerIntent`.
+   */
+  editingMessageId: string | null;
 }
 
 export interface ComposerIntent {
@@ -92,6 +98,11 @@ export interface ComposerIntent {
   workDir?: string;
   replyTo?: ReplyToContext;
   quote?: QuoteContext;
+  /**
+   * Present when the composer is editing an existing message instead of
+   * sending a new one. Carries the transcript block id of the edited message.
+   */
+  editingMessageId?: string;
 }
 
 export interface ComposerSubmitResult {
@@ -119,4 +130,5 @@ export type ComposerAction =
   | { type: 'removeAttachment'; attachmentId: string }
   | { type: 'setReplyTo'; replyTo: ReplyToContext | null }
   | { type: 'setQuote'; quote: QuoteContext | null }
+  | { type: 'setEditingMessage'; messageId: string | null }
   | { type: 'resetAfterSubmit' };

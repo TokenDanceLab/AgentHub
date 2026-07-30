@@ -79,6 +79,34 @@ export function ComposerQuoteBar({
   );
 }
 
+/**
+ * Edit-context bar shown above the composer while editing an already-sent
+ * message (#1462 CF16). Reuses the reply bar chrome so no new CSS is needed.
+ */
+export function ComposerEditBar({
+  isSubmitting,
+  onCancel,
+}: {
+  isSubmitting: boolean;
+  onCancel: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  return (
+    <div className={styles.replyToBar} data-edit-bar="true">
+      <span className={styles.replyToLabel}>{t('composer.editingMessage')}</span>
+      <button
+        aria-label={t('aria.cancelEdit')}
+        className={styles.replyToCancel}
+        disabled={isSubmitting}
+        onClick={onCancel}
+        type="button"
+      >
+        x
+      </button>
+    </div>
+  );
+}
+
 export function ComposerMentionChips({
   mentions,
   isSubmitting,
