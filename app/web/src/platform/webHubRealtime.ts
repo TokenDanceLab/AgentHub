@@ -3,6 +3,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
+import { getSubagentStreamStore } from '@shared/workbench';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
 import type { TransportStatus } from '@/api/transport';
 import { createHubClient } from '@/api/hubClient';
@@ -178,6 +179,14 @@ export function useWebHubRealtime({
           // conversation other than the currently visible transcript.
           liveBatcher.push();
         }
+      } else if (type === HUB_EVENTS.TEAM_SUBAGENT_STREAM) {
+        // #1478 Phase C: route team subagent stream frames into the
+        // SubagentStreamStore for team-run view aggregation. No live batch
+        // needed — team.subagent.stream has its own idempotency semantics
+        // (UPSERT by agent_task_id + event_seq) and is consumed by a store
+        // that handles ordering independently from the chat transcript.
+        getSubagentStreamStore().push(payload);
+        console.log('[team.subagent.stream]', payload);
       } else {
         // A terminal/session/etc. event stays immediate, but pending stream
         // frames must reach both consumers first to preserve wire ordering.
