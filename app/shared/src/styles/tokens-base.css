@@ -299,6 +299,11 @@
   --td-glass-content-border: var(--bdr, rgba(0,0,0,0.14));   /* anchored hairline with fallback */
   --td-glass-content-text-muted: var(--text-2, rgba(255,255,255,0.5));
 
+  /* Adaptive chrome hairline — auto-inverts across light/dark themes and stays
+     visible on frosted glass veils where a fixed --border washes out.
+     Default falls back to --bdr; @supports block below upgrades to color-mix(). */
+  --td-border-hairline: var(--bdr, rgba(0, 0, 0, 0.14));
+
   /* Light page fill (light-theme opaque panels) */
   --glass-light-fill: rgba(250, 250, 251, 0.92);
 
@@ -435,5 +440,14 @@ body {
     --glass-elev-3: 0 12px 36px rgba(15, 23, 42, 0.12);
     --ring-width: 3px;
     --focus-ring: 0 0 0 4px var(--ring);
+  }
+}
+
+/* Adaptive chrome hairline upgrade — color-mix() auto-inverts across light/dark
+   themes and stays visible on frosted glass veils where a fixed --border washes out.
+   Falls back to --bdr (set in :root above) where color-mix() is unsupported. */
+@supports (color: color-mix(in oklch, white, black)) {
+  :root {
+    --td-border-hairline: color-mix(in oklch, var(--foreground) 13%, transparent);
   }
 }
