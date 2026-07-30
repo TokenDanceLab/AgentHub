@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { getAgentActivityStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
-import { getSubagentStreamStore } from '@shared/workbench';
+import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HubWSHandle, HubWSOptions } from '@/api/hubWS';
@@ -609,6 +609,89 @@ describe('team.subagent.stream dispatch (#1478 Phase C)', () => {
     expect(bEvents).toHaveLength(1);
     expect(aEvents[0]!.payload).toEqual({ content: 'a1' });
     expect(bEvents[0]!.payload).toEqual({ content: 'b1' });
+
+    harness.unmount();
+    harness.clear();
+  });
+});
+
+describe('agent.dispatch → MessageDelegationStore (#1406 Phase 3)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    getMessageDelegationStore().reset();
+    vi.useRealTimers();
+  });
+
+  it('indexes agent.dispatch by trigger_message_id for inline cards', () => {
+    const harness = mountRealtimeHarness();
+    const store = getMessageDelegationStore();
+
+    harness.emit(HUB_EVENTS.AGENT_DISPATCH, {
+      task_id: 'task-dispatch-1',
+      trigger_message_id: 'msg-dispatch-1',
+      session_id: 'hub-session-1',
+      agent_instance_id: 'agent-1',
+      display_name: 'Researcher',
+      created_at: '2026-07-31T00:00:00Z',
+    });
+
+    const entries = store.getEntriesByMessage('msg-dispatch-1');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.taskId).toBe('task-dispatch-1');
+    expect(entries[0]!.triggerMessageId).toBe('msg-dispatch-1');
+    expect(entries[0]!.displayName).toBe('Researcher');
+    expect(entries[0]!.status).toBe('dispatching');
+
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('transitions dispatching → streaming → done across agent lifecycle frames', () => {
+    const harness = mountRealtimeHarness();
+    const store = getMessageDelegationStore();
+
+    harness.emit(HUB_EVENTS.AGENT_DISPATCH, {
+      task_id: 'task-lifecycle',
+      trigger_message_id: 'msg-lifecycle',
+      session_id: 'hub-session-1',
+      display_name: 'Planner',
+      created_at: '2026-07-31T00:00:00Z',
+    });
+    harness.emit(HUB_EVENTS.AGENT_STREAM, {
+      task_id: 'task-lifecycle',
+      session_id: 'hub-session-1',
+      event_seq: 1,
+      event_type: 'run.agent.text_delta',
+      created_at: '2026-07-31T00:00:01Z',
+    });
+    harness.emit(HUB_EVENTS.AGENT_DONE, {
+      task_id: 'task-lifecycle',
+      session_id: 'hub-session-1',
+      result_summary: 'done',
+      created_at: '2026-07-31T00:00:02Z',
+    });
+
+    const entry = store.state.byTaskId['task-lifecycle'];
+    expect(entry?.status).toBe('done');
+    expect(entry?.triggerMessageId).toBe('msg-lifecycle');
+
+    harness.unmount();
+    harness.clear();
+  });
+
+  it('ignores agent.dispatch frames without trigger_message_id', () => {
+    const harness = mountRealtimeHarness();
+    const store = getMessageDelegationStore();
+
+    harness.emit(HUB_EVENTS.AGENT_DISPATCH, {
+      task_id: 'task-no-msg',
+      session_id: 'hub-session-1',
+      created_at: '2026-07-31T00:00:00Z',
+    });
+    expect(store.state.byTaskId['task-no-msg']).toBeUndefined();
 
     harness.unmount();
     harness.clear();

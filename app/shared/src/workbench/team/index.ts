@@ -16,3 +16,18 @@ export {
   SubagentTranscript,
   type SubagentTranscriptProps,
 } from './SubagentTranscript';
+
+export {
+  InlineDelegationCard,
+  type InlineDelegationCardProps,
+} from './InlineDelegationCard';
+
+export {
+  createMessageDelegationStore,
+  getMessageDelegationStore,
+  type MessageDelegationStore,
+  type MessageDelegationState,
+  type DelegationEntry,
+  type DelegationStatus,
+  type MessageDelegationListener,
+} from './MessageDelegationStore';
