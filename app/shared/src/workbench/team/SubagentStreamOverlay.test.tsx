@@ -132,8 +132,8 @@ describe('SubagentStreamOverlay', () => {
     fireEvent.click(chipBtn);
     expect(chipBtn).toHaveAttribute('aria-expanded', 'true');
 
-    // Should show event detail
-    expect(screen.getByText('thinking')).toBeInTheDocument();
+    // Should show event detail (Phase 3: thinking → 思考 label via SubagentTranscript)
+    expect(screen.getByText('思考')).toBeInTheDocument();
   });
 
   it('renders event details when expanded', () => {
@@ -152,8 +152,9 @@ describe('SubagentStreamOverlay', () => {
       }));
     });
     render(<SubagentStreamOverlay />);
-    expect(screen.getByText('thinking')).toBeInTheDocument();
-    expect(screen.getByText('tool_call')).toBeInTheDocument();
+    // Phase 3: event_type renders as Chinese label via SubagentTranscript
+    expect(screen.getByText('思考')).toBeInTheDocument();
+    expect(screen.getByText('工具调用')).toBeInTheDocument();
     expect(screen.getByText(/Step 1 reasoning/)).toBeInTheDocument();
     expect(screen.getByText(/read_file/)).toBeInTheDocument();
   });
@@ -165,8 +166,8 @@ describe('SubagentStreamOverlay', () => {
       testStore.push(makeEvent({ agent_task_id: 'task-1', event_seq: 2, event_type: 'text_delta' }));
     });
     render(<SubagentStreamOverlay />);
-    // Should have 2 unique event rows, not 3
-    const eventRows = document.querySelectorAll('[class*="eventRow"]');
+    // Should have 2 unique event entries, not 3 (Phase 3: SubagentTranscript uses [data-event-category])
+    const eventRows = document.querySelectorAll('[data-event-category]');
     expect(eventRows.length).toBe(2);
   });
 
