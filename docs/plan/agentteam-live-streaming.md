@@ -1,6 +1,6 @@
 # SPEC — agentteam 子任务实时直播（对标 codeg live subagent transcripts）
 
-> 状态: **DRAFT — 待管理员定档** · Issue #1478 · 关联 #1385（投影层）
+> 状态: **Phase A 已合入 master `d4270360`** · Phase B/C DRAFT 待管理员定档 · Issue #1478 · 关联 #1385（投影层）
 > 作者: senior-architect agent · 日期: 2026-07-30
 > 权威: `docs/progress/MASTER.md` P3 表 · `api/events.md` 事件合同
 > 证据: codeg v0.22.1 `c612e6c2` + `D:\Code\Temp\codeg-research\{v0.22.1-DELTA,protocol,frontend,backend}.md`；AgentHub `hub-server/internal/service/agentteam/`、`edge-server/internal/adapters/`、`app/shared/src/hubEvents.ts` 实测
@@ -272,6 +272,8 @@ TypeTeamSubagentSubscription = "team.subagent.subscribe"  // C→S 订阅 / 重�
 ## 6. 分阶段实施计划
 
 ### Phase A — 事件归属与 bus fan-out（后端，可独立验证）
+
+> **状态：已合入 master `d4270360`（2026-07-30）。** 实现与下表差异：A3 只加了 1 个帧常量 `TypeTeamSubagentStream`（activity/batch/subscribe 留待 Phase B/C 有 wire producer 再加，遵守 #1362/#1422 死面禁令）；A2 LRU 缓存自实现（无外部依赖，bounded 1024）；A6 测试落在 `agent_team_subagent_stream_test.go`。edge 零改、前端未改也能观测。
 
 **目标**：`team.subagent.stream` bus 事件落地，WS 帧先发（前端不消费也无妨）。
 
