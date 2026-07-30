@@ -167,6 +167,7 @@ export function mapAgentsToComposerMentions(
     const mention: ComposerMention = {
       id: agent.id,
       label: agent.name,
+      dispatchRole: 'dispatch',
     };
     if (agent.description !== undefined) mention.description = agent.description;
     if (agent.status !== undefined) mention.status = agent.status;

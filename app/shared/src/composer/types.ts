@@ -10,6 +10,13 @@ export interface ComposerMention {
   model?: string;
   provider?: string;
   runtimeId?: string;
+  /**
+   * #1406 @agent 派单：区分「上下文附注」vs「派单指令」。
+   * - 'context'（default）：仅附注到消息上下文，不触发 agent-tasks
+   * - 'dispatch'：触发 POST /web/agent-tasks 派单
+   * mapAgentsToComposerMentions 标记 agent 类为 dispatch。
+   */
+  dispatchRole?: 'context' | 'dispatch';
 }
 
 /**
