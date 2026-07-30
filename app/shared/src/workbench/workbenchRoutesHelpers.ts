@@ -116,6 +116,11 @@ export function buildProjectsPageProps(
   assignDefined(props, 'projectsError', status?.error);
   assignDefined(props, 'projectsLoading', status?.loading);
 
+  // ── Infinite-scroll pagination ──
+  assignDefined(props, 'hasMore', projectsRoute.hasMore);
+  assignDefined(props, 'loadingMore', projectsRoute.loadingMore);
+  assignDefined(props, 'onLoadMore', projectsRoute.loadMore);
+
   return props;
 }
 

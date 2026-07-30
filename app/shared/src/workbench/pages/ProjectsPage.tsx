@@ -57,6 +57,9 @@ export function ProjectsPage({
   onProjectUpdate,
   onRunClick,
   onArtifactClick,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: ProjectsPageProps): React.ReactElement {
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
 
@@ -106,6 +109,9 @@ export function ProjectsPage({
         onFilterChange={onFilterChange}
         canCreateProject={canCreateProject}
         onStartCreate={startProjectCreate}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
       />
       <ProjectMain
         activeProject={activeProject}

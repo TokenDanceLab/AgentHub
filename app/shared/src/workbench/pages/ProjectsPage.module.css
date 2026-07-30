@@ -1144,6 +1144,13 @@
   min-height: 202px;
 }
 
+/* ── Infinite-scroll sentinel (1px trigger, invisible) ── */
+.sentinel {
+  height: 1px;
+  width: 100%;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .search,
   .navRow,
