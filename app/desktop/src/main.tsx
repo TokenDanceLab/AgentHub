@@ -10,6 +10,8 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import i18n from '@/i18n';
+import { setToastHandler } from '@shared/errorReporting';
+import { useToastStore } from '@/stores/toastStore';
 import '@/styles/tokens.css';
 import '@/styles/themes.css';
 import '@/styles/presets.css';
@@ -72,6 +74,14 @@ async function hydrateEdgeAuthToken(): Promise<void> {
 }
 
 function renderApp(): void {
+  // Bridge global error reporter to toast notifications
+  setToastHandler((config) => {
+    useToastStore.getState().showToast(
+      config.severity as 'error' | 'warning' | 'info',
+      config.title ? `${config.title}: ${config.message}` : config.message,
+    );
+  });
+
   createRoot(rootElement).render(
     <StrictMode>
       <LanguageProvider>

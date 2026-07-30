@@ -45,6 +45,7 @@ import { getHubClient } from '@/api/hubQueries';
 import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore } from '@/stores/toastStore';
+import { ToastContainer } from '@/components/Toast';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -83,24 +84,27 @@ export default function App() {
   }
 
   return (
-    <DesktopChrome showNavigationControls={entryMode !== 'entry'}>
-      {entryMode === 'entry' ? (
-        <DesktopEntryGate
-          onLoginSuccess={handleLoginSuccess}
-          onContinueDemo={continueDemo}
-          onConnectEdge={handleConnectEdge}
-          onToggleTheme={toggleAppliedAgentHubTheme}
-          edgeOnline={edgeOnline}
-        />
-      ) : (
-        <DesktopWorkbenchApp
-          onLogout={() => {
-            window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
-            setEntryMode('entry');
-          }}
-        />
-      )}
-    </DesktopChrome>
+    <>
+      <DesktopChrome showNavigationControls={entryMode !== 'entry'}>
+        {entryMode === 'entry' ? (
+          <DesktopEntryGate
+            onLoginSuccess={handleLoginSuccess}
+            onContinueDemo={continueDemo}
+            onConnectEdge={handleConnectEdge}
+            onToggleTheme={toggleAppliedAgentHubTheme}
+            edgeOnline={edgeOnline}
+          />
+        ) : (
+          <DesktopWorkbenchApp
+            onLogout={() => {
+              window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
+              setEntryMode('entry');
+            }}
+          />
+        )}
+      </DesktopChrome>
+      <ToastContainer />
+    </>
   );
 }
 
