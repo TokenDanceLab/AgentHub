@@ -94,6 +94,27 @@
   border-top: 1px solid var(--border);
 }
 
+/* Entrance fade: content fades in over 150ms when expanded */
+@media (prefers-reduced-motion: no-preference) {
+  .content {
+    animation: collapsibleFadeIn 150ms ease-out;
+  }
+}
+
+/*
+ * TODO: 退场 presence — 当前 content 在收起时立即从 DOM 移除，无退场动画。
+ * 后续可引入轻量 <Presence> 包装（或 framer AnimatePresence），
+ * 在 expanded=false 时保留 DOM 元素 150ms 让 opacity transition 完成再移除。
+ */
+@keyframes collapsibleFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ── Color schemes ─────────────── */
 
 .schemeDefault {
