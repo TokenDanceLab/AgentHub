@@ -62,6 +62,62 @@ describe('CollapsibleBlock', () => {
     expect(header.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('sets data-state on container', () => {
+    const { container } = render(
+      <CollapsibleBlock label="Section">
+        <p>Content</p>
+      </CollapsibleBlock>,
+    );
+    const block = container.firstElementChild as HTMLElement;
+    expect(block.getAttribute('data-state')).toBe('closed');
+  });
+
+  it('updates data-state when expanded', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <CollapsibleBlock label="Section">
+        <p>Content</p>
+      </CollapsibleBlock>,
+    );
+    const block = container.firstElementChild as HTMLElement;
+    expect(block.getAttribute('data-state')).toBe('closed');
+
+    await user.click(screen.getByRole('button'));
+    expect(block.getAttribute('data-state')).toBe('open');
+
+    await user.click(screen.getByRole('button'));
+    expect(block.getAttribute('data-state')).toBe('closed');
+  });
+
+  it('sets aria-controls on button and id on content', () => {
+    render(
+      <CollapsibleBlock label="Section" defaultExpanded={true}>
+        <p>Content</p>
+      </CollapsibleBlock>,
+    );
+    const header = screen.getByRole('button');
+    const contentId = header.getAttribute('aria-controls');
+    expect(contentId).toBeTruthy();
+
+    const content = document.getElementById(contentId!);
+    expect(content).toBeTruthy();
+    expect(content?.tagName).toBe('DIV');
+  });
+
+  it('does not render content when collapsed (aria-controls still present)', () => {
+    render(
+      <CollapsibleBlock label="Section">
+        <p data-testid="child">Hidden content</p>
+      </CollapsibleBlock>,
+    );
+    const header = screen.getByRole('button');
+    const contentId = header.getAttribute('aria-controls');
+    expect(contentId).toBeTruthy();
+
+    // Content element should not exist in DOM when collapsed
+    expect(document.getElementById(contentId!)).toBeNull();
+  });
+
   it('renders a badge when provided', () => {
     render(
       <CollapsibleBlock label="Section" badge="bash">
