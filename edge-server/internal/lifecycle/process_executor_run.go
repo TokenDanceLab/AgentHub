@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -100,143 +99,24 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
 
 		// Phase 3 — Decide: context checks, session retry, parse error, evidence gate, finish.
-		// Context budget compaction check: after the stream completes, evaluate
-		// whether the context budget exceeded the auto-compaction threshold.
-		// When triggered, we log the budget state and emit a compaction event
-		// so upstream session managers can compact the actual message history.
-		if compact := planContextCompaction(runCtx.Budget, run.ID); compact.Emit {
-			slog.Info("process: context compaction threshold reached", "runId", run.ID, "usagePercent", compact.UsagePct, "tokensUsed", compact.TokensUsed, "tokensRemaining", compact.Remaining)
-			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), compact.Payload)
-		}
-
-		if planCancelledRun(ctx.Err(), e.runStatus(run.ID)).Cancelled {
-			e.publishCancelled(run)
-			e.sendSubAgentResult(run.ID, "cancelled", nil)
+		switch e.completeRunAttempt(ctx, run, &runCtx, proc, attempt, lastWaitErr, parseErr, outStore) {
+		case outcomeDone:
 			return
-		}
-
-		// Session conflict retry: if CC failed quickly with a session conflict
-		// error and this is the first attempt, reset the session ID and retry.
-		// On Windows, exec.ExitError.Error() does not include stderr content
-		// (stderr is read via StderrPipe in a separate goroutine and stored in
-		// outStore), so we also pass the captured stderr output.
-		var stderrCapture string
-		if planOutputStoreCapture(outStore != nil).Read {
-			stderrCapture, _ = outStore.ReadAll()
-		}
-		sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(proc.subprocessStart), outStore != nil)
-		if sessionPlan.Retry {
-			newSession := newRandomSessionID()
-			slog.Warn("process: session conflict detected, retrying with fresh session ID", "runId", run.ID, "oldSessionId", runCtx.SessionID, "newSessionId", newSession, "error", lastWaitErr)
-			runCtx = withFreshSession(runCtx, newSession)
-			// Clean up the tracked process from this attempt before retrying.
-			e.mu.Lock()
-			delete(e.processes, run.ID)
-			if s, ok := e.runOutputs[run.ID]; shouldApplyTrackedClose(sessionPlan.CloseOutput, ok) {
-				_ = s.Close()
-				delete(e.runOutputs, run.ID)
-			}
-			e.mu.Unlock()
-			// Reset run status back to queued so the retry can transition to started.
-			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); planSessionRetryStatus(ok).LogReset {
-				slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
-			}
+		case outcomeRetry:
 			continue
+		case outcomeBreak:
+			// Non-recoverable wait error — fall through to fault escalation.
+			goto escalate
 		}
-
-		// Wait error is not a session-conflict retry. Leave the session-retry
-		// loop so fault-escalation can re-launch the run when configured.
-		// Terminal publishFailed happens after the escalation check below.
-		if planSessionRetryBreak(lastWaitErr).Break {
-			break
-		}
-		// #179: handle structured output parse errors with recoverability distinction.
-		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
-		// Recoverable errors (malformed event, orphaned tool) emit a warning and
-		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-		parseHandle := planStructuredParseHandleFromErr(parseErr, run.ID)
-		if parseHandle.WarnRecoverable {
-			slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
-			e.bus.Publish(adapters.BusEventContextWarning, runScope(run), parseHandle.WarningPayload)
-		} else if parseHandle.FailFatal {
-			e.publishFailed(run, structuredOutputParseFailed(parseErr))
-			e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
-			return
-		}
-		// Evidence gate: run post-completion verification before marking finished.
-		// When enabled (default), the gate runs type-specific checks (Go build+vet,
-		// TypeScript typecheck+test, generic file existence) against the workDir.
-		// If verification fails, the run is marked as completed_with_issues instead
-		// of finished, and the full evidence output is stored in run metadata.
-		attempt := planEvidenceGateAttempt(isEvidenceGateEnabledForRun(e.evidenceGateCfg, proc.workDir))
-		finalStatus := attempt.FinalStatus
-		if attempt.RunGate {
-			evidenceResult := runEvidenceGate(proc.workDir)
-			e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-			evidencePlan := planEvidenceGateResult(evidenceResult.Passed)
-			finalStatus = evidencePlan.FinalStatus
-			if evidencePlan.LogFailure {
-				slog.Warn("process: evidence gate verification failed", "runId", run.ID, "projectType", evidenceResult.ProjectType, "summary", evidenceResult.Summary)
-			}
-		}
-
-		finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
-		if planPublishStatus(ok).Publish {
-			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
-			e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
-			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
-			e.fireHubDone(run.ID, RunResponse(finished))
-		}
-		e.checkPersistError(run.ID)
-		return
 	}
 
+escalate:
 	// Exhausted session retries — attempt fault escalation if configured.
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
-	if planFaultEscalationAttempt(lastWaitErr, e.faultEscalationCfg).Attempt {
-		r, ok := e.store.GetRun(run.ID)
-		if planFaultEscalationHandoff(ok, e.faultEscalationCfg, r.RetryCount).Retry {
-			newCount := nextFaultEscalationRetryCount(r.RetryCount)
-			e.store.SetRunRetryCount(run.ID, newCount)
-			run.RetryCount = newCount
-			// Re-queue from started (normal wait failure) or failed (defensive).
-			// Status mutation only - #867 successor handoff stays below.
-			_, requeued := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed")
-			run = applyFaultEscalationQueuedStatus(run, requeued)
-			// Attempt-local cleanup only - leave concurrency slot / hub bookkeeping
-			// for the successor attempt. Terminal finish is owned by the successor.
-			e.mu.Lock()
-			delete(e.processes, run.ID)
-			s, hasOut := e.runOutputs[run.ID]
-			oldCancel, hasOldCancel := e.running[run.ID]
-			cleanup := planFaultEscalationCleanup(hasOut, hasOldCancel)
-			if cleanup.CloseOutput {
-				_ = s.Close()
-				delete(e.runOutputs, run.ID)
-			}
-			// Re-register the cancel func before releasing the slot ownership so
-			// Cancel() and max-concurrent accounting stay consistent across handoff.
-			newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
-			if cleanup.InvokeOldCancel {
-				oldCancel()
-			}
-			e.running[run.ID] = cancel
-			e.mu.Unlock()
-			e.bus.Publish("run.fault_escalation.retry", runScope(run),
-				faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
-			slog.Warn("process: fault escalation auto-retry", "runId", run.ID, "retryCount", newCount, "maxRetries", e.faultEscalationCfg.MaxRetries)
-			terminalFinish = false
-			go e.run(newCtx, run, runCtx)
-			return
-		}
-		// Max retries reached — emit escalation exhausted event (#867).
-		if exhausted := planFaultEscalationExhausted(); exhausted.Publish {
-			e.bus.Publish("run.fault_escalation.exhausted", runScope(run),
-				faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
-			if exhausted.Log {
-				slog.Warn("process: fault escalation exhausted", "runId", run.ID)
-			}
-		}
+	if e.handleFaultEscalation(ctx, &run, runCtx, lastWaitErr, lastOutStore) {
+		// Successor attempt launched; it owns the terminal finish.
+		terminalFinish = false
+		return
 	}
 	// Report the last error (terminal failure after retries exhausted or disabled).
 	if planTerminalWaitFailure(lastWaitErr).Publish {
