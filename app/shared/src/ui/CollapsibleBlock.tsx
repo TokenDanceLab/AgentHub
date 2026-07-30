@@ -1,4 +1,4 @@
-import React, { useState, useCallback, type ReactNode } from 'react';
+import React, { useState, useCallback, useId, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import styles from './CollapsibleBlock.module.css';
 
@@ -45,6 +45,7 @@ export function CollapsibleBlock({
   children,
 }: CollapsibleBlockProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const contentId = useId();
 
   const toggle = useCallback(() => setExpanded((v) => !v), []);
 
@@ -52,12 +53,16 @@ export function CollapsibleBlock({
   const hasMoreLines = previewLines.length > maxPreviewLines;
 
   return (
-    <div className={`${styles.block} ${schemeClass(colorScheme)} ${expanded ? styles.expanded : ''}`}>
+    <div
+      className={`${styles.block} ${schemeClass(colorScheme)} ${expanded ? styles.expanded : ''}`}
+      data-state={expanded ? 'open' : 'closed'}
+    >
       <button
         type="button"
         className={styles.header}
         onClick={toggle}
         aria-expanded={expanded}
+        aria-controls={contentId}
       >
         <span className={styles.headerLeft}>
           {icon && <Icon name={icon} size={16} />}
@@ -78,7 +83,11 @@ export function CollapsibleBlock({
         </div>
       ) : null}
 
-      {expanded && <div className={styles.content}>{children}</div>}
+      {expanded && (
+        <div id={contentId} className={styles.content}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
