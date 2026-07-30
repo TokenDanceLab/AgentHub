@@ -12,6 +12,7 @@ import type { WorkbenchConversation } from '../platform';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { SubagentStreamOverlay } from './team/SubagentStreamOverlay';
 
 export interface ChatViewBridgeProps {
   /** Filtered + optimistic transcript blocks to render. */
@@ -106,23 +107,26 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   }, [activeConversation, dismissedPinnedIds, onToast]);
 
   return (
-    <ChatViewTranscript
-      transcript={displayTranscript}
-      chatMode={chatMode}
-      onAgentClick={onAgentClick}
-      onBlockContextMenu={onBlockContextMenu}
-      onBlockSelect={onBlockSelect}
-      onBlockAction={onBlockAction}
-      onReviewFile={onReviewFile}
-      onDeploySubmit={onDeploySubmit}
-      selectedBlockIds={selectedBlockIds}
-      selectionMode={selectionMode}
-      softHiddenBlockIds={softHiddenBlockIds}
-      actionedBlockIds={actionedBlockIds}
-      highlightedBlockId={highlightedBlockId}
-      onHighlightEnd={onHighlightEnd}
-      pinnedAnnouncement={pinnedAnnouncement}
-      connectionStatus={connectionStatus}
-    />
+    <>
+      <ChatViewTranscript
+        transcript={displayTranscript}
+        chatMode={chatMode}
+        onAgentClick={onAgentClick}
+        onBlockContextMenu={onBlockContextMenu}
+        onBlockSelect={onBlockSelect}
+        onBlockAction={onBlockAction}
+        onReviewFile={onReviewFile}
+        onDeploySubmit={onDeploySubmit}
+        selectedBlockIds={selectedBlockIds}
+        selectionMode={selectionMode}
+        softHiddenBlockIds={softHiddenBlockIds}
+        actionedBlockIds={actionedBlockIds}
+        highlightedBlockId={highlightedBlockId}
+        onHighlightEnd={onHighlightEnd}
+        pinnedAnnouncement={pinnedAnnouncement}
+        connectionStatus={connectionStatus}
+      />
+      <SubagentStreamOverlay />
+    </>
   );
 });
