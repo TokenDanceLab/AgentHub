@@ -15,6 +15,7 @@ import type {
   HubFrame,
 } from '@/api/hubEvents';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import {
   createDesktopHubEventBridge,
   type DesktopHubEventBridgeHandle,
@@ -244,6 +245,17 @@ export function useHubEventStream(
         case HUB_EVENTS.AGENT_FAILED:
         case HUB_EVENTS.AGENT_CANCEL:
           if (payload) setLastAgentTask(payload as HubAgentTask);
+          break;
+
+        // ── Typing indicator — inbound ──────────
+        case HUB_EVENTS.TYPING:
+          if (payload) {
+            const sessionId = readSessionId(payload);
+            const userId = readString(payload, 'user_id');
+            if (sessionId && userId) {
+              handleIncomingTyping(sessionId, userId);
+            }
+          }
           break;
 
         case HUB_EVENTS.AGENT_CONTROL:

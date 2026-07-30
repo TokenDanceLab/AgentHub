@@ -93,4 +93,58 @@ describe('Transcript auto-follow', () => {
     );
     consoleError.mockRestore();
   });
+
+  // ── Scroll-to-bottom button tests ────────────────────────────────
+
+  it('shows scroll-to-bottom button when user scrolls up', () => {
+    const { getByRole, queryByRole } = render(<Transcript items={[agent('a1'), agent('a2')]} chatMode="group" />);
+    const log = getByRole('log');
+
+    // Default: near bottom → no button
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 395 });
+    fireEvent.scroll(log);
+
+    // No button when near bottom
+    expect(queryByRole('button', { name: '回到底部' })).not.toBeInTheDocument();
+
+    // Scroll up → button appears
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 50 });
+    fireEvent.scroll(log);
+
+    expect(queryByRole('button', { name: '回到底部' })).toBeInTheDocument();
+  });
+
+  it('scrolls to bottom when scroll-to-bottom button is clicked', async () => {
+    const { getByRole } = render(<Transcript items={[agent('a1'), agent('a2')]} chatMode="group" />);
+    const log = getByRole('log');
+
+    // Scroll up
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 50 });
+    fireEvent.scroll(log);
+
+    const btn = getByRole('button', { name: '回到底部' });
+    expect(btn).toBeInTheDocument();
+
+    // Now simulate new content that makes scrollHeight larger
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 800, scrollTop: 50 });
+
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(log.scrollTop).toBe(800));
+  });
+
+  it('hides scroll-to-bottom button after scrolling back to bottom', () => {
+    const { getByRole, queryByRole } = render(<Transcript items={[agent('a1'), agent('a2')]} chatMode="group" />);
+    const log = getByRole('log');
+
+    // Scroll up
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 50 });
+    fireEvent.scroll(log);
+    expect(queryByRole('button', { name: '回到底部' })).toBeInTheDocument();
+
+    // Scroll back to bottom
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 395 });
+    fireEvent.scroll(log);
+    expect(queryByRole('button', { name: '回到底部' })).not.toBeInTheDocument();
+  });
 });

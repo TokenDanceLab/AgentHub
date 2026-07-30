@@ -3,6 +3,36 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 .transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-gutter:stable; scrollbar-width:thin; padding:0 0 0 10px }
+/* ── Scroll-to-bottom button ────────────────────────────────────────── */
+.scroll-to-bottom-btn {
+  position: sticky;
+  bottom: 16px;
+  align-self: center;
+  z-index: 10;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--bdr);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  opacity: 0.85;
+}
+.scroll-to-bottom-btn:hover {
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  color: var(--text-1);
+  border-color: var(--bdr-strong, var(--bdr));
+}
+.scroll-to-bottom-btn:active {
+  transform: scale(0.95);
+}
 
 /* ── Date divider ─────────────────────────────────────────────────── */
 .date-divider {
@@ -347,3 +377,4 @@
 /* ── Spacer placeholder — preserves symmetric grp-row layout ──────── */
 .dm-spacer { flex-shrink:0; visibility:hidden }
 .dm-spacer .ag-av { visibility:hidden }
+
