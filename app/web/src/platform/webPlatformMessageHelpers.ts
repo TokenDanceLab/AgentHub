@@ -44,7 +44,27 @@ export function buildHubComposerPrompt(intent: ComposerIntent): string {
     lines.push('[AgentHub attachments]', attachmentContext.join('\n\n'));
   }
 
-  return lines.filter(Boolean).join('\n\n');
+  const text = lines.filter(Boolean).join('\n\n');
+
+  // #1406 @agent 派单：当有 dispatch mention 时，按 openapi 规范用 JSON 包装
+  // content 以携带 @Agent mention 元数据（openapi.yaml:3577）。
+  const dispatchMentions = intent.mentions.filter(
+    (m) => m.dispatchRole === 'dispatch',
+  );
+  if (dispatchMentions.length > 0) {
+    return JSON.stringify({
+      text,
+      mentions: dispatchMentions.map((mention) => ({
+        id: mention.id,
+        label: mention.label,
+        ...(mention.runtimeId ? { runtime_id: mention.runtimeId } : {}),
+        ...(mention.model ? { model: mention.model } : {}),
+        dispatch_role: mention.dispatchRole,
+      })),
+    });
+  }
+
+  return text;
 }
 
 /** Resolve Hub content_type + content payload for a composer intent. */

@@ -27,6 +27,7 @@ export function buildHubAgentTaskModelParams(intent: ComposerIntent): Record<str
       label: mention.label,
       ...(mention.runtimeId ? { runtime_id: mention.runtimeId } : {}),
       ...(mention.model ? { model: mention.model } : {}),
+      ...(mention.dispatchRole ? { dispatch_role: mention.dispatchRole } : {}),
     })),
     attachments: intent.attachments.map((attachment) => ({
       id: attachment.id,
