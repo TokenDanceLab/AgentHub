@@ -102,6 +102,7 @@ export function UnifiedComposer({
   const [mentionTrigger, setMentionTrigger] = useState<MentionTrigger | null>(null);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
   const [popoverCoords, setPopoverCoords] = useState<MentionPopoverCoords | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const compositionRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const listboxId = useId();
@@ -275,6 +276,54 @@ export function UnifiedComposer({
     if (effect.kind === 'submit') event.currentTarget.form?.requestSubmit();
   }
 
+  /* ═══════════════ onPaste / onDrop attachment (T9 / UI2+UI3) ═══════════
+     Extract File objects from clipboard paste or file drag-and-drop, convert
+     to ComposerAttachment (via browserFilesToComposerAttachments for content
+     preview + hash), and dispatch into the composer store. Upload is deferred
+     to ConversationHost on submit.  Orthogonal to @mention popover — no
+     interaction with evaluateTrigger / compositionRef.                         */
+
+  async function handleAttachFiles(files: File[]): Promise<void> {
+    if (files.length === 0 || view.isSubmitting) return;
+    const attachments = await browserFilesToComposerAttachments(files);
+    dispatchComposerAttachmentAdds(dispatchComposer, attachments);
+  }
+
+  function handleTextareaPaste(event: React.ClipboardEvent<HTMLTextAreaElement>): void {
+    const files = Array.from(event.clipboardData.files);
+    if (files.length === 0) return;
+    event.preventDefault();
+    void handleAttachFiles(files);
+  }
+
+  function handleFormDragEnter(event: React.DragEvent<HTMLFormElement>): void {
+    if (event.dataTransfer.types?.includes('Files')) {
+      event.preventDefault();
+      setDragOver(true);
+    }
+  }
+
+  function handleFormDragOver(event: React.DragEvent<HTMLFormElement>): void {
+    if (event.dataTransfer.types?.includes('Files')) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  function handleFormDragLeave(event: React.DragEvent<HTMLFormElement>): void {
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setDragOver(false);
+    }
+  }
+
+  function handleFormDrop(event: React.DragEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    setDragOver(false);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length === 0) return;
+    void handleAttachFiles(files);
+  }
+
   function selectMention(agentId: string): void {
     const action = planAddMentionAction(runtime.mentionableAgents, agentId);
     if (action) dispatchComposer(action);
@@ -306,7 +355,14 @@ export function UnifiedComposer({
   }
 
   return (
-    <form className={styles.composer} onSubmit={onSubmit}>
+    <form
+      className={styles.composer}
+      onSubmit={onSubmit}
+      onDragEnter={handleFormDragEnter}
+      onDragOver={handleFormDragOver}
+      onDragLeave={handleFormDragLeave}
+      onDrop={handleFormDrop}
+    >
       {chromeModel.replyTo && (
         <ComposerReplyBar
           isSubmitting={view.isSubmitting}
@@ -346,6 +402,7 @@ export function UnifiedComposer({
         />
       )}
       <div className={styles.composerRow}>
+        {dragOver && <div className={styles.composerDragOverlay} />}
         <textarea
           aria-label={t('aria.composerInput')}
           aria-expanded={popoverOpen}
@@ -368,6 +425,7 @@ export function UnifiedComposer({
           }}
           onSelect={(event) => evaluateTrigger(event.currentTarget)}
           onKeyDown={handleKeyDown}
+          onPaste={handleTextareaPaste}
           placeholder={view.inputPlaceholder}
           rows={1}
           value={composer.text}
