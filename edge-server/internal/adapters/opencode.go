@@ -16,6 +16,16 @@ import (
 
 // OpenCodeAdapter integrates the opencode CLI.
 //
+// DEPRECATED (ACP migration, second target): the hot path moves to
+// OpenCodeACPAdapter (opencode_acp.go) — the native `opencode acp` subcommand
+// (v1.18.5+, binary distribution, no npx wrapper) over the coder/acp-go-sdk
+// client runtime, which brings the official protocol boundary and the
+// session/request_permission approval chain in one hop. This adapter is kept
+// as the Phase 1/2 fallback/legacy path: `opencode run --format json`,
+// hand-rolled event parsing below, no ACP permission chain. Do not extend;
+// remove once opencode-acp is verified end-to-end (see
+// docs/analysis/agenthub-acp-go-migration.md §6).
+//
 // Phase 1: opencode run "prompt" — batch mode, plain text output.
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 //
