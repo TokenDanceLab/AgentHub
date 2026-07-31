@@ -42,6 +42,11 @@ type AcpAdapter struct {
 
 	// metadata carries the static adapter identification.
 	metadata AdapterMetadata
+
+	// permissionBroker bridges session/request_permission to the Edge
+	// approval chain. nil = auto-approve fallback (see
+	// acpClientHandler.RequestPermission).
+	permissionBroker *PermissionDecisionBroker
 }
 
 // NewAcpAdapter creates an experimental ACP adapter for the given agent binary.
@@ -51,8 +56,9 @@ type AcpAdapter struct {
 // displayName is shown in agent listings.
 func NewAcpAdapter(agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
 	return &AcpAdapter{
-		agentBinary: agentBinary,
-		agentArgs:   agentArgs,
+		agentBinary:      agentBinary,
+		agentArgs:        agentArgs,
+		permissionBroker: nil,
 		metadata: AdapterMetadata{
 			ID:          acpAdapterID,
 			Name:        displayName,
@@ -60,6 +66,15 @@ func NewAcpAdapter(agentBinary string, agentArgs []string, displayName string) *
 			Description: "ACP agent (experimental — JSON-RPC 2.0 over stdio)",
 		},
 	}
+}
+
+// SetPermissionBroker installs the shared PermissionDecisionBroker that
+// session/request_permission requests are bridged to (mirrors
+// ClaudeCodeAdapter.SetPermissionBroker; the API layer's
+// installPermissionBrokerLocked calls this automatically once the adapter is
+// registered).
+func (a *AcpAdapter) SetPermissionBroker(broker *PermissionDecisionBroker) {
+	a.permissionBroker = broker
 }
 
 // Metadata returns static adapter identification.
@@ -102,10 +117,12 @@ func (a *AcpAdapter) Available() bool {
 // ParseStream runs one ACP turn via the coder/acp-go-sdk client runtime:
 // initialize handshake → session/new → session/prompt → session/update
 // stream → prompt response. See runACPSession in acp_client.go for the
-// full flow and the TODO list (approval chain, fs/terminal frames, live
-// adapter verification).
+// full flow and the TODO list (fs/terminal frames, live adapter
+// verification). session/request_permission is bridged to the Edge
+// approval chain via the permission broker installed by
+// SetPermissionBroker.
 func (a *AcpAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	return runACPSession(ctx, stdout, stdin, emitter, run)
+	return runACPSession(ctx, stdout, stdin, emitter, run, a.permissionBroker)
 }
 
 // acpRunScope builds the bus event scope for an ACP run. Mirrors the
