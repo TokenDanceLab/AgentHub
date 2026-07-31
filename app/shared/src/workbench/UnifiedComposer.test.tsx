@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FormEvent } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { ComposerState } from '../composer';
+import type { ComposerMention, ComposerState } from '../composer';
 import { UnifiedComposer } from './UnifiedComposer';
 
 vi.mock('@lobehub/icons', () => ({
@@ -36,6 +36,8 @@ vi.mock('react-i18next', () => ({
         'aria.addAttachment': 'Add attachment',
         'profile.sendMessage': 'Send message',
         'composer.editingMessage': 'Editing message',
+        'composer.mentionHint': 'Select someone to mention…',
+        'composer.mentionEmpty': 'No matching agents',
       };
       let result = resources[key] ?? key;
       if (options) {
@@ -177,5 +179,210 @@ describe('UnifiedComposer execution target selection', () => {
     expect(screen.getByText('Editing message')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel edit' }));
     expect(dispatchComposer).toHaveBeenCalledWith({ type: 'setEditingMessage', messageId: null });
+  });
+});
+
+const mentionableAgents: ComposerMention[] = [
+  { id: 'reviewer', label: 'Reviewer', runtimeId: 'codex', dispatchRole: 'dispatch' },
+  { id: 'builder', label: 'Builder', runtimeId: 'claude-code', dispatchRole: 'dispatch' },
+];
+
+/** Type into the controlled textarea, setting value + caret, then fire the
+ *  change event (the repo convention for triggering React's onChange). */
+function typeInto(textarea: HTMLElement, value: string): void {
+  fireEvent.change(textarea, {
+    target: { value, selectionStart: value.length, selectionEnd: value.length },
+  });
+}
+
+describe('UnifiedComposer @mention popover', () => {
+  const baseComposer: ComposerState = {
+    conversationId: 'hub-session-1',
+    text: '',
+    mode: 'ask',
+    mentions: [],
+    attachments: [],
+    approvalMode: 'suggest',
+    workDir: '',
+    submitState: 'idle',
+    replyTo: null,
+    quote: null,
+    editingMessageId: null,
+  };
+
+  it('opens the popover with all candidates when the user types "@"', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@');
+
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).toBeInTheDocument();
+    expect(within(listbox).getAllByRole('option')).toHaveLength(2);
+    expect(screen.getByText('Select someone to mention…')).toBeInTheDocument();
+  });
+
+  it('filters candidates as the user types after the "@"', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@rev');
+
+    const options = within(screen.getByRole('listbox')).getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Reviewer');
+  });
+
+  it('shows an empty state when nothing matches', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@zzz');
+
+    const listbox = screen.getByRole('listbox');
+    expect(within(listbox).queryByRole('option')).toBeNull();
+    expect(screen.getByText('No matching agents')).toBeInTheDocument();
+  });
+
+  it('navigates with ArrowDown/ArrowUp and marks the active option', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@');
+    const listbox = screen.getByRole('listbox');
+
+    // First option (Reviewer) is active by default.
+    expect(within(listbox).getByRole('option', { selected: true })).toHaveTextContent('Reviewer');
+
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' });
+    expect(within(listbox).getByRole('option', { selected: true })).toHaveTextContent('Builder');
+
+    fireEvent.keyDown(textarea, { key: 'ArrowUp' });
+    expect(within(listbox).getByRole('option', { selected: true })).toHaveTextContent('Reviewer');
+  });
+
+  it('inserts a mention chip and clears the trigger text on Enter', () => {
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@rev');
+
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    // Trigger text '@rev' removed, mention added (dispatchRole preserved).
+    expect(dispatchComposer).toHaveBeenCalledWith({ type: 'setText', text: '' });
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'addMention',
+      mention: { id: 'reviewer', label: 'Reviewer', runtimeId: 'codex', dispatchRole: 'dispatch' },
+    });
+    // Popover closed after selection.
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('closes the popover on Escape without submitting', () => {
+    const handleSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={handleSubmit}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@');
+
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it('does not select or submit on Enter while IME is composing', () => {
+    const dispatchComposer = vi.fn();
+    const handleSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={mentionableAgents}
+        onSubmit={handleSubmit}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@');
+
+    fireEvent.keyDown(textarea, { key: 'Enter', isComposing: true });
+
+    const addMentionCalls = dispatchComposer.mock.calls.filter(
+      (call) => (call[0] as { type: string }).type === 'addMention',
+    );
+    expect(addMentionCalls).toHaveLength(0);
+    expect(handleSubmit).not.toHaveBeenCalled();
+    // Popover stays open.
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('does not open the popover when there are no mentionable agents', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@agent');
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('closes the popover when clicking outside the composer', () => {
+    render(
+      <UnifiedComposer
+        composer={baseComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={mentionableAgents}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Composer input' });
+    typeInto(textarea, '@');
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 });

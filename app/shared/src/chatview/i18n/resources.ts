@@ -278,6 +278,8 @@ export const chatviewResources = {
     // ═══ Profile pane ═══
     'profile.sendMessage': '发送消息',
     'composer.editingMessage': '正在编辑消息',
+    'composer.mentionHint': '选择提及对象...',
+    'composer.mentionEmpty': '没有匹配的 Agent',
     'profile.agentConfig': 'Agent 配置',
     'profile.role': '职责',
     'profile.engine': '引擎',
@@ -717,6 +719,8 @@ export const chatviewResources = {
     // ═══ Profile pane ═══
     'profile.sendMessage': 'Send message',
     'composer.editingMessage': 'Editing message',
+    'composer.mentionHint': 'Select someone to mention…',
+    'composer.mentionEmpty': 'No matching agents',
     'profile.agentConfig': 'Agent configuration',
     'profile.role': 'Role',
     'profile.engine': 'Engine',

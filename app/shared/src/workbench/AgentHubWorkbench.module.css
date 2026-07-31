@@ -1433,6 +1433,72 @@
   white-space: nowrap;
 }
 
+.composerMentionPopover {
+  position: fixed;
+  z-index: var(--z-popover, 500);
+  width: min(280px, calc(100vw - 32px));
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--sp-xxs);
+  border: 1px solid var(--glass-border-strong, var(--bdr));
+  border-radius: var(--r-md);
+  background: var(--glass-panel-strong, var(--surface));
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--glass-elev-3);
+  pointer-events: auto;
+}
+
+.composerMentionHint {
+  display: block;
+  padding: var(--sp-xxs) var(--sp-sm);
+  color: var(--text-3);
+  font: var(--caption);
+}
+
+.composerMentionEmpty {
+  padding: var(--sp-sm);
+  color: var(--text-3);
+  font: var(--caption);
+  text-align: center;
+}
+
+.composerMentionOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--sp-xs) var(--sp-sm);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-1);
+  font: var(--body);
+}
+
+.composerMentionOption:hover,
+.composerMentionOption[data-active='true'] {
+  background: var(--surface-low);
+}
+
+.composerMentionOptionLabel {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerMentionOptionMeta {
+  color: var(--text-3);
+  font: var(--caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sendButton {
   order: 2;
   width: 36px;
