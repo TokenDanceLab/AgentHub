@@ -26,6 +26,8 @@ export interface AgentActivitySnapshot {
     id: string;
     name: string;
     status: AgentActivityStatus;
+    /** Total tool calls observed for this agent while tracked. */
+    toolCalls: number;
   }>;
 }
 
@@ -46,6 +48,8 @@ export interface AgentActivityStore {
   /**
    * Directly push an agent status update into the store.
    * Used by Edge SSE event consumers that don't go through Hub WS events.
+   * `toolCalls` is a delta: the value is accumulated into the tracked entry
+   * (Edge emits one `run.agent.tool_call` event per call with `toolCalls = 1`).
    */
   pushAgentStatus(agentId: string, agentName: string, status: AgentActivityStatus, toolCalls?: number): void;
   /** Subscribe to state changes. Returns an unsubscribe function. */
@@ -104,7 +108,9 @@ export function createAgentActivityStore(): AgentActivityStore {
       agentName: current?.agentName ?? agentName,
       status,
       startedAt: current?.startedAt ?? Date.now(),
-      toolCalls: Math.max(current?.toolCalls ?? 0, toolCalls ?? 0),
+      // `toolCalls` is a per-event delta (Edge pushes 1 per `run.agent.tool_call`);
+      // accumulate so the count reflects the real number of tool calls.
+      toolCalls: (current?.toolCalls ?? 0) + (toolCalls ?? 0),
     });
     notify();
 
@@ -216,6 +222,7 @@ export function createAgentActivityStore(): AgentActivityStore {
         id: entry.agentId,
         name: entry.agentName,
         status: entry.status,
+        toolCalls: entry.toolCalls,
       });
     }
     cachedSnapshot = { activeAgents };
