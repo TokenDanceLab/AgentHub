@@ -1,42 +1,29 @@
 package adapters
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/coder/acp-go-sdk"
 )
 
-func TestMapACPUpdate_AgentMessageChunk(t *testing.T) {
-	got := mapACPUpdate(acpSessionUpdateEvent{
-		Type: "AgentMessageChunk",
-		Content: []acpContentPart{
-			{Type: "text", Text: "Hello"},
-			{Type: "text", Text: " world"},
-			{Type: "tool_use"}, // non-text parts skipped
-		},
-	})
-	if len(got) != 2 {
-		t.Fatalf("expected 2 text_delta events, got %d", len(got))
+func TestMapACPSessionUpdate_AgentMessageChunk(t *testing.T) {
+	got := mapACPSessionUpdate(acp.UpdateAgentMessageText("Hello"))
+	if len(got) != 1 {
+		t.Fatalf("expected 1 text_delta event, got %d", len(got))
 	}
-	for i, want := range []string{"Hello", " world"} {
-		if got[i].EventType != BusEventTextDelta {
-			t.Errorf("event[%d] type = %q, want %q", i, got[i].EventType, BusEventTextDelta)
-		}
-		if got[i].Payload["content"] != want {
-			t.Errorf("event[%d] content = %q, want %q", i, got[i].Payload["content"], want)
-		}
-		if _, ok := got[i].Payload["status"]; ok {
-			t.Errorf("event[%d] should not carry status for text deltas", i)
-		}
+	if got[0].EventType != BusEventTextDelta {
+		t.Errorf("type = %q, want %q", got[0].EventType, BusEventTextDelta)
+	}
+	if got[0].Payload["content"] != "Hello" {
+		t.Errorf("content = %v, want Hello", got[0].Payload["content"])
+	}
+	if _, ok := got[0].Payload["status"]; ok {
+		t.Errorf("text deltas should not carry status")
 	}
 }
 
-func TestMapACPUpdate_AgentThoughtChunk(t *testing.T) {
-	got := mapACPUpdate(acpSessionUpdateEvent{
-		Type: "AgentThoughtChunk",
-		Content: []acpContentPart{
-			{Type: "text", Text: "reasoning..."},
-		},
-	})
+func TestMapACPSessionUpdate_AgentThoughtChunk(t *testing.T) {
+	got := mapACPSessionUpdate(acp.UpdateAgentThoughtText("reasoning..."))
 	if len(got) != 1 {
 		t.Fatalf("expected 1 thinking event, got %d", len(got))
 	}
@@ -48,15 +35,14 @@ func TestMapACPUpdate_AgentThoughtChunk(t *testing.T) {
 	}
 }
 
-func TestMapACPUpdate_ToolCallCompletedEmitsResult(t *testing.T) {
-	got := mapACPUpdate(acpSessionUpdateEvent{
-		Type:       "ToolCall",
-		ToolCallID: "tc_1",
-		Title:      "read file",
-		Kind:       "function",
-		Status:     "completed",
-		RawOutput:  json.RawMessage(`{"ok":true}`),
-	})
+func TestMapACPSessionUpdate_ToolCallCompletedEmitsResult(t *testing.T) {
+	got := mapACPSessionUpdate(acp.StartToolCall(
+		"tc_1",
+		"read file",
+		acp.WithStartKind(acp.ToolKindRead),
+		acp.WithStartStatus(acp.ToolCallStatusCompleted),
+		acp.WithStartRawOutput(map[string]any{"ok": true}),
+	))
 	if len(got) != 2 {
 		t.Fatalf("expected tool_call + tool_result, got %d", len(got))
 	}
@@ -71,77 +57,80 @@ func TestMapACPUpdate_ToolCallCompletedEmitsResult(t *testing.T) {
 	}
 }
 
-func TestMapACPUpdate_ToolCallRunningNoResult(t *testing.T) {
-	got := mapACPUpdate(acpSessionUpdateEvent{
-		Type:       "ToolCall",
-		ToolCallID: "tc_2",
-		Status:     "running",
-	})
+func TestMapACPSessionUpdate_ToolCallInProgressNoResult(t *testing.T) {
+	got := mapACPSessionUpdate(acp.StartToolCall(
+		"tc_2",
+		"read file",
+		acp.WithStartStatus(acp.ToolCallStatusInProgress),
+	))
 	if len(got) != 1 || got[0].EventType != BusEventToolCall {
-		t.Fatalf("running tool call should emit only tool_call, got %+v", got)
+		t.Fatalf("in-progress tool call should emit only tool_call, got %+v", got)
+	}
+	if got[0].Payload["status"] != "in_progress" {
+		t.Errorf("status = %v, want in_progress", got[0].Payload["status"])
 	}
 }
 
-func TestMapACPUpdate_UsageUpdate(t *testing.T) {
-	got := mapACPUpdate(acpSessionUpdateEvent{
-		Type:        "UsageUpdate",
-		UsageInput:  120,
-		UsageOutput: 80,
+func TestMapACPSessionUpdate_UsageUpdate(t *testing.T) {
+	got := mapACPSessionUpdate(acp.SessionUpdate{
+		UsageUpdate: &acp.SessionUsageUpdate{Used: 120, Size: 100000},
 	})
 	if len(got) != 1 || got[0].EventType != BusEventContextUsage {
 		t.Fatalf("expected 1 context_usage event, got %+v", got)
 	}
-	if got[0].Payload["tokens_used"] != 200 {
-		t.Errorf("tokens_used = %v, want 200", got[0].Payload["tokens_used"])
+	// Typed semantics: context window usage (used/size), not a per-turn
+	// input/output split (the pre-SDK hand-rolled struct misread the schema).
+	if got[0].Payload["tokens_used"] != 120 {
+		t.Errorf("tokens_used = %v, want 120", got[0].Payload["tokens_used"])
 	}
-	if got[0].Payload["input_tokens"] != 120 || got[0].Payload["output_tokens"] != 80 {
-		t.Errorf("input/output split wrong: %+v", got[0].Payload)
-	}
-}
-
-func TestMapACPUpdate_UnknownTypeYieldsNothing(t *testing.T) {
-	// Plan / SessionInfoUpdate / ToolCallUpdate are deliberately unmapped in
-	// Phase 2 prep until the Edge frame design is approved.
-	if got := mapACPUpdate(acpSessionUpdateEvent{Type: "Plan"}); len(got) != 0 {
-		t.Errorf("Plan should map to nothing, got %+v", got)
-	}
-	if got := mapACPUpdate(acpSessionUpdateEvent{Type: "SessionInfoUpdate"}); len(got) != 0 {
-		t.Errorf("SessionInfoUpdate should map to nothing, got %+v", got)
-	}
-	if got := mapACPUpdate(acpSessionUpdateEvent{Type: "ToolCallUpdate"}); len(got) != 0 {
-		t.Errorf("ToolCallUpdate should map to nothing, got %+v", got)
+	if got[0].Payload["context_size"] != 100000 {
+		t.Errorf("context_size = %v, want 100000", got[0].Payload["context_size"])
 	}
 }
 
-func TestMapACPUpdate_EmptyContentNoEmit(t *testing.T) {
-	if got := mapACPUpdate(acpSessionUpdateEvent{Type: "AgentMessageChunk"}); len(got) != 0 {
-		t.Errorf("empty content should emit nothing, got %+v", got)
+func TestMapACPSessionUpdate_UnmappedVariantsYieldNothing(t *testing.T) {
+	// Plan / SessionInfoUpdate / ToolCallUpdate / UserMessageChunk are
+	// deliberately unmapped in Phase 2 prep until the Edge frame design is
+	// approved.
+	cases := []acp.SessionUpdate{
+		{Plan: &acp.SessionUpdatePlan{Entries: []acp.PlanEntry{}}},
+		{SessionInfoUpdate: &acp.SessionSessionInfoUpdate{}},
+		{ToolCallUpdate: &acp.SessionToolCallUpdate{ToolCallId: "tc_3"}},
+		{UserMessageChunk: &acp.SessionUpdateUserMessageChunk{Content: acp.TextBlock("echo")}},
 	}
-	// text part with empty text is dropped.
-	if got := mapACPUpdate(acpSessionUpdateEvent{
-		Type:    "AgentMessageChunk",
-		Content: []acpContentPart{{Type: "text", Text: ""}},
-	}); len(got) != 0 {
-		t.Errorf("empty text part should emit nothing, got %+v", got)
+	for i, u := range cases {
+		if got := mapACPSessionUpdate(u); len(got) != 0 {
+			t.Errorf("case %d should map to nothing, got %+v", i, got)
+		}
+	}
+}
+
+func TestMapACPSessionUpdate_NonTextBlockNoEmit(t *testing.T) {
+	// Image/audio/resource blocks are not emitted as text deltas.
+	got := mapACPSessionUpdate(acp.UpdateAgentMessage(acp.ImageBlock("data", "image/png")))
+	if len(got) != 0 {
+		t.Errorf("image block should emit nothing, got %+v", got)
+	}
+	if got := mapACPSessionUpdate(acp.UpdateAgentMessageText("")); len(got) != 0 {
+		t.Errorf("empty text should emit nothing, got %+v", got)
 	}
 }
 
 func TestMapACPPromptResult(t *testing.T) {
 	tests := []struct {
-		name    string
-		raw     string
-		wantNil bool
-		reason  string
+		name       string
+		res        acp.PromptResponse
+		wantNil    bool
+		reason     string
 	}{
-		{name: "end_turn", raw: `{"stopReason":"end_turn"}`, reason: "end_turn"},
-		{name: "tool_use", raw: `{"stopReason":"tool_use"}`, reason: "tool_use"},
-		{name: "empty", raw: ``, wantNil: true},
-		{name: "no_stop_reason", raw: `{"other":1}`, wantNil: true},
-		{name: "unparseable", raw: `{bad json`, wantNil: true},
+		{name: "end_turn", res: acp.PromptResponse{StopReason: acp.StopReasonEndTurn}, reason: "end_turn"},
+		{name: "tool_use", res: acp.PromptResponse{StopReason: acp.StopReasonMaxTurnRequests}, reason: "max_turn_requests"},
+		{name: "cancelled", res: acp.PromptResponse{StopReason: acp.StopReasonCancelled}, reason: "cancelled"},
+		{name: "empty", res: acp.PromptResponse{}, wantNil: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := mapACPPromptResult(json.RawMessage(tt.raw))
+			got := mapACPPromptResult(tt.res)
 			if tt.wantNil {
 				if got != nil {
 					t.Fatalf("expected nil, got %+v", got)
