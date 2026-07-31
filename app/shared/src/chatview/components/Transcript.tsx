@@ -1,5 +1,6 @@
 import { Fragment, forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
+import type { RowItem } from '../types'
 import { ArrowDown } from 'lucide-react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import { UserMessage } from './UserMessage'
@@ -148,6 +149,26 @@ function isAgent(item: TranscriptItem): item is TranscriptAgentItem {
   return !isUser(item)
 }
 
+/**
+ * A11y (#11): true while any row in the transcript is still streaming
+ * (`status: 'running'` — the adapter maps every non-completed agent group to
+ * it, so a streaming reply always surfaces here). Drives `aria-busy` and the
+ * live-region throttle on the role=log container below.
+ */
+function isRowStreaming(row: RowItem): boolean {
+  if (row.status === 'running') return true
+  if (row.children?.some(isRowStreaming)) return true
+  return row.orchAgents?.some((a) => a.status === 'running') ?? false
+}
+
+function isStreamingItems(items: TranscriptItem[]): boolean {
+  return items.some((item) => {
+    if (!isAgent(item)) return false
+    if (item.rows.some(isRowStreaming) || item.standaloneRows.some(isRowStreaming)) return true
+    return item.parts?.some((part) => part.type === 'row' && isRowStreaming(part.row)) ?? false
+  })
+}
+
 /** Extract the item's time string — `time` on both user and agent items. */
 function itemTime(item: TranscriptItem): string {
   if (isUser(item)) return item.time || ''
@@ -290,6 +311,12 @@ function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> 
 
 const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
   const segments = useMemo(() => partitionWithDates(items, unreadDivider, compactDividers), [items, unreadDivider, compactDividers])
+  /**
+   * Streaming throttle for the role=log live region (#11). While any row is
+   * still running, token-by-token DOM mutation would make ATs re-announce
+   * the full transcript text on every tick.
+   */
+  const isStreaming = useMemo(() => isStreamingItems(items), [items])
   const transcriptRef = useRef<HTMLDivElement>(null)
   /** Virtualizer handle — used for highlight/search scrollToIndex jumps. */
   const virtualizerRef = useRef<VirtualizerHandle>(null)
@@ -386,7 +413,13 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
   }, [items.length, itemsIdentity, items, sessionId])
 
   return (
-    <div className="transcript" role="log" aria-live="polite" onScroll={handleScroll} ref={transcriptRef}>
+    // A11y (#11): while streaming, `aria-live` drops to 'off' so ATs stay
+    // silent through the token torrent and `aria-busy` marks the region as
+    // mid-update; when streaming completes the region returns to 'polite'
+    // and the accumulated content is announced at most once (SR-dependent).
+    // aria-atomic="true" was rejected: on a long transcript every mutation
+    // would announce the ENTIRE region text — strictly worse than today.
+    <div className="transcript" role="log" aria-live={isStreaming ? 'off' : 'polite'} aria-busy={isStreaming} onScroll={handleScroll} ref={transcriptRef}>
       <Virtualizer ref={virtualizerRef} scrollRef={transcriptRef} bufferSize={800}>
         {segments.map((seg) => {
           if (seg.kind === 'divider') return <DateDivider key={seg.key} date={seg.date} />

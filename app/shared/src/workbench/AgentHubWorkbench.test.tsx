@@ -2631,8 +2631,9 @@ describe('AgentHubWorkbench', () => {
         }),
       ]);
     });
-    expect(screen.getByRole('status')).toHaveTextContent('数据：真实数据');
-    expect(screen.getByRole('status')).toHaveTextContent('目标：就绪 · Alpha Desktop');
+    const statusEls = screen.getAllByRole('status');
+    expect(statusEls.find((el) => el.textContent?.includes('数据：真实数据'))).toHaveTextContent('数据：真实数据');
+    expect(statusEls.find((el) => el.textContent?.includes('目标：就绪 · Alpha Desktop'))).toHaveTextContent('目标：就绪 · Alpha Desktop');
   });
 
   it('summarizes the Web to Edge demo main chain in one visible strip', () => {
@@ -2728,7 +2729,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
     expect(screen.getByText('目标未选')).toBeInTheDocument();
     expect(screen.getByText('需填写内容')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('请先选择执行目标再开始。');
+    expect(screen.getAllByRole('status').find((el) => el.textContent?.includes('请先选择执行目标'))).toHaveTextContent('请先选择执行目标再开始。');
     expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);
   });
