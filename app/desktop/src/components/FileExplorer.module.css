@@ -52,6 +52,13 @@
   padding: 4px 0;
 }
 
+/* The tree wrapper is the roving-tabindex focus host; the selected row's
+   highlight is the visible focus indicator, so suppress the browser's ring
+   around the whole scroll area. */
+.treeWrapper:focus {
+  outline: none;
+}
+
 .treeWrapper::-webkit-scrollbar {
   width: 8px;
 }
