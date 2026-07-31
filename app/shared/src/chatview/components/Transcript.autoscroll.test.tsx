@@ -147,4 +147,94 @@ describe('Transcript auto-follow', () => {
     fireEvent.scroll(log);
     expect(queryByRole('button', { name: '回到底部' })).not.toBeInTheDocument();
   });
+
+  // ── Per-session scroll memory ─────────────────────────────────────
+
+  it('does not force scroll-to-bottom when switching back to a session that was scrolled up', async () => {
+    const { getByRole, rerender } = render(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    const log = getByRole('log');
+
+    // Session A: user reads older content (scrolled up, not near bottom).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 120 });
+    fireEvent.scroll(log);
+
+    // Switch to session B (fresh session → starts at the bottom).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 700, scrollTop: 120 });
+    rerender(<Transcript items={[user('u1', 'B 的提问'), agent('b1')]} chatMode="group" sessionId="sB" />);
+    await waitFor(() => expect(log.scrollTop).toBe(700));
+
+    // Scroll up inside B, then switch back to A. The old buggy heuristic
+    // compared identities index-by-index across sessions and misjudged the
+    // switch as a new user message, forcing a scroll-to-bottom.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 900, scrollTop: 300 });
+    fireEvent.scroll(log);
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 300 });
+    rerender(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+
+    // A's own scroll memory is restored — no jump to the bottom.
+    await waitFor(() => expect(log.scrollTop).toBe(120));
+  });
+
+  it('restores each session its own scroll position on switch-back', async () => {
+    const { getByRole, rerender } = render(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    const log = getByRole('log');
+
+    // A scrolled up to 100.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 100 });
+    fireEvent.scroll(log);
+
+    // Switch to B (fresh → bottom).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 600, scrollTop: 100 });
+    rerender(<Transcript items={[agent('b1')]} chatMode="group" sessionId="sB" />);
+    await waitFor(() => expect(log.scrollTop).toBe(600));
+
+    // B scrolled up to 400.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 600, scrollTop: 400 });
+    fireEvent.scroll(log);
+
+    // Back to A → A's position (100), not B's (400).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 400 });
+    rerender(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    await waitFor(() => expect(log.scrollTop).toBe(100));
+
+    // Back to B → B's position (400).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 600, scrollTop: 100 });
+    rerender(<Transcript items={[agent('b1')]} chatMode="group" sessionId="sB" />);
+    await waitFor(() => expect(log.scrollTop).toBe(400));
+  });
+
+  it('still forces a follow when a new user message is appended in the same session', async () => {
+    const { getByRole, rerender } = render(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    const log = getByRole('log');
+
+    // Scrolled up, then the user submits a message in the same session.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 120 });
+    fireEvent.scroll(log);
+
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 700, scrollTop: 120 });
+    rerender(<Transcript items={[agent('a1'), user('u1', '新提问')]} chatMode="group" sessionId="sA" />);
+
+    await waitFor(() => expect(log.scrollTop).toBe(700));
+  });
+
+  it('restores the scroll-to-bottom button visibility per session', async () => {
+    const { getByRole, queryByRole, rerender } = render(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    const log = getByRole('log');
+
+    // A scrolled up → button visible.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 120 });
+    fireEvent.scroll(log);
+    expect(queryByRole('button', { name: '回到底部' })).toBeInTheDocument();
+
+    // Switch to B (fresh, at bottom) → button hidden.
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 700, scrollTop: 120 });
+    rerender(<Transcript items={[agent('b1')]} chatMode="group" sessionId="sB" />);
+    await waitFor(() => expect(log.scrollTop).toBe(700));
+    expect(queryByRole('button', { name: '回到底部' })).not.toBeInTheDocument();
+
+    // Back to A → button visible again (A was scrolled up).
+    setScrollMetrics(log, { clientHeight: 100, scrollHeight: 500, scrollTop: 120 });
+    rerender(<Transcript items={[agent('a1')]} chatMode="group" sessionId="sA" />);
+    expect(queryByRole('button', { name: '回到底部' })).toBeInTheDocument();
+  });
 });
