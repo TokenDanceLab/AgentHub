@@ -12,6 +12,7 @@ import type {
   TextTranscriptBlock,
   AgentTimelineTranscriptBlock,
   RunStepGroupTranscriptBlock,
+  CompactBoundaryTranscriptBlock,
 } from '../transcript/types'
 import type { RowItem } from './types'
 import type { TranscriptItem, TranscriptAgentItem } from './transcript-item'
@@ -259,4 +260,68 @@ export function resolveUnreadAnchorItemIndex(
     // Human non-text blocks are dropped by the adapter — they start nothing.
   }
   return Math.max(0, starts - 1)
+}
+
+/**
+ * Compact divider descriptor produced by `resolveCompactDividerIndices`.
+ * Each entry marks the TranscriptItem index before which a compact_boundary
+ * divider should render, plus optional metadata for the divider label.
+ */
+export interface CompactDividerDescriptor {
+  /** Item index before which the compact divider renders. */
+  index: number
+  /** Compaction trigger, e.g. "auto" or "manual". */
+  trigger?: string
+  /** Token count before compaction. */
+  preTokens?: number
+}
+
+/**
+ * Compute compact boundary divider positions for a transcript.
+ *
+ * Compact boundary blocks (`kind: 'compact_boundary'`) are stream-internal
+ * markers emitted when the model compacts its context mid-run. They are not
+ * conversational content and should render as thin dividers between message
+ * groups, similar to UnreadDivider and DateDivider.
+ *
+ * This function simulates the same block-to-item grouping that
+ * `blocksToTranscriptItems` performs, so the returned indices reference
+ * positions in the adapted items array, not the raw blocks array.
+ *
+ * @param blocks - Raw transcript blocks (including compact_boundary blocks).
+ * @returns Sorted array of compact divider descriptors (by ascending index).
+ */
+export function resolveCompactDividerIndices(blocks: TranscriptBlock[]): CompactDividerDescriptor[] {
+  const result: CompactDividerDescriptor[] = []
+  let itemIdx = 0
+  let prevAgentAuthor: string | null = null
+
+  for (const block of blocks) {
+    if (block.kind === 'compact_boundary') {
+      const cb = block as CompactBoundaryTranscriptBlock
+      result.push({
+        index: itemIdx,
+        ...(cb.trigger ? { trigger: cb.trigger } : {}),
+        ...(cb.preTokens != null ? { preTokens: cb.preTokens } : {}),
+      })
+      continue
+    }
+
+    const role = block.author?.role ?? 'system'
+    const author = block.author?.id ?? 'unknown'
+
+    // Mirror the adapter grouping: user text and agent/system blocks increment
+    // the item counter; compact_boundary and human non-text blocks do not.
+    if (role === 'human' && block.kind === 'text') {
+      itemIdx++
+      prevAgentAuthor = null
+    } else if (role === 'agent' || role === 'system') {
+      // Consecutive same-author agent blocks merge into one group.
+      if (author !== prevAgentAuthor) itemIdx++
+      prevAgentAuthor = author
+    }
+    // Human non-text, compact_boundary, and other edge cases are already handled above.
+  }
+
+  return result
 }

@@ -16,6 +16,7 @@ import type {
   FailureTranscriptBlock,
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   PreviewTranscriptBlock,
+  CompactBoundaryTranscriptBlock,
 } from '../transcript/types'
 import type { RowItem } from './types'
 import {
@@ -284,6 +285,7 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
     case 'replay_gap':
     case 'agent_timeline':
     case 'run_step_group':
+    case 'compact_boundary':
       return null
 
     default:

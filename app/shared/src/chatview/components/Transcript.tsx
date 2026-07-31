@@ -6,6 +6,7 @@ import { UserMessage } from './UserMessage'
 import { AgentGroup } from './AgentGroup'
 import { DateDivider } from './DateDivider'
 import { UnreadDivider } from './UnreadDivider'
+import { CompactDivider } from './CompactDivider'
 import { stableInteractionId } from './RowItem'
 import './Transcript.css'
 
@@ -81,6 +82,11 @@ interface Props {
    * the divider renders, plus pre-resolved copy. Absent for non-IM transcripts.
    */
   unreadDivider?: { index: number; label: string; readThrough?: string } | undefined
+  /**
+   * Compact boundary dividers (T21/CF23): item indices before which compact
+   * dividers render, with optional trigger and pre-token metadata.
+   */
+  compactDividers?: { index: number; trigger?: string; preTokens?: number }[] | undefined
 }
 
 /**
@@ -180,10 +186,11 @@ function formatItemDate(time: string): string {
   })
 }
 
-/** A segment of the transcript: a date divider, the unread divider, or a transcript item. */
+/** A segment of the transcript: a date divider, the unread divider, a compact divider, or a transcript item. */
 type TranscriptSegment =
   | { kind: 'divider'; date: string; key: string }
   | { kind: 'unread'; label: string; readThrough?: string }
+  | { kind: 'compact_divider'; trigger?: string; preTokens?: number; key: string }
   | { kind: 'item'; item: TranscriptItem }
 
 /**
@@ -191,17 +198,49 @@ type TranscriptSegment =
  * A divider is inserted before the first item whose day differs from the previous item.
  * The unread divider (desktop IM read watermark) is inserted before the item
  * at `unreadDivider.index` (already resolved against the adapted items).
+ * Compact dividers are inserted before items at their respective indices.
  */
 function partitionWithDates(
   items: TranscriptItem[],
   unreadDivider: { index: number; label: string; readThrough?: string } | undefined,
+  compactDividers: { index: number; trigger?: string; preTokens?: number }[] | undefined,
 ): TranscriptSegment[] {
   const segments: TranscriptSegment[] = []
+
+  // Index compact dividers by their target item index for O(1) lookup.
+  // Multiple compact dividers at the same index are stacked in order.
+  const compactByIndex = new Map<number, { trigger?: string; preTokens?: number }[]>()
+  if (compactDividers && compactDividers.length > 0) {
+    for (const cd of compactDividers) {
+      const list = compactByIndex.get(cd.index)
+      if (list) {
+        list.push({ trigger: cd.trigger, preTokens: cd.preTokens })
+      } else {
+        compactByIndex.set(cd.index, [{ trigger: cd.trigger, preTokens: cd.preTokens }])
+      }
+    }
+  }
+
   let prevDay: string | null = null
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     if (!item) continue
+
+    // Insert compact dividers before the item at this index
+    const cds = compactByIndex.get(i)
+    if (cds) {
+      for (let ci = 0; ci < cds.length; ci++) {
+        const cd = cds[ci]
+        segments.push({
+          kind: 'compact_divider',
+          key: `compact-${i}-${ci}`,
+          ...(cd?.trigger ? { trigger: cd.trigger } : {}),
+          ...(cd?.preTokens != null ? { preTokens: cd.preTokens } : {}),
+        })
+      }
+    }
+
     if (unreadDivider && i === unreadDivider.index) {
       segments.push({
         kind: 'unread',
@@ -249,8 +288,8 @@ function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> 
   return map
 }
 
-const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider }: Props, ref) {
-  const segments = useMemo(() => partitionWithDates(items, unreadDivider), [items, unreadDivider])
+const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
+  const segments = useMemo(() => partitionWithDates(items, unreadDivider, compactDividers), [items, unreadDivider, compactDividers])
   const transcriptRef = useRef<HTMLDivElement>(null)
   /** Virtualizer handle — used for highlight/search scrollToIndex jumps. */
   const virtualizerRef = useRef<VirtualizerHandle>(null)
@@ -353,6 +392,9 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
           if (seg.kind === 'divider') return <DateDivider key={seg.key} date={seg.date} />
           if (seg.kind === 'unread') {
             return <UnreadDivider key="unread-divider" label={seg.label} {...(seg.readThrough ? { readThrough: seg.readThrough } : {})} />
+          }
+          if (seg.kind === 'compact_divider') {
+            return <CompactDivider key={seg.key} trigger={seg.trigger} preTokens={seg.preTokens} />
           }
 
           const item = seg.item

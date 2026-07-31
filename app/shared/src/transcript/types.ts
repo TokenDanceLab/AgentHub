@@ -315,6 +315,14 @@ export interface DeployTranscriptBlock extends TranscriptBlockBase {
   url?: string;
 }
 
+export interface CompactBoundaryTranscriptBlock extends TranscriptBlockBase {
+  kind: 'compact_boundary';
+  /** Compaction trigger (e.g. "auto", "manual"). */
+  trigger?: string;
+  /** Token count before compaction. */
+  preTokens?: number;
+}
+
 export type TranscriptBlock =
   | TextTranscriptBlock
   | ToolCallTranscriptBlock
@@ -340,7 +348,8 @@ export type TranscriptBlock =
   | FinishedTranscriptBlock
   | ReplayGapTranscriptBlock
   | AttachmentTranscriptBlock
-  | DeployTranscriptBlock;
+  | DeployTranscriptBlock
+  | CompactBoundaryTranscriptBlock;
 
 /**
  * Returns `true` for transcript blocks that carry orchestration metadata
