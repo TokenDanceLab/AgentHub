@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { ConversationHostProps } from './ConversationHost';
 import type { ConversationSidebarProps } from './ConversationSidebar';
 import type { RightInspectorProps } from './rightInspectorTypes';
@@ -26,7 +27,9 @@ import {
    (#742).
 
    Child-prop builders for sidebar / conversation host / routes / inspector
-   frames. No React hooks / no intentional UX change.
+   frames. Pure builders are hook-free; useBuildChatConversationHostProps is
+   the hook form for the chat host frame that stabilizes per-render derived
+   values so the ConversationHost / ChatViewBridge memo gates hold.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -52,8 +55,22 @@ export function buildConversationSidebarProps(
   return sidebarProps;
 }
 
+/**
+ * Referentially stable host props. The frame-level hook (below) memoizes the
+ * per-render derived values (block event adapters + id Sets) and hands them to
+ * the pure builder so its default fresh-creation path is skipped.
+ */
+export interface ChatConversationHostStableOverrides {
+  onBlockContextMenu: ConversationHostProps['onBlockContextMenu'];
+  onBlockSelect: ConversationHostProps['onBlockSelect'];
+  selectedBlockIds: ConversationHostProps['selectedBlockIds'];
+  softHiddenBlockIds: ConversationHostProps['softHiddenBlockIds'];
+  actionedBlockIds: ConversationHostProps['actionedBlockIds'];
+}
+
 export function buildChatConversationHostProps(
   props: ChatConversationHostFrameProps,
+  stable?: ChatConversationHostStableOverrides,
 ): ConversationHostProps {
   const {
     platform,
@@ -109,18 +126,17 @@ export function buildChatConversationHostProps(
     mainchainSummary,
     onExportMainchainEvidence: exportMainchainEvidence,
     onAgentClick: openAgentProfile,
-    onBlockContextMenu: createTranscriptBlockContextMenuHandler(
-      transcript,
-      openBlockContextMenu,
-    ),
-    onBlockSelect: createTranscriptBlockSelectHandler(handleBlockSelect),
+    onBlockContextMenu: stable?.onBlockContextMenu
+      ?? createTranscriptBlockContextMenuHandler(transcript, openBlockContextMenu),
+    onBlockSelect: stable?.onBlockSelect
+      ?? createTranscriptBlockSelectHandler(handleBlockSelect),
     onBlockAction: handleTranscriptBlockAction,
     onReviewFile: openReviewFile,
     onDeploySubmit: handleDeploySubmit,
-    selectedBlockIds: toIdSet(selectedBlockIds),
+    selectedBlockIds: stable?.selectedBlockIds ?? toIdSet(selectedBlockIds),
     selectionMode,
-    softHiddenBlockIds: toIdSet(softHiddenBlockIds),
-    actionedBlockIds: toIdSet(actionedBlockIds),
+    softHiddenBlockIds: stable?.softHiddenBlockIds ?? toIdSet(softHiddenBlockIds),
+    actionedBlockIds: stable?.actionedBlockIds ?? toIdSet(actionedBlockIds),
     dismissedPinnedIds,
     onToast: showWorkbenchToast,
     selectedExecutionTargetId,
@@ -150,6 +166,52 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
 
   return hostProps;
+}
+
+/**
+ * Hook form of buildChatConversationHostProps, used by ChatConversationHostFrame.
+ *
+ * Memoizes the five per-render derived host props so the ConversationHost /
+ * ChatViewBridge memo gates hold across shell re-renders (every keystroke,
+ * toasts, sidebar changes, ...). Deps are exactly the underlying values each
+ * derived prop closes over:
+ *  - onBlockContextMenu closes over `transcript` + `openBlockContextMenu`
+ *    (controller-bound, referentially stable);
+ *  - onBlockSelect closes over `handleBlockSelect` (controller-bound, stable);
+ *  - the three id Sets are pure projections of their source arrays (state
+ *    arrays — identity changes only when the selection actually changes).
+ */
+export function useBuildChatConversationHostProps(
+  props: ChatConversationHostFrameProps,
+): ConversationHostProps {
+  const { transcript, transcriptChrome } = props;
+  const {
+    selectedBlockIds,
+    softHiddenBlockIds,
+    actionedBlockIds,
+    openBlockContextMenu,
+    handleBlockSelect,
+  } = transcriptChrome;
+
+  const onBlockContextMenu = useMemo(
+    () => createTranscriptBlockContextMenuHandler(transcript, openBlockContextMenu),
+    [transcript, openBlockContextMenu],
+  );
+  const onBlockSelect = useMemo(
+    () => createTranscriptBlockSelectHandler(handleBlockSelect),
+    [handleBlockSelect],
+  );
+  const selectedBlockIdSet = useMemo(() => toIdSet(selectedBlockIds), [selectedBlockIds]);
+  const softHiddenBlockIdSet = useMemo(() => toIdSet(softHiddenBlockIds), [softHiddenBlockIds]);
+  const actionedBlockIdSet = useMemo(() => toIdSet(actionedBlockIds), [actionedBlockIds]);
+
+  return buildChatConversationHostProps(props, {
+    onBlockContextMenu,
+    onBlockSelect,
+    selectedBlockIds: selectedBlockIdSet,
+    softHiddenBlockIds: softHiddenBlockIdSet,
+    actionedBlockIds: actionedBlockIdSet,
+  });
 }
 
 export function buildWorkbenchRoutesProps(

@@ -17,6 +17,9 @@ import {
    wiring props.  No visual regression -- pure structural signal.
    ========================================================================== */
 
+/** Last ConversationHost props seen by the mock (referential-stability gate). */
+const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
@@ -28,13 +31,16 @@ vi.mock('./ConversationSidebar', () => ({
 }));
 
 vi.mock('./ConversationHost', () => ({
-  ConversationHost: (props: Record<string, unknown>) => (
-    <div
-      data-testid="conversation-host"
-      data-current-id={props.currentConversationId as string}
-      data-inspector-collapsed={props.inspectorCollapsed ? 'true' : 'false'}
-    />
-  ),
+  ConversationHost: (props: Record<string, unknown>) => {
+    hostPropsLog.last = props;
+    return (
+      <div
+        data-testid="conversation-host"
+        data-current-id={props.currentConversationId as string}
+        data-inspector-collapsed={props.inspectorCollapsed ? 'true' : 'false'}
+      />
+    );
+  },
 }));
 
 vi.mock('./RightInspector', () => ({
@@ -294,6 +300,31 @@ describe('WorkbenchFrameParts', () => {
         />,
       );
       expect(screen.getByTestId('conversation-host')).toBeTruthy();
+    });
+
+    it('feeds referentially stable derived props to ConversationHost across re-renders (memo gate)', () => {
+      const frameProps = {
+        platform: platformMock() as any,
+        session: sessionMock() as any,
+        transcriptChrome: transcriptChromeMock() as any,
+        profile: profileMock() as any,
+        transcript: [{ id: 't1' }] as any,
+        inspectorCollapsed: false,
+        toggleInspector: vi.fn(),
+        showMainchainStatus: false,
+        showComposerAgentPicker: false,
+        showComposerStatus: false,
+      };
+      const { rerender } = render(<ChatConversationHostFrame {...frameProps} />);
+      const first = hostPropsLog.last!;
+      rerender(<ChatConversationHostFrame {...frameProps} />);
+      const second = hostPropsLog.last!;
+
+      expect(second.onBlockContextMenu).toBe(first.onBlockContextMenu);
+      expect(second.onBlockSelect).toBe(first.onBlockSelect);
+      expect(second.selectedBlockIds).toBe(first.selectedBlockIds);
+      expect(second.softHiddenBlockIds).toBe(first.softHiddenBlockIds);
+      expect(second.actionedBlockIds).toBe(first.actionedBlockIds);
     });
   });
 
