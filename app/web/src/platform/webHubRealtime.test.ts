@@ -1,7 +1,7 @@
 import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
-import { getAgentActivityStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
+import { getAgentActivityStore, getPinMapStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -391,8 +391,43 @@ describe('useWebHubRealtime live event ordering (#1415)', () => {
 
   afterEach(() => {
     getAgentActivityStore().reset();
+    getPinMapStore().reset();
     getSubagentStreamStore().reset();
     vi.useRealTimers();
+  });
+
+  it('feeds MESSAGE_PIN / MESSAGE_UNPIN frames into the session-scoped pinMap store', () => {
+    const harness = mountRealtimeHarness();
+    // Seed the pinMap for the harness runtime session, as the model's /pins
+    // seeding effect does in production.
+    getPinMapStore().loadPinnedForSession('hub-session-1', []);
+
+    harness.emit(HUB_EVENTS.MESSAGE_PIN, {
+      session_id: 'hub-session-1',
+      message_id: 'message-1',
+      pinned_by_user_id: 'user-1',
+      pinned_at: '2026-08-01T00:00:00Z',
+    });
+    expect(getPinMapStore().isPinned('message-1')).toBe(true);
+
+    harness.emit(HUB_EVENTS.MESSAGE_UNPIN, {
+      session_id: 'hub-session-1',
+      message_id: 'message-1',
+    });
+    expect(getPinMapStore().isPinned('message-1')).toBe(false);
+  });
+
+  it('drops pin frames from sessions other than the runtime session', () => {
+    const harness = mountRealtimeHarness();
+    getPinMapStore().loadPinnedForSession('hub-session-1', []);
+
+    harness.emit(HUB_EVENTS.MESSAGE_PIN, {
+      session_id: 'other-session',
+      message_id: 'foreign-message',
+      pinned_by_user_id: 'user-1',
+      pinned_at: '2026-08-01T00:00:00Z',
+    });
+    expect(getPinMapStore().isPinned('foreign-message')).toBe(false);
   });
 
   it('flushes pending stream events before dispatching a non-stream event immediately', () => {

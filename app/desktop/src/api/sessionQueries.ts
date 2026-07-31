@@ -135,6 +135,21 @@ export function useHubMessages(sessionId: string, opts?: { enabled?: boolean }) 
   });
 }
 
+/**
+ * Pinned messages for a session — GET /client/sessions/{id}/pins.
+ * Query key matches the invalidation hubEventBridge fires on
+ * MESSAGE_PIN / MESSAGE_UNPIN (hubQueryKeys.threads.pins).
+ * The returned message list is the server-authoritative pin set and is used
+ * to seed the pinMap store (useDesktopWorkbenchModel).
+ */
+export function useHubPinnedMessages(sessionId: string, opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['hub', 'threads', sessionId, 'pins'],
+    queryFn: () => getHubClient().listPinnedMessages(sessionId),
+    enabled: opts?.enabled ?? false,
+  });
+}
+
 export function useHubSendMessage() {
   const queryClient = useQueryClient();
   return useMutation({

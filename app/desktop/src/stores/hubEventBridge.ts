@@ -10,6 +10,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS, type HubEventType } from '@shared/hubEvents';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
+import { getPinMapStore } from '@shared/transcript';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
@@ -88,6 +89,10 @@ function onMessagePin(qc: QueryClient, payload: unknown) {
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
     invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    // Feed the pinMap store (session-scoped): the active session bucket is
+    // set by loadPinnedForSession in useDesktopWorkbenchModel; frames landing
+    // before any seed are dropped by the store (no active session yet).
+    getPinMapStore().handleFrame(HUB_EVENTS.MESSAGE_PIN, payload);
   }
 }
 
@@ -97,6 +102,7 @@ function onMessageUnpin(qc: QueryClient, payload: unknown) {
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
     invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    getPinMapStore().handleFrame(HUB_EVENTS.MESSAGE_UNPIN, payload);
   }
 }
 
