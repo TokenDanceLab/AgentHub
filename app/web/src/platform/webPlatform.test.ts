@@ -943,3 +943,92 @@ describe('webPlatform workbench agent mapping', () => {
     expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// redispatchTask: client-side dispatch queue flush port (UIUX #H)
+// Re-dispatches ONLY (no message re-send); maps 409 turn_in_progress;
+// no dispatch mention → drains as no-op.
+// ---------------------------------------------------------------------------
+describe('webPlatform redispatchTask (dispatch-only retry port)', () => {
+  it('re-dispatches (no message re-send) and returns taskId on success', async () => {
+    const queryClient = new QueryClient();
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-redispatch', agent_type: 'claude-code', session_id: 'hub-session-1',
+        inviter_user_id: 'user-1', display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn().mockResolvedValue({
+        id: 'task-redispatch-1', agent_instance_id: 'agent-instance-redispatch',
+        triggered_by_user_id: 'user-1', trigger_message_id: 'hub-message-1', status: 'queued',
+      }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [{ id: 'target-local-edge-1', name: 'Online Desktop Edge', target_type: 'local_edge', health_state: 'healthy', is_online: true }],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({ hubClient, queryClient, createClientMessageId: () => 'cm-redispatch' });
+
+    await expect(platform.runs.redispatchTask!(withExecutionTarget({
+      conversationId: 'hub-session-1', text: '继续任务', mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code', model: 'glm-5.1' }],
+      attachments: [], approvalMode: 'suggest',
+    }, 'target-local-edge-1'), 'hub-message-1')).resolves.toEqual({ taskId: 'task-redispatch-1' });
+
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', expect.objectContaining({
+      agent_instance_id: 'agent-instance-redispatch', target_id: 'target-local-edge-1',
+    }));
+  });
+
+  it('maps 409 turn_in_progress to { turnInProgress: true } (recoverable, no throw)', async () => {
+    const queryClient = new QueryClient();
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-redispatch', agent_type: 'claude-code', session_id: 'hub-session-1',
+        inviter_user_id: 'user-1', display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn().mockRejectedValue(new AppError(
+        { error: { code: 'turn_in_progress', message: 'agent instance already has a non-terminal task' } }, 409,
+      )),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [{ id: 'target-local-edge-1', name: 'Online Desktop Edge', target_type: 'local_edge', health_state: 'healthy', is_online: true }],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({ hubClient, queryClient, createClientMessageId: () => 'cm-redispatch' });
+
+    await expect(platform.runs.redispatchTask!(withExecutionTarget({
+      conversationId: 'hub-session-1', text: '继续任务', mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [], approvalMode: 'suggest',
+    }, 'target-local-edge-1'), 'hub-message-1')).resolves.toEqual({ turnInProgress: true });
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('drains as { taskId: undefined } when the intent has no dispatch mention', async () => {
+    const queryClient = new QueryClient();
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-redispatch', agent_type: 'claude-code', session_id: 'hub-session-1',
+        inviter_user_id: 'user-1', display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn().mockResolvedValue({ id: 'task-x' }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [{ id: 'target-local-edge-1', name: 'Online Desktop Edge', target_type: 'local_edge', health_state: 'healthy', is_online: true }],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({ hubClient, queryClient, createClientMessageId: () => 'cm-redispatch' });
+
+    await expect(platform.runs.redispatchTask!(withExecutionTarget({
+      conversationId: 'hub-session-1', text: 'just context, no dispatch', mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code', dispatchRole: 'context' as const }],
+      attachments: [], approvalMode: 'suggest',
+    }, 'target-local-edge-1'), 'hub-message-1')).resolves.toEqual({ taskId: undefined });
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+  });
+});

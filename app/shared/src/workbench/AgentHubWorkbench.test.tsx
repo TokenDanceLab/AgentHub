@@ -422,6 +422,10 @@ vi.mock('react-i18next', () => ({
         'composer.placeholder': '发消息给 {{target}}',
         'composer.send': '发送消息',
         'nav.contacts': '联系人',
+        'toast.submitFailed': '提交失败，请重试',
+        'toast.dispatchRetryExhausted': '派单重试 {{max}} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent',
+        'toast.dispatchRetryFailed': '派单重试失败，请手动重新触发该 Agent',
+        'toast.pendingDispatchBadge': '待发送 {{count}} 条',
       };
       const base = translations[key];
       if (base === undefined) return typeof options === 'string' ? options : key;
