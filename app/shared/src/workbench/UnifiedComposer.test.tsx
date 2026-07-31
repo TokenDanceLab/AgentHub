@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FormEvent } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearDraft, loadDraft, saveDraft } from '../composer';
 import type { ComposerMention, ComposerState } from '../composer';
 import { UnifiedComposer } from './UnifiedComposer';
 
@@ -49,6 +50,21 @@ vi.mock('react-i18next', () => ({
     },
   }),
 }));
+
+// requestIdleCallback polyfill for jsdom (used by draft persistence).
+beforeEach(() => {
+  vi.stubGlobal(
+    'requestIdleCallback',
+    vi.fn((cb: IdleRequestCallback, _opts?: IdleRequestOptions) => window.setTimeout(cb, 0)),
+  );
+  vi.stubGlobal(
+    'cancelIdleCallback',
+    vi.fn((id: number) => window.clearTimeout(id)),
+  );
+});
+afterEach(() => {
+  localStorage.clear();
+});
 
 const mentionedComposer: ComposerState = {
   conversationId: 'hub-session-1',
@@ -384,5 +400,145 @@ describe('UnifiedComposer @mention popover', () => {
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+});
+
+/* ═══════════════════ Draft persistence (T10/UI6) ═══════════════════ */
+
+const draftComposer: ComposerState = {
+  conversationId: 'hub-session-draft',
+  text: '',
+  mode: 'ask',
+  mentions: [],
+  attachments: [],
+  approvalMode: 'suggest',
+  workDir: '',
+  submitState: 'idle',
+  replyTo: null,
+  quote: null,
+  editingMessageId: null,
+};
+
+describe('UnifiedComposer draft persistence', () => {
+  it('loads a saved draft on mount', () => {
+    saveDraft('hub-session-draft', {
+      text: 'Persisted text',
+      mentions: [{ id: 'agent-alice', label: 'Alice', runtimeId: 'claude-code' }],
+    });
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[
+          { id: 'agent-alice', label: 'Alice', runtimeId: 'claude-code' },
+        ]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    // Text restored.
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'setText',
+      text: 'Persisted text',
+    });
+    // Mention restored.
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'addMention',
+      mention: { id: 'agent-alice', label: 'Alice', runtimeId: 'claude-code' },
+    });
+  });
+
+  it('does not load a draft when composer already has content', () => {
+    saveDraft('hub-session-draft', {
+      text: 'Stale draft',
+      mentions: [],
+    });
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={{ ...draftComposer, text: 'Existing content' }}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    // No draft restoration dispatched.
+    expect(dispatchComposer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'setText' }),
+    );
+  });
+
+  it('loads a draft with only text (no mentions)', () => {
+    saveDraft('hub-session-draft', {
+      text: 'Just text, no mentions',
+      mentions: [],
+    });
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'setText',
+      text: 'Just text, no mentions',
+    });
+    // No addMention dispatched.
+    expect(
+      dispatchComposer.mock.calls.filter((c) => c[0].type === 'addMention'),
+    ).toHaveLength(0);
+  });
+
+  it('clears the draft after submit (empty state cleanup)', () => {
+    // Pre-save a draft.
+    saveDraft('hub-session-draft', {
+      text: 'About to be submitted',
+      mentions: [{ id: 'agent-alice', label: 'Alice' }],
+    });
+    const dispatchComposer = vi.fn();
+    const { rerender } = render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[{ id: 'agent-alice', label: 'Alice' }]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    // Draft was loaded.
+    expect(loadDraft('hub-session-draft')).not.toBeNull();
+    // Simulate resetAfterSubmit: text goes to '' and mentions to [].
+    const emptyComposer: ComposerState = { ...draftComposer, text: '', mentions: [] };
+    rerender(
+      <UnifiedComposer
+        composer={emptyComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[{ id: 'agent-alice', label: 'Alice' }]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(loadDraft('hub-session-draft')).toBeNull();
+  });
+
+  it('does not load a draft for a different conversationId', () => {
+    saveDraft('hub-session-other', {
+      text: 'Wrong session',
+      mentions: [],
+    });
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    // No draft loaded — no saved draft for hub-session-draft.
+    expect(
+      dispatchComposer.mock.calls.filter((c) => c[0].type === 'setText' || c[0].type === 'addMention'),
+    ).toHaveLength(0);
   });
 });
