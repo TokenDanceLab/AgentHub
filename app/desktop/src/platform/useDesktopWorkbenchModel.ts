@@ -136,7 +136,10 @@ function useEdgeAvailableForDemo(enabled: boolean): boolean {
   return enabled && available;
 }
 
-export function useDesktopWorkbenchModel(selectedConversationId?: string): DesktopWorkbenchModel {
+export function useDesktopWorkbenchModel(
+  selectedConversationId?: string,
+  t?: (key: string) => string,
+): DesktopWorkbenchModel {
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -309,7 +312,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const transcript = useMemo(() => {
     // If a Hub session is active, use Hub messages for the transcript.
     if (activeHubSession) {
-      return normalizeHubMessagesToTranscript(hubMessages);
+      return normalizeHubMessagesToTranscript(hubMessages, t);
     }
     // Otherwise, use the Edge thread transcript path.
     const items = threadItems ?? [];
@@ -319,7 +322,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     }
     if (threads.length === 0 && hubSessions.length === 0) return EMPTY_TRANSCRIPT;
     return [];
-  }, [activeHubSession, hubMessages, liveTranscript, threadItems, threads.length, hubSessions.length]);
+  }, [activeHubSession, hubMessages, liveTranscript, threadItems, threads.length, hubSessions.length, t]);
 
   // IM read-watermark marker (T8): only meaningful for Hub IM sessions.
   // unread_count is the server-computed `next_seq − last_read_seq` watermark.

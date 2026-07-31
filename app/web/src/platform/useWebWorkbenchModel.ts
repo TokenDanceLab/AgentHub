@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { ProjectDraft } from '@shared/workbench';
 import {
   getWorkbenchDataModeContract,
@@ -74,6 +76,7 @@ import { errorMessage } from './webWorkbenchError';
 const hubClient = createHubClient({ getToken: getAccessToken });
 
 export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -423,8 +426,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       mergedRuntimeEvents,
       dataMode,
       selectedConversationId,
+      t,
     ),
-    [hubReady, activeHubSessionId, messages.data, mergedRuntimeEvents, dataMode, selectedConversationId],
+    [hubReady, activeHubSessionId, messages.data, mergedRuntimeEvents, dataMode, selectedConversationId, t],
   );
   const taskContractStatusBlocks = useMemo(
     () => resolveWebTaskContractStatusBlocks(
