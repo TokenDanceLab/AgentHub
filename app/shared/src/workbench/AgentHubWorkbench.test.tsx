@@ -7,6 +7,18 @@ import type { WorkbenchAgent } from '../platform/types';
 import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIcons';
+
+// jsdom has no layout engine, so virtua cannot measure the viewport/rows and
+// would mount zero rows — breaking content-level queries on transcript cards.
+// These tests cover workbench shell/transcript business logic, not
+// virtualization, so a passthrough Virtualizer (render every child)
+// preserves their semantics. The real Virtualizer is exercised by
+// Transcript.autoscroll.test.tsx (scroll contract) and
+// Transcript.virtualization.test.tsx (handle wiring).
+vi.mock('virtua', () => ({
+  Virtualizer: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+}));
+
 /* Build translation maps inside vi.hoisted so they are available before
    Vitest hoists the vi.mock factory.  Inline zh-CN from sharedWorkbench
    and chatview namespaces to avoid importing modules inside vi.mock. */
