@@ -2735,12 +2735,12 @@
 }
 
 .deploySpinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--bdr);
+  width: var(--spinner-sm);
+  height: var(--spinner-sm);
+  border: var(--spinner-sm-border) solid var(--bdr);
   border-top-color: var(--primary);
   border-radius: var(--r-full);
-  animation: deploySpin 0.8s linear infinite;
+  animation: deploySpin var(--spinner-speed) var(--spinner-easing) infinite;
 }
 
 @keyframes deploySpin {
@@ -2770,12 +2770,12 @@
 }
 
 .workspaceLoadingSpinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
+  width: var(--spinner-lg);
+  height: var(--spinner-lg);
+  border: var(--spinner-lg-border) solid var(--border);
   border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: deploySpin 0.8s linear infinite;
+  border-radius: var(--r-full);
+  animation: deploySpin var(--spinner-speed) var(--spinner-easing) infinite;
 }
 
 .workspaceLoadingLabel {
