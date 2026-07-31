@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
+import { fireEvent, render } from '@testing-library/react';
 import type { TranscriptBlock } from '../transcript';
 import {
   applyTranscriptChromeSideEffects,
@@ -188,6 +190,47 @@ describe('workbenchTranscriptChromeActionMappers', () => {
 
     const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
     expect(react).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '👍' });
+  });
+
+  it('plans the react effect with the emoji carried by the picker action string', () => {
+    const transcript = [textBlock({ id: 'b1' })];
+
+    const picked = planContextAction({
+      action: 'react:🔥',
+      blockId: 'b1',
+      transcript,
+      t,
+      sessionId: 'sess-1',
+    });
+    expect(picked).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '🔥' });
+    expect(picked.find((e) => e.type === 'toast')?.message).toBe('toast.reactionAdded');
+
+    // Without a session id (Desktop/demo) the picker action keeps the
+    // placeholder toast under the plain react label.
+    const demo = planContextAction({ action: 'react:🎉', blockId: 'b1', transcript, t });
+    expect(demo.some((e) => e.type === 'react')).toBe(false);
+    expect(demo.find((e) => e.type === 'toast')?.message).toBe('toast.reactOpened');
+  });
+
+  it('wires the react menu item to an emoji picker submenu that plans the chosen emoji', () => {
+    const onAction = vi.fn();
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock()],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+    });
+    const reactItem = groups[0]?.find((item) => item.label === 'context.react');
+    expect(reactItem?.chevron).toBe(true);
+    expect(typeof reactItem?.submenu).toBe('function');
+
+    const close = vi.fn();
+    const submenu = reactItem!.submenu as (close: () => void) => ReactNode;
+    const { getByRole } = render(submenu(close));
+    fireEvent.click(getByRole('gridcell', { name: '❤️' }));
+    expect(onAction).toHaveBeenCalledWith('react:❤️', 'b1');
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('keeps the placeholder toast for pin/react without a session id (Desktop/demo)', () => {

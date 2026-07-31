@@ -134,3 +134,28 @@
   color: var(--text-3);
   font: 600 0.875rem / 1 var(--font-sans);
 }
+
+/* ═══ Submenu (#1384) ═══ */
+
+.submenuAnchor {
+  position: relative;
+}
+
+.submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  z-index: 2;
+  padding: var(--sp-xxs);
+  border: 1px solid var(--glass-border-strong, var(--bdr-strong));
+  border-radius: var(--r-md);
+  background: var(--glass-panel-overlay, var(--glass-panel));
+  box-shadow: var(--glass-elev-3, var(--e-3));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+}
+
+.submenu.flip {
+  left: auto;
+  right: 100%;
+}
