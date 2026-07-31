@@ -2633,6 +2633,44 @@
   }
 }
 
+/* ═══ Touch targets ≥44px (WCAG 2.5.8) — coarse pointer / narrow viewport only ═══
+   Desktop density is unchanged: 36px is a reasonable size for fine pointers.
+   Enlarge the workbench chrome (rail / header / tabs / list / composer) only
+   where a coarse pointer (touch) or a ≤480px mobile viewport makes 28-40px
+   targets hard to hit. Mirrors the ui-library pattern (Button/Avatar/...)
+   at the --bp-mobile breakpoint, reusing the shared --touch-target-min token. */
+@media (pointer: coarse), (max-width: 480px) {
+  .railButton,
+  .iconButton {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .sidebarSort {
+    height: var(--touch-target-min, 44px);
+  }
+
+  .conversationButton {
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  /* Tabs sit in a fixed-height strip (28px); the strip must grow with the tab
+     or the enlarged tab gets clipped by its overflow-hidden container. */
+  .workspaceTabs {
+    height: var(--touch-target-min, 44px);
+  }
+
+  .workspaceTab {
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  /* Composer "+" affordance — visual hit surface of the picker row. */
+  .composerRow::before {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+}
+
 /* ═══ Inspector toggle button icons ═══ */
 .inspectorToggleBtn .iconCollapse {
   display: block;
