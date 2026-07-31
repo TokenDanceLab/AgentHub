@@ -883,3 +883,28 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ── Infinite-scroll load-more (T14 pattern: sentinel + fallback button) ── */
+.sentinel {
+  height: 1px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.loadMoreBtn {
+  display: block;
+  margin: var(--sp-md) auto 0;
+  height: 32px;
+  padding: 0 18px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+  color: var(--text-2);
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+}
+
+.loadMoreBtn:hover {
+  border-color: var(--bdr-strong);
+  color: var(--text-1);
+}

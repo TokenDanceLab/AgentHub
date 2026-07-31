@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
+import { StatusNotice } from '../../../ui';
+import { DesignNavIcon } from '../../designIcons';
 import { ProfilePopover } from '../../floating';
 import styles from '../ContactsPage.module.css';
 import { QuickActionGrid } from './ContactRows';
@@ -40,6 +42,9 @@ export function ContactListPage({
   rows,
   sectionTitle,
   showQuickGrid = false,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   activeMemberId,
   onAddContact,
   onMemberClick,
@@ -51,11 +56,42 @@ export function ContactListPage({
   rows: ContactMember[];
   sectionTitle: string;
   showQuickGrid?: boolean;
+  /** Whether more contacts are available via pagination (pageCursor). */
+  hasMore?: boolean;
+  /** Whether a load-more page fetch is in flight. */
+  loadingMore?: boolean;
+  /** Triggered when the scroll sentinel enters the viewport (or fallback button). */
+  onLoadMore?: (() => void) | undefined;
   activeMemberId?: string | undefined;
   onAddContact?: (() => void) | undefined;
   onMemberClick?: ((member: ContactMember) => void) | undefined;
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
+  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO) ──
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    // Environments without IntersectionObserver (jsdom, legacy browsers)
+    // fall back to the explicit "加载更多" button below.
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMoreRef.current?.();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore]);
+
   return (
     <main className={`${styles.main} workbench-main`}>
       <ContactMainHead
@@ -72,6 +108,28 @@ export function ContactListPage({
         onMemberClick={onMemberClick}
         onAvatarClick={onAvatarClick}
       />
+
+      {/* ── Infinite-scroll load-more (skeleton; hasMore stays false until the
+              data layer exposes pageCursor — see useWorkbenchContactsRoute) ── */}
+      {hasMore && !loadingMore ? (
+        <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
+          加载更多
+        </button>
+      ) : null}
+      <div
+        ref={sentinelRef}
+        className={styles.sentinel}
+        role="status"
+        aria-label={loadingMore ? '加载中…' : undefined}
+      />
+      {loadingMore ? (
+        <StatusNotice
+          icon={<DesignNavIcon name="running" size={14} />}
+          role="status"
+        >
+          加载中…
+        </StatusNotice>
+      ) : null}
     </main>
   );
 }
