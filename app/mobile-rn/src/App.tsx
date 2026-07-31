@@ -7,7 +7,7 @@ import { createHubClient } from '@/api/hubClient';
 import { createHubEventStream, type HubEventStream, type HubWebSocketLike } from '@/api/hubEvents';
 import { AppShell, BottomTabs } from '@/components/layout';
 import { AgentHubIcon } from '@/components/icons';
-import { Badge, Button, StatusPill, Surface } from '@/components/primitives';
+import { Badge, Button, EmptyState, ErrorBoundary, StatusPill, Surface } from '@/components/primitives';
 import {
   getMobileFixtureForScenario,
   getPendingReviewCount,
@@ -961,11 +961,32 @@ function isMobileTab(value: string | null): value is MobileTab {
 
 export default function App(): React.ReactElement {
   const preview = getPreviewOptions();
+  const t = useStrings();
 
   return (
     <SafeAreaProvider>
       <AgentHubThemeProvider initialMode={getPreviewThemeMode() ?? 'light'}>
-        <MobileAppContent preview={preview} />
+        <ErrorBoundary
+          fallback={(retry) => (
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 24,
+              }}
+            >
+              <EmptyState
+                icon="danger"
+                title="Something went wrong"
+                description="An unexpected error occurred while rendering this section."
+                action={{ label: t.retry, onPress: retry }}
+              />
+            </View>
+          )}
+        >
+          <MobileAppContent preview={preview} />
+        </ErrorBoundary>
       </AgentHubThemeProvider>
     </SafeAreaProvider>
   );

@@ -4,6 +4,11 @@ import { ErrorNotice } from './ErrorNotice';
 
 interface Props {
   children: React.ReactNode;
+  /**
+   * Optional custom fallback renderer. Receives a retry callback that clears
+   * the error state and re-renders children. Defaults to ErrorNotice.
+   */
+  fallback?: (retry: () => void) => React.ReactNode;
 }
 
 interface State {
@@ -32,6 +37,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render(): React.ReactNode {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback(this.handleRetry);
+      }
       return (
         <ErrorNotice
           title="Something went wrong"
