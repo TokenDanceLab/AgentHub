@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import type { GlobalRailPage } from './GlobalRail';
 import {
+  INSPECTOR_COLLAPSED_STORAGE_KEY,
+  INSPECTOR_DEFAULT_COLLAPSE_EVENT,
   INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_WIDTH_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
 } from './workbenchLayoutConstants';
 import {
@@ -15,6 +18,7 @@ import {
   attachPanelPointerResizeListeners,
   buildWorkbenchPanelLayoutResult,
   canBeginPanelResize,
+  clampInspectorWidth,
   createSyncedWidthWriter,
   maybeCollapseSidebarForWorkspacePressure,
   planInspectorResizeBy,
@@ -38,14 +42,57 @@ export type {
   WorkbenchPanelLayout,
 } from './workbenchPanelLayoutHelpers';
 
+// ── Inspector layout persistence (localStorage, best-effort) ────────────────
+// Follows the ConversationSidebar conversationSort pattern: load in the
+// useState initializer, write in a useEffect on change.
+
+function loadStoredInspectorWidth(): number {
+  if (typeof window === 'undefined') return INSPECTOR_DEFAULT_WIDTH;
+  try {
+    const raw = window.localStorage.getItem(INSPECTOR_WIDTH_STORAGE_KEY);
+    if (raw === null) return INSPECTOR_DEFAULT_WIDTH;
+    const width = Number.parseInt(raw, 10);
+    return Number.isFinite(width) ? clampInspectorWidth(width) : INSPECTOR_DEFAULT_WIDTH;
+  } catch {
+    return INSPECTOR_DEFAULT_WIDTH;
+  }
+}
+
+function loadStoredInspectorCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(INSPECTOR_COLLAPSED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function storeInspectorWidth(width: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(INSPECTOR_WIDTH_STORAGE_KEY, String(clampInspectorWidth(width)));
+  } catch {
+    // Quota / private-mode — persistence is best-effort.
+  }
+}
+
+function storeInspectorCollapsed(collapsed: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(INSPECTOR_COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    // Quota / private-mode — persistence is best-effort.
+  }
+}
+
 export function useWorkbenchPanelLayout({
   activePage,
   isChatPage,
   platformSurface,
   setActivePage,
 }: UseWorkbenchPanelLayoutOptions): WorkbenchPanelLayout {
-  const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [inspectorWidth, setInspectorWidth] = useState(loadStoredInspectorWidth);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(loadStoredInspectorCollapsed);
   const [inspectorResizing, setInspectorResizing] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -61,6 +108,26 @@ export function useWorkbenchPanelLayout({
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
   }, [sidebarWidth]);
+
+  // Persist inspector layout across restarts (mirror of the state machine).
+  useEffect(() => {
+    storeInspectorWidth(inspectorWidth);
+  }, [inspectorWidth]);
+
+  useEffect(() => {
+    storeInspectorCollapsed(inspectorCollapsed);
+  }, [inspectorCollapsed]);
+
+  // Settings gate (inspectorVisible=false): collapse the inspector by default.
+  // Dispatched by useWorkbenchSessionChrome once settings load / on toggle-off.
+  useEffect(() => {
+    function handleInspectorDefaultCollapse(): void {
+      setInspectorCollapsed(true);
+    }
+
+    window.addEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, handleInspectorDefaultCollapse);
+    return () => window.removeEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, handleInspectorDefaultCollapse);
+  }, []);
 
   const setSyncedInspectorWidth = useCallback(
     createSyncedWidthWriter(inspectorWidthRef, setInspectorWidth),
