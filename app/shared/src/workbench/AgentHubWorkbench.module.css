@@ -2525,9 +2525,76 @@
     grid-template-columns: 52px minmax(0, 1fr);
   }
 
-  .sidebarFrame,
-  .inspector,
-  .engineeringColumn {
+  /* 窄屏完全隐藏会话列表侧栏（行为不变）。 */
+  .sidebarFrame {
+    display: none;
+  }
+
+  /*
+   * Narrow inspector drawer（二轮调研 #2）：
+   * ≤760px 时 inspector 不再 display:none，改为从右侧滑入的 overlay drawer。
+   * 状态联动是纯 CSS——shell 上的 data-inspector-collapsed 属性本来就由
+   * WorkspaceHeader 的 inspectorCollapsed 状态驱动（inspectorToggleBtn 点击），
+   * 无需改动任何 JS/tsx。
+   *
+   * drawer 从 workspace header 之下（top: 60px）开始而非全高：header 位于
+   * workspace 的 stacking context 内（container-type + backdrop-filter），
+   * 全高 drawer 会盖住 header 右端的 inspectorToggleBtn，用户将无法收起。
+   * 避让后 toggle 始终可见可点（header 72px 时仅底部 12px 与 drawer 上缘
+   * 重叠，按钮垂直居中在 ~36px 处不受影响）。
+   */
+  .shell > .inspector,
+  .shell > .engineeringColumn {
+    position: fixed;
+    top: 60px;
+    right: 0;
+    bottom: 0;
+    width: min(var(--inspector-w, 400px), 100vw);
+    min-width: 0;
+    flex: none;
+    z-index: calc(var(--z-overlay, 300) + 50);
+    box-shadow: var(--glass-elev-1);
+    transform: translateX(105%);
+    visibility: hidden;
+    will-change: width, flex-basis, clip-path, transform;
+    transition:
+      width var(--inspector-motion-duration) var(--inspector-motion-ease),
+      flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
+      clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
+      border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+      transform var(--inspector-motion-duration) var(--inspector-motion-ease),
+      visibility 0s linear var(--inspector-motion-duration);
+  }
+
+  /* 收起态：等滑出动画结束后再隐藏，避免 offscreen 内容被 Tab 聚焦。 */
+  .shell[data-inspector-collapsed='true'] > .inspector,
+  .shell[data-inspector-collapsed='true'] > .engineeringColumn {
+    visibility: hidden;
+  }
+
+  /* 展开态（inspectorCollapsed=false，含 inspectorVisible 初始展开）：滑入。 */
+  .shell[data-inspector-collapsed='false'] > .inspector,
+  .shell[data-inspector-collapsed='false'] > .engineeringColumn {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+      width var(--inspector-motion-duration) var(--inspector-motion-ease),
+      flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
+      clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
+      border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+      transform var(--inspector-motion-duration) var(--inspector-motion-ease),
+      visibility 0s;
+  }
+
+  /* 屏宽 < 400px 时 drawer 收窄，内部固定 400px 的面板头部/主体跟随宽度。 */
+  .inspector .monitorHead,
+  .inspector .inspectorPanel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* drawer 模式下隐藏拖拽 resize 手柄（overlay 无 resize 需求）。 */
+  .inspectorResizer {
     display: none;
   }
 
@@ -3014,4 +3081,73 @@
   background: var(--bg-3, var(--surface-dim, #f3f4f6));
   color: var(--text-2);
   font: 500 12px var(--mono, ui-monospace, monospace);
+}
+
+/* ═══ Print stylesheet — workbench chrome (二轮调研 #7) ═══════════════════
+   仅 print 媒体: 隐藏全部不可打印的 chrome，解除 workspace/transcript 的
+   视口裁剪，让内容按页自然流动。屏幕渲染零影响 (规则只在 @media print 内)。
+   全局重置 (html/body/#root + chatview 内容规则) 在 styles/presets-base.css。 */
+@media print {
+  /* 隐藏 chrome: 全局 rail / 会话 sidebar / 右侧 inspector 列 / 头部 /
+     mainchain strip / composer 及其附属条 / terminal dock。 */
+  .rail,
+  .sidebarFrame,
+  .sidebar,
+  .sidebarResizer,
+  .inspector,
+  .engineeringColumn,
+  .inspectorResizer,
+  .monitorHead,
+  .workspaceHeader,
+  .mainchainStrip,
+  .composer,
+  .pendingIntentBadge,
+  .replyToBar,
+  .quoteBar,
+  .composerMentions,
+  .composerMainchain,
+  .composerAttachmentBar,
+  .composerStatus,
+  .composerDragOverlay,
+  .terminalDock,
+  .skipLink {
+    display: none !important;
+  }
+
+  /* Shell: 去掉固定 4 列 grid + 视口裁剪 (height:100%/overflow:hidden);
+     display:block 使 grid-template-* 失效，只留 workspace 流入正常文档流。 */
+  .shell {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* Workspace: 同样解除裁剪; ::before 玻璃染色是纯屏幕装饰。
+     max-width:none 抵消窄屏媒体查询 (≤760px) 的 calc(100vw - 52px) 缩进。 */
+  .workspace {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .workspace::before {
+    display: none !important;
+  }
+
+  /* Transcript 区域: 重置 flex:1 + overflow 裁剪，内容按页流动。 */
+  .transcriptRegion {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
 }
