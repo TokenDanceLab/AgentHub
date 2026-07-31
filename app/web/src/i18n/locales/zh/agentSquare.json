@@ -49,7 +49,6 @@
   "empty.noResults": "没有匹配此视图的智能体",
   "empty.description": "尝试其他分类，移除搜索文本，或清除本地筛选。",
   "detail.title": "智能体详情",
-  "detail.close": "关闭详情面板",
   "detail.rating": "评分",
   "detail.installs": "暂存数",
   "detail.favorites": "收藏",

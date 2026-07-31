@@ -82,7 +82,6 @@
     "reopen": "重新打开"
   },
   "taskForm": {
-    "drawerAria": "新建任务面板",
     "title": "新建任务草稿",
     "description": "此面板仅为本地 UI 演示。它展示了项目页面如何在无需连接后端的情况下提供任务创建功能。",
     "fieldTitle": "标题",
