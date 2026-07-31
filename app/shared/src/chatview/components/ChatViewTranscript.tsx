@@ -21,6 +21,13 @@ interface Props {
   transcript: TranscriptBlock[]
   /** DM or group mode. Inferred from agent count when not provided. */
   chatMode?: 'dm' | 'group'
+  /**
+   * Conversation/session identity. Passed through to Transcript so scroll
+   * memory (auto-follow state, scroll position) is isolated per session —
+   * switching sessions must neither force a scroll-to-bottom nor leak one
+   * session's scroll position into another.
+   */
+  sessionId?: string
   onAgentClick?: ((agentName: string, anchor: HTMLElement) => void) | undefined
   onBlockContextMenu?: ((blockId: string, event: React.MouseEvent) => void) | undefined
   onBlockSelect?: ((blockId: string, shiftKey: boolean) => void) | undefined
@@ -91,7 +98,7 @@ class TranscriptErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -189,7 +196,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyState />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript items={items} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
+          <Transcript items={items} sessionId={sessionId} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
           {/* Ephemeral typing indicator — shown when other session members are typing */}
           {typingUserNames && typingUserNames.length > 0 && (
             <TypingIndicator names={typingUserNames} chatMode={chatMode} />

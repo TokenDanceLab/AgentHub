@@ -126,6 +126,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
     <>
       <ChatViewTranscript
         transcript={displayTranscript}
+        sessionId={activeConversation?.id}
         chatMode={chatMode}
         onAgentClick={onAgentClick}
         onBlockContextMenu={onBlockContextMenu}
