@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProfilePopover, Toast } from './floating';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
@@ -80,6 +80,58 @@ export function GlobalRail({
   const isControlled = activePageProp !== undefined;
   const activePage = isControlled ? activePageProp : internalPage;
 
+  /* ── Roving tabindex (#8): the rail page buttons form one tab stop;
+     ArrowLeft/ArrowRight (and Home/End) move it. Same pattern as
+     ContextMenu.tsx: activeIndex state + focus-on-change effect. ── */
+  const railRef = useRef<HTMLElement>(null);
+  const rovingKeyboardRef = useRef(false);
+  const pageIds = useMemo<GlobalRailPage[]>(
+    () => [...topNavItems.map((item) => item.id), 'settings'],
+    [],
+  );
+  const [rovingIndex, setRovingIndex] = useState(() =>
+    Math.max(0, pageIds.indexOf(activePage)),
+  );
+
+  // Keep the single tab stop on the active page when it changes externally.
+  useEffect(() => {
+    const index = pageIds.indexOf(activePage);
+    if (index >= 0) setRovingIndex(index);
+  }, [activePage, pageIds]);
+
+  // Move DOM focus only when the index changed via the keyboard (mount and
+  // mouse clicks must not steal focus from where the user is).
+  useEffect(() => {
+    if (!rovingKeyboardRef.current || !railRef.current) return;
+    rovingKeyboardRef.current = false;
+    const buttons = railRef.current.querySelectorAll<HTMLButtonElement>('[data-rail-page]');
+    buttons[rovingIndex]?.focus();
+  }, [rovingIndex]);
+
+  function handleRailKeyDown(event: React.KeyboardEvent<HTMLElement>): void {
+    let next = -1;
+    switch (event.key) {
+      case 'ArrowRight':
+        next = (rovingIndex + 1) % pageIds.length;
+        break;
+      case 'ArrowLeft':
+        next = (rovingIndex - 1 + pageIds.length) % pageIds.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = pageIds.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    rovingKeyboardRef.current = true;
+    setRovingIndex(next);
+    handleNavigate(pageIds[next]!);
+  }
+
   function handleNavigate(page: GlobalRailPage) {
     if (onNavigate) {
       onNavigate(page);
@@ -111,7 +163,7 @@ export function GlobalRail({
   }
 
   return (
-    <nav aria-label="Global rail" className={styles.rail}>
+    <nav aria-label="Global rail" className={styles.rail} onKeyDown={handleRailKeyDown} ref={railRef}>
       <div
         aria-label={displayName}
         aria-expanded={profileOpen}
@@ -131,13 +183,15 @@ export function GlobalRail({
         )}
       </div>
 
-      {topNavItems.map((item) => (
+      {topNavItems.map((item, index) => (
         <button
           aria-current={activePage === item.id ? 'page' : undefined}
           aria-label={navLabelMap[item.id] ?? item.label}
           className={styles.railButton}
+          data-rail-page={item.id}
           key={item.id}
           onClick={() => handleNavigate(item.id)}
+          tabIndex={rovingIndex === index ? 0 : -1}
           title={navLabelMap[item.id] ?? item.label}
           type="button"
         >
@@ -150,7 +204,9 @@ export function GlobalRail({
       <button
         aria-label={t('aria.settings')}
         className={styles.railButton}
+        data-rail-page="settings"
         onClick={() => handleNavigate('settings')}
+        tabIndex={rovingIndex === pageIds.length - 1 ? 0 : -1}
         title={t('user.settings')}
         type="button"
       >
