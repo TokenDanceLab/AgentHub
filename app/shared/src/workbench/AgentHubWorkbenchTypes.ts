@@ -102,6 +102,13 @@ export interface AgentHubWorkbenchProps {
   showComposerStatus?: boolean | undefined;
   showMainchainStatus?: boolean | undefined;
   transcript: TranscriptBlock[];
+  /**
+   * Optional unread-messages divider for the transcript (T8 desktop IM path).
+   * The IM consumer (desktop Hub sessions) derives the anchor from the read
+   * watermark (unread_count = next_seq − last_read_seq); absent for execution
+   * threads, demos, and the web app.
+   */
+  transcriptUnreadDivider?: import('../chatview').UnreadDividerDescriptor | undefined;
   /** Current user profile info, shown in GlobalRail avatar and profile popover. */
   userDisplayName?: string | undefined;
   userAvatarUrl?: string | undefined;

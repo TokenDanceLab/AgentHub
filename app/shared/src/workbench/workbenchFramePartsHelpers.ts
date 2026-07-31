@@ -61,6 +61,7 @@ export function buildChatConversationHostProps(
     transcriptChrome,
     profile,
     transcript,
+    transcriptUnreadDivider,
     connectionStatus,
     inspectorCollapsed,
     toggleInspector,
@@ -71,8 +72,7 @@ export function buildChatConversationHostProps(
     showComposerStatus,
     highlightedBlockId,
     onHighlightEnd,
-  } = props;
-  const {
+  } = props;  const {
     currentConversationId,
     activeConversation,
     selectedExecutionTargetId,
@@ -141,6 +141,7 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'activeConversation', activeConversation);
   assignIfDefined(hostProps, 'connectionStatus', connectionStatus);
   assignIfDefined(hostProps, 'workbenchStatus', workbenchStatus);
+  assignIfDefined(hostProps, 'transcriptUnreadDivider', transcriptUnreadDivider);
   assignIfDefined(hostProps, 'highlightedBlockId', highlightedBlockId);
   assignIfDefined(hostProps, 'onHighlightEnd', onHighlightEnd);
   assignIfDefined(hostProps, 'composerExecutionTargets', composerExecutionTargets);

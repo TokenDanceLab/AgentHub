@@ -206,3 +206,57 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
   if (currentAgent) items.push(currentAgent)
   return items
 }
+
+/**
+ * Resolve the transcript item index before which an unread-messages divider
+ * should render (desktop IM path, T8).
+ *
+ * The consumer (session model) maps the read watermark (last_read_seq) to the
+ * transcript block id of the first unread message. This helper converts that
+ * block-level anchor to an ITEM-level index, because blocks and items are not
+ * 1:1 — consecutive same-author agent blocks merge into one TranscriptAgentItem
+ * and some blocks are dropped (human non-text).
+ *
+ * Placement rules:
+ * - Exact: the anchor block's containing item (the item whose render starts at
+ *   or before the anchor block). Mirrors the adapter's grouping so merged
+ *   agent groups are treated as a unit.
+ * - Fallback: when the anchor block is not present in the filtered blocks
+ *   (e.g. it was dropped upstream), place by the unread tail count.
+ * - No descriptor / zero count / empty items → -1 (render nothing).
+ */
+export function resolveUnreadAnchorItemIndex(
+  blocks: TranscriptBlock[],
+  items: TranscriptItem[],
+  descriptor: { anchorBlockId?: string; count: number } | undefined,
+): number {
+  if (!descriptor || descriptor.count <= 0 || items.length === 0) return -1
+
+  const anchorIndex = descriptor.anchorBlockId
+    ? blocks.findIndex((b) => b.id === descriptor.anchorBlockId)
+    : -1
+  if (anchorIndex < 0) {
+    // Anchor block filtered out upstream — approximate with the unread tail.
+    return Math.max(0, items.length - descriptor.count)
+  }
+
+  // Count item starts (adapter grouping) up to and including the anchor block.
+  let starts = 0
+  let prevAgentAuthor: string | null = null
+  for (let i = 0; i <= anchorIndex; i++) {
+    const block = blocks[i]
+    if (!block) continue
+    const role = block.author?.role ?? 'system'
+    const author = block.author?.id ?? 'unknown'
+    if (role === 'human' && block.kind === 'text') {
+      starts++
+      prevAgentAuthor = null
+    } else if (role === 'agent' || role === 'system') {
+      // Consecutive same-author agent blocks merge into one group.
+      if (author !== prevAgentAuthor) starts++
+      prevAgentAuthor = author
+    }
+    // Human non-text blocks are dropped by the adapter — they start nothing.
+  }
+  return Math.max(0, starts - 1)
+}

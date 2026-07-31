@@ -51,7 +51,13 @@ function FileTypeIcon({ item }: { item: RowItemType }) {
   return <Icon size={14} />
 }
 
-function stableInteractionId(item: RowItemType): string {
+/**
+ * Stable DOM identity for a row, used as the `data-block-id` attribute and
+ * the value highlight/search jump targets. Exported so the Transcript can
+ * build a `blockId → segmentIndex` map for virtualized `scrollToIndex` jumps
+ * (the row may be off-screen / unmounted under virtualization).
+ */
+export function stableInteractionId(item: RowItemType): string {
   return item.type === 'tool' && item.toolCallId ? `call-${item.toolCallId}` : item.id
 }
 

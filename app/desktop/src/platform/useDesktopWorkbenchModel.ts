@@ -12,6 +12,7 @@ import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
 import { orderTranscriptBlocks } from '@shared/transcript';
 import { getAgentActivityStore, type AgentActivitySnapshot } from '@shared/transcript/agentActivity';
+import { computeTranscriptUnreadMarker, type TranscriptUnreadMarker } from '@/components/IM/transcriptUnreadMarker';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
@@ -79,6 +80,13 @@ export interface DesktopWorkbenchModel {
     update: (projectId: string, draft: ProjectDraft) => Promise<ProjectInfo>;
   };
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
+  /**
+   * Unread-messages marker for the IM transcript (T8): anchor block id of the
+   * first unread message derived from the Hub session read watermark
+   * (unread_count = next_seq − last_read_seq). Present only for Hub IM
+   * sessions with unread messages. The shell renders the divider copy.
+   */
+  transcriptUnread?: TranscriptUnreadMarker | undefined;
   /** Agent activity state for the streaming status bar. */
   agentActivity?: AgentActivitySnapshot;
   /** Whether threads are currently being fetched (first load or refetching). */
@@ -313,6 +321,16 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     return [];
   }, [activeHubSession, hubMessages, liveTranscript, threadItems, threads.length, hubSessions.length]);
 
+  // IM read-watermark marker (T8): only meaningful for Hub IM sessions.
+  // unread_count is the server-computed `next_seq − last_read_seq` watermark.
+  const transcriptUnread = useMemo(
+    () =>
+      activeHubSession
+        ? computeTranscriptUnreadMarker(hubMessages, activeHubSession.unread_count)
+        : undefined,
+    [activeHubSession, hubMessages],
+  );
+
   // Resolve Hub contacts for the workbench contacts page.
   const resolvedContacts = useMemo(
     () => resolveHubContacts(
@@ -412,6 +430,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     ...(resolvedProjectsActions != null ? { projectsActions: resolvedProjectsActions } : {}),
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     transcript,
+    ...(transcriptUnread ? { transcriptUnread } : {}),
     agentActivity,
     threadsLoading: threadsQuery.isLoading || (hubReady && hubSessionsQuery.isLoading),
     itemsLoading: activeHubSession ? hubMessagesQuery.isLoading : threadItemsQuery.isLoading,

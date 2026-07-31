@@ -56,3 +56,21 @@ export interface RowItem {
   /** Display title for URL preview (derived from URL path when no explicit title). */
   previewTitle?: string
 }
+
+/**
+ * Unread-messages divider descriptor (desktop IM path, T8).
+ * The upstream session exposes a read watermark (Hub: next_seq − last_read_seq
+ * as unread_count); the consumer resolves it to a transcript block id of the
+ * first unread message plus display copy, and ChatView renders a thin divider
+ * right above that message.
+ */
+export interface UnreadDividerDescriptor {
+  /** Transcript block id of the first unread message (divider renders above it). */
+  anchorBlockId?: string
+  /** Unread message count (watermark-derived). */
+  count: number
+  /** Main copy, e.g. "3 条未读". */
+  label: string
+  /** Optional read-through hint, e.g. "已读到 #12". */
+  readThrough?: string
+}

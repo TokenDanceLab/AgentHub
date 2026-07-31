@@ -302,4 +302,74 @@ describe('useDesktopWorkbenchModel', () => {
       expect.arrayContaining(['hub-session-1', 'edge-thread-1']),
     );
   });
+
+  it('exposes the IM transcript unread marker from the Hub session watermark (T8)', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseHubStore.mockReturnValue(true as never);
+    mockedGetAccessToken.mockReturnValue('token');
+
+    mockedUseHubSessions.mockReturnValue({
+      data: [{
+        id: 'hub-session-1',
+        title: 'Hub DM',
+        type: 'private',
+        unread_count: 2,
+      }],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubSessions>);
+    mockedUseHubMessages.mockReturnValue({
+      data: [
+        { id: 'm1', session_id: 'hub-session-1', seq_id: 1, sender_type: 'user', sender_id: 'me', content_type: 'text/plain', content: 'hi' },
+        { id: 'm2', session_id: 'hub-session-1', seq_id: 2, sender_type: 'user', sender_id: 'other', content_type: 'text/plain', content: 'hello' },
+        { id: 'm3', session_id: 'hub-session-1', seq_id: 3, sender_type: 'user', sender_id: 'other', content_type: 'text/plain', content: 'unread-1' },
+        { id: 'm4', session_id: 'hub-session-1', seq_id: 4, sender_type: 'user', sender_id: 'other', content_type: 'text/plain', content: 'unread-2' },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubMessages>);
+
+    const { result } = renderWithProvider();
+
+    expect(result.current.transcriptUnread).toEqual({
+      anchorBlockId: 'hub-message-m3',
+      count: 2,
+      readThroughSeq: 2,
+    });
+    // The transcript itself stays marker-free (blocks unchanged).
+    expect(result.current.transcript.map((b) => b.id)).toEqual([
+      'hub-message-m1',
+      'hub-message-m2',
+      'hub-message-m3',
+      'hub-message-m4',
+    ]);
+  });
+
+  it('omits the IM transcript unread marker when the session is fully read', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseHubStore.mockReturnValue(true as never);
+    mockedGetAccessToken.mockReturnValue('token');
+
+    mockedUseHubSessions.mockReturnValue({
+      data: [{
+        id: 'hub-session-1',
+        title: 'Hub DM',
+        type: 'private',
+        unread_count: 0,
+      }],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubSessions>);
+    mockedUseHubMessages.mockReturnValue({
+      data: [
+        { id: 'm1', session_id: 'hub-session-1', seq_id: 1, sender_type: 'user', sender_id: 'me', content_type: 'text/plain', content: 'hi' },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useHubMessages>);
+
+    const { result } = renderWithProvider();
+
+    expect(result.current.transcriptUnread).toBeUndefined();
+  });
 });
