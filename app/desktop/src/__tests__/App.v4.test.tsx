@@ -147,9 +147,20 @@ vi.mock('@/stores/hubStore', () => ({
   useHubStore: vi.fn(() => ({})),
 }));
 
-vi.mock('@/stores/toastStore', () => ({
-  useToastStore: vi.fn(() => ({ showToast: vi.fn() })),
-}));
+vi.mock('@/stores/toastStore', () => {
+  const state = {
+    toasts: [],
+    showToast: vi.fn(),
+    dismissToast: vi.fn(),
+    removeToast: vi.fn(),
+  };
+  return {
+    useToastStore: vi.fn(
+      (selector?: (s: typeof state) => unknown) =>
+        typeof selector === 'function' ? selector(state) : state,
+    ),
+  };
+});
 
 vi.mock('@/demo/demoEvidence', () => ({
   getDemoRuntimeEvidence: vi.fn(),
