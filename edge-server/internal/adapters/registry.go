@@ -10,6 +10,7 @@ var cliAdapterIDs = map[string]struct{}{
 	"codex":          {},
 	"codex-acp":      {}, // official @agentclientprotocol/codex-acp (ACP migration, first target)
 	"opencode":       {},
+	"opencode-acp":   {}, // native `opencode acp` subcommand (ACP migration, second target)
 	"anthropic-sdk":  {},
 	"openai-sdk":     {},
 }
@@ -34,7 +35,7 @@ func ValidateCLIAdapterID(id string) error {
 	if _, ok := cliAdapterIDs[id]; ok {
 		return nil
 	}
-	return fmt.Errorf("unsupported CLI adapter %q; supported values: claude-code, codex, codex-acp, opencode, anthropic-sdk, openai-sdk", id)
+	return fmt.Errorf("unsupported CLI adapter %q; supported values: claude-code, codex, codex-acp, opencode, opencode-acp, anthropic-sdk, openai-sdk", id)
 }
 
 // Registry manages available agent adapters.
