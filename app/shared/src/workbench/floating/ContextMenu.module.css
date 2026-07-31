@@ -82,11 +82,19 @@
   background: var(--surface-high);
 }
 
+.item.active {
+  background: var(--surface-high);
+}
+
 .item.danger {
   color: var(--danger);
 }
 
 .item.danger:hover {
+  background: var(--danger-bg);
+}
+
+.item.danger.active {
   background: var(--danger-bg);
 }
 
@@ -110,6 +118,10 @@
 }
 
 .item:hover .icon {
+  color: currentColor;
+}
+
+.item.active .icon {
   color: currentColor;
 }
 
