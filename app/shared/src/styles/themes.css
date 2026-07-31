@@ -36,7 +36,7 @@ html[data-theme-sync='true'] *::after {
   /* Text */
   --text-1: #e3e4e6;
   --text-2: #9a9aa4;
-  --text-3: #606068;
+  --text-3: #83838d; /* #606068 was 2.78:1 on #1a1a20 — fail AA; now 4.62:1 (#9) */
   --text-inv: #1a1a20;
 
   /* Borders */
@@ -60,8 +60,8 @@ html[data-theme-sync='true'] *::after {
   --info: #6a93d4;
   --info-bg: rgba(106,147,212,0.06);
 
-  /* Ring / focus */
-  --ring: rgba(41,171,226,0.25);
+  /* Ring / focus — alpha .25 was 1.54:1 vs app-bg (fail 2.4.11); .6 = 3.18:1 (#8/#13) */
+  --ring: rgba(41,171,226,0.6);
 
   /* Thinking */
   --thinking-bg: rgba(41,171,226,0.08);
@@ -248,7 +248,7 @@ html[data-theme-sync='true'] *::after {
   /* Text */
   --text-1: #1a1a2e;
   --text-2: #585870;
-  --text-3: #9595ac;
+  --text-3: #6a6a7c; /* #9595ac was 2.78:1 on #f8f9fb — fail AA; now 5.03:1 (#9) */
   --text-inv: #ffffff;
 
   /* Borders — hairline */
@@ -272,8 +272,10 @@ html[data-theme-sync='true'] *::after {
   --info: #5e8dcc;
   --info-bg: rgba(94,141,204,0.06);
 
-  /* Ring / focus — higher opacity for dark-surface visibility (WCAG 2.4.7) */
-  --ring: rgba(41,171,226,0.40);
+  /* Ring / focus — bright blue rgba(41,171,226) cannot reach 3:1 on light
+     bg (even solid = 2.49:1), so use the theme's deep primary #0071BC at
+     .8 alpha: 3.48:1 on app-bg, 3.62:1 on white (#8/#13) */
+  --ring: rgba(0,113,188,0.8);
 
   /* Thinking */
   --thinking-bg: rgba(94,141,204,0.06);
