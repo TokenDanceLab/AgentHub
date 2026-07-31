@@ -503,15 +503,17 @@ export function buildTranscriptContextMenuGroups({
     [
       { label: t('context.createTopic'), icon: 'groups', onClick: () => onAction('topic', blockId) },
       { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => onEnterSelection(blockId) },
-      // TODO(unpinMenu): the unpin entry needs message-level pin state that
-      // the backend/adapter does not expose yet. TranscriptBlockBase has no
-      // `pinned` field, HubMessage has none either (hubClientDomainTypes' pin
-      // fields are session/member level), and the MESSAGE_PIN WS frame
-      // (HubMessagePinFrame) has no consumer writing pin state back onto the
-      // block. When the adapter surfaces `block.pinned`, switch this item to
-      // `block.pinned ? unpin : pin` — `t('context.unpin')` label +
-      // `onAction('unpin', blockId)` when pinned.
-      { label: t('context.pinMessage'), icon: 'bell', onClick: () => onAction('pin', blockId) },
+      // #1449: the pin entry toggles — pinned blocks show the unpin action
+      // (`context.unpin` i18n pre-seeded with the J-planner unpin branch:
+      // effect + toast + pulse). `block.pinned` is written by the adapter
+      // from message-level pin state; until the pinMap store lands (see
+      // TODO(pinMap) in normalizeHubMessages.ts) it stays false and the
+      // item pins as before.
+      {
+        label: block?.pinned ? t('context.unpin') : t('context.pinMessage'),
+        icon: 'bell',
+        onClick: () => onAction(block?.pinned ? 'unpin' : 'pin', blockId),
+      },
       { label: t('context.copyLink'), icon: 'external', onClick: () => onAction('link', blockId) },
       { label: t('context.translate'), icon: 'library', onClick: () => onAction('translate', blockId) },
     ],

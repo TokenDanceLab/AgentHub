@@ -36,6 +36,12 @@ interface TranscriptBlockBase {
   author: TranscriptAuthor;
   createdAt?: string;
   evidenceRefs?: EvidenceRef[];
+  /**
+   * Whether the underlying hub message is pinned in its session. Written by
+   * the adapter (normalizeHubMessagesToTranscript) from message-level pin
+   * state; drives the pin/unpin toggle in the transcript context menu.
+   */
+  pinned?: boolean;
 }
 
 export interface TextTranscriptBlock extends TranscriptBlockBase {
