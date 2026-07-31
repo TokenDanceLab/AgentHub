@@ -61,6 +61,38 @@ describe('normalizeHubMessagesToTranscript', () => {
     ]);
   });
 
+  it('writes message-level pin state through to block.pinned (#1449)', () => {
+    const blocks = normalizeHubMessagesToTranscript([
+      {
+        id: 'pinned-message',
+        session_id: 'session-1',
+        seq_id: 4,
+        sender_type: 'user',
+        sender_id: 'user-1',
+        sender: { nickname: 'Delicious233' },
+        content: { text: '置顶的消息' },
+        pinned: true,
+        created_at: '2026-06-07T07:00:04Z',
+      },
+      {
+        id: 'plain-message',
+        session_id: 'session-1',
+        seq_id: 5,
+        sender_type: 'agent',
+        sender_id: 'agent-1',
+        sender: { nickname: 'Hub Builder' },
+        content: { text: '未置顶的消息' },
+        created_at: '2026-06-07T07:00:05Z',
+      },
+    ]);
+
+    const pinned = blocks.find((b) => b.id === 'hub-message-pinned-message');
+    const plain = blocks.find((b) => b.id === 'hub-message-plain-message');
+    expect(pinned?.kind === 'text' && pinned.pinned).toBe(true);
+    // Absent / false pin state keeps the field unset (exactOptional style).
+    expect(plain && 'pinned' in plain ? plain.pinned : undefined).toBeUndefined();
+  });
+
   it('handles recalled and empty Hub messages without crashing', () => {
     const blocks = normalizeHubMessagesToTranscript([
       {

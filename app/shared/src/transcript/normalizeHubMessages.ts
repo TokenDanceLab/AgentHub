@@ -44,6 +44,14 @@ export interface HubMessageTranscriptInput {
   content_type?: string;
   content?: unknown;
   recalled?: boolean;
+  /**
+   * Message-level pin state. Not present on hub messages today — pin lives in
+   * the `message_pins` table and the MESSAGE_PIN/MESSAGE_UNPIN WS frames, and
+   * neither the REST message list nor HubMessage carries it (see
+   * TODO(pinMap) below). Set by callers that maintain pin state before
+   * normalizing; the adapter writes it through to `block.pinned`.
+   */
+  pinned?: boolean;
   created_at?: string;
   attachments?: HubMessageAttachment[];
   sender?: {
@@ -60,6 +68,33 @@ const RECALLED_TEXT_FALLBACK = '消息已撤回';
  * Key space: the shared 'chatview' namespace (see chatview/i18n/resources.ts).
  */
 export type NormalizeHubTranslate = (key: string) => string;
+
+/**
+ * TODO(pinMap): message-level pin state has no normalize-time source today.
+ *
+ * Survey (2026-08-01, sonnet-unpin-recall 续23 → unpin menu entry):
+ * - hub-server `model.Message` has no `pinned` field; pins live in the
+ *   separate `message_pins` table (`model.MessagePin`), surfaced only via
+ *   REST `GET /client/sessions/{id}/pins` — which the frontend has no runtime
+ *   consumer for (only e2e mocks / payload path builders).
+ * - WS frames `message.pin` (payload: session_id, message_id,
+ *   pinned_by_user_id, pinned_at) and `message.unpin` (session_id,
+ *   message_id) carry the pin events, but the consumers only refresh:
+ *   web (webHubRealtime.ts) invalidates the hub-messages query — whose
+ *   re-fetched payload still has no pin field — and desktop
+ *   (useHubEventStream.ts / hubEventBridge.ts) just touches `lastMessage`.
+ * - `hubClientDomainTypes.HubMessage.pinned` was deliberately NOT added:
+ *   the REST message shape has no such field, so it would be a dead field.
+ *
+ * Planned store path (out of scope here, do not fake the data): the web /
+ * desktop WS handlers maintain a session-scoped `messageId → pinned` map
+ * (fed by the MESSAGE_PIN/MESSAGE_UNPIN frames, seeded from
+ * `GET /client/sessions/{id}/pins`), and the normalize callers
+ * (webWorkbenchTranscript.ts / useDesktopWorkbenchModel.ts) merge the map
+ * into `HubMessageTranscriptInput.pinned` before calling this function —
+ * the adapter below already writes it through to `block.pinned`, and the
+ * context menu already toggles pin/unpin off `block.pinned`.
+ */
 
 export function normalizeHubMessagesToTranscript(
   messages: HubMessageTranscriptInput[] | undefined,
@@ -98,6 +133,9 @@ function normalizeHubMessage(
 
   const contentType = message.content_type?.trim().toLowerCase();
   const recalled = message.recalled;
+  // Only `pinned: true` is written through — absent/false keeps the field
+  // unset so `block.pinned` defaults to `undefined` (exactOptional style).
+  const pinned = message.pinned === true;
 
   // Image or file attachment message
   if (!recalled && (contentType === 'image' || contentType === 'file')) {
@@ -116,6 +154,7 @@ function normalizeHubMessage(
         id,
         author: normalizeAuthor(message),
         ...(message.created_at ? { createdAt: message.created_at } : {}),
+        ...(pinned ? { pinned: true } : {}),
         kind: 'attachment',
         attachmentRef,
         contentType: contentType === 'image' ? 'image' : 'file',
@@ -134,6 +173,7 @@ function normalizeHubMessage(
       id,
       author: normalizeAuthor(message),
       ...(message.created_at ? { createdAt: message.created_at } : {}),
+      ...(pinned ? { pinned: true } : {}),
       kind: 'route_decision',
       action: metadata.routeDecision.action ?? 'route',
       ...(metadata.routeDecision.summary ?? text ? { summary: metadata.routeDecision.summary ?? text } : {}),
@@ -148,6 +188,7 @@ function normalizeHubMessage(
     id,
     author: normalizeAuthor(message),
     ...(message.created_at ? { createdAt: message.created_at } : {}),
+    ...(pinned ? { pinned: true } : {}),
     kind: 'text',
     text,
     ...(visibleState.displayTitle ? { displayTitle: visibleState.displayTitle } : {}),

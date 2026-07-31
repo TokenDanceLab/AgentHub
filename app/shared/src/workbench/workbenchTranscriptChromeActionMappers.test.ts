@@ -203,9 +203,12 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.recall');
   });
 
-  it('keeps the pin menu item for both user and agent messages (unpin gated on pin state, TODO(unpinMenu))', () => {
+  it('toggles the pin menu item between pin and unpin off block.pinned (#1449)', () => {
     const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
     const agentBlock = textBlock({ id: 'a' });
+    const pinnedBlock = textBlock({ id: 'p', pinned: true });
+
+    // Unpinned blocks keep the pin item and the pin action.
     const userMenu = buildTranscriptContextMenuGroups({
       blockId: 'u',
       transcript: [userBlock],
@@ -222,6 +225,38 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onEnterSelection: vi.fn(),
     });
     expect(agentMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
+    const pinOnAction = vi.fn();
+    const pinCapture = buildTranscriptContextMenuGroups({
+      blockId: 'u',
+      transcript: [userBlock],
+      t,
+      onAction: pinOnAction,
+      onEnterSelection: vi.fn(),
+    });
+    pinCapture.flat().find((i) => i.label === 'context.pinMessage')?.onClick?.();
+    expect(pinOnAction).toHaveBeenCalledWith('pin', 'u');
+
+    // Pinned blocks switch the entry to the unpin action.
+    const pinnedMenu = buildTranscriptContextMenuGroups({
+      blockId: 'p',
+      transcript: [pinnedBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    const labels = pinnedMenu.flat().map((i) => i.label);
+    expect(labels).toContain('context.unpin');
+    expect(labels).not.toContain('context.pinMessage');
+    const unpinOnAction = vi.fn();
+    const unpinCapture = buildTranscriptContextMenuGroups({
+      blockId: 'p',
+      transcript: [pinnedBlock],
+      t,
+      onAction: unpinOnAction,
+      onEnterSelection: vi.fn(),
+    });
+    unpinCapture.flat().find((i) => i.label === 'context.unpin')?.onClick?.();
+    expect(unpinOnAction).toHaveBeenCalledWith('unpin', 'p');
   });
 
   it('plans Hub REST message actions (pin/unpin/recall/react) when a session id is available', () => {
