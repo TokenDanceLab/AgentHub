@@ -25,6 +25,11 @@ import { SessionImportList } from '../../sessionImport';
 import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';
+import {
+  getResolvedShortcutGroups,
+  checkConflicts,
+} from '../../../utils/keyboardShortcuts';
+import type { KeyboardShortcutGroup } from '../../../utils/keyboardShortcuts';
 
 export {
   DataModeStatus,
@@ -236,10 +241,80 @@ export function StatesPane(props: SettingsPageProps): React.ReactElement {
   );
 }
 
+/* ── Keyboard shortcuts pane ── */
+
+function formatKeys(keys: string[]): string {
+  return keys.join(' + ');
+}
+
+function hasConflictInGroup(group: KeyboardShortcutGroup): boolean {
+  const seen = new Map<string, string>();
+  for (const s of group.shortcuts) {
+    const key = s.keys.join('+');
+    const existing = seen.get(key);
+    if (existing !== undefined) return true;
+    seen.set(key, s.id);
+  }
+  return false;
+}
+
+function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): string | null {
+  const shortcut = group.shortcuts.find((s) => s.id === shortcutId);
+  if (!shortcut) return null;
+  const conflict = checkConflicts(shortcut.keys, shortcutId);
+  return conflict ? conflict.id : null;
+}
+
+export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
+  const groups = getResolvedShortcutGroups();
+
+  return (
+    <>
+      {groups.map((group) => (
+        <SettingsSection key={group.id} title={group.labelKey}>
+          {group.shortcuts.map((shortcut) => {
+            const conflictId = shortcutConflictId(group, shortcut.id);
+            const hasConflict = conflictId !== null;
+            return (
+              <SettingsRow
+                key={shortcut.id}
+                label={shortcut.labelKey}
+                description={
+                  hasConflict
+                    ? `冲突: 与 "${conflictId}" 按键相同`
+                    : (shortcut.detailKey ?? '')
+                }
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontFamily: 'var(--mono, monospace)',
+                    fontSize: '0.8125rem',
+                    color: hasConflict ? 'var(--danger, #e5484d)' : 'var(--text-2)',
+                    background: hasConflict ? 'var(--danger-bg, rgba(229,72,77,0.08))' : 'var(--bg-3)',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    border: hasConflict ? '1px solid var(--danger, #e5484d)' : '1px solid var(--border)',
+                  }}
+                >
+                  {formatKeys(shortcut.keys)}
+                </span>
+              </SettingsRow>
+            );
+          })}
+        </SettingsSection>
+      ))}
+    </>
+  );
+}
+
 export const PANE_RENDERERS: Record<SettingsPaneId, React.FC<SettingsPageProps>> = {
   appearance: AppearancePane,
   notify: NotifyPane,
   agent: AgentDefaultsPane,
   local: LocalDevPane,
+  shortcuts: ShortcutsPane,
   states: StatesPane,
 };
