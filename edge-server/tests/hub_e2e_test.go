@@ -224,7 +224,7 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, ok := runBody["runId"].(string)
+	runID, ok := unwrapSuccess(runBody)["runId"].(string)
 	if !ok {
 		t.Fatalf("expected runId in response, got %v", runBody)
 	}
@@ -342,7 +342,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, _ := runBody["runId"].(string)
+	runID, _ := unwrapSuccess(runBody)["runId"].(string)
 	t.Logf("created failing run %s for task %s", runID, taskID)
 
 	// Wait for run to terminate with failure
@@ -523,7 +523,7 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, ok := runBody["runId"].(string)
+	runID, ok := unwrapSuccess(runBody)["runId"].(string)
 	if !ok {
 		t.Fatalf("expected runId, got %v", runBody)
 	}
