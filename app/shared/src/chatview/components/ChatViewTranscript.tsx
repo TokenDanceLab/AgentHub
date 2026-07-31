@@ -11,7 +11,7 @@ import { ExternalLink, Pin, X } from 'lucide-react'
 import { Transcript, type TranscriptHandle } from './Transcript'
 import { TypingIndicator } from './TypingIndicator'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
-import { blocksToTranscriptItems, resolveUnreadAnchorItemIndex, type TranscriptBlock } from '../adapter'
+import { blocksToTranscriptItems, resolveCompactDividerIndices, resolveUnreadAnchorItemIndex, type TranscriptBlock } from '../adapter'
 import type { UnreadDividerDescriptor } from '../types'
 import type { BlockActionCallback, TranscriptUserItem } from '../transcript-item'
 
@@ -127,6 +127,14 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
       ...(unreadDivider.readThrough ? { readThrough: unreadDivider.readThrough } : {}),
     }
   }, [transcript, items, unreadDivider])
+
+  // Compute compact boundary divider positions from transcript blocks.
+  // Compact boundary blocks are filtered out of items but their positions
+  // are resolved to item indices for divider rendering.
+  const resolvedCompactDividers = useMemo(
+    () => resolveCompactDividerIndices(transcript),
+    [transcript],
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   /** Imperative handle into the virtualized Transcript — used to mount the
@@ -227,7 +235,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyState />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript ref={transcriptRef} items={items} sessionId={sessionId} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
+          <Transcript ref={transcriptRef} items={items} sessionId={sessionId} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} compactDividers={resolvedCompactDividers} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
           {/* Ephemeral typing indicator — shown when other session members are typing */}
           {typingUserNames && typingUserNames.length > 0 && (
             <TypingIndicator names={typingUserNames} chatMode={chatMode} />

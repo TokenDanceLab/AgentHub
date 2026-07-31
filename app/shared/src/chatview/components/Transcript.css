@@ -68,6 +68,28 @@
   color: var(--text-2);
 }
 
+/* ── Compact divider (context compaction boundary, T21/CF23) ───────── */
+.compact-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md, 16px);
+  align-self: stretch;
+  color: var(--text-3);
+}
+.compact-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--bdr);
+}
+.compact-divider-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-xs);
+  font: 400 0.625rem var(--font-sans);
+  white-space: nowrap;
+}
+
 /* ── Empty state ──────────────────────────────────────────────────── */
 .chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
 
