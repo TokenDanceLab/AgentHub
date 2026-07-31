@@ -1,8 +1,10 @@
 import { createElement } from 'react';
 import type { ComposerAction } from '../composer';
+import type { WorkbenchConversation } from '../platform';
 import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import { EmojiPicker } from './floating/EmojiPicker';
+import { ForwardConversationPicker } from './floating/ForwardConversationPicker';
 import {
   blockTitle,
   buildPermissionApprovalDecision,
@@ -51,6 +53,12 @@ export type TranscriptChromeSideEffect =
 // string and is decoded here — no protocol / plumbing changes needed.
 const REACT_EMOJI_ACTION_PREFIX = 'react:';
 
+// #1385: the forward picker submenu rides the chosen target session ids on
+// the menu action string (`forward:<encoded>`), same channel trick as the
+// emoji picker — no protocol / plumbing changes. Ids are URI-encoded and
+// comma-joined so any session id shape survives the round trip.
+const FORWARD_TARGETS_ACTION_PREFIX = 'forward:';
+
 function isReactEmojiAction(action: string): boolean {
   return action === 'react' || action.startsWith(REACT_EMOJI_ACTION_PREFIX);
 }
@@ -60,6 +68,23 @@ function reactEmojiForAction(action: string): string {
     return action.slice(REACT_EMOJI_ACTION_PREFIX.length) || '👍';
   }
   return '👍';
+}
+
+/** Build the menu action string carrying the chosen forward targets. */
+export function forwardActionForTargets(targetSessionIds: string[]): string {
+  return `${FORWARD_TARGETS_ACTION_PREFIX}${targetSessionIds
+    .map((id) => encodeURIComponent(id))
+    .join(',')}`;
+}
+
+function isForwardTargetsAction(action: string): boolean {
+  return action.startsWith(FORWARD_TARGETS_ACTION_PREFIX);
+}
+
+function forwardTargetsForAction(action: string): string[] {
+  const raw = action.slice(FORWARD_TARGETS_ACTION_PREFIX.length);
+  if (!raw) return [];
+  return raw.split(',').filter(Boolean).map((id) => decodeURIComponent(id));
 }
 
 export function planContextAction(options: {
@@ -184,10 +209,20 @@ export function planContextAction(options: {
     );
     return effects;
   }
-  if (action === 'forward') {
-    // TODO(#1385): no target-conversation picker yet — keep the placeholder
-    // toast. Once a picker exists, plan a forward effect with the chosen
-    // targetSessionIds and the REST port runs.
+  if (action === 'forward' || isForwardTargetsAction(action)) {
+    if (isForwardTargetsAction(action)) {
+      // #1385: targets chosen in the picker submenu ride the action string
+      // (`forward:<encoded>`); plan the real forward effect so the REST
+      // port runs onForwardMessage(messageId, targetSessionIds).
+      effects.push(
+        { type: 'forward', messageId: blockId, targetSessionIds: forwardTargetsForAction(action) },
+        { type: 'pulse', blockId },
+        { type: 'toast', message: t('toast.forwardQueued') },
+      );
+      return effects;
+    }
+    // Plain forward (no picker wired, e.g. direct callers): keep the
+    // placeholder toast until a target is chosen.
     effects.push(
       { type: 'pulse', blockId },
       { type: 'toast', message: t('toast.forwardSelectTarget') },
@@ -388,6 +423,12 @@ export interface BuildTranscriptContextMenuGroupsOptions {
   t: TranscriptChromeTranslate;
   onAction: (action: string, blockId: string) => void;
   onEnterSelection: (blockId: string) => void;
+  /**
+   * Forward target candidates (#1385). When provided, the forward menu item
+   * gets a target-conversation picker submenu; absent (Desktop/demo shells)
+   * keeps the old plain-forward placeholder toast.
+   */
+  conversations?: WorkbenchConversation[] | undefined;
 }
 
 export function buildTranscriptContextMenuGroups({
@@ -396,6 +437,7 @@ export function buildTranscriptContextMenuGroups({
   t,
   onAction,
   onEnterSelection,
+  conversations,
 }: BuildTranscriptContextMenuGroupsOptions): Array<Array<ContextMenuItem>> {
   const block = transcript.find((item) => item.id === blockId);
   const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
@@ -425,7 +467,33 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
       ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),
-      { label: t('context.forward'), icon: 'external', onClick: () => onAction('forward', blockId) },
+      {
+        label: t('context.forward'),
+        icon: 'external',
+        // #1385: with a conversation list the item opens the target picker
+        // submenu (chevron); without one it stays a plain action that keeps
+        // the placeholder toast.
+        chevron: conversations !== undefined,
+        onClick: () => onAction('forward', blockId),
+        ...(conversations !== undefined
+          ? {
+            submenu: (close: () => void) => createElement(ForwardConversationPicker, {
+              conversations,
+              ariaLabel: t('aria.forwardPicker'),
+              confirmLabel: t('forward.confirm'),
+              cancelLabel: t('forward.cancel'),
+              emptyLabel: t('forward.empty'),
+              onConfirm: (targetSessionIds: string[]) => {
+                // The chosen targets ride the action string (`forward:<ids>`);
+                // planContextAction decodes them into the forward effect.
+                onAction(forwardActionForTargets(targetSessionIds), blockId);
+                close();
+              },
+              onCancel: close,
+            })
+          }
+          : {}),
+      },
     ],
     [
       { label: t('context.createTopic'), icon: 'groups', onClick: () => onAction('topic', blockId) },
