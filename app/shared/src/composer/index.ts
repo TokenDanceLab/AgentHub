@@ -19,6 +19,14 @@ export {
   composerReducer,
   createInitialComposerState,
 } from './composerReducer';
+export {
+  clearDraft,
+  loadDraft,
+  saveDraft,
+} from './composerDraft';
+export type {
+  ComposerDraft,
+} from './composerDraft';
 export type {
   ApprovalMode,
   AttachmentRef,
