@@ -228,3 +228,32 @@ describe('ChatViewTranscript highlight jump (virtualized)', () => {
     });
   });
 });
+
+/* ──────────────────────────────────────────────────────────────────────
+   A11y live-region throttle (#11).
+   ────────────────────────────────────────────────────────────────────── */
+
+describe('Transcript aria-busy / live-region throttle', () => {
+  it('marks the log aria-busy and drops aria-live while any row is running', () => {
+    const { getByRole, rerender } = render(
+      <Transcript items={[agentItem('a1', [row('r1', { status: 'running' })])]} chatMode="group" />
+    );
+    const log = getByRole('log');
+    expect(log).toHaveAttribute('aria-busy', 'true');
+    expect(log).toHaveAttribute('aria-live', 'off');
+
+    // Streaming completes → region returns to polite, busy clears.
+    rerender(<Transcript items={[agentItem('a1', [row('r1', { status: 'ok' })])]} chatMode="group" />);
+    expect(log).toHaveAttribute('aria-busy', 'false');
+    expect(log).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('keeps the log polite and not busy for idle transcripts', () => {
+    const { getByRole } = render(
+      <Transcript items={[agentItem('a1', [row('r1', { status: 'ok' })])]} chatMode="group" />
+    );
+    const log = getByRole('log');
+    expect(log).toHaveAttribute('aria-live', 'polite');
+    expect(log).toHaveAttribute('aria-busy', 'false');
+  });
+});
