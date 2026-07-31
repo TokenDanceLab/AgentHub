@@ -9,6 +9,23 @@ import {
 } from '../agentProfileCatalog';
 import { AgentsPage } from './AgentsPage';
 
+// AgentInstalledViews now resolves empty-state copy via i18n (agents.empty.*).
+// Other AgentsPage text is hardcoded in components, so a narrow t() mock
+// covering only the empty keys (fallback to the key itself) keeps the rest
+// of the suite unaffected.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const resources: Record<string, string> = {
+        'agents.empty.title': '暂无已安装 Agent',
+        'agents.empty.description': '当前 Hub 账号还没有已安装配置。',
+        'agents.empty.add': '添加 Agent',
+      };
+      return resources[key] ?? key;
+    },
+  }),
+}));
+
 vi.mock('@lobehub/icons', () => {
   const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
   return {
