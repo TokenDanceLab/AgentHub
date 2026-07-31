@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -437,5 +437,62 @@ describe('RowItem approval card (T16)', () => {
     expect(hint).not.toBeNull();
     expect(hint!.textContent).toContain('A');
     expect(hint!.textContent).toContain('R');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fable UIUX gap #4: code-copy button Copy→Check feedback
+// ---------------------------------------------------------------------------
+describe('RowItem code-copy button (fable UIUX #4)', () => {
+  const codeItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'code-1', type: 'tool', label: 'read', status: 'ok',
+    collapsible: true, open: true,
+    codeLines: ['const a = 1;', 'console.log(a);'],
+    ...overrides,
+  });
+
+  it('renders the copy button in idle 复制 state', () => {
+    const { container } = render(<RowItem item={codeItem()} />);
+    const btn = container.querySelector('.code-copy')!;
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toContain('复制');
+    expect(btn.classList.contains('copied')).toBe(false);
+  });
+
+  it('flips to 已复制 on click via onCopy and back after 1500ms', () => {
+    const onCopy = vi.fn();
+    const { container } = render(<RowItem item={codeItem()} onCopy={onCopy} />);
+    const btn = container.querySelector('.code-copy')!;
+    fireEvent.click(btn);
+    // delegates to the app-level handler with the joined lines
+    expect(onCopy).toHaveBeenCalledWith('code-1', 'const a = 1;\nconsole.log(a);');
+    // Copy→Check feedback
+    expect(btn.textContent).toContain('已复制');
+    expect(btn.classList.contains('copied')).toBe(true);
+    // 1500ms later the flag resets
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    expect(btn.textContent).toContain('复制');
+    expect(btn.classList.contains('copied')).toBe(false);
+  });
+
+  it('copies via navigator.clipboard when no onCopy handler is provided', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const { container } = render(<RowItem item={codeItem()} />);
+    const btn = container.querySelector('.code-copy')!;
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    expect(writeText).toHaveBeenCalledWith('const a = 1;\nconsole.log(a);');
+    expect(btn.textContent).toContain('已复制');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
   });
 });
