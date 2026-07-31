@@ -210,3 +210,16 @@ export function agentResultBlock(event: EventEnvelope): TranscriptBlock | null {
     ...(turns != null ? { turns } : {}),
   };
 }
+
+export function compactBoundaryBlock(event: EventEnvelope): TranscriptBlock | null {
+  const runId = eventRunId(event);
+  const trigger = stringField(event.payload.trigger);
+  const preTokens = numberField(event.payload.preTokens) ?? numberField(event.payload.pre_tokens);
+
+  return {
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, 'running')),
+    kind: 'compact_boundary',
+    ...(trigger ? { trigger } : {}),
+    ...(preTokens != null ? { preTokens } : {}),
+  };
+}

@@ -21,6 +21,7 @@ export {
 export {
   agentResultBlock,
   childAgentBlock,
+  compactBoundaryBlock,
   contextUsageBlock,
   routeDecisionBlock,
   subagentBlock,
