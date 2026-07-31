@@ -178,9 +178,10 @@
    applies theme values as inline styles, not a <style> tag). Inline
    overflow:auto already sets overflow-x:auto — same value as this rule, so
    no !important needed. This selector's real job is max-width:100% (no inline
-   competitor). If a future theme swap or customStyle change diverges the
-   inline overflow, re-add !important — inline specificity (1,0,0,0) is
-   unbeatable by selectors. */
+   competitor). It now also applies to the code-block header/body wrappers
+   (which hold the PreTag), where overflow-x:auto is harmless. If a future
+   theme swap or customStyle change diverges the inline overflow, re-add
+   !important — inline specificity (1,0,0,0) is unbeatable by selectors. */
 .codeBlockWrapper > div {
   overflow-x: auto;
   max-width: 100%;
@@ -193,12 +194,95 @@
   overflow-wrap: break-word;
 }
 
+/* ── Code block header: language label + copy button ─────────── */
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-dim);
+}
+
 .codeLang {
   display: block;
   padding: 3px 12px;
-  background: var(--surface-dim);
   font-size: 0.6875rem;
   font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--text-2);
+}
+
+.codeCopyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: 0.6875rem;
+  font-family: var(--font-sans);
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.codeCopyBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.codeCopyBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Copy→Check feedback state (icon + label swap) */
+.codeCopyBtn.copied {
+  color: var(--success);
+}
+
+/* ── Long-code collapse (fable UIUX #3) ─────────────────────────
+   Collapsed body clips at 400px; overflow-y comes from the shorthand below
+   while overflow-x stays auto from .codeBlockWrapper > div, so horizontal
+   scrolling of long lines still works inside the clipped region. */
+.codeBodyCollapsed {
+  position: relative;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.codeBodyCollapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  pointer-events: none;
+  /* Fade-out matches oneDark's background (#282c34) — the code block is
+     always rendered with the oneDark theme regardless of app theme. */
+  background: linear-gradient(180deg, transparent, rgba(40, 44, 52, 0.85));
+}
+
+.codeToggle {
+  display: block;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  border-top: 1px solid var(--bdr);
+  background: var(--surface-dim);
+  color: var(--text-2);
+  font-size: 0.6875rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.codeToggle:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.codeToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }

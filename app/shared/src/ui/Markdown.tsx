@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkCjkFriendly from 'remark-cjk-friendly/parseOnly';
@@ -6,8 +6,13 @@ import remarkGfm from 'remark-gfm';
 import remarkCjkAutolink from './cjkRemarkPlugin';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Check, Copy } from 'lucide-react';
 import './prismRegistry'; // registers all languages on shared refractor instance
+import { useCopiedFlag } from './useCopiedFlag';
 import styles from './Markdown.module.css';
+
+/** Collapsed blocks are clipped to 400px height (see .codeBodyCollapsed in Markdown.module.css). */
+const CODE_COLLAPSE_LINE_THRESHOLD = 20;
 
 // ── CodeBlock component ───────────────────────────
 function CodeBlock({
@@ -33,24 +38,56 @@ function CodeBlock({
   }
 
   const code = rawCode.replace(/\n$/, '');
+  const isLong = code.split('\n').length > CODE_COLLAPSE_LINE_THRESHOLD;
+  const [collapsed, setCollapsed] = useState(isLong);
+  const [copied, markCopied] = useCopiedFlag();
+
+  const handleCopy = () => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(code).then(markCopied).catch(() => {
+      /* clipboard may be denied — keep silent, no feedback flip */
+    });
+  };
 
   return (
     <div className={styles.codeBlockWrapper}>
-      {language && <span className={styles.codeLang}>{language}</span>}
-      <SyntaxHighlighter
-        style={oneDark}
-        language={language || 'text'}
-        PreTag="div"
-        customStyle={{
-          margin: 0,
-          borderRadius: language ? '0 0 4px 4px' : 4,
-          fontSize: 12,
-          lineHeight: 1.5,
-        }}
-        {...rest}
-      >
-        {code}
-      </SyntaxHighlighter>
+      <div className={styles.codeBlockHeader}>
+        {language && <span className={styles.codeLang}>{language}</span>}
+        <button
+          type="button"
+          className={`${styles.codeCopyBtn}${copied ? ' ' + styles.copied : ''}`}
+          onClick={handleCopy}
+          aria-label={copied ? '已复制' : '复制'}
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? '已复制' : '复制'}
+        </button>
+      </div>
+      <div className={collapsed ? styles.codeBodyCollapsed : undefined}>
+        <SyntaxHighlighter
+          style={oneDark}
+          language={language || 'text'}
+          PreTag="div"
+          customStyle={{
+            margin: 0,
+            borderRadius: '0 0 4px 4px',
+            fontSize: 12,
+            lineHeight: 1.5,
+          }}
+          {...rest}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          className={styles.codeToggle}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          {collapsed ? '展开' : '收起'}
+        </button>
+      )}
     </div>
   );
 }
