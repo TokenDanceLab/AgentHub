@@ -14,7 +14,7 @@ import {
   webConversations,
   webHubEmptyConversation,
 } from './webPlatform';
-import type { MessageResponse, SendMessageResponse } from '@/api/hubClient';
+import type { HubClient, MessageResponse, SendMessageResponse } from '@/api/hubClient';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -1030,5 +1030,100 @@ describe('webPlatform redispatchTask (dispatch-only retry port)', () => {
     }, 'target-local-edge-1'), 'hub-message-1')).resolves.toEqual({ taskId: undefined });
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
     expect(hubClient.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// messageActions port: right-click REST wiring (pin/unpin/forward/recall/react).
+// ---------------------------------------------------------------------------
+describe('webPlatform messageActions port (Hub REST wiring)', () => {
+  type ExtraMessageClient = Partial<Pick<HubClient,
+    'pinMessage' | 'unpinMessage' | 'forwardMessage' | 'recallMessage' | 'addMessageReaction'
+  >>;
+
+  function platformWithHubClient(extra: ExtraMessageClient) {
+    const queryClient = new QueryClient();
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+      ...extra,
+    };
+    return { queryClient, hubClient, platform: createWebPlatform({ hubClient, queryClient }) };
+  }
+
+  it('pins a message and invalidates the pin + message caches', async () => {
+    const { queryClient, hubClient, platform } = platformWithHubClient({
+      pinMessage: vi.fn().mockResolvedValue(undefined),
+    });
+    queryClient.setQueryData(['web-v4', 'hub-pins', 'sess-1'], [{ message_id: 'm1' }]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-1'], [{ message_id: 'm1' }]);
+
+    await platform.messageActions!.pinMessage('hub-message-1', 'sess-1');
+
+    expect(hubClient.pinMessage).toHaveBeenCalledWith('hub-message-1', 'sess-1');
+    expect(queryClient.getQueryState(['web-v4', 'hub-pins', 'sess-1'])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-1'])?.isInvalidated).toBe(true);
+  });
+
+  it('unpins a message and invalidates the pin + message caches', async () => {
+    const { queryClient, hubClient, platform } = platformWithHubClient({
+      unpinMessage: vi.fn().mockResolvedValue(undefined),
+    });
+    queryClient.setQueryData(['web-v4', 'hub-pins', 'sess-1'], [{ message_id: 'm1' }]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-1'], [{ message_id: 'm1' }]);
+
+    await platform.messageActions!.unpinMessage('hub-message-1', 'sess-1');
+
+    expect(hubClient.unpinMessage).toHaveBeenCalledWith('hub-message-1', 'sess-1');
+    expect(queryClient.getQueryState(['web-v4', 'hub-pins', 'sess-1'])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-1'])?.isInvalidated).toBe(true);
+  });
+
+  it('recalls a message and invalidates open message caches (no session id available)', async () => {
+    const { queryClient, hubClient, platform } = platformWithHubClient({
+      recallMessage: vi.fn().mockResolvedValue(undefined),
+    });
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-1'], [{ message_id: 'm1' }]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-2'], [{ message_id: 'm2' }]);
+
+    await platform.messageActions!.recallMessage('hub-message-1');
+
+    expect(hubClient.recallMessage).toHaveBeenCalledWith('hub-message-1');
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-1'])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-2'])?.isInvalidated).toBe(true);
+  });
+
+  it('adds a reaction and invalidates the message cache', async () => {
+    const { queryClient, hubClient, platform } = platformWithHubClient({
+      addMessageReaction: vi.fn().mockResolvedValue(undefined),
+    });
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-1'], [{ message_id: 'm1' }]);
+
+    await platform.messageActions!.addMessageReaction('hub-message-1', 'sess-1', { emoji: '👍' });
+
+    expect(hubClient.addMessageReaction).toHaveBeenCalledWith('hub-message-1', 'sess-1', { emoji: '👍' });
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-1'])?.isInvalidated).toBe(true);
+  });
+
+  it('forwards a message to target sessions and invalidates sessions + target message caches', async () => {
+    const { queryClient, hubClient, platform } = platformWithHubClient({
+      forwardMessage: vi.fn().mockResolvedValue(undefined),
+    });
+    queryClient.setQueryData(['web-v4', 'hub-sessions'], [{ session_id: 'sess-1' }]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'sess-9'], [{ message_id: 'm1' }]);
+
+    await platform.messageActions!.forwardMessage('hub-message-1', ['sess-9']);
+
+    expect(hubClient.forwardMessage).toHaveBeenCalledWith('hub-message-1', ['sess-9']);
+    expect(queryClient.getQueryState(['web-v4', 'hub-sessions'])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'sess-9'])?.isInvalidated).toBe(true);
+  });
+
+  it('throws when the injected Hub client lacks the endpoint', async () => {
+    const { platform } = platformWithHubClient({});
+    await expect(platform.messageActions!.pinMessage('hub-message-1', 'sess-1')).rejects.toThrow(
+      'Hub pin endpoint is unavailable',
+    );
   });
 });

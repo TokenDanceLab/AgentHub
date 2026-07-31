@@ -116,7 +116,18 @@ export function buildSessionChromeOptions(
 }
 
 export interface BuildTranscriptChromeOptionsInput {
-  props: Pick<AgentHubWorkbenchProps, 'transcript' | 'onApprovalDecision' | 'onRegenerate'>;
+  props: Pick<
+    AgentHubWorkbenchProps,
+    | 'transcript'
+    | 'onApprovalDecision'
+    | 'onRegenerate'
+    | 'activeConversationId'
+    | 'onPinMessage'
+    | 'onUnpinMessage'
+    | 'onForwardMessage'
+    | 'onRecallMessage'
+    | 'onAddMessageReaction'
+  >;
   t: WorkbenchTranslate;
   session: Pick<
     WorkbenchSessionChrome,
@@ -141,6 +152,13 @@ export function buildTranscriptChromeOptions(
 
   assignDefined(options, 'onApprovalDecision', props.onApprovalDecision);
   assignDefined(options, 'onRegenerate', props.onRegenerate);
+  // #1383 REST message actions: activeConversationId doubles as the session id.
+  assignDefined(options, 'sessionId', props.activeConversationId);
+  assignDefined(options, 'onPinMessage', props.onPinMessage);
+  assignDefined(options, 'onUnpinMessage', props.onUnpinMessage);
+  assignDefined(options, 'onForwardMessage', props.onForwardMessage);
+  assignDefined(options, 'onRecallMessage', props.onRecallMessage);
+  assignDefined(options, 'onAddMessageReaction', props.onAddMessageReaction);
 
   return options;
 }
