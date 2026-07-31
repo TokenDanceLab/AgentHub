@@ -157,6 +157,7 @@ export function resolveWebWorkbenchTranscript(
   liveRuntimeEvents: HubRuntimeEventTranscriptInput[],
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
   conversationId?: string,
+  t?: (key: string) => string,
 ): TranscriptBlock[] {
   if (!hubReady) {
     return isWorkbenchRealDataMode(dataMode)
@@ -165,7 +166,7 @@ export function resolveWebWorkbenchTranscript(
   }
   if (activeHubSessionId) {
     return orderTranscriptBlocks([
-      ...normalizeHubMessagesToTranscript(messages),
+      ...normalizeHubMessagesToTranscript(messages, t),
       ...normalizeHubRuntimeEventsToTranscript(liveRuntimeEvents),
     ]);
   }

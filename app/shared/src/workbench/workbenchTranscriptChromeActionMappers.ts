@@ -57,9 +57,17 @@ export function planContextAction(options: {
   const effects: TranscriptChromeSideEffect[] = [];
 
   if (action === 'copy') {
-    effects.push({ type: 'copy', text: title });
+    // Copy the full text of text blocks (not the 28-char truncated title);
+    // non-text blocks keep the short blockTitle.
+    const copyText = block?.kind === 'text' ? block.text : title;
+    effects.push({ type: 'copy', text: copyText });
   }
   if (action === 'link') {
+    // TODO(copyLink): `agenthub://card/<blockId>` is a custom scheme with no
+    // registered handler — copying it yields a dead link. Needs a product
+    // decision (scheme handler registration or a real shareable URL) before
+    // this copy can be useful; see cardLinkForBlock in
+    // workbenchTranscriptChromeLabels.ts.
     effects.push({ type: 'copy', text: cardLinkForBlock(blockId) });
   }
   if (action === 'delete') {

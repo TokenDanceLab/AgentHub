@@ -120,7 +120,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // unread divider copy (T8).
   const { t: tIm } = useTranslation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
-  const workbench = useDesktopWorkbenchModel(selectedConversationId);
+  const workbench = useDesktopWorkbenchModel(selectedConversationId, t);
   const { online: edgeOnline } = useHealth({ enabled: !workbench.isDemo || workbench.edgeDemoData === true });
   const queryClient = useQueryClient();
   const submitRunRef = useRef(false);
@@ -448,6 +448,16 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }}
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
+        onEditMessage={
+          workbench.chatActions
+            ? async (blockId: string, content: string) => {
+                await workbench.chatActions!.editMessage(
+                  blockId.replace(/^hub-message-/, ''),
+                  content,
+                );
+              }
+            : undefined
+        }
         onProjectCreate={workbench.projectsActions?.create}
         onProjectUpdate={workbench.projectsActions?.update}
         onApprovalDecision={handleApprovalDecision}

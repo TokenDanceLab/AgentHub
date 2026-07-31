@@ -87,6 +87,50 @@ describe('normalizeHubMessagesToTranscript', () => {
     ]);
   });
 
+  it('renders recalled messages through an injected translator when provided', () => {
+    const blocks = normalizeHubMessagesToTranscript(
+      [
+        {
+          session_id: 'session-1',
+          seq_id: 3,
+          sender_type: 'system',
+          recalled: true,
+          content: 'hidden',
+        },
+      ],
+      (key) => (key === 'message.recalled' ? 'Message recalled' : `t(${key})`),
+    );
+
+    expect(blocks).toEqual([
+      {
+        id: 'hub-message-session-1-3',
+        author: { id: 'hub-system', name: 'AgentHub', role: 'system' },
+        kind: 'text',
+        text: 'Message recalled',
+      },
+    ]);
+  });
+
+  it('delegates the recalled copy entirely to the injected translator', () => {
+    // Even when the translator returns the raw key (i18next miss / custom
+    // translator), the normalizer does not re-inject the zh literal — the
+    // translator is the single source of the copy once injected.
+    const blocks = normalizeHubMessagesToTranscript(
+      [
+        {
+          session_id: 'session-1',
+          seq_id: 3,
+          sender_type: 'system',
+          recalled: true,
+          content: 'hidden',
+        },
+      ],
+      (key) => key,
+    );
+
+    expect(blocks[0]).toEqual(expect.objectContaining({ text: 'message.recalled' }));
+  });
+
   it('keeps Agent DM, agent-to-agent, group @Agent, and task queue state visible', () => {
     const blocks = normalizeHubMessagesToTranscript([
       {
