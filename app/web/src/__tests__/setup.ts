@@ -54,9 +54,11 @@ vi.mock('@lobehub/fluent-emoji', () => ({
 // ── Polyfills for jsdom — required once virtualization (virtua) landed ──
 // jsdom has no layout engine: ResizeObserver never fires and scrollIntoView
 // is unimplemented. virtua mounts a ResizeObserver per row + scroll container;
-// a no-op stub keeps it from throwing. Tests asserting on transcript ROW
-// CONTENT mock `virtua` itself (passthrough Virtualizer) per-file. Mirrors
-// shared setup.ts (RFC §6.4 / §8.2).
+// a no-op stub keeps it from throwing. The global vi.mock('virtua') above
+// is a passthrough so transcript row content renders in integration tests
+// without the viewport measurement virtua can't perform in jsdom (the real
+// Virtualizer is exercised by shared Transcript.autoscroll/virtualization
+// tests). Mirrors shared + desktop setup.ts (RFC §6.4 / §8.2).
 if (typeof globalThis.ResizeObserver === 'undefined') {
   class ResizeObserverStub {
     observe(): void {}
