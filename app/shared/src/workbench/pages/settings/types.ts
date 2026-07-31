@@ -5,7 +5,7 @@
 import type { DesignNavIconName } from '../../designIcons';
 import type { LocalCliDiscoveryManifest, RuntimeSessionSummary } from '../../../platform';
 
-export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states';
+export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states' | 'shortcuts';
 
 export type StatePanelKind = 'empty' | 'invalid' | 'missing';
 
@@ -111,6 +111,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'notify', label: '通知', glyph: 'bell' },
   { id: 'agent', label: 'Agent 默认值', glyph: 'agent' },
   { id: 'local', label: '本地开发', glyph: 'laptop' },
+  { id: 'shortcuts', label: '快捷键', glyph: 'edit' },
   { id: 'states', label: '状态组件', glyph: 'states' },
 ];
 
@@ -135,6 +136,10 @@ export const PANE_META: Record<SettingsPaneId, PaneMeta> = {
   local: {
     title: '本地开发',
     description: '配置本地 Vite 预览、工作目录、日志和设计 demo 调试开关。',
+  },
+  shortcuts: {
+    title: '快捷键',
+    description: '查看和自定义键盘快捷键。红色标记表示存在按键冲突。',
   },
   states: {
     title: '状态组件',
