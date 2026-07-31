@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { WorkbenchConversation } from '../platform';
 import type { GlobalRailPage } from './GlobalRail';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
 import type { UseWorkbenchSessionChromeOptions, WorkbenchSessionChrome } from './workbenchSessionChromeHelpers';
@@ -292,12 +293,15 @@ export function buildTranscriptOverlaysProps(input: {
   isChatPage: boolean;
   transcriptChrome: WorkbenchTranscriptChrome;
   transcriptLength: number;
+  /** Forward target candidates (#1385) — forwarded to the context menu builder. */
+  conversations?: WorkbenchConversation[] | undefined;
 }): WorkbenchTranscriptOverlaysProps {
-  const { isChatPage, transcriptChrome, transcriptLength } = input;
+  const { isChatPage, transcriptChrome, transcriptLength, conversations } = input;
   return {
     isChatPage,
     contextMenu: transcriptChrome.contextMenu,
     contextMenuGroups: transcriptChrome.contextMenuGroups,
+    ...(conversations !== undefined ? { conversations } : {}),
     onCloseContextMenu: () => transcriptChrome.setContextMenu(null),
     selectionMode: transcriptChrome.selectionMode,
     multiSelectActions: transcriptChrome.multiSelectActions,

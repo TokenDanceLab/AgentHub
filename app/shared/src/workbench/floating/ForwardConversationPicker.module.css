@@ -1,0 +1,101 @@
+/* ═══ ForwardConversationPicker (#1385) ═══ */
+
+.listbox {
+  min-width: 200px;
+  max-height: 216px;
+  overflow-y: auto;
+  padding: var(--sp-xxs);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-1);
+  font: 500 0.8125rem / 1.4 var(--font-sans);
+}
+
+.option:hover,
+.option.active {
+  background: var(--surface-high);
+}
+
+.option:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.check {
+  width: 14px;
+  flex: 0 0 14px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-sm);
+  padding: var(--sp-2) var(--sp-xxs) var(--sp-xxs);
+}
+
+.cancel {
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-3);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.cancel:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.cancel:focus-visible,
+.confirm:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.confirm {
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 4px 12px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font: 600 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.confirm:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.confirm:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.empty {
+  min-width: 200px;
+  padding: var(--sp-md) var(--sp-sm);
+  text-align: center;
+  color: var(--text-3);
+  font: 500 0.75rem var(--font-sans);
+}

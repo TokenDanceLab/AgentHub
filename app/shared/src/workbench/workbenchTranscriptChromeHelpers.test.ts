@@ -782,4 +782,49 @@ describe('workbenchTranscriptChromeHelpers', () => {
     controller.disposeSelectionHold();
     controller.disposeTimers();
   });
+
+  it('passes conversations into the context menu builder for the forward picker (#1385)', () => {
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null },
+      toastTimerRef: { current: null },
+      pulseTimersRef: { current: new Map<string, number>() },
+    };
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn(),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+    };
+    const controller = createTranscriptChromeController({
+      refs,
+      writers,
+      getTranscript: () => [textBlock({ id: 'a', text: 'Alpha' })],
+      getSelectedBlockIds: () => [],
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    });
+
+    // Without conversations the forward item keeps the plain action shape.
+    const plain = controller.contextMenuGroups('a');
+    const plainForward = plain[0]?.find((item) => item.label === 'context.forward');
+    expect(plainForward?.chevron).toBe(false);
+    expect(plainForward?.submenu).toBeUndefined();
+
+    // With conversations the forward item gains the picker submenu.
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's1', title: '需求', kind: 'direct' },
+    ];
+    const withPicker = controller.contextMenuGroups('a', conversations);
+    const forwardItem = withPicker[0]?.find((item) => item.label === 'context.forward');
+    expect(forwardItem?.chevron).toBe(true);
+    expect(typeof forwardItem?.submenu).toBe('function');
+  });
 });

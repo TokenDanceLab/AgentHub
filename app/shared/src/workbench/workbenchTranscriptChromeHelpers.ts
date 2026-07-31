@@ -1,4 +1,5 @@
 import type { ComposerAction } from '../composer';
+import type { WorkbenchConversation } from '../platform';
 import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import {
@@ -229,7 +230,10 @@ export interface TranscriptChromeController {
   ) => void;
   disposeSelectionHold: () => void;
   disposeTimers: () => void;
-  contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
+  contextMenuGroups: (
+    blockId: string,
+    conversations?: WorkbenchConversation[],
+  ) => Array<Array<ContextMenuItem>>;
   multiSelectActions: () => Array<MultiSelectBarAction>;
   effectHandlers: () => TranscriptChromeEffectHandlers;
 }
@@ -440,12 +444,13 @@ export function createTranscriptChromeController(
     updateSelectBarRect,
     disposeSelectionHold: () => disposeSelectionHoldRef(refs.selectionHoldRef),
     disposeTimers: () => disposeToastAndPulseTimers(refs.toastTimerRef, refs.pulseTimersRef),
-    contextMenuGroups: (blockId: string) => buildTranscriptContextMenuGroups({
+    contextMenuGroups: (blockId: string, conversations?: WorkbenchConversation[]) => buildTranscriptContextMenuGroups({
       blockId,
       transcript: getTranscript(),
       t,
       onAction: runContextAction,
       onEnterSelection: enterSelection,
+      ...(conversations !== undefined ? { conversations } : {}),
     }),
     multiSelectActions: () => buildTranscriptMultiSelectActions({
       t,
