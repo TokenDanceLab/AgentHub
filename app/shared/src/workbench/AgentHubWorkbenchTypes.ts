@@ -134,6 +134,17 @@ export interface AgentHubWorkbenchProps {
   onCancelRun?: (() => void) | undefined;
   /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
+  /**
+   * Hub REST message actions (#1383). `activeConversationId` is reused as the
+   * session id. All handlers receive the raw block id (`hub-message-<uuid>`);
+   * parents strip the prefix before calling the Hub API. Optional — Desktop/demo
+   * shells omit them and pin/unpin/recall/react keep the placeholder toast.
+   */
+  onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
+  onRecallMessage?: ((messageId: string) => Promise<void> | void) | undefined;
+  onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: ConnectionStatusKind | undefined;
 }

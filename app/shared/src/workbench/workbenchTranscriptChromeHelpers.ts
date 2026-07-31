@@ -183,6 +183,16 @@ export interface TranscriptChromeControllerDeps {
   composerInputRef: { current: { focus: () => void } | null };
   onRegenerate?: ((blockId: string) => void) | undefined;
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+  /**
+   * Hub session id for REST message actions (#1383). Absent on Desktop/demo
+   * shells — pin/unpin/react then keep the placeholder toast behavior.
+   */
+  sessionId?: string | null | undefined;
+  onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
+  onRecallMessage?: ((messageId: string) => Promise<void> | void) | undefined;
+  onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
 }
 
 export interface TranscriptChromeController {
@@ -279,6 +289,11 @@ export function createTranscriptChromeController(
     focusComposer: () => focusComposerInput(deps.composerInputRef),
     onRegenerate: deps.onRegenerate,
     onApprovalDecision: deps.onApprovalDecision,
+    onPinMessage: deps.onPinMessage,
+    onUnpinMessage: deps.onUnpinMessage,
+    onForwardMessage: deps.onForwardMessage,
+    onRecallMessage: deps.onRecallMessage,
+    onAddMessageReaction: deps.onAddMessageReaction,
     pulseBlock,
     showWorkbenchToast,
     exitSelection,
@@ -354,6 +369,7 @@ export function createTranscriptChromeController(
       transcript: getTranscript(),
       t,
       selectedText: window.getSelection()?.toString() ?? null,
+      ...(deps.sessionId ? { sessionId: deps.sessionId } : {}),
     }), effectHandlers());
   };
 
