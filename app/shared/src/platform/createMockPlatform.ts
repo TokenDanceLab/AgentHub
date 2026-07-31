@@ -3,6 +3,7 @@ import type { EvidenceRef } from '../transcript';
 import type {
   AgentHubPlatform,
   AgentHubSurface,
+  RedispatchTaskResult,
   SurfaceCapabilities,
   TerminalPort,
   WorkspaceFileEntry,
@@ -47,6 +48,8 @@ export interface MockPlatform extends AgentHubPlatform {
   };
   openedEvidence: EvidenceRef[];
   submittedIntents: ComposerIntent[];
+  /** Dispatch-only retries recorded by `runs.redispatchTask` (CF22 queue). */
+  redispatchCalls: Array<{ intent: ComposerIntent; messageId: string }>;
   terminal?: MockTerminalPort | TerminalPort;
 }
 
@@ -151,6 +154,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
   const conversations = seed.conversations ?? [];
   const openedEvidence: EvidenceRef[] = [];
   const submittedIntents: ComposerIntent[] = [];
+  const redispatchCalls: Array<{ intent: ComposerIntent; messageId: string }> = [];
   const capabilities: SurfaceCapabilities = {
     ...defaultCapabilities,
     ...seed.capabilities,
@@ -168,6 +172,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
     },
     openedEvidence,
     submittedIntents,
+    redispatchCalls,
     conversations: {
       async list() {
         return conversations;
@@ -207,6 +212,12 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
         submittedIntents.push(intent);
         return {
           intentId: `mock-intent-${submittedIntents.length}`,
+        };
+      },
+      async redispatchTask(intent: ComposerIntent, messageId: string): Promise<RedispatchTaskResult> {
+        redispatchCalls.push({ intent, messageId });
+        return {
+          taskId: `mock-task-${redispatchCalls.length}`,
         };
       },
     },

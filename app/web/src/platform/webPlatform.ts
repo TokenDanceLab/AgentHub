@@ -6,7 +6,7 @@ import {
   type WorkbenchDataMode,
   type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
-import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import type { AgentHubPlatform, RedispatchTaskResult, WorkbenchConversation } from '@shared/platform';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
 import { isTurnInProgressError } from '@shared/errors';
@@ -172,6 +172,30 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
+      async redispatchTask(intent: ComposerIntent, messageId: string): Promise<RedispatchTaskResult> {
+        // Same fail-closed gates as submitComposerIntent (AH-SR-043). The demo
+        // sink never rejects a dispatch (no agent-tasks flow), so a no-op
+        // result drains the client queue without simulating anything.
+        const dataMode = normalizeWorkbenchDataMode(
+          options.dataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
+        );
+        const hasHubToken = Boolean(getAccessToken());
+        const shouldUseDemoFallback = allowsWorkbenchDemoRuntimeMutation({
+          demoRuntimeFallback: options.demoRuntimeFallback,
+          dataMode,
+          hasInjectedHubClient,
+        });
+        if (shouldUseDemoFallback) {
+          return { taskId: undefined };
+        }
+        if (!hasHubToken && ensureAuth && !ensureAuth()) {
+          throw new Error('Hub authentication is required before Web can submit real Hub work.');
+        }
+        if (!hasHubToken && !ensureAuth && !hasInjectedHubClient) {
+          throw new Error('Hub authentication is required before Web can submit real Hub work.');
+        }
+        return redispatchWebTask(hubClient, messageId, intent, { queryClient });
+      },
     },
     settings: createWebSettingsAdapter(),
   };
@@ -291,6 +315,59 @@ export async function submitWebComposerIntent(
     });
   }
   return { intentId: task.id || message.message_id };
+}
+
+/**
+ * Dispatch-only retry for the client pending-intents queue (CF22). Unlike
+ * `submitWebComposerIntent` this never sends a message — the given Hub
+ * message id is the retry trigger for the existing agent-tasks dispatch.
+ * A recoverable 409 turn_in_progress is surfaced as `{ turnInProgress: true }`
+ * so the queue can requeue (bounded) instead of dropping the dispatch.
+ */
+export async function redispatchWebTask(
+  hubClient: WebRunHubClient,
+  messageId: string,
+  intent: ComposerIntent,
+  options: { queryClient?: QueryClient } = {},
+): Promise<RedispatchTaskResult> {
+  const dispatchMention = intent.mentions.find((m) => m.dispatchRole !== 'context');
+  if (!dispatchMention) {
+    // Nothing to dispatch (e.g. only context mentions) — treat as success so
+    // the queue drains instead of stalling on a non-dispatch entry.
+    return { taskId: undefined };
+  }
+  const dispatchTarget = await resolveWebDispatchTarget(
+    hubClient,
+    (intent as WebComposerIntent).executionTargetId,
+  );
+  const agentInstance = await ensureMentionedAgentInstance(
+    hubClient,
+    intent.conversationId,
+    dispatchMention,
+    options.queryClient,
+  );
+  try {
+    const task = await triggerMentionedAgent(hubClient, messageId, agentInstance?.id, dispatchTarget, intent);
+    if (task.id) {
+      const targetId = task.target_id ?? dispatchTarget?.id;
+      recordWebAgentTaskIndex(options.queryClient, {
+        taskId: task.id,
+        sessionId: intent.conversationId,
+        agentInstanceId: task.agent_instance_id,
+        triggerMessageId: task.trigger_message_id || messageId,
+        ...(targetId ? { targetId } : {}),
+        ...(task.edge_run_id ? { edgeRunId: task.edge_run_id } : {}),
+        ...(task.edge_device_id ? { edgeDeviceId: task.edge_device_id } : {}),
+        status: task.status || 'queued',
+      });
+    }
+    return { taskId: task.id };
+  } catch (error) {
+    if (isTurnInProgressError(error)) {
+      return { turnInProgress: true };
+    }
+    throw error;
+  }
 }
 
 async function sendComposerMessage(
