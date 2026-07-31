@@ -31,6 +31,16 @@ export interface UseWorkbenchTranscriptChromeOptions {
   t: (key: string, options?: Record<string, unknown>) => string;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   onRegenerate?: ((blockId: string) => void) | undefined;
+  /**
+   * Hub session id for REST message actions (#1383). Optional — Desktop/demo
+   * shells omit it and pin/unpin/react keep the placeholder toast.
+   */
+  sessionId?: string | null | undefined;
+  onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
+  onRecallMessage?: ((messageId: string) => Promise<void> | void) | undefined;
+  onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
   dispatchComposer: Dispatch<ComposerAction>;
   composerInputRef: RefObject<HTMLTextAreaElement | null>;
   workspaceRef: RefObject<HTMLElement | null>;
@@ -71,6 +81,12 @@ export function useWorkbenchTranscriptChrome({
   t,
   onApprovalDecision,
   onRegenerate,
+  sessionId,
+  onPinMessage,
+  onUnpinMessage,
+  onForwardMessage,
+  onRecallMessage,
+  onAddMessageReaction,
   dispatchComposer,
   composerInputRef,
   workspaceRef,
@@ -129,11 +145,23 @@ export function useWorkbenchTranscriptChrome({
     composerInputRef,
     onRegenerate,
     onApprovalDecision,
+    ...(sessionId ? { sessionId } : {}),
+    ...(onPinMessage ? { onPinMessage } : {}),
+    ...(onUnpinMessage ? { onUnpinMessage } : {}),
+    ...(onForwardMessage ? { onForwardMessage } : {}),
+    ...(onRecallMessage ? { onRecallMessage } : {}),
+    ...(onAddMessageReaction ? { onAddMessageReaction } : {}),
   }), [
     composerInputRef,
     dispatchComposer,
     onApprovalDecision,
+    onAddMessageReaction,
+    onForwardMessage,
+    onPinMessage,
+    onRecallMessage,
     onRegenerate,
+    onUnpinMessage,
+    sessionId,
     t,
   ]);
 

@@ -227,6 +227,56 @@ function WebWorkbenchRoot() {
               }
             : undefined
         }
+        onPinMessage={
+          workbench.chatActions
+            ? (messageId: string, sessionId: string) => {
+                void workbench.chatActions!.onPinMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                  sessionId,
+                ).catch(() => {});
+              }
+            : undefined
+        }
+        onUnpinMessage={
+          workbench.chatActions
+            ? (messageId: string, sessionId: string) => {
+                void workbench.chatActions!.onUnpinMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                  sessionId,
+                ).catch(() => {});
+              }
+            : undefined
+        }
+        onForwardMessage={
+          workbench.chatActions
+            ? (messageId: string, targetSessionIds: string[]) => {
+                void workbench.chatActions!.onForwardMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                  targetSessionIds,
+                ).catch(() => {});
+              }
+            : undefined
+        }
+        onRecallMessage={
+          workbench.chatActions
+            ? (messageId: string) => {
+                void workbench.chatActions!.onRecallMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                ).catch(() => {});
+              }
+            : undefined
+        }
+        onAddMessageReaction={
+          workbench.chatActions
+            ? (messageId: string, sessionId: string, emoji: string) => {
+                void workbench.chatActions!.onAddReaction(
+                  messageId.replace(/^hub-message-/, ''),
+                  sessionId,
+                  emoji,
+                ).catch(() => {});
+              }
+            : undefined
+        }
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker
