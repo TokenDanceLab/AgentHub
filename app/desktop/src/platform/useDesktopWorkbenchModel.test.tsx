@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, resolveDemoWorkbenchTranscript } from '@shared/demo';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
-import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
+import { useHubSessions, useHubMessages, useHubPinnedMessages } from '@/api/sessionQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useDesktopWorkbenchModel } from './useDesktopWorkbenchModel';
@@ -20,6 +20,7 @@ vi.mock('@/api/threadQueries', () => ({
 vi.mock('@/api/sessionQueries', () => ({
   useHubSessions: vi.fn(),
   useHubMessages: vi.fn(),
+  useHubPinnedMessages: vi.fn(() => ({ data: undefined })),
   useHubSendMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubRecallMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubEditMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
@@ -65,6 +66,7 @@ const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedUseHubSessions = vi.mocked(useHubSessions);
 const mockedUseHubMessages = vi.mocked(useHubMessages);
+const mockedUseHubPinnedMessages = vi.mocked(useHubPinnedMessages);
 const mockedUseDesktopEdgeEvents = vi.mocked(useDesktopEdgeEvents);
 const mockedFetchHealth = vi.mocked(fetchHealth);
 const mockedUseHubStore = vi.mocked(useHubStore);
@@ -95,6 +97,9 @@ describe('useDesktopWorkbenchModel', () => {
     mockedUseHubMessages.mockReturnValue({
       data: undefined,
     } as unknown as ReturnType<typeof useHubMessages>);
+    mockedUseHubPinnedMessages.mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useHubPinnedMessages>);
     mockedUseDesktopEdgeEvents.mockReturnValue([]);
     mockedFetchHealth.mockRejectedValue(new Error('Edge not available'));
     mockedUseHubStore.mockReturnValue(false as never);

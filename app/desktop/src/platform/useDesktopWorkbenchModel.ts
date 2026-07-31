@@ -11,6 +11,7 @@ import {
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
 import { orderTranscriptBlocks } from '@shared/transcript';
+import { getPinMapStore, withPinnedState } from '@shared/transcript';
 import { getAgentActivityStore, type AgentActivitySnapshot } from '@shared/transcript/agentActivity';
 import { computeTranscriptUnreadMarker, type TranscriptUnreadMarker } from '@/components/IM/transcriptUnreadMarker';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
@@ -25,7 +26,7 @@ import {
   type HubContactLike,
 } from '@shared/workbench/hubDataMapping';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
-import { useHubSessions, useHubMessages, useHubSendMessage, useHubRecallMessage, useHubEditMessage, useHubPinMessage, useHubUnpinMessage, useHubMarkRead } from '@/api/sessionQueries';
+import { useHubSessions, useHubMessages, useHubPinnedMessages, useHubSendMessage, useHubRecallMessage, useHubEditMessage, useHubPinMessage, useHubUnpinMessage, useHubMarkRead } from '@/api/sessionQueries';
 import {
   useHubContacts,
   useHubSearchUser,
@@ -168,6 +169,15 @@ export function useDesktopWorkbenchModel(
     getAgentActivityStore().getSnapshot,
   );
 
+  // Subscribe to the session-scoped pinMap store: MESSAGE_PIN/MESSAGE_UNPIN
+  // frames (hubEventBridge) and the /pins endpoint seed below feed it, and the
+  // normalize pipeline merges `pinned` into HubMessageTranscriptInput from it.
+  const pinnedSnapshot = useSyncExternalStore(
+    getPinMapStore().subscribe,
+    getPinMapStore().getSnapshot,
+    getPinMapStore().getSnapshot,
+  );
+
   // Hub WS real-time ingestion for the workbench runs through
   // DesktopHubTaskBridge → useHubEventStream (api/hubWS subprotocol auth);
   // per-event cache invalidation is handled by the central hubEventBridge.
@@ -239,6 +249,24 @@ export function useDesktopWorkbenchModel(
   // Hub session messages (IM path) — only when a Hub session is active.
   const hubMessagesQuery = useHubMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
   const hubMessages = hubMessagesQuery.data ?? [];
+
+  // Hub session pins — seed the pinMap store from GET /client/sessions/{id}/pins.
+  // Keyed per session (query key matches hubQueryKeys.threads.pins, which
+  // hubEventBridge invalidates on MESSAGE_PIN/MESSAGE_UNPIN); each arrival
+  // re-seeds the session bucket (server list is authoritative).
+  const hubPinsQuery = useHubPinnedMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
+  useEffect(() => {
+    if (activeHubSession?.id && hubPinsQuery.data) {
+      getPinMapStore().loadPinnedForSession(
+        activeHubSession.id,
+        hubPinsQuery.data.map((message) => message.id),
+      );
+    } else if (!activeHubSession?.id) {
+      // Signed out / no Hub session: drop the session pointer so stale frames
+      // can never leak into a later session.
+      getPinMapStore().setActiveSession(null);
+    }
+  }, [activeHubSession?.id, hubPinsQuery.data]);
 
   const demoModel = useMemo(() => {
     // When auto mode can use Local Edge fallback, use Edge API data for
@@ -312,7 +340,13 @@ export function useDesktopWorkbenchModel(
   const transcript = useMemo(() => {
     // If a Hub session is active, use Hub messages for the transcript.
     if (activeHubSession) {
-      return normalizeHubMessagesToTranscript(hubMessages, t);
+      return normalizeHubMessagesToTranscript(
+        // Merge the pinMap store's pinned state into the normalize input:
+        // hub messages carry no pin field, so the store (fed by WS frames and
+        // seeded from /pins) is the only normalize-time source.
+        withPinnedState(hubMessages, pinnedSnapshot.pinnedIds),
+        t,
+      );
     }
     // Otherwise, use the Edge thread transcript path.
     const items = threadItems ?? [];
@@ -322,7 +356,7 @@ export function useDesktopWorkbenchModel(
     }
     if (threads.length === 0 && hubSessions.length === 0) return EMPTY_TRANSCRIPT;
     return [];
-  }, [activeHubSession, hubMessages, liveTranscript, threadItems, threads.length, hubSessions.length, t]);
+  }, [activeHubSession, hubMessages, pinnedSnapshot, liveTranscript, threadItems, threads.length, hubSessions.length, t]);
 
   // IM read-watermark marker (T8): only meaningful for Hub IM sessions.
   // unread_count is the server-computed `next_seq − last_read_seq` watermark.
