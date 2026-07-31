@@ -5,6 +5,7 @@ import {
   agentTextBlock,
   artifactCreatedBlock,
   childAgentBlock,
+  compactBoundaryBlock,
   contextUsageBlock,
   fileChangeBlock,
   outputBatchTextBlock,
@@ -159,6 +160,8 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
       return routeDecisionBlock(event);
     case 'run.agent.context_usage':
       return contextUsageBlock(event);
+    case 'run.agent.compact_boundary':
+      return compactBoundaryBlock(event);
     case 'run.agent.tool_call':
       return toolCallBlock(event);
     case 'run.agent.tool_result':
