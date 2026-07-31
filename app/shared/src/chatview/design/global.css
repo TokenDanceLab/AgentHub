@@ -1,6 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    GLOBAL STYLES — reset + base
-   ══════════════════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════════════
+   ⚠ DEAD CODE (a11y #12): this file is NOT imported anywhere (verified
+   2026-08-01, zero @import / JS import). The prefers-reduced-motion
+   kill-switch below never reaches the app; per-component reduce blocks
+   (RowItem.css, AgentStreamingBar.module.css, TypingIndicator.css, …)
+   are the real reduced-motion handling. Kept on purpose — may be wired
+   up by a future consumer. */
 
 @import './tokens.css';
 
