@@ -55,6 +55,11 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
     if (agents.length === 0) return null;
   }
 
+  // No real progress percentage exists for agent runs, so surface the one
+  // quantitative signal we do have: the number of tool calls.
+  const totalToolCalls = agents.reduce((sum, a) => sum + (a.toolCalls ?? 0), 0);
+  const toolCallsLabel = totalToolCalls > 0 ? ` · ${totalToolCalls} 次工具调用` : '';
+
   return (
     <div className={`${styles.bar} ${className ?? ''}`} role="status" aria-live="polite">
       {agents.length === 1 ? (
@@ -63,12 +68,13 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
           <span className={styles.name}>{agents[0]!.name}</span>
           <span className={`${styles.status} ${statusClassName(agents[0]!.status)}`}>
             {statusLabel(agents[0]!.status)}
+            {toolCallsLabel}
           </span>
         </div>
       ) : (
         <div className={styles.agent}>
           <span className={`${styles.icon} ${styles.iconPulse}`} aria-hidden="true">{'\u{1F916}'}</span>
-          <span className={styles.name}>{activeCount} 个 Agent 运行中</span>
+          <span className={styles.name}>{activeCount} 个 Agent 运行中{toolCallsLabel}</span>
           <span className={styles.detail}>
             {agents.map((a) => STATUS_ICON[a.status]).join(' ')}
           </span>
