@@ -56,6 +56,7 @@
     "react-syntax-highlighter": "^16.1.1",
     "remark-cjk-friendly": "2.3.1",
     "remark-gfm": "^4.0.1",
+    "virtua": "^0.50.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

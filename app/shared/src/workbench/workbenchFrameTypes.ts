@@ -103,6 +103,7 @@ export interface WorkbenchFrameProps {
   showComposerStatus: boolean;
   showMainchainStatus: boolean;
   transcript: TranscriptBlock[];
+  transcriptUnreadDivider?: import('../chatview').UnreadDividerDescriptor | undefined;
   userDisplayName?: string | undefined;
   userAvatarUrl?: string | undefined;
   currentUserId?: string | undefined;
@@ -158,6 +159,7 @@ export interface ChatConversationHostFrameProps {
   transcriptChrome: WorkbenchTranscriptChrome;
   profile: WorkbenchProfileChrome;
   transcript: TranscriptBlock[];
+  transcriptUnreadDivider?: import('../chatview').UnreadDividerDescriptor | undefined;
   connectionStatus?: ConnectionStatusKind | undefined;
   inspectorCollapsed: boolean;
   toggleInspector: () => void;

@@ -67,6 +67,7 @@ export function WorkbenchFrame({
   showComposerStatus,
   showMainchainStatus,
   transcript,
+  transcriptUnreadDivider,
   userDisplayName,
   userAvatarUrl,
   currentUserId,
@@ -192,6 +193,7 @@ export function WorkbenchFrame({
             transcriptChrome={transcriptChrome}
             profile={profile}
             transcript={transcript}
+            transcriptUnreadDivider={transcriptUnreadDivider}
             connectionStatus={connectionStatus}
             inspectorCollapsed={inspectorCollapsed}
             toggleInspector={toggleInspector}
