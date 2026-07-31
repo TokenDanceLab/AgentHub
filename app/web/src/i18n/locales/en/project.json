@@ -82,7 +82,6 @@
     "reopen": "Reopen"
   },
   "taskForm": {
-    "drawerAria": "New task panel",
     "title": "New task draft",
     "description": "This panel is local UI only. It demonstrates how the project page will expose task creation without connecting a backend.",
     "fieldTitle": "Title",
