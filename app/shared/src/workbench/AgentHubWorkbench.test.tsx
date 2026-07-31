@@ -503,6 +503,11 @@ describe('AgentHubWorkbench', () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    // Panel layout persistence keys — cleared so inspector width/collapsed
+    // state written to localStorage by earlier tests cannot leak into later
+    // mounts (useWorkbenchPanelLayout reads them in its state initializers).
+    window.localStorage.removeItem('agenthub.workbench.inspectorWidth');
+    window.localStorage.removeItem('agenthub.workbench.inspectorCollapsed');
   });
 
   const agents: WorkbenchAgent[] = [
@@ -3386,6 +3391,140 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(filesTab, { key: 'ArrowRight' });
     expect(overviewTab).toHaveAttribute('aria-selected', 'true');
     expect(document.activeElement).toBe(overviewTab);
+  });
+
+  describe('inspector layout persistence', () => {
+    const widthKey = 'agenthub.workbench.inspectorWidth';
+    const collapsedKey = 'agenthub.workbench.inspectorCollapsed';
+
+    function renderPanelHarness() {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+    }
+
+    it('writes the default layout to localStorage on mount', () => {
+      renderPanelHarness();
+      expect(window.localStorage.getItem(widthKey)).toBe('400');
+      expect(window.localStorage.getItem(collapsedKey)).toBe('false');
+    });
+
+    it('persists the inspector width after keyboard resize', () => {
+      renderPanelHarness();
+      const resizer = screen.getByRole('separator', { name: '调整右侧栏宽度' });
+      fireEvent.keyDown(resizer, { key: 'ArrowLeft' });
+      expect(resizer).toHaveAttribute('aria-valuenow', '416');
+      expect(window.localStorage.getItem(widthKey)).toBe('416');
+    });
+
+    it('persists collapsed state when the inspector is collapsed', () => {
+      renderPanelHarness();
+      fireEvent.click(screen.getByRole('button', { name: '收起右侧概览' }));
+      expect(window.localStorage.getItem(collapsedKey)).toBe('true');
+    });
+
+    it('restores the persisted inspector width', () => {
+      window.localStorage.setItem(widthKey, '520');
+      renderPanelHarness();
+      expect(screen.getByTestId('agenthub-workbench')).toHaveStyle({ '--inspector-w': '520px' });
+      expect(screen.getByRole('separator', { name: '调整右侧栏宽度' }))
+        .toHaveAttribute('aria-valuenow', '520');
+    });
+
+    it('clamps an over-max persisted width to 760', () => {
+      window.localStorage.setItem(widthKey, '9999');
+      renderPanelHarness();
+      expect(screen.getByTestId('agenthub-workbench')).toHaveStyle({ '--inspector-w': '760px' });
+      expect(screen.getByRole('separator', { name: '调整右侧栏宽度' }))
+        .toHaveAttribute('aria-valuenow', '760');
+    });
+
+    it('clamps an under-min persisted width to 48', () => {
+      window.localStorage.setItem(widthKey, '10');
+      renderPanelHarness();
+      expect(screen.getByTestId('agenthub-workbench')).toHaveStyle({ '--inspector-w': '48px' });
+      expect(screen.getByRole('separator', { name: '调整右侧栏宽度' }))
+        .toHaveAttribute('aria-valuenow', '48');
+    });
+
+    it('restores the persisted collapsed state', () => {
+      window.localStorage.setItem(collapsedKey, 'true');
+      renderPanelHarness();
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-inspector-collapsed', 'true');
+      // byRole skips aria-hidden elements (and their names) — query the DOM directly.
+      expect(document.querySelector('aside[aria-label="Right inspector"]'))
+        .toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByRole('button', { name: '展开右侧概览' })).toBeInTheDocument();
+    });
+  });
+
+  describe('inspectorVisible settings wiring', () => {
+    function renderWithSettings(readSettings: () => Promise<Record<string, string>>) {
+      const platform = {
+        ...createMockPlatform({
+          surface: 'desktop',
+          conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+        }),
+        settings: {
+          readSettings,
+          async writeSettings(): Promise<void> {},
+        },
+      };
+      return render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+    }
+
+    it('collapses the inspector when settings load with inspectorVisible=false', async () => {
+      renderWithSettings(async () => ({ inspectorVisible: 'false' }));
+
+      // Chat page default: inspector open.
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-inspector-collapsed', 'false');
+
+      // Settings load lazily when a non-chat page mounts (WorkbenchRoutes → useWorkbenchSettingsRoute).
+      fireEvent.click(screen.getByRole('button', { name: '设置' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-inspector-collapsed', 'true');
+      });
+    });
+
+    it('collapses the inspector live when 右侧概览 is toggled off in Settings', async () => {
+      renderWithSettings(async () => ({}));
+      fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('右侧概览')).toBeInTheDocument();
+      });
+      const row = screen.getByText('右侧概览').closest('.settings-row') as HTMLElement;
+      expect(within(row).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+
+      fireEvent.click(within(row).getByRole('switch'));
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-inspector-collapsed', 'true');
+    });
+
+    it('keeps the inspector state untouched when inspectorVisible stays true', async () => {
+      renderWithSettings(async () => ({ inspectorVisible: 'true' }));
+      fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('右侧概览')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-inspector-collapsed', 'false');
+    });
   });
 });
 

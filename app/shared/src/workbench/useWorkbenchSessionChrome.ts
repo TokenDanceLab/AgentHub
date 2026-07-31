@@ -16,6 +16,7 @@ import { buildMainchainSummary } from './mainchain';
 import type { FileItem } from './inspector';
 import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import { createSettingsService, type SettingsService } from './settingsService';
+import { INSPECTOR_DEFAULT_COLLAPSE_EVENT } from './workbenchLayoutConstants';
 import {
   LOCAL_CLI_DISCOVERY_FALLBACK,
   buildInspectorTranscriptViews,
@@ -80,6 +81,26 @@ export function useWorkbenchSessionChrome({
     () => (platform.settings ? createSettingsService(platform.settings, WORKBENCH_MOCK_SETTINGS_DEFAULTS) : null),
     [platform.settings],
   );
+
+  // Settings gate: inspectorVisible=false means the inspector starts collapsed
+  // (default hidden). Re-runs on every snapshot change, so toggling 右侧概览 off
+  // in Settings collapses the inspector immediately; toggling it on never
+  // force-opens — manual/last-session state wins for expansion. The layout
+  // hook listens for INSPECTOR_DEFAULT_COLLAPSE_EVENT to apply the collapse.
+  useEffect(() => {
+    if (!settingsService) return undefined;
+    const service = settingsService;
+
+    function applyInspectorVisibleDefault(): void {
+      if (!service.initialized) return;
+      if (service.readAll()['inspectorVisible'] === false) {
+        window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT));
+      }
+    }
+
+    applyInspectorVisibleDefault();
+    return service.subscribe(applyInspectorVisibleDefault);
+  }, [settingsService]);
 
   const fallbackConversationId = conversations[0]?.id ?? 'default';
   const [localConversationId, setLocalConversationId] = useState(fallbackConversationId);
