@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check, Copy } from 'lucide-react'
 
 import type { RowItem as RowItemType } from '../types'
 import {
@@ -13,6 +14,7 @@ import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
 import MarkdownContent from '../../ui/Markdown'
 import { RiskBadge } from '../../ui/RiskBadge'
 import type { RiskLevel } from '../../ui/RiskBadge'
+import { useCopiedFlag } from '../../ui/useCopiedFlag'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -130,6 +132,8 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const [thinkDuration, setThinkDuration] = useState<number | undefined>(undefined)
   // T16: critical approval second-confirm — first click arms, second click fires.
   const [confirmingApprove, setConfirmingApprove] = useState(false)
+  // Fable UIUX #4: Copy→Check feedback for the code-copy button.
+  const [copied, markCopied] = useCopiedFlag()
   const isOpen = item.type === 'route' ? true : open
 
   // Think cards: auto-open when running, auto-collapse 1s after done
@@ -214,6 +218,21 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     onReject?.(item.id)
   }
 
+  // Fable UIUX #4: copy code lines, then flip the button to Check for 1500ms.
+  // Follows the previous contract: onCopy (app-level handler, e.g. toast) takes
+  // precedence; otherwise fall back to navigator.clipboard directly.
+  const handleCodeCopy = () => {
+    const text = item.codeLines?.join('\n') || ''
+    if (onCopy) {
+      onCopy(item.id, text)
+      markCopied()
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(markCopied).catch(() => {
+        /* clipboard may be denied — keep silent, no feedback flip */
+      })
+    }
+  }
+
   // T16: keyboard shortcuts on approval cards — A approve / R deny / Esc collapse.
   // Letters are case-insensitive; modifier combos (Cmd+A, Ctrl+R) pass through so
   // browser/OS shortcuts still work; ignored inside editable fields so typing
@@ -293,7 +312,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             <div className="code-block">
               <div className="code-head">
                 <span className="code-head-left"><FileTypeIcon item={item} /><span>{item.codeLang || labelText}</span></span>
-                <button className="code-copy" aria-label={t('code.copy')} onClick={() => { const text = item.codeLines?.join('\n') || ''; onCopy ? onCopy(item.id, text) : navigator.clipboard?.writeText(text) }}>{t('code.copy')}</button>
+                <button className={`code-copy${copied ? ' copied' : ''}`} aria-label={copied ? '已复制' : '复制'} onClick={handleCodeCopy}>{copied ? <><Check size={12} />已复制</> : <><Copy size={12} />复制</>}</button>
               </div>
               <div className="code-lines">{item.codeLines.map((line, i) => (
                 <div key={i} className="code-line"><span className="code-num">{i + 1}</span><span className="code-text">{line}</span></div>

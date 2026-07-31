@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
+import { act, fireEvent, render } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import MarkdownContent from './Markdown';
 import styles from './Markdown.module.css';
 
@@ -103,5 +103,83 @@ describe('Markdown renderer regressions', () => {
 
   test('returns no markup for empty content', () => {
     expect(renderMarkdown('')).toBeEmptyDOMElement();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fable UIUX gap #3: code block copy button + long-code collapse
+// ---------------------------------------------------------------------------
+describe('code block copy & collapse (fable UIUX #3)', () => {
+  let writeTextMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+  });
+
+  test('renders a copy button on fenced code blocks', () => {
+    const container = renderMarkdown('```ts\nconst a = 1;\n```');
+    const btn = container.querySelector(`.${styles.codeCopyBtn ?? ''}`);
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toContain('复制');
+  });
+
+  test('clicking copy writes the code and flips to 已复制, then resets', async () => {
+    const container = renderMarkdown('```ts\nconst a = 1;\n```');
+    const btn = container.querySelector(`.${styles.codeCopyBtn ?? ''}`)!;
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    expect(writeTextMock).toHaveBeenCalledWith('const a = 1;');
+    expect(btn.textContent).toContain('已复制');
+    // 1500ms later the flag resets back to 复制
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(btn.textContent).toContain('复制');
+  });
+
+  test('copies blocks without a language tag too', () => {
+    const container = renderMarkdown('```\nplain text\nlines\n```');
+    const btn = container.querySelector(`.${styles.codeCopyBtn ?? ''}`)!;
+    fireEvent.click(btn);
+    expect(writeTextMock).toHaveBeenCalledWith('plain text\nlines');
+  });
+
+  test('does not offer a collapse toggle for short blocks', () => {
+    const lines = Array.from({ length: 5 }, (_, i) => `line ${i}`).join('\n');
+    const container = renderMarkdown('```text\n' + lines + '\n```');
+    expect(container.querySelector(`.${styles.codeToggle ?? ''}`)).toBeNull();
+    expect(container.querySelector(`.${styles.codeBodyCollapsed ?? ''}`)).toBeNull();
+  });
+
+  test('collapses long blocks (>20 lines) with a 展开/收起 toggle', () => {
+    const lines = Array.from({ length: 25 }, (_, i) => `line ${i}`).join('\n');
+    const container = renderMarkdown('```ts\n' + lines + '\n```');
+    const toggle = container.querySelector(`.${styles.codeToggle ?? ''}`)!;
+    expect(toggle).not.toBeNull();
+    // collapsed by default
+    expect(container.querySelector(`.${styles.codeBodyCollapsed ?? ''}`)).not.toBeNull();
+    expect(toggle.textContent).toContain('展开');
+    // expand
+    fireEvent.click(toggle);
+    expect(container.querySelector(`.${styles.codeBodyCollapsed ?? ''}`)).toBeNull();
+    expect(toggle.textContent).toContain('收起');
+    // collapse again
+    fireEvent.click(toggle);
+    expect(container.querySelector(`.${styles.codeBodyCollapsed ?? ''}`)).not.toBeNull();
+    expect(toggle.textContent).toContain('展开');
   });
 });
