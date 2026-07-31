@@ -11,6 +11,7 @@ vi.mock('react-i18next', () => ({
       const resources: Record<string, string> = {
         'nav.projects': '项目',
         'projects.newProject': '新建项目',
+        'projects.edit': '编辑项目',
         'projects.loading': '正在加载项目…',
         'projects.empty.title': '暂无项目',
         'projects.empty.description': '创建第一个项目后开始协作',
