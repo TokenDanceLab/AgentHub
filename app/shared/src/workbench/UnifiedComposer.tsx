@@ -24,17 +24,33 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 import {
   ComposerAgentPicker,
-  ComposerAttachButton,
-  ComposerAttachmentBar,
-  ComposerEditBar,
-  ComposerMainchainStrip,
-  ComposerMentionChips,
-  ComposerQuoteBar,
-  ComposerReplyBar,
-  ComposerSendButton,
+  ComposerAttachButton as ComposerAttachButtonBase,
+  ComposerAttachmentBar as ComposerAttachmentBarBase,
+  ComposerEditBar as ComposerEditBarBase,
+  ComposerMainchainStrip as ComposerMainchainStripBase,
+  ComposerMentionChips as ComposerMentionChipsBase,
+  ComposerQuoteBar as ComposerQuoteBarBase,
+  ComposerReplyBar as ComposerReplyBarBase,
+  ComposerSendButton as ComposerSendButtonBase,
   ComposerStatusStrip,
-  ComposerTargetPicker,
+  ComposerTargetPicker as ComposerTargetPickerBase,
 } from './UnifiedComposerParts';
+
+/* #21 性能：composer 状态每次击键都变（textarea 值必要更新），UnifiedComposer
+   自身每击键重渲染不可避免；但子面板的 props 在击键时大多保持稳定（数据来自
+   composer 状态的稳定引用 + useCallback 稳定的回调），包一层 React.memo 跳过
+   不必要的子树重渲染。
+   ─ ComposerAgentPicker / ComposerStatusStrip 未包：availableMentionOptions /
+     statusItems 每次渲染由纯函数重建（新引用），memo 无效。 */
+const ComposerReplyBar = React.memo(ComposerReplyBarBase);
+const ComposerQuoteBar = React.memo(ComposerQuoteBarBase);
+const ComposerEditBar = React.memo(ComposerEditBarBase);
+const ComposerMentionChips = React.memo(ComposerMentionChipsBase);
+const ComposerMainchainStrip = React.memo(ComposerMainchainStripBase);
+const ComposerAttachmentBar = React.memo(ComposerAttachmentBarBase);
+const ComposerTargetPicker = React.memo(ComposerTargetPickerBase);
+const ComposerSendButton = React.memo(ComposerSendButtonBase);
+const ComposerAttachButton = React.memo(ComposerAttachButtonBase);
 import {
   buildUnifiedComposerHostState,
   cancelEditAction,
@@ -90,6 +106,24 @@ export function UnifiedComposer({
   });
   const { chromeModel } = view;
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* #21 性能：稳定回调（依赖仅 dispatchComposer —— useReducer dispatch 跨渲染
+     稳定），配合上方子组件 React.memo，跳过击键时子面板的不必要重渲染。 */
+  const handleCancelReply = useCallback(() => dispatchComposer(cancelReplyAction()), [dispatchComposer]);
+  const handleCancelQuote = useCallback(() => dispatchComposer(cancelQuoteAction()), [dispatchComposer]);
+  const handleCancelEdit = useCallback(() => dispatchComposer(cancelEditAction()), [dispatchComposer]);
+  const handleRemoveMention = useCallback(
+    (id: string) => dispatchComposer(removeMentionAction(id)),
+    [dispatchComposer],
+  );
+  const handleRemoveAttachment = useCallback(
+    (id: string) => dispatchComposer(removeAttachmentAction(id)),
+    [dispatchComposer],
+  );
+  const handleExecutionTargetChange = useCallback(
+    (id: string) => onExecutionTargetChange?.(id),
+    [onExecutionTargetChange],
+  );
 
   useEffect(() => {
     if (!shouldClearExecutionTarget(executionTargets, runtime.executionTargetId)) return;
@@ -447,7 +481,7 @@ export function UnifiedComposer({
     if (result.resetInput && fileInputRef.current) fileInputRef.current.value = '';
   }, [dispatchComposer, onPickLocalAttachments, onToast, runtime.hasNativePicker]);
 
-  function openFilePicker(): void {
+  const openFilePicker = useCallback((): void => {
     void resolveComposerOpenFilePicker({
       hasNativePicker: runtime.hasNativePicker,
       onPickLocalAttachments,
@@ -458,7 +492,7 @@ export function UnifiedComposer({
       }
       dispatchComposerAttachmentAdds(dispatchComposer, result.attachments);
     });
-  }
+  }, [dispatchComposer, onPickLocalAttachments, runtime.hasNativePicker]);
 
   return (
     <form
@@ -472,38 +506,43 @@ export function UnifiedComposer({
       {chromeModel.replyTo && (
         <ComposerReplyBar
           isSubmitting={view.isSubmitting}
-          onCancel={() => dispatchComposer(cancelReplyAction())}
+          onCancel={handleCancelReply}
           replyTo={chromeModel.replyTo}
         />
       )}
       {chromeModel.quote && (
         <ComposerQuoteBar
           isSubmitting={view.isSubmitting}
-          onCancel={() => dispatchComposer(cancelQuoteAction())}
+          onCancel={handleCancelQuote}
           quote={chromeModel.quote}
         />
       )}
       {composer.editingMessageId && (
         <ComposerEditBar
           isSubmitting={view.isSubmitting}
-          onCancel={() => dispatchComposer(cancelEditAction())}
+          onCancel={handleCancelEdit}
         />
       )}
       {chromeModel.mentions && (
         <ComposerMentionChips
           isSubmitting={view.isSubmitting}
           mentions={chromeModel.mentions}
-          onRemove={(id) => dispatchComposer(removeMentionAction(id))}
+          onRemove={handleRemoveMention}
         />
       )}
       {chromeModel.mainchain && (
-        <ComposerMainchainStrip {...chromeModel.mainchain} />
+        <ComposerMainchainStrip
+          mainchainTask={chromeModel.mainchain.mainchainTask}
+          selectedAgentLabel={chromeModel.mainchain.selectedAgentLabel}
+          selectedTargetLabel={chromeModel.mainchain.selectedTargetLabel}
+          targetSelected={chromeModel.mainchain.targetSelected}
+        />
       )}
       {chromeModel.attachment && (
         <ComposerAttachmentBar
           attachments={chromeModel.attachment.attachments}
           isSubmitting={view.isSubmitting}
-          onRemove={(id) => dispatchComposer(removeAttachmentAction(id))}
+          onRemove={handleRemoveAttachment}
           uploadProgresses={chromeModel.attachment.uploadProgresses}
         />
       )}
@@ -556,9 +595,10 @@ export function UnifiedComposer({
         )}
         {chromeModel.targetPicker && (
           <ComposerTargetPicker
-            {...chromeModel.targetPicker}
+            executionTargetId={chromeModel.targetPicker.executionTargetId}
+            executionTargets={chromeModel.targetPicker.executionTargets}
             isSubmitting={view.isSubmitting}
-            onChange={(id) => onExecutionTargetChange?.(id)}
+            onChange={handleExecutionTargetChange}
           />
         )}
         <ComposerSendButton
