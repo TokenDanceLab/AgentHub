@@ -10,11 +10,14 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   getSubagentStreamStore,
   type TeamSubagentStreamEvent,
 } from './SubagentStreamStore';
 import { SubagentTranscript } from './SubagentTranscript';
+import { SubagentSessionDialog } from './SubagentSessionDialog';
 import { Icon } from '../../ui/Icon';
 import styles from './SubagentStreamOverlay.module.css';
 
@@ -174,13 +177,16 @@ function statusColor(status: StreamStatus): string {
 interface SubagentStreamChipProps {
   entry: StreamEntry;
   defaultExpanded: boolean;
+  /** Open the full-session drill-down dialog for this entry. */
+  onOpenSession: (taskId: string) => void;
 }
 
-function SubagentStreamChip({ entry, defaultExpanded }: SubagentStreamChipProps): React.ReactElement {
+function SubagentStreamChip({ entry, defaultExpanded, onOpenSession }: SubagentStreamChipProps): React.ReactElement {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [manualToggle, setManualToggle] = useState(false);
   const prevStatusRef = useRef(entry.status);
   const hasDoneOrFailed = entry.status === 'done' || entry.status === 'failed';
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
 
   // Auto-expand when active; auto-collapse on done/failed after 3s if no manual toggle.
   React.useEffect(() => {
@@ -213,27 +219,39 @@ function SubagentStreamChip({ entry, defaultExpanded }: SubagentStreamChipProps)
       data-stream-status={entry.status}
     >
       {/* ── Chip header (always visible) ── */}
-      <button
-        type="button"
-        className={styles.chipHeader}
-        onClick={toggle}
-        aria-expanded={expanded}
-        aria-label={`${entry.displayName}: ${statusLabel(entry.status)}`}
-      >
-        <span className={`${styles.avatar} ${isActiveStatus(entry.status) ? styles.avatarPulse : ''}`}>
-          {avatarLetter}
-        </span>
-        <span className={styles.chipBody}>
-          <span className={styles.chipLabel}>{entry.displayName}</span>
-          <span className={`${styles.chipStatus} ${statusColor(entry.status)}`}>
-            {statusLabel(entry.status)}
+      <div className={styles.chipHeaderRow}>
+        <button
+          type="button"
+          className={styles.chipHeader}
+          onClick={toggle}
+          aria-expanded={expanded}
+          aria-label={`${entry.displayName}: ${statusLabel(entry.status)}`}
+        >
+          <span className={`${styles.avatar} ${isActiveStatus(entry.status) ? styles.avatarPulse : ''}`}>
+            {avatarLetter}
           </span>
-        </span>
-        {entry.latestText && !expanded ? (
-          <span className={styles.chipPreview}>{truncate(entry.latestText, 40)}</span>
-        ) : null}
-        <Icon name={expanded ? 'expand_more' : 'expand_less'} size={16} />
-      </button>
+          <span className={styles.chipBody}>
+            <span className={styles.chipLabel}>{entry.displayName}</span>
+            <span className={`${styles.chipStatus} ${statusColor(entry.status)}`}>
+              {statusLabel(entry.status)}
+            </span>
+          </span>
+          {entry.latestText && !expanded ? (
+            <span className={styles.chipPreview}>{truncate(entry.latestText, 40)}</span>
+          ) : null}
+          <Icon name={expanded ? 'expand_more' : 'expand_less'} size={16} />
+        </button>
+        {/* Drill-down: open the full-session dialog (#1406 follow-up) */}
+        <button
+          type="button"
+          className={styles.chipExpandBtn}
+          onClick={() => onOpenSession(entry.taskId)}
+          aria-label={t('subagentStream.openSession')}
+          title={t('subagentStream.openSession')}
+        >
+          <Icon name="open_in_full" size={14} />
+        </button>
+      </div>
 
       {/* ── Expanded transcript (#1406 Phase 3) ── */}
       {expanded ? (
@@ -258,32 +276,46 @@ export function SubagentStreamOverlay({
 }: SubagentStreamOverlayProps): React.ReactElement | null {
   const byTaskId = useSubagentStreamMap();
   const entries = useMemo(() => buildStreamEntries(byTaskId), [byTaskId]);
+  // Which sub-session is open in the drill-down dialog (null = closed).
+  const [dialogTaskId, setDialogTaskId] = useState<string | null>(null);
 
   if (entries.length === 0) return null;
 
   const visibleEntries = entries.slice(0, maxVisible);
   const stackedCount = entries.length - visibleEntries.length;
+  const dialogEntry = dialogTaskId != null
+    ? entries.find((entry) => entry.taskId === dialogTaskId) ?? null
+    : null;
 
   return (
-    <div
-      className={`${styles.overlay} ${position === 'bottom-left' ? styles.positionLeft : styles.positionRight}`}
-      role="region"
-      aria-label="Subagent stream status"
-      aria-live="polite"
-    >
-      {stackedCount > 0 ? (
-        <div className={styles.stackedBadge}>
-          +{stackedCount} more
-        </div>
-      ) : null}
-      {visibleEntries.map((entry) => (
-        <SubagentStreamChip
-          key={entry.taskId}
-          entry={entry}
-          defaultExpanded={isActiveStatus(entry.status)}
-        />
-      ))}
-    </div>
+    <>
+      <div
+        className={`${styles.overlay} ${position === 'bottom-left' ? styles.positionLeft : styles.positionRight}`}
+        role="region"
+        aria-label="Subagent stream status"
+        aria-live="polite"
+      >
+        {stackedCount > 0 ? (
+          <div className={styles.stackedBadge}>
+            +{stackedCount} more
+          </div>
+        ) : null}
+        {visibleEntries.map((entry) => (
+          <SubagentStreamChip
+            key={entry.taskId}
+            entry={entry}
+            defaultExpanded={isActiveStatus(entry.status)}
+            onOpenSession={setDialogTaskId}
+          />
+        ))}
+      </div>
+      <SubagentSessionDialog
+        open={dialogEntry != null}
+        onClose={() => setDialogTaskId(null)}
+        agentName={dialogEntry?.displayName ?? ''}
+        events={dialogEntry?.events ?? []}
+      />
+    </>
   );
 }
 

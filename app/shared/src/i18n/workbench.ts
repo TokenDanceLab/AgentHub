@@ -262,6 +262,11 @@ export const sharedWorkbenchResources = {
     pinnedAnnouncement: {
       pin: '置顶', link: '链接', close: '关闭',
     },
+    subagentStream: {
+      dialogTitle: '{{name}} · 子会话详情',
+      openSession: '打开完整会话',
+      transcriptLabel: '子会话事件流',
+    },
   },
   en: {
     nav: {
@@ -521,6 +526,11 @@ export const sharedWorkbenchResources = {
     },
     pinnedAnnouncement: {
       pin: 'Pin', link: 'Link', close: 'Close',
+    },
+    subagentStream: {
+      dialogTitle: '{{name}} · Sub-session details',
+      openSession: 'Open full session',
+      transcriptLabel: 'Sub-session event stream',
     },
   },
 } as const;
