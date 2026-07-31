@@ -1,11 +1,30 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   createSubagentStreamStore,
   type SubagentStreamStore,
 } from './SubagentStreamStore';
 import { SubagentStreamOverlay } from './SubagentStreamOverlay';
+
+// Mock i18n: SubagentStreamOverlay + SubagentSessionDialog use the
+// sharedWorkbench namespace for dialog/open-button labels.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const translations: Record<string, string> = {
+        'subagentStream.dialogTitle': '{{name}} · 子会话详情',
+        'subagentStream.openSession': '打开完整会话',
+        'subagentStream.transcriptLabel': '子会话事件流',
+      };
+      const base = translations[key] ?? key;
+      if (!options || typeof options !== 'object') return base;
+      return base.replace(/\{\{(\w+)\}\}/g, (_m: string, name: string) =>
+        String(options[name] ?? ''));
+    },
+    i18n: { language: 'zh' },
+  }),
+}));
 
 // Mock getSubagentStreamStore to return a test-controlled store.
 let testStore: SubagentStreamStore;
@@ -105,10 +124,10 @@ describe('SubagentStreamOverlay', () => {
     });
     render(<SubagentStreamOverlay maxVisible={2} />);
     expect(screen.getByText('+2 more')).toBeInTheDocument();
-    // Only first 2 visible (sorted by active first)
-    const chips = screen.getAllByRole('button');
-    // 1 for each of 2 visible chips (the +N badge is not a button)
-    expect(chips.length).toBe(2);
+    // Only first 2 chips visible: 2 toggle buttons + 2 drill-down buttons
+    // (the +N badge is not a button).
+    expect(screen.getAllByRole('button').length).toBe(4);
+    expect(document.querySelectorAll('[aria-expanded]').length).toBe(2);
   });
 
   it('expands chip on click', () => {
@@ -121,7 +140,7 @@ describe('SubagentStreamOverlay', () => {
       }));
     });
     render(<SubagentStreamOverlay />);
-    const chipBtn = screen.getByRole('button');
+    const chipBtn = screen.getByRole('button', { name: /TestAgent:/ });
     expect(chipBtn).toHaveAttribute('aria-expanded', 'true'); // default expanded for active
 
     // Collapse it first
@@ -217,5 +236,73 @@ describe('SubagentStreamOverlay', () => {
     const region = screen.getByRole('region');
     expect(region.className).toContain('positionLeft');
     expect(region.className).not.toContain('positionRight');
+  });
+
+  // ── Full-session drill-down dialog (#1406 follow-up) ──
+
+  it('opens the full-session dialog from the chip drill-down button', () => {
+    act(() => {
+      testStore.push(makeEvent({
+        agent_task_id: 'task-1',
+        member_id: 'Agent A',
+        event_type: 'thinking',
+        event_seq: 1,
+        payload: { text: 'Deep reasoning step' },
+      }));
+    });
+    render(<SubagentStreamOverlay />);
+
+    // No dialog before clicking the drill-down button.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开完整会话' }));
+
+    // Dialog opens with the agent name in the title and the full transcript.
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveTextContent('Agent A');
+    expect(within(dialog).getByText('思考')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Deep reasoning step/)).toBeInTheDocument();
+  });
+
+  it('closes the dialog via the modal close button', () => {
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'thinking', event_seq: 1 }));
+    });
+    render(<SubagentStreamOverlay />);
+    fireEvent.click(screen.getByRole('button', { name: '打开完整会话' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the selected sub-session only when multiple chips exist', () => {
+    act(() => {
+      testStore.push(makeEvent({
+        agent_task_id: 'task-1',
+        member_id: 'Agent A',
+        event_type: 'thinking',
+        event_seq: 1,
+        payload: { text: 'A-only reasoning' },
+      }));
+      testStore.push(makeEvent({
+        agent_task_id: 'task-2',
+        member_id: 'Agent B',
+        event_type: 'done',
+        event_seq: 1,
+        payload: { summary: 'B-only result' },
+      }));
+    });
+    render(<SubagentStreamOverlay maxVisible={5} />);
+
+    // Two drill-down buttons; open the first (active thinking first).
+    const openButtons = screen.getAllByRole('button', { name: '打开完整会话' });
+    expect(openButtons.length).toBe(2);
+    fireEvent.click(openButtons[0]!);
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/A-only reasoning/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/B-only result/)).not.toBeInTheDocument();
   });
 });
