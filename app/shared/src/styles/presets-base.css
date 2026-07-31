@@ -1025,3 +1025,16 @@
   --diff-removed-bg: rgba(255, 85, 85, 0.10);
   --diff-removed-border: #FF5555;
 }
+
+/* ═══ Global focus fallback (a11y #8/#13) ═══════════════════════════════
+   Non-`:focus-visible` focus (mouse/pointer clicks) gets an explicit
+   outline ring — no global `:focus` rule existed before. Keyboard focus
+   is untouched: `:focus-visible` matches make `:not(:focus-visible)`
+   false, so component `:focus-visible { outline:none }` rules win.
+   Components that deliberately strip click focus via their own
+   `.x:focus { outline: none }` (same specificity, loaded later, e.g.
+   `.composerInput`) still override this fallback. */
+:focus:not(:focus-visible) {
+  outline: 2px solid var(--focus-ring-color, var(--ring));
+  outline-offset: 2px;
+}
