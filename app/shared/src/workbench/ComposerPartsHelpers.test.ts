@@ -9,7 +9,9 @@ import {
   formatMainchainTaskLabel,
   formatMentionChipLabel,
   formatReplyToLabel,
+  isMediaAttachment,
   mainchainDataState,
+  resolveAttachmentPreviewKind,
   resolveAttachmentUploadProgress,
   targetPickerPlaceholder,
 } from './ComposerPartsHelpers';
@@ -71,7 +73,7 @@ describe('ComposerPartsHelpers', () => {
     expect(uploading.isImage).toBe(true);
     expect(uploading.isUploading).toBe(true);
     expect(uploading.uploadPercent).toBe(42);
-    expect(uploading.thumbPreview).toBe('AB');
+    expect(uploading.previewKind).toBe('image');
     expect(uploading.sizeLabel).toBeTruthy();
 
     const idle = buildAttachmentChipViewModel({
@@ -79,9 +81,10 @@ describe('ComposerPartsHelpers', () => {
       uploadProgress: undefined,
     });
     expect(idle.isImage).toBe(false);
+    expect(idle.isMedia).toBe(false);
     expect(idle.isUploading).toBe(false);
     expect(idle.uploadPercent).toBe(0);
-    expect(idle.thumbPreview).toBeUndefined();
+    expect(idle.previewKind).toBeUndefined();
 
     const map = {
       'att-1': { percent: 10, phase: 'hashing' as const },
@@ -92,5 +95,45 @@ describe('ComposerPartsHelpers', () => {
     });
     expect(resolveAttachmentUploadProgress(map, 'missing')).toBeUndefined();
     expect(resolveAttachmentUploadProgress(undefined, 'att-1')).toBeUndefined();
+  });
+
+  it('resolves image / media / code preview kinds', () => {
+    expect(resolveAttachmentPreviewKind(imageAttachment)).toBe('image');
+    expect(resolveAttachmentPreviewKind(textAttachment)).toBeUndefined();
+    expect(resolveAttachmentPreviewKind({
+      id: 'a1',
+      name: 'notes.txt',
+      mime: 'text/plain',
+      size: 12,
+      contentPreview: 'hello\nworld',
+    })).toBe('code');
+    expect(isMediaAttachment({
+      id: 'a1',
+      name: 'clip.mp4',
+      mime: 'video/mp4',
+      size: 99,
+    })).toBe(true);
+    expect(isMediaAttachment({
+      id: 'a1',
+      name: 'voice.mp3',
+      size: 99,
+    })).toBe(true);
+    expect(isMediaAttachment({
+      id: 'a1',
+      name: 'notes.txt',
+      mime: 'text/plain',
+      size: 99,
+    })).toBe(false);
+    expect(resolveAttachmentPreviewKind({
+      id: 'a1',
+      name: 'clip.mp4',
+      mime: 'video/mp4',
+      size: 99,
+    })).toBe('media');
+    expect(resolveAttachmentPreviewKind({
+      id: 'a1',
+      name: 'archive.zip',
+      size: 99,
+    })).toBeUndefined();
   });
 });

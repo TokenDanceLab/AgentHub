@@ -67,10 +67,32 @@ export function targetPickerPlaceholder(
 
 export interface ComposerAttachmentChipViewModel {
   isImage: boolean;
+  isMedia: boolean;
+  previewKind: ComposerAttachmentPreviewKind | undefined;
   sizeLabel: string | undefined;
   isUploading: boolean;
   uploadPercent: number;
-  thumbPreview: string | undefined;
+}
+
+const MEDIA_FILE_NAME_PATTERN = /\.(mp4|mov|webm|mkv|avi|mp3|wav|flac|m4a|ogg|aac|oga|opus)$/i;
+
+/** video/audio attachment — MIME prefix or media extension. */
+export function isMediaAttachment(attachment: ComposerAttachment): boolean {
+  const mime = attachment.mime ?? '';
+  if (mime.startsWith('video/') || mime.startsWith('audio/')) return true;
+  return MEDIA_FILE_NAME_PATTERN.test(attachment.name);
+}
+
+export type ComposerAttachmentPreviewKind = 'image' | 'media' | 'code';
+
+/** Which in-chip preview applies to this attachment, if any. */
+export function resolveAttachmentPreviewKind(
+  attachment: ComposerAttachment,
+): ComposerAttachmentPreviewKind | undefined {
+  if (isImageAttachment(attachment)) return 'image';
+  if (isMediaAttachment(attachment)) return 'media';
+  if (attachment.contentPreview) return 'code';
+  return undefined;
 }
 
 export function buildAttachmentChipViewModel(params: {
@@ -78,23 +100,20 @@ export function buildAttachmentChipViewModel(params: {
   uploadProgress: AttachmentUploadState | undefined;
 }): ComposerAttachmentChipViewModel {
   const { attachment, uploadProgress } = params;
-  const isImage = isImageAttachment(attachment);
+  const previewKind = resolveAttachmentPreviewKind(attachment);
   const sizeLabel = attachment.size
     ? formatComposerAttachmentSize(attachment.size)
     : undefined;
   const isUploading = isAttachmentUploading(uploadProgress, attachment);
   const uploadPercent = uploadProgress?.percent ?? 0;
-  const thumbPreview =
-    isImage && attachment.contentPreview
-      ? attachment.contentPreview.slice(0, 2)
-      : undefined;
 
   return {
-    isImage,
+    isImage: previewKind === 'image',
+    isMedia: previewKind === 'media',
+    previewKind,
     sizeLabel,
     isUploading,
     uploadPercent,
-    thumbPreview,
   };
 }
 

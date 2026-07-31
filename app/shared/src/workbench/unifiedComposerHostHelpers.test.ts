@@ -36,6 +36,7 @@ const baseComposer: ComposerState = {
   approvalMode: 'suggest',
   workDir: '',
   submitState: 'idle',
+  editingMessageId: null,
   replyTo: null,
   quote: null,
 };
