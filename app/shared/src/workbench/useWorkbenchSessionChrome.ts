@@ -8,6 +8,7 @@ import {
 import {
   composerReducer,
   createInitialComposerState,
+  saveDraft,
 } from '../composer';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
@@ -131,6 +132,11 @@ export function useWorkbenchSessionChrome({
   const mentionableAgents = mapAgentsToComposerMentions(agents);
 
   useEffect(() => {
+    // Flush current composer state as a draft for the outgoing session
+    // before resetting so the draft is available on switch-back (CF20).
+    if (composer.text || composer.mentions.length > 0 || composer.attachments.length > 0) {
+      saveDraft(composer.conversationId, { text: composer.text, mentions: composer.mentions });
+    }
     dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
   }, [currentConversationId]);
 

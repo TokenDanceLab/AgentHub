@@ -81,6 +81,7 @@ export function planComposerHostKeyDownEffect(params: {
   isSubmitting: boolean;
   targetSelectionRequired: boolean;
   executionTargetId: string;
+  isRunning: boolean;
 }): ComposerHostKeyDownEffect {
   return composerHostKeyDownEffect(planComposerHostKeyDownFromEvent(params));
 }
@@ -134,6 +135,7 @@ export function planComposerHostKeyDown(params: {
   isSubmitting: boolean;
   targetSelectionRequired: boolean;
   executionTargetId: string;
+  isRunning: boolean;
 }): ComposerHostKeyDownPlan {
   const keyPlan = shouldSubmitComposerKey({
     key: params.key,
@@ -162,6 +164,7 @@ export function planComposerHostKeyDown(params: {
     isSubmitting: params.isSubmitting,
     targetSelectionRequired: params.targetSelectionRequired,
     executionTargetId: params.executionTargetId,
+    isRunning: params.isRunning,
   })) {
     return { kind: 'submit' };
   }
@@ -190,6 +193,7 @@ export function planComposerHostKeyDownFromEvent(params: {
   isSubmitting: boolean;
   targetSelectionRequired: boolean;
   executionTargetId: string;
+  isRunning: boolean;
 }): ComposerHostKeyDownPlan {
   const fields = readComposerKeyDownEventFields(params.event);
   return planComposerHostKeyDown({
@@ -200,6 +204,7 @@ export function planComposerHostKeyDownFromEvent(params: {
     isSubmitting: params.isSubmitting,
     targetSelectionRequired: params.targetSelectionRequired,
     executionTargetId: params.executionTargetId,
+    isRunning: params.isRunning,
   });
 }
 
