@@ -2,6 +2,8 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
+  useId,
   memo,
   useRef,
   type MouseEvent as ReactMouseEvent,
@@ -30,6 +32,11 @@ import {
   Loader2,
 } from 'lucide-react';
 import { gitStatusChar, type GitStatus } from '@/hooks/useGitStatus';
+import {
+  buildVisibleRows,
+  fileExplorerRowElementId,
+  resolveTreeKeyboardAction,
+} from './fileTreeKeyboard';
 import styles from './FileExplorer.module.css';
 
 // ── Types ──
@@ -152,7 +159,31 @@ export default memo(function FileExplorer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const treeRef = useRef<HTMLDivElement>(null);
+  const treeWrapperRef = useRef<HTMLDivElement>(null);
+  const treeId = useId();
+
+  // ── Roving-tabindex keyboard navigation ──────────────────────────────
+  // The tree wrapper is the single tab stop; aria-activedescendant points at
+  // the active row. All rows stay out of the tab order (tabIndex={-1}).
+  const visibleRows = useMemo(
+    () => buildVisibleRows(tree, expanded),
+    [tree, expanded],
+  );
+
+  const activeRowId =
+    selectedPath != null && visibleRows.some((row) => row.path === selectedPath)
+      ? fileExplorerRowElementId(treeId, selectedPath)
+      : undefined;
+
+  // Move the roving focus cursor to a visible row and bring it on screen.
+  const focusRow = useCallback(
+    (path: string) => {
+      setSelectedPath(path);
+      const row = document.getElementById(fileExplorerRowElementId(treeId, path));
+      row?.scrollIntoView({ block: 'nearest' });
+    },
+    [treeId],
+  );
 
   // Drag-and-drop state
   const [dragSourcePath, setDragSourcePath] = useState<string | null>(null);
@@ -373,7 +404,7 @@ export default memo(function FileExplorer({
   // Clear drag state when leaving the tree entirely
   const handleTreeDragLeave = useCallback((e: DragEvent) => {
     // Only clear if we're leaving the tree container, not entering a child
-    if (treeRef.current && !treeRef.current.contains(e.relatedTarget as Node)) {
+    if (treeWrapperRef.current && !treeWrapperRef.current.contains(e.relatedTarget as Node)) {
       setDragOverPath(null);
       setDragIsCopy(false);
     }
@@ -385,8 +416,49 @@ export default memo(function FileExplorer({
     setDragIsCopy(false);
   }, []);
 
-  // Keyboard navigation
-  const handleKeyDown = useCallback(
+  // Keyboard navigation — the tree wrapper owns focus (single tab stop).
+  const handleTreeKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const action = resolveTreeKeyboardAction(e.key, visibleRows, selectedPath);
+      if (!action) return;
+      // We own this key — keep the scroll container from also scrolling on it.
+      e.preventDefault();
+      switch (action.kind) {
+        case 'focus':
+          focusRow(action.path);
+          break;
+        case 'expand':
+          setExpanded((prev) => {
+            if (prev.has(action.path)) return prev;
+            const next = new Set(prev);
+            next.add(action.path);
+            return next;
+          });
+          break;
+        case 'collapse':
+          setExpanded((prev) => {
+            if (!prev.has(action.path)) return prev;
+            const next = new Set(prev);
+            next.delete(action.path);
+            return next;
+          });
+          break;
+        case 'toggle':
+          toggleExpand(action.path);
+          break;
+        case 'open':
+          selectFile(action.path, false);
+          break;
+        case 'noop':
+          break;
+      }
+    },
+    [visibleRows, selectedPath, focusRow, toggleExpand, selectFile],
+  );
+
+  // Root-level handler: Escape closes the context menu regardless of which
+  // child (header buttons, tree, menu) currently has focus.
+  const handleRootKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         closeContextMenu();
@@ -450,9 +522,15 @@ export default memo(function FileExplorer({
       return (
         <div key={entry.path}>
           <div
+            id={fileExplorerRowElementId(treeId, entry.path)}
             className={`${styles.node} ${isSelected ? styles.nodeSelected : ''} ${isDragSource ? styles.nodeDragSource : ''} ${dragOverClass}`}
             style={{ '--indent': `${indent}px` } as React.CSSProperties}
-            onClick={() => selectFile(entry.path, isDir)}
+            onClick={() => {
+              selectFile(entry.path, isDir);
+              // Home keyboard focus to the stable container so aria-activedescendant
+              // stays meaningful and arrow keys work right after a click.
+              treeWrapperRef.current?.focus({ preventScroll: true });
+            }}
             onContextMenu={(e) => handleContextMenu(e, entry.path, isDir)}
             draggable
             onDragStart={(e) => handleDragStart(e, entry.path, isDir)}
@@ -463,13 +541,10 @@ export default memo(function FileExplorer({
             role="treeitem"
             aria-expanded={isDir ? isExpanded : undefined}
             aria-selected={isSelected}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                selectFile(entry.path, isDir);
-              }
-            }}
+            data-tree-row-path={entry.path}
+            // Roving tabindex: rows stay out of the tab order; the tree
+            // wrapper is the single tab stop.
+            tabIndex={-1}
           >
             {isDir ? (
               <span
@@ -504,7 +579,7 @@ export default memo(function FileExplorer({
         </div>
       );
     },
-    [expanded, selectedPath, selectFile, handleContextMenu, toggleExpand, gitStatus, rootDir, t,
+    [expanded, selectedPath, selectFile, handleContextMenu, toggleExpand, gitStatus, rootDir, t, treeId,
      dragSourcePath, dragOverPath, dragIsCopy, handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd],
   );
 
@@ -517,7 +592,7 @@ export default memo(function FileExplorer({
     : '';
 
   return (
-    <div className={`${styles.root} ${className ?? ''}`} onKeyDown={handleKeyDown}>
+    <div className={`${styles.root} ${className ?? ''}`} onKeyDown={handleRootKeyDown}>
       {/* Header */}
       <div className={styles.header}>
         <span className={styles.headerTitle} title={rootDir}>
@@ -543,8 +618,16 @@ export default memo(function FileExplorer({
         </div>
       </div>
 
-      {/* Tree area */}
-      <div className={styles.treeWrapper} ref={treeRef} role="tree" onDragLeave={handleTreeDragLeave}>
+      {/* Tree area — single tab stop; active row tracked via aria-activedescendant */}
+      <div
+        className={styles.treeWrapper}
+        ref={treeWrapperRef}
+        role="tree"
+        tabIndex={0}
+        aria-activedescendant={activeRowId}
+        onKeyDown={handleTreeKeyDown}
+        onDragLeave={handleTreeDragLeave}
+      >
         {loading && (
           <div className={styles.loading}>
             <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
