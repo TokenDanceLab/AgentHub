@@ -128,6 +128,8 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
             isChatPage,
             transcriptChrome,
             transcriptLength: transcript.length,
+            // #1385: conversation list powers the forward picker submenu.
+            conversations: props.conversations,
           })}
         />
         <WorkbenchProfileOverlays
