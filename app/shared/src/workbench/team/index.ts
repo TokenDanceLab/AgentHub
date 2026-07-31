@@ -18,6 +18,11 @@ export {
 } from './SubagentTranscript';
 
 export {
+  SubagentSessionDialog,
+  type SubagentSessionDialogProps,
+} from './SubagentSessionDialog';
+
+export {
   InlineDelegationCard,
   type InlineDelegationCardProps,
 } from './InlineDelegationCard';
