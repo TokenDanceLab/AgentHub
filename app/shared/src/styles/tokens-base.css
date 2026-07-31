@@ -166,6 +166,14 @@
   --ease-standard:   var(--ease);
   --ease-emphasized: var(--ease-spring);
 
+  /* ── Spinner ────────────────────────────────────────────────── */
+  --spinner-speed: 0.8s;
+  --spinner-easing: linear;
+  --spinner-sm: 12px;
+  --spinner-sm-border: 2px;
+  --spinner-lg: 32px;
+  --spinner-lg-border: 3px;
+
   /* Workbench density map (#1198): 4 / 8 / 12 / 16 */
   --wb-gap-2xs: var(--sp-xs);     /* 4px  — hairline gaps / tab strip */
   --wb-gap-xs:  var(--sp-sm);     /* 8px  — chrome padding */
