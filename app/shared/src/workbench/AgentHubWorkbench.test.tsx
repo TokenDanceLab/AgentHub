@@ -154,6 +154,7 @@ const { workbenchZhMap, chatviewZhMap } = vi.hoisted(() => {
       'aria.selectedAgents': 'Selected agents',
       'aria.sessionSettings': '会话设置',
       'aria.settings': '设置',
+      'aria.sortConversations': '排序方式',
       'aria.settingsMore': '设置更多',
       'aria.switchView': '切换视图',
       'aria.target': 'Desktop/Edge target',
@@ -3001,5 +3002,165 @@ describe('AgentHubWorkbench', () => {
     );
 
     expect(screen.getAllByText('继续修复聊天流')).toHaveLength(2);
+  });
+
+  describe('conversation sort', () => {
+    afterEach(() => {
+      window.localStorage.removeItem('agenthub.conversationSort');
+    });
+
+    it('renders sort dropdown with 3 options, default recent', () => {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'a', title: 'Alpha', kind: 'direct' },
+          { id: 'b', title: 'Beta', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const select = screen.getByRole('combobox', { name: '排序方式' });
+      expect(select).toBeInTheDocument();
+      expect(select).toHaveValue('recent');
+      const options = within(select).getAllByRole('option');
+      expect(options).toHaveLength(3);
+      expect(options[0]).toHaveValue('recent');
+      expect(options[1]).toHaveValue('name');
+      expect(options[2]).toHaveValue('active');
+    });
+
+    it('sorts by name alphabetically', () => {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'c', title: 'Charlie', kind: 'direct' },
+          { id: 'a', title: 'Alpha', kind: 'direct' },
+          { id: 'b', title: 'Beta', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const select = within(sidebar).getByRole('combobox');
+      fireEvent.change(select, { target: { value: 'name' } });
+      expect(select).toHaveValue('name');
+
+      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
+      expect(titles).toHaveLength(3);
+      expect(titles[0]).toHaveTextContent('Alpha');
+      expect(titles[1]).toHaveTextContent('Beta');
+      expect(titles[2]).toHaveTextContent('Charlie');
+    });
+
+    it('keeps pinned conversations on top regardless of sort mode', () => {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'b', title: 'Beta', kind: 'direct', pinned: true },
+          { id: 'a', title: 'Alpha', kind: 'direct' },
+          { id: 'c', title: 'Charlie', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const select = within(sidebar).getByRole('combobox');
+      fireEvent.change(select, { target: { value: 'name' } });
+      expect(select).toHaveValue('name');
+
+      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
+      // Beta is pinned, so it should be first
+      expect(titles[0]).toHaveTextContent('Beta');
+      expect(titles[1]).toHaveTextContent('Alpha');
+      expect(titles[2]).toHaveTextContent('Charlie');
+    });
+
+    it('persists sort preference to localStorage', () => {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'a', title: 'Alpha', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const select = screen.getByRole('combobox', { name: '排序方式' });
+      fireEvent.change(select, { target: { value: 'name' } });
+      expect(window.localStorage.getItem('agenthub.conversationSort')).toBe('name');
+    });
+
+    it('loads sort preference from localStorage on mount', () => {
+      window.localStorage.setItem('agenthub.conversationSort', 'name');
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'a', title: 'Alpha', kind: 'direct' },
+          { id: 'b', title: 'Beta', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const select = screen.getByRole('combobox', { name: '排序方式' });
+      expect(select).toHaveValue('name');
+    });
+
+    it('sorts by active (unread count descending)', () => {
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        conversations: [
+          { id: 'a', title: 'Alpha', kind: 'direct', unreadCount: 1 },
+          { id: 'b', title: 'Beta', kind: 'direct', unreadCount: 5 },
+          { id: 'c', title: 'Charlie', kind: 'direct' },
+        ],
+      });
+      render(
+        <AgentHubWorkbench
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+        />,
+      );
+      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const select = within(sidebar).getByRole('combobox');
+      fireEvent.change(select, { target: { value: 'active' } });
+      expect(select).toHaveValue('active');
+
+      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
+      // Beta has 5 unread, Alpha has 1, Charlie has 0
+      expect(titles[0]).toHaveTextContent('Beta');
+      expect(titles[1]).toHaveTextContent('Alpha');
+      expect(titles[2]).toHaveTextContent('Charlie');
+    });
   });
 });
