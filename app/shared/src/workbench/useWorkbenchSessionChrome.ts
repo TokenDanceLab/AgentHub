@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useReducer,
@@ -150,7 +151,10 @@ export function useWorkbenchSessionChrome({
 
   const inspectorViews = useMemo(() => buildInspectorTranscriptViews(transcript), [transcript]);
   const activeConversation = findConversationById(conversations, currentConversationId);
-  const mentionableAgents = mapAgentsToComposerMentions(agents);
+  // Stable across shell re-renders so the UnifiedComposer memo gate holds;
+  // `agents` is app-shell state derived via useMemo — identity changes only
+  // when the agent data actually changes.
+  const mentionableAgents = useMemo(() => mapAgentsToComposerMentions(agents), [agents]);
 
   useEffect(() => {
     // Flush current composer state as a draft for the outgoing session
@@ -254,15 +258,19 @@ export function useWorkbenchSessionChrome({
     toggleAppliedAgentHubTheme();
   }
 
-  function openReviewFile(file: FileItem): void {
+  // Stable callbacks — both feed ChatViewBridge (onReviewFile/onDeploySubmit),
+  // so identity must survive shell re-renders for its memo gate. Deps are the
+  // only values they capture: openInspector (layout useCallback, stable) and
+  // state setters / refs / t (stable).
+  const openReviewFile = useCallback((file: FileItem): void => {
     openInspector();
     setReviewFileRequest({ ...file });
-  }
+  }, [openInspector, setReviewFileRequest]);
 
-  function handleDeploySubmit(_id: string): void {
+  const handleDeploySubmit = useCallback((_id: string): void => {
     openInspector();
     showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
-  }
+  }, [openInspector, t]);
 
   function exportMainchainEvidence(): void {
     if (!mainchainSummary.exportEnabled) {

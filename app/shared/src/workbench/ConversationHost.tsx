@@ -82,6 +82,10 @@ type PendingUserBlock = TextTranscriptBlock & {
   ackOrdinal: number;
 };
 
+/** Stable empty mention list — avoids busting the memoized UnifiedComposer
+ *  with a fresh `[]` on every render when the agent picker is hidden. */
+const EMPTY_MENTIONS: ComposerMention[] = [];
+
 /**
  * Pending dispatch entry stored in the client queue (CF22). The Hub message
  * is already sent & confirmed — only task dispatch (triggerAgentTask) is
@@ -338,7 +342,7 @@ export const ConversationHost = React.memo(function ConversationHost({
           )}
           <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
             executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
-            inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
+            inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : EMPTY_MENTIONS}
             onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
             onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
             submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
