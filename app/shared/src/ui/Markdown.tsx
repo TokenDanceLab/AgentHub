@@ -93,8 +93,20 @@ function CodeBlock({
 }
 
 // ── Custom component map ──────────────────────────
+/* TODO(codeg parity #8): heading anchor links (rehype-slug +
+   rehype-autolink-headings) need new dependencies — skipped deliberately. */
 const components: Components = {
   code: CodeBlock,
+  // Lazy-load markdown images; they are often large and below the fold.
+  img: ({ node: _node, ...props }) => <img {...props} loading="lazy" />,
+  // Open external links in a new tab with noopener; in-page anchors (#…)
+  // keep navigating within the same window (e.g. GFM footnote backrefs).
+  a: ({ node: _node, ...props }) =>
+    typeof props.href === 'string' && props.href.startsWith('#') ? (
+      <a {...props} />
+    ) : (
+      <a {...props} target="_blank" rel="noopener noreferrer" />
+    ),
 };
 
 /* ── Exported component ───────────────────────────── */
