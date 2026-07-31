@@ -8,9 +8,54 @@ import './Transcript.css'
 
 const AUTO_FOLLOW_THRESHOLD_PX = 96
 
+/** Session key used when no sessionId prop is provided (single-session usage). */
+const DEFAULT_SESSION_KEY = '__default__'
+
+/**
+ * Scroll memory for one session. The Transcript survives session switches
+ * (the consumer swaps `items` instead of unmounting), so all auto-follow
+ * state must be isolated per session — otherwise session A's "scrolled up"
+ * state force-follows in session B, and B inherits A's physical scrollTop.
+ */
+interface SessionScrollState {
+  /** Last scrollTop observed for this session (tracked on scroll events). */
+  scrollTop: number
+  /** Whether the user was near the bottom when this session was last shown. */
+  shouldAutoFollow: boolean
+  /** True right after the user submits a message — forces follow even from older content. */
+  followAfterUserSubmit: boolean
+  /** items.length of the last applied render — 0 marks a never-rendered session. */
+  previousCount: number
+  /** itemIdentity baselines of the last applied render (same-session append detection). */
+  previousIdentities: string[]
+  /** Whether the scroll-to-bottom button should be visible. */
+  nearBottom: boolean
+}
+
+function createSessionScrollState(): SessionScrollState {
+  return {
+    scrollTop: 0,
+    shouldAutoFollow: true,
+    followAfterUserSubmit: false,
+    previousCount: 0,
+    previousIdentities: [],
+    nearBottom: true,
+  }
+}
+
 interface Props {
   items: TranscriptItem[]
   chatMode: 'dm' | 'group'
+  /**
+   * Identity of the conversation/session this transcript belongs to.
+   * The Transcript is NOT unmounted when the active session changes (the
+   * consumer swaps the items prop instead), so scroll memory — auto-follow
+   * state, scroll position, the "new user message" baseline — is isolated
+   * per sessionId: switching sessions neither force-scrolls to the bottom
+   * nor leaks one session's scroll position into another. Omit when the
+   * transcript always belongs to a single session.
+   */
+  sessionId?: string
   onAgentClick?: (agentName: string, anchor: HTMLElement) => void
   onBlockContextMenu?: (blockId: string, event: React.MouseEvent) => void
   onBlockSelect?: (blockId: string, shiftKey: boolean) => void
@@ -135,13 +180,15 @@ function partitionWithDates(items: TranscriptItem[]): TranscriptSegment[] {
   return segments
 }
 
-export const Transcript = memo(function Transcript({ items, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter }: Props) {
+export const Transcript = memo(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter }: Props) {
   const segments = useMemo(() => partitionWithDates(items), [items])
   const transcriptRef = useRef<HTMLDivElement>(null)
-  const shouldAutoFollowRef = useRef(true)
-  const previousCountRef = useRef(0)
-  const previousIdentitiesRef = useRef<string[]>([])
-  const followAfterUserSubmitRef = useRef(false)
+  /** Scroll state per session — see SessionScrollState. */
+  const sessionStatesRef = useRef(new Map<string, SessionScrollState>())
+  /** Session key currently rendered; updated in the layout effect. */
+  const currentSessionRef = useRef<string | null>(null)
+  /** Pointer to the active session's state (read by handleScroll). */
+  const currentStateRef = useRef<SessionScrollState | null>(null)
   const itemsIdentity = useMemo(() => items.map(itemIdentity).join('\n'), [items])
   const [nearBottom, setNearBottom] = useState(true)
 
@@ -150,21 +197,59 @@ export const Transcript = memo(function Transcript({ items, chatMode, onAgentCli
     if (!element) return
     const nb = isNearBottom(element)
     setNearBottom(nb)
-    shouldAutoFollowRef.current = nb
-    if (!nb) followAfterUserSubmitRef.current = false
+    const state = currentStateRef.current
+    if (state) {
+      state.nearBottom = nb
+      state.scrollTop = element.scrollTop
+      state.shouldAutoFollow = nb
+      if (!nb) state.followAfterUserSubmit = false
+    }
   }, [])
 
   useLayoutEffect(() => {
     const element = transcriptRef.current
     if (!element) return undefined
-    const currentIdentities = items.map(itemIdentity)
-    const appendedUserMessage = containsNewUserMessage(items, currentIdentities, previousIdentitiesRef.current)
-    const initialRender = previousCountRef.current === 0
-    if (appendedUserMessage) followAfterUserSubmitRef.current = true
+    const sessionKey = sessionId ?? DEFAULT_SESSION_KEY
+    const switched = currentSessionRef.current !== sessionKey
 
-    const shouldFollow = initialRender || followAfterUserSubmitRef.current || shouldAutoFollowRef.current
-    previousCountRef.current = items.length
-    previousIdentitiesRef.current = currentIdentities
+    let state = sessionStatesRef.current.get(sessionKey)
+    if (switched) {
+      // Leaving the previous session. The DOM at this point already contains
+      // the incoming session's content, so element.scrollTop may have been
+      // clamped to the new content — prefer the position tracked by onScroll
+      // for sessions the user had scrolled away from the bottom of.
+      const prevKey = currentSessionRef.current
+      if (prevKey !== null) {
+        const prev = sessionStatesRef.current.get(prevKey)
+        if (prev && !prev.shouldAutoFollow) {
+          prev.scrollTop = Math.max(prev.scrollTop, element.scrollTop)
+        }
+      }
+      if (!state) {
+        state = createSessionScrollState()
+        sessionStatesRef.current.set(sessionKey, state)
+      }
+      currentSessionRef.current = sessionKey
+      currentStateRef.current = state
+      // Restore this session's own scroll position (clamped to what the
+      // incoming content allows) instead of the outgoing session's.
+      element.scrollTop = Math.min(state.scrollTop, Math.max(0, element.scrollHeight - element.clientHeight))
+      setNearBottom(state.nearBottom)
+    }
+    // State is guaranteed to exist from here on (created on the first switch).
+    if (!state) return undefined
+
+    const currentIdentities = items.map(itemIdentity)
+    // A session switch is NOT a new user message — only same-session appends
+    // (e.g. the user submitting a message) force a follow. Identity baselines
+    // are per-session, so switching never misjudges the new items.
+    const appendedUserMessage = !switched && containsNewUserMessage(items, currentIdentities, state.previousIdentities)
+    const initialRender = state.previousCount === 0
+    if (appendedUserMessage) state.followAfterUserSubmit = true
+
+    const shouldFollow = initialRender || state.followAfterUserSubmit || state.shouldAutoFollow
+    state.previousCount = items.length
+    state.previousIdentities = currentIdentities
     if (!shouldFollow) return undefined
 
     const rafs: number[] = []
@@ -173,7 +258,7 @@ export const Transcript = memo(function Transcript({ items, chatMode, onAgentCli
       rafs.push(requestAnimationFrame(() => scrollToBottom(element)))
     }))
     return () => rafs.forEach((raf) => cancelAnimationFrame(raf))
-  }, [items.length, itemsIdentity, items])
+  }, [items.length, itemsIdentity, items, sessionId])
 
   return (
     <div className="transcript" role="log" aria-live="polite" onScroll={handleScroll} ref={transcriptRef}>
