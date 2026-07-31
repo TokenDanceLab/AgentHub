@@ -154,7 +154,7 @@ func TestRunACPSession_MockAgentStreamsTypedUpdates(t *testing.T) {
 	agent := newFakeACPAgent()
 	go agent.run(t, clientToAgentR, agentToClientW, notifications)
 
-	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run)
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, nil)
 	if err != nil {
 		t.Fatalf("runACPSession: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestRunACPSession_MockAgentStreamsTypedUpdates(t *testing.T) {
 	}
 }
 
-func TestRunACPSession_RequestPermissionGetsErrorResponse(t *testing.T) {
+func TestRunACPSession_RequestPermissionAutoAllowWithoutBroker(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-2", ProjectID: "proj-acp", ThreadID: "thread-acp"}
 
@@ -216,10 +216,8 @@ func TestRunACPSession_RequestPermissionGetsErrorResponse(t *testing.T) {
 
 	// The agent asks permission mid-turn (blocking request with an id).
 	// Options must be present (RequestPermissionRequest.Validate requires it).
-	permReq := []byte(
-		`{"jsonrpc":"2.0","id":900,"method":"session/request_permission",` +
-			`"params":{"sessionId":"sess-mock-1","options":[],` +
-			`"toolCall":{"toolCallId":"tc_perm","title":"Bash"}}}`)
+	permReq := permissionRequestLine(900, "sess-mock-1", `[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
 
 	notifications := [][]byte{
 		permReq,
@@ -230,38 +228,433 @@ func TestRunACPSession_RequestPermissionGetsErrorResponse(t *testing.T) {
 	agent := newFakeACPAgent()
 	go agent.run(t, clientToAgentR, agentToClientW, notifications)
 
-	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run)
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, nil)
 	if err != nil {
 		t.Fatalf("runACPSession: %v", err)
 	}
 
-	// The spike handler answers with a JSON-RPC error (no silent hang). The
-	// error response is written by the SDK's concurrent request-handler
-	// goroutine, which may outlive the turn — wait for the agent to see it.
+	// Without a broker the handler auto-approves: the agent receives a
+	// "selected" outcome instead of a JSON-RPC error (no silent hang).
 	select {
 	case permResp := <-agent.responses:
-		if !strings.Contains(permResp, `"error"`) {
-			t.Fatalf("expected JSON-RPC error response for request_permission, got: %s", permResp)
+		if strings.Contains(permResp, `"error"`) {
+			t.Fatalf("expected selected outcome for request_permission, got JSON-RPC error: %s", permResp)
 		}
-		if !strings.Contains(permResp, "not wired") {
-			t.Errorf("error response should mention the unwired endpoint, got: %s", permResp)
+		if !strings.Contains(permResp, `"outcome":"selected"`) || !strings.Contains(permResp, "opt-allow") {
+			t.Errorf("auto-allow response should select the allow_once option, got: %s", permResp)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("fake agent never received a response for session/request_permission")
 	}
 
-	// The error response must not kill the stream: text after the permission
-	// request is still delivered, then the result event.
+	// Events: permission_requested, permission_decided (allow), text_delta,
+	// result. The permission events are emitted from the SDK's request
+	// handler goroutine and the stream events from the notification
+	// goroutine, so absolute order across the two pairs is not guaranteed —
+	// assert by type instead.
 	got := emitterAll(emitter)
-	if len(got) != 2 {
-		t.Fatalf("emitted %d events, want [text_delta, result]: %+v", len(got), got)
+	if len(got) != 4 {
+		t.Fatalf("emitted %d events, want [permission_requested, permission_decided, text_delta, result]: %+v", len(got), got)
 	}
-	if got[0].eventType != BusEventTextDelta || got[0].payload.(map[string]any)["content"] != "after permission" {
-		t.Errorf("event[0] = %+v, want text_delta 'after permission'", got[0])
+	byType := map[string]recordedEvent{}
+	for _, ev := range got {
+		byType[ev.eventType] = ev
 	}
-	if got[1].eventType != BusEventResult {
-		t.Errorf("event[1] = %+v, want result", got[1])
+	for _, typ := range []string{BusEventPermissionRequested, BusEventPermissionDecided, BusEventTextDelta, BusEventResult} {
+		if _, ok := byType[typ]; !ok {
+			t.Fatalf("missing event %q in emitted: %+v", typ, got)
+		}
 	}
+
+	permEvt := byType[BusEventPermissionRequested]
+	reqPayload := permEvt.payload.(map[string]any)
+	if reqPayload["requestId"] == "" || reqPayload["requestId"] == nil {
+		t.Errorf("permission_requested payload missing requestId: %+v", reqPayload)
+	}
+	if reqPayload["toolName"] != "Bash" || reqPayload["toolUseId"] != "tc_perm" {
+		t.Errorf("permission_requested tool fields = %q/%q, want Bash/tc_perm", reqPayload["toolName"], reqPayload["toolUseId"])
+	}
+	if reqPayload["riskLevel"] == nil || reqPayload["riskLevel"] == "" {
+		t.Errorf("permission_requested payload missing riskLevel: %+v", reqPayload)
+	}
+	for k, v := range map[string]any{"projectId": "proj-acp", "threadId": "thread-acp", "runId": "run-acp-2"} {
+		if permEvt.scope[k] != v {
+			t.Errorf("permission_requested scope[%s] = %v, want %v", k, permEvt.scope[k], v)
+		}
+	}
+	if byType[BusEventPermissionDecided].payload.(map[string]any)["decision"] != "allow" {
+		t.Errorf("permission_decided decision = %v, want allow", byType[BusEventPermissionDecided].payload.(map[string]any)["decision"])
+	}
+	if byType[BusEventTextDelta].payload.(map[string]any)["content"] != "after permission" {
+		t.Errorf("text_delta content = %v, want 'after permission'", byType[BusEventTextDelta].payload.(map[string]any)["content"])
+	}
+}
+
+// permissionRequestLine builds a wire-format session/request_permission
+// request from the agent (JSON-RPC request with an id).
+func permissionRequestLine(id int, sessionID, optionsJSON, toolCallJSON string) []byte {
+	return []byte(fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":%d,"method":"session/request_permission",`+
+			`"params":{"sessionId":%q,"options":%s,"toolCall":%s}}`,
+		id, sessionID, optionsJSON, toolCallJSON))
+}
+
+// TestRunACPSession_PermissionBrokerBlocksThenAllows drives the full chain:
+// request_permission → broker.Begin parks the request → permission_requested
+// event upstream → POST /v1/permissions/decide (broker.Decide) resolves it →
+// the agent receives a "selected" outcome with the allow option id.
+func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-allow", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"},{"kind":"reject_once","name":"Deny","optionId":"opt-deny"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq})
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	// The request must be parked: permission_requested emitted with the
+	// broker request id, and the agent must NOT have received a response yet.
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+	waitForBrokerPending(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+	select {
+	case resp := <-agent.responses:
+		t.Fatalf("agent got a response while the permission was still pending: %s", resp)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	// Desktop decides allow → broker resolves the parked request.
+	pending, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"})
+	if !ok {
+		t.Fatal("broker did not find the pending ACP permission request")
+	}
+	if pending.ProjectID != "proj-acp" || pending.ThreadID != "thread-acp" || pending.RunID != run.ID {
+		t.Fatalf("pending scope = %+v, want proj-acp/thread-acp/%s", pending, run.ID)
+	}
+	if pending.ToolName != "Bash" || pending.ToolUseID != "tc_perm" {
+		t.Fatalf("pending tool = %q/%q, want Bash/tc_perm", pending.ToolName, pending.ToolUseID)
+	}
+
+	// The handler responds with the allow_once option selected.
+	select {
+	case resp := <-agent.responses:
+		if strings.Contains(resp, `"error"`) {
+			t.Fatalf("expected selected outcome, got JSON-RPC error: %s", resp)
+		}
+		if !strings.Contains(resp, `"outcome":"selected"`) || !strings.Contains(resp, "opt-allow") {
+			t.Errorf("allow decision should select opt-allow, got: %s", resp)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fake agent never received a response after broker.Decide")
+	}
+
+	// A second Decide must miss (entry consumed).
+	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "allow"}); ok {
+		t.Error("broker still holds the resolved permission request")
+	}
+
+	// permission_decided emitted with the allow decision.
+	decidedEvt := waitForEvent(t, emitter, BusEventPermissionDecided, 5*time.Second)
+	if decidedEvt.payload.(map[string]any)["decision"] != "allow" {
+		t.Errorf("permission_decided decision = %v, want allow", decidedEvt.payload.(map[string]any)["decision"])
+	}
+}
+
+// TestRunACPSession_PermissionBrokerDenyMapsToRejectOption: a deny decision
+// selects the agent's reject option when one exists.
+func TestRunACPSession_PermissionBrokerDenyMapsToRejectOption(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-deny", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_always","name":"Allow","optionId":"opt-allow"},{"kind":"reject_always","name":"Deny","optionId":"opt-deny"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq})
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+
+	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
+		t.Fatal("broker did not find the pending ACP permission request")
+	}
+
+	select {
+	case resp := <-agent.responses:
+		if strings.Contains(resp, `"error"`) {
+			t.Fatalf("expected selected outcome, got JSON-RPC error: %s", resp)
+		}
+		if !strings.Contains(resp, `"outcome":"selected"`) || !strings.Contains(resp, "opt-deny") {
+			t.Errorf("deny decision should select opt-deny, got: %s", resp)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fake agent never received a response after broker.Decide")
+	}
+
+	decidedEvt := waitForEvent(t, emitter, BusEventPermissionDecided, 5*time.Second)
+	if decidedEvt.payload.(map[string]any)["decision"] != "deny" {
+		t.Errorf("permission_decided decision = %v, want deny", decidedEvt.payload.(map[string]any)["decision"])
+	}
+}
+
+// TestRunACPSession_PermissionBrokerDenyWithoutRejectOption: when the agent
+// offers no reject option, a deny decision answers 'cancelled' — the closest
+// ACP denial signal.
+func TestRunACPSession_PermissionBrokerDenyWithoutRejectOption(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-deny-norej", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq})
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+
+	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
+		t.Fatal("broker did not find the pending ACP permission request")
+	}
+
+	select {
+	case resp := <-agent.responses:
+		if strings.Contains(resp, `"error"`) {
+			t.Fatalf("expected cancelled outcome, got JSON-RPC error: %s", resp)
+		}
+		if !strings.Contains(resp, `"outcome":"cancelled"`) {
+			t.Errorf("deny without reject option should answer cancelled, got: %s", resp)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fake agent never received a response after broker.Decide")
+	}
+}
+
+// TestRunACPSession_PermissionBrokerDisconnectRecyclesParked: when the agent
+// process exits (stdout EOF), the SDK cancels the dispatch ctx and the parked
+// broker entry must be recycled.
+func TestRunACPSession_PermissionBrokerDisconnectRecyclesParked(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-disconnect", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq})
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+	key := permissionDecisionKey{runID: run.ID, requestID: requestID}
+	waitForBrokerPending(t, broker, key, 5*time.Second)
+
+	// Agent process exit: close its stdout side → SDK receive loop EOF →
+	// connection ctx cancelled → waiter recycles the parked entry.
+	agentToClientW.Close()
+
+	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+}
+
+// TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked: a
+// $/cancel_request from the agent (ACP prompt-turn cancellation) cancels the
+// in-flight request; the parked entry is recycled and the agent receives the
+// 'cancelled' outcome.
+func TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-cancel", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+	// ACP prompt-turn cancellation: the agent cancels its own permission
+	// request (id 900) after asking.
+	cancelReq := []byte(`{"jsonrpc":"2.0","method":"$/cancel_request","params":{"requestId":900}}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq, cancelReq})
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+	// Note: no waitForBrokerPending here — $/cancel_request may be processed
+	// before the handler goroutine parks; either ordering ends with the same
+	// observable result (cancelled outcome + no parked entry).
+
+	// The agent receives the 'cancelled' outcome for its own request.
+	select {
+	case resp := <-agent.responses:
+		if strings.Contains(resp, `"error"`) {
+			t.Fatalf("expected cancelled outcome, got JSON-RPC error: %s", resp)
+		}
+		if !strings.Contains(resp, `"outcome":"cancelled"`) {
+			t.Errorf("cancelled request should answer cancelled, got: %s", resp)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fake agent never received a response after $/cancel_request")
+	}
+
+	// And the parked entry is recycled.
+	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+}
+
+// TestRunACPSession_PermissionBrokerRunCancelRecyclesParked: run teardown
+// (ParseStream ctx cancelled before the agent process exits) recycles the
+// parked entry via the run ctx wired into the wait.
+func TestRunACPSession_PermissionBrokerRunCancelRecyclesParked(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-broker-runcancel", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+	broker := NewPermissionDecisionBroker()
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	permReq := permissionRequestLine(900, "sess-mock-1",
+		`[{"kind":"allow_once","name":"Allow","optionId":"opt-allow"}]`,
+		`{"toolCallId":"tc_perm","title":"Bash"}`)
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, [][]byte{permReq})
+
+	runCtx, cancelRun := context.WithCancel(testACPContext("hello agent", `C:\work`))
+	defer cancelRun()
+
+	err := runACPSession(runCtx, agentToClientR, clientToAgentW, emitter, run, broker)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
+	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
+	key := permissionDecisionKey{runID: run.ID, requestID: requestID}
+	waitForBrokerPending(t, broker, key, 5*time.Second)
+
+	cancelRun()
+
+	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+}
+
+// waitForEvent polls the recording emitter until an event of the given type
+// appears, then returns it.
+func waitForEvent(t *testing.T, r *recordingEmitter, eventType string, timeout time.Duration) recordedEvent {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if evs := r.eventsByType(eventType); len(evs) > 0 {
+			return evs[0]
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for event %q (emitted: %+v)", eventType, emitterAll(r))
+	return recordedEvent{}
+}
+
+// waitForBrokerPending polls until the broker holds the given key (the
+// handler registers the request before emitting permission_requested, so the
+// requestId from the event is authoritative).
+func waitForBrokerPending(t *testing.T, b *PermissionDecisionBroker, key permissionDecisionKey, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		b.mu.Lock()
+		_, ok := b.pending[key]
+		b.mu.Unlock()
+		if ok {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("broker never registered pending key %+v", key)
+}
+
+// waitForBrokerMiss polls until the broker no longer holds the key, i.e. the
+// parked entry was recycled. Read-only: it never consumes the entry (a
+// Decide probe would resolve the parked request and poison the test).
+func waitForBrokerMiss(t *testing.T, b *PermissionDecisionBroker, key permissionDecisionKey, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		b.mu.Lock()
+		_, ok := b.pending[key]
+		b.mu.Unlock()
+		if !ok {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("broker entry %+v was never recycled", key)
 }
 
 func TestRunACPSession_RequiresPromptAndWorkDir(t *testing.T) {
@@ -269,13 +662,13 @@ func TestRunACPSession_RequiresPromptAndWorkDir(t *testing.T) {
 	run := store.Run{ID: "run-acp-3"}
 
 	// No RunProcessContext attached → non-recoverable error.
-	err := runACPSession(context.Background(), strings.NewReader(""), io.Discard, emitter, run)
+	err := runACPSession(context.Background(), strings.NewReader(""), io.Discard, emitter, run, nil)
 	if err == nil || !isNonRecoverable(err) {
 		t.Fatalf("missing RunProcessContext: got %v, want non-recoverable ParseStreamError", err)
 	}
 
 	// Empty workdir → non-recoverable error.
-	err = runACPSession(testACPContext("prompt", ""), strings.NewReader(""), io.Discard, emitter, run)
+	err = runACPSession(testACPContext("prompt", ""), strings.NewReader(""), io.Discard, emitter, run, nil)
 	if err == nil || !isNonRecoverable(err) {
 		t.Fatalf("empty workdir: got %v, want non-recoverable ParseStreamError", err)
 	}

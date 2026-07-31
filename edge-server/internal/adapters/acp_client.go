@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
+	"sync/atomic"
 
 	"github.com/agenthub/edge-server/internal/store"
 	"github.com/coder/acp-go-sdk"
@@ -26,10 +28,11 @@ import (
 const acpSDKVersion = "v0.13.5"
 
 // errACPEndpointNotWired is returned by client handler methods that the spike
-// deliberately leaves unwired: the agent receives a JSON-RPC error instead of
-// a silent hang. All of these are tracked TODOs (approval chain / frame
-// design), not production behavior.
-var errACPEndpointNotWired = errors.New("acp: endpoint not wired in spike (TODO)")
+// deliberately leaves unwired (fs/terminal frame design): the agent receives
+// a JSON-RPC error instead of a silent hang. session/request_permission no
+// longer goes through this sentinel — it is bridged to the Edge approval
+// chain via PermissionDecisionBroker.
+var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO: frame design)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
 // inbound JSON-RPC to the acp.Client interface methods:
@@ -48,14 +51,30 @@ type acpClientHandler struct {
 	emitter   EventEmitter
 	run       store.Run
 	sessionID acp.SessionId
+
+	// broker bridges session/request_permission to the Edge approval chain
+	// (PermissionDecisionBroker → POST /v1/permissions/decide, see
+	// control_protocol.go). nil = auto-approve fallback, mirroring
+	// DefaultPermissionHandler when no decider/broker is configured.
+	broker *PermissionDecisionBroker
+
+	// runCtx is the ParseStream context for this turn; it is cancelled when
+	// the run is torn down. Waiters select on it so parked permission
+	// requests are recycled on run cancellation even before the agent
+	// process exits (the SDK dispatch ctx only cancels on connection close
+	// or $/cancel_request).
+	runCtx context.Context
+
+	// permSeq generates unique per-run broker request ids.
+	permSeq atomic.Uint64
 }
 
 // compile-time check: the handler must satisfy the full acp.Client interface
 // (the SDK dispatch calls these methods directly).
 var _ acp.Client = (*acpClientHandler)(nil)
 
-func newACPClientHandler(emitter EventEmitter, run store.Run) *acpClientHandler {
-	return &acpClientHandler{emitter: emitter, run: run}
+func newACPClientHandler(emitter EventEmitter, run store.Run, broker *PermissionDecisionBroker, runCtx context.Context) *acpClientHandler {
+	return &acpClientHandler{emitter: emitter, run: run, broker: broker, runCtx: runCtx}
 }
 
 // SessionUpdate handles the agent's session/update notification: typed
@@ -71,17 +90,160 @@ func (h *acpClientHandler) SessionUpdate(ctx context.Context, params acp.Session
 // RequestPermission handles session/request_permission — a blocking RPC: the
 // agent pauses until the client responds.
 //
-// TODO(审批链迁移, 最大工作项): wire this to the existing
-// PermissionDecisionBroker / plan_approval chain and respond via the
-// Responder. Semantics to port: agent-side pause semantics, clean rejection
-// (cancelled outcome) on disconnect, idempotent PermissionResolved.
-// Spike leaves the interface + a JSON-RPC error response only.
+// Approval chain: the request is registered with the shared
+// PermissionDecisionBroker (keyed by runID + generated requestID), a
+// run.agent.permission_requested event is emitted upstream so Desktop can
+// render the approval UI, and the handler blocks until either
+//   - POST /v1/permissions/decide resolves the broker entry (allow/deny), or
+//   - the wait context is cancelled (agent process exit / $/cancel_request /
+//     run teardown), which recycles the parked entry and answers 'cancelled'.
+//
+// When no broker is configured the request is auto-approved (mirrors
+// DefaultPermissionHandler's no-decider fallback); the permission_requested /
+// permission_decided events are still emitted for observability.
 func (h *acpClientHandler) RequestPermission(ctx context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	slog.Warn("acp: session/request_permission received but approval chain not wired (TODO)",
-		"run_id", h.run.ID,
-		"session_id", string(params.SessionId),
-	)
-	return acp.RequestPermissionResponse{}, fmt.Errorf("acp: request_permission → PermissionDecisionBroker is TODO (%w)", errACPEndpointNotWired)
+	if params.SessionId != "" && h.sessionID != "" && params.SessionId != h.sessionID {
+		slog.Warn("acp: request_permission for unexpected session",
+			"run_id", h.run.ID, "session_id", string(params.SessionId), "expected", string(h.sessionID))
+	}
+	if len(params.Options) == 0 {
+		// Validate() only rejects a nil slice, so guard the empty case here:
+		// without options there is nothing to select — answer with an error
+		// instead of hanging the agent.
+		return acp.RequestPermissionResponse{}, fmt.Errorf("acp: request_permission without options (%w)", errACPEndpointNotWired)
+	}
+
+	requestID := fmt.Sprintf("acp-%s-%d", h.run.ID, h.permSeq.Add(1))
+	toolName := acpPermissionToolName(params)
+	toolUseID := string(params.ToolCall.ToolCallId)
+
+	// 1. Register with the broker before emitting, so /v1/permissions/decide
+	// can resolve the request as soon as Desktop sees the event.
+	var waitForBrokerDecision func(context.Context) PermissionDecision
+	registerFailed := false
+	if h.broker != nil {
+		var ok bool
+		waitForBrokerDecision, ok = h.broker.Begin(PermissionScope{
+			ProjectID: h.run.ProjectID,
+			ThreadID:  h.run.ThreadID,
+			RunID:     h.run.ID,
+		}, PermissionRequest{
+			RequestID: requestID,
+			ToolName:  toolName,
+			ToolUseID: toolUseID,
+			Input:     params.ToolCall.RawInput,
+		})
+		registerFailed = !ok
+	}
+
+	// 2. Emit permission_requested so Desktop can display the approval UI.
+	scope := acpRunScope(h.run)
+	h.emitter.Emit(BusEventPermissionRequested, scope, map[string]any{
+		"requestId": requestID,
+		"toolName":  toolName,
+		"toolUseId": toolUseID,
+		"input":     params.ToolCall.RawInput,
+		"riskLevel": string(ClassifyToolRisk(toolName)),
+	})
+
+	// 3. Wait for the decision: broker blocks until Desktop responds (the
+	// broker waiter returns a safe deny on cancellation and recycles the
+	// parked entry); without a broker, fall back to auto-approve.
+	var decision PermissionDecision
+	switch {
+	case waitForBrokerDecision != nil:
+		waitCtx, stop := h.permissionWaitCtx(ctx)
+		decision = waitForBrokerDecision(waitCtx)
+		stop() // unregister the runCtx hook once the wait completes
+	case registerFailed:
+		decision = PermissionDecision{
+			Behavior: "deny",
+			Message:  "permission request could not be registered for approval",
+		}
+	default:
+		decision = PermissionDecision{Behavior: "allow"}
+	}
+	decision = normalizePermissionDecision(decision)
+
+	// 4. Emit permission_decided for observability (mirrors
+	// DefaultPermissionHandler.handleCanUseTool).
+	h.emitter.Emit(BusEventPermissionDecided, scope, map[string]any{
+		"requestId": requestID,
+		"toolName":  toolName,
+		"toolUseId": toolUseID,
+		"decision":  decision.Behavior,
+	})
+
+	// 5. Map the broker decision to the ACP response outcome.
+	return acp.RequestPermissionResponse{Outcome: acpOutcomeForDecision(decision, params.Options)}, nil
+}
+
+// permissionWaitCtx returns a wait context that cancels when either the SDK
+// dispatch ctx (connection close, $/cancel_request) or the run ctx (run
+// teardown) is done, plus a stop func that unregisters the runCtx hook once
+// the wait completes (call it when the broker waiter returns). The broker
+// waiter selects on the context and recycles the parked permission entry on
+// cancellation.
+func (h *acpClientHandler) permissionWaitCtx(ctx context.Context) (context.Context, func()) {
+	if h.runCtx == nil {
+		return ctx, func() {}
+	}
+	waitCtx, cancel := context.WithCancelCause(ctx)
+	stop := context.AfterFunc(h.runCtx, func() { cancel(context.Cause(h.runCtx)) })
+	return waitCtx, func() { stop() }
+}
+
+// acpPermissionToolName derives a tool name for the permission event payload.
+// ACP identifies the tool call by id/kind/title; prefer the human-readable
+// title, falling back to the kind, then "unknown".
+func acpPermissionToolName(params acp.RequestPermissionRequest) string {
+	if params.ToolCall.Title != nil {
+		if t := strings.TrimSpace(*params.ToolCall.Title); t != "" {
+			return t
+		}
+	}
+	if params.ToolCall.Kind != nil {
+		return string(*params.ToolCall.Kind)
+	}
+	return "unknown"
+}
+
+// acpOutcomeForDecision maps an Edge broker decision to the ACP response
+// outcome:
+//
+//	allow → the first non-reject option the agent offered (preferring
+//	        allow_once, then allow_always, then any other non-reject option)
+//	deny  → the first reject_* option the agent offered, else 'cancelled'
+//	        (there is no bare deny outcome in ACP — without a reject option,
+//	        'cancelled' is the closest denial signal)
+func acpOutcomeForDecision(decision PermissionDecision, options []acp.PermissionOption) acp.RequestPermissionOutcome {
+	if decision.Behavior == "allow" {
+		if id, ok := firstPermissionOption(options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
+			return acp.NewRequestPermissionOutcomeSelected(id)
+		}
+		for _, opt := range options {
+			if opt.Kind != acp.PermissionOptionKindRejectOnce && opt.Kind != acp.PermissionOptionKindRejectAlways {
+				return acp.NewRequestPermissionOutcomeSelected(opt.OptionId)
+			}
+		}
+		return acp.NewRequestPermissionOutcomeCancelled()
+	}
+
+	if id, ok := firstPermissionOption(options, acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways); ok {
+		return acp.NewRequestPermissionOutcomeSelected(id)
+	}
+	return acp.NewRequestPermissionOutcomeCancelled()
+}
+
+func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOptionId, bool) {
+	for _, k := range kinds {
+		for _, opt := range options {
+			if opt.Kind == k {
+				return opt.OptionId, true
+			}
+		}
+	}
+	return "", false
 }
 
 // ReadTextFile handles fs/read_text_file.
@@ -89,7 +251,8 @@ func (h *acpClientHandler) RequestPermission(ctx context.Context, params acp.Req
 // TODO(帧设计): the Edge-side fs frame + allowlist enforcement (see
 // tool_allowlist_hook.go) is not designed for ACP yet; for the spike the
 // capability is advertised in initialize but the endpoint answers with an
-// error so the agent can surface it instead of hanging.
+// error so the agent can surface it instead of hanging. (Permission-style
+// tool gates are handled via session/request_permission, which IS wired.)
 func (h *acpClientHandler) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
 	return acp.ReadTextFileResponse{}, fsEndpointError("fs/read_text_file", params.Path)
 }
@@ -100,7 +263,7 @@ func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTe
 }
 
 func fsEndpointError(method, path string) error {
-	return fmt.Errorf("acp: %s %q not wired in spike (TODO: fs frame design + approval chain): %w",
+	return fmt.Errorf("acp: %s %q not wired (TODO: Edge fs frame design + allowlist): %w",
 		method, path, errACPEndpointNotWired)
 }
 
@@ -130,7 +293,7 @@ func (h *acpClientHandler) WaitForTerminalExit(ctx context.Context, params acp.W
 }
 
 func terminalEndpointError(method string) error {
-	return fmt.Errorf("acp: %s not wired in spike (TODO: terminal frame design + approval chain): %w", method, errACPEndpointNotWired)
+	return fmt.Errorf("acp: %s not wired (TODO: Edge terminal frame design): %w", method, errACPEndpointNotWired)
 }
 
 // runACPSession runs one ACP turn with the SDK client runtime: initialize
@@ -138,6 +301,10 @@ func terminalEndpointError(method string) error {
 // notifications → prompt response. Returns when the turn completes; the
 // connection is torn down by the SDK when the peer (agent process) closes
 // stdout or ctx is cancelled.
+//
+// broker, when non-nil, is the shared PermissionDecisionBroker that
+// session/request_permission is bridged to (see RequestPermission); nil
+// falls back to auto-approve.
 //
 // Prompt and workdir come from the RunProcessContext attached to ctx via
 // SDKAdapterContext (same pattern as the anthropic/openai SDK adapters).
@@ -147,7 +314,7 @@ func terminalEndpointError(method string) error {
 // and a live end-to-end run require an environment with npx + agent keys —
 // left for environment verification. The SDK connection layer and typed
 // dispatch are exercised by acp_client_test.go with a mock JSON-RPC peer.
-func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
+func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run, broker *PermissionDecisionBroker) error {
 	rc, ok := RunProcessContextFromContext(ctx)
 	if !ok || rc.Prompt == "" {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: RunProcessContext with prompt required in ctx (use SDKAdapterContext)"))
@@ -156,13 +323,15 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 		return NewNonRecoverableParseError(fmt.Errorf("acp: workdir required for session/new (got %q)", rc.WorkDir))
 	}
 
-	handler := newACPClientHandler(emitter, run)
+	handler := newACPClientHandler(emitter, run, broker, ctx)
 	conn := acp.NewClientSideConnection(handler, stdin, stdout)
 	conn.SetLogger(slog.With("component", "acp-sdk", "sdk", acpSDKVersion, "run_id", run.ID))
 
 	// 1. initialize handshake. Capabilities: fs read/write + terminal are
-	// advertised; the endpoints answer with errors until the approval chain
-	// and frame design land (see handler TODO comments).
+	// advertised; the endpoints answer with errors until the fs/terminal
+	// frame design lands (see handler TODO comments). Tool permission gates
+	// use session/request_permission, which is bridged to the Edge approval
+	// chain.
 	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		ClientCapabilities: acp.ClientCapabilities{
