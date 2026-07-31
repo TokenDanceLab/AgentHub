@@ -332,3 +332,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Reduced motion (#12): kill infinite/decorative loops ────────────
+   thinkShimmer / routePulse / dagPulse are infinite loops; highlightFadeOut
+   and routeSlideIn are decorative one-shots (README motion tier 2).
+   apConfirmPulse is an infinite pulse covered here as a bonus (same tier). */
+@media (prefers-reduced-motion: reduce) {
+  .think-shimmer,
+  .row-item.route,
+  .row-item.route > .row-hd .row-icon,
+  .row-item.highlighted,
+  .dag-pulse,
+  .ap-approve.critical.confirming {
+    animation: none;
+  }
+}
