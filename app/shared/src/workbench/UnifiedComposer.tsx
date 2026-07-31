@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { browserFilesToComposerAttachments } from '../composer';
+import { browserFilesToComposerAttachments, clearDraft, loadDraft, saveDraft } from '../composer';
 import type { ComposerMention } from '../composer';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import {
@@ -106,6 +106,95 @@ export function UnifiedComposer({
   const compositionRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const listboxId = useId();
+
+  /* ═══════════════ Draft persistence (T10/UI6) ═══════════════
+     Save composer draft (text + mentions) per conversationId via
+     requestIdleCallback batching, load on mount, flush on hidden,
+     clear on submit (empty state).                              */
+
+  const draftLoadedRef = useRef<string | null>(null);
+  const pendingDraftRef = useRef<{
+    conversationId: string;
+    text: string;
+    mentions: ComposerMention[];
+  } | null>(null);
+  const ricIdRef = useRef<number | null>(null);
+
+  /** Flush any pending draft to localStorage immediately. */
+  function flushDraft(): void {
+    if (ricIdRef.current !== null) {
+      if (typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(ricIdRef.current);
+      }
+      ricIdRef.current = null;
+    }
+    const pending = pendingDraftRef.current;
+    pendingDraftRef.current = null;
+    if (!pending) return;
+    saveDraft(pending.conversationId, { text: pending.text, mentions: pending.mentions });
+  }
+
+  // Load + Save draft in a single effect to avoid a race between the load
+  // phase (reads draft, dispatches setText/addMention) and the save phase
+  // (clears empty-state draft) in the same commit.
+  useEffect(() => {
+    const cid = composer.conversationId;
+    if (!cid) return;
+
+    // ══ Phase 1: Load draft (first time per conversationId) ══
+    if (draftLoadedRef.current !== cid) {
+      draftLoadedRef.current = cid;
+      // Only load when the composer is empty (fresh mount / conversation switch).
+      if (composer.text === '' && composer.mentions.length === 0) {
+        const draft = loadDraft(cid);
+        if (draft) {
+          // Restore text and mentions — dispatches trigger a re-render.
+          dispatchComposer({ type: 'setText', text: draft.text });
+          for (const m of draft.mentions) {
+            dispatchComposer({ type: 'addMention', mention: m });
+          }
+          return; // Don't save/clear this cycle — let the re-render handle it.
+        }
+      }
+    }
+
+    // ══ Phase 2: Save / Clear draft ══
+    if (composer.text === '' && composer.mentions.length === 0) {
+      // Empty state after user interaction or submit → clear draft.
+      clearDraft(cid);
+      if (ricIdRef.current !== null) {
+        if (typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(ricIdRef.current);
+        }
+        ricIdRef.current = null;
+      }
+      pendingDraftRef.current = null;
+      return;
+    }
+    // Non-empty state → schedule a batch save via requestIdleCallback.
+    pendingDraftRef.current = {
+      conversationId: cid,
+      text: composer.text,
+      mentions: composer.mentions,
+    };
+    if (ricIdRef.current !== null) return; // already scheduled
+    ricIdRef.current =
+      typeof window.requestIdleCallback === 'function'
+        ? window.requestIdleCallback(flushDraft, { timeout: 500 })
+        : window.setTimeout(flushDraft, 200);
+  }, [composer.text, composer.mentions, composer.conversationId, dispatchComposer]);
+
+  // Force-flush pending draft when the page is hidden; flush on unmount.
+  useEffect(() => {
+    function onVisibilityChange(): void {
+      if (document.hidden) flushDraft();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      flushDraft();
+    };
+  }, []);
 
   const mentionCandidates = mentionTrigger
     ? filterMentionCandidates({
