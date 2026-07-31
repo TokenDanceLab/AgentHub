@@ -54,6 +54,7 @@ type config struct {
 	CodexPath        string         // path to codex binary
 	CodexACPPath     string         // npx launcher for the official codex-acp ACP adapter; empty = not registered
 	OpenCodePath     string         // path to opencode binary
+	OpencodeACPPath  string         // path to opencode binary for native `opencode acp` ACP mode; empty = not registered
 	AgentModel       string         // model override for the default agent
 	RuntimeManifests repeatedString // fixture-only custom runtime manifests
 
@@ -285,11 +286,12 @@ func buildConfig(args []string) (config, error) {
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
-	fs.StringVar(&cfg.AgentDefault, "agent-default", getEnv("AGENTHUB_AGENT_DEFAULT", ""), "default agent adapter ID (claude-code, codex, codex-acp, opencode)")
+	fs.StringVar(&cfg.AgentDefault, "agent-default", getEnv("AGENTHUB_AGENT_DEFAULT", ""), "default agent adapter ID (claude-code, codex, codex-acp, opencode, opencode-acp)")
 	fs.StringVar(&cfg.ClaudeCodePath, "claude-code-path", getEnv("AGENTHUB_CLAUDE_CODE_PATH", "claude"), "path to claude binary")
 	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
 	fs.StringVar(&cfg.CodexACPPath, "codex-acp-path", getEnv("AGENTHUB_CODEX_ACP_PATH", ""), "npx launcher for the official codex-acp ACP adapter (e.g. \"npx.cmd\"); empty = codex-acp not registered (ACP migration spike, default off)")
 	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
+	fs.StringVar(&cfg.OpencodeACPPath, "opencode-acp-path", getEnv("AGENTHUB_OPENCODE_ACP_PATH", ""), "path to opencode binary for the native opencode-acp ACP adapter (e.g. \"opencode\"); empty = opencode-acp not registered (ACP migration, default off)")
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
 	cfg.RuntimeManifests = append(cfg.RuntimeManifests, splitPathList(getEnv("AGENTHUB_RUNTIME_MANIFESTS", ""))...)
 	fs.Var(&cfg.RuntimeManifests, "runtime-manifest", "fixture-only custom runtime manifest JSON path; may be repeated; env AGENTHUB_RUNTIME_MANIFESTS uses OS path-list separators")
@@ -491,6 +493,18 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Warn("failed to register opencode adapter", "err", err)
 		} else {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
+		}
+	}
+	// opencode-acp: native `opencode acp` subcommand on the opencode binary
+	// (ACP migration, second switch target; default off — enable with
+	// --opencode-acp-path opencode). Cutover = point --agent-default (or
+	// per-run agentId) at "opencode-acp".
+	if cfg.OpencodeACPPath != "" {
+		a := adapters.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register opencode-acp adapter", "err", err)
+		} else {
+			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpencodeACPPath, "version", a.Metadata().Version, "available", a.Available())
 		}
 	}
 	for _, manifestPath := range cfg.RuntimeManifests {
