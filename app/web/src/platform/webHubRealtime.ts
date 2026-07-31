@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
+import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
@@ -157,6 +158,12 @@ export function useWebHubRealtime({
     });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidation.notify(type, payload);
+
+      // ── Pin state — feed MESSAGE_PIN / MESSAGE_UNPIN frames into the
+      // session-scoped pinMap store (runtime session filter; the existing
+      // query invalidation above is kept — refetched payloads still carry
+      // no pin field, so the store is the normalize-time source).
+      getPinMapStore().handleFrame(type, payload, runtimeSessionIdRef.current);
 
       // ── Typing indicator — inbound ─────────
       if (type === HUB_EVENTS.TYPING) {
