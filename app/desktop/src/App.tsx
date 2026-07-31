@@ -46,6 +46,7 @@ import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@share
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore } from '@/stores/toastStore';
 import { ToastContainer } from '@/components/Toast';
+import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -121,6 +122,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const submitRunRef = useRef(false);
   const agentsRef = useRef<WorkbenchAgent[] | undefined>(undefined);
   const showToast = useToastStore((s) => s.showToast);
+
+  // Central keyboard shortcut dispatch
+  useGlobalKeyboardShortcuts();
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   // In auto mode with Local Edge fallback, also fetch evidence from Edge API.
