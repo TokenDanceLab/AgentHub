@@ -180,4 +180,12 @@ export interface ContactsPageProps {
   onBlockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
   /** Called when user updates a contact remark */
   onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
+
+  // ── Infinite scroll (T14 pattern; data-layer pagination not wired yet) ──
+  /** Whether more contacts are available via pagination (pageCursor). */
+  hasMore?: boolean | undefined;
+  /** Whether a load-more page fetch is in flight. */
+  loadingMore?: boolean | undefined;
+  /** Triggered when the scroll sentinel enters the viewport (or fallback button). */
+  onLoadMore?: (() => void) | undefined;
 }
