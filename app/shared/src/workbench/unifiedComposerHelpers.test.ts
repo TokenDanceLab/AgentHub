@@ -122,6 +122,7 @@ describe('unifiedComposerHelpers', () => {
       isSubmitting: false,
       targetSelectionRequired: true,
       executionTargetId: '',
+      isRunning: false,
     })).toBe(false);
 
     expect(canSubmitFromKeyDown({
@@ -130,6 +131,7 @@ describe('unifiedComposerHelpers', () => {
       isSubmitting: false,
       targetSelectionRequired: true,
       executionTargetId: 'target-1',
+      isRunning: false,
     })).toBe(true);
   });
 

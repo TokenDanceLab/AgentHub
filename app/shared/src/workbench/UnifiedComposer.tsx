@@ -350,6 +350,7 @@ export function UnifiedComposer({
       isSubmitting: view.isSubmitting,
       targetSelectionRequired: view.targetSelectionRequired,
       executionTargetId: runtime.executionTargetId,
+      isRunning: Boolean(isRunning),
     });
     if (effect.kind === 'none') return;
     event.preventDefault();
@@ -515,7 +516,7 @@ export function UnifiedComposer({
           onSelect={(event) => evaluateTrigger(event.currentTarget)}
           onKeyDown={handleKeyDown}
           onPaste={handleTextareaPaste}
-          placeholder={view.inputPlaceholder}
+          placeholder={isRunning ? t('composer.agentResponding', { target: targetLabel ?? 'AgentHub' }) : view.inputPlaceholder}
           rows={1}
           value={composer.text}
         />
