@@ -88,3 +88,32 @@ describe('TasksPage empty state', () => {
     expect(screen.getByText('示例任务')).toBeInTheDocument();
   });
 });
+
+describe('TasksPage infinite scroll (T14 skeleton)', () => {
+  it('renders no load-more affordance when pagination props are absent', () => {
+    render(<TasksPage {...BASE_PROPS} />);
+
+    expect(
+      screen.queryByRole('button', { name: '加载更多' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('加载中…')).not.toBeInTheDocument();
+  });
+
+  it('shows the fallback load-more button when hasMore is set and fires onLoadMore', () => {
+    const onLoadMore = vi.fn();
+    render(<TasksPage {...BASE_PROPS} hasMore onLoadMore={onLoadMore} />);
+
+    const button = screen.getByRole('button', { name: '加载更多' });
+    fireEvent.click(button);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows loading status and hides the button while loadingMore', () => {
+    render(<TasksPage {...BASE_PROPS} hasMore loadingMore />);
+
+    expect(
+      screen.queryByRole('button', { name: '加载更多' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('加载中…')).toBeInTheDocument();
+  });
+});
