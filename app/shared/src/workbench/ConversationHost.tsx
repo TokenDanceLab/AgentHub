@@ -2,8 +2,17 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } f
 import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript';
 import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '../transcript';
-import type { ComposerMention } from '../composer';
+import type { ComposerIntent, ComposerMention } from '../composer';
 import { buildComposerIntent, composerReducer, createInitialComposerState } from '../composer';
+import {
+  enqueuePendingIntent,
+  MAX_PENDING_DISPATCH_RETRIES,
+  markPendingIntentRetried,
+  peekPendingIntent,
+  PENDING_DISPATCH_RETRY_DELAY_MS,
+  removePendingIntent,
+  type PendingDispatchIntent,
+} from './composer/pendingIntents';
 import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { AttachmentUploadState } from './UnifiedComposer';
@@ -73,6 +82,13 @@ type PendingUserBlock = TextTranscriptBlock & {
   ackOrdinal: number;
 };
 
+/**
+ * Pending dispatch entry stored in the client queue (CF22). The Hub message
+ * is already sent & confirmed — only task dispatch (triggerAgentTask) is
+ * retried, never the message itself.
+ */
+type PendingDispatchIntentEntry = PendingDispatchIntent<ComposerIntent & { executionTargetId?: string }>;
+
 export const ConversationHost = React.memo(function ConversationHost({
   transcript, activeConversation, connectionStatus, inspectorCollapsed, onToggleInspector,
   showMainchainStatus, mainchainSummary, onExportMainchainEvidence, workbenchStatus,
@@ -93,6 +109,84 @@ export const ConversationHost = React.memo(function ConversationHost({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const composerSubmitBehavior = useComposerSubmitBehavior();
+
+  // ── Pending dispatch queue (CF22) ──────────────────────────────────────
+  // Queue is ref-authoritative (mutations are synchronous read-modify-write,
+  // never split across an await) with a version tick to trigger re-renders.
+  const [, bumpPendingIntentsVersion] = useState(0);
+  const pendingIntentsRef = useRef<PendingDispatchIntentEntry[]>([]);
+  const isAgentRunningRef = useRef(false);
+  const flushInFlightRef = useRef(false);
+
+  const mutatePendingIntents = useCallback(
+    (mutate: (current: PendingDispatchIntentEntry[]) => PendingDispatchIntentEntry[]) => {
+      pendingIntentsRef.current = mutate(pendingIntentsRef.current);
+      bumpPendingIntentsVersion((version) => version + 1);
+    },
+    [],
+  );
+
+  /**
+   * Retry the dispatch of the queue head (one at a time — a successful
+   * dispatch makes the agent busy again, so the rest wait for the next
+   * run end). Only `platform.runs.redispatchTask` is called: the message
+   * itself is never re-sent.
+   */
+  const flushPendingIntents = useCallback(async (): Promise<void> => {
+    if (flushInFlightRef.current) return;
+    const redispatchTask = platform.runs.redispatchTask;
+    if (!redispatchTask) return; // surface without separable dispatch: toast-only (unchanged behavior)
+    // Skip while a run is active: dispatch would 409 and burn a retry. The
+    // run-end transition flushes the queue at the right moment instead.
+    if (isAgentRunningRef.current) return;
+    const head = peekPendingIntent(pendingIntentsRef.current);
+    if (!head) return;
+    // The message lives in its original conversation — never dispatch a
+    // queued intent after the user has switched away (drop silently; same
+    // as the pre-queue behavior of losing the dispatch opportunity).
+    if (head.intent.conversationId !== currentConversationId) {
+      mutatePendingIntents((current) => removePendingIntent(current, head));
+      return;
+    }
+    flushInFlightRef.current = true;
+    try {
+      const result = await redispatchTask(head.intent, head.messageId);
+      mutatePendingIntents((current) => {
+        const headNow = peekPendingIntent(current);
+        if (!headNow || headNow.messageId !== head.messageId) return current;
+        if (result.turnInProgress) {
+          const { queue: nextQueue, outcome } = markPendingIntentRetried(current, headNow);
+          if (outcome === 'abandoned') {
+            onToast(`派单重试 ${MAX_PENDING_DISPATCH_RETRIES} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent`);
+            return nextQueue;
+          }
+          // Still busy — the run-end signal may have raced the Hub task
+          // status; give the status a moment and try the head once more.
+          if (!isAgentRunningRef.current) {
+            window.setTimeout(() => void flushPendingIntents(), PENDING_DISPATCH_RETRY_DELAY_MS);
+          }
+          return nextQueue;
+        }
+        return removePendingIntent(current, headNow);
+      });
+    } catch (err) {
+      mutatePendingIntents((current) => removePendingIntent(current, head));
+      onToast(err instanceof Error ? err.message : '派单重试失败，请手动重新触发该 Agent');
+    } finally {
+      flushInFlightRef.current = false;
+    }
+  }, [platform, currentConversationId, mutatePendingIntents, onToast]);
+
+  // Agent run reached a terminal state (run.finished / run.failed /
+  // run.cancelled are folded into the shell's isAgentRunning signal) —
+  // flush any queued dispatch intents.
+  useEffect(() => {
+    const wasRunning = isAgentRunningRef.current;
+    isAgentRunningRef.current = isAgentRunning ?? false;
+    if (wasRunning && !(isAgentRunning ?? false)) {
+      void flushPendingIntents();
+    }
+  }, [isAgentRunning, flushPendingIntents]);
 
   const displayTranscript = useMemo(() => {
     const chat = transcript.filter((b) => !isSidebarOnlyTranscriptBlock(b));
@@ -180,8 +274,24 @@ export const ConversationHost = React.memo(function ConversationHost({
       // is independent) but task dispatch was rejected because the agent instance
       // already has a non-terminal task (#1430). Keep the optimistic user block
       // (the message is real), restore the composer to idle, and surface an
-      // info toast rather than a hard error (#1438).
+      // info toast rather than a hard error (#1438). With a dispatch-only
+      // retry port available (CF22), also enqueue the dispatch intent so the
+      // agent dispatch is retried once the run ends instead of being dropped.
       if (submitResult.turnInProgress) {
+        const dispatchMention = submitPayload.mentions.find((mention) => mention.dispatchRole !== 'context');
+        if (dispatchMention && platform.runs.redispatchTask) {
+          mutatePendingIntents((current) => enqueuePendingIntent(current, {
+            agentId: dispatchMention.id,
+            messageId: submitResult.intentId,
+            attempt: 0,
+            intent: submitPayload,
+          }));
+          // If no run is reported active the busy window may already be over
+          // (no run-end transition will fire) — schedule a short-delayed flush.
+          if (!(isAgentRunning ?? false)) {
+            window.setTimeout(() => void flushPendingIntents(), PENDING_DISPATCH_RETRY_DELAY_MS);
+          }
+        }
         onToast(t('toast.turnInProgress'));
       }
     } catch (err) {
@@ -192,7 +302,8 @@ export const ConversationHost = React.memo(function ConversationHost({
       setUploadProgresses({});
       onToast(err instanceof Error ? err.message : '提交失败，请重试');
     } finally { isSubmittingRef.current = false; }
-  }, [composer, currentConversationId, platform, selectedExecutionTargetId, onToast, dispatchComposer, t, transcript, onEditMessage]);
+  }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
+    onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, flushPendingIntents]);
 
   const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
   const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);
@@ -219,13 +330,20 @@ export const ConversationHost = React.memo(function ConversationHost({
         onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
         searchLabel="搜索消息" searchPlaceholder="搜索消息内容..." noResultsLabel="未找到匹配的消息" />
       {!selectionMode && (
-        <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
-          executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
-          inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
-          onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
-          onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
-          submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
-          isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
+        <>
+          {pendingIntentsRef.current.length > 0 && (
+            <div className={styles.pendingIntentBadge} role="status">
+              待发送 {pendingIntentsRef.current.length} 条
+            </div>
+          )}
+          <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
+            executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
+            inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
+            onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
+            onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
+            submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
+            isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
+        </>
       )}
     </>
   );

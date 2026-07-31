@@ -17,6 +17,7 @@ export type {
   LocalCliDiscoveryManifest,
   LocalCliRuntimeId,
   PreviewPort,
+  RedispatchTaskResult,
   RunPort,
   RuntimeSessionSummary,
   SurfaceCapabilities,
