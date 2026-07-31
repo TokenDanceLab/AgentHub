@@ -157,7 +157,7 @@ export const ConversationHost = React.memo(function ConversationHost({
         if (result.turnInProgress) {
           const { queue: nextQueue, outcome } = markPendingIntentRetried(current, headNow);
           if (outcome === 'abandoned') {
-            onToast(`派单重试 ${MAX_PENDING_DISPATCH_RETRIES} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent`);
+            onToast(t('toast.dispatchRetryExhausted', { max: MAX_PENDING_DISPATCH_RETRIES }));
             return nextQueue;
           }
           // Still busy — the run-end signal may have raced the Hub task
@@ -171,7 +171,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       });
     } catch (err) {
       mutatePendingIntents((current) => removePendingIntent(current, head));
-      onToast(err instanceof Error ? err.message : '派单重试失败，请手动重新触发该 Agent');
+      onToast(err instanceof Error ? err.message : t('toast.dispatchRetryFailed'));
     } finally {
       flushInFlightRef.current = false;
     }
@@ -300,7 +300,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       }
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
       setUploadProgresses({});
-      onToast(err instanceof Error ? err.message : '提交失败，请重试');
+      onToast(err instanceof Error ? err.message : t('toast.submitFailed'));
     } finally { isSubmittingRef.current = false; }
   }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
     onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, flushPendingIntents]);
@@ -333,7 +333,7 @@ export const ConversationHost = React.memo(function ConversationHost({
         <>
           {pendingIntentsRef.current.length > 0 && (
             <div className={styles.pendingIntentBadge} role="status">
-              待发送 {pendingIntentsRef.current.length} 条
+              {t('toast.pendingDispatchBadge', { count: pendingIntentsRef.current.length })}
             </div>
           )}
           <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
