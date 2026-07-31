@@ -52,6 +52,7 @@ type config struct {
 	AgentDefault     string         // default agent adapter ID
 	ClaudeCodePath   string         // path to claude binary
 	CodexPath        string         // path to codex binary
+	CodexACPPath     string         // npx launcher for the official codex-acp ACP adapter; empty = not registered
 	OpenCodePath     string         // path to opencode binary
 	AgentModel       string         // model override for the default agent
 	RuntimeManifests repeatedString // fixture-only custom runtime manifests
@@ -284,9 +285,10 @@ func buildConfig(args []string) (config, error) {
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
-	fs.StringVar(&cfg.AgentDefault, "agent-default", getEnv("AGENTHUB_AGENT_DEFAULT", ""), "default agent adapter ID (claude-code, codex, opencode)")
+	fs.StringVar(&cfg.AgentDefault, "agent-default", getEnv("AGENTHUB_AGENT_DEFAULT", ""), "default agent adapter ID (claude-code, codex, codex-acp, opencode)")
 	fs.StringVar(&cfg.ClaudeCodePath, "claude-code-path", getEnv("AGENTHUB_CLAUDE_CODE_PATH", "claude"), "path to claude binary")
 	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
+	fs.StringVar(&cfg.CodexACPPath, "codex-acp-path", getEnv("AGENTHUB_CODEX_ACP_PATH", ""), "npx launcher for the official codex-acp ACP adapter (e.g. \"npx.cmd\"); empty = codex-acp not registered (ACP migration spike, default off)")
 	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
 	cfg.RuntimeManifests = append(cfg.RuntimeManifests, splitPathList(getEnv("AGENTHUB_RUNTIME_MANIFESTS", ""))...)
@@ -470,6 +472,17 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Warn("failed to register codex adapter", "err", err)
 		} else {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.CodexPath)
+		}
+	}
+	// codex-acp: official ACP adapter binary via npx (ACP migration, first
+	// switch target; default off — enable with --codex-acp-path npx.cmd).
+	// Cutover = point --agent-default (or per-run agentId) at "codex-acp".
+	if cfg.CodexACPPath != "" {
+		a := adapters.NewCodexACPAadapter(cfg.CodexACPPath)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register codex-acp adapter", "err", err)
+		} else {
+			slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.CodexACPPath, "version", a.Metadata().Version, "available", a.Available())
 		}
 	}
 	if cfg.OpenCodePath != "" {
