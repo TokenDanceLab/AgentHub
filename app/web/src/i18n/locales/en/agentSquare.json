@@ -70,7 +70,6 @@
   "empty.description": "Try another category, remove the search text, or clear the local filters.",
 
   "detail.title": "Agent detail",
-  "detail.close": "Close detail drawer",
   "detail.rating": "Rating",
   "detail.installs": "Staged count",
   "detail.favorites": "Favorites",
