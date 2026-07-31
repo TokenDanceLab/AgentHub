@@ -1038,3 +1038,134 @@
   outline: 2px solid var(--focus-ring-color, var(--ring));
   outline-offset: 2px;
 }
+
+/* ═══ Print stylesheet — minimal readable transcript/artifacts ═══════════
+   二轮调研 #7: 全仓零 `@media print` —— 打印时产出整个 SPA shell
+   (overflow-hidden 的 html/body/#root + 固定 4 列 grid)。本块只作用于
+   print 媒体，屏幕渲染零影响。
+
+   分工: workbench 专属 chrome (rail/sidebar/inspector/composer/… 是 CSS
+   module 哈希类) 在 AgentHubWorkbench.module.css 中隐藏; 本文件负责全局
+   重置 + chatview 全局类 (非 module) 的内容规则。 */
+@media print {
+  /* 1. 根: 解除 SPA 裁剪 —— html/body/#root 的 height:100% + overflow:hidden
+        把应用裁剪成一页视口; 12pt 作为可读的打印字号基准。 */
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  html {
+    font-size: 12pt !important;
+  }
+
+  body {
+    color: #111 !important;
+  }
+
+  /* 2. 深色主题打印是浅字白纸 (浏览器默认不打印背景色):
+        仅重着色 transcript 解析的文字/surface 变量; diff/status 等语义色
+        在白底上本来可读，不动。 */
+  :root[data-theme='dark'] {
+    --text-strong: #000 !important;
+    --text-primary: #111 !important;
+    --text-1: #111 !important;
+    --text-2: #333 !important;
+    --text-weaker: #444 !important;
+    --text-3: #555 !important;
+    --text-weakest: #777 !important;
+    --foreground: #111 !important;
+    --chat-agent-bg: transparent !important;
+    --chat-user-bg: #f1f5f9 !important;
+    --chat-code-bg: #f6f6f6 !important;
+    --chat-thinking-bg: #fafafa !important;
+    --bdr: #d8d8d8 !important;
+    --border: #d8d8d8 !important;
+    --guide-line: #d8d8d8 !important;
+  }
+
+  /* 3. Transcript 容器: chatview/.transcript 是 flex-column + flex:1 +
+        overflow:hidden/auto —— 打印时平铺成正常流，跨页自然分页。 */
+  .chatview,
+  .transcript {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    scroll-behavior: auto;
+  }
+
+  /* 4. transcript 内部的交互浮层: 不可打印 */
+  .scroll-to-bottom-btn,
+  .chatview-pinned-wrap {
+    display: none !important;
+  }
+
+  /* 5. 消息卡片/代码块: 去阴影、解除行内裁剪 (row-bd overflow:hidden /
+        think 块 max-height / 代码区 overflow-x:auto 会截断打印内容)。 */
+  .row-item,
+  .chatview-empty,
+  .preview-card {
+    box-shadow: none !important;
+  }
+
+  .row-bd {
+    overflow: visible !important;
+  }
+
+  .row-item.think > .row-bd {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .code-block,
+  .code-lines,
+  .ap-cmd-body,
+  .ap-json {
+    overflow: visible !important;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .code-line {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .row-item img,
+  .row-item video,
+  .row-item canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* 6. 玻璃/模糊与阴影在纸上无意义 —— 全量拍平 (仅 print 媒体)。 */
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 7. 外链在纸上保留 URL (可选增强) */
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    color: var(--text-3, #555);
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+  }
+}
