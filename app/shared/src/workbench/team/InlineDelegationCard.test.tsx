@@ -4,12 +4,23 @@
 // and mounts below a user message via the Transcript renderUserFooter slot.
 
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { HUB_EVENTS } from '../../hubEvents';
 import { getMessageDelegationStore } from './MessageDelegationStore';
 import { getSubagentStreamStore } from './SubagentStreamStore';
 import { InlineDelegationCard } from './InlineDelegationCard';
 import { Transcript } from '../../chatview/components/Transcript';
+
+// jsdom has no layout engine, so virtua cannot measure the viewport/rows and
+// would mount zero rows — breaking content-level queries. These tests cover
+// the delegation-card business logic, not virtualization, so a passthrough
+// Virtualizer (render every child) preserves their semantics. The real
+// Virtualizer is exercised by Transcript.autoscroll.test.tsx (scroll
+// contract) and Transcript.virtualization.test.tsx (handle wiring).
+vi.mock('virtua', () => ({
+  Virtualizer: ({ children }: { children?: ReactNode }) => <>{children}</>,
+}));
 import type { TranscriptUserItem } from '../../chatview/transcript-item';
 
 function feedDispatch(overrides: Record<string, unknown> = {}): void {
