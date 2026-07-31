@@ -8,6 +8,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Exclude stray git worktrees (e.g. .worktrees/refactor/*) and the
+    // vendored reference/ repos so their test files — which resolve with a
+    // different environment — aren't picked up and fail spuriously.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/reference/**'],
     setupFiles: ['./src/__tests__/setup.ts'],
     coverage: {
       provider: 'v8',
