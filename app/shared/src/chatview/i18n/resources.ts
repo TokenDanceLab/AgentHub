@@ -221,6 +221,9 @@ export const chatviewResources = {
     'label.agent': 'Agent',
     'label.agentHub': 'AgentHub',
 
+    // ═══ Message state ═══
+    'message.recalled': '消息已撤回',
+
     // ═══ Chat kind ═══
     'chat.kind.group': '群聊',
     'chat.kind.friend': '好友',
@@ -710,6 +713,9 @@ export const chatviewResources = {
     'label.contact': 'Contact',
     'label.agent': 'Agent',
     'label.agentHub': 'AgentHub',
+
+    // ═══ Message state ═══
+    'message.recalled': 'Message recalled',
 
     // ═══ Chat kind ═══
     'chat.kind.group': 'Group',
