@@ -290,6 +290,35 @@
   background: var(--glass-input-bg, var(--surface));
 }
 
+.sidebarSort {
+  width: auto;
+  height: 34px;
+  margin: 0 var(--sp-10) var(--sp-xxs);
+  padding: 0 var(--sp-xs) 0 var(--sp-10);
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: var(--r-md);
+  background: var(--glass-input-bg, var(--surface-low));
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+.sidebarSort:hover {
+  color: var(--text-1);
+}
+
+.sidebarSort:focus {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--focus-ring);
+}
+
 .conversationList {
   display: flex;
   flex-direction: column;
@@ -1252,6 +1281,22 @@
 
 .composerRow:active::before {
   transform: scale(var(--glass-press-scale, 0.985));
+}
+
+/* ── Composer drag-drop dashed overlay (T9 / UI2+UI3) ── */
+.composerDragOverlay {
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--primary);
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  font: var(--caption);
+  color: var(--primary);
 }
 
 .composerMentions {
