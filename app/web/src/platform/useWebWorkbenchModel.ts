@@ -15,6 +15,8 @@ import {
 } from '@shared/workbench/hubDataMapping';
 import {
   getAgentActivityStore,
+  getPinMapStore,
+  withPinnedState,
   type ApprovalDecisionAction,
   type HubRuntimeEventTranscriptInput,
 } from '@shared/transcript';
@@ -95,6 +97,15 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     getAgentActivityStore().subscribe,
     getAgentActivityStore().getSnapshot,
     getAgentActivityStore().getSnapshot,
+  );
+
+  // Subscribe to the session-scoped pinMap store: MESSAGE_PIN/MESSAGE_UNPIN
+  // frames (webHubRealtime) and the /pins endpoint seed below feed it, and the
+  // normalize pipeline merges `pinned` into HubMessageTranscriptInput from it.
+  const pinnedSnapshot = useSyncExternalStore(
+    getPinMapStore().subscribe,
+    getPinMapStore().getSnapshot,
+    getPinMapStore().getSnapshot,
   );
 
   const sessions = useQuery({
@@ -202,6 +213,24 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
+
+  // Seed the pinMap store from GET /client/sessions/{id}/pins. The pins
+  // query is keyed per session, so data changes on session switch (and after
+  // pin/unpin invalidations) — each arrival re-seeds the session bucket.
+  // placeholderData guard: during a session switch the query briefly shows the
+  // previous session's pins, which must not seed the new session's bucket.
+  useEffect(() => {
+    if (activeHubSessionId && !pinnedMessages.isPlaceholderData && pinnedMessages.data) {
+      getPinMapStore().loadPinnedForSession(
+        activeHubSessionId,
+        pinnedMessages.data.map((message) => message.id),
+      );
+    } else if (!activeHubSessionId) {
+      // Signed out / no Hub session: drop the session pointer so stale
+      // frames can never leak into a later session.
+      getPinMapStore().setActiveSession(null);
+    }
+  }, [activeHubSessionId, pinnedMessages.data, pinnedMessages.isPlaceholderData]);
 
   const contacts = useQuery({
     queryKey: ['web-v4', 'hub-contacts', hubReady],
@@ -422,13 +451,16 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     () => resolveWebWorkbenchTranscript(
       hubReady,
       activeHubSessionId,
-      messages.data,
+      // Merge the pinMap store's pinned state into the normalize input:
+      // hub messages carry no pin field, so the store (fed by WS frames and
+      // seeded from /pins) is the only normalize-time source.
+      withPinnedState(messages.data, pinnedSnapshot.pinnedIds),
       mergedRuntimeEvents,
       dataMode,
       selectedConversationId,
       t,
     ),
-    [hubReady, activeHubSessionId, messages.data, mergedRuntimeEvents, dataMode, selectedConversationId, t],
+    [hubReady, activeHubSessionId, messages.data, pinnedSnapshot, mergedRuntimeEvents, dataMode, selectedConversationId, t],
   );
   const taskContractStatusBlocks = useMemo(
     () => resolveWebTaskContractStatusBlocks(

@@ -14,6 +14,13 @@ export {
   type AgentActivityState,
   type AgentActivityStatus,
 } from './agentActivity';
+export {
+  createPinMapStore,
+  getPinMapStore,
+  withPinnedState,
+  type PinMapSnapshot,
+  type PinMapStore,
+} from './pinMap';
 export type { HubMessageTranscriptInput } from './normalizeHubMessages';
 export type { HubRuntimeEventTranscriptInput } from './normalizeHubRuntimeEvents';
 export type { ThreadTranscriptItemInput } from './normalizeThreadItems';
