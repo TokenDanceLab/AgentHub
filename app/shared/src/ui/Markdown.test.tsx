@@ -1,7 +1,19 @@
 import { act, fireEvent, render } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import MarkdownContent from './Markdown';
 import styles from './Markdown.module.css';
+
+// jsdom cannot compute stylesheet rules under vitest's default css:false
+// (module CSS exports class names only; the styles never reach the
+// document), so rules that only matter visually are asserted as a
+// CSS-contract test against the module source (same pattern as
+// chatview/components/Transcript.css.test.ts).
+const markdownCss = readFileSync(
+  path.resolve(process.cwd(), 'src/ui/Markdown.module.css'),
+  'utf8',
+);
 
 function renderMarkdown(markdown: string): HTMLElement {
   return render(<MarkdownContent content={markdown} />).container;
@@ -181,5 +193,68 @@ describe('code block copy & collapse (fable UIUX #3)', () => {
     fireEvent.click(toggle);
     expect(container.querySelector(`.${styles.codeBodyCollapsed ?? ''}`)).not.toBeNull();
     expect(toggle.textContent).toContain('展开');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fable UIUX: markdown links & images (codeg parity)
+// ---------------------------------------------------------------------------
+describe('markdown links & images (codeg parity)', () => {
+  test('renders images with loading="lazy"', () => {
+    const container = renderMarkdown('![alt text](https://example.com/img.png)');
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute('src', 'https://example.com/img.png');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img).toHaveAttribute('alt', 'alt text');
+  });
+
+  test('opens external links in a new tab with noopener noreferrer', () => {
+    const container = renderMarkdown('[docs](https://example.com/guide)');
+    const link = container.querySelector('a');
+    expect(link).toHaveAttribute('href', 'https://example.com/guide');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  test('keeps in-page anchor links in the same window', () => {
+    const container = renderMarkdown('[jump](#section-1)');
+    const link = container.querySelector('a');
+    expect(link).toHaveAttribute('href', '#section-1');
+    expect(link).not.toHaveAttribute('target');
+    expect(link).not.toHaveAttribute('rel');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fable UIUX: GFM task lists + sticky table header (codeg parity)
+// ---------------------------------------------------------------------------
+describe('GFM task lists (codeg parity)', () => {
+  test('renders checkboxes with contains-task-list / task-list-item classes', () => {
+    const container = renderMarkdown('- [x] 已完成\n- [ ] 待办事项');
+    expect(container.querySelector('ul.contains-task-list')).not.toBeNull();
+    const items = container.querySelectorAll('li.task-list-item');
+    expect(items).toHaveLength(2);
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0]).toHaveAttribute('checked');
+    expect(checkboxes[0]).toHaveAttribute('disabled');
+    expect(checkboxes[1]).not.toHaveAttribute('checked');
+  });
+
+  test('strikes through and dims checked items', () => {
+    expect(markdownCss).toMatch(/li\.task-list-item:has\(> input\[type='checkbox'\]:checked\)/);
+    expect(markdownCss).toMatch(/text-decoration:\s*line-through;/);
+    expect(markdownCss).toMatch(/opacity:\s*0\.6;/);
+  });
+});
+
+describe('markdown table header stickiness (codeg parity)', () => {
+  test('pins the header row while the table scrolls', () => {
+    const container = renderMarkdown('| A | B |\n| - | - |\n| 1 | 2 |');
+    expect(container.querySelector('thead th')).not.toBeNull();
+    const thRule = markdownCss.match(/\.root th\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? '';
+    expect(thRule).toMatch(/position:\s*sticky;/);
+    expect(thRule).toMatch(/top:\s*0;/);
+    expect(thRule).toMatch(/z-index:\s*1;/);
   });
 });
