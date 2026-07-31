@@ -1117,6 +1117,21 @@
   pointer-events: none;
 }
 
+/* ── Pending dispatch queue badge (CF22) ── */
+.pendingIntentBadge {
+  align-self: center;
+  margin-top: var(--sp-xxs);
+  padding: 2px 12px;
+  border: 1px solid var(--glass-border, var(--bdr));
+  border-radius: 999px;
+  background: var(--glass-bg-light, var(--surface-low));
+  color: var(--text-secondary, var(--fg-muted));
+  font-size: 12px;
+  line-height: 20px;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Reply-To banner above composer ── */
 .replyToBar {
   position: relative;

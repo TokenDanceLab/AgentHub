@@ -79,6 +79,26 @@ export interface ConversationPort {
 
 export interface RunPort {
   submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult>;
+  /**
+   * Re-dispatch an agent task for an already-sent Hub message (client
+   * pending-intents queue, CF22). Never re-sends the message — the message
+   * id is the retry trigger for the existing agent-tasks dispatch only.
+   * Optional: surfaces whose submit path has no separable dispatch step
+   * (Desktop local-edge submitRun) omit it and the queue degrades to the
+   * toast-only 409 behavior.
+   */
+  redispatchTask?(intent: ComposerIntent, messageId: string): Promise<RedispatchTaskResult>;
+}
+
+/** Result of a dispatch-only retry (`RunPort.redispatchTask`). */
+export interface RedispatchTaskResult {
+  /** Dispatched agent task id; absent when there was nothing to dispatch. */
+  taskId?: string;
+  /**
+   * Recoverable 409 turn_in_progress — the agent instance still has a
+   * non-terminal task. The caller may retry again (bounded), then abandon.
+   */
+  turnInProgress?: boolean;
 }
 
 export interface AttachmentPort {
