@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
-import { useFocusTrap } from '../../ui/focusTrap';
+import { FOCUSABLE, useFocusTrap } from '../../ui/focusTrap';
 import styles from './ContextMenu.module.css';
 
 export interface ContextMenuItem {
@@ -10,6 +10,13 @@ export interface ContextMenuItem {
   chevron?: boolean;
   danger?: boolean;
   onClick?: () => void;
+  /**
+   * Optional submenu panel (#1384). Rendered next to the item when it is
+   * active/focused (chevron items). May be a node or a render function that
+   * receives `close` (closes the whole menu — call it after the submenu
+   * selection is committed).
+   */
+  submenu?: React.ReactNode | ((close: () => void) => React.ReactNode);
 }
 
 export interface ContextMenuProps {
@@ -25,6 +32,7 @@ export interface ContextMenuProps {
 
 const EDGE_GAP = 8;
 const MENU_WIDTH = 244;
+const SUBMENU_WIDTH = 132;
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
   groups,
@@ -40,6 +48,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number }>({ left: x, top: y });
   const [activeIndex, setActiveIndex] = useState(0);
+  // Flat index of the item whose submenu panel is open (null = none).
+  const [submenuIndex, setSubmenuIndex] = useState<number | null>(null);
+  // Submenu flips to the left when the menu sits near the right viewport edge.
+  const [submenuFlip, setSubmenuFlip] = useState(false);
 
   // Flatten menu groups into a single indexed list for arrow navigation.
   const flatItems = useMemo(() => {
@@ -53,10 +65,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     return result;
   }, [groups, items]);
 
-  // Reset activeIndex on every open (render-phase state update — safe in React 18+).
+  // Reset activeIndex (and any open submenu) on every open (render-phase
+  // state update — safe in React 18+).
   const prevOpenRef = useRef(isOpen);
   if (isOpen && !prevOpenRef.current) {
     setActiveIndex(0);
+    setSubmenuIndex(null);
   }
   prevOpenRef.current = isOpen;
 
@@ -71,6 +85,23 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     target?.focus();
   }, [activeIndex, isOpen]);
 
+  // Keep the open submenu in sync with the active item: hovering or roving
+  // to an item with a `submenu` opens it; moving away closes it.
+  useEffect(() => {
+    if (!isOpen) return;
+    const active = flatItems[activeIndex]?.item;
+    setSubmenuIndex(active?.submenu !== undefined ? activeIndex : null);
+  }, [activeIndex, isOpen, flatItems]);
+
+  // Move focus into the submenu panel when it opens (its content may also
+  // autofocus); when it closes, roving focus stays on the parent item.
+  useEffect(() => {
+    if (!isOpen || submenuIndex === null || !menuRef.current) return;
+    const panel = menuRef.current.querySelector<HTMLElement>('[data-submenu-panel]');
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
+    first?.focus();
+  }, [submenuIndex, isOpen]);
+
   useLayoutEffect(() => {
     if (!isOpen || !menuRef.current) {
       setOpen(false);
@@ -83,16 +114,34 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const top = Math.max(EDGE_GAP, Math.min(y, window.innerHeight - menuH - EDGE_GAP));
 
     setPos({ left: Math.round(left), top: Math.round(top) });
+    setSubmenuFlip(left + MENU_WIDTH + SUBMENU_WIDTH > window.innerWidth - EDGE_GAP);
 
     const raf = requestAnimationFrame(() => setOpen(true));
     return () => cancelAnimationFrame(raf);
   }, [isOpen, x, y]);
 
   // Keyboard: Escape close + Arrow navigation (wrap) + Enter select + Home/End.
+  // While a submenu is open it owns navigation (arrows rove inside it); the
+  // menu level only handles Escape (close the submenu, keep the menu).
   useEffect(() => {
     if (!isOpen || flatItems.length === 0) return;
 
     const handleKey = (e: KeyboardEvent) => {
+      if (submenuIndex !== null) {
+        // Escape always closes the submenu; ArrowLeft closes it only when
+        // focus is outside the submenu panel, so content that roves with
+        // arrows (e.g. the EmojiPicker grid) keeps its own Left/Right keys.
+        const focusInSubmenu = menuRef.current
+          ?.querySelector('[data-submenu-panel]')
+          ?.contains(document.activeElement);
+        if (e.key === 'Escape' || (e.key === 'ArrowLeft' && !focusInSubmenu)) {
+          e.preventDefault();
+          setSubmenuIndex(null);
+          const buttons = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+          buttons?.[activeIndex]?.focus();
+        }
+        return;
+      }
       switch (e.key) {
         case 'Escape':
           e.preventDefault();
@@ -106,6 +155,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           e.preventDefault();
           setActiveIndex((prev) => (prev - 1 + flatItems.length) % flatItems.length);
           break;
+        case 'ArrowRight': {
+          const item = flatItems[activeIndex]?.item;
+          if (item?.submenu !== undefined) {
+            e.preventDefault();
+            setSubmenuIndex(activeIndex);
+          }
+          break;
+        }
         case 'Home':
           e.preventDefault();
           setActiveIndex(0);
@@ -116,22 +173,35 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           break;
         case 'Enter': {
           e.preventDefault();
-          flatItems[activeIndex]?.item.onClick?.();
-          onClose();
+          const item = flatItems[activeIndex]?.item;
+          if (item?.submenu !== undefined) {
+            // Chevron item: open the submenu instead of activating the action.
+            setSubmenuIndex(activeIndex);
+          } else {
+            item?.onClick?.();
+            onClose();
+          }
           break;
         }
       }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose, flatItems, activeIndex]);
+  }, [isOpen, onClose, flatItems, activeIndex, submenuIndex]);
 
   if (!isOpen) return null;
 
   const menuGroups = groups ?? (items ? [items] : []);
   const handleBackdropClick = () => onClose();
-  const handleItemClick = (item: ContextMenuItem) => {
-    item.onClick?.();
+  const handleItemClick = (idx: number) => {
+    const item = flatItems[idx]?.item;
+    if (item?.submenu !== undefined) {
+      // Chevron item with a submenu: opening it is the click's job, not the
+      // item action (prevents accidental default reactions).
+      setSubmenuIndex(idx);
+      return;
+    }
+    item?.onClick?.();
     onClose();
   };
 
@@ -159,14 +229,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             {group.map((item, itemIndex) => {
               const idx = globalIdx++;
               const isActive = idx === activeIndex;
-              return (
+              const isSubmenuOpen = idx === submenuIndex;
+              const menuItemButton = (
                 <button
                   key={`${item.label}-${itemIndex}`}
                   className={`${styles.item}${item.danger ? ` ${styles.danger}` : ''}${isActive ? ` ${styles.active}` : ''}`}
                   type="button"
                   role="menuitem"
                   tabIndex={isActive ? 0 : -1}
-                  onClick={() => handleItemClick(item)}
+                  onClick={() => handleItemClick(idx)}
                   onMouseEnter={() => setActiveIndex(idx)}
                 >
                   <span className={styles.icon}>
@@ -176,6 +247,23 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                   {item.shortcut ? <kbd className={styles.shortcut}>{item.shortcut}</kbd> : null}
                   {item.chevron ? <b className={styles.chevron}>›</b> : null}
                 </button>
+              );
+              if (item.submenu === undefined) return menuItemButton;
+              return (
+                <div
+                  key={`submenu-${item.label}-${itemIndex}`}
+                  className={styles.submenuAnchor}
+                >
+                  {menuItemButton}
+                  {isSubmenuOpen ? (
+                    <div
+                      className={`${styles.submenu}${submenuFlip ? ` ${styles.flip}` : ''}`}
+                      data-submenu-panel
+                    >
+                      {typeof item.submenu === 'function' ? item.submenu(onClose) : item.submenu}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>

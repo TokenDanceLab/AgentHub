@@ -1,6 +1,8 @@
+import { createElement } from 'react';
 import type { ComposerAction } from '../composer';
 import type { ApprovalDecisionAction, TranscriptBlock } from '../transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
+import { EmojiPicker } from './floating/EmojiPicker';
 import {
   blockTitle,
   buildPermissionApprovalDecision,
@@ -42,6 +44,23 @@ export type TranscriptChromeSideEffect =
   | { type: 'forward'; messageId: string; targetSessionIds: string[] }
   | { type: 'recall'; messageId: string }
   | { type: 'react'; messageId: string; sessionId: string; emoji: string };
+
+// #1384: the emoji picker submenu carries the chosen emoji on the menu
+// action string (`react:<emoji>`); plain `react` keeps the default 👍.
+// The menu channel only carries (action, blockId), so the emoji rides the
+// string and is decoded here — no protocol / plumbing changes needed.
+const REACT_EMOJI_ACTION_PREFIX = 'react:';
+
+function isReactEmojiAction(action: string): boolean {
+  return action === 'react' || action.startsWith(REACT_EMOJI_ACTION_PREFIX);
+}
+
+function reactEmojiForAction(action: string): string {
+  if (action.startsWith(REACT_EMOJI_ACTION_PREFIX)) {
+    return action.slice(REACT_EMOJI_ACTION_PREFIX.length) || '👍';
+  }
+  return '👍';
+}
 
 export function planContextAction(options: {
   action: string;
@@ -130,7 +149,8 @@ export function planContextAction(options: {
 
   // Hub REST message actions (#1383). With a session id these replace the
   // placeholder toast; without one (Desktop/demo) the old toast stays.
-  if ((action === 'pin' || action === 'unpin' || action === 'react') && sessionId) {
+  const reactAction = isReactEmojiAction(action);
+  if ((action === 'pin' || action === 'unpin' || reactAction) && sessionId) {
     if (action === 'pin') {
       effects.push(
         { type: 'pin', messageId: blockId, sessionId },
@@ -145,12 +165,11 @@ export function planContextAction(options: {
         { type: 'toast', message: t('toast.unpinned') },
       );
     }
-    if (action === 'react') {
-      // TODO(#1384): no emoji picker UI yet — fixed default reaction until a
-      // chooser exists; the effect already carries the emoji so the REST port
-      // signature needs no change when the picker lands.
+    if (reactAction) {
+      // #1384: the emoji comes from the picker submenu (`react:<emoji>`);
+      // plain `react` keeps the fixed default 👍.
       effects.push(
-        { type: 'react', messageId: blockId, sessionId, emoji: '👍' },
+        { type: 'react', messageId: blockId, sessionId, emoji: reactEmojiForAction(action) },
         { type: 'pulse', blockId },
         { type: 'toast', message: t('toast.reactionAdded') },
       );
@@ -178,7 +197,7 @@ export function planContextAction(options: {
 
   effects.push(
     { type: 'pulse', blockId },
-    { type: 'toast', message: cardActionLabel(action, title, t) },
+    { type: 'toast', message: cardActionLabel(reactAction ? 'react' : action, title, t) },
   );
   return effects;
 }
@@ -385,7 +404,24 @@ export function buildTranscriptContextMenuGroups({
   return [
     [
       { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => onAction('copy', blockId) },
-      { label: t('context.react'), icon: 'star', chevron: true, onClick: () => onAction('react', blockId) },
+      {
+        label: t('context.react'),
+        icon: 'star',
+        chevron: true,
+        // Plain click path (default 👍) is kept for direct callers; the menu
+        // click/Enter opens the picker submenu instead (#1384).
+        onClick: () => onAction('react', blockId),
+        submenu: (close) => createElement(EmojiPicker, {
+          ariaLabel: t('aria.emojiPicker'),
+          autoFocus: true,
+          onSelect: (emoji: string) => {
+            // The chosen emoji rides the action string (`react:<emoji>`);
+            // planContextAction decodes it back into the react effect.
+            onAction(`react:${emoji}`, blockId);
+            close();
+          },
+        }),
+      },
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
       ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),
