@@ -136,6 +136,7 @@ export function ProjectsPage({
         onEditAnnouncement={onEditAnnouncement}
         onRunClick={onRunClick}
         onArtifactClick={onArtifactClick}
+        loading={projectsLoading}
       />
     </section>
   );
