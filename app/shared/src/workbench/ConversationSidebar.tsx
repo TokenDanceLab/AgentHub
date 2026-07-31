@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
+
+const SORT_STORAGE_KEY = 'agenthub.conversationSort';
+type SortBy = 'recent' | 'name' | 'active';
+
+function loadSortBy(): SortBy {
+  if (typeof window === 'undefined') return 'recent';
+  const stored = window.localStorage.getItem(SORT_STORAGE_KEY);
+  if (stored === 'name' || stored === 'active') return stored;
+  return 'recent';
+}
 
 export interface ConversationSidebarProps {
   conversations: WorkbenchConversation[];
@@ -27,6 +37,13 @@ export function ConversationSidebar({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [sortBy, setSortBy] = useState<SortBy>(loadSortBy);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SORT_STORAGE_KEY, sortBy);
+    }
+  }, [sortBy]);
 
   const filteredConversations = (() => {
     let list = conversations;
@@ -48,10 +65,23 @@ export function ConversationSidebar({
     return list;
   })();
 
-  // Sort: pinned first, then by original order (which reflects last_message_at from server)
+  // Sort: pinned first, then by selected sort mode
   const sortedConversations = [...filteredConversations].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
+
+    if (sortBy === 'name') {
+      return (a.title || '').localeCompare(b.title || '');
+    }
+
+    if (sortBy === 'active') {
+      const aUnread = a.unreadCount ?? 0;
+      const bUnread = b.unreadCount ?? 0;
+      if (aUnread !== bUnread) return bUnread - aUnread;
+      return 0;
+    }
+
+    // 'recent' — keep original order (reflects last_message_at from server)
     return 0;
   });
 
@@ -67,6 +97,16 @@ export function ConversationSidebar({
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
       />
+      <select
+        aria-label={t('aria.sortConversations') ?? '排序方式'}
+        className={styles.sidebarSort}
+        value={sortBy}
+        onChange={(event) => setSortBy(event.target.value as SortBy)}
+      >
+        <option value="recent">最近活动</option>
+        <option value="name">名称</option>
+        <option value="active">活跃</option>
+      </select>
       {archivedCount > 0 && (
         <button
           className={styles.archiveFilterToggle}
