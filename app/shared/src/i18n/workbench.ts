@@ -137,6 +137,7 @@ export const sharedWorkbenchResources = {
       nav: { all: '全部项目', running: '运行中', completed: '已完成', archived: '已归档' },
       tab: { overview: '概览', settings: '设置', members: '成员' },
       newProject: '新建项目',
+      edit: '编辑项目',
       projectRuns: '项目运行',
       loading: '正在加载项目…',
       empty: {
@@ -201,6 +202,11 @@ export const sharedWorkbenchResources = {
         workspaceTrust: '工作目录信任', memory: '记忆', mcp: 'MCP 服务',
       },
       market: { title: 'Agent 市场', search: '搜索 Agent', install: '安装', installed: '已安装' },
+      empty: {
+        title: '暂无已安装 Agent',
+        description: '当前 Hub 账号还没有已安装配置。',
+        add: '添加 Agent',
+      },
       emptySearch: {
         title: '没有匹配的 Agent',
         description: '换个关键词试试，或安装新 Agent。',
@@ -391,6 +397,7 @@ export const sharedWorkbenchResources = {
       nav: { all: 'All projects', running: 'Running', completed: 'Completed', archived: 'Archived' },
       tab: { overview: 'Overview', settings: 'Settings', members: 'Members' },
       newProject: 'New project',
+      edit: 'Edit project',
       projectRuns: 'Project runs',
       loading: 'Loading projects…',
       empty: {
@@ -455,6 +462,11 @@ export const sharedWorkbenchResources = {
         workspaceTrust: 'Workspace trust', memory: 'Memory', mcp: 'MCP services',
       },
       market: { title: 'Agent marketplace', search: 'Search agents', install: 'Install', installed: 'Installed' },
+      empty: {
+        title: 'No installed agents',
+        description: 'This Hub account has no installed configuration yet.',
+        add: 'Add agent',
+      },
       emptySearch: {
         title: 'No matching agents',
         description: 'Try a different keyword, or install a new agent.',

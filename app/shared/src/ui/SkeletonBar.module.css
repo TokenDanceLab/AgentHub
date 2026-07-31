@@ -4,11 +4,25 @@
   width: 100%;
 }
 
+/* Base bar styles live outside the motion media queries so reduced-motion
+   users still see the shape; only the pulse animation is motion-gated. */
+.line {
+  display: block;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: oklch(0 0 0 / 0.08);
+}
+
+/* Variant shapes: circle for avatar placeholders, block for card bodies. */
+.circle {
+  border-radius: 50%;
+}
+
+.block {
+  border-radius: var(--radius-md, 0.5rem);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .line {
-    display: block;
-    border-radius: var(--radius-sm, 0.25rem);
-    background: oklch(0 0 0 / 0.08);
     animation: skeletonPulse 1.8s ease-in-out infinite;
   }
 

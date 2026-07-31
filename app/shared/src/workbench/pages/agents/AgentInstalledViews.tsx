@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { DesignNavIcon } from '../../designIcons';
 import { EmptyState, RecoveryPanel, StatusNotice } from '../../../ui';
+import { SkeletonBar } from '../../../ui/SkeletonBar';
 import styles from '../AgentsPage.module.css';
 import { AgentEditPanel } from './AgentEditPanel';
 import {
@@ -54,6 +55,8 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
   const selectedAgentBusy = Boolean(selectedAgent && (savingAgentId === selectedAgent.id || deletingAgentId === selectedAgent.id));
+  const showInstalledSkeleton = agentsLoading && agents.length === 0 && !agentsError;
+  const showInstalledEmpty = agents.length === 0 && !agentsLoading && !agentsError;
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
@@ -136,10 +139,11 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             </div>
           ) : null}
           <div className={styles['agent-config-list']}>
-            {agents.length === 0 && !agentsLoading && !agentsError ? (
+            {showInstalledSkeleton ? <AgentListSkeleton /> : null}
+            {showInstalledEmpty ? (
               <EmptyState
-                title="暂无已安装 Agent"
-                description="当前 Hub 账号还没有已安装配置。"
+                title={t('agents.empty.title')}
+                description={t('agents.empty.description')}
                 icon={<DesignNavIcon name="package" size={28} strokeWidth={1.5} />}
                 titleLevel={3}
                 {...(styles['agent-empty-compact']
@@ -158,7 +162,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                   ? { actionClassName: styles['agent-empty-compact-action'] }
                   : {})}
                 {...(onAgentAdd
-                  ? { action: { label: '添加 Agent', onClick: onAgentAdd } }
+                  ? { action: { label: t('agents.empty.add'), onClick: onAgentAdd } }
                   : {})}
               />
             ) : null}
@@ -227,3 +231,35 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     </main>
   );
 };
+
+/* ── First-load skeleton rows (mirrors .agent-config-row grid) ── */
+
+const AGENT_LIST_SKELETON_ROW: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '34px minmax(0, 1fr) minmax(116px, 148px) 14px',
+  alignItems: 'center',
+  gap: 'var(--sp-10)',
+  minHeight: 66,
+  padding: 'var(--sp-sm) var(--sp-10)',
+  pointerEvents: 'none',
+};
+
+const AGENT_LIST_SKELETON_ROWS = 3;
+
+function AgentListSkeleton(): React.ReactElement {
+  return (
+    <div aria-hidden="true" className={styles['agent-config-list']} data-testid="agent-list-skeleton">
+      {Array.from({ length: AGENT_LIST_SKELETON_ROWS }, (_, i) => (
+        <div key={i} style={AGENT_LIST_SKELETON_ROW}>
+          <SkeletonBar variant="circle" width="34px" height="34px" />
+          <div style={{ display: 'grid', gap: 6 }}>
+            <SkeletonBar width="45%" height="14px" />
+            <SkeletonBar width="70%" height="10px" />
+          </div>
+          <SkeletonBar width="85%" height="10px" />
+          <SkeletonBar variant="circle" width="10px" height="10px" />
+        </div>
+      ))}
+    </div>
+  );
+}

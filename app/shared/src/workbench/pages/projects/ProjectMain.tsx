@@ -10,6 +10,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { EmptyState } from '../../../ui';
+import { SkeletonBar } from '../../../ui/SkeletonBar';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 import styles from '../ProjectsPage.module.css';
@@ -24,6 +25,9 @@ import type {
 } from './types';
 
 export type ProjectMainProps = {
+  /** First-load flag: renders a detail skeleton in place of the empty state
+   *  while the project list is still loading (wire from the parent page). */
+  loading?: boolean | undefined;
   activeProject: ProjectInfo | null;
   activeTab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
@@ -47,6 +51,7 @@ export type ProjectMainProps = {
 };
 
 export function ProjectMain({
+  loading = false,
   activeProject,
   activeTab,
   onTabChange,
@@ -100,7 +105,7 @@ export function ProjectMain({
                   className={styles.newProjectBtn}
                   onClick={() => onStartUpdate(activeProject)}
                 >
-                  编辑项目
+                  {t('projects.edit')}
                 </button>
               ) : null}
               <span className={styles.statusBadge}>{activeProject.status}</span>
@@ -118,6 +123,11 @@ export function ProjectMain({
             activePreview={activePreview}
             onClosePreview={onClosePreview}
           />
+        </>
+      ) : loading ? (
+        <>
+          <ProjectDetailSkeleton />
+          {editor}
         </>
       ) : (
         <div className={styles.emptyMain}>
@@ -151,5 +161,22 @@ export function ProjectMain({
         </div>
       )}
     </main>
+  );
+}
+
+/* ── First-load detail skeleton (project list still loading) ── */
+
+function ProjectDetailSkeleton(): React.ReactElement {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="project-detail-skeleton"
+      style={{ display: 'grid', gap: 'var(--sp-10)', padding: 'var(--sp-lg) 0' }}
+    >
+      <SkeletonBar width="38%" height="26px" />
+      <SkeletonBar width="62%" height="12px" />
+      <SkeletonBar variant="block" width="100%" height="120px" />
+      <SkeletonBar variant="block" width="100%" height="88px" />
+    </div>
   );
 }
