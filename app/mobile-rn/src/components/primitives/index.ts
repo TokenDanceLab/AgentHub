@@ -2,6 +2,7 @@ export { Badge } from './Badge';
 export { BottomSheet } from './BottomSheet';
 export { Button } from './Button';
 export { EmptyState } from './EmptyState';
+export { ErrorBoundary } from './ErrorBoundary';
 export { ErrorNotice } from './ErrorNotice';
 export { IconButton } from './IconButton';
 export { ListRow } from './ListRow';
