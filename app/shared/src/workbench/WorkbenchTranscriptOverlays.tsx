@@ -1,4 +1,5 @@
 import React from 'react';
+import type { WorkbenchConversation } from '../platform';
 import {
   ContextMenu,
   MultiSelectBar,
@@ -11,7 +12,13 @@ import type { WorkbenchContextMenuState } from './useWorkbenchTranscriptChrome';
 export interface WorkbenchTranscriptOverlaysProps {
   isChatPage: boolean;
   contextMenu: WorkbenchContextMenuState | null;
-  contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
+  contextMenuGroups: (
+    blockId: string,
+    conversations?: WorkbenchConversation[],
+  ) => Array<Array<ContextMenuItem>>;
+  /** Forward target candidates (#1385) — passed into the menu builder so the
+   *  forward item can render its picker submenu. */
+  conversations?: WorkbenchConversation[] | undefined;
   onCloseContextMenu: () => void;
   selectionMode: boolean;
   multiSelectActions: Array<MultiSelectBarAction>;
@@ -26,6 +33,7 @@ export function WorkbenchTranscriptOverlays({
   isChatPage,
   contextMenu,
   contextMenuGroups,
+  conversations,
   onCloseContextMenu,
   selectionMode,
   multiSelectActions,
@@ -39,7 +47,7 @@ export function WorkbenchTranscriptOverlays({
     <>
       {isChatPage && contextMenu && (
         <ContextMenu
-          groups={contextMenuGroups(contextMenu.blockId)}
+          groups={contextMenuGroups(contextMenu.blockId, conversations)}
           isOpen={Boolean(contextMenu)}
           title={contextMenu.title}
           x={contextMenu.x}

@@ -281,6 +281,11 @@ export const chatviewResources = {
     'context.delete': '删除',
     'context.edit': '编辑',
 
+    // ═══ Forward picker (#1385) ═══
+    'forward.confirm': '确认转发',
+    'forward.cancel': '取消',
+    'forward.empty': '暂无会话可转发',
+
     // ═══ Multi-select bar ═══
     'bar.selectAll': '全选',
     'bar.clear': '清空',
@@ -420,6 +425,7 @@ export const chatviewResources = {
     'aria.unarchive': '取消归档',
     'aria.contextMenu': '卡片操作菜单',
     'aria.emojiPicker': '选择表情',
+    'aria.forwardPicker': '选择转发目标会话',
     'aria.resizeInspector': '调整右侧栏宽度',
     'aria.inspectorTabs': '右侧工作区',
     'aria.newInspectorTab': '新建右侧窗口',
@@ -775,6 +781,11 @@ export const chatviewResources = {
     'context.delete': 'Delete',
     'context.edit': 'Edit',
 
+    // ═══ Forward picker (#1385) ═══
+    'forward.confirm': 'Forward',
+    'forward.cancel': 'Cancel',
+    'forward.empty': 'No conversations to forward to',
+
     // ═══ Multi-select bar ═══
     'bar.selectAll': 'Select all',
     'bar.clear': 'Clear',
@@ -914,6 +925,7 @@ export const chatviewResources = {
     'aria.unarchive': 'Unarchive',
     'aria.contextMenu': 'Card action menu',
     'aria.emojiPicker': 'Choose emoji',
+    'aria.forwardPicker': 'Choose conversations to forward to',
     'aria.resizeInspector': 'Resize inspector width',
     'aria.inspectorTabs': 'Inspector tabs',
     'aria.newInspectorTab': 'New inspector tab',

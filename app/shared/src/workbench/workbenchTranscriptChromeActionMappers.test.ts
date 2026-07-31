@@ -7,6 +7,7 @@ import {
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
   createTranscriptChromeEffectHandlers,
+  forwardActionForTargets,
   planContextAction,
   planMultiAction,
   planTranscriptBlockAction,
@@ -241,12 +242,103 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(pin.some((e) => e.type === 'toast')).toBe(true);
   });
 
-  it('keeps the forward placeholder toast until a target-conversation picker exists', () => {
+  it('keeps the forward placeholder toast for the plain forward action (direct callers)', () => {
     const transcript = [textBlock({ id: 'b1' })];
     const forward = planContextAction({ action: 'forward', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
     expect(forward.some((e) => e.type === 'forward')).toBe(false);
     expect(forward.some((e) => e.type === 'toast')).toBe(true);
     expect(forward.find((e) => e.type === 'toast')?.message).toBe('toast.forwardSelectTarget');
+  });
+
+  it('plans a forward effect with target ids for the picker action (#1385)', () => {
+    const transcript = [textBlock({ id: 'b1' })];
+    const picked = planContextAction({
+      action: forwardActionForTargets(['s9', 's10']),
+      blockId: 'b1',
+      transcript,
+      t,
+      sessionId: 'sess-1',
+    });
+    expect(picked).toContainEqual({ type: 'forward', messageId: 'b1', targetSessionIds: ['s9', 's10'] });
+    expect(picked.some((e) => e.type === 'pulse')).toBe(true);
+    expect(picked.find((e) => e.type === 'toast')?.message).toBe('toast.forwardQueued');
+  });
+
+  it('round-trips forward target ids through the action string encoding', () => {
+    // Ids with characters that are URL-sensitive survive the round trip.
+    const ids = ['sess/1', 'sess 2', 'sess,3', 'sess%4'];
+    const encoded = forwardActionForTargets(ids);
+    expect(encoded.startsWith('forward:')).toBe(true);
+    expect(encoded).not.toBe('forward:'); // non-empty payload
+    expect(planContextAction({
+      action: encoded,
+      blockId: 'b1',
+      transcript: [textBlock({ id: 'b1' })],
+      t,
+    })).toContainEqual({ type: 'forward', messageId: 'b1', targetSessionIds: ids });
+  });
+
+  it('wires the forward menu item to a picker submenu that plans the chosen targets (#1385)', () => {
+    const onAction = vi.fn();
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's1', title: '需求', kind: 'direct' },
+      { id: 's2', title: '评审', kind: 'group' },
+    ];
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock()],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+      conversations,
+    });
+    const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
+    expect(forwardItem?.chevron).toBe(true);
+    expect(typeof forwardItem?.submenu).toBe('function');
+
+    const close = vi.fn();
+    const submenu = forwardItem!.submenu as (close: () => void) => ReactNode;
+    const { getByRole, getAllByRole } = render(submenu(close));
+    expect(getByRole('listbox')).toHaveAttribute('aria-multiselectable', 'true');
+    expect(getAllByRole('option').map((option) => option.textContent)).toEqual(['需求', '评审']);
+
+    fireEvent.click(getAllByRole('option')[1]!);
+    fireEvent.click(getByRole('button', { name: 'forward.confirm' }));
+    expect(onAction).toHaveBeenCalledWith('forward:s2', 'b1');
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the plain forward menu item when no conversations are wired (#1385)', () => {
+    const onAction = vi.fn();
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock()],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+    });
+    const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
+    expect(forwardItem?.chevron).toBe(false);
+    expect(forwardItem?.submenu).toBeUndefined();
+    forwardItem?.onClick?.();
+    expect(onAction).toHaveBeenCalledWith('forward', 'b1');
+  });
+
+  it('shows the empty picker state when the conversation list is empty (#1385)', () => {
+    const onAction = vi.fn();
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock()],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+      conversations: [],
+    });
+    const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
+    const close = vi.fn();
+    const submenu = forwardItem!.submenu as (close: () => void) => ReactNode;
+    const { getByRole } = render(submenu(close));
+    expect(getByRole('status')).toHaveTextContent('forward.empty');
   });
 
   it('applies Hub REST side effects through the optional effect handlers', () => {
