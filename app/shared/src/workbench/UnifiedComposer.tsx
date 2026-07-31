@@ -16,7 +16,11 @@ import {
   type MentionPopoverCoords,
 } from './composerMentionPopoverHelpers';
 import { ComposerMentionPopover } from './ComposerMentionPopover';
-import { filterAvailableMentionOptions } from './unifiedComposerHelpers';
+import {
+  buildAttachmentOversizeToast,
+  filterAvailableMentionOptions,
+  partitionAttachmentsBySize,
+} from './unifiedComposerHelpers';
 import styles from './AgentHubWorkbench.module.css';
 import {
   ComposerAgentPicker,
@@ -70,6 +74,7 @@ export function UnifiedComposer({
   uploadProgresses,
   isRunning,
   onCancel,
+  onToast,
 }: UnifiedComposerProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { runtime, view } = buildUnifiedComposerHostState({
@@ -371,11 +376,17 @@ export function UnifiedComposer({
      to ComposerAttachment (via browserFilesToComposerAttachments for content
      preview + hash), and dispatch into the composer store. Upload is deferred
      to ConversationHost on submit.  Orthogonal to @mention popover — no
-     interaction with evaluateTrigger / compositionRef.                         */
+     interaction with evaluateTrigger / compositionRef.
+     Size gate (fable UIUX gap #10): files over MAX_ATTACHMENT_BYTES are
+     rejected up front with a toast instead of failing mid-upload.            */
 
   async function handleAttachFiles(files: File[]): Promise<void> {
     if (files.length === 0 || view.isSubmitting) return;
-    const attachments = await browserFilesToComposerAttachments(files);
+    const { accepted, rejected } = partitionAttachmentsBySize(files);
+    const oversizeToast = buildAttachmentOversizeToast(rejected);
+    if (oversizeToast) onToast?.(oversizeToast);
+    if (accepted.length === 0) return;
+    const attachments = await browserFilesToComposerAttachments(accepted);
     dispatchComposerAttachmentAdds(dispatchComposer, attachments);
   }
 
@@ -424,12 +435,17 @@ export function UnifiedComposer({
       fileList: event.target.files,
       hasNativePicker: runtime.hasNativePicker,
       onPickLocalAttachments,
-      browserFilesToAttachments: browserFilesToComposerAttachments,
+      browserFilesToAttachments: (files) => {
+        const { accepted, rejected } = partitionAttachmentsBySize(files);
+        const oversizeToast = buildAttachmentOversizeToast(rejected);
+        if (oversizeToast) onToast?.(oversizeToast);
+        return browserFilesToComposerAttachments(accepted);
+      },
     });
     if (result.kind === 'noop') return;
     dispatchComposerAttachmentAdds(dispatchComposer, result.attachments);
     if (result.resetInput && fileInputRef.current) fileInputRef.current.value = '';
-  }, [dispatchComposer, onPickLocalAttachments, runtime.hasNativePicker]);
+  }, [dispatchComposer, onPickLocalAttachments, onToast, runtime.hasNativePicker]);
 
   function openFilePicker(): void {
     void resolveComposerOpenFilePicker({
