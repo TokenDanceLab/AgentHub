@@ -1,5 +1,5 @@
 import type { ComposerAttachment, ComposerMention, ComposerState } from '../composer';
-import { canSubmitComposer } from '../composer';
+import { canSubmitComposer, formatComposerAttachmentSize } from '../composer';
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -28,6 +28,43 @@ export interface ComposerStatusHints {
 
 export const COMPOSER_FILE_ACCEPT =
   'image/*,.pdf,.txt,.md,.json,.csv,.yaml,.yml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.go,.rs,.java,.c,.cpp,.h,.hpp,.log,.zip,.tar,.gz';
+
+/** Max attachable file size — 50 MB, mirrors the codeg composer limit. */
+export const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+
+/** Attachment size-limit reject message, or null when the file is within limits. */
+export function validateAttachment(file: File): string | null {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return `「${file.name}」超出附件大小限制（${formatComposerAttachmentSize(
+      MAX_ATTACHMENT_BYTES,
+    )}），无法附加`;
+  }
+  return null;
+}
+
+/** Split a file batch into size-valid and rejected halves. */
+export function partitionAttachmentsBySize(files: File[]): {
+  accepted: File[];
+  rejected: File[];
+} {
+  const accepted: File[] = [];
+  const rejected: File[] = [];
+  for (const file of files) {
+    if (validateAttachment(file)) rejected.push(file);
+    else accepted.push(file);
+  }
+  return { accepted, rejected };
+}
+
+/** Toast text for rejected files, or undefined when nothing was rejected. */
+export function buildAttachmentOversizeToast(rejected: File[]): string | undefined {
+  if (rejected.length === 0) return undefined;
+  const first = rejected[0];
+  if (rejected.length === 1) return (first ? validateAttachment(first) : undefined) ?? undefined;
+  return `有 ${rejected.length} 个附件超出大小限制（${formatComposerAttachmentSize(
+    MAX_ATTACHMENT_BYTES,
+  )}）`;
+}
 
 export function isTargetSelectionRequired(
   executionTargets: ComposerExecutionTarget[] | undefined,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ComposerState } from '../composer';
 import {
+  MAX_ATTACHMENT_BYTES,
+  buildAttachmentOversizeToast,
   buildComposerStatusItems,
   buildTextWithNewline,
   canSubmitFromKeyDown,
@@ -13,8 +15,10 @@ import {
   isImageAttachment,
   isTargetSelectionRequired,
   mainchainTaskState,
+  partitionAttachmentsBySize,
   resolveTargetStatus,
   shouldSubmitComposerKey,
+  validateAttachment,
 } from './unifiedComposerHelpers';
 
 const baseComposer: ComposerState = {
@@ -26,6 +30,7 @@ const baseComposer: ComposerState = {
   approvalMode: 'suggest',
   workDir: '',
   submitState: 'idle',
+  editingMessageId: null,
   replyTo: null,
   quote: null,
 };
@@ -172,5 +177,49 @@ describe('unifiedComposerHelpers', () => {
     expect(derived.statusItems).toContain('数据：真实数据');
     expect(derived.statusItems).toContain('请先选择执行目标再开始。');
     expect(derived.mainchainTask).toBe('draft required');
+  });
+
+  describe('attachment size limit', () => {
+    function fileOfSize(size: number, name: string): File {
+      return new File([new Uint8Array(size)], name);
+    }
+
+    it('accepts files at or under the 50MB limit', () => {
+      expect(validateAttachment(fileOfSize(0, 'empty.bin'))).toBeNull();
+      expect(validateAttachment(fileOfSize(1024, 'small.txt'))).toBeNull();
+      expect(validateAttachment(fileOfSize(MAX_ATTACHMENT_BYTES, 'at-limit.bin'))).toBeNull();
+    });
+
+    it('rejects files over the limit with a named message', () => {
+      const message = validateAttachment(
+        fileOfSize(MAX_ATTACHMENT_BYTES + 1, 'huge.zip'),
+      );
+      expect(message).toContain('huge.zip');
+      expect(message).toContain('50.0 MB');
+    });
+
+    it('partitions mixed batches without dropping files', () => {
+      const small = fileOfSize(10, 'a.txt');
+      const big = fileOfSize(MAX_ATTACHMENT_BYTES + 1, 'b.zip');
+      const exactly = fileOfSize(MAX_ATTACHMENT_BYTES, 'c.bin');
+      const { accepted, rejected } = partitionAttachmentsBySize([small, big, exactly]);
+      expect(accepted).toEqual([small, exactly]);
+      expect(rejected).toEqual([big]);
+    });
+
+    it('builds single and multi-file oversize toasts', () => {
+      expect(buildAttachmentOversizeToast([])).toBeUndefined();
+
+      const one = buildAttachmentOversizeToast([fileOfSize(MAX_ATTACHMENT_BYTES + 1, 'big.zip')]);
+      expect(one).toContain('big.zip');
+      expect(one).toContain('50.0 MB');
+
+      const many = buildAttachmentOversizeToast([
+        fileOfSize(MAX_ATTACHMENT_BYTES + 1, 'a.zip'),
+        fileOfSize(MAX_ATTACHMENT_BYTES + 2, 'b.zip'),
+      ]);
+      expect(many).toContain('2 个附件');
+      expect(many).toContain('50.0 MB');
+    });
   });
 });

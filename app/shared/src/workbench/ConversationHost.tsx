@@ -225,7 +225,7 @@ export const ConversationHost = React.memo(function ConversationHost({
           onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
           onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
           submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
-          isRunning={isAgentRunning} onCancel={onCancelRun} />
+          isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
       )}
     </>
   );

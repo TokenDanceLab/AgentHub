@@ -65,6 +65,8 @@ export interface UnifiedComposerProps {
   isRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
   onCancel?: (() => void) | undefined;
+  /** Non-blocking feedback sink (e.g. oversize-attachment toast). */
+  onToast?: ((message: string) => void) | undefined;
 }
 
 export interface ComposerChromeVisibility {
