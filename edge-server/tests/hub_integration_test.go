@@ -237,6 +237,19 @@ func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 	return v
 }
 
+// unwrapSuccess peels the unified success envelope {"code":"OK","data":...}
+// used by Edge (and Hub) success responses. Returns the "data" payload when
+// the envelope is present, otherwise returns the body unchanged (backward
+// compatible with raw/non-envelope responses such as error bodies).
+func unwrapSuccess(body map[string]any) map[string]any {
+	if body["code"] == "OK" {
+		if data, ok := body["data"].(map[string]any); ok {
+			return data
+		}
+	}
+	return body
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 // TestEdgeRegistersWithHub verifies that Edge can register a device with Hub
@@ -321,9 +334,9 @@ func TestEdgeReceivesDispatchFromHub(t *testing.T) {
 	}
 
 	runResp := decodeJSON[map[string]any](t, resp)
-	runID, ok := runResp["runId"].(string)
+	runID, ok := unwrapSuccess(runResp)["runId"].(string)
 	if !ok || !strings.HasPrefix(runID, "run_") {
-		t.Fatalf("expected runId with run_ prefix, got %v", runResp["runId"])
+		t.Fatalf("expected runId with run_ prefix, got %v", unwrapSuccess(runResp)["runId"])
 	}
 
 	// Verify run exists in Edge store.
@@ -340,7 +353,7 @@ func TestEdgeReceivesDispatchFromHub(t *testing.T) {
 
 	// Verify run appears in Edge's GET /v1/runs endpoint.
 	getResp := getJSON(t, ts.URL+"/v1/runs?threadId=thread_local")
-	runsBody := decodeJSON[map[string]any](t, getResp)
+	runsBody := unwrapSuccess(decodeJSON[map[string]any](t, getResp))
 	items, _ := runsBody["items"].([]any)
 	found := false
 	for _, item := range items {
@@ -456,8 +469,11 @@ func TestEdgeFullProtocolRoundTrip(t *testing.T) {
 	if dispatchResp.StatusCode != http.StatusAccepted {
 		t.Fatalf("phase 2 dispatch: expected 202, got %d", dispatchResp.StatusCode)
 	}
-	runResp := decodeJSON[map[string]any](t, dispatchResp)
-	runID := runResp["runId"].(string)
+	runResp := unwrapSuccess(decodeJSON[map[string]any](t, dispatchResp))
+	runID, ok := runResp["runId"].(string)
+	if !ok {
+		t.Fatalf("expected runId in dispatch response, got %v", runResp)
+	}
 
 	// Phase 3: Edge streams results back to Hub (via Desktop).
 	taskID := "task-" + runID
