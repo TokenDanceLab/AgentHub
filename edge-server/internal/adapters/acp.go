@@ -15,7 +15,8 @@ package adapters
 import (
 	"context"
 	"io"
-	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -33,7 +34,12 @@ const acpAdapterID = "acp"
 // Reference: #1404, docs/analysis/acp-spike-phase1.md,
 // docs/analysis/agenthub-acp-go-migration.md (option C').
 type AcpAdapter struct {
-	// agentBinary is the absolute path to the ACP agent executable.
+	// id is the registry identifier for this adapter instance. The generic
+	// NewAcpAdapter uses "acp"; concrete agent configs (e.g. codex-acp) use
+	// their own IDs so multiple ACP agents can coexist in the registry.
+	id string
+
+	// agentBinary is the path or command name of the ACP agent executable.
 	agentBinary string
 
 	// agentArgs are extra arguments passed to the agent binary beyond
@@ -51,16 +57,30 @@ type AcpAdapter struct {
 
 // NewAcpAdapter creates an experimental ACP adapter for the given agent binary.
 //
-// agentBinary must be an absolute path to an ACP-compatible executable.
-// agentArgs are appended after the ACP protocol flag.
-// displayName is shown in agent listings.
+// agentBinary must be an executable on PATH (or an absolute path to an
+// ACP-compatible executable). agentArgs are appended after the ACP protocol
+// flag. displayName is shown in agent listings. The adapter registers under
+// the generic "acp" ID; use NewAcpAdapterWithID for concrete agent configs.
 func NewAcpAdapter(agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
+	return newAcpAdapter(acpAdapterID, agentBinary, agentArgs, displayName)
+}
+
+// NewAcpAdapterWithID is like NewAcpAdapter but with an explicit registry ID,
+// so a concrete ACP agent configuration (e.g. "codex-acp" backed by
+// `npx -y @agentclientprotocol/codex-acp`) can be registered alongside the
+// generic "acp" adapter.
+func NewAcpAdapterWithID(id, agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
+	return newAcpAdapter(id, agentBinary, agentArgs, displayName)
+}
+
+func newAcpAdapter(id, agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
 	return &AcpAdapter{
-		agentBinary:      agentBinary,
-		agentArgs:        agentArgs,
+		id:             id,
+		agentBinary:    agentBinary,
+		agentArgs:      agentArgs,
 		permissionBroker: nil,
 		metadata: AdapterMetadata{
-			ID:          acpAdapterID,
+			ID:          id,
 			Name:        displayName,
 			Version:     "acp-experimental",
 			Description: "ACP agent (experimental — JSON-RPC 2.0 over stdio)",
@@ -108,10 +128,23 @@ func (a *AcpAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string, args [
 // initialize, session/prompt, and permission responses.
 func (a *AcpAdapter) NeedsStdin() bool { return true }
 
-// Available reports whether the agent binary exists and is executable.
+// Available reports whether the agent binary resolves on PATH (or is an
+// existing absolute path). A raw stat+executable-bit check is unreliable on
+// Windows, where .cmd launchers such as npx.cmd have no executable mode bit,
+// so availability is resolved via exec.LookPath (same pattern as the
+// claude-code / codex adapters).
 func (a *AcpAdapter) Available() bool {
-	fi, err := os.Stat(a.agentBinary)
-	return err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0
+	return acpBinaryAvailable(a.agentBinary, exec.LookPath)
+}
+
+// acpBinaryAvailable reports whether the agent binary resolves via the given
+// lookPath function (injected for testability).
+func acpBinaryAvailable(binary string, lookPath func(string) (string, error)) bool {
+	if strings.TrimSpace(binary) == "" {
+		return false
+	}
+	_, err := lookPath(binary)
+	return err == nil
 }
 
 // ParseStream runs one ACP turn via the coder/acp-go-sdk client runtime:

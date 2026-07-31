@@ -17,6 +17,16 @@ import (
 
 // CodexAdapter integrates the codex CLI.
 //
+// DEPRECATED (ACP migration, first target): the hot path moves to
+// CodexACPAadapter (codex_acp.go) — the official
+// `@agentclientprotocol/codex-acp` ACP binary over the coder/acp-go-sdk
+// client runtime, which brings streaming (Capabilities.Streaming: true) and
+// the session/request_permission approval chain in one hop. This adapter is
+// kept as the Phase 1 fallback/legacy path: batch mode, hand-rolled JSONL
+// stdout parsing (codex_emit_*.go companions), no streaming. Do not extend;
+// remove once codex-acp is verified end-to-end (see
+// docs/analysis/agenthub-acp-go-migration.md §6).
+//
 // Phase 1: codex exec "prompt" -- batch mode, JSONL output (simple, reliable).
 // Phase 2: codex app-server --listen stdio:// -- JSON-RPC full streaming.
 //
