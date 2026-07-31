@@ -1,9 +1,12 @@
-import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
 import { ArrowDown } from 'lucide-react'
+import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import { UserMessage } from './UserMessage'
 import { AgentGroup } from './AgentGroup'
 import { DateDivider } from './DateDivider'
+import { UnreadDivider } from './UnreadDivider'
+import { stableInteractionId } from './RowItem'
 import './Transcript.css'
 
 const AUTO_FOLLOW_THRESHOLD_PX = 96
@@ -73,6 +76,28 @@ interface Props {
    * footer is needed for that item.
    */
   renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
+  /**
+   * Unread-messages divider (T8 desktop IM path): item index before which
+   * the divider renders, plus pre-resolved copy. Absent for non-IM transcripts.
+   */
+  unreadDivider?: { index: number; label: string; readThrough?: string } | undefined
+}
+
+/**
+ * Imperative handle exposed by the Transcript so the parent
+ * (ChatViewTranscript) can drive the virtualizer for highlight/search jumps.
+ * Under virtualization the target row may be off-screen and unmounted, so the
+ * parent first asks the Transcript to scroll the containing segment into view
+ * via {@link scrollToBlockId}, then querySelector-s the now-mounted row to add
+ * the highlight class (existing interaction preserved, RFC §6.3).
+ */
+export interface TranscriptHandle {
+  /**
+   * Scroll the virtualizer so the segment containing `blockId` is mounted.
+   * Returns the segment index, or `-1` if no segment contains the block
+   * (caller falls back to a plain querySelector).
+   */
+  scrollToBlockId(blockId: string): number
 }
 
 function isUser(item: TranscriptItem): item is Extract<TranscriptItem, { type: 'user' }> {
@@ -155,18 +180,35 @@ function formatItemDate(time: string): string {
   })
 }
 
-/** A segment of the transcript: either a date divider or a transcript item. */
-type TranscriptSegment = { kind: 'divider'; date: string; key: string } | { kind: 'item'; item: TranscriptItem }
+/** A segment of the transcript: a date divider, the unread divider, or a transcript item. */
+type TranscriptSegment =
+  | { kind: 'divider'; date: string; key: string }
+  | { kind: 'unread'; label: string; readThrough?: string }
+  | { kind: 'item'; item: TranscriptItem }
 
 /**
  * Partition items into segments with date dividers inserted at day boundaries.
  * A divider is inserted before the first item whose day differs from the previous item.
+ * The unread divider (desktop IM read watermark) is inserted before the item
+ * at `unreadDivider.index` (already resolved against the adapted items).
  */
-function partitionWithDates(items: TranscriptItem[]): TranscriptSegment[] {
+function partitionWithDates(
+  items: TranscriptItem[],
+  unreadDivider: { index: number; label: string; readThrough?: string } | undefined,
+): TranscriptSegment[] {
   const segments: TranscriptSegment[] = []
   let prevDay: string | null = null
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item) continue
+    if (unreadDivider && i === unreadDivider.index) {
+      segments.push({
+        kind: 'unread',
+        label: unreadDivider.label,
+        ...(unreadDivider.readThrough ? { readThrough: unreadDivider.readThrough } : {}),
+      })
+    }
     const time = itemTime(item)
     const day = time ? dayKey(time) : null
     // Insert divider when day changes (and we have a valid day)
@@ -180,9 +222,40 @@ function partitionWithDates(items: TranscriptItem[]): TranscriptSegment[] {
   return segments
 }
 
-export const Transcript = memo(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter }: Props) {
-  const segments = useMemo(() => partitionWithDates(items), [items])
+/**
+ * Build a `blockId → segmentIndex` map for virtualized highlight/search jumps.
+ * Only row interaction ids (the value carried by `data-block-id` on RowItem)
+ * are mapped — those are the only highlightable targets. User messages carry
+ * no `data-block-id`, so a user-id highlight resolves to -1 and falls back to
+ * the plain querySelector (which returns null, preserving pre-virtualization
+ * behavior). Rows come from an agent item's `rows`, `standaloneRows`, and the
+ * row parts interleaved with bubbles in `parts` (RFC §6.3 / §8.1).
+ */
+function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> {
+  const map = new Map<string, number>()
+  segments.forEach((seg, i) => {
+    if (seg.kind !== 'item') return
+    const item = seg.item
+    if (isAgent(item)) {
+      for (const row of item.rows) map.set(stableInteractionId(row), i)
+      for (const row of item.standaloneRows) map.set(stableInteractionId(row), i)
+      if (item.parts) {
+        for (const part of item.parts) {
+          if (part.type === 'row') map.set(stableInteractionId(part.row), i)
+        }
+      }
+    }
+  })
+  return map
+}
+
+const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider }: Props, ref) {
+  const segments = useMemo(() => partitionWithDates(items, unreadDivider), [items, unreadDivider])
   const transcriptRef = useRef<HTMLDivElement>(null)
+  /** Virtualizer handle — used for highlight/search scrollToIndex jumps. */
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
+  /** blockId → segment index, for virtualized highlight/search jumps (RFC §6.3). */
+  const blockIndexMap = useMemo(() => buildBlockIndexMap(segments), [segments])
   /** Scroll state per session — see SessionScrollState. */
   const sessionStatesRef = useRef(new Map<string, SessionScrollState>())
   /** Session key currently rendered; updated in the layout effect. */
@@ -191,6 +264,19 @@ export const Transcript = memo(function Transcript({ items, sessionId, chatMode,
   const currentStateRef = useRef<SessionScrollState | null>(null)
   const itemsIdentity = useMemo(() => items.map(itemIdentity).join('\n'), [items])
   const [nearBottom, setNearBottom] = useState(true)
+
+  useImperativeHandle(ref, () => ({
+    scrollToBlockId(blockId: string) {
+      const idx = blockIndexMap.get(blockId)
+      if (idx === undefined) return -1
+      // Instant center-mount of the containing segment; the caller follows up
+      // with a rAF + querySelector + scrollIntoView for the smooth final
+      // centering and highlight class (RFC §6.3). Smooth here would fight the
+      // subsequent scrollIntoView and is avoided per virtua guidance.
+      virtualizerRef.current?.scrollToIndex(idx, { align: 'center' })
+      return idx
+    },
+  }), [blockIndexMap])
 
   const handleScroll = useCallback(() => {
     const element = transcriptRef.current
@@ -262,23 +348,28 @@ export const Transcript = memo(function Transcript({ items, sessionId, chatMode,
 
   return (
     <div className="transcript" role="log" aria-live="polite" onScroll={handleScroll} ref={transcriptRef}>
-      {segments.map((seg) => {
-        if (seg.kind === 'divider') return <DateDivider key={seg.key} date={seg.date} />
+      <Virtualizer ref={virtualizerRef} scrollRef={transcriptRef} bufferSize={800}>
+        {segments.map((seg) => {
+          if (seg.kind === 'divider') return <DateDivider key={seg.key} date={seg.date} />
+          if (seg.kind === 'unread') {
+            return <UnreadDivider key="unread-divider" label={seg.label} {...(seg.readThrough ? { readThrough: seg.readThrough } : {})} />
+          }
 
-        const item = seg.item
-        if (isUser(item)) {
-          const userKey = item.id ?? item.text + (item.name || '')
-          const footer = renderUserFooter?.(item)
-          return (
-            <Fragment key={userKey}>
-              <UserMessage item={item} chatMode={chatMode} />
-              {footer ?? null}
-            </Fragment>
-          )
-        }
-        if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
-        return null
-      })}
+          const item = seg.item
+          if (isUser(item)) {
+            const userKey = item.id ?? item.text + (item.name || '')
+            const footer = renderUserFooter?.(item)
+            return (
+              <Fragment key={userKey}>
+                <UserMessage item={item} chatMode={chatMode} />
+                {footer ?? null}
+              </Fragment>
+            )
+          }
+          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
+          return null
+        })}
+      </Virtualizer>
       {/* Scroll-to-bottom button — appears when user has scrolled up */}
       {!nearBottom && (
         <button
@@ -293,3 +384,5 @@ export const Transcript = memo(function Transcript({ items, sessionId, chatMode,
     </div>
   )
 })
+
+export const Transcript = memo(TranscriptImpl)

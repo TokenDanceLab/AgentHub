@@ -84,6 +84,7 @@ export type { TranscriptItem, TranscriptUserItem, TranscriptAgentItem } from './
  * route, deploy, attachment, context, session.
  */
 export type { RowItem, RowType, AgentRole } from './types'
+export type { UnreadDividerDescriptor } from './types'
 
 // ── Backward-compat aliases (deprecated — prefer the names above) ─────
 

@@ -69,8 +69,18 @@ export function normalizeHubMessagesToTranscript(
     .map((entry) => entry.block);
 }
 
-function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBlock | null {
+/**
+ * Transcript block id for a hub message — single source of truth for the
+ * `hub-message-` prefix so unread-divider anchors (desktop IM) match blocks.
+ * Returns undefined when no stable id can be derived.
+ */
+export function hubMessageBlockId(message: HubMessageTranscriptInput): string | undefined {
   const id = message.client_msg_id ?? message.id ?? message.message_id ?? fallbackMessageId(message);
+  return id ? `hub-message-${id}` : undefined;
+}
+
+function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBlock | null {
+  const id = hubMessageBlockId(message);
   if (!id) return null;
 
   const contentType = message.content_type?.trim().toLowerCase();
@@ -90,7 +100,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
         ...(attachment.created_at ? { created_at: attachment.created_at } : {}),
       };
       return {
-        id: `hub-message-${id}`,
+        id,
         author: normalizeAuthor(message),
         ...(message.created_at ? { createdAt: message.created_at } : {}),
         kind: 'attachment',
@@ -108,7 +118,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
 
   if (metadata?.routeDecision) {
     return {
-      id: `hub-message-${id}`,
+      id,
       author: normalizeAuthor(message),
       ...(message.created_at ? { createdAt: message.created_at } : {}),
       kind: 'route_decision',
@@ -122,7 +132,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
 
   const visibleState = visibleIMState(message, metadata);
   return {
-    id: `hub-message-${id}`,
+    id,
     author: normalizeAuthor(message),
     ...(message.created_at ? { createdAt: message.created_at } : {}),
     kind: 'text',

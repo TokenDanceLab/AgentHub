@@ -8,10 +8,11 @@ import { Component, useMemo, useEffect, useRef, useCallback, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, Pin, X } from 'lucide-react'
 
-import { Transcript } from './Transcript'
+import { Transcript, type TranscriptHandle } from './Transcript'
 import { TypingIndicator } from './TypingIndicator'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
-import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
+import { blocksToTranscriptItems, resolveUnreadAnchorItemIndex, type TranscriptBlock } from '../adapter'
+import type { UnreadDividerDescriptor } from '../types'
 import type { BlockActionCallback, TranscriptUserItem } from '../transcript-item'
 
 // Load ChatView design tokens — scoped to .chatview, no :root pollution
@@ -65,6 +66,13 @@ interface Props {
    * footer is needed for that item.
    */
   renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
+  /**
+   * Unread-messages divider descriptor (T8 desktop IM path). The consumer
+   * (desktop Hub sessions) derives the anchor block id from the session read
+   * watermark; this wrapper resolves it to an item index against the adapted
+   * items (merged agent groups are treated as a unit) before passing it down.
+   */
+  unreadDivider?: UnreadDividerDescriptor | undefined
 }
 
 function EmptyState() {
@@ -98,7 +106,7 @@ class TranscriptErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter, unreadDivider }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -107,8 +115,23 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
       return []
     }
   }, [transcript])
+  // Resolve the block-level anchor to an item index (agent groups merge
+  // blocks, so the divider must sit above the containing item, not inside it).
+  const resolvedUnreadDivider = useMemo(() => {
+    if (!unreadDivider) return undefined
+    const index = resolveUnreadAnchorItemIndex(transcript, items, unreadDivider)
+    if (index < 0) return undefined
+    return {
+      index,
+      label: unreadDivider.label,
+      ...(unreadDivider.readThrough ? { readThrough: unreadDivider.readThrough } : {}),
+    }
+  }, [transcript, items, unreadDivider])
   const containerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  /** Imperative handle into the virtualized Transcript — used to mount the
+   *  segment containing a highlighted block before querySelector-ing it. */
+  const transcriptRef = useRef<TranscriptHandle>(null)
 
   // Memory-stable callback so the effect doesn't re-fire on render churn
   const onHighlightEndRef = useRef(onHighlightEnd)
@@ -122,6 +145,14 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
 
   useEffect(() => {
     if (!highlightedBlockId || !containerRef.current) return
+
+    // Under virtualization the target row may be off-screen and unmounted.
+    // Ask the Transcript to scroll the containing segment into view first;
+    // scrollToIndex mounts the segment so the rAF below can find the row.
+    // Returns -1 when no segment contains the block — then we still try the
+    // querySelector (graceful fallback for ids without a data-block-id, e.g.
+    // user messages, preserving pre-virtualization behavior).
+    transcriptRef.current?.scrollToBlockId(highlightedBlockId)
 
     // Wait one tick for the DOM to settle (new rows may be rendering)
     const raf = requestAnimationFrame(() => {
@@ -196,7 +227,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyState />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript items={items} sessionId={sessionId} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
+          <Transcript ref={transcriptRef} items={items} sessionId={sessionId} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
           {/* Ephemeral typing indicator — shown when other session members are typing */}
           {typingUserNames && typingUserNames.length > 0 && (
             <TypingIndicator names={typingUserNames} chatMode={chatMode} />

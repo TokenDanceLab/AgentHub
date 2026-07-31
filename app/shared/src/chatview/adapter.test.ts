@@ -3,7 +3,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { describe, it, expect } from 'vitest'
-import { blocksToTranscriptItems } from './adapter'
+import { blocksToTranscriptItems, resolveUnreadAnchorItemIndex } from './adapter'
 import type { AgentTranscriptBlock } from './index'
 import type { TranscriptBlock } from '../transcript/types'
 
@@ -1770,5 +1770,71 @@ describe('blocksToTranscriptItems', () => {
     const row = (blocksToTranscriptItems(blocks)[0] as AgentTranscriptBlock).standaloneRows![0]!
     expect(row.type).toBe('attachment')
     expect(row.status).toBe('ok')
+  })
+})
+
+describe('resolveUnreadAnchorItemIndex (T8 desktop IM unread divider)', () => {
+  const text = (id: string, role: 'agent' | 'human', authorId: string, timeOffset = 0) => ({
+    id,
+    kind: 'text' as const,
+    createdAt: makeTime(timeOffset),
+    author: role === 'agent' ? makeAuthor(authorId) : makeUser(authorId),
+    text: 'msg ' + id,
+  })
+
+  it('returns -1 without a descriptor or when count is zero', () => {
+    const blocks = [text('b1', 'human', 'alice')] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, undefined)).toBe(-1)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { count: 0 })).toBe(-1)
+  })
+
+  it('places the divider above a user-message anchor (1:1 blocks/items)', () => {
+    const blocks = [
+      text('m1', 'human', 'alice', 0),
+      text('m2', 'human', 'alice', 1),
+      text('m3', 'human', 'alice', 2),
+    ] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'm3', count: 1 })).toBe(2)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'm2', count: 2 })).toBe(1)
+  })
+
+  it('treats a merged agent group as the item containing the anchor block', () => {
+    const blocks = [
+      text('u1', 'human', 'alice', 0),
+      text('a1', 'agent', 'bob', 1),
+      text('a2', 'agent', 'bob', 2),
+      text('a3', 'agent', 'bob', 3),
+    ] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(2) // user + one merged agent group
+    // Anchor mid-group → divider above the whole group (index 1).
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'a2', count: 2 })).toBe(1)
+    // Anchor at the group start → same result.
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'a1', count: 3 })).toBe(1)
+  })
+
+  it('anchors a second same-author group after a user message', () => {
+    const blocks = [
+      text('a1', 'agent', 'bob', 0),
+      text('u1', 'human', 'alice', 1),
+      text('a2', 'agent', 'bob', 2),
+    ] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(3)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'a2', count: 1 })).toBe(2)
+  })
+
+  it('falls back to the unread tail count when the anchor block is missing', () => {
+    const blocks = [
+      text('m1', 'human', 'alice', 0),
+      text('m2', 'human', 'alice', 1),
+      text('m3', 'human', 'alice', 2),
+    ] as TranscriptBlock[]
+    const items = blocksToTranscriptItems(blocks)
+    // Anchor was filtered out upstream → place before the last `count` items.
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'ghost', count: 2 })).toBe(1)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'ghost', count: 99 })).toBe(0)
   })
 })

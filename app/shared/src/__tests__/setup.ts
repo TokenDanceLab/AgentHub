@@ -5,6 +5,43 @@ import { beforeAll, vi } from 'vitest';
 // Tests can reset/override this per-suite via vi.mocked(fetch).mockImplementation.
 globalThis.fetch = vi.fn();
 
+// ──────────────────────────────────────────────────────────────
+// Polyfills for jsdom — required once virtualization (virtua) landed.
+//
+// jsdom has no layout engine: clientHeight/offsetHeight/scrollHeight are 0,
+// ResizeObserver never fires, and scrollIntoView is unimplemented. virtua
+// mounts a ResizeObserver per visible row and on the scroll container; a
+// no-op stub keeps it from throwing. Tests that assert on transcript ROW
+// CONTENT mock `virtua` itself (a passthrough Virtualizer) so children
+// render without the viewport measurement virtua can't perform in jsdom;
+// tests that assert on the SCROLL CONTRACT keep the real Virtualizer and
+// mock clientHeight/scrollTop/scrollHeight directly on `.transcript`
+// (orthogonal to RO). Mirrors codeg's test-setup.ts (frontend.md Q9).
+// (RFC §6.4 / §8.2)
+// ──────────────────────────────────────────────────────────────
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
+// jsdom's Element.scrollIntoView is not implemented and logs a noisy
+// "Not implemented" error. The Transcript highlight effect calls it on the
+// target row; stub it as a no-op so tests stay quiet and deterministic.
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'undefined') {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+}
+
+// jsdom's Element.scrollIntoView is not implemented and logs a noisy
+// "Not implemented" error. The Transcript highlight effect calls it on the
+// target row; stub it as a no-op so tests stay quiet and deterministic.
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'undefined') {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+}
+
 // Re-export testing utilities so shared component tests import from one place.
 export { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 export { default as userEvent } from '@testing-library/user-event';

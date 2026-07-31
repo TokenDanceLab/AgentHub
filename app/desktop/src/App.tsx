@@ -11,6 +11,7 @@ import {
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import type { UnreadDividerDescriptor } from '@shared/chatview';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
@@ -115,6 +116,9 @@ export interface DesktopWorkbenchAppProps {
 
 export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {}) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  // Default namespace — desktop locale keys (im.session.*) for the IM transcript
+  // unread divider copy (T8).
+  const { t: tIm } = useTranslation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const { online: edgeOnline } = useHealth({ enabled: !workbench.isDemo || workbench.edgeDemoData === true });
@@ -191,6 +195,21 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     if (!workbench.activeThreadId && !demoEdgeEnabled) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
   }, [workbench.activeThreadId, workbench.transcript, demoEdgeEnabled]);
+
+  // IM transcript unread divider (T8): desktop-owned copy over the
+  // workbench-computed read-watermark marker.
+  const transcriptUnreadDivider = useMemo<UnreadDividerDescriptor | undefined>(() => {
+    const marker = workbench.transcriptUnread;
+    if (!marker) return undefined;
+    return {
+      anchorBlockId: marker.anchorBlockId,
+      count: marker.count,
+      label: tIm('im.session.unread', { count: marker.count }),
+      ...(marker.readThroughSeq !== undefined
+        ? { readThrough: tIm('im.session.readThrough', { seq: marker.readThroughSeq }) }
+        : {}),
+    };
+  }, [workbench.transcriptUnread, tIm]);
   // In auto mode with an available Local Edge, also fetch run evidence from Edge API.
   const edgeRunEvidence = useRunEvidence(edgeFetchEnabled ? activeRunId : undefined);
 
@@ -457,6 +476,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         showComposerStatus={false}
         showMainchainStatus={false}
         transcript={workbench.transcript}
+        transcriptUnreadDivider={transcriptUnreadDivider}
         userDisplayName={currentUser?.displayName}
         userAvatarUrl={currentUser?.avatarUrl}
         skillMarketItems={skillMarketItems}

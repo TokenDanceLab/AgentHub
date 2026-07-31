@@ -158,6 +158,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      virtua:
+        specifier: ^0.50.0
+        version: 0.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -361,6 +364,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      virtua:
+        specifier: ^0.50.0
+        version: 0.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       xlsx:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
@@ -7335,6 +7341,32 @@ packages:
       svelte: '>=5.0'
       vue: '>=3.2'
     peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      solid-js:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
+  virtua@0.50.0:
+    resolution: {integrity: sha512-W4lBvBqCIdNORXAVHHQbN+raBnViVZwKLk8BFhUAOOv8RashH/SU5DUSOk+RsS4UvqdZOaAylWC4pncw3JSaMQ==}
+    peerDependencies:
+      '@angular/common': '>=20.0.0'
+      '@angular/core': '>=20.0.0'
+      react: '>=16.14.0'
+      react-dom: '>=16.14.0'
+      solid-js: '>=1.0'
+      svelte: '>=5.0'
+      vue: '>=3.2'
+    peerDependenciesMeta:
+      '@angular/common':
+        optional: true
+      '@angular/core':
+        optional: true
       react:
         optional: true
       react-dom:
@@ -16113,6 +16145,11 @@ snapshots:
       vfile-message: 4.0.3
 
   virtua@0.49.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    optionalDependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+
+  virtua@0.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     optionalDependencies:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
