@@ -34,7 +34,14 @@ export type TranscriptChromeSideEffect =
   | { type: 'approval'; decision: ApprovalDecisionAction }
   | { type: 'pulse'; blockId: string }
   | { type: 'toast'; message: string }
-  | { type: 'exitSelection' };
+  | { type: 'exitSelection' }
+  // Hub REST message actions (#1383). Planned only when a session id is
+  // available; applied via the optional `on*Message` effect handlers.
+  | { type: 'pin'; messageId: string; sessionId: string }
+  | { type: 'unpin'; messageId: string; sessionId: string }
+  | { type: 'forward'; messageId: string; targetSessionIds: string[] }
+  | { type: 'recall'; messageId: string }
+  | { type: 'react'; messageId: string; sessionId: string; emoji: string };
 
 export function planContextAction(options: {
   action: string;
@@ -42,8 +49,9 @@ export function planContextAction(options: {
   transcript: TranscriptBlock[];
   t: TranscriptChromeTranslate;
   selectedText?: string | null;
+  sessionId?: string | null;
 }): TranscriptChromeSideEffect[] {
-  const { action, blockId, transcript, t, selectedText } = options;
+  const { action, blockId, transcript, t, selectedText, sessionId } = options;
   const title = resolveBlockTitleById(transcript, blockId, t);
   const block = transcript.find((item) => item.id === blockId);
   const effects: TranscriptChromeSideEffect[] = [];
@@ -108,6 +116,54 @@ export function planContextAction(options: {
       { type: 'regenerate', blockId },
       { type: 'pulse', blockId },
       { type: 'toast', message: cardActionLabel(action, title, t) },
+    );
+    return effects;
+  }
+
+  // Hub REST message actions (#1383). With a session id these replace the
+  // placeholder toast; without one (Desktop/demo) the old toast stays.
+  if ((action === 'pin' || action === 'unpin' || action === 'react') && sessionId) {
+    if (action === 'pin') {
+      effects.push(
+        { type: 'pin', messageId: blockId, sessionId },
+        { type: 'pulse', blockId },
+        { type: 'toast', message: t('toast.pinUpdated') },
+      );
+    }
+    if (action === 'unpin') {
+      effects.push(
+        { type: 'unpin', messageId: blockId, sessionId },
+        { type: 'pulse', blockId },
+        { type: 'toast', message: t('toast.unpinned') },
+      );
+    }
+    if (action === 'react') {
+      // TODO(#1384): no emoji picker UI yet — fixed default reaction until a
+      // chooser exists; the effect already carries the emoji so the REST port
+      // signature needs no change when the picker lands.
+      effects.push(
+        { type: 'react', messageId: blockId, sessionId, emoji: '👍' },
+        { type: 'pulse', blockId },
+        { type: 'toast', message: t('toast.reactionAdded') },
+      );
+    }
+    return effects;
+  }
+  if (action === 'recall') {
+    effects.push(
+      { type: 'recall', messageId: blockId },
+      { type: 'pulse', blockId },
+      { type: 'toast', message: t('toast.recalled') },
+    );
+    return effects;
+  }
+  if (action === 'forward') {
+    // TODO(#1385): no target-conversation picker yet — keep the placeholder
+    // toast. Once a picker exists, plan a forward effect with the chosen
+    // targetSessionIds and the REST port runs.
+    effects.push(
+      { type: 'pulse', blockId },
+      { type: 'toast', message: t('toast.forwardSelectTarget') },
     );
     return effects;
   }
@@ -209,6 +265,13 @@ export interface TranscriptChromeEffectHandlers {
   pulseBlock: (blockId: string) => void;
   showWorkbenchToast: (message: string) => void;
   exitSelection: () => void;
+  // Hub REST message actions (#1383) — optional; without them the side
+  // effects are no-ops and the planner keeps the placeholder toast.
+  onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
+  onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
+  onRecallMessage?: ((messageId: string) => Promise<void> | void) | undefined;
+  onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
 }
 
 export function createTranscriptChromeEffectHandlers(
@@ -227,6 +290,13 @@ export function createTranscriptChromeEffectHandlers(
   if (handlers.onRegenerate !== undefined) next.onRegenerate = handlers.onRegenerate;
   if (handlers.onApprovalDecision !== undefined) {
     next.onApprovalDecision = handlers.onApprovalDecision;
+  }
+  if (handlers.onPinMessage !== undefined) next.onPinMessage = handlers.onPinMessage;
+  if (handlers.onUnpinMessage !== undefined) next.onUnpinMessage = handlers.onUnpinMessage;
+  if (handlers.onForwardMessage !== undefined) next.onForwardMessage = handlers.onForwardMessage;
+  if (handlers.onRecallMessage !== undefined) next.onRecallMessage = handlers.onRecallMessage;
+  if (handlers.onAddMessageReaction !== undefined) {
+    next.onAddMessageReaction = handlers.onAddMessageReaction;
   }
   return next;
 }
@@ -263,6 +333,21 @@ export function applyTranscriptChromeSideEffects(
         break;
       case 'exitSelection':
         handlers.exitSelection();
+        break;
+      case 'pin':
+        handlers.onPinMessage?.(effect.messageId, effect.sessionId);
+        break;
+      case 'unpin':
+        handlers.onUnpinMessage?.(effect.messageId, effect.sessionId);
+        break;
+      case 'forward':
+        handlers.onForwardMessage?.(effect.messageId, effect.targetSessionIds);
+        break;
+      case 'recall':
+        handlers.onRecallMessage?.(effect.messageId);
+        break;
+      case 'react':
+        handlers.onAddMessageReaction?.(effect.messageId, effect.sessionId, effect.emoji);
         break;
       default:
         break;

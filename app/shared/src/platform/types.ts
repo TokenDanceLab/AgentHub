@@ -157,6 +157,20 @@ export interface SettingsPort {
   writeSettings(values: Record<string, string>): Promise<void>;
 }
 
+/**
+ * Typed host port for per-message actions (right-click context menu wiring).
+ * Maps 1:1 onto the existing Hub REST endpoints; surfaces that lack a Hub
+ * backend (Desktop local-edge, demo shells) simply omit the whole port —
+ * every member is therefore optional on `AgentHubPlatform.messageActions`.
+ */
+export interface MessageActionsPort {
+  pinMessage(messageId: string, sessionId: string): Promise<void>;
+  unpinMessage(messageId: string, sessionId: string): Promise<void>;
+  forwardMessage(messageId: string, targetSessionIds: string[]): Promise<void>;
+  recallMessage(messageId: string): Promise<void>;
+  addMessageReaction(messageId: string, sessionId: string, reaction: { emoji: string }): Promise<void>;
+}
+
 /** Stable id for a host-owned terminal session (not a renderer process handle). */
 export type TerminalSessionId = string;
 
@@ -251,6 +265,12 @@ export interface AgentHubPlatform {
   preview?: PreviewPort;
   runs: RunPort;
   settings?: SettingsPort;
+  /**
+   * Optional per-message action port (pin/unpin/forward/recall/react).
+   * Present on surfaces with a Hub backend (Web); Desktop/demo omit it and
+   * the workbench chrome degrades to the previous toast-only behavior.
+   */
+  messageActions?: MessageActionsPort | undefined;
   /**
    * Optional typed terminal host. Present only when the surface can host a local terminal
    * (typically Desktop with `capabilities.localTerminal === true`). No PTY ownership here.

@@ -4,6 +4,7 @@ import {
   applyTranscriptChromeSideEffects,
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
+  createTranscriptChromeEffectHandlers,
   planContextAction,
   planMultiAction,
   planTranscriptBlockAction,
@@ -156,5 +157,85 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onEnterSelection: vi.fn(),
     });
     expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.edit');
+  });
+
+  it('plans Hub REST message actions (pin/unpin/recall/react) when a session id is available', () => {
+    const transcript = [textBlock({ id: 'b1' })];
+
+    const pin = planContextAction({ action: 'pin', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
+    expect(pin).toContainEqual({ type: 'pin', messageId: 'b1', sessionId: 'sess-1' });
+    expect(pin.some((e) => e.type === 'toast')).toBe(true);
+    expect(pin.some((e) => e.type === 'pulse')).toBe(true);
+
+    const unpin = planContextAction({ action: 'unpin', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
+    expect(unpin).toContainEqual({ type: 'unpin', messageId: 'b1', sessionId: 'sess-1' });
+
+    const recall = planContextAction({ action: 'recall', blockId: 'b1', transcript, t });
+    expect(recall).toContainEqual({ type: 'recall', messageId: 'b1' });
+
+    const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
+    expect(react).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '👍' });
+  });
+
+  it('keeps the placeholder toast for pin/react without a session id (Desktop/demo)', () => {
+    const transcript = [textBlock({ id: 'b1' })];
+    const pin = planContextAction({ action: 'pin', blockId: 'b1', transcript, t });
+    expect(pin.some((e) => e.type === 'pin')).toBe(false);
+    expect(pin.some((e) => e.type === 'pulse')).toBe(true);
+    expect(pin.some((e) => e.type === 'toast')).toBe(true);
+  });
+
+  it('keeps the forward placeholder toast until a target-conversation picker exists', () => {
+    const transcript = [textBlock({ id: 'b1' })];
+    const forward = planContextAction({ action: 'forward', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
+    expect(forward.some((e) => e.type === 'forward')).toBe(false);
+    expect(forward.some((e) => e.type === 'toast')).toBe(true);
+    expect(forward.find((e) => e.type === 'toast')?.message).toBe('toast.forwardSelectTarget');
+  });
+
+  it('applies Hub REST side effects through the optional effect handlers', () => {
+    const handlers = createTranscriptChromeEffectHandlers({
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+      onPinMessage: vi.fn(),
+      onUnpinMessage: vi.fn(),
+      onForwardMessage: vi.fn(),
+      onRecallMessage: vi.fn(),
+      onAddMessageReaction: vi.fn(),
+    });
+    applyTranscriptChromeSideEffects([
+      { type: 'pin', messageId: 'm1', sessionId: 's1' },
+      { type: 'unpin', messageId: 'm2', sessionId: 's2' },
+      { type: 'forward', messageId: 'm3', targetSessionIds: ['s9'] },
+      { type: 'recall', messageId: 'm4' },
+      { type: 'react', messageId: 'm5', sessionId: 's5', emoji: '🔥' },
+    ], handlers);
+    expect(handlers.onPinMessage).toHaveBeenCalledWith('m1', 's1');
+    expect(handlers.onUnpinMessage).toHaveBeenCalledWith('m2', 's2');
+    expect(handlers.onForwardMessage).toHaveBeenCalledWith('m3', ['s9']);
+    expect(handlers.onRecallMessage).toHaveBeenCalledWith('m4');
+    expect(handlers.onAddMessageReaction).toHaveBeenCalledWith('m5', 's5', '🔥');
+  });
+
+  it('is a no-op for Hub REST side effects when handlers are not wired', () => {
+    const handlers = createTranscriptChromeEffectHandlers({
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    });
+    expect(() => applyTranscriptChromeSideEffects([
+      { type: 'pin', messageId: 'm1', sessionId: 's1' },
+      { type: 'recall', messageId: 'm2' },
+    ], handlers)).not.toThrow();
+    expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
   });
 });

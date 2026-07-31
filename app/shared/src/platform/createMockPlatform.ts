@@ -50,6 +50,14 @@ export interface MockPlatform extends AgentHubPlatform {
   submittedIntents: ComposerIntent[];
   /** Dispatch-only retries recorded by `runs.redispatchTask` (CF22 queue). */
   redispatchCalls: Array<{ intent: ComposerIntent; messageId: string }>;
+  /** Per-message action calls recorded by `messageActions` (Hub REST wiring). */
+  messageActionCalls: Array<
+    | { type: 'pin'; messageId: string; sessionId: string }
+    | { type: 'unpin'; messageId: string; sessionId: string }
+    | { type: 'forward'; messageId: string; targetSessionIds: string[] }
+    | { type: 'recall'; messageId: string }
+    | { type: 'react'; messageId: string; sessionId: string; emoji: string }
+  >;
   terminal?: MockTerminalPort | TerminalPort;
 }
 
@@ -155,6 +163,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
   const openedEvidence: EvidenceRef[] = [];
   const submittedIntents: ComposerIntent[] = [];
   const redispatchCalls: Array<{ intent: ComposerIntent; messageId: string }> = [];
+  const messageActionCalls: MockPlatform['messageActionCalls'] = [];
   const capabilities: SurfaceCapabilities = {
     ...defaultCapabilities,
     ...seed.capabilities,
@@ -173,6 +182,24 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
     openedEvidence,
     submittedIntents,
     redispatchCalls,
+    messageActionCalls,
+    messageActions: {
+      async pinMessage(messageId: string, sessionId: string): Promise<void> {
+        messageActionCalls.push({ type: 'pin', messageId, sessionId });
+      },
+      async unpinMessage(messageId: string, sessionId: string): Promise<void> {
+        messageActionCalls.push({ type: 'unpin', messageId, sessionId });
+      },
+      async forwardMessage(messageId: string, targetSessionIds: string[]): Promise<void> {
+        messageActionCalls.push({ type: 'forward', messageId, targetSessionIds });
+      },
+      async recallMessage(messageId: string): Promise<void> {
+        messageActionCalls.push({ type: 'recall', messageId });
+      },
+      async addMessageReaction(messageId: string, sessionId: string, reaction: { emoji: string }): Promise<void> {
+        messageActionCalls.push({ type: 'react', messageId, sessionId, emoji: reaction.emoji });
+      },
+    },
     conversations: {
       async list() {
         return conversations;
