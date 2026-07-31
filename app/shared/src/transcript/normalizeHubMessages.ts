@@ -52,13 +52,23 @@ export interface HubMessageTranscriptInput {
   };
 }
 
+/** zh fallback for `message.recalled` when no translator is injected. */
+const RECALLED_TEXT_FALLBACK = '消息已撤回';
+
+/**
+ * Plain-text translator callback for i18n of normalizer-owned labels.
+ * Key space: the shared 'chatview' namespace (see chatview/i18n/resources.ts).
+ */
+export type NormalizeHubTranslate = (key: string) => string;
+
 export function normalizeHubMessagesToTranscript(
   messages: HubMessageTranscriptInput[] | undefined,
+  t?: NormalizeHubTranslate,
 ): TranscriptBlock[] {
   if (!messages?.length) return [];
 
   return messages
-    .map((message, index) => ({ block: normalizeHubMessage(message), index, timestamp: timestampMs(message) }))
+    .map((message, index) => ({ block: normalizeHubMessage(message, t), index, timestamp: timestampMs(message) }))
     .filter((entry): entry is { block: TranscriptBlock; index: number; timestamp: number } => Boolean(entry.block))
     .sort((a, b) => {
       if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
@@ -79,7 +89,10 @@ export function hubMessageBlockId(message: HubMessageTranscriptInput): string | 
   return id ? `hub-message-${id}` : undefined;
 }
 
-function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBlock | null {
+function normalizeHubMessage(
+  message: HubMessageTranscriptInput,
+  t?: NormalizeHubTranslate,
+): TranscriptBlock | null {
   const id = hubMessageBlockId(message);
   if (!id) return null;
 
@@ -112,7 +125,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
   }
 
   const metadata = recalled ? null : hubContentMetadata(message.content);
-  const text = recalled ? '消息已撤回' : renderHubContent(message.content, metadata?.record);
+  const text = recalled ? (t?.('message.recalled') ?? RECALLED_TEXT_FALLBACK) : renderHubContent(message.content, metadata?.record);
   if (!text.trim()) return null;
   if (isRuntimeDiagnosticText(text)) return null;
 

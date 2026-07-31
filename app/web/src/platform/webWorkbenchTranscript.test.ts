@@ -33,4 +33,32 @@ describe('webWorkbenchTranscript', () => {
     const blocks = resolveWebWorkbenchTranscript(false, null, undefined, [], 'fixture');
     expect(blocks.length).toBeGreaterThan(0);
   });
+
+  it('passes the injected translator through to hub message normalization', () => {
+    const blocks = resolveWebWorkbenchTranscript(
+      true,
+      'hub-session-1',
+      [
+        {
+          session_id: 'hub-session-1',
+          seq_id: 1,
+          sender_type: 'system',
+          recalled: true,
+          content: 'hidden',
+        },
+      ],
+      [],
+      'approved-real',
+      undefined,
+      (key: string) => (key === 'message.recalled' ? 'Message recalled' : key),
+    );
+
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        id: 'hub-message-hub-session-1-1',
+        kind: 'text',
+        text: 'Message recalled',
+      }),
+    ]);
+  });
 });

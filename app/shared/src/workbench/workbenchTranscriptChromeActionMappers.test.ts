@@ -60,6 +60,19 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(multiDelete.some((effect) => effect.type === 'exitSelection')).toBe(true);
   });
 
+  it('copies the full text of text blocks instead of the truncated title', () => {
+    const longText = 'a'.repeat(60);
+    const transcript = [textBlock({ id: 'b1', text: longText })];
+    const copy = planContextAction({ action: 'copy', blockId: 'b1', transcript, t });
+    expect(copy).toContainEqual({ type: 'copy', text: longText });
+    expect(copy.some((effect) => effect.type === 'toast')).toBe(true);
+
+    // Non-text blocks keep the short blockTitle copy.
+    const permTranscript = [permissionBlock({ id: 'perm-1', title: 'Allow bash?' })];
+    const permCopy = planContextAction({ action: 'copy', blockId: 'perm-1', transcript: permTranscript, t });
+    expect(permCopy).toContainEqual({ type: 'copy', text: 'Allow bash?' });
+  });
+
   it('plans permission and regenerate block actions', () => {
     const transcript = [permissionBlock(), textBlock({ id: 'agent' })];
     const approve = planTranscriptBlockAction({

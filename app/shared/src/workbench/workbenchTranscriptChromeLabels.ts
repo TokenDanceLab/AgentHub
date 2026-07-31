@@ -130,6 +130,10 @@ export function multiActionLabel(
 }
 
 export function cardLinkForBlock(blockId: string): string {
+  // TODO(copyLink): `agenthub://card/<blockId>` is a custom scheme with no
+  // registered handler anywhere (Desktop/Web) — copying it produces a dead
+  // link. Do NOT invent a handler: enabling the scheme needs a product
+  // decision (register a protocol handler, or produce a real shareable URL).
   return `agenthub://card/${blockId}`;
 }
 
