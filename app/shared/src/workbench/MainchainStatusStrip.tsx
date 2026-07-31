@@ -15,7 +15,9 @@ export function MainchainStatusStrip({
 }: MainchainStatusStripProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <section className={styles.mainchainStrip} aria-label={t('aria.mainChainStatus')}>
+    // A11y (#10): the strip's node states/labels change at runtime — a
+    // polite live region announces the changes without stealing focus.
+    <section className={styles.mainchainStrip} aria-label={t('aria.mainChainStatus')} aria-live="polite">
       <div className={styles.mainchainTrack} role="list">
         {summary.nodes.map((n) => (
           <div className={styles.mainchainNode} data-state={n.state} key={n.id} role="listitem">
