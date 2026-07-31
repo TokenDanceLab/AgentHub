@@ -5,14 +5,16 @@
 // 当 ACP 映射增加新事件类型或 adapter.go 中常量发生变化时，本测试会报错，
 // 迫使开发者显式更新此规范表——从而实现 §3 映射的 SSOT 一致性。
 //
-// 参考：docs/analysis/acp-spike-phase1.md §3（翻译映射）
+// 输入为 coder/acp-go-sdk（v0.13.5）typed SessionUpdate/PromptResponse，
+// 见 acp_events.go。参考：docs/analysis/acp-spike-phase1.md §3（翻译映射）
 //       api/events.md §3.3（live-streaming 事件表）
 package adapters
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/coder/acp-go-sdk"
 )
 
 // acpEdgeMapEntry 描述一条 ACP 事件类型到 Edge run.agent.* 事件的一一对应。
@@ -121,7 +123,7 @@ func TestACPVocabularyLock(t *testing.T) {
 		}
 
 		input := buildACPInput(e.acpType)
-		got := mapACPUpdate(input)
+		got := mapACPSessionUpdate(input)
 
 		if !e.mapped {
 			// 有意未映射的类型应返回 nil。
@@ -149,54 +151,58 @@ func TestACPVocabularyLock(t *testing.T) {
 		}
 	}
 
-	// ----- 阶段 3：ToolCall running 只发 tool_call，不发 tool_result -----
+	// ----- 阶段 3：ToolCall in_progress 只发 tool_call，不发 tool_result -----
 	// 这是词汇锁的关键边界：不能因为规范表写了两个 event 就假定所有状态都发两个。
-	gotRunning := mapACPUpdate(acpSessionUpdateEvent{
-		Type:       "ToolCall",
-		ToolCallID: "tc_vocab",
-		Status:     "running",
-	})
+	gotRunning := mapACPSessionUpdate(acp.StartToolCall(
+		"tc_vocab",
+		"vocab-lock tool",
+		acp.WithStartStatus(acp.ToolCallStatusInProgress),
+	))
 	if len(gotRunning) != 1 || gotRunning[0].EventType != BusEventToolCall {
-		t.Errorf("ToolCall running: expected [tool_call], got %+v", gotRunning)
+		t.Errorf("ToolCall in_progress: expected [tool_call], got %+v", gotRunning)
 	}
 }
 
-// buildACPInput 为给定的 ACP 类型构造最小的合法输入值，使 mapACPUpdate
-// 能被调用并返回合理数量的映射事件。
-func buildACPInput(acpType string) acpSessionUpdateEvent {
+// buildACPInput 为给定的 ACP 类型构造最小的合法 typed 输入值（coder/acp-go-sdk
+// SessionUpdate 判别联合），使 mapACPSessionUpdate 能被调用并返回合理数量的
+// 映射事件。
+func buildACPInput(acpType string) acp.SessionUpdate {
 	switch acpType {
-	case "AgentMessageChunk", "AgentThoughtChunk":
-		return acpSessionUpdateEvent{
-			Type: acpType,
-			Content: []acpContentPart{
-				{Type: "text", Text: "vocab-lock"},
-			},
-		}
+	case "AgentMessageChunk":
+		return acp.UpdateAgentMessageText("vocab-lock")
+	case "AgentThoughtChunk":
+		return acp.UpdateAgentThoughtText("vocab-lock")
 	case "ToolCall":
-		return acpSessionUpdateEvent{
-			Type:       acpType,
-			ToolCallID: "tc_vocab",
-			Title:      "vocab-lock tool",
-			Kind:       "function",
-			Status:     "completed",
-			RawOutput:  json.RawMessage(`{"ok":true}`),
-		}
+		return acp.StartToolCall(
+			"tc_vocab",
+			"vocab-lock tool",
+			acp.WithStartKind(acp.ToolKindRead),
+			acp.WithStartStatus(acp.ToolCallStatusCompleted),
+			acp.WithStartRawOutput(map[string]any{"ok": true}),
+		)
 	case "UsageUpdate":
-		return acpSessionUpdateEvent{
-			Type:        acpType,
-			UsageInput:  10,
-			UsageOutput: 20,
+		return acp.SessionUpdate{
+			UsageUpdate: &acp.SessionUsageUpdate{Used: 10, Size: 100000},
 		}
 	default:
 		// Plan / SessionInfoUpdate / ToolCallUpdate / unknown
-		return acpSessionUpdateEvent{Type: acpType}
+		switch acpType {
+		case "Plan":
+			return acp.SessionUpdate{Plan: &acp.SessionUpdatePlan{Entries: []acp.PlanEntry{}}}
+		case "SessionInfoUpdate":
+			return acp.SessionUpdate{SessionInfoUpdate: &acp.SessionSessionInfoUpdate{}}
+		case "ToolCallUpdate":
+			return acp.SessionUpdate{ToolCallUpdate: &acp.SessionToolCallUpdate{ToolCallId: "tc_vocab"}}
+		default:
+			return acp.SessionUpdate{}
+		}
 	}
 }
 
-// verifyPromptResultMapping 验证 session/prompt 响应的映射。
+// verifyPromptResultMapping 验证 session/prompt 响应的映射（typed PromptResponse）。
 func verifyPromptResultMapping(t *testing.T, e acpEdgeMapEntry) {
 	t.Helper()
-	got := mapACPPromptResult(json.RawMessage(`{"stopReason":"end_turn"}`))
+	got := mapACPPromptResult(acp.PromptResponse{StopReason: acp.StopReasonEndTurn})
 	if got == nil {
 		t.Fatalf("PromptResult: expected non-nil mappedEvent, got nil")
 	}
