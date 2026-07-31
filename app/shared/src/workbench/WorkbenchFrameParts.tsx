@@ -17,10 +17,10 @@ import {
   WorkspaceLoadingState,
 } from './WorkbenchFrameChromeParts';
 import {
-  buildChatConversationHostProps,
   buildChatInspectorProps,
   buildConversationSidebarProps,
   buildWorkbenchRoutesProps,
+  useBuildChatConversationHostProps,
 } from './workbenchFramePartsHelpers';
 import { resolveComposerWorkDir } from './workbenchFrameHelpers';
 import styles from './AgentHubWorkbench.module.css';
@@ -76,7 +76,9 @@ export function ChatSidebarFrame({
 export function ChatConversationHostFrame(
   props: ChatConversationHostFrameProps,
 ): React.ReactElement {
-  return <ConversationHost {...buildChatConversationHostProps(props)} />;
+  // Hook form stabilizes per-render derived props (block event adapters +
+  // id Sets) so ConversationHost/ChatViewBridge memo gates hold (#perf).
+  return <ConversationHost {...useBuildChatConversationHostProps(props)} />;
 }
 
 /** Non-chat page host wrapping WorkbenchRoutes. */

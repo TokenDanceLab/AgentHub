@@ -1,9 +1,12 @@
+import React from 'react';
+import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildChatConversationHostProps,
   buildChatInspectorProps,
   buildConversationSidebarProps,
   buildWorkbenchRoutesProps,
+  useBuildChatConversationHostProps,
 } from './workbenchFramePartsHelpers';
 import {
   DEFAULT_BROWSER_PREVIEW_URL,
@@ -12,11 +15,14 @@ import {
   INSPECTOR_MAX_WIDTH,
   INSPECTOR_MIN_WIDTH,
 } from './workbenchLayoutConstants';
+import type { ChatConversationHostFrameProps } from './workbenchFrameTypes';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchFramePartsHelpers unit tests (#742)
 
-   Pure prop-builder coverage for frame residual slices. No React render.
+   Pure prop-builder coverage for frame residual slices. The
+   useBuildChatConversationHostProps hook form is exercised with a render
+   probe asserting referential stability of the derived host props.
    ═══════════════════════════════════════════════════════════════════════ */
 
 function sessionMock(overrides: Record<string, unknown> = {}) {
@@ -386,6 +392,112 @@ describe('workbenchFramePartsHelpers', () => {
       expect('routeBlocks' in props).toBe(false);
       expect('deployPreviewUrl' in props).toBe(false);
       expect('runResult' in props).toBe(false);
+    });
+  });
+
+  describe('useBuildChatConversationHostProps', () => {
+    function hostFramePropsFixture(overrides: Record<string, unknown> = {}) {
+      return {
+        platform: platformMock() as any,
+        session: sessionMock() as any,
+        transcriptChrome: transcriptChromeMock() as any,
+        profile: profileMock() as any,
+        transcript: [{ id: 't1' }] as any,
+        inspectorCollapsed: false,
+        toggleInspector: vi.fn(),
+        showMainchainStatus: false,
+        showComposerAgentPicker: false,
+        showComposerStatus: false,
+        ...overrides,
+      } as any as ChatConversationHostFrameProps;
+    }
+
+    /** Render probe: captures the hook result of the latest render. */
+    function createHostPropsProbe() {
+      const latest: {
+        hostProps: ReturnType<typeof useBuildChatConversationHostProps> | null;
+      } = { hostProps: null };
+      const Probe = (frameProps: ChatConversationHostFrameProps): null => {
+        latest.hostProps = useBuildChatConversationHostProps(frameProps);
+        return null;
+      };
+      return { Probe, latest };
+    }
+
+    it('keeps derived host props referentially stable across re-renders with unchanged frame props', () => {
+      const { Probe, latest } = createHostPropsProbe();
+      const frameProps = hostFramePropsFixture();
+      const { rerender } = render(React.createElement(Probe, frameProps));
+      const first = latest.hostProps!;
+      rerender(React.createElement(Probe, frameProps));
+      const second = latest.hostProps!;
+
+      expect(second.onBlockContextMenu).toBe(first.onBlockContextMenu);
+      expect(second.onBlockSelect).toBe(first.onBlockSelect);
+      expect(second.selectedBlockIds).toBe(first.selectedBlockIds);
+      expect(second.softHiddenBlockIds).toBe(first.softHiddenBlockIds);
+      expect(second.actionedBlockIds).toBe(first.actionedBlockIds);
+    });
+
+    it('rebuilds only the context-menu handler when transcript changes', () => {
+      const { Probe, latest } = createHostPropsProbe();
+      const chrome = transcriptChromeMock();
+      const { rerender } = render(
+        React.createElement(Probe, hostFramePropsFixture({ transcriptChrome: chrome })),
+      );
+      const first = latest.hostProps!;
+      rerender(React.createElement(Probe, hostFramePropsFixture({
+        transcriptChrome: chrome,
+        transcript: [{ id: 't1' }, { id: 't2' }],
+      })));
+      const second = latest.hostProps!;
+
+      expect(second.onBlockContextMenu).not.toBe(first.onBlockContextMenu);
+      expect(second.onBlockSelect).toBe(first.onBlockSelect);
+      expect(second.selectedBlockIds).toBe(first.selectedBlockIds);
+      expect(second.softHiddenBlockIds).toBe(first.softHiddenBlockIds);
+      expect(second.actionedBlockIds).toBe(first.actionedBlockIds);
+    });
+
+    it('rebuilds only the id set whose source array changed', () => {
+      const { Probe, latest } = createHostPropsProbe();
+      const chrome = transcriptChromeMock();
+      // Same transcript identity across renders — only the selection source
+      // array changes (state-array semantics in the real hook).
+      const transcript = [{ id: 't1' }] as any;
+      const { rerender } = render(
+        React.createElement(Probe, hostFramePropsFixture({ transcriptChrome: chrome, transcript })),
+      );
+      const first = latest.hostProps!;
+      rerender(React.createElement(Probe, hostFramePropsFixture({
+        transcriptChrome: { ...chrome, selectedBlockIds: ['b1'] },
+        transcript,
+      })));
+      const second = latest.hostProps!;
+
+      expect(second.selectedBlockIds).not.toBe(first.selectedBlockIds);
+      expect(second.softHiddenBlockIds).toBe(first.softHiddenBlockIds);
+      expect(second.actionedBlockIds).toBe(first.actionedBlockIds);
+      expect(second.onBlockContextMenu).toBe(first.onBlockContextMenu);
+      expect(second.onBlockSelect).toBe(first.onBlockSelect);
+    });
+
+    it('context-menu handler resolves blocks from the latest transcript', () => {
+      const { Probe, latest } = createHostPropsProbe();
+      const chrome = transcriptChromeMock();
+      const { rerender } = render(
+        React.createElement(Probe, hostFramePropsFixture({ transcriptChrome: chrome })),
+      );
+      const block = { id: 't2' };
+      rerender(React.createElement(Probe, hostFramePropsFixture({
+        transcriptChrome: chrome,
+        transcript: [block],
+      })));
+      const props = latest.hostProps!;
+      const event = { preventDefault: vi.fn() } as any;
+
+      props.onBlockContextMenu('t2', event);
+      expect(chrome.openBlockContextMenu).toHaveBeenCalledWith(block, event);
     });
   });
 });
