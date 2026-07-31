@@ -55,10 +55,10 @@ const { workbenchZhMap, chatviewZhMap } = vi.hoisted(() => {
     contextMenu: { copy:'复制', forward:'转发', pin:'置顶', delete:'删除', select:'选择', reply:'回复' },
     'settings.pane.appearance.title': '外观设置',
     'settings.pane.localDev.title': '本地开发设置',
-    agents: { 'nav.installed':'已安装', 'nav.market':'Agent 市场', 'detail.tools':'工具权限', 'installed.search':'搜索已安装 Agent', 'installed.title':'Agent管理', 'market.title':'Agent 市场', 'market.search':'搜索 Agent', 'market.install':'安装', 'market.installed':'已安装' },
+    agents: { 'nav.installed':'已安装', 'nav.market':'Agent 市场', 'detail.tools':'工具权限', 'installed.search':'搜索已安装 Agent', 'installed.title':'Agent管理', 'market.title':'Agent 市场', 'market.search':'搜索 Agent', 'market.install':'安装', 'market.installed':'已安装', 'empty.title':'暂无已安装 Agent', 'empty.description':'当前 Hub 账号还没有已安装配置。', 'empty.add':'添加 Agent' },
     contacts: { 'nav.internal':'组织内联系人', 'nav.external':'外部联系人', 'nav.newFriend':'新的联系人', 'search.placeholder':'搜索联系人' },
     tasks: { 'nav.all':'全部任务', 'nav.assigned':'分配给我', 'nav.created':'我创建的', 'nav.watching':'我关注的', 'view.list':'列表', 'view.board':'看板', 'view.timeline':'时间线', 'newTask':'新建任务', 'status.pending':'待执行', 'status.active':'进行中', 'status.done':'已完成', 'status.failed':'失败', 'status.cancelled':'已取消' },
-    projects: { 'nav.all':'全部项目', 'nav.running':'运行中', 'nav.completed':'已完成', 'nav.archived':'已归档', 'tab.overview':'概览', 'tab.settings':'设置', 'tab.members':'成员', 'newProject':'新建项目', loading:'正在加载项目…', 'empty.title':'暂无项目', 'empty.description':'创建第一个项目以开始协作。', 'empty.createFirst':'创建第一个项目' },
+    projects: { 'nav.all':'全部项目', 'nav.running':'运行中', 'nav.completed':'已完成', 'nav.archived':'已归档', 'tab.overview':'概览', 'tab.settings':'设置', 'tab.members':'成员', 'newProject':'新建项目', edit:'编辑项目', loading:'正在加载项目…', 'empty.title':'暂无项目', 'empty.description':'创建第一个项目以开始协作。', 'empty.createFirst':'创建第一个项目' },
     docs: { 'tab.recent':'最近访问', 'tab.mine':'归我所有', 'tab.shared':'与我共享', 'tab.starred':'收藏', 'newDoc':'新建文档', 'search.placeholder':'搜索云文档' },
     'settings.nav.appearance': '外观', 'settings.nav.appearanceDesc': '主题、语言和界面风格',
     'settings.nav.notifications': '通知', 'settings.nav.notificationsDesc': '消息提醒和声音',
@@ -2103,7 +2103,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(within(page).getByRole('button', { name: /筛选 1/ }));
     expect(within(page).getByRole('button', { name: '筛选' })).toBeInTheDocument();
 
-    fireEvent.click(within(page).getAllByRole('button', { name: '新建任务' })[0]);
+    fireEvent.click(within(page).getAllByRole('button', { name: '新建任务' })[0]!);
     expect(within(page).getByLabelText('编辑任务标题')).toHaveValue('未命名任务 1');
     fireEvent.change(within(page).getByLabelText('编辑任务标题'), {
       target: { value: '任务 CRUD 交互验收' },
@@ -2195,12 +2195,12 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('Prefer real data, allow development fallback')).toBeInTheDocument();
     expect(screen.queryByText('Normal 只走真实数据')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Fixture' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Fixture' })[0]!);
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('fixture');
     expect(screen.getByText('Fixture data')).toBeInTheDocument();
     expect(screen.getByText('Pinned shared workbench fixture')).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Approved real' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approved real' })[0]!);
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('approved-real');
     expect(screen.getAllByText('Approved real').length).toBeGreaterThan(0);
     expect(screen.getByText('Approved real Hub / Edge data only')).toBeInTheDocument();
@@ -3174,5 +3174,212 @@ describe('AgentHubWorkbench', () => {
       expect(titles[1]).toHaveTextContent('Alpha');
       expect(titles[2]).toHaveTextContent('Charlie');
     });
+  });
+
+  it('exposes a skip-to-content link that targets the workspace main region', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const skipLink = screen.getByRole('link', { name: 'a11y.skipToContent' });
+    expect(skipLink).toHaveAttribute('href', '#main-content');
+    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('id', 'main-content');
+  });
+
+  it('opens and toggles the keyboard-shortcuts help overlay with the global ? key', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // '?' outside editable targets opens the help overlay.
+    fireEvent.keyDown(document, { key: '?' });
+    const dialog = screen.getByRole('dialog', { name: 'shortcut.title' });
+    expect(within(dialog).getByText('shortcut.group.conversation')).toBeInTheDocument();
+    expect(within(dialog).getByText('shortcut.group.navigation')).toBeInTheDocument();
+    expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
+    expect(within(dialog).getByText('Enter')).toBeInTheDocument();
+
+    // A second '?' toggles it closed.
+    fireEvent.keyDown(document, { key: '?' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // '?' inside an editable element must not open the overlay.
+    const composer = screen.getByPlaceholderText('发消息给 Builder');
+    composer.focus();
+    fireEvent.keyDown(composer, { key: '?' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Esc closes the open overlay via the Modal.
+    fireEvent.keyDown(document, { key: '?' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('roves the global rail page buttons with arrow keys (single tab stop)', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const chatButton = screen.getByRole('button', { name: '对话' });
+    const contactsButton = screen.getByRole('button', { name: '联系人' });
+    const settingsButton = screen.getByRole('button', { name: '设置' });
+    const themeButton = screen.getByRole('button', { name: '切换主题' });
+
+    // Only the active page button is in the tab order by default.
+    expect(chatButton).toHaveAttribute('tabindex', '0');
+    expect(contactsButton).toHaveAttribute('tabindex', '-1');
+    expect(settingsButton).toHaveAttribute('tabindex', '-1');
+    // Non-page buttons (theme toggle) stay independently tabbable.
+    expect(themeButton).not.toHaveAttribute('tabindex');
+
+    // ArrowRight moves the single tab stop to the next page and navigates.
+    fireEvent.keyDown(chatButton, { key: 'ArrowRight' });
+    expect(contactsButton).toHaveAttribute('tabindex', '0');
+    expect(chatButton).toHaveAttribute('tabindex', '-1');
+    expect(document.activeElement).toBe(contactsButton);
+    expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'contacts');
+
+    // ArrowLeft wraps back to the previous page.
+    fireEvent.keyDown(contactsButton, { key: 'ArrowLeft' });
+    expect(chatButton).toHaveAttribute('tabindex', '0');
+    expect(contactsButton).toHaveAttribute('tabindex', '-1');
+    expect(document.activeElement).toBe(chatButton);
+
+    // ArrowLeft from the first page wraps to the rail footer settings page.
+    fireEvent.keyDown(chatButton, { key: 'ArrowLeft' });
+    expect(settingsButton).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(settingsButton);
+
+    // End jumps to the last page button; Home back to the first.
+    fireEvent.keyDown(settingsButton, { key: 'End' });
+    expect(settingsButton).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(settingsButton, { key: 'Home' });
+    expect(chatButton).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(chatButton);
+  });
+
+  it('roves inspector tabs with arrow keys across visible tabs', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    restoreInspectorTab('files');
+    restoreInspectorTab('browser');
+
+    const tablist = screen.getByRole('tablist', { name: '右侧工作区' });
+    const overviewTab = within(tablist).getByRole('tab', { name: /概览/ });
+    const browserTab = within(tablist).getByRole('tab', { name: /浏览器/ });
+    const filesTab = within(tablist).getByRole('tab', { name: /文件/ });
+
+    // Restoring a tab switches the active tab; reset to overview as the start.
+    fireEvent.click(overviewTab);
+    expect(overviewTab).toHaveAttribute('tabindex', '0');
+    expect(browserTab).toHaveAttribute('tabindex', '-1');
+    expect(filesTab).toHaveAttribute('tabindex', '-1');
+
+    // ArrowRight selects the next tab and moves the tab stop with it.
+    fireEvent.keyDown(overviewTab, { key: 'ArrowRight' });
+    expect(browserTab).toHaveAttribute('aria-selected', 'true');
+    expect(browserTab).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(browserTab);
+
+    fireEvent.keyDown(browserTab, { key: 'ArrowRight' });
+    expect(filesTab).toHaveAttribute('aria-selected', 'true');
+    expect(filesTab).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(filesTab);
+
+    // ArrowRight from the last tab wraps to the first.
+    fireEvent.keyDown(filesTab, { key: 'ArrowRight' });
+    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+    expect(overviewTab).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(overviewTab);
+  });
+
+  it('roving inspector tabs skip the capability-disabled browser tab', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    restoreInspectorTab('files');
+    restoreInspectorTab('browser');
+
+    const tablist = screen.getByRole('tablist', { name: '右侧工作区' });
+    const overviewTab = within(tablist).getByRole('tab', { name: /概览/ });
+    const browserTab = within(tablist).getByRole('tab', { name: /浏览器/ });
+    const filesTab = within(tablist).getByRole('tab', { name: /文件/ });
+
+    expect(browserTab).toBeDisabled();
+
+    // Restoring a tab switches the active tab; reset to overview as the start.
+    fireEvent.click(overviewTab);
+
+    // ArrowRight from overview skips the disabled browser tab → files.
+    fireEvent.keyDown(overviewTab, { key: 'ArrowRight' });
+    expect(filesTab).toHaveAttribute('aria-selected', 'true');
+    expect(filesTab).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(filesTab);
+
+    // ArrowRight from files wraps to overview, still skipping browser.
+    fireEvent.keyDown(filesTab, { key: 'ArrowRight' });
+    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(overviewTab);
   });
 });

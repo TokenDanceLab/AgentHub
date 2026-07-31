@@ -322,7 +322,11 @@
 .conversationList {
   display: flex;
   flex-direction: column;
-  gap: var(--wb-gap-2xs, 4px);
+  /* Virtualized list (virtua): row offsets are accumulated from each row's
+     measured CONTENT box — a flex `gap` here is invisible to that math and
+     would misalign rows progressively as the list grows. Row spacing moves
+     into an in-flow ::after spacer inside each row (see below). */
+  gap: 0;
   width: 100%;
   min-width: 0;
   min-height: 0;
@@ -333,6 +337,14 @@
   list-style: none;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* In-flow spacer per row: part of the measured content box, so virtua keeps
+   offsets correct while preserving the original 4px row rhythm. */
+.conversationList li::after {
+  content: '';
+  display: block;
+  height: var(--wb-gap-2xs, 4px);
 }
 
 .conversationButton {
@@ -2882,4 +2894,71 @@
   background:
     var(--canvas-ambient),
     var(--surface);
+}
+
+/* ═══ Skip-to-content (#8) ═══ */
+.skipLink {
+  position: fixed;
+  top: -100%;
+  left: 12px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: var(--r-sm);
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 600 13px var(--font-sans);
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.skipLink:focus {
+  top: 12px;
+}
+
+/* ═══ Global '?' keyboard-shortcuts help overlay (#8) ═══ */
+.shortcutHelpContent {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.shortcutHelp {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-lg);
+  padding: var(--sp-sm) 0;
+}
+
+.shortcutHelpGroup h3 {
+  margin: 0 0 var(--sp-xs);
+  font: 600 12px var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.shortcutHelpGroup ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcutHelpRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: 5px 0;
+  font: 400 13px var(--font-sans);
+  color: var(--text-1);
+}
+
+.shortcutHelpRow kbd {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg-3, var(--surface-dim, #f3f4f6));
+  color: var(--text-2);
+  font: 500 12px var(--mono, ui-monospace, monospace);
 }

@@ -1,7 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import Modal from '../ui/Modal';
+import { getResolvedShortcutGroups } from '../utils/keyboardShortcuts';
 import type { GlobalRailPage } from './GlobalRail';
+import styles from './AgentHubWorkbench.module.css';
 import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
@@ -41,6 +44,29 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
 
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
   const isChatPage = isWorkbenchChatPage(activePage);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+
+  // Global '?' opens/closes the keyboard-shortcuts help overlay (#8).
+  // Reuses getResolvedShortcutGroups() — the same data source as the
+  // Settings ShortcutsPane. Skips editable targets and modifier chords.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase() ?? '';
+      const isEditable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        target?.isContentEditable === true;
+      if (isEditable) return;
+      event.preventDefault();
+      setShortcutHelpOpen((open) => !open);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const layout = useWorkbenchPanelLayout({
     activePage,
     isChatPage,
@@ -114,5 +140,46 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
     ),
   });
 
-  return <WorkbenchFrame {...frameProps} />;
+  return (
+    <>
+      <a className={styles.skipLink} href="#main-content">
+        {translate('a11y.skipToContent')}
+      </a>
+      <WorkbenchFrame {...frameProps} />
+      <Modal
+        open={shortcutHelpOpen}
+        onClose={() => setShortcutHelpOpen(false)}
+        title={translate('shortcut.title')}
+        contentClassName={styles.shortcutHelpContent}
+      >
+        <ShortcutHelpContent />
+      </Modal>
+    </>
+  );
+}
+
+/** Keyboard-shortcut reference content for the global '?' help overlay.
+ *  Renders the same canonical groups as the Settings ShortcutsPane
+ *  (getResolvedShortcutGroups, including user-custom bindings). */
+function ShortcutHelpContent(): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const translate = t as (key: string) => string;
+  const groups = getResolvedShortcutGroups();
+  return (
+    <div className={styles.shortcutHelp}>
+      {groups.map((group) => (
+        <section className={styles.shortcutHelpGroup} key={group.id}>
+          <h3>{translate(group.labelKey)}</h3>
+          <ul>
+            {group.shortcuts.map((shortcut) => (
+              <li className={styles.shortcutHelpRow} key={shortcut.id}>
+                <span>{translate(shortcut.labelKey)}</span>
+                <kbd>{shortcut.keys.join(' + ')}</kbd>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
 }
