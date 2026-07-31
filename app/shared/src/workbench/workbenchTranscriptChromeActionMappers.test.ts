@@ -175,6 +175,55 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.edit');
   });
 
+  it('offers a recall menu item for user messages but not for agent messages', () => {
+    const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
+    const agentBlock = textBlock({ id: 'a' });
+
+    const onAction = vi.fn();
+    const userMenu = buildTranscriptContextMenuGroups({
+      blockId: 'u',
+      transcript: [userBlock],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+    });
+    const recallItem = userMenu.flat().find((i) => i.label === 'context.recall');
+    expect(recallItem).toBeDefined();
+    expect(recallItem?.danger).toBe(true);
+    recallItem?.onClick?.();
+    expect(onAction).toHaveBeenCalledWith('recall', 'u');
+
+    const agentMenu = buildTranscriptContextMenuGroups({
+      blockId: 'a',
+      transcript: [agentBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.recall');
+  });
+
+  it('keeps the pin menu item for both user and agent messages (unpin gated on pin state, TODO(unpinMenu))', () => {
+    const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
+    const agentBlock = textBlock({ id: 'a' });
+    const userMenu = buildTranscriptContextMenuGroups({
+      blockId: 'u',
+      transcript: [userBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    expect(userMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
+    const agentMenu = buildTranscriptContextMenuGroups({
+      blockId: 'a',
+      transcript: [agentBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    expect(agentMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
+  });
+
   it('plans Hub REST message actions (pin/unpin/recall/react) when a session id is available', () => {
     const transcript = [textBlock({ id: 'b1' })];
 

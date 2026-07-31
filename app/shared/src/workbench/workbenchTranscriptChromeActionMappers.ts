@@ -443,6 +443,11 @@ export function buildTranscriptContextMenuGroups({
   const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
   const isUserText = block?.kind === 'text' && block.author.role === 'human';
   const isTextBlock = block?.kind === 'text';
+  // Recall (撤回) is a message-level Hub REST action (#1383): only the user's
+  // own messages can be recalled (author.role === 'human'). Unlike edit
+  // (composer backfill) recall is not text-kind specific — any user-authored
+  // block id round-trips through the recall effect.
+  const isUserMessage = block?.author.role === 'human';
   return [
     [
       { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => onAction('copy', blockId) },
@@ -498,6 +503,14 @@ export function buildTranscriptContextMenuGroups({
     [
       { label: t('context.createTopic'), icon: 'groups', onClick: () => onAction('topic', blockId) },
       { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => onEnterSelection(blockId) },
+      // TODO(unpinMenu): the unpin entry needs message-level pin state that
+      // the backend/adapter does not expose yet. TranscriptBlockBase has no
+      // `pinned` field, HubMessage has none either (hubClientDomainTypes' pin
+      // fields are session/member level), and the MESSAGE_PIN WS frame
+      // (HubMessagePinFrame) has no consumer writing pin state back onto the
+      // block. When the adapter surfaces `block.pinned`, switch this item to
+      // `block.pinned ? unpin : pin` — `t('context.unpin')` label +
+      // `onAction('unpin', blockId)` when pinned.
       { label: t('context.pinMessage'), icon: 'bell', onClick: () => onAction('pin', blockId) },
       { label: t('context.copyLink'), icon: 'external', onClick: () => onAction('link', blockId) },
       { label: t('context.translate'), icon: 'library', onClick: () => onAction('translate', blockId) },
@@ -507,6 +520,12 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.addTask'), icon: 'running', onClick: () => onAction('task', blockId) },
       { label: t('context.exportDoc'), icon: 'download', onClick: () => onAction('export', blockId) },
       { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => onAction('apps', blockId) },
+      // Recall (#1383) only makes sense for the user's own messages — the
+      // Hub REST planner already supports it; the menu entry was missing.
+      // Danger-styled like delete.
+      ...(isUserMessage
+        ? [{ label: t('context.recall'), icon: 'back' as const, danger: true, onClick: () => onAction('recall', blockId) }]
+        : []),
       { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => onAction('delete', blockId) },
     ],
   ];
