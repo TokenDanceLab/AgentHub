@@ -391,6 +391,11 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               </div>
             )
           })()}
+          {/* a11y TODO (#10 approval arrival): this waiting approval card lives inside the
+              Transcript's role=log region. Under virtualization the card is unmounted while
+              outside the buffer window, so its arrival is never announced to screen readers.
+              Fix: a live region OUTSIDE the virtualizer (ChatViewTranscript/consumer level)
+              fed by an approval-arrival signal — needs data flow changes, deferred. */}
           {item.apReason && item.status==='waiting' && (
             <div className={`ap-actions${item.riskLevel ? ' has-risk' : ''}`}>
               {item.riskLevel && (
