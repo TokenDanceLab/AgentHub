@@ -12,6 +12,7 @@ import type { WorkbenchConversation } from '../platform';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
 import type { TranscriptUserItem } from '../chatview/transcript-item';
+import type { UnreadDividerDescriptor } from '../chatview';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import { useTypingPresence } from '../chatview/typingPresence';
 import { SubagentStreamOverlay } from './team/SubagentStreamOverlay';
@@ -57,6 +58,11 @@ export interface ChatViewBridgeProps {
   dismissedPinnedIds: Set<string>;
   /** Called to show a toast (used for pinned announcement copy feedback). */
   onToast?: ((message: string) => void) | undefined;
+  /**
+   * Unread-messages divider descriptor (T8 desktop IM path). Resolved by the
+   * ChatView against the adapted items; absent for non-IM transcripts.
+   */
+  unreadDivider?: UnreadDividerDescriptor | undefined;
 }
 
 /**
@@ -89,6 +95,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   connectionStatus,
   dismissedPinnedIds,
   onToast,
+  unreadDivider,
 }: ChatViewBridgeProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const chatMode = useMemo<'dm' | 'group'>(
@@ -128,6 +135,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         transcript={displayTranscript}
         sessionId={activeConversation?.id}
         chatMode={chatMode}
+        unreadDivider={unreadDivider}
         onAgentClick={onAgentClick}
         onBlockContextMenu={onBlockContextMenu}
         onBlockSelect={onBlockSelect}

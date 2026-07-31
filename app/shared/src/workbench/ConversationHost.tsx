@@ -14,6 +14,7 @@ import { MainchainStatusStrip } from './MainchainStatusStrip';
 import type { MainchainSummary } from './mainchain';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
+import type { UnreadDividerDescriptor } from '../chatview';
 import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
@@ -60,6 +61,11 @@ export interface ConversationHostProps {
    * `hub-message-` prefix and calls `editMessage` REST.
    */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
+  /**
+   * Unread-messages divider descriptor (T8 desktop IM path). Passed through to
+   * the ChatView; absent for non-IM transcripts.
+   */
+  transcriptUnreadDivider?: UnreadDividerDescriptor | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -79,6 +85,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   composer, dispatchComposer, composerInputRef,
   searchOpen, onSearchOpenChange,
   isAgentRunning, onCancelRun, onEditMessage,
+  transcriptUnreadDivider,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -198,6 +205,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
       <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
         <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
+          unreadDivider={transcriptUnreadDivider}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
           onReviewFile={onReviewFile} onDeploySubmit={onDeploySubmit}

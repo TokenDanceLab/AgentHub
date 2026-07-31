@@ -43,6 +43,31 @@
   align-self: center;
 }
 
+/* ── Unread divider (desktop IM read watermark, T8) ──────────────── */
+.unread-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md, 16px);
+  align-self: stretch;
+  color: var(--text-3);
+}
+.unread-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--bdr);
+}
+.unread-divider-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-xs);
+  font: 400 0.625rem var(--font-sans);
+  white-space: nowrap;
+}
+.unread-divider-read-through {
+  color: var(--text-2);
+}
+
 /* ── Empty state ──────────────────────────────────────────────────── */
 .chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
 

@@ -223,6 +223,8 @@ export function buildWorkbenchFrameProps(
     setActivePage,
   };
 
+  assignDefined(frameProps, 'transcriptUnreadDivider', props.transcriptUnreadDivider);
+
   assignDefined(frameProps, 'agents', props.agents);
   assignDefined(frameProps, 'composerExecutionTargets', props.composerExecutionTargets);
   assignDefined(frameProps, 'workbenchStatus', props.workbenchStatus);
