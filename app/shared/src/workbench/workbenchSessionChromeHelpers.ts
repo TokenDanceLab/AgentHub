@@ -29,6 +29,8 @@ import type { MainchainSummary } from './mainchain';
 import type { FileItem, RunResultInfo } from './inspector';
 import type { SettingsService } from './settingsService';
 import type { GlobalRailPage } from './GlobalRail';
+import { matchesShortcut } from '../utils/keyboardUtils';
+import type { KeyboardEventLike } from '../utils/keyboardUtils';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchSessionChromeHelpers — pure residual slices from
@@ -256,12 +258,8 @@ export function shouldLoadSessionImport(input: {
 }
 
 /** Ctrl/Cmd+F search shortcut for chat page. */
-export function isChatSearchShortcut(event: {
-  key: string;
-  ctrlKey: boolean;
-  metaKey: boolean;
-}): boolean {
-  return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f';
+export function isChatSearchShortcut(event: KeyboardEventLike): boolean {
+  return matchesShortcut(event, ['Ctrl/⌘', 'F']);
 }
 
 export interface MainchainEvidenceExportPayload {

@@ -5,8 +5,9 @@ export const BINDING_IDS = [
   'send',
   'newline',
   'search',
-  'toggleSidebar',
-  'toggleRunPanel',
+  'chat-search',
+  'toggle-sidebar',
+  'toggle-run-panel',
   'close',
   'help',
 ] as const;
@@ -17,8 +18,9 @@ export const DEFAULT_BINDINGS: Record<BindingId, string[]> = {
   send: ['Enter'],
   newline: ['Shift', 'Enter'],
   search: ['Ctrl', 'K'],
-  toggleSidebar: ['Ctrl', 'B'],
-  toggleRunPanel: ['Ctrl', 'J'],
+  'chat-search': ['Ctrl', 'F'],
+  'toggle-sidebar': ['Ctrl', 'B'],
+  'toggle-run-panel': ['Ctrl', 'J'],
   close: ['Escape'],
   help: ['?'],
 };

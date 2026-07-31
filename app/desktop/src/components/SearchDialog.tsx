@@ -5,7 +5,6 @@ import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@shared/types/chat';
 import type { ThreadInfo } from '@shared/types';
-import { matchesBinding, getBinding } from '@/utils/keyboardShortcuts';
 import styles from './SearchDialog.module.css';
 
 interface Props {
@@ -87,13 +86,9 @@ export default function SearchDialog({ messages, onSelect, threads = [], onSelec
     );
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Ctrl+K to open, Esc to close
+  // Esc to close (Ctrl+K to open is handled by the central useGlobalKeyboardShortcuts hook)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (matchesBinding(e, getBinding('search'))) {
-        e.preventDefault();
-        useSearchStore.getState().openDialog();
-      }
       if (e.key === 'Escape') closeDialog();
     };
     window.addEventListener('keydown', handler);
