@@ -175,6 +175,7 @@ export function WorkbenchFrame({
         ref={workspaceRef as React.RefObject<HTMLElement>}
         aria-label={t('aria.workspace')}
         className={styles.workspace}
+        id="main-content"
         {...workspaceDataAttrs}
       >
         {showLoadError ? (

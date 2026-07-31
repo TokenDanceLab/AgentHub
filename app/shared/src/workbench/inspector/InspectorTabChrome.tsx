@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
@@ -108,10 +108,53 @@ export function InspectorMonitorHead({
   const inspectorTabs = getInspectorTabs(t);
   const quickOpenItems = getQuickOpenItems(t);
   const visibleInspectorTabs = inspectorTabs.filter((tab) => visibleTabs.has(tab.mode));
+  const tablistRef = useRef<HTMLDivElement>(null);
+
+  /* Roving tabindex (#8): ArrowLeft/Right + Home/End move the single tab stop
+     between visible tabs, skipping the capability-disabled browser tab.
+     Same pattern as ContextMenu.tsx: index state + focus-on-change. */
+  function handleTablistKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
+    const enabledTabs = visibleInspectorTabs.filter(
+      (tab) => !(tab.mode === 'browser' && !browserPreviewEnabled),
+    );
+    if (enabledTabs.length === 0) return;
+
+    const current = enabledTabs.findIndex((tab) => tab.mode === activeMode);
+    const from = current >= 0 ? current : 0;
+    let next = -1;
+    switch (event.key) {
+      case 'ArrowRight':
+        next = (from + 1) % enabledTabs.length;
+        break;
+      case 'ArrowLeft':
+        next = (from - 1 + enabledTabs.length) % enabledTabs.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = enabledTabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const nextMode = enabledTabs[next]!.mode;
+    onSelectMode(nextMode);
+    tablistRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-inspector-tab="${nextMode}"]`)
+      ?.focus();
+  }
 
   return (
     <div className={styles.monitorHead}>
-      <div aria-label="右侧工作区" className={styles.inspectorTabs} role="tablist">
+      <div
+        aria-label="右侧工作区"
+        className={styles.inspectorTabs}
+        onKeyDown={handleTablistKeyDown}
+        ref={tablistRef}
+        role="tablist"
+      >
         {visibleInspectorTabs.map((tab) => {
           const disabled = tab.mode === 'browser' && !browserPreviewEnabled;
           return (
@@ -128,6 +171,7 @@ export function InspectorMonitorHead({
                 onCloseTab(tab.mode);
               }}
               role="tab"
+              tabIndex={activeMode === tab.mode ? 0 : -1}
               type="button"
             >
               <TabMark char={tab.markChar} mode={tab.mode} onClose={onCloseTab} t={t}>
