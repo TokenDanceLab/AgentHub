@@ -22,15 +22,12 @@ export function composerReducer(
 ): ComposerState {
   switch (action.type) {
     case 'setConversationId':
+      // Full reset: text/mentions/attachments are session-scoped.
+      // Draft persistence (T10) restores per-session state via localStorage
+      // when the composer comes up empty for the new conversation.
       return state.conversationId === action.conversationId
         ? state
-        : {
-            ...state,
-            conversationId: action.conversationId,
-            submitState: 'idle',
-            // A stale edit context must not survive a conversation switch (#1462).
-            editingMessageId: null,
-          };
+        : createInitialComposerState(action.conversationId);
     case 'setText':
       return {
         ...state,

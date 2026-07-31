@@ -50,6 +50,7 @@ describe('unifiedComposerHostKeyDown', () => {
       isSubmitting: false,
       targetSelectionRequired: false,
       executionTargetId: '',
+      isRunning: false,
     })).toEqual({ kind: 'insert-newline', nextText: 'a\nb', caret: 2 });
 
     expect(planComposerHostKeyDownFromEvent({
@@ -72,6 +73,7 @@ describe('unifiedComposerHostKeyDown', () => {
       isSubmitting: false,
       targetSelectionRequired: true,
       executionTargetId: '',
+      isRunning: false,
     })).toEqual({ kind: 'blocked-submit' });
 
     expect(composerCaretRestore(4)).toEqual({
@@ -118,6 +120,7 @@ describe('unifiedComposerHostKeyDown', () => {
       isSubmitting: false,
       targetSelectionRequired: false,
       executionTargetId: '',
+      isRunning: false,
     })).toEqual({
       kind: 'insert-newline',
       textAction: { type: 'setText', text: 'a\nb' },
@@ -144,6 +147,7 @@ describe('unifiedComposerHostKeyDown', () => {
       isSubmitting: false,
       targetSelectionRequired: false,
       executionTargetId: '',
+      isRunning: false,
     })).toEqual({ kind: 'submit' });
   });
 });

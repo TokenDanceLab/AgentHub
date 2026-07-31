@@ -204,6 +204,7 @@ export function canSubmitFromKeyDown(params: {
   isSubmitting: boolean;
   targetSelectionRequired: boolean;
   executionTargetId: string;
+  isRunning: boolean;
 }): boolean {
   const {
     currentText,
@@ -211,11 +212,12 @@ export function canSubmitFromKeyDown(params: {
     isSubmitting,
     targetSelectionRequired,
     executionTargetId,
+    isRunning,
   } = params;
   const hasText = currentText.trim().length > 0;
   const canSubmit = hasText || attachments.length > 0;
   const targetOk = !targetSelectionRequired || executionTargetId.trim().length > 0;
-  return canSubmit && !isSubmitting && targetOk;
+  return canSubmit && !isSubmitting && targetOk && !isRunning;
 }
 
 export function findMentionById(
