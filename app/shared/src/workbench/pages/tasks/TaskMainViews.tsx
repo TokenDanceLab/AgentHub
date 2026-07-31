@@ -6,9 +6,10 @@
    CSS remains on shared TasksPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
+import { StatusNotice } from '../../../ui';
 import { DesignNavIcon } from '../../designIcons';
 import styles from '../TasksPage.module.css';
 import { TaskSelectionStrip, TaskTable } from './TaskTableViews';
@@ -39,6 +40,9 @@ export type TaskMainProps = Pick<
   | 'fieldConfigActive'
   | 'showCreatorColumn'
   | 'selectedTaskId'
+  | 'hasMore'
+  | 'loadingMore'
+  | 'onLoadMore'
   | 'onCreateTask'
   | 'onAddTaskRow'
   | 'onTaskClick'
@@ -80,6 +84,9 @@ export function TaskMain({
   fieldConfigActive = false,
   showCreatorColumn = true,
   selectedTaskId = null,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   onCreateTask,
   onAddTaskRow,
   onTaskClick,
@@ -99,6 +106,31 @@ export function TaskMain({
 }: TaskMainProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const title = PANE_TITLES[activePane] ?? '我负责的';
+
+  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO) ──
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    // Environments without IntersectionObserver (jsdom, legacy browsers)
+    // fall back to the explicit "加载更多" button below.
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMoreRef.current?.();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore]);
 
   return (
     <main className={`${styles.main} workbench-main`}>
@@ -230,6 +262,28 @@ export function TaskMain({
         onSaveEdit={onSaveTaskEdit}
         onTaskClick={onTaskClick}
       />
+
+      {/* ── Infinite-scroll load-more (skeleton; hasMore stays false until the
+              data layer exposes pageCursor — see useWorkbenchTasksRoute) ── */}
+      {hasMore && !loadingMore ? (
+        <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
+          加载更多
+        </button>
+      ) : null}
+      <div
+        ref={sentinelRef}
+        className={styles.sentinel}
+        role="status"
+        aria-label={loadingMore ? '加载中…' : undefined}
+      />
+      {loadingMore ? (
+        <StatusNotice
+          icon={<DesignNavIcon name="running" size={14} />}
+          role="status"
+        >
+          加载中…
+        </StatusNotice>
+      ) : null}
     </main>
   );
 }
