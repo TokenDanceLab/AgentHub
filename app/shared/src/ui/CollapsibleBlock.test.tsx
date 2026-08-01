@@ -23,13 +23,18 @@ describe('CollapsibleBlock', () => {
     expect(screen.getByTestId('child')).toBeDefined();
   });
 
-  it('hides children when collapsed by default', () => {
-    render(
+  it('keeps children in DOM but hidden when collapsed by default', () => {
+    const { container } = render(
       <CollapsibleBlock label="Section">
         <p data-testid="child">Hidden content</p>
       </CollapsibleBlock>,
     );
-    expect(screen.queryByTestId('child')).toBeNull();
+    const block = container.firstElementChild as HTMLElement;
+    // Always-mounted for exit fade: child stays in DOM, but the block is in
+    // closed state and the content node is aria-hidden (visually faded out
+    // via CSS opacity/height, not by unmounting).
+    expect(block.getAttribute('data-state')).toBe('closed');
+    expect(screen.queryByTestId('child')).not.toBeNull();
   });
 
   it('toggles expanded state on header click', async () => {
@@ -40,13 +45,21 @@ describe('CollapsibleBlock', () => {
       </CollapsibleBlock>,
     );
     const header = screen.getByRole('button');
-    expect(screen.queryByTestId('child')).toBeNull();
+    const contentId = header.getAttribute('aria-controls');
+    expect(contentId).toBeTruthy();
 
-    await user.click(header);
+    await user.click(header); // expand
     expect(screen.getByTestId('child')).toBeDefined();
+    expect(header.getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById(contentId!)?.getAttribute('aria-hidden')).toBe('false');
 
-    await user.click(header);
-    expect(screen.queryByTestId('child')).toBeNull();
+    await user.click(header); // collapse
+    // Child stays in DOM (always-mounted) for the exit fade; the content node
+    // is now aria-hidden so AT cannot reach it. Visibility is driven by CSS,
+    // not by unmounting.
+    expect(screen.queryByTestId('child')).not.toBeNull();
+    expect(header.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById(contentId!)?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('sets aria-expanded on the header button', () => {
@@ -104,7 +117,7 @@ describe('CollapsibleBlock', () => {
     expect(content?.tagName).toBe('DIV');
   });
 
-  it('does not render content when collapsed (aria-controls still present)', () => {
+  it('keeps content node in DOM and aria-hidden when collapsed', () => {
     render(
       <CollapsibleBlock label="Section">
         <p data-testid="child">Hidden content</p>
@@ -114,8 +127,13 @@ describe('CollapsibleBlock', () => {
     const contentId = header.getAttribute('aria-controls');
     expect(contentId).toBeTruthy();
 
-    // Content element should not exist in DOM when collapsed
-    expect(document.getElementById(contentId!)).toBeNull();
+    // Always-mounted for exit fade: the content element stays in the DOM so
+    // the CSS opacity transition can play on collapse. When collapsed it is
+    // aria-hidden (unreachable to AT) instead of unmounted.
+    const content = document.getElementById(contentId!);
+    expect(content).toBeTruthy();
+    expect(content?.tagName).toBe('DIV');
+    expect(content?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('renders a badge when provided', () => {
