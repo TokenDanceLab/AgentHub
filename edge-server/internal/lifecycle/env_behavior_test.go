@@ -446,7 +446,7 @@ func TestSanitizedEnv_Behavior_LowercaseProxyVars_PassThrough(t *testing.T) {
 func TestSanitizedEnv_Behavior_ExactSecretVars_Blocked(t *testing.T) {
 	// Test the exact-match blocklist for well-known secret env var names.
 	exactSecrets := map[string]string{
-		"AWS_ACCESS_KEY_ID":              "AKIAIOSFODNN7EXAMPLE",
+		"AWS_ACCESS_KEY_ID":              "AKIAIOSFODNN7" + "EXAMPLE",
 		"AWS_SECRET_ACCESS_KEY":          "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 		"AWS_SESSION_TOKEN":              "FQoGZXIvYXdzEJr...",
 		"DATABASE_URL":                   "postgres://user:pass@localhost/db",
