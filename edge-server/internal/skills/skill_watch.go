@@ -250,7 +250,7 @@ func (r *SkillRegistry) removeSkillByPath(path string) {
 // debounce cycle.
 func (r *SkillRegistry) flushPendingReloads() {
 	r.debounceMu.Lock()
-	if r.pendingPaths == nil || len(r.pendingPaths) == 0 {
+	if len(r.pendingPaths) == 0 {
 		r.debounceMu.Unlock()
 		return
 	}

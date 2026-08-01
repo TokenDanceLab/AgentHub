@@ -339,13 +339,14 @@ func sanitizeParentEnv(extraEnv []string) ([]string, EnvFilterAudit) {
 			continue
 		}
 		audit.TotalVars++
-		if IsSensitiveEnvKey(key) {
+		switch {
+		case IsSensitiveEnvKey(key):
 			audit.SensitiveVars++
 			audit.FilteredKeys = append(audit.FilteredKeys, key)
-		} else if isWhitelistedEnvKey(key) {
+		case isWhitelistedEnvKey(key):
 			audit.PassedVars++
 			env = append(env, kv)
-		} else {
+		default:
 			audit.NotWhitelisted++
 			audit.FilteredKeys = append(audit.FilteredKeys, key)
 		}

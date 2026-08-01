@@ -18,37 +18,46 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 		n, err := reader.Read(buf)
 		readPlan := planOutputRead(n, err)
 		if readPlan.Process {
-			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
-			chunk := planOutputChunk(run.ID, stream, allowed, offset, truncatedNow, written, maxBytes, outStore != nil)
-			if chunk.Publish {
-				// Log stderr to structured logger so CC failure diagnostics
-				// are visible in Edge server logs without subscribing to bus events.
-				if chunk.LogStderr {
-					for _, line := range stderrLogLines(chunk.Text) {
-						sanitizedLine, _ := recursiveSanitizeString(line)
-						slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
-					}
-				}
-				if chunk.WriteStore {
-					if _, err := outStore.Write(chunk.Text); planOutputStoreWriteLog(err).Log {
-						slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
-					}
-				}
-				if chunk.ForwardHub {
-					e.recordHubOutput(run.ID, chunk.Text)
-					e.fireHubStream(run.ID, chunk.Text)
-				}
-				if chunk.LogTruncate {
-					slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
-				}
-				e.bus.Publish("run.output.batch", runScope(run), chunk.Payload)
-				offset = chunk.NextOffset
-			}
+			offset = e.publishOutputChunk(run, outStore, limiter, stream, buf[:n], offset)
 		}
 		if readPlan.Stop {
 			return
 		}
 	}
+}
+
+// publishOutputChunk applies the output limiter to one read chunk and performs
+// the per-chunk side effects (stderr logging, output store write, Hub stream
+// forwarding, truncation warning, run.output.batch publish). It returns the
+// updated chunk offset for the caller's next iteration.
+func (e *ProcessExecutor) publishOutputChunk(run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, data []byte, offset int) int {
+	allowed, truncatedNow, written, maxBytes := limiter.allow(data)
+	chunk := planOutputChunk(run.ID, stream, allowed, offset, truncatedNow, written, maxBytes, outStore != nil)
+	if !chunk.Publish {
+		return offset
+	}
+	// Log stderr to structured logger so CC failure diagnostics
+	// are visible in Edge server logs without subscribing to bus events.
+	if chunk.LogStderr {
+		for _, line := range stderrLogLines(chunk.Text) {
+			sanitizedLine, _ := recursiveSanitizeString(line)
+			slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
+		}
+	}
+	if chunk.WriteStore {
+		if _, err := outStore.Write(chunk.Text); planOutputStoreWriteLog(err).Log {
+			slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
+		}
+	}
+	if chunk.ForwardHub {
+		e.recordHubOutput(run.ID, chunk.Text)
+		e.fireHubStream(run.ID, chunk.Text)
+	}
+	if chunk.LogTruncate {
+		slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
+	}
+	e.bus.Publish("run.output.batch", runScope(run), chunk.Payload)
+	return chunk.NextOffset
 }
 
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {

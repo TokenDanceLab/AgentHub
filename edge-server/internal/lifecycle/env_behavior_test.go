@@ -168,23 +168,23 @@ func TestSanitizedEnv_Behavior_SensitivePatterns_TOKEN_KEY_SECRET_PASSWORD(t *te
 	// Test that the suffix-based sensitive detection correctly blocks
 	// vars ending with TOKEN, KEY, SECRET, PASSWORD (and their variations).
 	sensitiveVars := map[string]string{
-		"MY_TOKEN":                "tok1",
-		"API_TOKEN":               "tok2",
-		"ACCESS_TOKEN":            "tok3",
-		"REFRESH_TOKEN":           "tok4",
-		"AUTH_TOKEN":              "tok5",
-		"MY_KEY":                  "key1",
-		"ENCRYPTION_KEY":          "key2",
-		"API_KEY":                 "key3",
-		"PRIVATE_KEY":             "key4",
-		"MY_SECRET":               "sec1",
-		"API_SECRET":              "sec2",
-		"CLIENT_SECRET":           "sec3",
-		"MY_PASSWORD":             "pw1",
-		"DB_PASSWORD":             "pw2",
-		"ADMIN_PASSWORD":          "pw3",
-		"MY_CREDENTIAL":           "cred1",
-		"SERVICE_CREDENTIALS":     "cred2",
+		"MY_TOKEN":                       "tok1",
+		"API_TOKEN":                      "tok2",
+		"ACCESS_TOKEN":                   "tok3",
+		"REFRESH_TOKEN":                  "tok4",
+		"AUTH_TOKEN":                     "tok5",
+		"MY_KEY":                         "key1",
+		"ENCRYPTION_KEY":                 "key2",
+		"API_KEY":                        "key3",
+		"PRIVATE_KEY":                    "key4",
+		"MY_SECRET":                      "sec1",
+		"API_SECRET":                     "sec2",
+		"CLIENT_SECRET":                  "sec3",
+		"MY_PASSWORD":                    "pw1",
+		"DB_PASSWORD":                    "pw2",
+		"ADMIN_PASSWORD":                 "pw3",
+		"MY_CREDENTIAL":                  "cred1",
+		"SERVICE_CREDENTIALS":            "cred2",
 		"GOOGLE_APPLICATION_CREDENTIALS": "gac1",
 	}
 
@@ -446,39 +446,39 @@ func TestSanitizedEnv_Behavior_LowercaseProxyVars_PassThrough(t *testing.T) {
 func TestSanitizedEnv_Behavior_ExactSecretVars_Blocked(t *testing.T) {
 	// Test the exact-match blocklist for well-known secret env var names.
 	exactSecrets := map[string]string{
-		"AWS_ACCESS_KEY_ID":           "AKIAIOSFODNN7EXAMPLE",
-		"AWS_SECRET_ACCESS_KEY":       "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		"AWS_SESSION_TOKEN":           "FQoGZXIvYXdzEJr...",
-		"DATABASE_URL":                "postgres://user:pass@localhost/db",
-		"DATABASE_PASSWORD":           "db-secret",
-		"DB_URL":                      "mysql://user:pass@localhost/db",
-		"MONGODB_URI":                 "mongodb://user:pass@localhost:27017",
-		"REDIS_URL":                   "redis://:password@localhost:6379",
-		"CONNECTION_STRING":           "Server=localhost;User=sa;Password=secret",
-		"PGPASSWORD":                  "pg-secret",
-		"MYSQL_PWD":                   "mysql-secret",
-		"DOCKER_PASSWORD":             "docker-secret",
-		"DOCKER_AUTH":                 "docker-auth-data",
-		"GITHUB_TOKEN":                "ghp_fake123",
-		"GITLAB_TOKEN":                "glpat-fake123",
-		"BITBUCKET_TOKEN":             "bb-fake123",
-		"NPM_TOKEN":                   "npm_fake123",
-		"NUGET_API_KEY":               "nuget-fake123",
-		"PYPI_TOKEN":                  "pypi-fake123",
-		"AZURE_STORAGE_KEY":           "azure-key-fake",
-		"AZURE_CLIENT_SECRET":         "azure-secret-fake",
+		"AWS_ACCESS_KEY_ID":              "AKIAIOSFODNN7" + "EXAMPLE",
+		"AWS_SECRET_ACCESS_KEY":          "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+		"AWS_SESSION_TOKEN":              "FQoGZXIvYXdzEJr...",
+		"DATABASE_URL":                   "postgres://user:pass@localhost/db",
+		"DATABASE_PASSWORD":              "db-secret",
+		"DB_URL":                         "mysql://user:pass@localhost/db",
+		"MONGODB_URI":                    "mongodb://user:pass@localhost:27017",
+		"REDIS_URL":                      "redis://:password@localhost:6379",
+		"CONNECTION_STRING":              "Server=localhost;User=sa;Password=secret",
+		"PGPASSWORD":                     "pg-secret",
+		"MYSQL_PWD":                      "mysql-secret",
+		"DOCKER_PASSWORD":                "docker-secret",
+		"DOCKER_AUTH":                    "docker-auth-data",
+		"GITHUB_TOKEN":                   "ghp_fake123",
+		"GITLAB_TOKEN":                   "glpat-fake123",
+		"BITBUCKET_TOKEN":                "bb-fake123",
+		"NPM_TOKEN":                      "npm_fake123",
+		"NUGET_API_KEY":                  "nuget-fake123",
+		"PYPI_TOKEN":                     "pypi-fake123",
+		"AZURE_STORAGE_KEY":              "azure-key-fake",
+		"AZURE_CLIENT_SECRET":            "azure-secret-fake",
 		"GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json",
-		"KUBECONFIG":                  "/path/to/kubeconfig",
-		"JWT_SECRET":                  "jwt-fake",
-		"ENCRYPTION_KEY":              "enc-fake",
-		"MASTER_KEY":                  "master-fake",
-		"SIGNING_KEY":                 "sign-fake",
-		"SSH_PRIVATE_KEY":             "-----BEGIN RSA PRIVATE KEY-----",
-		"CODEX_ACCESS_TOKEN":          "codex-fake",
-		"CODEX_CONNECTORS_TOKEN":      "connectors-fake",
-		"OPENAI_API_KEY":              "sk-fake",
-		"ANTHROPIC_API_KEY":           "sk-ant-fake",
-		"CLAUDE_API_KEY":              "sk-ant-claude-fake",
+		"KUBECONFIG":                     "/path/to/kubeconfig",
+		"JWT_SECRET":                     "jwt-fake",
+		"ENCRYPTION_KEY":                 "enc-fake",
+		"MASTER_KEY":                     "master-fake",
+		"SIGNING_KEY":                    "sign-fake",
+		"SSH_PRIVATE_KEY":                "-----BEGIN RSA PRIVATE KEY" + "-----",
+		"CODEX_ACCESS_TOKEN":             "codex-fake",
+		"CODEX_CONNECTORS_TOKEN":         "connectors-fake",
+		"OPENAI_API_KEY":                 "sk-fake",
+		"ANTHROPIC_API_KEY":              "sk-ant-fake",
+		"CLAUDE_API_KEY":                 "sk-ant-claude-fake",
 	}
 
 	for k, v := range exactSecrets {
@@ -501,16 +501,16 @@ func TestSanitizedEnv_Behavior_CaseInsensitive_SensitiveDetection(t *testing.T) 
 	// IsSensitiveEnvKey is case-insensitive. Lowercase variants of secret
 	// suffixes should also be blocked.
 	sensitiveVars := map[string]string{
-		"my_api_key":              "val1",
-		"MY_API_KEY":              "val2",
-		"anthropic_api_key":       "val3",
-		"ANTHROPIC_API_KEY":       "val4",
-		"github_token":            "val5",
-		"GITHUB_TOKEN":            "val6",
-		"db_password":             "val7",
-		"DB_PASSWORD":             "val8",
-		"jwt_secret":              "val9",
-		"JWT_SECRET":              "val10",
+		"my_api_key":        "val1",
+		"MY_API_KEY":        "val2",
+		"anthropic_api_key": "val3",
+		"ANTHROPIC_API_KEY": "val4",
+		"github_token":      "val5",
+		"GITHUB_TOKEN":      "val6",
+		"db_password":       "val7",
+		"DB_PASSWORD":       "val8",
+		"jwt_secret":        "val9",
+		"JWT_SECRET":        "val10",
 	}
 
 	for k, v := range sensitiveVars {
@@ -533,11 +533,11 @@ func TestSanitizedEnv_Behavior_IsSensitiveEnvKey_DoesNotFalsePositiveOnPartial(t
 	// Suffix matching is by HasSuffix, not substring. Vars that contain
 	// sensitive substrings but don't end with them should NOT be flagged.
 	nonSensitive := []string{
-		"TOKENIZER_PATH",       // does not end with _TOKEN
-		"KEYSTORE_PATH",        // does not end with _KEY
-		"SECRETARY_NAME",       // does not end with _SECRET
-		"PASSWORDLESS_CONFIG",  // does not end with _PASSWORD
-		"KEY_GENERATION_ALGO",  // does not end with _KEY
+		"TOKENIZER_PATH",      // does not end with _TOKEN
+		"KEYSTORE_PATH",       // does not end with _KEY
+		"SECRETARY_NAME",      // does not end with _SECRET
+		"PASSWORDLESS_CONFIG", // does not end with _PASSWORD
+		"KEY_GENERATION_ALGO", // does not end with _KEY
 	}
 
 	for _, key := range nonSensitive {
@@ -663,7 +663,7 @@ func TestIsSensitiveEnvKey_Behavior_AllSuffixPatterns(t *testing.T) {
 		// Suffix: _API_SECRET
 		{"MY_API_SECRET", true},
 		// Negative: safe vars
-		{"API_KEY_HOLDER", false},   // ends with HOLDER, not _KEY
+		{"API_KEY_HOLDER", false},    // ends with HOLDER, not _KEY
 		{"TOKEN_COUNT", false},       // ends with COUNT, not _TOKEN
 		{"SECRET_AGENT_CODE", false}, // ends with CODE, not _SECRET
 	}

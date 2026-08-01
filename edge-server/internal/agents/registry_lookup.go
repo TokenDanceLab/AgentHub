@@ -151,7 +151,7 @@ func (r *Registry) CountActiveByParent(parentID string) int {
 		switch inst.Status {
 		case StatusCompleted, StatusError, StatusDisconnected:
 			continue
-		default:
+		case StatusOnline, StatusBusy, StatusIdle, StatusWaitingInput, StatusDraining:
 			count++
 		}
 	}

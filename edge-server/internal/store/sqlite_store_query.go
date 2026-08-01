@@ -22,108 +22,42 @@ type sqliteRowUpsert struct {
 func applySQLiteRow(snapshot *fileSnapshot, kind, id, payload string) error {
 	switch kind {
 	case sqliteRowKindProject:
-		var value Project
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite project row %s: %w", id, err)
-		}
-		if snapshot.Projects == nil {
-			snapshot.Projects = map[string]Project{}
-		}
-		snapshot.Projects[id] = value
-		snapshot.ProjectOrder = append(snapshot.ProjectOrder, id)
+		return applySQLiteEntityRow(&snapshot.Projects, &snapshot.ProjectOrder, id, payload, "project")
 	case sqliteRowKindThread:
-		var value Thread
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite thread row %s: %w", id, err)
-		}
-		if snapshot.Threads == nil {
-			snapshot.Threads = map[string]Thread{}
-		}
-		snapshot.Threads[id] = value
-		snapshot.ThreadOrder = append(snapshot.ThreadOrder, id)
+		return applySQLiteEntityRow(&snapshot.Threads, &snapshot.ThreadOrder, id, payload, "thread")
 	case sqliteRowKindRun:
-		var value Run
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite run row %s: %w", id, err)
-		}
-		if snapshot.Runs == nil {
-			snapshot.Runs = map[string]Run{}
-		}
-		snapshot.Runs[id] = value
-		snapshot.RunOrder = append(snapshot.RunOrder, id)
+		return applySQLiteEntityRow(&snapshot.Runs, &snapshot.RunOrder, id, payload, "run")
 	case sqliteRowKindItem:
-		var value Item
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite item row %s: %w", id, err)
-		}
-		if snapshot.Items == nil {
-			snapshot.Items = map[string]Item{}
-		}
-		snapshot.Items[id] = value
-		snapshot.ItemOrder = append(snapshot.ItemOrder, id)
+		return applySQLiteEntityRow(&snapshot.Items, &snapshot.ItemOrder, id, payload, "item")
 	case sqliteRowKindPin:
-		var value ThreadPin
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite pin row %s: %w", id, err)
-		}
-		if snapshot.Pins == nil {
-			snapshot.Pins = map[string]ThreadPin{}
-		}
-		snapshot.Pins[id] = value
-		snapshot.PinOrder = append(snapshot.PinOrder, id)
+		return applySQLiteEntityRow(&snapshot.Pins, &snapshot.PinOrder, id, payload, "pin")
 	case sqliteRowKindDiff:
-		var value RunDiffFile
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite diff row %s: %w", id, err)
-		}
-		if snapshot.Diffs == nil {
-			snapshot.Diffs = map[string]RunDiffFile{}
-		}
-		snapshot.Diffs[id] = value
-		snapshot.DiffOrder = append(snapshot.DiffOrder, id)
+		return applySQLiteEntityRow(&snapshot.Diffs, &snapshot.DiffOrder, id, payload, "diff")
 	case sqliteRowKindArtifact:
-		var value Artifact
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite artifact row %s: %w", id, err)
-		}
-		if snapshot.Artifacts == nil {
-			snapshot.Artifacts = map[string]Artifact{}
-		}
-		snapshot.Artifacts[id] = value
-		snapshot.ArtifactOrder = append(snapshot.ArtifactOrder, id)
+		return applySQLiteEntityRow(&snapshot.Artifacts, &snapshot.ArtifactOrder, id, payload, "artifact")
 	case sqliteRowKindPreview:
-		var value Preview
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite preview row %s: %w", id, err)
-		}
-		if snapshot.Previews == nil {
-			snapshot.Previews = map[string]Preview{}
-		}
-		snapshot.Previews[id] = value
-		snapshot.PreviewOrder = append(snapshot.PreviewOrder, id)
+		return applySQLiteEntityRow(&snapshot.Previews, &snapshot.PreviewOrder, id, payload, "preview")
 	case sqliteRowKindAgentProfile:
-		var value AgentProfile
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite agent_profile row %s: %w", id, err)
-		}
-		if snapshot.AgentProfiles == nil {
-			snapshot.AgentProfiles = map[string]AgentProfile{}
-		}
-		snapshot.AgentProfiles[id] = value
-		snapshot.AgentProfileOrder = append(snapshot.AgentProfileOrder, id)
+		return applySQLiteEntityRow(&snapshot.AgentProfiles, &snapshot.AgentProfileOrder, id, payload, "agent_profile")
 	case sqliteRowKindUserProfile:
-		var value UserProfile
-		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
-			return fmt.Errorf("decode sqlite user_profile row %s: %w", id, err)
-		}
-		if snapshot.UserProfiles == nil {
-			snapshot.UserProfiles = map[string]UserProfile{}
-		}
-		snapshot.UserProfiles[id] = value
-		snapshot.UserProfileOrder = append(snapshot.UserProfileOrder, id)
+		return applySQLiteEntityRow(&snapshot.UserProfiles, &snapshot.UserProfileOrder, id, payload, "user_profile")
 	default:
 		return fmt.Errorf("unknown sqlite store row kind %s", kind)
 	}
+}
+
+// applySQLiteEntityRow decodes one row payload, upserts it into the snapshot map,
+// and appends the id to the row-kind order list.
+func applySQLiteEntityRow[V any](items *map[string]V, order *[]string, id, payload, kindLabel string) error {
+	var value V
+	if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+		return fmt.Errorf("decode sqlite %s row %s: %w", kindLabel, id, err)
+	}
+	if *items == nil {
+		*items = map[string]V{}
+	}
+	(*items)[id] = value
+	*order = append(*order, id)
 	return nil
 }
 

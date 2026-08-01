@@ -269,8 +269,8 @@ func TestClassifyComplexity_EdgeCases(t *testing.T) {
 		want   ComplexityLevel
 	}{
 		{
-			name:   "very long prompt >100 words", prompt: longText(200),
-			want:   ComplexityComplex,
+			name: "very long prompt >100 words", prompt: longText(200),
+			want: ComplexityComplex,
 		},
 		{
 			name:   "exactly 100 words (boundary)",
@@ -293,12 +293,12 @@ func TestClassifyComplexity_EdgeCases(t *testing.T) {
 			want:   ComplexityMedium,
 		},
 		{
-			name: "CJK 800 runes (medium: runes>800 threshold not yet reached)",
+			name:   "CJK 800 runes (medium: runes>800 threshold not yet reached)",
 			prompt: makeCJKPrompt(800),
 			want:   ComplexityMedium,
 		},
 		{
-			name: "CJK 900 runes (complex: runes>800 fires before words<20 fallback, fixed in critical 2.5)",
+			name:   "CJK 900 runes (complex: runes>800 fires before words<20 fallback, fixed in critical 2.5)",
 			prompt: makeCJKPrompt(900),
 			want:   ComplexityComplex,
 		},
@@ -313,7 +313,7 @@ func TestClassifyComplexity_EdgeCases(t *testing.T) {
 			want:   ComplexityComplex,
 		},
 		{
-			name: "CJK with first...then pattern → medium",
+			name:   "CJK with first...then pattern → medium",
 			prompt: "first 检查日志，then 验证数据库连接",
 			want:   ComplexityMedium,
 		},

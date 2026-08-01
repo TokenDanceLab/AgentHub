@@ -279,7 +279,7 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 	case "error":
 		a.handleOpenCodeError(scope, emitter, evt)
 	default:
-		a.handleOpenCodeDefault(scope, emitter, evt)
+		a.handleOpenCodeDefault(evt)
 	}
 }
 
@@ -426,7 +426,7 @@ func (a *OpenCodeAdapter) handleOpenCodeError(scope map[string]any, emitter Even
 	emitter.Emit(BusEventResult, scope, result)
 }
 
-func (a *OpenCodeAdapter) handleOpenCodeDefault(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+func (a *OpenCodeAdapter) handleOpenCodeDefault(evt *opencodeEvent) {
 	slog.Debug("opencode: unhandled event type", "type", evt.Type)
 }
 

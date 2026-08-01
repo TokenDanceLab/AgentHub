@@ -36,11 +36,11 @@ func TestValidateSlug_Invalid(t *testing.T) {
 		{"has spaces", "slug must be"},
 		{"-leading", "slug must be"},
 		{"trailing-", "slug must be"},
-		{"a", "slug must be"},                          // single char: pattern requires >=2
-		{"aBc", "slug must be"},                        // mixed case
-		{"my_app", "slug must be"},                     // underscore not allowed
-		{"s p a c e s", "slug must be"},                // spaces
-		{".dots", "slug must be"},                      // dots not allowed
+		{"a", "slug must be"},                            // single char: pattern requires >=2
+		{"aBc", "slug must be"},                          // mixed case
+		{"my_app", "slug must be"},                       // underscore not allowed
+		{"s p a c e s", "slug must be"},                  // spaces
+		{".dots", "slug must be"},                        // dots not allowed
 		{"a" + string(make([]byte, 64)), "slug must be"}, // >63 chars
 	}
 	for _, tt := range tests {

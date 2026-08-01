@@ -230,7 +230,7 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 				Name      string `json:"name"`
 				Transport string `json:"transport"`
 				Command   string `json:"command"`
-				Args      string `json:"args"`    // JSON array string
+				Args      string `json:"args"`     // JSON array string
 				EnvVars   string `json:"env_vars"` // JSON object string
 				URL       string `json:"url"`
 				IsPublic  bool   `json:"is_public"`

@@ -654,10 +654,10 @@ func TestCompactHistoryAboveThreshold_Triggered(t *testing.T) {
 // TestEstimateTokens_Accuracy verifies token estimation with various inputs.
 func TestEstimateTokens_Accuracy(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		minWant  int
-		maxWant  int
+		name    string
+		text    string
+		minWant int
+		maxWant int
 	}{
 		{"empty", "", 0, 0},
 		{"single", "a", 1, 1},

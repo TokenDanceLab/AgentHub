@@ -35,52 +35,59 @@ func listClaudeCodeSessions(projectsRoot, historyPath string) ([]SessionSummary,
 
 	var out []SessionSummary
 	for _, projectEntry := range entries {
-		if !projectEntry.IsDir() {
+		out = append(out, listClaudeProjectSessions(projectsRoot, projectEntry, titles)...)
+	}
+	return out, nil
+}
+
+// listClaudeProjectSessions collects session summaries for one project directory.
+func listClaudeProjectSessions(projectsRoot string, projectEntry os.DirEntry, titles map[string]string) []SessionSummary {
+	if !projectEntry.IsDir() {
+		return nil
+	}
+	projectKey := projectEntry.Name()
+	// Skip internal non-project dirs.
+	if projectKey == "memory" || strings.HasPrefix(projectKey, ".") {
+		return nil
+	}
+	projectDir := filepath.Join(projectsRoot, projectKey)
+	files, err := os.ReadDir(projectDir)
+	if err != nil {
+		return nil
+	}
+	var out []SessionSummary
+	for _, f := range files {
+		if f.IsDir() {
 			continue
 		}
-		projectKey := projectEntry.Name()
-		// Skip internal non-project dirs.
-		if projectKey == "memory" || strings.HasPrefix(projectKey, ".") {
+		name := f.Name()
+		if !strings.HasSuffix(name, ".jsonl") {
 			continue
 		}
-		projectDir := filepath.Join(projectsRoot, projectKey)
-		files, err := os.ReadDir(projectDir)
+		id := strings.TrimSuffix(name, ".jsonl")
+		if id == "" {
+			continue
+		}
+		fi, err := f.Info()
 		if err != nil {
 			continue
 		}
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			name := f.Name()
-			if !strings.HasSuffix(name, ".jsonl") {
-				continue
-			}
-			id := strings.TrimSuffix(name, ".jsonl")
-			if id == "" {
-				continue
-			}
-			fi, err := f.Info()
-			if err != nil {
-				continue
-			}
-			path := filepath.Join(projectDir, name)
-			title := titles[id]
-			if title == "" {
-				title = id
-			}
-			out = append(out, SessionSummary{
-				Runtime:    RuntimeClaudeCode,
-				ID:         id,
-				Title:      truncateTitle(title, 120),
-				Path:       path,
-				ProjectKey: projectKey,
-				UpdatedAt:  fi.ModTime().UTC().Format(time.RFC3339),
-				SourceMode: SourceModeImport,
-			})
+		path := filepath.Join(projectDir, name)
+		title := titles[id]
+		if title == "" {
+			title = id
 		}
+		out = append(out, SessionSummary{
+			Runtime:    RuntimeClaudeCode,
+			ID:         id,
+			Title:      truncateTitle(title, 120),
+			Path:       path,
+			ProjectKey: projectKey,
+			UpdatedAt:  fi.ModTime().UTC().Format(time.RFC3339),
+			SourceMode: SourceModeImport,
+		})
 	}
-	return out, nil
+	return out
 }
 
 type claudeHistoryLine struct {

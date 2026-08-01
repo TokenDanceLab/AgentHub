@@ -165,7 +165,7 @@ func TestControlProtocolActionSubtypesDoNotClaimAppliedWork(t *testing.T) {
 }
 
 func TestWriteUnsupportedControlResponseWriteError(t *testing.T) {
-	err := writeUnsupportedControlResponse(&failingWriter{}, "req-write-error", "get_context_usage", "context_usage", nil)
+	err := writeUnsupportedControlResponse(&failingWriter{}, "req-write-error", "get_context_usage", "context_usage")
 	if err == nil {
 		t.Fatal("expected write error, got nil")
 	}

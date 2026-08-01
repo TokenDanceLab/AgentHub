@@ -3,9 +3,9 @@
 //
 // This file implements the three-layer context compression system:
 //
-//   1. CompactionNone    — no compression needed
-//   2. CompactionToolFold — fold (truncate) tool outputs exceeding a byte limit
-//   3. CompactionSummarize — summarize older conversation messages
+//  1. CompactionNone    — no compression needed
+//  2. CompactionToolFold — fold (truncate) tool outputs exceeding a byte limit
+//  3. CompactionSummarize — summarize older conversation messages
 //
 // Reference: SeiyunSky context_compactor.py three-layer design.
 package runnerctx
@@ -74,10 +74,10 @@ type CompactionPolicy struct {
 //   - Summarization at 70% usage, keeping the last 10 messages
 func DefaultCompactionPolicy() CompactionPolicy {
 	return CompactionPolicy{
-		TokenThreshold:    0.7,
-		ToolFoldThreshold: 0.5,
+		TokenThreshold:     0.7,
+		ToolFoldThreshold:  0.5,
 		ToolOutputMaxBytes: 16 * 1024, // 16 KB
-		SummarizeKeepLast: 10,
+		SummarizeKeepLast:  10,
 	}
 }
 

@@ -6,6 +6,9 @@ import (
 	"sync"
 	"time"
 
+	// modernc.org/sqlite registers its "sqlite" driver via init; the blank
+	// import is required for database/sql to find it without importing the
+	// driver's API surface.
 	_ "modernc.org/sqlite"
 )
 

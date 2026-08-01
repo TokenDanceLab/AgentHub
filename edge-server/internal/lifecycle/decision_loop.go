@@ -3,8 +3,9 @@
 // enforcement, and tool-approval gating.
 //
 // This addresses the gap documented in:
-//   Historical LobeHub borrow-list Finding 1, indexed by docs/history.md:
-//   "AgentHub relies on Claude Code's opaque internal loop"
+//
+//	Historical LobeHub borrow-list Finding 1, indexed by docs/history.md:
+//	"AgentHub relies on Claude Code's opaque internal loop"
 //
 // Design:
 //   - DecisionLoop wraps the adapter's event stream emitted during ParseStream.
@@ -34,13 +35,13 @@ import (
 type AgentPhase string
 
 const (
-	PhaseIdle         AgentPhase = "idle"          // loop not yet started
-	PhaseCallingLLM   AgentPhase = "calling_llm"   // LLM request in flight
-	PhaseToolResult   AgentPhase = "tool_result"   // tool execution completed, results being processed
-	PhaseDone         AgentPhase = "done"          // agent finished successfully
-	PhaseError        AgentPhase = "error"         // agent encountered an error
-	PhaseForceFinish  AgentPhase = "force_finish"  // max steps reached, forcing summary
-	PhaseInterrupted  AgentPhase = "interrupted"   // agent was interrupted (human or system)
+	PhaseIdle        AgentPhase = "idle"         // loop not yet started
+	PhaseCallingLLM  AgentPhase = "calling_llm"  // LLM request in flight
+	PhaseToolResult  AgentPhase = "tool_result"  // tool execution completed, results being processed
+	PhaseDone        AgentPhase = "done"         // agent finished successfully
+	PhaseError       AgentPhase = "error"        // agent encountered an error
+	PhaseForceFinish AgentPhase = "force_finish" // max steps reached, forcing summary
+	PhaseInterrupted AgentPhase = "interrupted"  // agent was interrupted (human or system)
 )
 
 // String returns the string representation of the phase.
@@ -51,6 +52,8 @@ func (p AgentPhase) IsTerminal() bool {
 	switch p {
 	case PhaseDone, PhaseError, PhaseInterrupted:
 		return true
+	case PhaseIdle, PhaseCallingLLM, PhaseToolResult, PhaseForceFinish:
+		return false
 	default:
 		return false
 	}
@@ -110,11 +113,11 @@ type DecisionLoop struct {
 	stdinMu     sync.Mutex
 
 	// Outcome tracking
-	startTime  time.Time
-	endTime    time.Time
-	endTimeMu  sync.Mutex
-	err        error
-	errMu      sync.Mutex
+	startTime time.Time
+	endTime   time.Time
+	endTimeMu sync.Mutex
+	err       error
+	errMu     sync.Mutex
 }
 
 // NewDecisionLoop creates a new DecisionLoop wrapping the given event stream.
@@ -341,12 +344,12 @@ func (e *decisionLoopEmitter) Emit(eventType string, scope map[string]any, paylo
 		// Warning when approaching max steps.
 		if step >= maxSteps-3 {
 			e.inner.Emit(adapters.BusEventContextWarning, scope, map[string]any{
-				"runId":       e.run.ID,
-				"step":        step,
-				"maxSteps":    maxSteps,
-				"remaining":   maxSteps - step,
-				"message":     fmt.Sprintf("Approaching max steps: %d/%d (%d remaining)", step, maxSteps, maxSteps-step),
-				"phase":       e.loop.Phase().String(),
+				"runId":     e.run.ID,
+				"step":      step,
+				"maxSteps":  maxSteps,
+				"remaining": maxSteps - step,
+				"message":   fmt.Sprintf("Approaching max steps: %d/%d (%d remaining)", step, maxSteps, maxSteps-step),
+				"phase":     e.loop.Phase().String(),
 			})
 		}
 

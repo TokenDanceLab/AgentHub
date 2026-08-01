@@ -260,7 +260,7 @@ func redactedRuntimeManifestArgs(args []string) []string {
 			if ok {
 				redacted = name + "=[redacted]"
 			} else if strings.HasPrefix(redacted, "-") {
-				redacted = redacted + " [redacted]"
+				redacted += " [redacted]"
 			}
 		}
 		out = append(out, redacted)

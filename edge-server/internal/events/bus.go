@@ -144,7 +144,9 @@ func (l *EventLog) truncateLocked() {
 		return
 	}
 	if start < n {
-		l.f.Write(buf[start:n])
+		// Best-effort rewrite: the log truncation path degrades silently on
+		// write failure rather than failing the enclosing Append call.
+		_, _ = l.f.Write(buf[start:n])
 	}
 }
 

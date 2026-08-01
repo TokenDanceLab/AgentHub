@@ -159,7 +159,7 @@ func countChildStatuses(children []agents.AgentInstance) childStatusCounts {
 			c.errored++
 		case agents.StatusBusy:
 			c.running++
-		default:
+		case agents.StatusOnline, agents.StatusIdle, agents.StatusWaitingInput, agents.StatusDraining, agents.StatusDisconnected:
 			c.waiting++
 		}
 	}

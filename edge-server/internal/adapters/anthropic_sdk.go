@@ -170,11 +170,6 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 		runCtx = rc
 	}
 
-	prompt := runCtx.Prompt
-	if prompt == "" {
-		prompt = "Continue."
-	}
-
 	model := a.model
 	if runCtx.Model != "" {
 		model = ResolveModel(anthropicSDKAdapterID, runCtx.Model)

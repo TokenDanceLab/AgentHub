@@ -8,9 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,8 +60,8 @@ type config struct {
 	RuntimeManifests repeatedString // fixture-only custom runtime manifests
 
 	// SDK adapter configuration (direct HTTP API calls, no CLI subprocess)
-	AnthropicSDKPath string         // enables anthropic-sdk adapter; value is API key or "env" for ANTHROPIC_API_KEY
-	OpenAISDKPath    string         // enables openai-sdk adapter; value is API key or "env" for OPENAI_API_KEY
+	AnthropicSDKPath string // enables anthropic-sdk adapter; value is API key or "env" for ANTHROPIC_API_KEY
+	OpenAISDKPath    string // enables openai-sdk adapter; value is API key or "env" for OPENAI_API_KEY
 
 	// SKILL.md discovery
 	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
@@ -70,7 +70,7 @@ type config struct {
 	EventLogPath string // append-only JSON-lines event log path; empty = no persistence
 
 	// MCP Hub sync: periodically fetch MCP server configs from Hub's /web/mcp-servers endpoint
-	HubMCPSyncURL string // Hub URL for MCP config sync; empty = no sync
+	HubMCPSyncURL      string // Hub URL for MCP config sync; empty = no sync
 	HubMCPSyncInterval string // sync interval (default "5m")
 }
 
@@ -185,9 +185,9 @@ func main() {
 		EventLogPath:       cfg.EventLogPath,
 		MCPConfigStore:     mcpConfigStore,
 	}
-		if mcpSyncer != nil {
-			serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
-		}
+	if mcpSyncer != nil {
+		serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
+	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
 			Command:  cfg.RunnerCommand,
@@ -319,38 +319,59 @@ func buildConfig(args []string) (config, error) {
 	cfg.LocalAuthToken = strings.TrimSpace(cfg.LocalAuthToken)
 	cfg.HubJWTSecret = strings.TrimSpace(cfg.HubJWTSecret)
 	cfg.EdgeDeviceID = strings.TrimSpace(cfg.EdgeDeviceID)
+	if err := cfg.validateStoreBackend(); err != nil {
+		return config{}, err
+	}
+	if err := cfg.validateListenMode(); err != nil {
+		return config{}, err
+	}
+	if err := cfg.validateRunnerAndArgs(fs); err != nil {
+		return config{}, err
+	}
+	return cfg, nil
+}
+
+// validateStoreBackend cross-checks --store-backend against the --store-file
+// and --store-db combinations.
+func (cfg *config) validateStoreBackend() error {
 	switch cfg.StoreBackend {
 	case "":
 		if cfg.StoreDB != "" {
-			return config{}, fmt.Errorf("--store-db requires --store-backend sqlite")
+			return fmt.Errorf("--store-db requires --store-backend sqlite")
 		}
 	case "memory":
 		if cfg.StoreFile != "" {
-			return config{}, fmt.Errorf("--store-file cannot be combined with --store-backend memory")
+			return fmt.Errorf("--store-file cannot be combined with --store-backend memory")
 		}
 		if cfg.StoreDB != "" {
-			return config{}, fmt.Errorf("--store-db cannot be combined with --store-backend memory")
+			return fmt.Errorf("--store-db cannot be combined with --store-backend memory")
 		}
 	case "file":
 		if cfg.StoreFile == "" {
-			return config{}, fmt.Errorf("--store-backend file requires --store-file")
+			return fmt.Errorf("--store-backend file requires --store-file")
 		}
 		if cfg.StoreDB != "" {
-			return config{}, fmt.Errorf("--store-db cannot be combined with --store-backend file")
+			return fmt.Errorf("--store-db cannot be combined with --store-backend file")
 		}
 	case "sqlite":
 		if cfg.StoreDB == "" {
-			return config{}, fmt.Errorf("--store-backend sqlite requires --store-db")
+			return fmt.Errorf("--store-backend sqlite requires --store-db")
 		}
 		if cfg.StoreFile != "" {
-			return config{}, fmt.Errorf("--store-file cannot be combined with --store-backend sqlite")
+			return fmt.Errorf("--store-file cannot be combined with --store-backend sqlite")
 		}
 	default:
-		return config{}, fmt.Errorf("unknown --store-backend %q; supported values: memory, file, sqlite", cfg.StoreBackend)
+		return fmt.Errorf("unknown --store-backend %q; supported values: memory, file, sqlite", cfg.StoreBackend)
 	}
 	if cfg.StoreReadiness && cfg.StoreBackend != "sqlite" {
-		return config{}, fmt.Errorf("--store-readiness requires --store-backend sqlite")
+		return fmt.Errorf("--store-readiness requires --store-backend sqlite")
 	}
+	return nil
+}
+
+// validateListenMode applies tailscale/remote-mode semantics and validates
+// the listen address and its auth requirements.
+func (cfg *config) validateListenMode() error {
 	// --tailscale implies --remote-mode and tailscale-aware registration with Hub
 	if cfg.Tailscale {
 		cfg.RemoteMode = true
@@ -362,42 +383,48 @@ func buildConfig(args []string) (config, error) {
 	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
-			return config{}, err
+			return err
 		}
 		if cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
-			return config{}, fmt.Errorf("--remote-mode requires --local-auth-token or --hub-jwt-secret to be set")
+			return fmt.Errorf("--remote-mode requires --local-auth-token or --hub-jwt-secret to be set")
 		}
 	} else {
 		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-			return config{}, err
+			return err
 		}
 	}
 	if cfg.HubJWTSecret != "" && cfg.EdgeDeviceID == "" {
-		return config{}, fmt.Errorf("--hub-jwt-secret requires --edge-device-id")
+		return fmt.Errorf("--hub-jwt-secret requires --edge-device-id")
 	}
-	if err := applyRunnerProfile(&cfg); err != nil {
-		return config{}, err
+	return nil
+}
+
+// validateRunnerAndArgs applies the runner profile and finalizes the
+// runner-command/arg/env cross-checks, rejecting unexpected positional args.
+func (cfg *config) validateRunnerAndArgs(fs *flag.FlagSet) error {
+	if err := applyRunnerProfile(cfg); err != nil {
+		return err
 	}
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
 	cfg.AgentDefault = strings.TrimSpace(cfg.AgentDefault)
 	cfg.AllowedOrigins = trimRepeatedStrings(cfg.AllowedOrigins)
 	cfg.RuntimeManifests = trimRepeatedStrings(cfg.RuntimeManifests)
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
-		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
+		return fmt.Errorf("--runner-arg requires --runner-command")
 	}
 	if cfg.RunnerCommand == "" && len(cfg.RunnerEnv) > 0 {
-		return config{}, fmt.Errorf("--runner-env requires --runner-command")
+		return fmt.Errorf("--runner-env requires --runner-command")
 	}
 	if cfg.RunnerCommand == "" && cfg.RunnerWorkDir != "" {
-		return config{}, fmt.Errorf("--runner-workdir requires --runner-command")
+		return fmt.Errorf("--runner-workdir requires --runner-command")
 	}
 	if _, err := lifecycle.NewCommandTemplate(nil, cfg.RunnerEnv); err != nil {
-		return config{}, fmt.Errorf("--runner-env: %w", err)
+		return fmt.Errorf("--runner-env: %w", err)
 	}
 	if fs.NArg() != 0 {
-		return config{}, fmt.Errorf("unexpected positional arguments: %v", fs.Args())
+		return fmt.Errorf("unexpected positional arguments: %v", fs.Args())
 	}
-	return cfg, nil
+	return nil
 }
 
 func runStoreReadiness(cfg config, out io.Writer) error {
@@ -462,66 +489,112 @@ func applyRunnerProfile(cfg *config) error {
 func buildAdapterRegistry(cfg config) *adapters.Registry {
 	reg := adapters.NewRegistry()
 
-	if cfg.ClaudeCodePath != "" {
-		a := adapters.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register claude-code adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath)
-		}
+	registerClaudeCodeAdapter(reg, cfg)
+	registerCodexAdapter(reg, cfg)
+	registerCodexACPAdapter(reg, cfg)
+	registerOpenCodeAdapter(reg, cfg)
+	registerOpenCodeACPAdapter(reg, cfg)
+	registerClaudeACPAdapter(reg, cfg)
+	registerManifestAdapters(reg, cfg)
+	registerSDKAdapters(reg, cfg)
+	registerOrchestratorAdapter(reg, cfg)
+
+	if cfg.AgentDefault != "" {
+		reg.SetDefault("default", cfg.AgentDefault)
 	}
-	if cfg.CodexPath != "" {
-		a := adapters.NewCodexAdapter(cfg.CodexPath, cfg.AgentModel)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register codex adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.CodexPath)
-		}
+
+	return reg
+}
+
+// registerClaudeCodeAdapter registers the legacy claude-code NDJSON adapter.
+func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.ClaudeCodePath == "" {
+		return
 	}
-	// codex-acp: official ACP adapter binary via npx (ACP migration, first
-	// switch target; default off — enable with --codex-acp-path npx.cmd).
-	// Cutover = point --agent-default (or per-run agentId) at "codex-acp".
-	if cfg.CodexACPPath != "" {
-		a := adapters.NewCodexACPAadapter(cfg.CodexACPPath)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register codex-acp adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.CodexACPPath, "version", a.Metadata().Version, "available", a.Available())
-		}
+	a := adapters.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register claude-code adapter", "err", err)
+		return
 	}
-	if cfg.OpenCodePath != "" {
-		a := adapters.NewOpenCodeAdapter(cfg.OpenCodePath)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register opencode adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
-		}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath)
+}
+
+// registerCodexAdapter registers the codex CLI adapter.
+func registerCodexAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.CodexPath == "" {
+		return
 	}
-	// opencode-acp: native `opencode acp` subcommand on the opencode binary
-	// (ACP migration, second switch target; default off — enable with
-	// --opencode-acp-path opencode). Cutover = point --agent-default (or
-	// per-run agentId) at "opencode-acp".
-	if cfg.OpencodeACPPath != "" {
-		a := adapters.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register opencode-acp adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpencodeACPPath, "version", a.Metadata().Version, "available", a.Available())
-		}
+	a := adapters.NewCodexAdapter(cfg.CodexPath, cfg.AgentModel)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register codex adapter", "err", err)
+		return
 	}
-	// claude-acp: official ACP adapter binary via npx (ACP migration, third
-	// switch target; default off — enable with --claude-acp-path npx.cmd).
-	// Cutover = point --agent-default (or per-run agentId) at "claude-acp".
-	// The legacy claude-code NDJSON parser stays registered as a fallback and
-	// control (claude_code.go, marked DEPRECATED).
-	if cfg.ClaudeACPPath != "" {
-		a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register claude-acp adapter", "err", err)
-		} else {
-			slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.ClaudeACPPath, "version", a.Metadata().Version, "available", a.Available())
-		}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.CodexPath)
+}
+
+// registerCodexACPAdapter registers the official codex-acp ACP adapter via
+// npx (ACP migration, first switch target; default off — enable with
+// --codex-acp-path npx.cmd). Cutover = point --agent-default (or per-run
+// agentId) at "codex-acp".
+func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.CodexACPPath == "" {
+		return
 	}
+	a := adapters.NewCodexACPAadapter(cfg.CodexACPPath)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register codex-acp adapter", "err", err)
+		return
+	}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.CodexACPPath, "version", a.Metadata().Version, "available", a.Available())
+}
+
+// registerOpenCodeAdapter registers the opencode CLI adapter.
+func registerOpenCodeAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.OpenCodePath == "" {
+		return
+	}
+	a := adapters.NewOpenCodeAdapter(cfg.OpenCodePath)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register opencode adapter", "err", err)
+		return
+	}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
+}
+
+// registerOpenCodeACPAdapter registers the native `opencode acp` subcommand
+// adapter (ACP migration, second switch target; default off — enable with
+// --opencode-acp-path opencode). Cutover = point --agent-default (or per-run
+// agentId) at "opencode-acp".
+func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.OpencodeACPPath == "" {
+		return
+	}
+	a := adapters.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register opencode-acp adapter", "err", err)
+		return
+	}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpencodeACPPath, "version", a.Metadata().Version, "available", a.Available())
+}
+
+// registerClaudeACPAdapter registers the official claude-agent-acp ACP adapter
+// via npx (ACP migration, third switch target; default off — enable with
+// --claude-acp-path npx.cmd). The legacy claude-code NDJSON parser stays
+// registered as a fallback and control (claude_code.go, marked DEPRECATED).
+func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.ClaudeACPPath == "" {
+		return
+	}
+	a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register claude-acp adapter", "err", err)
+		return
+	}
+	slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.ClaudeACPPath, "version", a.Metadata().Version, "available", a.Available())
+}
+
+// registerManifestAdapters registers fixture-only custom runtime manifests.
+func registerManifestAdapters(reg *adapters.Registry, cfg config) {
 	for _, manifestPath := range cfg.RuntimeManifests {
 		manifest, err := adapters.LoadRuntimeManifestFile(manifestPath)
 		if err != nil {
@@ -531,14 +604,16 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 		a := adapters.NewRuntimeManifestAdapter(manifest)
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register runtime manifest adapter", "id", manifest.ID, "path", manifestPath, "err", err)
-		} else {
-			slog.Info("registered runtime manifest adapter", "id", a.Metadata().ID, "path", manifestPath, "fixture", manifest.Fixture.Type)
+			continue
 		}
+		slog.Info("registered runtime manifest adapter", "id", a.Metadata().ID, "path", manifestPath, "fixture", manifest.Fixture.Type)
 	}
+}
 
-	// SDK adapters: direct HTTP API calls, no CLI subprocess needed.
-	// When the flag value is "env" or empty, the API key is read from the
-	// corresponding environment variable (ANTHROPIC_API_KEY / OPENAI_API_KEY).
+// registerSDKAdapters registers the direct HTTP API adapters (no CLI
+// subprocess needed). When the flag value is "env" or empty, the API key is
+// read from the corresponding environment variable.
+func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	if cfg.AnthropicSDKPath != "" {
 		apiKey := resolveSDKAPIKey(cfg.AnthropicSDKPath, "ANTHROPIC_API_KEY")
 		a := adapters.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel)
@@ -557,27 +632,27 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "available", a.Available())
 		}
 	}
+}
 
-	if cfg.ClaudeCodePath != "" {
-		childAgents := registeredChildAgentIDs(reg)
-		a := adapters.NewOrchestratorAdapter(
-			cfg.ClaudeCodePath,
-			cfg.AgentModel,
-			adapters.DefaultOrchestratorPrompt(childAgents),
-			childAgents,
-		)
-		if err := reg.Register(a); err != nil {
-			slog.Warn("failed to register orchestrator adapter", "err", err)
-		} else {
-			reg.SetDefault("orchestrator", a.Metadata().ID)
-			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath, "children", childAgents)
-		}
+// registerOrchestratorAdapter registers the orchestrator adapter with the
+// registered child agent IDs when a claude-code binary is configured.
+func registerOrchestratorAdapter(reg *adapters.Registry, cfg config) {
+	if cfg.ClaudeCodePath == "" {
+		return
 	}
-	if cfg.AgentDefault != "" {
-		reg.SetDefault("default", cfg.AgentDefault)
+	childAgents := registeredChildAgentIDs(reg)
+	a := adapters.NewOrchestratorAdapter(
+		cfg.ClaudeCodePath,
+		cfg.AgentModel,
+		adapters.DefaultOrchestratorPrompt(childAgents),
+		childAgents,
+	)
+	if err := reg.Register(a); err != nil {
+		slog.Warn("failed to register orchestrator adapter", "err", err)
+		return
 	}
-
-	return reg
+	reg.SetDefault("orchestrator", a.Metadata().ID)
+	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath, "children", childAgents)
 }
 
 func registeredChildAgentIDs(reg *adapters.Registry) []string {
@@ -622,6 +697,7 @@ func newStoreFromConfig(cfg config) (store.Repository, error) {
 		return nil, fmt.Errorf("unknown store backend %q", cfg.StoreBackend)
 	}
 }
+
 // resolveSDKAPIKey resolves the API key for an SDK adapter. If the value is
 // "env" or empty, it reads from the specified environment variable. Otherwise
 // the value itself is used as the API key.

@@ -149,7 +149,7 @@ type SDKMappedEvent struct {
 // register provider SDKs.
 func MapSDKFixtureStream(stream SDKFixtureStream, scope map[string]any) []SDKMappedEvent {
 	provider := strings.TrimSpace(stream.Provider)
-	var mapped []SDKMappedEvent
+	mapped := make([]SDKMappedEvent, 0, len(stream.Events))
 	for _, fixtureEvent := range stream.Events {
 		eventProvider := provider
 		if fixtureEvent.Provider != "" {

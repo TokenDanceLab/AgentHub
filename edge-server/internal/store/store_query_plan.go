@@ -55,7 +55,7 @@ func createProjectInMaps(
 	id, name, ownerID, now string,
 ) (Project, []string, error) {
 	existing, exists := projects[id]
-	project, err, created := resolveCreateProject(existing, exists, id, name, ownerID, now)
+	project, created, err := resolveCreateProject(existing, exists, id, name, ownerID, now)
 	return project, putTracked(projects, order, id, project, created), err
 }
 
@@ -68,7 +68,7 @@ func createThreadInMaps(
 ) (Thread, []string, error) {
 	_, projectExists := projects[projectID]
 	existing, exists := threads[id]
-	thread, err, created := resolveCreateThread(existing, exists, projectExists, id, projectID, title, kind, avatarColor, avatarLabel, now)
+	thread, created, err := resolveCreateThread(existing, exists, projectExists, id, projectID, title, kind, avatarColor, avatarLabel, now)
 	return thread, putTracked(threads, order, id, thread, created), err
 }
 
@@ -82,7 +82,7 @@ func createRunInMaps(
 ) (Run, []string, error) {
 	existing, exists := runs[id]
 	refsOK := validateCreateRunRefs(projects, threads, projectID, threadID)
-	run, err, created := resolveCreateRun(existing, exists, refsOK, id, projectID, threadID, now)
+	run, created, err := resolveCreateRun(existing, exists, refsOK, id, projectID, threadID, now)
 	return run, putTracked(runs, order, id, run, created), err
 }
 
@@ -98,7 +98,7 @@ func createItemInMaps(
 ) (Item, []string, error) {
 	existing, exists := items[item.ID]
 	refsOK := validateCreateItemRefs(projects, threads, runs, item)
-	item, err, created := resolveCreateItem(existing, exists, refsOK, item, now)
+	item, created, err := resolveCreateItem(existing, exists, refsOK, item, now)
 	return item, putTracked(items, order, item.ID, item, created), err
 }
 
@@ -121,8 +121,8 @@ func createAgentProfileInMaps(
 	profile AgentProfile,
 	now string,
 ) (AgentProfile, []string, error) {
-	existing, exists := profiles[profile.ID]
-	profile, err, created := resolveCreateAgentProfile(existing, exists, profile, now)
+	_, exists := profiles[profile.ID]
+	profile, created, err := resolveCreateAgentProfile(exists, profile, now)
 	return profile, putTracked(profiles, order, profile.ID, profile, created), err
 }
 

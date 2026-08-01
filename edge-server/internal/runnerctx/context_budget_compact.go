@@ -167,12 +167,10 @@ func EvictToBudget(messages []Message, maxTokens int) []Message {
 
 // ── Summary Heuristics ───────────────────────────────────────────────────
 
-// summarizeMessages extracts key information from a list of messages without
-// requiring an LLM call. It identifies decisions, file changes, errors, and
-// conclusions using keyword-based heuristics.
-func summarizeMessages(messages []Message) []string {
-	// Keywords that indicate important information.
-	decisionWords := []string{
+// decisionWords, errorWords, and fileChangeWords are keywords that indicate
+// important information in a summarized sentence.
+var (
+	decisionWords = []string{
 		"decided", "decision", "choose", "chose", "chosen", "will use",
 		"approach", "plan to", "going to", "agreed", "resolved", "conclusion",
 		"final answer", "therefore", "thus", "result",
@@ -180,7 +178,7 @@ func summarizeMessages(messages []Message) []string {
 		"决定", "选择", "选定", "采用", "方案", "计划", "同意", "已解决",
 		"结论", "最终答案", "因此", "所以", "结果",
 	}
-	fileChangeWords := []string{
+	fileChangeWords = []string{
 		"created", "deleted", "modified", "updated", "changed", "added",
 		"removed", "renamed", "moved", "wrote", "rewrote", "edited",
 		"installed", "uninstalled", "generated",
@@ -189,7 +187,7 @@ func summarizeMessages(messages []Message) []string {
 		"移除", "重命名", "移动", "编写", "重写", "编辑",
 		"安装", "卸载", "生成",
 	}
-	errorWords := []string{
+	errorWords = []string{
 		"error", "failed", "failure", "panic", "crash", "exception",
 		"timeout", "rejected", "denied", "invalid", "cannot", "unable",
 		"not found", "permission denied",
@@ -197,73 +195,15 @@ func summarizeMessages(messages []Message) []string {
 		"错误", "失败", "崩溃", "异常", "超时", "拒绝", "无效",
 		"无法", "找不到", "权限不足", "不允许",
 	}
+)
 
+// summarizeMessages extracts key information from a list of messages without
+// requiring an LLM call. It identifies decisions, file changes, errors, and
+// conclusions using keyword-based heuristics.
+func summarizeMessages(messages []Message) []string {
 	var lines []string
-
 	for i, m := range messages {
-		role := m.Role
-		content := m.Content
-		if content == "" {
-			continue
-		}
-
-		// Skip system messages that are already summaries.
-		if role == "system" && i > 0 {
-			continue
-		}
-
-		// Extract relevant sentences from the content.
-		sentences := splitSentences(content)
-		for _, s := range sentences {
-			s = strings.TrimSpace(s)
-			if s == "" {
-				continue
-			}
-			lower := strings.ToLower(s)
-
-			// Check for important content.
-			category := ""
-			for _, kw := range decisionWords {
-				if strings.Contains(lower, kw) {
-					category = "decision"
-					break
-				}
-			}
-			if category == "" {
-				for _, kw := range errorWords {
-					if strings.Contains(lower, kw) {
-						category = "error"
-						break
-					}
-				}
-			}
-			if category == "" {
-				for _, kw := range fileChangeWords {
-					if strings.Contains(lower, kw) {
-						category = "file_change"
-						break
-					}
-				}
-			}
-
-			if category != "" {
-				prefix := ""
-				switch category {
-				case "decision":
-					prefix = "[Decision] "
-				case "error":
-					prefix = "[Error] "
-				case "file_change":
-					prefix = "[File] "
-				}
-				// Truncate long sentences for summary compactness.
-				truncated := s
-				if len(truncated) > 200 {
-					truncated = truncated[:200] + "..."
-				}
-				lines = append(lines, prefix+truncated)
-			}
-		}
+		lines = append(lines, summarizeMessage(m, i == 0)...)
 	}
 
 	if len(lines) == 0 {
@@ -277,6 +217,72 @@ func summarizeMessages(messages []Message) []string {
 	}
 
 	return lines
+}
+
+// summarizeMessage extracts noteworthy sentences from a single message.
+// isFirst marks the first message in the list, which may be a summary kept as-is.
+func summarizeMessage(m Message, isFirst bool) []string {
+	content := m.Content
+	if content == "" {
+		return nil
+	}
+
+	// Skip system messages that are already summaries.
+	if m.Role == "system" && !isFirst {
+		return nil
+	}
+
+	var lines []string
+	for _, s := range splitSentences(content) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+
+		// Check for important content.
+		category := sentenceCategory(strings.ToLower(s))
+		if category == "" {
+			continue
+		}
+
+		prefix := ""
+		switch category {
+		case "decision":
+			prefix = "[Decision] "
+		case "error":
+			prefix = "[Error] "
+		case "file_change":
+			prefix = "[File] "
+		}
+		// Truncate long sentences for summary compactness.
+		truncated := s
+		if len(truncated) > 200 {
+			truncated = truncated[:200] + "..."
+		}
+		lines = append(lines, prefix+truncated)
+	}
+	return lines
+}
+
+// sentenceCategory classifies a lower-cased sentence into "decision", "error",
+// or "file_change" by keyword matching, or "" when nothing matches.
+func sentenceCategory(lower string) string {
+	for _, kw := range decisionWords {
+		if strings.Contains(lower, kw) {
+			return "decision"
+		}
+	}
+	for _, kw := range errorWords {
+		if strings.Contains(lower, kw) {
+			return "error"
+		}
+	}
+	for _, kw := range fileChangeWords {
+		if strings.Contains(lower, kw) {
+			return "file_change"
+		}
+	}
+	return ""
 }
 
 // splitSentences splits text into approximate sentences on common delimiters.

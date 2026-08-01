@@ -131,8 +131,8 @@ func TestOpenCodeACPAdapterBuildCommandEnvPassthrough(t *testing.T) {
 
 func TestOpenCodeACPAdapterDefaultBinaryPath(t *testing.T) {
 	a := NewOpenCodeACPAdapter("")
-	if a.AcpAdapter.agentBinary != "opencode" {
-		t.Errorf("agentBinary = %q, want default opencode", a.AcpAdapter.agentBinary)
+	if a.agentBinary != "opencode" {
+		t.Errorf("agentBinary = %q, want default opencode", a.agentBinary)
 	}
 }
 
