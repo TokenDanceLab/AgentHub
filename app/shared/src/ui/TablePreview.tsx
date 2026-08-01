@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, X } from 'lucide-react';
 import styles from './TablePreview.module.css';
+import { Tooltip } from './Tooltip';
 
 export interface TablePreviewProps {
   fileUrl: string;
@@ -237,15 +238,16 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           <span className={styles.badge}>{fileExt}</span>
         </div>
         {onClose && (
-          <button
-            className={styles.closeBtn}
-            type="button"
-            onClick={onClose}
-            aria-label="关闭预览"
-            title="关闭预览"
-          >
-            <X size={16} />
-          </button>
+          <Tooltip label="关闭预览">
+            <button
+              className={styles.closeBtn}
+              type="button"
+              onClick={onClose}
+              aria-label="关闭预览"
+            >
+              <X size={16} />
+            </button>
+          </Tooltip>
         )}
       </div>
 

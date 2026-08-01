@@ -1,5 +1,6 @@
 import React from 'react';
 import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
+import { Tooltip } from '../../ui/Tooltip';
 import styles from './MultiSelectBar.module.css';
 
 export interface MultiSelectBarAction {
@@ -43,21 +44,21 @@ export const MultiSelectBar: React.FC<MultiSelectBarProps> = ({
         <em className={styles.countTotal}>/ {total}</em>
       </div>
       {actions.map((action, i) => (
-        <button
-          key={i}
-          aria-label={action.label}
-          className={[
-            styles.action,
-            action.danger ? styles.danger : '',
-            action.ghost ? styles.ghost : '',
-          ].filter(Boolean).join(' ')}
-          title={action.label}
-          type="button"
-          onClick={action.onClick}
-        >
-          {action.icon && <DesignNavIcon name={action.icon} size={15} />}
-          <span>{action.label}</span>
-        </button>
+        <Tooltip key={i} label={action.label}>
+          <button
+            aria-label={action.label}
+            className={[
+              styles.action,
+              action.danger ? styles.danger : '',
+              action.ghost ? styles.ghost : '',
+            ].filter(Boolean).join(' ')}
+            type="button"
+            onClick={action.onClick}
+          >
+            {action.icon && <DesignNavIcon name={action.icon} size={15} />}
+            <span>{action.label}</span>
+          </button>
+        </Tooltip>
       ))}
     </div>
   );

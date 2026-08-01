@@ -5,6 +5,7 @@
 
 import { Check, X } from 'lucide-react';
 import { cx } from './cx';
+import { Tooltip } from './Tooltip';
 import { highlightLine } from './syntaxHighlight';
 import {
   fileActionClass,
@@ -209,32 +210,34 @@ export function DiffReviewSideColumn({
             />
             {row.rowType !== 'context' && (
               <div className={styles.lineActions}>
-                <button
-                  className={cx(
-                    styles.lineActionBtn,
-                    styles.lineAcceptBtn,
-                    lineActionBtnClassName,
-                    rowState === 'accepted' && styles.lineAcceptBtnActive,
-                  )}
-                  onClick={() => onAcceptClick(rowIndex)}
-                  aria-label={acceptLineLabel}
-                  title={acceptLineLabel}
-                >
-                  <Check size={11} />
-                </button>
-                <button
-                  className={cx(
-                    styles.lineActionBtn,
-                    styles.lineRejectBtn,
-                    lineActionBtnClassName,
-                    rowState === 'rejected' && styles.lineRejectBtnActive,
-                  )}
-                  onClick={() => onRejectClick(rowIndex)}
-                  aria-label={rejectLineLabel}
-                  title={rejectLineLabel}
-                >
-                  <X size={11} />
-                </button>
+                <Tooltip label={acceptLineLabel}>
+                  <button
+                    className={cx(
+                      styles.lineActionBtn,
+                      styles.lineAcceptBtn,
+                      lineActionBtnClassName,
+                      rowState === 'accepted' && styles.lineAcceptBtnActive,
+                    )}
+                    onClick={() => onAcceptClick(rowIndex)}
+                    aria-label={acceptLineLabel}
+                  >
+                    <Check size={11} />
+                  </button>
+                </Tooltip>
+                <Tooltip label={rejectLineLabel}>
+                  <button
+                    className={cx(
+                      styles.lineActionBtn,
+                      styles.lineRejectBtn,
+                      lineActionBtnClassName,
+                      rowState === 'rejected' && styles.lineRejectBtnActive,
+                    )}
+                    onClick={() => onRejectClick(rowIndex)}
+                    aria-label={rejectLineLabel}
+                  >
+                    <X size={11} />
+                  </button>
+                </Tooltip>
               </div>
             )}
           </div>

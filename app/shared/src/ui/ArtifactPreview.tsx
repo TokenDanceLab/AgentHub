@@ -17,6 +17,7 @@ import {
 import Modal from './Modal';
 import styles from './ArtifactPreview.module.css';
 import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
+import { Tooltip } from './Tooltip';
 
 export type ArtifactType = 'iframe' | 'page' | 'image' | 'file';
 
@@ -274,15 +275,16 @@ function ArtifactContent({
       {onApplyDiff != null && (
         <div className={styles.toolbar}>
           <span className={styles.toolbarUrl}>{artifactUrl}</span>
-          <button
-            className={`${styles.toolbarBtn} ${styles.toolbarBtnPrimary}`}
-            onClick={() => window.open(artifactUrl, '_blank', 'noopener,noreferrer')}
-            title={t('artifact.openInNewTab')}
-            aria-label={t('artifact.openInNewTab')}
-            type="button"
-          >
-            <ExternalLink size={14} />
-          </button>
+          <Tooltip label={t('artifact.openInNewTab')}>
+            <button
+              className={`${styles.toolbarBtn} ${styles.toolbarBtnPrimary}`}
+              onClick={() => window.open(artifactUrl, '_blank', 'noopener,noreferrer')}
+              aria-label={t('artifact.openInNewTab')}
+              type="button"
+            >
+              <ExternalLink size={14} />
+            </button>
+          </Tooltip>
           <button
             className={`${styles.actionBtn} ${applyState === 'applied' ? styles.actionBtnApplied : ''}`}
             onClick={onApplyDiff}

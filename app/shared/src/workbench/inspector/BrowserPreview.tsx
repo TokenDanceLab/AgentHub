@@ -4,6 +4,7 @@ import {
   type AgentHubTheme,
 } from '../../theme';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
+import { Tooltip } from '../../ui/Tooltip';
 import styles from './BrowserPreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -128,36 +129,39 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
       {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
         {/* Back */}
-        <button
-          className={styles.navBtn}
-          type="button"
-          aria-label="后退"
-          title="后退"
-          disabled
-        >
-          <DesignNavIcon name="back" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-        </button>
+        <Tooltip label="后退">
+          <button
+            className={styles.navBtn}
+            type="button"
+            aria-label="后退"
+            disabled
+          >
+            <DesignNavIcon name="back" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+          </button>
+        </Tooltip>
 
         {/* Forward */}
-        <button
-          className={styles.navBtn}
-          type="button"
-          aria-label="前进"
-          title="前进"
-          disabled
-        >
-          <DesignNavIcon name="forward" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-        </button>
+        <Tooltip label="前进">
+          <button
+            className={styles.navBtn}
+            type="button"
+            aria-label="前进"
+            disabled
+          >
+            <DesignNavIcon name="forward" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+          </button>
+        </Tooltip>
 
         {/* Refresh */}
-        <button
-          className={styles.navBtn}
-          type="button"
-          aria-label="刷新"
-          title="刷新"
-        >
-          <DesignNavIcon name="refresh" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-        </button>
+        <Tooltip label="刷新">
+          <button
+            className={styles.navBtn}
+            type="button"
+            aria-label="刷新"
+          >
+            <DesignNavIcon name="refresh" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+          </button>
+        </Tooltip>
 
         {/* Address bar */}
         <div className={styles.address}>
@@ -168,15 +172,16 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
         </div>
 
         {/* Close */}
-        <button
-          className={styles.closeBtn}
-          type="button"
-          onClick={onClose}
-          aria-label="关闭预览"
-          title="关闭预览"
-        >
-          <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-        </button>
+        <Tooltip label="关闭预览">
+          <button
+            className={styles.closeBtn}
+            type="button"
+            onClick={onClose}
+            aria-label="关闭预览"
+          >
+            <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Iframe ── */}

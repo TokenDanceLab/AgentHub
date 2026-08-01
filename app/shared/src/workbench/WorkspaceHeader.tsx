@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { Tooltip } from '../ui/Tooltip';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface WorkspaceHeaderProps {
@@ -94,49 +95,54 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.workspaceActions}>
-        <button
-          aria-label={t('aria.search')}
-          className={styles.iconButton}
-          onClick={onOpenSearch}
-          title="搜索"
-          type="button"
-        >
-          <DesignNavIcon name="search" />
-        </button>
-        <button
-          aria-label={t('aria.newTask')}
-          className={styles.iconButton}
-          title="新任务"
-          type="button"
-        >
-          <DesignNavIcon name="template" />
-        </button>
-        <button
-          aria-label={t('aria.confirmItems')}
-          className={styles.iconButton}
-          title="确认项"
-          type="button"
-        >
-          <DesignNavIcon name="check" />
-        </button>
-        <button
-          aria-label={t('aria.sessionSettings')}
-          className={styles.iconButton}
-          title="会话设置"
-          type="button"
-        >
-          <DesignNavIcon name="settings" />
-        </button>
-        <button
-          aria-label={inspectorCollapsed ? t('aria.expandInspector') : t('aria.collapseInspector')}
-          className={`${styles.iconButton} ${styles.inspectorToggleBtn}`}
-          onClick={onToggleInspector}
-          title={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}
-          type="button"
-        >
-          <span className={styles.iconCollapse}><DesignNavIcon name="sidebarRight" /></span>
-          <span className={styles.iconExpand}><DesignNavIcon name="sidebarLeft" /></span>
-        </button>
+        <Tooltip label="搜索">
+          <button
+            aria-label={t('aria.search')}
+            className={styles.iconButton}
+            onClick={onOpenSearch}
+            type="button"
+          >
+            <DesignNavIcon name="search" />
+          </button>
+        </Tooltip>
+        <Tooltip label="新任务">
+          <button
+            aria-label={t('aria.newTask')}
+            className={styles.iconButton}
+            type="button"
+          >
+            <DesignNavIcon name="template" />
+          </button>
+        </Tooltip>
+        <Tooltip label="确认项">
+          <button
+            aria-label={t('aria.confirmItems')}
+            className={styles.iconButton}
+            type="button"
+          >
+            <DesignNavIcon name="check" />
+          </button>
+        </Tooltip>
+        <Tooltip label="会话设置">
+          <button
+            aria-label={t('aria.sessionSettings')}
+            className={styles.iconButton}
+            type="button"
+          >
+            <DesignNavIcon name="settings" />
+          </button>
+        </Tooltip>
+        <Tooltip label={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}>
+          <button
+            aria-label={inspectorCollapsed ? t('aria.expandInspector') : t('aria.collapseInspector')}
+            className={`${styles.iconButton} ${styles.inspectorToggleBtn}`}
+            onClick={onToggleInspector}
+            type="button"
+          >
+            <span className={styles.iconCollapse}><DesignNavIcon name="sidebarRight" /></span>
+            <span className={styles.iconExpand}><DesignNavIcon name="sidebarLeft" /></span>
+          </button>
+        </Tooltip>
       </div>
     </header>
   );
