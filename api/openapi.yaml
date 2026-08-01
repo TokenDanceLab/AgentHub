@@ -69,7 +69,14 @@ paths:
   #   /v1/artifacts/{artifactId} (GET), /v1/previews (GET/POST),
   #   /v1/previews/{previewId} (GET), /v1/previews/{previewId}:stop,
   #   /v1/metrics, /v1/agent-instances (GET only), /v1/agent-instances/{id},
-  #   /v1/permissions/decide
+  #   /v1/permissions/decide,
+  #   /v1/runs/{runId}/apply (POST), /v1/runs/{runId}/apply-all (POST),
+  #   /v1/plans/decide (POST), /v1/plans/pending (GET),
+  #   /v1/delivery-journal (GET), /v1/users (GET), /v1/users/current (GET),
+  #   /v1/agent-profiles (GET/POST), /v1/agent-profiles/{profileId} (GET/PATCH/DELETE),
+  #   /v1/settings (GET/PATCH), /v1/runtime-sessions (GET),
+  #   /v1/ccswitch/status (GET), /v1/ccswitch/providers (GET),
+  #   /v1/deployments (POST), /v1/memory (GET/POST)
   #
   # PLANNED (documented but not yet implemented):
   #   PATCH/DELETE /v1/projects/{projectId},
@@ -805,6 +812,105 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
+  /v1/runs/{runId}/apply:
+    post:
+      tags: [ExecutionRunner]
+      operationId: applyRunDiffHunk
+      summary: Apply a single run diff hunk to the filesystem.
+      description: >
+        Applies one accepted hunk decision for a finished run to the workspace
+        filesystem. Reads the run's persisted diff, applies the selected hunk,
+        and returns the updated diff state. workDir must be within the Edge
+        workspace allowlist.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file_path, hunk_index, accepted]
+              properties:
+                file_path:
+                  type: string
+                  description: Workspace-relative file path whose hunk is being decided.
+                hunk_index:
+                  type: integer
+                  minimum: 0
+                  description: Zero-based hunk index within the file's unified diff.
+                accepted:
+                  type: boolean
+                  description: When true the hunk is written to the filesystem; when false it is recorded as rejected without writing.
+                workDir:
+                  type: string
+                  description: Absolute workspace root; must be within the Edge workspace allowlist. Required when accepted is true.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/runs/{runId}/apply-all:
+    post:
+      tags: [ExecutionRunner]
+      operationId: applyAllRunDiffHunks
+      summary: Batch apply multiple run diff hunk decisions.
+      description: >
+        Applies multiple hunk accept/reject decisions for a finished run in one
+        request. Each decision is applied in order; the first failure aborts
+        the batch. Returns the per-hunk results and count applied.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decisions]
+              properties:
+                decisions:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [file_path, hunk_index, accepted]
+                    properties:
+                      file_path:
+                        type: string
+                      hunk_index:
+                        type: integer
+                        minimum: 0
+                      accepted:
+                        type: boolean
+                workDir:
+                  type: string
+                  description: Absolute workspace root; must be within the Edge workspace allowlist.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
   /v1/approvals:
     get:
       tags: [ExecutionRunner]
@@ -1160,6 +1266,484 @@ paths:
           description: Invalid decision payload.
         "404":
           description: Pending permission request not found.
+
+  /v1/plans/decide:
+    post:
+      tags: [ExecutionRunner]
+      operationId: decidePlan
+      summary: Approve or reject a pending orchestrator plan.
+      description: >
+        Plan confirmation gate (P0 #3). Resolves a pending plan for the given
+        run via the PlanApprovalBroker. The resolved plan_approved /
+        plan_rejected event is emitted by the dispatch interceptor once the
+        broker decision resolves; this endpoint only records the decision.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, decision]
+              properties:
+                runId: { type: string }
+                decision:
+                  type: string
+                  enum: [approve, reject]
+                reason: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /v1/plans/pending:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listPendingPlans
+      summary: List pending orchestrator plans awaiting approval.
+      description: >
+        Returns pending plans registered with the PlanApprovalBroker. When no
+        broker is configured an empty list is returned.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /v1/delivery-journal:
+    get:
+      tags: [Foundation]
+      operationId: getDeliveryJournal
+      summary: Read Edge-to-Hub delivery journal for reconciliation.
+      description: >
+        Edge-local callback journal snapshot for AH-SR-049 reconciliation. When
+        the Edge CallbackClient is not configured, returns 503. Under Hub JWT /
+        multi-user mode, entries are filtered to runs owned by the caller;
+        local single-tenant mode sees all rows.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: afterSeq
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            default: 0
+          description: Return entries with seq greater than this value.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /v1/users:
+    get:
+      tags: [Foundation]
+      operationId: listEdgeUsers
+      summary: List Edge-local user profiles.
+      description: >
+        Returns Edge-local user profiles from the Edge store. This is the
+        single-tenant local profile surface; Hub-owned users live under Hub
+        Server routes.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /v1/users/current:
+    get:
+      tags: [Foundation]
+      operationId: getCurrentEdgeUser
+      summary: Get the current Edge-local user profile.
+      description: >
+        Returns the current Edge-local user profile, or 404 when no current
+        user is set.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /v1/agent-profiles:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listEdgeAgentProfiles
+      summary: List Edge-local agent profiles.
+      description: >
+        Edge-local agent profile index. Profiles have no per-user owner
+        binding, so under Hub JWT / multi-user mode this route fails closed
+        (AH-SR-045); local single-tenant mode keeps access. Supports an
+        optional adapterId query filter.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: adapterId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional adapter id filter.
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [ExecutionRunner]
+      operationId: createEdgeAgentProfile
+      summary: Create an Edge-local agent profile.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                adapterId: { type: string }
+                model: { type: string }
+                provider: { type: string }
+                reasoningEffort: { type: string }
+                thinkingMode: { type: string }
+                maxThinkingTokens: { type: integer }
+                permissionMode: { type: string }
+                systemPrompt: { type: string }
+                allowedTools:
+                  type: array
+                  items:
+                    type: string
+                mcpConfig: { type: string }
+                skills:
+                  type: array
+                  items:
+                    type: string
+                avatarRef: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /v1/agent-profiles/{profileId}:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getEdgeAgentProfile
+      summary: Get an Edge-local agent profile.
+      description: >
+        Edge-local agent profile lookup. Fails closed under Hub JWT /
+        multi-user mode (AH-SR-045).
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [ExecutionRunner]
+      operationId: updateEdgeAgentProfile
+      summary: Update an Edge-local agent profile.
+      description: Partial update of an Edge-local agent profile by id.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: JSON patch map merged into the profile.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [ExecutionRunner]
+      operationId: deleteEdgeAgentProfile
+      summary: Delete an Edge-local agent profile.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/settings:
+    get:
+      tags: [Foundation]
+      operationId: getEdgeSettings
+      summary: Read Edge-local settings.
+      description: >
+        Edge-local settings have no per-user owner binding; under Hub JWT /
+        multi-user mode this route fails closed (AH-SR-045). Local
+        single-tenant mode keeps access.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    patch:
+      tags: [Foundation]
+      operationId: updateEdgeSettings
+      summary: Upsert Edge-local settings.
+      description: >
+        Merges a string-keyed patch into Edge-local settings. An empty patch
+        is rejected. Persist failures are reported as 500 so callers do not
+        mistake them for success.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+              minProperties: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/runtime-sessions:
+    get:
+      tags: [Foundation]
+      operationId: listRuntimeSessions
+      summary: List observed local Agent Runtime sessions.
+      description: >
+        Read-only Desktop import discovery surface. Scans the local filesystem
+        for recent Agent Runtime session summaries; never mutates third-party
+        stores. Shared machine surface: fails closed under Hub JWT / multi-user
+        mode (AH-SR-045).
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+        - name: runtime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated runtime filter list (e.g. claude-code,codex).
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/ccswitch/status:
+    get:
+      tags: [Foundation]
+      operationId: getCCSwitchStatus
+      summary: Report cc-switch installation status.
+      description: >
+        Returns whether cc-switch is installed and whether model routing is
+        active on this Edge. When cc-switch is not detected the response
+        reports installed=false, routingActive=false.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /v1/ccswitch/providers:
+    get:
+      tags: [Foundation]
+      operationId: listCCSwitchProviders
+      summary: List cc-switch providers for an app type.
+      description: >
+        Reads cc-switch provider entries for the given appType (defaults to
+        claude). Returns an empty list when cc-switch is not installed or its
+        database is not readable.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: appType
+          in: query
+          required: false
+          schema:
+            type: string
+            default: claude
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/deployments:
+    post:
+      tags: [ExecutionRunner]
+      operationId: createDeployment
+      summary: Deploy run artifacts to a static site target.
+      description: >
+        Collects a finished run's artifacts, archives them, and SCPs the
+        archive to the configured deployment target. The slug becomes the
+        subdomain of the pages domain. The run must be in a terminal state and
+        have at least one artifact.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, slug]
+              properties:
+                runId: { type: string }
+                slug:
+                  type: string
+                  description: DNS-safe subdomain slug (lowercase alphanumeric with hyphens, 2-63 chars).
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /v1/memory:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getEdgeMemory
+      summary: Read AgentHub memory entries for a workspace.
+      description: >
+        Reads AgentHub memory entries for the given workDir / threadId /
+        agentId. workDir must be within the Edge workspace allowlist when set.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: workDir
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: threadId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: agentId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [ExecutionRunner]
+      operationId: writeEdgeMemory
+      summary: Write or update an AgentHub memory entry.
+      description: >
+        Writes a single AgentHub memory entry for the given workDir. workDir is
+        required and must be within the Edge workspace allowlist. When id is
+        omitted one is generated. An empty content body is rejected.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workDir, content]
+              properties:
+                workDir: { type: string }
+                threadId: { type: string }
+                agentId: { type: string }
+                id: { type: string }
+                content: { type: string }
+                source: { type: string }
+                tags:
+                  type: array
+                  items:
+                    type: string
+                overwrite: { type: boolean }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   # ═══════════════════════════════════════════════════════════
   # Hub Server Routes (prefix: /client, /edge, /web, /api/public)
