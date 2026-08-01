@@ -251,9 +251,9 @@ func TestParsePlanRobust_EdgeCases(t *testing.T) {
 		hasTasks bool
 	}{
 		{
-			name:    "only opening brace",
-			input:   `{`,
-			wantErr: false, // heuristic fallback treats "{" as text and creates single-task plan
+			name:     "only opening brace",
+			input:    `{`,
+			wantErr:  false, // heuristic fallback treats "{" as text and creates single-task plan
 			hasTasks: true,
 		},
 		{

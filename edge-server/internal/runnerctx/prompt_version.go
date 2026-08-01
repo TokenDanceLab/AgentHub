@@ -11,8 +11,8 @@ import (
 // downstream CI gates, A/B testing, and prompt registry tooling can
 // identify and compare prompts deterministically.
 type PromptVersion struct {
-	ID          string    `json:"id"`          // unique version identifier (e.g. "orchestrator-v3")
-	Version     int       `json:"version"`     // monotonically increasing
+	ID          string    `json:"id"`      // unique version identifier (e.g. "orchestrator-v3")
+	Version     int       `json:"version"` // monotonically increasing
 	Created     time.Time `json:"created"`
 	Author      string    `json:"author"`      // "agent-hub/edge-server"
 	ModelTarget string    `json:"modelTarget"` // "claude-opus-4-8" or "any"

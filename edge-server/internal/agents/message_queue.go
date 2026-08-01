@@ -8,15 +8,15 @@ import (
 // Message represents an inter-agent communication message.
 // It follows the pattern from Codex's InterAgentCommunication protocol.
 type Message struct {
-	ID          string    `json:"id"`
-	FromAgentID string    `json:"fromAgentId"`
-	ToAgentID   string    `json:"toAgentId"`           // empty = broadcast to all children
-	Type        string    `json:"type"`                // "task", "result", "progress", "error", "shutdown"
-	Payload     any       `json:"payload"`
-	TaskID      string    `json:"taskId,omitempty"`    // associated task
-	CorrelationID string  `json:"correlationId,omitempty"` // for request/response pairing
-	TriggerTurn bool      `json:"triggerTurn"`         // wake the target agent's RunLoop on delivery
-	Timestamp   time.Time `json:"timestamp"`
+	ID            string    `json:"id"`
+	FromAgentID   string    `json:"fromAgentId"`
+	ToAgentID     string    `json:"toAgentId"` // empty = broadcast to all children
+	Type          string    `json:"type"`      // "task", "result", "progress", "error", "shutdown"
+	Payload       any       `json:"payload"`
+	TaskID        string    `json:"taskId,omitempty"`        // associated task
+	CorrelationID string    `json:"correlationId,omitempty"` // for request/response pairing
+	TriggerTurn   bool      `json:"triggerTurn"`             // wake the target agent's RunLoop on delivery
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 // Message types for inter-agent communication.
@@ -34,7 +34,7 @@ const (
 // enabling the Supervisor pattern from 03-orchestration.md.
 type Queue struct {
 	mu     sync.RWMutex
-	queues map[string]chan Message // per-agent receive channels
+	queues map[string]chan Message  // per-agent receive channels
 	wakes  map[string]chan struct{} // per-agent wake channels for trigger_turn
 	closed map[string]bool
 }

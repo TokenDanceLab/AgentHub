@@ -13,13 +13,15 @@ type blockAllHook struct{}
 func (h *blockAllHook) PreToolUse(ctx context.Context, toolName string, input map[string]any) (map[string]any, bool, string) {
 	return input, true, "blocked by test"
 }
-func (h *blockAllHook) PostToolUse(ctx context.Context, toolName string, output string) string { return output }
+func (h *blockAllHook) PostToolUse(ctx context.Context, toolName string, output string) string {
+	return output
+}
 func (h *blockAllHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
-func (h *blockAllHook) OnError(ctx context.Context, err error) ErrorAction            { return ErrRetry }
-func (h *blockAllHook) PrePrompt(ctx context.Context, prompt string) string            { return prompt }
-func (h *blockAllHook) PostResponse(ctx context.Context, response string) string       { return response }
+func (h *blockAllHook) OnError(ctx context.Context, err error) ErrorAction       { return ErrRetry }
+func (h *blockAllHook) PrePrompt(ctx context.Context, prompt string) string      { return prompt }
+func (h *blockAllHook) PostResponse(ctx context.Context, response string) string { return response }
 
 // modifyInputHook modifies PreToolUse input by adding a key.
 type modifyInputHook struct{}
@@ -31,11 +33,13 @@ func (h *modifyInputHook) PreToolUse(ctx context.Context, toolName string, input
 	input["modified"] = true
 	return input, false, ""
 }
-func (h *modifyInputHook) PostToolUse(ctx context.Context, toolName string, output string) string { return output }
+func (h *modifyInputHook) PostToolUse(ctx context.Context, toolName string, output string) string {
+	return output
+}
 func (h *modifyInputHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
-func (h *modifyInputHook) OnError(ctx context.Context, err error) ErrorAction      { return ErrRetry }
+func (h *modifyInputHook) OnError(ctx context.Context, err error) ErrorAction       { return ErrRetry }
 func (h *modifyInputHook) PrePrompt(ctx context.Context, prompt string) string      { return prompt }
 func (h *modifyInputHook) PostResponse(ctx context.Context, response string) string { return response }
 
@@ -53,9 +57,11 @@ func (h *appendToOutputHook) PostToolUse(ctx context.Context, toolName string, o
 func (h *appendToOutputHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
-func (h *appendToOutputHook) OnError(ctx context.Context, err error) ErrorAction      { return ErrRetry }
-func (h *appendToOutputHook) PrePrompt(ctx context.Context, prompt string) string      { return prompt }
-func (h *appendToOutputHook) PostResponse(ctx context.Context, response string) string { return response }
+func (h *appendToOutputHook) OnError(ctx context.Context, err error) ErrorAction  { return ErrRetry }
+func (h *appendToOutputHook) PrePrompt(ctx context.Context, prompt string) string { return prompt }
+func (h *appendToOutputHook) PostResponse(ctx context.Context, response string) string {
+	return response
+}
 
 // --- Tests ---
 

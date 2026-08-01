@@ -326,7 +326,7 @@ func TestEdgeReceivesDispatchFromHub(t *testing.T) {
 		"prompt":    "Please review this PR for security issues.",
 		"agentId":   "codex",
 		"model":     "claude-sonnet-4-5",
-		"workDir": h.WorkspaceAllowlist[0],
+		"workDir":   h.WorkspaceAllowlist[0],
 	}
 	resp := postJSON(t, ts.URL+"/v1/runs", dispatchBody)
 	if resp.StatusCode != http.StatusAccepted {

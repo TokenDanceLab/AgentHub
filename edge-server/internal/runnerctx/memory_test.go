@@ -581,7 +581,7 @@ func TestWriteMemoryEntryOverwrite(t *testing.T) {
 
 	// Overwrite with new entry
 	_, err = WriteMemoryEntry(MemoryWriteRequest{
-		WorkDir: dir,
+		WorkDir:   dir,
 		Overwrite: true,
 		Entry: MemoryEntry{
 			ID:      "new-entry",
@@ -627,7 +627,7 @@ func TestWriteThenReadRoundTrip(t *testing.T) {
 	// Write entries across all three scopes
 	_, _ = WriteMemoryEntry(MemoryWriteRequest{
 		WorkDir: dir,
-		Entry: MemoryEntry{ID: "p1", Content: "Project fact.", Source: "system"},
+		Entry:   MemoryEntry{ID: "p1", Content: "Project fact.", Source: "system"},
 	})
 	_, _ = WriteMemoryEntry(MemoryWriteRequest{
 		WorkDir: dir, ThreadID: "t1",

@@ -67,7 +67,7 @@ type Handler struct {
 
 	// CCSwitchStatus holds the detected cc-switch installation status.
 	// nil means cc-switch was not found on this machine.
-	CCSwitchStatus *ccswitch.CCSwitchStatus
+	CCSwitchStatus *ccswitch.Status
 
 	// CCSwitchReader reads cc-switch database for model alias resolution.
 	// nil means cc-switch is not installed or database is not readable.
@@ -238,6 +238,24 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/runners", h.GetRunners)
 	mux.HandleFunc("/v1/agents", h.GetAgents)
 	mux.HandleFunc("/v1/model-catalog", h.GetModelCatalog)
+	h.registerProjectRoutes(mux)
+	h.registerThreadRoutes(mux)
+	h.registerItemRoutes(mux)
+	h.registerRunRoutes(mux)
+	h.registerArtifactRoutes(mux)
+	h.registerPreviewRoutes(mux)
+	mux.HandleFunc("/v1/metrics", h.GetMetrics)
+	mux.HandleFunc("/v1/events", h.GetEvents)
+	h.registerAgentInstanceRoutes(mux)
+	h.registerPlanRoutes(mux)
+	h.registerUserRoutes(mux)
+	h.registerAgentProfileRoutes(mux)
+	h.registerSettingsRoutes(mux)
+	h.registerDeploymentAndMemoryRoutes(mux)
+}
+
+// registerProjectRoutes wires the /v1/projects and /v1/projects/ handlers.
+func (h *Handler) registerProjectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/projects", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -255,6 +273,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+}
+
+// registerThreadRoutes wires the /v1/threads and /v1/threads/ handlers,
+// including the /items, /pins, /messages and :archive sub-routes.
+func (h *Handler) registerThreadRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/threads", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -265,50 +288,57 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
 	})
-	mux.HandleFunc("/v1/threads/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/items") && r.Method == http.MethodGet {
-			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/items")
-			h.GetThreadItems(w, r, threadID)
-			return
-		}
-		if strings.HasSuffix(r.URL.Path, "/pins") {
-			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/pins")
-			switch r.Method {
-			case http.MethodGet:
-				h.GetThreadPins(w, r, threadID)
-			case http.MethodPost:
-				h.PostThreadPin(w, r, threadID)
-			case http.MethodDelete:
-				h.DeleteThreadPin(w, r, threadID)
-			default:
-				writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
-			}
-			return
-		}
-		if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
-			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/messages")
-			h.PostThreadMessage(w, r, threadID)
-			return
-		}
-		if strings.HasSuffix(r.URL.Path, ":archive") && r.Method == http.MethodPost {
-			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), ":archive")
-			h.ArchiveThread(w, r, threadID)
-			return
-		}
-		if r.Method == http.MethodGet {
-			h.GetThread(w, r)
-			return
-		}
-		threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
+	mux.HandleFunc("/v1/threads/", h.handleThreadSubRoute)
+}
+
+// handleThreadSubRoute dispatches /v1/threads/{threadId}... sub-routes.
+func (h *Handler) handleThreadSubRoute(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/items") && r.Method == http.MethodGet {
+		threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/items")
+		h.GetThreadItems(w, r, threadID)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/pins") {
+		threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/pins")
 		switch r.Method {
-		case http.MethodPatch:
-			h.PatchThread(w, r, threadID)
+		case http.MethodGet:
+			h.GetThreadPins(w, r, threadID)
+		case http.MethodPost:
+			h.PostThreadPin(w, r, threadID)
 		case http.MethodDelete:
-			h.DeleteThread(w, r, threadID)
+			h.DeleteThreadPin(w, r, threadID)
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
-	})
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
+		threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/messages")
+		h.PostThreadMessage(w, r, threadID)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, ":archive") && r.Method == http.MethodPost {
+		threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), ":archive")
+		h.ArchiveThread(w, r, threadID)
+		return
+	}
+	if r.Method == http.MethodGet {
+		h.GetThread(w, r)
+		return
+	}
+	threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
+	switch r.Method {
+	case http.MethodPatch:
+		h.PatchThread(w, r, threadID)
+	case http.MethodDelete:
+		h.DeleteThread(w, r, threadID)
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	}
+}
+
+// registerItemRoutes wires the /v1/items/ handler.
+func (h *Handler) registerItemRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/items/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetItem(w, r)
@@ -316,6 +346,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+}
+
+// registerRunRoutes wires the /v1/runs and /v1/runs/ handlers, including the
+// :cancel, /diff, /apply and /apply-all sub-routes.
+func (h *Handler) registerRunRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -326,46 +361,53 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
 	})
-	mux.HandleFunc("/v1/runs/", func(w http.ResponseWriter, r *http.Request) {
-		// Routes with runId suffix: /v1/runs/{runId}:cancel
-		if strings.HasSuffix(r.URL.Path, ":cancel") && r.Method == http.MethodPost {
-			h.PostCancelRun(w, r)
-			return
-		}
-		if strings.HasSuffix(r.URL.Path, "/diff") && r.Method == http.MethodGet {
-			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/diff")
-			h.GetRunDiff(w, r, runID)
-			return
-		}
-		// POST /v1/runs/{runId}/apply — apply a single hunk decision
-		if strings.HasSuffix(r.URL.Path, "/apply") && r.Method == http.MethodPost {
-			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply")
-			h.PostApplyRunDiff(w, r, runID)
-			return
-		}
-		// POST /v1/runs/{runId}/apply-all — batch apply multiple hunk decisions
-		if strings.HasSuffix(r.URL.Path, "/apply-all") && r.Method == http.MethodPost {
-			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply-all")
-			h.PostApplyAllRunDiffs(w, r, runID)
-			return
-		}
-		if r.Method == http.MethodGet {
-			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
-			repo := ensureStore(h)
-			userID := h.ownerUserID(r)
-			if run, ok := repo.GetRun(runID); ok {
-				if !isRunOwnedBy(repo, run.ID, userID) {
-					writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
-					return
-				}
-				writeSuccess(w, http.StatusOK, runToResponse(run))
+	mux.HandleFunc("/v1/runs/", h.handleRunSubRoute)
+}
+
+// handleRunSubRoute dispatches /v1/runs/{runId}... sub-routes.
+func (h *Handler) handleRunSubRoute(w http.ResponseWriter, r *http.Request) {
+	// Routes with runId suffix: /v1/runs/{runId}:cancel
+	if strings.HasSuffix(r.URL.Path, ":cancel") && r.Method == http.MethodPost {
+		h.PostCancelRun(w, r)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/diff") && r.Method == http.MethodGet {
+		runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/diff")
+		h.GetRunDiff(w, r, runID)
+		return
+	}
+	// POST /v1/runs/{runId}/apply — apply a single hunk decision
+	if strings.HasSuffix(r.URL.Path, "/apply") && r.Method == http.MethodPost {
+		runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply")
+		h.PostApplyRunDiff(w, r, runID)
+		return
+	}
+	// POST /v1/runs/{runId}/apply-all — batch apply multiple hunk decisions
+	if strings.HasSuffix(r.URL.Path, "/apply-all") && r.Method == http.MethodPost {
+		runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply-all")
+		h.PostApplyAllRunDiffs(w, r, runID)
+		return
+	}
+	if r.Method == http.MethodGet {
+		runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
+		repo := ensureStore(h)
+		userID := h.ownerUserID(r)
+		if run, ok := repo.GetRun(runID); ok {
+			if !isRunOwnedBy(repo, run.ID, userID) {
+				writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 				return
 			}
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+			writeSuccess(w, http.StatusOK, runToResponse(run))
 			return
 		}
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
-	})
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+}
+
+// registerArtifactRoutes wires the /v1/artifacts and /v1/artifacts/ handlers.
+func (h *Handler) registerArtifactRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/artifacts", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetArtifacts(w, r)
@@ -381,6 +423,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+}
+
+// registerPreviewRoutes wires the /v1/previews and /v1/previews/ handlers.
+func (h *Handler) registerPreviewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/previews", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -407,8 +453,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
-	mux.HandleFunc("/v1/metrics", h.GetMetrics)
-	mux.HandleFunc("/v1/events", h.GetEvents)
+}
+
+// registerAgentInstanceRoutes wires the /v1/agent-instances handlers.
+func (h *Handler) registerAgentInstanceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/agent-instances", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetAgentInstances(w, r)
@@ -424,6 +472,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+}
+
+// registerPlanRoutes wires the permission and plan approval endpoints
+// (P0 #3: plan confirmation gate).
+func (h *Handler) registerPlanRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.PostPermissionDecide(w, r)
@@ -431,7 +484,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
-	// Plan approval gate (P0 #3: Plan confirmation gate)
 	mux.HandleFunc("/v1/plans/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.PostPlanDecide(w, r)
@@ -446,7 +498,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
-	// User profiles
+}
+
+// registerUserRoutes wires the user profile endpoints.
+func (h *Handler) registerUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/users", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListUserProfiles()))
@@ -465,7 +520,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
-	// Agent profiles
+}
+
+// registerAgentProfileRoutes wires the /v1/agent-profiles handlers.
+func (h *Handler) registerAgentProfileRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/agent-profiles", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -493,7 +551,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
 	})
-	// Settings
+}
+
+// registerSettingsRoutes wires the settings, runtime session and cc-switch
+// endpoints.
+func (h *Handler) registerSettingsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/settings", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -509,6 +571,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// cc-switch integration
 	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
 	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
+}
+
+// registerDeploymentAndMemoryRoutes wires the deployments and memory endpoints.
+func (h *Handler) registerDeploymentAndMemoryRoutes(mux *http.ServeMux) {
 	// Deployments (static site deploy to *.example.agenthub.dev)
 	mux.HandleFunc("/v1/deployments", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

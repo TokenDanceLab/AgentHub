@@ -458,8 +458,8 @@ func TestDefaultOrchestratorPrompt_RequiredXMLTags(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		agents  []string
+		name   string
+		agents []string
 	}{
 		{
 			name:   "with multiple agents",

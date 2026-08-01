@@ -1276,10 +1276,10 @@ func TestBuildConfigEnvVarEmptyStringNotUsed(t *testing.T) {
 
 func TestParseDurationOrDefault(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		def     string
-		want    string
+		name  string
+		input string
+		def   string
+		want  string
 	}{
 		{"30s literal", "30s", "5m", "30s"},
 		{"5m literal", "5m", "1s", "5m0s"},

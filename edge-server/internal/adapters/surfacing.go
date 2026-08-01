@@ -74,7 +74,11 @@ func TakeWorkdirSnapshot(workDir string) *WorkdirSnapshot {
 
 	_ = filepath.WalkDir(workDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip inaccessible entries
+			// Skip inaccessible entries; do not abort the walk.
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if d.IsDir() {
 			if skipDirs[d.Name()] {
@@ -85,51 +89,58 @@ func TakeWorkdirSnapshot(workDir string) *WorkdirSnapshot {
 		if len(s.Files) >= maxSnapshotTotalFiles {
 			return filepath.SkipAll
 		}
-
-		fi, err := d.Info()
-		if err != nil {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(workDir, path)
-		if err != nil || relPath == "" || relPath == "." {
-			return nil
-		}
-		relPath = filepath.ToSlash(relPath)
-
-		// Skip binary artifacts (executables, DBs, archives, backups).
-		if isBinaryArtifact(relPath) {
-			return nil
-		}
-
-		rec := fileRecord{
-			Size:    fi.Size(),
-			ModTime: fi.ModTime(),
-		}
-
-		// Compute MD5 hash.
-		f, err := os.Open(path)
-		if err != nil {
-			return nil
-		}
-		h := md5.New()
-		_, _ = io.Copy(h, io.LimitReader(f, maxSnapshotFileBytes))
-		f.Close()
-		rec.Hash = hex.EncodeToString(h.Sum(nil))
-
-		// Store content for text files (enables diff generation).
-		if isTextFilePath(relPath) && fi.Size() <= maxSnapshotFileBytes {
-			data, err := os.ReadFile(path)
-			if err == nil {
-				rec.Content = string(data)
-			}
-		}
-
-		s.Files[relPath] = rec
+		captureSnapshotEntry(s, workDir, path, d)
 		return nil
 	})
 
 	return s
+}
+
+// captureSnapshotEntry records a single file's state (hash + content) into
+// the snapshot. Errors are non-fatal: the entry is skipped and the walk
+// continues, matching the "best-effort snapshot" contract of
+// TakeWorkdirSnapshot.
+func captureSnapshotEntry(s *WorkdirSnapshot, workDir, path string, d fs.DirEntry) {
+	fi, err := d.Info()
+	if err != nil {
+		return
+	}
+
+	relPath, err := filepath.Rel(workDir, path)
+	if err != nil || relPath == "" || relPath == "." {
+		return
+	}
+	relPath = filepath.ToSlash(relPath)
+
+	// Skip binary artifacts (executables, DBs, archives, backups).
+	if isBinaryArtifact(relPath) {
+		return
+	}
+
+	rec := fileRecord{
+		Size:    fi.Size(),
+		ModTime: fi.ModTime(),
+	}
+
+	// Compute MD5 hash.
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	h := md5.New()
+	_, _ = io.Copy(h, io.LimitReader(f, maxSnapshotFileBytes))
+	f.Close()
+	rec.Hash = hex.EncodeToString(h.Sum(nil))
+
+	// Store content for text files (enables diff generation).
+	if isTextFilePath(relPath) && fi.Size() <= maxSnapshotFileBytes {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			rec.Content = string(data)
+		}
+	}
+
+	s.Files[relPath] = rec
 }
 
 // ── Surface detection ───────────────────────────────────────────────────
@@ -161,11 +172,12 @@ func DetectSurfacedFiles(snapshot *WorkdirSnapshot) []SurfacedFile {
 		before, existed := snapshot.Files[relPath]
 
 		var action string
-		if !existed {
+		switch {
+		case !existed:
 			action = "created"
-		} else if before.Hash != afterRec.Hash {
+		case before.Hash != afterRec.Hash:
 			action = "modified"
-		} else {
+		default:
 			continue // unchanged
 		}
 
@@ -225,7 +237,7 @@ func SurfaceAndEmit(bus *events.Bus, writer store.Writer, snapshot *WorkdirSnaps
 			emitSurfacedImage(bus, writer, scope, run, sf)
 		case surfacingKindDeploy:
 			emitSurfacedDeploy(bus, writer, scope, run, sf, snapshot)
-		default:
+		case surfacingKindArtifact:
 			emitSurfacedArtifact(bus, writer, scope, run, sf, snapshot)
 		}
 	}

@@ -30,7 +30,7 @@ type PlanTask struct {
 	ID             string     `json:"id"`
 	Agent          string     `json:"agent"`
 	Description    string     `json:"description"`
-	Mode           string     `json:"mode,omitempty"`           // "parallel" or "sequential" execution hint for this task
+	Mode           string     `json:"mode,omitempty"` // "parallel" or "sequential" execution hint for this task
 	TargetFiles    []string   `json:"targetFiles,omitempty"`
 	DependsOn      []string   `json:"dependsOn,omitempty"`
 	ExpectedOutput string     `json:"expectedOutput,omitempty"`
@@ -123,56 +123,70 @@ func ParsePlan(text string) (*ExecutionPlan, error) {
 // ({"tasks":[...]}) and the legacy nested format ({"plan":{"tasks":[...]}}).
 func scanForPlanBlock(text string) *ExecutionPlan {
 	lines := strings.Split(text, "\n")
-	var buf strings.Builder
-	inBlock := false
-	braceDepth := 0
-
-	// tryParse attempts to parse a JSON candidate as flat then nested format.
-	tryParse := func(candidate string) *ExecutionPlan {
-		// Try flat format first.
-		var flat flatPlanEnvelope
-		if err := json.Unmarshal([]byte(candidate), &flat); err == nil && len(flat.Tasks) > 0 {
-			initTaskStatuses(flat.Tasks)
-			return &ExecutionPlan{Tasks: flat.Tasks}
-		}
-		// Fall back to nested format.
-		var env structuredPlanEnvelope
-		if err := json.Unmarshal([]byte(candidate), &env); err == nil && len(env.Plan.Tasks) > 0 {
-			initTaskStatuses(env.Plan.Tasks)
-			return &env.Plan
-		}
-		return nil
-	}
+	var scanner planBlockScanner
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// Try each line as a standalone JSON object first.
 		if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
-			if plan := tryParse(trimmed); plan != nil {
+			if plan := tryParsePlanCandidate(trimmed); plan != nil {
 				return plan
 			}
 		}
 
 		// Multi-line JSON block accumulation.
-		for _, ch := range line {
-			if ch == '{' {
-				if braceDepth == 0 {
-					inBlock = true
-					buf.Reset()
-				}
-				braceDepth++
+		if plan := scanner.scanLine(line); plan != nil {
+			return plan
+		}
+	}
+	return nil
+}
+
+// tryParsePlanCandidate attempts to parse a JSON candidate as flat then
+// nested format, returning the parsed plan or nil when neither matches.
+func tryParsePlanCandidate(candidate string) *ExecutionPlan {
+	// Try flat format first.
+	var flat flatPlanEnvelope
+	if err := json.Unmarshal([]byte(candidate), &flat); err == nil && len(flat.Tasks) > 0 {
+		initTaskStatuses(flat.Tasks)
+		return &ExecutionPlan{Tasks: flat.Tasks}
+	}
+	// Fall back to nested format.
+	var env structuredPlanEnvelope
+	if err := json.Unmarshal([]byte(candidate), &env); err == nil && len(env.Plan.Tasks) > 0 {
+		initTaskStatuses(env.Plan.Tasks)
+		return &env.Plan
+	}
+	return nil
+}
+
+// planBlockScanner accumulates multi-line JSON blocks across lines while
+// tracking brace depth, and returns a parsed plan as soon as a block closes.
+type planBlockScanner struct {
+	buf        strings.Builder
+	inBlock    bool
+	braceDepth int
+}
+
+func (s *planBlockScanner) scanLine(line string) *ExecutionPlan {
+	for _, ch := range line {
+		if ch == '{' {
+			if s.braceDepth == 0 {
+				s.inBlock = true
+				s.buf.Reset()
 			}
-			if inBlock {
-				buf.WriteRune(ch)
-			}
-			if ch == '}' {
-				braceDepth--
-				if braceDepth == 0 && inBlock {
-					inBlock = false
-					if plan := tryParse(buf.String()); plan != nil {
-						return plan
-					}
+			s.braceDepth++
+		}
+		if s.inBlock {
+			s.buf.WriteRune(ch)
+		}
+		if ch == '}' {
+			s.braceDepth--
+			if s.braceDepth == 0 && s.inBlock {
+				s.inBlock = false
+				if plan := tryParsePlanCandidate(s.buf.String()); plan != nil {
+					return plan
 				}
 			}
 		}
@@ -274,9 +288,7 @@ func stripMarkdownFences(text string) string {
 		t = strings.TrimPrefix(t, "```")
 	}
 	t = strings.TrimSpace(t)
-	if strings.HasSuffix(t, "```") {
-		t = strings.TrimSuffix(t, "```")
-	}
+	t = strings.TrimSuffix(t, "```")
 	return strings.TrimSpace(t)
 }
 

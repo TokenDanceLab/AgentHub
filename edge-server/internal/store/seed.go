@@ -30,10 +30,8 @@ func SeedIfEmpty(repo Repository) error {
 	slog.Info("seed: store is empty, seeding demo data")
 
 	// 1. User profiles
-	for _, profile := range seedUserProfiles {
-		if _, err := repo.CreateUserProfile(profile); err != nil {
-			return err
-		}
+	if err := seedUserProfilesData(repo); err != nil {
+		return err
 	}
 
 	// 2. Project
@@ -42,94 +40,129 @@ func SeedIfEmpty(repo Repository) error {
 	}
 
 	// 3. Threads + Runs + Items + Evidence
+	if err := seedThreadsData(repo); err != nil {
+		return err
+	}
+
+	// 4. Pins
+	seedPinsData(repo)
+
+	slog.Info("seed: done", "threads", len(seedThreads), "runs", countSeedRuns(), "pins", len(seedPins))
+	return nil
+}
+
+// seedUserProfilesData creates all demo user profiles.
+func seedUserProfilesData(repo Repository) error {
+	for _, profile := range seedUserProfiles {
+		if _, err := repo.CreateUserProfile(profile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedThreadsData creates every demo thread, its run evidence, and its items.
+func seedThreadsData(repo Repository) error {
 	for _, t := range seedThreads {
 		if _, err := repo.CreateThread(t.ID, seedProjectID, t.Title, t.Kind, t.AvatarColor, t.AvatarLabel); err != nil {
 			return err
 		}
-
-		// Run (if this thread has one)
 		if t.Run != nil {
-			run, err := repo.CreateRun(t.Run.ID, seedProjectID, t.ID)
-			if err != nil {
+			if err := seedThreadRun(repo, t); err != nil {
 				return err
-			}
-			if t.Run.Status == "finished" {
-				repo.SetRunStatus(run.ID, "started")
-				repo.SetRunStatus(run.ID, t.Run.Status)
-			} else if t.Run.Status != "queued" {
-				repo.SetRunStatus(run.ID, t.Run.Status)
-			}
-
-			// Diffs
-			for _, d := range t.Run.Diffs {
-				if _, err := repo.UpsertRunDiffFile(RunDiffFile{
-					RunID:  run.ID,
-					Path:   d.Path,
-					Diff:   d.Diff,
-					Status: d.Status,
-				}); err != nil {
-					return err
-				}
-			}
-
-			// Artifacts
-			for _, a := range t.Run.Artifacts {
-				if _, err := repo.UpsertArtifact(Artifact{
-					ID:        a.ID,
-					RunID:     run.ID,
-					ThreadID:  t.ID,
-					Kind:      a.Kind,
-					Path:      a.Path,
-					SizeBytes: a.SizeBytes,
-				}); err != nil {
-					return err
-				}
-			}
-
-			// Previews
-			for _, p := range t.Run.Previews {
-				if _, err := repo.UpsertPreview(Preview{
-					ID:       p.ID,
-					RunID:    run.ID,
-					ThreadID: t.ID,
-					URL:      p.URL,
-					Status:   p.Status,
-				}); err != nil {
-					return err
-				}
 			}
 		}
+		if err := seedThreadItems(repo, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		// Items (messages, diffs, approvals, artifacts)
-		for _, item := range t.Items {
-			runID := item.RunID
-			if _, err := repo.CreateItem(Item{
-				ID:         item.ID,
-				ProjectID:  seedProjectID,
-				ThreadID:   t.ID,
-				RunID:      runID,
-				Type:       item.Type,
-				Role:       item.Role,
-				SenderID:   item.SenderID,
-				SenderName: item.SenderName,
-				Status:     "created",
-				Content:    item.Content,
-			}); err != nil {
-				return err
-			}
+// seedThreadRun creates the thread's run and its diffs/artifacts/previews.
+func seedThreadRun(repo Repository, t seedThreadDef) error {
+	run, err := repo.CreateRun(t.Run.ID, seedProjectID, t.ID)
+	if err != nil {
+		return err
+	}
+	switch t.Run.Status {
+	case "finished":
+		repo.SetRunStatus(run.ID, "started")
+		repo.SetRunStatus(run.ID, t.Run.Status)
+	case "queued":
+		// Leave the run in its initial queued state.
+	default:
+		repo.SetRunStatus(run.ID, t.Run.Status)
+	}
+
+	for _, d := range t.Run.Diffs {
+		if _, err := repo.UpsertRunDiffFile(RunDiffFile{
+			RunID:  run.ID,
+			Path:   d.Path,
+			Diff:   d.Diff,
+			Status: d.Status,
+		}); err != nil {
+			return err
 		}
 	}
 
-	// 3. Pins
+	for _, a := range t.Run.Artifacts {
+		if _, err := repo.UpsertArtifact(Artifact{
+			ID:        a.ID,
+			RunID:     run.ID,
+			ThreadID:  t.ID,
+			Kind:      a.Kind,
+			Path:      a.Path,
+			SizeBytes: a.SizeBytes,
+		}); err != nil {
+			return err
+		}
+	}
+
+	for _, p := range t.Run.Previews {
+		if _, err := repo.UpsertPreview(Preview{
+			ID:       p.ID,
+			RunID:    run.ID,
+			ThreadID: t.ID,
+			URL:      p.URL,
+			Status:   p.Status,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedThreadItems creates the thread's items (messages, diffs, approvals, artifacts).
+func seedThreadItems(repo Repository, t seedThreadDef) error {
+	for _, item := range t.Items {
+		runID := item.RunID
+		if _, err := repo.CreateItem(Item{
+			ID:         item.ID,
+			ProjectID:  seedProjectID,
+			ThreadID:   t.ID,
+			RunID:      runID,
+			Type:       item.Type,
+			Role:       item.Role,
+			SenderID:   item.SenderID,
+			SenderName: item.SenderName,
+			Status:     "created",
+			Content:    item.Content,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedPinsData pins demo items; failures are non-fatal.
+func seedPinsData(repo Repository) {
 	for _, pin := range seedPins {
 		if _, err := repo.PinThreadItem(pin.ThreadID, pin.ItemID, pin.PinnedBy); err != nil {
 			// Pin failure is non-fatal; the item might not exist yet in some edge cases.
 			slog.Warn("seed: pin warning", "error", err)
 		}
 	}
-
-	slog.Info("seed: done", "threads", len(seedThreads), "runs", countSeedRuns(), "pins", len(seedPins))
-	return nil
 }
 
 func countSeedRuns() int {

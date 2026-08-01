@@ -70,6 +70,12 @@ func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifi
 			return
 		}
 
+		// Record the request BEFORE answering it: the client returns as
+		// soon as it reads our response, so recording afterwards races
+		// with the test's gotMethods() assertion and can drop the last
+		// method (observed flaky on session/prompt).
+		f.recordMethod(msg.Method)
+
 		switch msg.Method {
 		case "":
 			// JSON-RPC response (e.g. to a session/request_permission request).
@@ -91,7 +97,6 @@ func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifi
 			// session/request_permission and anything else: no result —
 			// the response (possibly an error) is written by the SDK.
 		}
-		f.recordMethod(msg.Method)
 	}
 }
 

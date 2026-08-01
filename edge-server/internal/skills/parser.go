@@ -132,11 +132,12 @@ func parseFrontmatterLine(line string) (key, value string) {
 	}
 
 	// Strip surrounding double quotes.
-	if len(rawValue) >= 2 && rawValue[0] == '"' && rawValue[len(rawValue)-1] == '"' {
+	switch {
+	case len(rawValue) >= 2 && rawValue[0] == '"' && rawValue[len(rawValue)-1] == '"':
 		value = rawValue[1 : len(rawValue)-1]
-	} else if len(rawValue) >= 2 && rawValue[0] == '\'' && rawValue[len(rawValue)-1] == '\'' {
+	case len(rawValue) >= 2 && rawValue[0] == '\'' && rawValue[len(rawValue)-1] == '\'':
 		value = rawValue[1 : len(rawValue)-1]
-	} else {
+	default:
 		value = rawValue
 	}
 

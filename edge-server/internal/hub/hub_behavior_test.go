@@ -22,8 +22,6 @@ import (
 
 func TestNewCallbackClient_TrimsTrailingSlash(t *testing.T) {
 	// The constructor should strip trailing slashes so URLs are well-formed.
-	client := hub.NewCallbackClient("https://hub.example.com/", "token")
-
 	// Indirect verification: make a request and check the URL path.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Path should NOT contain double slashes like //edge/...
@@ -37,7 +35,7 @@ func TestNewCallbackClient_TrimsTrailingSlash(t *testing.T) {
 	defer srv.Close()
 
 	// Re-create client pointing at the test server with trailing slash.
-	client = hub.NewCallbackClient(srv.URL+"/", "token")
+	client := hub.NewCallbackClient(srv.URL+"/", "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

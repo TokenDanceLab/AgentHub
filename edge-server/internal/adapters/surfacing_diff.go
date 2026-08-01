@@ -17,8 +17,8 @@ func generateUnifiedDiff(path, oldContent, newContent string) string {
 	suffix := commonSuffixLen(oldLines[prefix:], newLines[prefix:])
 
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("--- a/%s\n", path))
-	buf.WriteString(fmt.Sprintf("+++ b/%s\n", path))
+	fmt.Fprintf(&buf, "--- a/%s\n", path)
+	fmt.Fprintf(&buf, "+++ b/%s\n", path)
 
 	oldMiddle := oldLines[prefix : len(oldLines)-suffix]
 	newMiddle := newLines[prefix : len(newLines)-suffix]
@@ -29,9 +29,9 @@ func generateUnifiedDiff(path, oldContent, newContent string) string {
 
 	// Determine context start line (1-indexed).
 	startLine := prefix + 1
-	buf.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n",
+	fmt.Fprintf(&buf, "@@ -%d,%d +%d,%d @@\n",
 		startLine, len(oldMiddle),
-		startLine, len(newMiddle)))
+		startLine, len(newMiddle))
 
 	for _, line := range oldMiddle {
 		buf.WriteString("-")

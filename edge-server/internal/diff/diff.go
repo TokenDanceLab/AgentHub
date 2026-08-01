@@ -81,55 +81,68 @@ func ExtractDiffs(value any) []Diff {
 
 	switch v := value.(type) {
 	case []any:
-		if len(v) == 0 {
-			return nil
-		}
-		// Check if every element is a valid diff
-		all := true
-		for _, item := range v {
-			if !IsDiff(item) {
-				all = false
-				break
-			}
-		}
-		if all {
-			result := make([]Diff, 0, len(v))
-			for _, item := range v {
-				result = append(result, castDiff(item.(map[string]any)))
-			}
-			return result
-		}
-		// Filter to valid diffs only
-		var result []Diff
-		for _, item := range v {
-			m, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if IsDiff(m) {
-				result = append(result, castDiff(m))
-			}
-		}
-		return result
+		return extractDiffsFromSlice(v)
 	case map[string]any:
-		if IsDiff(v) {
-			return []Diff{castDiff(v)}
-		}
-		// Keyed object: extract values that are diffs
-		var result []Diff
-		for _, val := range v {
-			m, ok := val.(map[string]any)
-			if !ok {
-				continue
-			}
-			if IsDiff(m) {
-				result = append(result, castDiff(m))
-			}
-		}
-		return result
+		return extractDiffsFromMap(v)
 	default:
 		return nil
 	}
+}
+
+// extractDiffsFromSlice extracts diffs from a []any input, matching the
+// OpenCode diffs() behavior: a fully-valid slice is converted wholesale,
+// otherwise only valid elements are kept.
+func extractDiffsFromSlice(v []any) []Diff {
+	if len(v) == 0 {
+		return nil
+	}
+	// Check if every element is a valid diff
+	all := true
+	for _, item := range v {
+		if !IsDiff(item) {
+			all = false
+			break
+		}
+	}
+	if all {
+		result := make([]Diff, 0, len(v))
+		for _, item := range v {
+			result = append(result, castDiff(item.(map[string]any)))
+		}
+		return result
+	}
+	// Filter to valid diffs only
+	var result []Diff
+	for _, item := range v {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if IsDiff(m) {
+			result = append(result, castDiff(m))
+		}
+	}
+	return result
+}
+
+// extractDiffsFromMap extracts diffs from a keyed-object input: a single valid
+// diff is wrapped, otherwise valid values are collected in map iteration order.
+func extractDiffsFromMap(v map[string]any) []Diff {
+	if IsDiff(v) {
+		return []Diff{castDiff(v)}
+	}
+	// Keyed object: extract values that are diffs
+	var result []Diff
+	for _, val := range v {
+		m, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		if IsDiff(m) {
+			result = append(result, castDiff(m))
+		}
+	}
+	return result
 }
 
 // IsObj returns true if value is a non-nil, non-array object.

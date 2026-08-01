@@ -107,13 +107,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		case outcomeBreak:
 			// Non-recoverable wait error — fall through to fault escalation.
 			goto escalate
+		case outcomeHandoff:
+			// Fault-escalation successor already launched; it owns the
+			// terminal finish.
+			terminalFinish = false
+			return
 		}
 	}
 
 escalate:
 	// Exhausted session retries — attempt fault escalation if configured.
 	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
-	if e.handleFaultEscalation(ctx, &run, runCtx, lastWaitErr, lastOutStore) {
+	if e.handleFaultEscalation(&run, runCtx, lastWaitErr) {
 		// Successor attempt launched; it owns the terminal finish.
 		terminalFinish = false
 		return

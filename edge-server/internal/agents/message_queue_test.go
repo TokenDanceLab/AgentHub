@@ -266,7 +266,7 @@ func TestQueue_ConcurrentSend(t *testing.T) {
 
 	// Drain and count.
 	count := 0
-	drainLoop:
+drainLoop:
 	for {
 		select {
 		case <-ch:

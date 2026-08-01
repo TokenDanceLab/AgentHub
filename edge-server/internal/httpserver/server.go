@@ -183,26 +183,159 @@ func Run(cfg Config) error {
 	return nil
 }
 
-func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
-	if cfg.Store == nil {
-		cfg.Store = store.New()
-	}
-
+// buildEventBusAndMetrics creates the event bus (optionally persisted to the
+// event log) and the bus-stats wired Prometheus metrics.
+func buildEventBusAndMetrics(cfg Config) (*events.Bus, *metrics.EdgeMetrics) {
 	busOpts := []events.BusOption{}
 	if cfg.EventLogPath != "" {
 		busOpts = append(busOpts, events.WithEventLogPath(cfg.EventLogPath))
 	}
 	bus := events.NewBus(10000, busOpts...)
-	reg := runners.NewRegistry()
 
 	// Prometheus metrics wired to bus depth
 	edgeMetrics := metrics.NewWithBusStats(
 		func() float64 { return float64(bus.HistoryLen()) },
 		func() float64 { return float64(bus.DroppedCount()) },
 	)
+	return bus, edgeMetrics
+}
 
-	var executor lifecycle.RunExecutor
+// wireRunEventTracker installs the per-run event counter observer that
+// debugs event counts at run completion. OFF by default (slog.Debug).
+// Observers are NOT in the hot path — the bus fans out concurrently.
+func wireRunEventTracker(bus *events.Bus) {
+	var mu sync.Mutex
+	type runEventTracker struct {
+		count int64
+		types map[string]int64
+	}
+	trackers := make(map[string]*runEventTracker)
+	bus.AddObserver(func(evt events.EventEnvelope) {
+		runID, _ := evt.Scope["runId"].(string)
+		if runID == "" {
+			return
+		}
+		mu.Lock()
+		t, ok := trackers[runID]
+		if !ok {
+			t = &runEventTracker{types: make(map[string]int64)}
+			trackers[runID] = t
+		}
+		t.count++
+		t.types[evt.Type]++
+		switch evt.Type {
+		case "run.finished", "run.failed", "run.cancelled":
+			typeStrs := make([]string, 0, len(t.types))
+			for k, v := range t.types {
+				typeStrs = append(typeStrs, fmt.Sprintf("%s=%d", k, v))
+			}
+			slog.Debug("ws.run.events", "runId", runID, "eventCount", t.count, "eventTypes", typeStrs)
+			delete(trackers, runID)
+		}
+		mu.Unlock()
+	})
+}
+
+// buildProcessExecutor wires the process executor, agent adapter, and the
+// Hub callback client (including the durable delivery journal). Returns nil
+// executor/hub client when neither a runner command nor an agent default is
+// configured.
+func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry, msgQueue *agents.Queue, resultAgg *lifecycle.ResultAggregator, edgeMetrics *metrics.EdgeMetrics) (lifecycle.RunExecutor, *hub.CallbackClient, error) {
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
+	if cfg.ProcessExecutor.Command == "" && !hasAdapter {
+		return nil, nil, nil
+	}
+	execCfg := cfg.ProcessExecutor
+	if execCfg.Command == "" && hasAdapter {
+		// No static command configured; the adapter's BuildCommand supplies the real path.
+		// Use a sentinel value so NewProcessExecutor passes the non-empty check.
+		execCfg.Command = "agenthub-adapter-sentinel"
+	}
+	// Resolve the default agent adapter if configured
+	var agentAdapter adapters.AgentAdapter
+	if cfg.AdapterRegistry != nil && cfg.AgentDefault != "" {
+		if a, ok := cfg.AdapterRegistry.Get(cfg.AgentDefault); ok {
+			agentAdapter = a
+		}
+	}
+	processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, execCfg, agentAdapter, cfg.AdapterRegistry)
+	if err != nil {
+		return nil, nil, err
+	}
+	processExecutor.SetMetrics(edgeMetrics)
+	processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
+
+	var hubCallbackClient *hub.CallbackClient
+	// Wire Hub callback client for Edge-to-Hub direct bridge
+	if cfg.HubURL != "" {
+		hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+		hubCallbackClient = hubClient
+		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
+		// Falls back to in-memory journal on open failure so callback path never blocks startup.
+		if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
+			if err := hubClient.EnableSQLiteJournal(journalPath); err != nil {
+				slog.Warn("durable delivery journal unavailable; using memory journal", "path", journalPath, "error", err)
+			} else {
+				slog.Info("durable delivery journal enabled", "path", journalPath)
+			}
+		}
+		processExecutor.WithHubCallback(hubClient)
+		slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
+	}
+	return processExecutor, hubCallbackClient, nil
+}
+
+// wireCCSwitch detects cc-switch and wires it into the handler for API
+// endpoints and model catalog enrichment. Non-fatal: missing cc-switch is
+// normal.
+func wireCCSwitch(cfg Config, h *api.Handler) {
+	ccStatus := ccswitch.Detect()
+	if !ccStatus.Installed {
+		slog.Debug("cc-switch not detected")
+		return
+	}
+	ccReader := ccswitch.NewReader()
+	h.CCSwitchStatus = &ccStatus
+	h.CCSwitchReader = ccReader
+
+	// Consume cc-switch model aliases into the static config so all
+	// adapters benefit from dynamic model resolution (not just
+	// Claude Code). Graceful degradation: on error, static config
+	// only — never crash because cc-switch is unavailable.
+	if _, err := adapters.ConsumeCCSwitchModels(ccStatus.DBPath); err != nil {
+		slog.Warn("cc-switch model alias consumption failed, using static config only", "error", err)
+	}
+
+	// Wire cc-switch dynamic model resolver into Claude Code adapter
+	// so model aliases are resolved through the transparent proxy mapping.
+	if cfg.AdapterRegistry != nil && ccReader != nil {
+		if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
+			if claudeAdapter, ok := a.(interface {
+				SetCCSwitchResolver(adapters.CCSwitchModelResolver)
+			}); ok {
+				claudeAdapter.SetCCSwitchResolver(ccReader)
+				slog.Debug("cc-switch model resolver wired into claude-code adapter")
+			}
+		}
+	}
+
+	if ccStatus.RoutingActive {
+		slog.Info("cc-switch detected and routing is active",
+			"db", ccStatus.DBPath,
+			"port", ccStatus.ProxyPort,
+			"appTypes", ccStatus.ActiveAppTypes)
+	} else {
+		slog.Info("cc-switch detected but routing is inactive", "db", ccStatus.DBPath)
+	}
+}
+
+func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
+	if cfg.Store == nil {
+		cfg.Store = store.New()
+	}
+
+	bus, edgeMetrics := buildEventBusAndMetrics(cfg)
+	reg := runners.NewRegistry()
 
 	agentReg := agents.NewRegistry()
 	msgQueue := agents.NewQueue()
@@ -212,81 +345,12 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
 
 	// Per-run event counter: tracks event counts per run and debugs at
-	// completion time. OFF by default (slog.Debug). Observers are NOT
-	// in the hot path — the bus fans out concurrently.
-	{
-		var mu sync.Mutex
-		type runEventTracker struct {
-			count int64
-			types map[string]int64
-		}
-		trackers := make(map[string]*runEventTracker)
-		bus.AddObserver(func(evt events.EventEnvelope) {
-			runID, _ := evt.Scope["runId"].(string)
-			if runID == "" {
-				return
-			}
-			mu.Lock()
-			t, ok := trackers[runID]
-			if !ok {
-				t = &runEventTracker{types: make(map[string]int64)}
-				trackers[runID] = t
-			}
-			t.count++
-			t.types[evt.Type]++
-			switch evt.Type {
-			case "run.finished", "run.failed", "run.cancelled":
-				typeStrs := make([]string, 0, len(t.types))
-				for k, v := range t.types {
-					typeStrs = append(typeStrs, fmt.Sprintf("%s=%d", k, v))
-				}
-				slog.Debug("ws.run.events", "runId", runID, "eventCount", t.count, "eventTypes", typeStrs)
-				delete(trackers, runID)
-			}
-			mu.Unlock()
-		})
-	}
+	// completion time (see wireRunEventTracker).
+	wireRunEventTracker(bus)
 
-	var hubCallbackClient *hub.CallbackClient
-	if cfg.ProcessExecutor.Command != "" || hasAdapter {
-		execCfg := cfg.ProcessExecutor
-		if execCfg.Command == "" && hasAdapter {
-			// No static command configured; the adapter's BuildCommand supplies the real path.
-			// Use a sentinel value so NewProcessExecutor passes the non-empty check.
-			execCfg.Command = "agenthub-adapter-sentinel"
-		}
-		// Resolve the default agent adapter if configured
-		var agentAdapter adapters.AgentAdapter
-		if cfg.AdapterRegistry != nil && cfg.AgentDefault != "" {
-			if a, ok := cfg.AdapterRegistry.Get(cfg.AgentDefault); ok {
-				agentAdapter = a
-			}
-		}
-		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, execCfg, agentAdapter, cfg.AdapterRegistry)
-		if err != nil {
-			return nil, err
-		}
-		processExecutor.SetMetrics(edgeMetrics)
-		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
-
-		// Wire Hub callback client for Edge-to-Hub direct bridge
-		if cfg.HubURL != "" {
-			hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
-			hubCallbackClient = hubClient
-			// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
-			// Falls back to in-memory journal on open failure so callback path never blocks startup.
-			if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
-				if err := hubClient.EnableSQLiteJournal(journalPath); err != nil {
-					slog.Warn("durable delivery journal unavailable; using memory journal", "path", journalPath, "error", err)
-				} else {
-					slog.Info("durable delivery journal enabled", "path", journalPath)
-				}
-			}
-			processExecutor.WithHubCallback(hubClient)
-			slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
-		}
-
-		executor = processExecutor
+	executor, hubCallbackClient, err := buildProcessExecutor(cfg, bus, agentReg, msgQueue, resultAgg, edgeMetrics)
+	if err != nil {
+		return nil, err
 	}
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
 
@@ -329,44 +393,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	// Detect cc-switch and wire into handler for API endpoints and model
 	// catalog enrichment. Non-fatal: missing cc-switch is normal.
-	ccStatus := ccswitch.Detect()
-	if ccStatus.Installed {
-		ccReader := ccswitch.NewReader()
-		h.CCSwitchStatus = &ccStatus
-		h.CCSwitchReader = ccReader
-
-		// Consume cc-switch model aliases into the static config so all
-		// adapters benefit from dynamic model resolution (not just
-		// Claude Code). Graceful degradation: on error, static config
-		// only — never crash because cc-switch is unavailable.
-		if _, err := adapters.ConsumeCCSwitchModels(ccStatus.DBPath); err != nil {
-			slog.Warn("cc-switch model alias consumption failed, using static config only", "error", err)
-		}
-
-		// Wire cc-switch dynamic model resolver into Claude Code adapter
-		// so model aliases are resolved through the transparent proxy mapping.
-		if cfg.AdapterRegistry != nil && ccReader != nil {
-			if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
-				if claudeAdapter, ok := a.(interface {
-					SetCCSwitchResolver(adapters.CCSwitchModelResolver)
-				}); ok {
-					claudeAdapter.SetCCSwitchResolver(ccReader)
-					slog.Debug("cc-switch model resolver wired into claude-code adapter")
-				}
-			}
-		}
-
-		if ccStatus.RoutingActive {
-			slog.Info("cc-switch detected and routing is active",
-				"db", ccStatus.DBPath,
-				"port", ccStatus.ProxyPort,
-				"appTypes", ccStatus.ActiveAppTypes)
-		} else {
-			slog.Info("cc-switch detected but routing is inactive", "db", ccStatus.DBPath)
-		}
-	} else {
-		slog.Debug("cc-switch not detected")
-	}
+	wireCCSwitch(cfg, h)
 
 	// Validate security-critical configuration at startup.
 	// An empty workspace allowlist means all non-empty workDir values

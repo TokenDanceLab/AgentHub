@@ -214,10 +214,10 @@ func TestScanLinesLargeLine(t *testing.T) {
 // TestScanLinesTableDriven runs table-driven tests for various input patterns.
 func TestScanLinesTableDriven(t *testing.T) {
 	cases := []struct {
-		name     string
-		input    string
-		want     []string
-		wantErr  bool
+		name    string
+		input   string
+		want    []string
+		wantErr bool
 	}{
 		{"single line", "hello\n", []string{"hello"}, false},
 		{"multiple lines", "a\nb\nc\n", []string{"a", "b", "c"}, false},

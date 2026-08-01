@@ -20,7 +20,7 @@ func withParserContextValues(ctx context.Context, runCtx RunProcessContext) cont
 	if runCtx.WorkDir != "" {
 		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
 	}
-	return adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
+	return adapters.SDKAdapterContext(parserCtx, runCtx)
 }
 
 // withFreshSession replaces the session ID and clears continue-last for a

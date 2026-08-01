@@ -503,11 +503,11 @@ func TestFaultEscalationConfig_Behavior_DefaultConfigIsSensible(t *testing.T) {
 func TestEscalationPhase_Behavior_Constants(t *testing.T) {
 	// Verify all escalation phase constants have the expected string values.
 	phases := map[EscalationPhase]string{
-		EscalationPhaseNone:     "none",
-		EscalationPhaseRetry:    "retry",
-		EscalationPhaseReview:   "review",
-		EscalationPhaseReplan:   "replan",
-		EscalationPhaseExhaust:  "exhausted",
+		EscalationPhaseNone:    "none",
+		EscalationPhaseRetry:   "retry",
+		EscalationPhaseReview:  "review",
+		EscalationPhaseReplan:  "replan",
+		EscalationPhaseExhaust: "exhausted",
 	}
 
 	for phase, want := range phases {
