@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { useFocusTrap } from '../../ui/focusTrap';
 import type {
   AccountMenuRow,
   AccountSpace,
@@ -73,6 +74,8 @@ export function ProfilePopover({
   onStatusToggle,
 }: ProfilePopoverProps) {
   const popoverRef = useRef<HTMLElement>(null);
+  // Focus trap: saves trigger, wraps Tab/Shift+Tab, returns focus on close.
+  useFocusTrap(popoverRef, isOpen);
 
   const position = useCallback(() => {
     const popover = popoverRef.current;
