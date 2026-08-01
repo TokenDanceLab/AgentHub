@@ -40,7 +40,7 @@ func TestAgentTeamService_CreateTeamEmptyName(t *testing.T) {
 
 	_, err := svc.CreateTeam(context.Background(), "user-1", "", "desc")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -270,7 +270,7 @@ func TestAgentTeamService_AddTeamMemberInvalidRole(t *testing.T) {
 
 	err := svc.AddTeamMember(context.Background(), "user-1", "team-1", "agent-1", "invalid_role")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -470,7 +470,7 @@ func TestAgentTeamService_StartTeamRun_EmptyMembers(t *testing.T) {
 
 	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -852,7 +852,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(
 		Instructions: "Do work",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -891,7 +891,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *test
 		Instructions: "one more task",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -923,7 +923,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenActiveSubagentLimitReach
 		Instructions: "blocked by active limit",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -953,7 +953,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenRouteRepeatLimitReached(
 
 	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, repeated)
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -984,7 +984,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsTimedOutAssignment(t *testin
 		Instructions: "blocked by timeout",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -1021,7 +1021,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsBudgetExceeded(t *testing.T)
 		Instructions: "blocked by budget",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
@@ -1070,7 +1070,7 @@ func TestAgentTeamService_CreateAssignmentRejectsDelegationDepthLimit(t *testing
 
 	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor4.ID, supervisor5.ID, model.AssignmentTypeDelegate, "too deep", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 }
 
@@ -1093,7 +1093,7 @@ func TestAgentTeamService_CreateAssignmentRejectsTeamRunTaskLimit(t *testing.T) 
 
 	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor.ID, executor.ID, model.AssignmentTypeDelegate, "too many", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 }
 
@@ -1125,7 +1125,7 @@ func TestAgentTeamService_CreateAssignmentRejectsDelegationCycle(t *testing.T) {
 
 	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor3.ID, supervisor.ID, model.AssignmentTypeDelegate, "cycle", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 }
 
@@ -1150,7 +1150,7 @@ func TestAgentTeamService_CreateAssignmentUsesConfiguredDelegationDepthLimit(t *
 
 	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor2.ID, supervisor3.ID, model.AssignmentTypeDelegate, "too deep for config", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 }
 
@@ -1173,7 +1173,7 @@ func TestAgentTeamService_CreateAssignmentUsesConfiguredTeamRunTaskLimit(t *test
 
 	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor.ID, executor.ID, model.AssignmentTypeDelegate, "over configured task limit", "")
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, assignment)
 }
 
@@ -1615,7 +1615,7 @@ func TestAgentTeamService_ResolveConflictRejectsTaskOutsideConflict(t *testing.T
 		SelectedAgentTaskID: "missing-task",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, resolved)
 }
 
@@ -1858,7 +1858,7 @@ func TestAgentTeamService_DecideApprovalRejectsMissingEdgeDeviceForControl(t *te
 		Decision: "allow",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, decided)
 	assert.Empty(t, controlSvc.calls)
 }
@@ -1900,7 +1900,7 @@ func TestAgentTeamService_DecideApprovalRejectsAlreadyDecided(t *testing.T) {
 		Decision: "allow",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	assert.Nil(t, decided)
 }
 
@@ -2548,7 +2548,7 @@ func TestCompeteModeRejectsExceedingMaxAgents(t *testing.T) {
 		Instructions: "Too many workers",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 }
 
 func strPtr(s string) *string {
@@ -2582,7 +2582,7 @@ func TestHumanReviewGate(t *testing.T) {
 			Action: model.ReviewActionApprove,
 		})
 		require.Error(t, err)
-		assert.Equal(t, errcode.ErrBadRequest, err)
+		assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	})
 
 	t.Run("enabled sets pending_review after route decision", func(t *testing.T) {
@@ -2787,7 +2787,7 @@ func TestHumanReviewGate(t *testing.T) {
 			Action: "bogus",
 		})
 		require.Error(t, err)
-		assert.Equal(t, errcode.ErrBadRequest, err)
+		assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	})
 
 	t.Run("review rejects non-pending_review status", func(t *testing.T) {
@@ -2800,7 +2800,7 @@ func TestHumanReviewGate(t *testing.T) {
 			Action: model.ReviewActionApprove,
 		})
 		require.Error(t, err)
-		assert.Equal(t, errcode.ErrBadRequest, err)
+		assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	})
 
 	t.Run("review rejects non-owner user", func(t *testing.T) {
@@ -2882,7 +2882,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun(t *testing.T) {
 		Instructions: "Do more work",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 
 	// A repeated finish with blocked_reason must not downgrade completed to failed.
 	_, err = svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
@@ -2890,7 +2890,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun(t *testing.T) {
 		BlockedReason: "should not overwrite",
 	})
 	require.Error(t, err)
-	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 
 	gotRun, err := repository.GetTeamRunByID(db, run.ID)
 	require.NoError(t, err)

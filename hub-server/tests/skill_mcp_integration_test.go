@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -71,7 +72,7 @@ func TestSkillAndMCPIntegrationReadthrough(t *testing.T) {
 		}
 
 		resp = get("/web/skills/"+skill.ID, stranger.Token)
-		mustCode(t, parse(resp), "AUTH_DEVICE_MISMATCH", "stranger get skill fixture")
+		mustCode(t, parse(resp), errcode.AuthDeviceMismatch.Code, "stranger get skill fixture")
 
 		resp = get("/web/skills?pageSize=10", stranger.Token)
 		r = parse(resp)
@@ -118,7 +119,7 @@ func TestSkillAndMCPIntegrationReadthrough(t *testing.T) {
 		}
 
 		resp = get("/web/mcp-servers/"+mcp.ID, stranger.Token)
-		mustCode(t, parse(resp), "AUTH_DEVICE_MISMATCH", "stranger get mcp fixture")
+		mustCode(t, parse(resp), errcode.AuthDeviceMismatch.Code, "stranger get mcp fixture")
 
 		resp = get("/web/mcp-servers?transport=stdio&pageSize=10", stranger.Token)
 		r = parse(resp)

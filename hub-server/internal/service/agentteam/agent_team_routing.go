@@ -196,7 +196,10 @@ func (s *AgentTeamService) rejectRouteDecision(runID string, decision model.Coor
 	if err := s.appendRouteRejected(runID, decision, reason); err != nil {
 		return err
 	}
-	return errcode.ErrBadRequest
+	// Surface the specific guardrail reason (e.g. "route repeat limit
+	// reached") in the API response instead of a generic "invalid request":
+	// the coordinator UI needs to know which limit was hit.
+	return errcode.ErrBadRequest.WithMessage(reason)
 }
 
 func (s *AgentTeamService) appendRouteRejected(runID string, decision model.CoordinatorRouteDecision, reason string) error {
