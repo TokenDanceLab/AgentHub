@@ -12,7 +12,9 @@ import path from 'node:path';
  * authorize → redirect → callback → token exchange → authenticated session.
  */
 
-const HUB_BASE = 'https://api.hub.vectorcontrol.tech';
+const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
+const WEB_E2E_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
+const WEB_CALLBACK_PATH = '/auth/tokendance/callback';
 
 // ── Test helpers ──────────────────────────────────
 
@@ -24,7 +26,7 @@ interface MockOIDCParams {
   deviceId?: string;
 }
 
-function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
+async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
   const {
     state = 'web-test-state-mock-12345',
     authError,
@@ -36,7 +38,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
   let tokenCallCount = 0;
 
   // Mock POST /client/auth/oidc/authorize
-  page.route(`${HUB_BASE}/client/auth/oidc/authorize`, async (route) => {
+  await page.route('**/client/auth/oidc/authorize', async (route) => {
     authCallCount++;
     if (authError) {
       await route.fulfill({
@@ -48,7 +50,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
     }
 
     const body = route.request().postDataJSON();
-    const authUrl = new URL('https://id.vectorcontrol.tech/oidc/authorize');
+    const authUrl = new URL('https://id.tokendancelab.com/oidc/authorize');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', 'c_test_client');
     authUrl.searchParams.set('redirect_uri', body.redirect_uri || buildWebRedirectUri());
@@ -65,7 +67,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
   });
 
   // Mock POST /client/auth/oidc/callback
-  page.route(`${HUB_BASE}/client/auth/oidc/callback`, async (route) => {
+  await page.route('**/client/auth/oidc/callback', async (route) => {
     tokenCallCount++;
     if (tokenError) {
       await route.fulfill({
@@ -82,19 +84,19 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
         access_token: 'web-test-access-token-mock',
         refresh_token: 'web-test-refresh-token-mock',
         expires_in: 900,
-        user: { id: deviceId, username: 'webuser', display_name: 'Web User' },
+        user: { id: deviceId, username: 'webuser', nickname: 'Web User' },
       }),
     });
   });
 
   // Mock GET /client/auth/me (for post-login profile fetch)
-  page.route(`${HUB_BASE}/client/auth/me`, async (route) => {
+  await page.route('**/client/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         code: 'OK',
-        data: { id: deviceId, username: 'webuser', display_name: 'Web User' },
+        data: { id: deviceId, username: 'webuser', nickname: 'Web User' },
       }),
     });
   });
@@ -103,7 +105,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
 }
 
 function buildWebRedirectUri(): string {
-  return 'http://localhost:5174/auth/tokendance/callback';
+  return `${WEB_E2E_ORIGIN}${WEB_CALLBACK_PATH}`;
 }
 
 interface LoginE2EConfig {
@@ -327,11 +329,11 @@ function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
 }
 
 async function waitForHubAccessToken(page: import('@playwright/test').Page): Promise<string> {
-  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('agenthub_hub_access_token')), {
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')), {
     timeout: 180_000,
     message: 'waiting for Hub-issued session after approved TokenDanceID login',
   }).not.toBeNull();
-  const token = await page.evaluate(() => sessionStorage.getItem('agenthub_hub_access_token'));
+  const token = await page.evaluate(() => sessionStorage.getItem('agenthub_hub_token'));
   return String(token);
 }
 
@@ -362,7 +364,7 @@ test.describe('Web OIDC Login — Happy Path', () => {
   });
 
   test('clicking TokenDance ID login redirects to TokenDance ID', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -378,32 +380,32 @@ test.describe('Web OIDC Login — Happy Path', () => {
   });
 
   test('callback URL completes full OIDC login cycle', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     // Plant pending PKCE data in sessionStorage
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((redirectUri) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-test-state-mock-12345',
         codeVerifier: 'web-test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri: 'http://localhost:5174/auth/tokendance/callback',
+        redirectUri,
         createdAt: Date.now(),
       }));
-    });
+    }, buildWebRedirectUri());
 
     // Simulate TokenDance ID redirect back to our callback URL
-    await page.goto('/auth/tokendance/callback?code=web-test-auth-code-67890&state=web-test-state-mock-12345');
+    await page.goto(`${WEB_CALLBACK_PATH}?code=web-test-auth-code-67890&state=web-test-state-mock-12345`);
     await page.waitForTimeout(3000);
   });
 
   test('auth session persists across page reloads', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     await page.evaluate(() => {
       sessionStorage.setItem('agenthub_token_source', 'tokendance');
-      sessionStorage.setItem('agenthub_hub_access_token', 'web-test-access-token-mock');
+      sessionStorage.setItem('agenthub_hub_token', 'web-test-access-token-mock');
     });
 
     // Reload and check auth state
@@ -414,7 +416,7 @@ test.describe('Web OIDC Login — Happy Path', () => {
 
 test.describe('Web OIDC Login — Error Handling', () => {
   test('handles CSRF state mismatch', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     await page.evaluate((redirectUri) => {
@@ -428,7 +430,7 @@ test.describe('Web OIDC Login — Error Handling', () => {
     }, buildWebRedirectUri());
 
     // Attacker-modified callback URL
-    await page.goto('/auth/tokendance/callback?code=evil-code&state=attacker-state');
+    await page.goto(`${WEB_CALLBACK_PATH}?code=evil-code&state=attacker-state`);
     await page.waitForTimeout(2000);
 
     // URL should be cleaned
@@ -436,7 +438,7 @@ test.describe('Web OIDC Login — Error Handling', () => {
   });
 
   test('handles expired PKCE (over 10 minutes)', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     await page.evaluate((redirectUri) => {
@@ -449,26 +451,26 @@ test.describe('Web OIDC Login — Error Handling', () => {
       }));
     }, buildWebRedirectUri());
 
-    await page.goto('/auth/tokendance/callback?code=some-code&state=web-expired-test');
+    await page.goto(`${WEB_CALLBACK_PATH}?code=some-code&state=web-expired-test`);
     await page.waitForTimeout(2000);
 
     expect(page.url()).not.toContain('/auth/tokendance/callback');
   });
 
   test('handles orphan callback (no pending PKCE)', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     // No pending PKCE sessionStorage data
 
-    await page.goto('/auth/tokendance/callback?code=orphan-code&state=orphan-state');
+    await page.goto(`${WEB_CALLBACK_PATH}?code=orphan-code&state=orphan-state`);
     await page.waitForTimeout(2000);
 
     expect(page.url()).not.toContain('/auth/tokendance/callback');
   });
 
   test('handles authorize API failure gracefully', async ({ page }) => {
-    mockOIDCFlow(page, { authError: 'Service unavailable' });
+    await mockOIDCFlow(page, { authError: 'Service unavailable' });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -481,7 +483,7 @@ test.describe('Web OIDC Login — Error Handling', () => {
   });
 
   test('handles token exchange failure after callback', async ({ page }) => {
-    mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
+    await mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
 
     await page.goto('/');
     await page.evaluate((redirectUri) => {
@@ -494,7 +496,7 @@ test.describe('Web OIDC Login — Error Handling', () => {
       }));
     }, buildWebRedirectUri());
 
-    await page.goto('/auth/tokendance/callback?code=bad-code&state=web-test-state-mock-12345');
+    await page.goto(`${WEB_CALLBACK_PATH}?code=bad-code&state=web-test-state-mock-12345`);
     await page.waitForTimeout(3000);
 
     expect(page.url()).not.toContain('/auth/tokendance/callback');
@@ -502,21 +504,41 @@ test.describe('Web OIDC Login — Error Handling', () => {
 });
 
 test.describe('Web OIDC Login — Logout', () => {
-  test('logout clears session and returns to login screen', async ({ page }) => {
+  test('logout clears session and returns to login screen', async ({ page }, testInfo) => {
+    const oidcFlow = await mockOIDCFlow(page);
+    let logoutCalls = 0;
     // Mock logout
-    page.route(`${HUB_BASE}/client/auth/logout`, async (route) => {
+    await page.route('**/client/auth/logout', async (route) => {
+      logoutCalls++;
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{"code":"OK"}' });
     });
 
-    // Plant auth session
     await page.goto('/');
-    await page.evaluate(() => {
-      sessionStorage.setItem('agenthub_token_source', 'tokendance');
-      sessionStorage.setItem('agenthub_hub_access_token', 'web-test-access-token-mock');
-    });
+    await page.evaluate((redirectUri) => {
+      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
+        state: 'web-test-state-mock-12345',
+        codeVerifier: 'test-code-verifier-base64url',
+        deviceId: '00000000-0000-0000-0000-000000000002',
+        redirectUri,
+        createdAt: Date.now(),
+      }));
+    }, buildWebRedirectUri());
 
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
+    await page.goto(`${WEB_CALLBACK_PATH}?code=web-test-auth-code&state=web-test-state-mock-12345`);
+    await expect.poll(oidcFlow.tokenCallCount).toBe(1);
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')))
+      .toBe('web-test-access-token-mock');
+    await page.getByRole('button', { name: 'Web User' }).click();
+    await expect(page.getByRole('dialog').first()).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('profile-menu-open.png'), fullPage: true });
+    await page.getByRole('button', { name: /^(退出登录|Log out|user\.logout)$/ }).click();
+
+    await expect.poll(() => logoutCalls).toBe(1);
+    await expect(page.getByRole('heading', { name: 'AgentHub' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => ({
+      accessToken: sessionStorage.getItem('agenthub_hub_token'),
+      tokenSource: sessionStorage.getItem('agenthub_token_source'),
+    }))).toEqual({ accessToken: null, tokenSource: null });
   });
 });
 

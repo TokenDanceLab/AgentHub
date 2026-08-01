@@ -12,8 +12,6 @@ import { test, expect } from '@playwright/test';
  * similar to the Web app.
  */
 
-const HUB_BASE = 'https://api.hub.vectorcontrol.tech';
-
 // ── Test helpers ──────────────────────────────────
 
 interface MockOIDCParams {
@@ -24,7 +22,7 @@ interface MockOIDCParams {
   deviceId?: string;
 }
 
-function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
+async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
   const {
     state = 'test-state-mock-12345',
     code = 'test-auth-code-67890',
@@ -34,7 +32,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
   } = params;
 
   // Mock POST /client/auth/oidc/authorize
-  page.route(`${HUB_BASE}/client/auth/oidc/authorize`, async (route) => {
+  await page.route('**/client/auth/oidc/authorize', async (route) => {
     if (authError) {
       await route.fulfill({
         status: 400,
@@ -45,7 +43,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
     }
 
     const body = route.request().postDataJSON();
-    const authUrl = new URL('https://id.vectorcontrol.tech/oidc/authorize');
+    const authUrl = new URL('https://id.tokendancelab.com/oidc/authorize');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', 'c_test_client');
     authUrl.searchParams.set('redirect_uri', body.redirect_uri || 'http://localhost:5173/auth/tokendance/callback');
@@ -63,7 +61,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
 
   // Mock POST /client/auth/oidc/callback
   const tokenCalls: Array<Record<string, unknown>> = [];
-  page.route(`${HUB_BASE}/client/auth/oidc/callback`, async (route) => {
+  await page.route('**/client/auth/oidc/callback', async (route) => {
     tokenCalls.push(route.request().postDataJSON());
     if (tokenError) {
       await route.fulfill({
@@ -85,6 +83,17 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
     });
   });
 
+  await page.route('**/client/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'OK',
+        data: { id: deviceId, username: 'testuser', display_name: 'Test User' },
+      }),
+    });
+  });
+
   return tokenCalls;
 }
 
@@ -102,7 +111,7 @@ async function simulateOIDCCallback(page: import('@playwright/test').Page, code:
 
 test.describe('OIDC Login — Desktop', () => {
   test('login button redirects to TokenDance ID', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
 
@@ -126,7 +135,7 @@ test.describe('OIDC Login — Desktop', () => {
   });
 
   test('callback URL processes code and completes login', async ({ page }) => {
-    const tokenCalls = mockOIDCFlow(page);
+    const tokenCalls = await mockOIDCFlow(page);
 
     // Simulate PKCE pending data in sessionStorage BEFORE navigating
     await page.goto('/');
@@ -160,7 +169,7 @@ test.describe('OIDC Login — Desktop', () => {
   });
 
   test('rejects state mismatch as CSRF protection', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     // Plant pending PKCE with a DIFFERENT state
@@ -185,7 +194,7 @@ test.describe('OIDC Login — Desktop', () => {
   });
 
   test('rejects expired PKCE (over 10 minutes)', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
     // Plant expired PKCE data (11 minutes ago)
@@ -209,7 +218,7 @@ test.describe('OIDC Login — Desktop', () => {
   });
 
   test('handles missing pending PKCE data gracefully', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     await page.goto('/');
 
@@ -226,7 +235,7 @@ test.describe('OIDC Login — Desktop', () => {
 
 test.describe('OIDC Login — Error Scenarios', () => {
   test('handles authorize endpoint failure', async ({ page }) => {
-    mockOIDCFlow(page, { authError: 'Service temporarily unavailable' });
+    await mockOIDCFlow(page, { authError: 'Service temporarily unavailable' });
 
     await page.goto('/');
 
@@ -244,7 +253,7 @@ test.describe('OIDC Login — Error Scenarios', () => {
   });
 
   test('handles token exchange failure after callback', async ({ page }) => {
-    mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
+    await mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
 
     await page.goto('/');
     await page.evaluate(() => {
@@ -268,13 +277,13 @@ test.describe('OIDC Login — Error Scenarios', () => {
 
 test.describe('OIDC Login — Session Persistence', () => {
   test('retains auth session across page reloads', async ({ page }) => {
-    mockOIDCFlow(page);
+    await mockOIDCFlow(page);
 
     // Setup: plant valid token in storage
     await page.goto('/');
     await page.evaluate(() => {
       sessionStorage.setItem('agenthub_token_source', 'tokendance');
-      sessionStorage.setItem('agenthub_hub_access_token', 'test-access-token-mock');
+      sessionStorage.setItem('agenthub_hub_token', 'test-access-token-mock');
     });
 
     // Reload the page
@@ -282,20 +291,49 @@ test.describe('OIDC Login — Session Persistence', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('logout clears session and returns to unauthenticated state', async ({ page }) => {
+  test('logout clears session and returns to unauthenticated state', async ({ page }, testInfo) => {
+    page.on('request', (request) => {
+      if (request.url().includes('oidc') || request.url().includes('/auth/')) console.log('[desktop auth request]', request.method(), request.url());
+    });
+    page.on('requestfailed', (request) => {
+      if (request.url().includes('oidc') || request.url().includes('/auth/')) console.log('[desktop auth failed]', request.url(), request.failure()?.errorText);
+    });
+    const tokenCalls = await mockOIDCFlow(page);
+    let logoutCalls = 0;
     // Mock the logout endpoint
-    page.route(`${HUB_BASE}/client/auth/logout`, async (route) => {
+    await page.route('**/client/auth/logout', async (route) => {
+      logoutCalls++;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'OK' }) });
     });
 
     await page.goto('/');
-    // Plant auth session
     await page.evaluate(() => {
-      sessionStorage.setItem('agenthub_token_source', 'tokendance');
-      sessionStorage.setItem('agenthub_hub_access_token', 'test-access-token-mock');
+      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
+        state: 'test-state-mock-12345',
+        codeVerifier: 'test-code-verifier-base64url',
+        deviceId: '00000000-0000-0000-0000-000000000001',
+        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        createdAt: Date.now(),
+      }));
     });
 
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
+    await page.goto('/auth/tokendance/callback?code=test-auth-code-67890&state=test-state-mock-12345');
+    console.log('[desktop runtime]', await page.evaluate(() => ({
+      tauri: '__TAURI_INTERNALS__' in window,
+      href: window.location.href,
+    })));
+    await expect.poll(() => tokenCalls.length).toBe(1);
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token'))).toBe('test-access-token-mock');
+    await page.getByRole('button', { name: /^(Test User|testuser|User|user\.fallbackName)$/ }).click();
+    await expect(page.getByRole('dialog').first()).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('profile-menu-open.png'), fullPage: true });
+    await page.getByRole('button', { name: /^(退出登录|Log out|user\.logout)$/ }).click();
+
+    await expect.poll(() => logoutCalls).toBe(1);
+    await expect(page.getByRole('heading', { name: /登录 AgentHub|Sign in to AgentHub/i })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => ({
+      accessToken: sessionStorage.getItem('agenthub_hub_token'),
+      tokenSource: localStorage.getItem('agenthub_token_source'),
+    }))).toEqual({ accessToken: null, tokenSource: null });
   });
 });

@@ -62,13 +62,16 @@ export default function App() {
     dataModeContract.requiresLocalEdgeForDesktop ||
     dataModeContract.allowsLocalEdgeAutoFallback;
   const { online: edgeOnline } = useHealth({ enabled: edgeHealthEnabled });
-  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, logout } = useAuth();
 
-  // If already authenticated (e.g. returning from OIDC callback with stored session),
-  // skip the entry gate and go straight to workbench.
-  if (entryMode === 'entry' && user) {
-    setEntryMode('workbench');
-  }
+  // If a callback or stored session has established auth, leave the entry gate.
+  // Do this as an effect rather than mutating state during render.
+  useEffect(() => {
+    if (entryMode === 'entry' && isAuthenticated) {
+      setEntryMode('workbench');
+    }
+  }, [entryMode, isAuthenticated]);
 
   function continueDemo(): void {
     writeWorkbenchDataModeOverride('mock');
@@ -85,6 +88,13 @@ export default function App() {
     setEntryMode('workbench');
   }
 
+  const handleLogout = useCallback(async (): Promise<void> => {
+    await logout();
+    queryClient.clear();
+    window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
+    setEntryMode('entry');
+  }, [logout, queryClient]);
+
   return (
     <>
       <DesktopChrome showNavigationControls={entryMode !== 'entry'}>
@@ -97,12 +107,7 @@ export default function App() {
             edgeOnline={edgeOnline}
           />
         ) : (
-          <DesktopWorkbenchApp
-            onLogout={() => {
-              window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
-              setEntryMode('entry');
-            }}
-          />
+          <DesktopWorkbenchApp onLogout={handleLogout} />
         )}
       </DesktopChrome>
       <ToastContainer />
