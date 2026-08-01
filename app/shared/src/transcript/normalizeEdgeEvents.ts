@@ -125,10 +125,31 @@ function evidenceRunId(block: TranscriptBlock): string {
 
 // System-level run lifecycle events that should not appear as transcript blocks.
 // These are status indicators, not conversational content.
+//
+// Members:
+// - run.queued / run.started / run.status.changed: run-level lifecycle state
+//   transitions (run.status.changed is also handled by the switch below, but is
+//   short-circuited here to null).
+// - run.agent.status_change: agent-level status indicator (e.g. the "compacting"
+//   state during auto-compaction); emitted by the Anthropic/OpenAI/NDJSON adapters.
+// - run.agent.context_warning: auto-compaction budget alert (emitted at ~85%
+//   context budget by BudgetAwareEmitter); status indicator, not content.
+// - run.agent.api_retry: transient transport/retry signal (emitted ×N per retry
+//   attempt by the SDK request paths); observability noise, not content.
+//   Consuming it for retry counting is a larger follow-up, deferred for now.
+// - run.agent.context_compaction: final auto-compaction marker emitted at
+//   compaction completion; status indicator, not content.
+//
+// Explicitly skipping these silences the default-branch console.warn for known
+// system-level status events. Truly unknown event types still warn (see default).
 const SKIPPED_EVENT_TYPES = new Set<string>([
   'run.queued',
   'run.started',
   'run.status.changed',
+  'run.agent.status_change',
+  'run.agent.context_warning',
+  'run.agent.api_retry',
+  'run.agent.context_compaction',
 ]);
 
 function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
