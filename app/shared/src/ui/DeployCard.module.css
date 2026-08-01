@@ -51,7 +51,7 @@
 }
 
 .spin {
-  animation: deploySpin 1.2s linear infinite;
+  animation: deploySpin var(--spinner-speed) var(--spinner-easing) infinite;
 }
 
 @keyframes deploySpin {
