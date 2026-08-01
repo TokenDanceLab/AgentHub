@@ -6,7 +6,7 @@
 import { Check, X } from 'lucide-react';
 import { cx } from './cx';
 import { Tooltip } from './Tooltip';
-import { highlightLine } from './syntaxHighlight';
+import { highlightLine, highlightLineWithWordDiff } from './syntaxHighlight';
 import {
   fileActionClass,
   fileActionLabel,
@@ -14,7 +14,9 @@ import {
 } from './DiffReviewPanelHelpers';
 import type {
   DiffReviewFile,
+  SideBySideCell,
   SideBySideRow,
+  WordDiffToken,
 } from './DiffReviewPanelTypes';
 import styles from './DiffReviewPanel.module.css';
 
@@ -119,6 +121,45 @@ export function DiffReviewToolbar({
 
 // ── Side column (left/old or right/new) ────────────────────────────────
 
+// ── Word-diff class mapper + line HTML (P6 Step 4) ───────────────────
+// `wordClassFor` maps a word-diff token type to the scoped CSS module
+// class consumed by the HAST injector (P6 Step 3, highlightLineWithWordDiff).
+// `context` returns '' so context runs stay as bare text leaves — Prism
+// syntax color passes through unchanged inside them (report §4.3).
+// `?? ''` mirrors DiffReviewPanelHelpers.rowStyleClass's guard against a
+// missing CSS module key (test env proxy never yields undefined here,
+// but the guard keeps the contract explicit).
+const wordClassFor = (t: WordDiffToken['type']): string =>
+  t === 'added'
+    ? (styles.wordAdded ?? '')
+    : t === 'removed'
+      ? (styles.wordRemoved ?? '')
+      : '';
+
+/**
+ * Render the HTML for a diff cell's line content.
+ *
+ * Modified rows carrying a non-empty `cell.wordDiff` (filled by
+ * `buildSideBySideRows` when the Step 1 size guard did NOT skip) go
+ * through `highlightLineWithWordDiff` — Prism syntax color is preserved
+ * AND per-word added/removed spans are layered on top via HAST injection.
+ * Every other path (non-modified rows, modified rows where the size guard
+ * returned null → `wordDiff` undefined, modified rows with an empty token
+ * array, or a null cell) falls back to the existing whole-line
+ * `highlightLine`, so behaviour is byte-identical to pre-P6 for those rows.
+ */
+function renderLineHtml(
+  row: SideBySideRow,
+  cell: SideBySideCell | null,
+  lang: string,
+): string {
+  const wordDiff = cell?.wordDiff;
+  if (row.rowType === 'modified' && cell && wordDiff && wordDiff.length > 0) {
+    return highlightLineWithWordDiff(cell.content, lang, wordDiff, wordClassFor);
+  }
+  return highlightLine(cell?.content ?? ' ', lang);
+}
+
 export function DiffReviewSideColumn({
   side,
   headerLabel,
@@ -205,7 +246,7 @@ export function DiffReviewSideColumn({
             <span
               className={styles.lineContent}
               dangerouslySetInnerHTML={{
-                __html: highlightLine(cell?.content ?? ' ', activeLang),
+                __html: renderLineHtml(row, cell, activeLang),
               }}
             />
             {row.rowType !== 'context' && (
