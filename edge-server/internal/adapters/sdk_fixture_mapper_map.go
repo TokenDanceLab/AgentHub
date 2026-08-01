@@ -78,30 +78,7 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 		})
 		return oneSDKMappedEvent(BusEventResult, scope, payload)
 	case "tool_state":
-		events := []SDKMappedEvent{{
-			Type:  BusEventToolCall,
-			Scope: cloneSDKScope(scope),
-			Payload: commonSDKPayload(event, provider, map[string]any{
-				"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
-				"toolName": event.ToolName,
-				"input":    sanitizeSDKValue(event.Input),
-				"status":   firstNonEmpty(event.Status, "pending"),
-			}),
-		}}
-		if event.Status == "completed" || event.Status == "error" || event.Output != "" || event.Error != "" {
-			events = append(events, SDKMappedEvent{
-				Type:  BusEventToolResult,
-				Scope: cloneSDKScope(scope),
-				Payload: commonSDKPayload(event, provider, map[string]any{
-					"callId":      firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
-					"toolName":    event.ToolName,
-					"content":     firstNonEmpty(event.Output, event.Error),
-					"isError":     event.IsError || event.Status == "error",
-					"attachments": sanitizeSDKValue(event.Attachments),
-				}),
-			})
-		}
-		return events
+		return mapSDKFixtureToolStateEvent(event, provider, scope)
 	case "tool_call":
 		return oneSDKMappedEvent(BusEventToolCall, scope, commonSDKPayload(event, provider, map[string]any{
 			"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
@@ -158,19 +135,54 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 		})
 		return oneSDKMappedEvent(sdkFixtureEventArtifactCreated, scope, payload)
 	case "trace_ref", "result", "run_result", "terminal_result":
-		success := true
-		if event.Success != nil {
-			success = *event.Success
-		}
-		payload := commonSDKPayload(event, provider, map[string]any{
-			"success":        success,
-			"summary":        event.Summary,
-			"terminalReason": terminalReasonForSDKEvent(event, success),
-			"reason":         event.Reason,
-			"usage":          sdkUsagePayload(event),
-		})
-		return oneSDKMappedEvent(BusEventResult, scope, payload)
+		return mapSDKFixtureResultEvent(event, provider, scope)
 	default:
 		return nil
 	}
+}
+
+// mapSDKFixtureToolStateEvent maps a tool_state fixture event into the
+// tool_call (+ tool_result when the tool has finished) event pair.
+func mapSDKFixtureToolStateEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
+	events := []SDKMappedEvent{{
+		Type:  BusEventToolCall,
+		Scope: cloneSDKScope(scope),
+		Payload: commonSDKPayload(event, provider, map[string]any{
+			"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
+			"toolName": event.ToolName,
+			"input":    sanitizeSDKValue(event.Input),
+			"status":   firstNonEmpty(event.Status, "pending"),
+		}),
+	}}
+	if event.Status == "completed" || event.Status == "error" || event.Output != "" || event.Error != "" {
+		events = append(events, SDKMappedEvent{
+			Type:  BusEventToolResult,
+			Scope: cloneSDKScope(scope),
+			Payload: commonSDKPayload(event, provider, map[string]any{
+				"callId":      firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
+				"toolName":    event.ToolName,
+				"content":     firstNonEmpty(event.Output, event.Error),
+				"isError":     event.IsError || event.Status == "error",
+				"attachments": sanitizeSDKValue(event.Attachments),
+			}),
+		})
+	}
+	return events
+}
+
+// mapSDKFixtureResultEvent maps a terminal result fixture event into the
+// BusEventResult projection.
+func mapSDKFixtureResultEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
+	success := true
+	if event.Success != nil {
+		success = *event.Success
+	}
+	payload := commonSDKPayload(event, provider, map[string]any{
+		"success":        success,
+		"summary":        event.Summary,
+		"terminalReason": terminalReasonForSDKEvent(event, success),
+		"reason":         event.Reason,
+		"usage":          sdkUsagePayload(event),
+	})
+	return oneSDKMappedEvent(BusEventResult, scope, payload)
 }

@@ -95,7 +95,7 @@ func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
 	if err := c1.EnableSQLiteJournal(path); err != nil {
 		t.Fatalf("enable: %v", err)
 	}
-	c1.recordJournal("task-ack", "run-1", "ack", true, "", 1)                    // seq 1 success
+	c1.recordJournal("task-ack", "run-1", "ack", true, "", 1)                     // seq 1 success
 	c1.recordJournal("task-fail", "run-2", "done", false, "hub unreachable", 3)   // seq 2 failure
 	c1.recordJournal("task-later", "run-3", "stream", true, "", 1)                // seq 3 success
 	c1.recordJournal("task-fail", "run-2", "done", false, "still unreachable", 3) // seq 4 failure again

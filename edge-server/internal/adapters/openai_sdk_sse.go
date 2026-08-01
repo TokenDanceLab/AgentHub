@@ -13,17 +13,22 @@ import (
 // Residual pure-helper peel #1152: OpenAI SSE stream parse + event dispatch.
 // Same package adapters; ParseStream continues to call parseSSEStream.
 
+// openaiSSEState accumulates cross-chunk state while parsing an SSE stream.
+type openaiSSEState struct {
+	currentText      strings.Builder
+	currentToolCalls map[int]*openaiToolCallAccumulator
+	inputTokens      int64
+	outputTokens     int64
+	finishReason     string
+}
+
 // parseSSEStream reads the Server-Sent Events stream from the OpenAI API
 // and emits Edge typed events.
 func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, emitter EventEmitter, scope map[string]any, model string) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 256*1024), openaiMaxResponseSize)
 
-	var currentText strings.Builder
-	var currentToolCalls map[int]*openaiToolCallAccumulator
-
-	var inputTokens, outputTokens int64
-	var finishReason string
+	st := &openaiSSEState{}
 
 	for scanner.Scan() {
 		if ctx.Err() != nil {
@@ -50,73 +55,9 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 			continue
 		}
 
-		if len(chunk.Choices) == 0 {
-			// Usage-only chunk (stream_options include_usage)
-			if chunk.Usage != nil {
-				inputTokens = chunk.Usage.PromptTokens
-				outputTokens = chunk.Usage.CompletionTokens
-			}
+		if handleOpenAIChatChunk(chunk, emitter, scope, st) {
+			// Usage-only chunk or nil delta; nothing to emit.
 			continue
-		}
-
-		choice := chunk.Choices[0]
-
-		if choice.Delta == nil {
-			continue
-		}
-
-		// Handle text content
-		if choice.Delta.Content != "" {
-			emitter.Emit(BusEventTextDelta, scope, map[string]any{
-				"content":  choice.Delta.Content,
-				"provider": "openai",
-			})
-			currentText.WriteString(choice.Delta.Content)
-		}
-
-		// Handle tool calls
-		if len(choice.Delta.ToolCalls) > 0 {
-			for _, tc := range choice.Delta.ToolCalls {
-				if currentToolCalls == nil {
-					currentToolCalls = make(map[int]*openaiToolCallAccumulator)
-				}
-				acc, ok := currentToolCalls[tc.Index]
-				if !ok {
-					acc = &openaiToolCallAccumulator{
-						ID:   tc.ID,
-						Name: tc.Function.Name,
-					}
-					currentToolCalls[tc.Index] = acc
-				}
-				if tc.ID != "" {
-					acc.ID = tc.ID
-				}
-				if tc.Function.Name != "" {
-					acc.Name = tc.Function.Name
-				}
-				if tc.Function.Arguments != "" {
-					acc.Arguments.WriteString(tc.Function.Arguments)
-				}
-			}
-		}
-
-		// Handle reasoning/thinking content (o-series models)
-		if choice.Delta.ReasoningContent != "" {
-			emitter.Emit(BusEventThinking, scope, map[string]any{
-				"content":  choice.Delta.ReasoningContent,
-				"provider": "openai",
-			})
-		}
-
-		// Track finish reason
-		if choice.FinishReason != "" {
-			finishReason = choice.FinishReason
-		}
-
-		// Usage from streaming chunk
-		if chunk.Usage != nil {
-			inputTokens = chunk.Usage.PromptTokens
-			outputTokens = chunk.Usage.CompletionTokens
 		}
 	}
 
@@ -127,8 +68,97 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 		return NewNonRecoverableParseError(fmt.Errorf("openai-sdk: SSE stream read error: %w", err))
 	}
 
+	emitOpenAIFinalEvents(emitter, scope, model, st)
+	return nil
+}
+
+// handleOpenAIChatChunk processes one chat completion chunk and returns true
+// when the chunk carries nothing emit-worthy (usage-only or nil delta).
+func handleOpenAIChatChunk(chunk openaiChatChunk, emitter EventEmitter, scope map[string]any, st *openaiSSEState) bool {
+	if len(chunk.Choices) == 0 {
+		// Usage-only chunk (stream_options include_usage)
+		if chunk.Usage != nil {
+			st.inputTokens = chunk.Usage.PromptTokens
+			st.outputTokens = chunk.Usage.CompletionTokens
+		}
+		return true
+	}
+
+	choice := chunk.Choices[0]
+	if choice.Delta == nil {
+		return true
+	}
+
+	// Handle text content
+	if choice.Delta.Content != "" {
+		emitter.Emit(BusEventTextDelta, scope, map[string]any{
+			"content":  choice.Delta.Content,
+			"provider": "openai",
+		})
+		st.currentText.WriteString(choice.Delta.Content)
+	}
+
+	// Handle tool calls
+	accumulateOpenAIToolCalls(chunk, st)
+
+	// Handle reasoning/thinking content (o-series models)
+	if choice.Delta.ReasoningContent != "" {
+		emitter.Emit(BusEventThinking, scope, map[string]any{
+			"content":  choice.Delta.ReasoningContent,
+			"provider": "openai",
+		})
+	}
+
+	// Track finish reason
+	if choice.FinishReason != "" {
+		st.finishReason = choice.FinishReason
+	}
+
+	// Usage from streaming chunk
+	if chunk.Usage != nil {
+		st.inputTokens = chunk.Usage.PromptTokens
+		st.outputTokens = chunk.Usage.CompletionTokens
+	}
+
+	return false
+}
+
+// accumulateOpenAIToolCalls merges streaming tool-call deltas into the
+// per-index accumulators held in the stream state.
+func accumulateOpenAIToolCalls(chunk openaiChatChunk, st *openaiSSEState) {
+	if len(chunk.Choices) == 0 {
+		return
+	}
+	choice := chunk.Choices[0]
+	for _, tc := range choice.Delta.ToolCalls {
+		if st.currentToolCalls == nil {
+			st.currentToolCalls = make(map[int]*openaiToolCallAccumulator)
+		}
+		acc, ok := st.currentToolCalls[tc.Index]
+		if !ok {
+			acc = &openaiToolCallAccumulator{
+				ID:   tc.ID,
+				Name: tc.Function.Name,
+			}
+			st.currentToolCalls[tc.Index] = acc
+		}
+		if tc.ID != "" {
+			acc.ID = tc.ID
+		}
+		if tc.Function.Name != "" {
+			acc.Name = tc.Function.Name
+		}
+		if tc.Function.Arguments != "" {
+			acc.Arguments.WriteString(tc.Function.Arguments)
+		}
+	}
+}
+
+// emitOpenAIFinalEvents emits the accumulated text block, tool calls, usage,
+// and final result once the stream has been fully consumed.
+func emitOpenAIFinalEvents(emitter EventEmitter, scope map[string]any, model string, st *openaiSSEState) {
 	// Emit text block if we accumulated text
-	text := currentText.String()
+	text := st.currentText.String()
 	if text != "" {
 		emitter.Emit(BusEventTextBlock, scope, map[string]any{
 			"content":  text,
@@ -137,7 +167,7 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 	}
 
 	// Emit tool calls
-	for _, acc := range currentToolCalls {
+	for _, acc := range st.currentToolCalls {
 		inputJSON := acc.Arguments.String()
 		if inputJSON == "" {
 			inputJSON = "{}"
@@ -157,8 +187,8 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 
 	// Emit usage
 	usageMap := map[string]any{
-		"inputTokens":  inputTokens,
-		"outputTokens": outputTokens,
+		"inputTokens":  st.inputTokens,
+		"outputTokens": st.outputTokens,
 		"model":        model,
 	}
 	emitter.Emit(BusEventContextUsage, scope, usageMap)
@@ -170,8 +200,6 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 		"provider":       "openai",
 		"model":          model,
 		"usage":          usageMap,
-		"finishReason":   finishReason,
+		"finishReason":   st.finishReason,
 	})
-
-	return nil
 }

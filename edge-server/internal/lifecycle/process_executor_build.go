@@ -46,7 +46,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	var cmdPath string
 	var args, env []string
 	var workDir string
-	adapterCtx := adapters.RunProcessContext(runCtx)
+	adapterCtx := runCtx
 	cmdPlan := planCommandBuild(adapter != nil)
 
 	if cmdPlan.UseAdapter {
@@ -87,26 +87,9 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	cmd := exec.Command(cmdPath, args...)
 	cmd.Dir = workDir
 	cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)
-	stdout, err := cmd.StdoutPipe()
-	if planPipeFailure(err).Fail {
-		e.publishFailed(run, pipeOpenError("stdout", err))
+	stdout, stderr, stdin, err := e.openProcessPipes(cmd, run, adapter)
+	if err != nil {
 		return nil, err
-	}
-	stderr, err := cmd.StderrPipe()
-	if planPipeFailure(err).Fail {
-		e.publishFailed(run, pipeOpenError("stderr", err))
-		return nil, err
-	}
-	var stdin io.WriteCloser
-	if planStdinPipeOpen(adapter).Open {
-		stdin, err = cmd.StdinPipe()
-		if planPipeFailure(err).Fail {
-			e.publishFailed(run, pipeOpenError("stdin", err))
-			return nil, err
-		}
-		e.mu.Lock()
-		e.stdins[run.ID] = stdin
-		e.mu.Unlock()
 	}
 	setResourceLimits(cmd)
 	slog.Debug("executor.subprocess.starting", subprocessStartingLogArgs(run.ID, cmdPath, args, attempt)...)
@@ -122,6 +105,8 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	case cmdStartFailed:
 		e.publishFailed(run, startErr)
 		return nil, startErr
+	case cmdStartOK:
+		// Process started successfully; continue to post-start setup.
 	}
 	// Post-start cancel kill/wait plan.
 	if cancelPlan := planPostStartCancel(ctx.Err(), cmd.Process); cancelPlan.Cancel {
@@ -180,6 +165,34 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		workDir:         workDir,
 		buildPlan:       cmdPlan,
 	}, nil
+}
+
+// openProcessPipes opens the stdout/stderr pipes and, when the adapter needs a
+// stdin pipe, opens it and tracks it for eager-close or interrupt signalling.
+// On failure it publishes the pipe error and returns it — the caller must
+// return from buildAndStartProcess immediately.
+func (e *ProcessExecutor) openProcessPipes(cmd *exec.Cmd, run store.Run, adapter adapters.AgentAdapter) (stdout, stderr io.ReadCloser, stdin io.WriteCloser, err error) {
+	stdout, err = cmd.StdoutPipe()
+	if planPipeFailure(err).Fail {
+		e.publishFailed(run, pipeOpenError("stdout", err))
+		return nil, nil, nil, err
+	}
+	stderr, err = cmd.StderrPipe()
+	if planPipeFailure(err).Fail {
+		e.publishFailed(run, pipeOpenError("stderr", err))
+		return nil, nil, nil, err
+	}
+	if planStdinPipeOpen(adapter).Open {
+		stdin, err = cmd.StdinPipe()
+		if planPipeFailure(err).Fail {
+			e.publishFailed(run, pipeOpenError("stdin", err))
+			return nil, nil, nil, err
+		}
+		e.mu.Lock()
+		e.stdins[run.ID] = stdin
+		e.mu.Unlock()
+	}
+	return stdout, stderr, stdin, nil
 }
 
 // collectAndWaitOutput launches stderr/stdout collection goroutines, waits for
@@ -382,11 +395,9 @@ func (e *ProcessExecutor) completeRunAttempt(
 //
 // Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 func (e *ProcessExecutor) handleFaultEscalation(
-	ctx context.Context,
 	run *store.Run,
 	runCtx RunProcessContext,
 	lastWaitErr error,
-	lastOutStore *runnerctx.RunOutputStore,
 ) bool {
 	if !planFaultEscalationAttempt(lastWaitErr, e.faultEscalationCfg).Attempt {
 		return false
@@ -435,4 +446,3 @@ func (e *ProcessExecutor) handleFaultEscalation(
 	go e.run(newCtx, *run, runCtx)
 	return true
 }
-

@@ -40,7 +40,7 @@ func validateCreateRunRefs(projects map[string]Project, threads map[string]Threa
 	if _, ok := projects[projectID]; !ok {
 		return false
 	}
-	if _, ok := lookupThreadInProject(threads, threadID, projectID); !ok {
+	if !lookupThreadInProject(threads, threadID, projectID) {
 		return false
 	}
 	return true
@@ -56,11 +56,11 @@ func validateCreateItemRefs(
 	if _, ok := projects[item.ProjectID]; !ok {
 		return false
 	}
-	if _, ok := lookupThreadInProject(threads, item.ThreadID, item.ProjectID); !ok {
+	if !lookupThreadInProject(threads, item.ThreadID, item.ProjectID) {
 		return false
 	}
 	if item.RunID != "" {
-		if _, ok := lookupRunInThread(runs, item.RunID, item.ThreadID); !ok {
+		if !lookupRunInThread(runs, item.RunID, item.ThreadID) {
 			return false
 		}
 	}
@@ -69,11 +69,11 @@ func validateCreateItemRefs(
 
 // resolveCreateProject returns a new project, or the existing one with ErrProjectExists.
 // created is true only when the new project should be stored.
-func resolveCreateProject(existing Project, exists bool, id, name, ownerID, now string) (Project, error, bool) {
+func resolveCreateProject(existing Project, exists bool, id, name, ownerID, now string) (Project, bool, error) {
 	if exists {
-		return existing, ErrProjectExists, false
+		return existing, false, ErrProjectExists
 	}
-	return buildProject(id, name, ownerID, now), nil, true
+	return buildProject(id, name, ownerID, now), true, nil
 }
 
 // resolveCreateThread decides create vs reuse vs conflict for CreateThread.
@@ -83,41 +83,41 @@ func resolveCreateThread(
 	exists bool,
 	projectExists bool,
 	id, projectID, title, kind, avatarColor, avatarLabel, now string,
-) (Thread, error, bool) {
+) (Thread, bool, error) {
 	if !projectExists {
-		return Thread{}, ErrNotFound, false
+		return Thread{}, false, ErrNotFound
 	}
 	if exists {
 		if existingThreadConflict(existing, projectID) {
-			return Thread{}, errThreadExistsInProject(id, existing.ProjectID), false
+			return Thread{}, false, errThreadExistsInProject(id, existing.ProjectID)
 		}
-		return existing, nil, false
+		return existing, false, nil
 	}
-	return buildThread(id, projectID, title, kind, avatarColor, avatarLabel, now), nil, true
+	return buildThread(id, projectID, title, kind, avatarColor, avatarLabel, now), true, nil
 }
 
 // resolveCreateRun returns existing reuse or a new queued run.
 // created is true when a new run should be stored.
-func resolveCreateRun(existing Run, exists bool, refsOK bool, id, projectID, threadID, now string) (Run, error, bool) {
+func resolveCreateRun(existing Run, exists bool, refsOK bool, id, projectID, threadID, now string) (Run, bool, error) {
 	if !refsOK {
-		return Run{}, ErrNotFound, false
+		return Run{}, false, ErrNotFound
 	}
 	if exists {
-		return existing, nil, false
+		return existing, false, nil
 	}
-	return buildQueuedRun(id, projectID, threadID, now), nil, true
+	return buildQueuedRun(id, projectID, threadID, now), true, nil
 }
 
 // resolveCreateItem returns existing reuse or a prepared new item.
 // created is true when a new item should be stored.
-func resolveCreateItem(existing Item, exists bool, refsOK bool, item Item, now string) (Item, error, bool) {
+func resolveCreateItem(existing Item, exists bool, refsOK bool, item Item, now string) (Item, bool, error) {
 	if !refsOK {
-		return Item{}, ErrNotFound, false
+		return Item{}, false, ErrNotFound
 	}
 	if exists {
-		return existing, nil, false
+		return existing, false, nil
 	}
-	return prepareItemDefaults(item, now), nil, true
+	return prepareItemDefaults(item, now), true, nil
 }
 
 // resolveCreateUserProfile returns existing reuse or a prepared new profile.
@@ -131,14 +131,14 @@ func resolveCreateUserProfile(existing UserProfile, exists bool, profile UserPro
 
 // resolveCreateAgentProfile validates and prepares agent profile create.
 // created is true when a new profile should be stored.
-func resolveCreateAgentProfile(existing AgentProfile, exists bool, profile AgentProfile, now string) (AgentProfile, error, bool) {
+func resolveCreateAgentProfile(exists bool, profile AgentProfile, now string) (AgentProfile, bool, error) {
 	if err := validateAgentProfileCreate(profile); err != nil {
-		return AgentProfile{}, err, false
+		return AgentProfile{}, false, err
 	}
 	if exists {
-		return AgentProfile{}, errAgentProfileExists(profile.ID), false
+		return AgentProfile{}, false, errAgentProfileExists(profile.ID)
 	}
-	return prepareAgentProfileCreate(profile, now), nil, true
+	return prepareAgentProfileCreate(profile, now), true, nil
 }
 
 // applySettingsUpsert patches settings and returns the updated map plus cloned view.
@@ -247,7 +247,7 @@ func validatePinThreadItemRefs(threads map[string]Thread, items map[string]Item,
 	if _, ok := threads[threadID]; !ok {
 		return false
 	}
-	if _, ok := lookupItemInThread(items, itemID, threadID); !ok {
+	if !lookupItemInThread(items, itemID, threadID) {
 		return false
 	}
 	return true

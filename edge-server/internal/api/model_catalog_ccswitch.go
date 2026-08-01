@@ -45,7 +45,7 @@ func addCcSwitchCatalog(builder *modelCatalogBuilder, ccSwitchHome string) {
 // addCcSwitchDBCatalog enriches the model catalog with data read directly from
 // the cc-switch SQLite database, providing the real model aliases (transparent
 // proxy mappings) for the currently active provider.
-func addCcSwitchDBCatalog(builder *modelCatalogBuilder, reader *ccswitch.Reader, status *ccswitch.CCSwitchStatus) {
+func addCcSwitchDBCatalog(builder *modelCatalogBuilder, reader *ccswitch.Reader, status *ccswitch.Status) {
 	if status == nil || !status.Installed {
 		builder.addSource(modelCatalogSource{
 			ID:     "cc-switch-db",

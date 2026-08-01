@@ -75,9 +75,9 @@ func NewAcpAdapterWithID(id, agentBinary string, agentArgs []string, displayName
 
 func newAcpAdapter(id, agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
 	return &AcpAdapter{
-		id:             id,
-		agentBinary:    agentBinary,
-		agentArgs:      agentArgs,
+		id:               id,
+		agentBinary:      agentBinary,
+		agentArgs:        agentArgs,
 		permissionBroker: nil,
 		metadata: AdapterMetadata{
 			ID:          id,

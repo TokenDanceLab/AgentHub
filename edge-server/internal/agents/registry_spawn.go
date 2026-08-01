@@ -32,7 +32,7 @@ func (r *Registry) TryReserveSlot(parentID string, childDepth int) error {
 		switch inst.Status {
 		case StatusCompleted, StatusError, StatusDisconnected:
 			continue
-		default:
+		case StatusOnline, StatusBusy, StatusIdle, StatusWaitingInput, StatusDraining:
 			active++
 		}
 	}
@@ -78,7 +78,7 @@ func (r *Registry) CanSpawn(parentID string, childDepth int) error {
 		switch inst.Status {
 		case StatusCompleted, StatusError, StatusDisconnected:
 			continue
-		default:
+		case StatusOnline, StatusBusy, StatusIdle, StatusWaitingInput, StatusDraining:
 			active++
 		}
 	}

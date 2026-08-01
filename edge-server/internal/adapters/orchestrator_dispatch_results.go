@@ -62,22 +62,12 @@ func (d *dispatchInterceptor) processResultMessage(msg agents.Message) {
 // retry, switch agents, or skip the task.
 func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError bool) {
 	payload, _ := msg.Payload.(map[string]any)
-	agentName := ""
-	if payload != nil {
-		if name, ok := payload["agentName"].(string); ok {
-			agentName = name
-		}
-	}
+	agentName := subAgentPayloadString(payload, "agentName")
 	agentID := msg.FromAgentID
 
 	// For error results, attempt failure recovery before injecting.
 	if isError && d.failureRecovery != nil {
-		errMsg := ""
-		if payload != nil {
-			if err, ok := payload["result"].(string); ok {
-				errMsg = err
-			}
-		}
+		errMsg := subAgentPayloadString(payload, "result")
 		// Guard: if no error details are available, provide a meaningful
 		// fallback message so ClassifyFailure does not receive an error
 		// with an empty Error() string, which would pass the nil-guard
@@ -87,12 +77,7 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 			errMsg = "sub-agent reported error (no details)"
 		}
 
-		taskID := ""
-		if payload != nil {
-			if tid, ok := payload["runId"].(string); ok {
-				taskID = tid
-			}
-		}
+		taskID := subAgentPayloadString(payload, "runId")
 
 		scope := map[string]any{"runId": d.parentRun.ID}
 		decision, fErr := d.failureRecovery.HandleSubAgentFailure(
@@ -116,74 +101,8 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 			return
 		}
 
-		switch decision {
-		case DecisionRetry:
-			// Recovery manager already handled backoff.
-			// Inject retry notification with a Reflexion critique so the
-			// orchestrator can learn from the failure before re-attempting.
-			// The critique follows the Reflexion pattern (Shinn et al., 2023):
-			// verbal self-reflection on failure to turn a blind retry into
-			// a learning opportunity.
-			failureErr := fmt.Errorf("%s", errMsg)
-			category, reason := ClassifyFailure(failureErr, nil)
-			critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
-			// T1-D03: Retry context purification — inject a directive marker
-			// into the task description that will flow back to the retried
-			// sub-agent via the orchestrator's text stream. This prevents
-			// the orchestrator from repeating the same failing approach.
-			retryDirective := formatRetryDirective(failureErr)
-			retryMsg := formatRetryInjectText(agentName, errMsg, retryDirective, critique)
-			d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(retryMsg, "sub_agent_retry"))
+		if handled := d.handleRecoveryDecision(decision, scope, agentID, agentName, taskID, errMsg, payload); handled {
 			return
-
-		case DecisionSwitchAgent:
-			// Look up the original dispatch event so we can re-dispatch
-			// to the alternate agent with the same task parameters.
-			d.dispatchedMu.Lock()
-			origEvt, hasOrig := d.dispatched[agentID]
-			d.dispatchedMu.Unlock()
-
-			altID := d.failureRecovery.FindAlternateAgentID(agentName)
-			if altID != "" && hasOrig {
-				switchMsg := formatSwitchInjectText(agentName, altID, errMsg, true)
-				d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(switchMsg, "sub_agent_switch"))
-				// Construct a new dispatch event targeting the alternate agent,
-				// copying the original task description and parameters.
-				newEvt := cloneDispatchForAgent(origEvt, altID)
-				d.handleDispatch(newEvt, scope)
-			} else {
-				switchMsg := formatSwitchInjectText(agentName, altID, errMsg, false)
-				d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(switchMsg, "sub_agent_switch"))
-			}
-			return
-
-		case DecisionSkip:
-			// Skip: inject skip notification and continue.
-			skipMsg := formatSkipInjectText(agentName, errMsg)
-			d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(skipMsg, "sub_agent_skip"))
-			// Still emit status update for the skipped agent.
-			errStr := ""
-			if payload != nil {
-				if err, ok := payload["result"].(string); ok {
-					errStr = err
-				}
-			}
-			d.inner.Emit(BusEventSubAgentStatus, scope, subAgentStatusPayload(
-				agentID, agentName, string(agents.StatusError), "skipped", true, errStr,
-			))
-			d.emitProgressSummary(scope)
-			return
-
-		case DecisionFail:
-			// Inject reflexion critique before falling through to the
-			// normal error injection, so the orchestrator SEES the
-			// failure analysis even when depth limit prevents retry.
-			failureErr := fmt.Errorf("%s", errMsg)
-			category, reason := ClassifyFailure(failureErr, nil)
-			critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
-			failMsg := formatFailInjectText(agentName, errMsg, critique)
-			d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(failMsg, "sub_agent_fail"))
-			// Fall through to the normal error injection below.
 		}
 	}
 
@@ -198,13 +117,16 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 		d.failureRecovery.RecordCircuitSuccess(cbKey)
 	}
 
+	scope := map[string]any{"runId": d.parentRun.ID}
+	d.emitSubAgentResult(scope, agentID, agentName, isError, payload)
+}
+
+// emitSubAgentResult injects the sub-agent result/error as a text block into
+// the orchestrator's stream and emits the status update plus the aggregate
+// progress summary.
+func (d *dispatchInterceptor) emitSubAgentResult(scope map[string]any, agentID, agentName string, isError bool, payload map[string]any) {
 	// Build the injected message following OpenCode's XML task result injection pattern.
-	errMsg := ""
-	if isError && payload != nil {
-		if err, ok := payload["result"].(string); ok {
-			errMsg = err
-		}
-	}
+	errMsg := subAgentPayloadString(payload, "result")
 	resultSummary := ""
 	if !isError {
 		resultSummary = formatResultSummary(payload)
@@ -212,7 +134,6 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 	injectedText := formatSubAgentResultInjectText(agentName, isError, errMsg, resultSummary)
 
 	// P1: Inject result/error into the orchestrator's text stream.
-	scope := map[string]any{"runId": d.parentRun.ID}
 	d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(injectedText, "sub_agent_result"))
 
 	// P1: Emit sub-agent status update.
@@ -228,6 +149,98 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 
 	// P1: Emit aggregate progress summary.
 	d.emitProgressSummary(scope)
+}
+
+// subAgentPayloadString extracts a string field from a sub-agent result
+// payload, returning "" when the payload or field is missing/not a string.
+func subAgentPayloadString(payload map[string]any, key string) string {
+	if payload == nil {
+		return ""
+	}
+	if v, ok := payload[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// handleRecoveryDecision applies the failure-recovery decision for a failed
+// sub-agent. It returns true when the caller should stop processing this
+// result (retry/switch/skip handled), or false when the caller should fall
+// through to the normal error injection (DecisionFail).
+func (d *dispatchInterceptor) handleRecoveryDecision(decision FailureDecision, scope map[string]any, agentID, agentName, taskID, errMsg string, payload map[string]any) bool {
+	switch decision {
+	case DecisionRetry:
+		// Recovery manager already handled backoff.
+		// Inject retry notification with a Reflexion critique so the
+		// orchestrator can learn from the failure before re-attempting.
+		// The critique follows the Reflexion pattern (Shinn et al., 2023):
+		// verbal self-reflection on failure to turn a blind retry into
+		// a learning opportunity.
+		failureErr := fmt.Errorf("%s", errMsg)
+		category, reason := ClassifyFailure(failureErr, nil)
+		critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
+		// T1-D03: Retry context purification — inject a directive marker
+		// into the task description that will flow back to the retried
+		// sub-agent via the orchestrator's text stream. This prevents
+		// the orchestrator from repeating the same failing approach.
+		retryDirective := formatRetryDirective(failureErr)
+		retryMsg := formatRetryInjectText(agentName, errMsg, retryDirective, critique)
+		d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(retryMsg, "sub_agent_retry"))
+		return true
+
+	case DecisionSwitchAgent:
+		// Look up the original dispatch event so we can re-dispatch
+		// to the alternate agent with the same task parameters.
+		d.dispatchedMu.Lock()
+		origEvt, hasOrig := d.dispatched[agentID]
+		d.dispatchedMu.Unlock()
+
+		altID := d.failureRecovery.FindAlternateAgentID(agentName)
+		if altID != "" && hasOrig {
+			switchMsg := formatSwitchInjectText(agentName, altID, errMsg, true)
+			d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(switchMsg, "sub_agent_switch"))
+			// Construct a new dispatch event targeting the alternate agent,
+			// copying the original task description and parameters.
+			newEvt := cloneDispatchForAgent(origEvt, altID)
+			d.handleDispatch(newEvt, scope)
+		} else {
+			switchMsg := formatSwitchInjectText(agentName, altID, errMsg, false)
+			d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(switchMsg, "sub_agent_switch"))
+		}
+		return true
+
+	case DecisionSkip:
+		// Skip: inject skip notification and continue.
+		skipMsg := formatSkipInjectText(agentName, errMsg)
+		d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(skipMsg, "sub_agent_skip"))
+		// Still emit status update for the skipped agent.
+		errStr := ""
+		if payload != nil {
+			if err, ok := payload["result"].(string); ok {
+				errStr = err
+			}
+		}
+		d.inner.Emit(BusEventSubAgentStatus, scope, subAgentStatusPayload(
+			agentID, agentName, string(agents.StatusError), "skipped", true, errStr,
+		))
+		d.emitProgressSummary(scope)
+		return true
+
+	case DecisionFail:
+		// Inject reflexion critique before falling through to the
+		// normal error injection, so the orchestrator SEES the
+		// failure analysis even when depth limit prevents retry.
+		failureErr := fmt.Errorf("%s", errMsg)
+		category, reason := ClassifyFailure(failureErr, nil)
+		critique := BuildReflexionCritique(agentName, taskID, category, reason, failureErr)
+		failMsg := formatFailInjectText(agentName, errMsg, critique)
+		d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(failMsg, "sub_agent_fail"))
+		// Fall through to the normal error injection below.
+		return false
+
+	default:
+		return false
+	}
 }
 
 // emitProgressSummary counts sub-agents by status and emits a human-readable

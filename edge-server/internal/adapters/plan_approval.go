@@ -31,13 +31,13 @@ func DefaultPlanApprovalConfig() PlanApprovalConfig {
 // PendingPlan represents a plan proposed by the orchestrator that is awaiting
 // user approval before sub-agent dispatches proceed.
 type PendingPlan struct {
-	RunID     string         `json:"runId"`
-	ProjectID string         `json:"projectId,omitempty"`
-	ThreadID  string         `json:"threadId,omitempty"`
-	Tasks     []PlanTask     `json:"tasks"`
-	Mode      string         `json:"mode"`            // "parallel" or "sequential"
-	CreatedAt time.Time      `json:"createdAt"`
-	Status    string         `json:"status"`          // "pending", "approved", "rejected", "expired"
+	RunID     string     `json:"runId"`
+	ProjectID string     `json:"projectId,omitempty"`
+	ThreadID  string     `json:"threadId,omitempty"`
+	Tasks     []PlanTask `json:"tasks"`
+	Mode      string     `json:"mode"` // "parallel" or "sequential"
+	CreatedAt time.Time  `json:"createdAt"`
+	Status    string     `json:"status"` // "pending", "approved", "rejected", "expired"
 }
 
 // PlanDecision is the user's decision on a proposed plan.

@@ -325,7 +325,7 @@ func (e *captureEmitter) Emit(eventType string, scope map[string]any, payload an
 type nopWriteCloser struct{}
 
 func (w *nopWriteCloser) Write(p []byte) (int, error) { return len(p), nil }
-func (w *nopWriteCloser) Close() error                 { return nil }
+func (w *nopWriteCloser) Close() error                { return nil }
 
 func makeRun(id string) store.Run {
 	return store.Run{

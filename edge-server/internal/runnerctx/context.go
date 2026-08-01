@@ -69,8 +69,8 @@ type RunProcessContext struct {
 	Budget *ContextBudget
 
 	// Thread history (context continuity for all agent runtimes)
-	Messages       []Message `json:"messages,omitempty"`        // thread history messages
-	PinnedMessages []Message `json:"pinnedMessages,omitempty"`  // pinned context messages
+	Messages       []Message `json:"messages,omitempty"`       // thread history messages
+	PinnedMessages []Message `json:"pinnedMessages,omitempty"` // pinned context messages
 }
 
 // AgentDefinition mirrors Claude Code's AgentDefinitionSchema for --agents flag.

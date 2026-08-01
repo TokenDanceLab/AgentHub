@@ -297,12 +297,13 @@ func TestEnvFilterAudit_KnownMixCounts(t *testing.T) {
 		}
 	}
 }
+
 // It validates that:
-//   1. Only explicitly approved AGENTHUB_* vars pass through from inherited env.
-//   2. Non-allowlisted AGENTHUB_* vars are blocked from inherited env.
-//   3. Sensitive vars (JWT_SECRET, REDIS_PASSWORD, etc.) are always blocked.
-//   4. Profile env (explicitly configured) is distinct from inherited env —
-//      it passes through verbatim while inherited env is strictly filtered.
+//  1. Only explicitly approved AGENTHUB_* vars pass through from inherited env.
+//  2. Non-allowlisted AGENTHUB_* vars are blocked from inherited env.
+//  3. Sensitive vars (JWT_SECRET, REDIS_PASSWORD, etc.) are always blocked.
+//  4. Profile env (explicitly configured) is distinct from inherited env —
+//     it passes through verbatim while inherited env is strictly filtered.
 func TestEnvAllowlist(t *testing.T) {
 	t.Run("explicit safe AGENTHUB vars inherited", func(t *testing.T) {
 		t.Setenv("AGENTHUB_RUN_ID", "inherited-run-123")

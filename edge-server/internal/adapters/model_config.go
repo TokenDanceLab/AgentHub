@@ -116,10 +116,10 @@ var ReasoningEfforts = map[string]map[string]string{
 
 // DefaultModels holds the default model per agent ID.
 var DefaultModels = map[string]string{
-	"claude-code":  "claude-sonnet-4-6",
-	"codex":        "gpt-5.5",
-	"opencode":     "newapi/deepseek-v4-pro",
-	"orchestrator": "claude-sonnet-4-6",
+	"claude-code":   "claude-sonnet-4-6",
+	"codex":         "gpt-5.5",
+	"opencode":      "newapi/deepseek-v4-pro",
+	"orchestrator":  "claude-sonnet-4-6",
 	"anthropic-sdk": "claude-sonnet-4-6",
 	"openai-sdk":    "gpt-5.5",
 }

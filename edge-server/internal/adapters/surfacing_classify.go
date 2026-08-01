@@ -161,60 +161,39 @@ func mimeTypeFromExt(path string) string {
 	}
 }
 
+// extLanguageMap maps file extensions to display languages for surfaced
+// artifacts. Keys are lower-case; lookups are normalized in languageFromExt.
+var extLanguageMap = map[string]string{
+	".py":         "python",
+	".go":         "go",
+	".ts":         "typescript",
+	".tsx":        "typescript",
+	".js":         "javascript",
+	".jsx":        "javascript",
+	".rs":         "rust",
+	".java":       "java",
+	".c":          "c",
+	".cpp":        "cpp",
+	".rb":         "ruby",
+	".php":        "php",
+	".swift":      "swift",
+	".kt":         "kotlin",
+	".css":        "css",
+	".scss":       "scss",
+	".html":       "html",
+	".htm":        "html",
+	".xml":        "xml",
+	".json":       "json",
+	".yaml":       "yaml",
+	".yml":        "yaml",
+	".toml":       "toml",
+	".md":         "markdown",
+	".sql":        "sql",
+	".sh":         "bash",
+	".bash":       "bash",
+	".dockerfile": "dockerfile",
+}
+
 func languageFromExt(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".py":
-		return "python"
-	case ".go":
-		return "go"
-	case ".ts":
-		return "typescript"
-	case ".tsx":
-		return "typescript"
-	case ".js":
-		return "javascript"
-	case ".jsx":
-		return "javascript"
-	case ".rs":
-		return "rust"
-	case ".java":
-		return "java"
-	case ".c":
-		return "c"
-	case ".cpp":
-		return "cpp"
-	case ".rb":
-		return "ruby"
-	case ".php":
-		return "php"
-	case ".swift":
-		return "swift"
-	case ".kt":
-		return "kotlin"
-	case ".css":
-		return "css"
-	case ".scss":
-		return "scss"
-	case ".html", ".htm":
-		return "html"
-	case ".xml":
-		return "xml"
-	case ".json":
-		return "json"
-	case ".yaml", ".yml":
-		return "yaml"
-	case ".toml":
-		return "toml"
-	case ".md":
-		return "markdown"
-	case ".sql":
-		return "sql"
-	case ".sh", ".bash":
-		return "bash"
-	case ".dockerfile":
-		return "dockerfile"
-	default:
-		return ""
-	}
+	return extLanguageMap[strings.ToLower(filepath.Ext(path))]
 }

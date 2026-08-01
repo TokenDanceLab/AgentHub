@@ -131,14 +131,7 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 		s, reason := recursiveSanitizeString(v)
 		// Truncate if the result exceeds the maximum allowed size.
 		s, truncReason := truncateUTF8Safe(s)
-		if truncReason != "" {
-			if reason != "" {
-				reason = reason + "," + truncReason
-			} else {
-				reason = truncReason
-			}
-		}
-		return s, reason
+		return s, combineReasons(reason, truncReason)
 
 	case map[string]any:
 		// Recursively sanitize all string values and keys in the map.
@@ -148,20 +141,8 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 			sanVal, r := SanitizeSubAgentResult(val)
 			sanitizedKey, keyReason := recursiveSanitizeString(k)
 			sanitized[sanitizedKey] = sanVal
-			if keyReason != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + keyReason
-				} else {
-					combinedReason = keyReason
-				}
-			}
-			if r != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + r
-				} else {
-					combinedReason = r
-				}
-			}
+			combinedReason = combineReasons(combinedReason, keyReason)
+			combinedReason = combineReasons(combinedReason, r)
 		}
 		return sanitized, combinedReason
 
@@ -172,13 +153,7 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 		for i, val := range v {
 			sanVal, r := SanitizeSubAgentResult(val)
 			sanitized[i] = sanVal
-			if r != "" {
-				if combinedReason != "" {
-					combinedReason = combinedReason + "," + r
-				} else {
-					combinedReason = r
-				}
-			}
+			combinedReason = combineReasons(combinedReason, r)
 		}
 		return sanitized, combinedReason
 
@@ -192,20 +167,25 @@ func SanitizeSubAgentResult(payload any) (any, string) {
 	case []byte:
 		s, reason := recursiveSanitizeString(string(v))
 		s, truncReason := truncateUTF8Safe(s)
-		if truncReason != "" {
-			if reason != "" {
-				reason = reason + "," + truncReason
-			} else {
-				reason = truncReason
-			}
-		}
-		return s, reason
+		return s, combineReasons(reason, truncReason)
 
 	default:
 		// Non-string, non-map, non-slice payloads (e.g. numbers, bools)
 		// are passed through unchanged.
 		return payload, ""
 	}
+}
+
+// combineReasons joins two comma-separated sanitization reason lists,
+// skipping empty parts, while preserving the order of modifications.
+func combineReasons(existing, added string) string {
+	if added == "" {
+		return existing
+	}
+	if existing == "" {
+		return added
+	}
+	return existing + "," + added
 }
 
 // truncateUTF8Safe truncates s to maxSanitizedResultBytes at a UTF-8
@@ -243,7 +223,6 @@ func truncateUTF8Safe(s string) (string, string) {
 		}
 		tailStart++
 	}
-	tailSize = len(s) - tailStart
 
 	truncated := s[:headSize] + "\n... [truncated " + strconv.Itoa(len(s)-maxSanitizedResultBytes) + " bytes] ...\n" + s[tailStart:]
 	return truncated, "truncated-32kb"

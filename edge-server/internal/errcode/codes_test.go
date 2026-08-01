@@ -257,7 +257,7 @@ func TestErrorBodyMultipleCallsGeneratesDifferentTraceIDs(t *testing.T) {
 func TestErrorTypeAlias(t *testing.T) {
 	// Error is a type alias for sharederr.Error
 	e := &Error{Code: "alias_test", Message: "test", HTTPStatus: 418}
-	var _ *Error = e // compile-time check that Error is the Error pointer type
+	_ = e // compile-time check that Error is the Error pointer type
 	if e.Code != "alias_test" {
 		t.Errorf("Error type alias should behave as sharederr.Error")
 	}

@@ -52,31 +52,22 @@ func orderKeepPresent[T any](order []string, items map[string]T) []string {
 	})
 }
 
-// lookupThreadInProject returns the thread when it exists and belongs to projectID.
-func lookupThreadInProject(threads map[string]Thread, threadID, projectID string) (Thread, bool) {
+// lookupThreadInProject reports whether the thread exists and belongs to projectID.
+func lookupThreadInProject(threads map[string]Thread, threadID, projectID string) bool {
 	thread, ok := threads[threadID]
-	if !ok || thread.ProjectID != projectID {
-		return Thread{}, false
-	}
-	return thread, true
+	return ok && thread.ProjectID == projectID
 }
 
-// lookupRunInThread returns the run when it exists and belongs to threadID.
-func lookupRunInThread(runs map[string]Run, runID, threadID string) (Run, bool) {
+// lookupRunInThread reports whether the run exists and belongs to threadID.
+func lookupRunInThread(runs map[string]Run, runID, threadID string) bool {
 	run, ok := runs[runID]
-	if !ok || run.ThreadID != threadID {
-		return Run{}, false
-	}
-	return run, true
+	return ok && run.ThreadID == threadID
 }
 
-// lookupItemInThread returns the item when it exists and belongs to threadID.
-func lookupItemInThread(items map[string]Item, itemID, threadID string) (Item, bool) {
+// lookupItemInThread reports whether the item exists and belongs to threadID.
+func lookupItemInThread(items map[string]Item, itemID, threadID string) bool {
 	item, ok := items[itemID]
-	if !ok || item.ThreadID != threadID {
-		return Item{}, false
-	}
-	return item, true
+	return ok && item.ThreadID == threadID
 }
 
 // existingThreadConflict reports whether an already-stored thread may be reused for projectID.

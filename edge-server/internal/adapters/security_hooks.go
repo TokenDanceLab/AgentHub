@@ -99,19 +99,17 @@ func (h *SecurityHook) PermissionRequest(_ context.Context, toolName string, ris
 	case RiskCritical:
 		return PermDeny
 	case RiskHigh:
-		switch h.Mode {
-		case ApprovalYOLO:
+		// YOLO auto-approves; Auto/Manual (and unknown modes) require confirmation.
+		if h.Mode == ApprovalYOLO {
 			return PermAllow
-		default: // ApprovalAuto, ApprovalManual
-			return PermAllowOnce
 		}
+		return PermAllowOnce
 	case RiskLow, RiskMedium:
-		switch h.Mode {
-		case ApprovalManual:
+		// Manual requires confirmation; YOLO/Auto (and unknown modes) auto-allow.
+		if h.Mode == ApprovalManual {
 			return PermAllowOnce
-		default: // ApprovalYOLO, ApprovalAuto
-			return PermAllow
 		}
+		return PermAllow
 	default:
 		return PermAllow
 	}
@@ -275,11 +273,11 @@ func truncate(s string, n int) string {
 // dangerousPatternsRE matches seven categories of blocked shell input
 // adapted from Claude Code's 23-check pipeline.
 //
-//	1. rm -rf /  or  rm -r -f /  or  rm --recursive --force / (root deletion)
-//	2. curl/wget piped to shell OR redirect-then-execute (remote execution)
-//	3. sudo bash / sudo /bin/bash / sudo zsh (root shell escalation)
-//	4. chmod 777 / 0777 / a+rwx (world-writable escalation)
-//	5. > /dev/sd* / nvme* / dd of=/dev/* (raw block-device overwrite)
+//  1. rm -rf /  or  rm -r -f /  or  rm --recursive --force / (root deletion)
+//  2. curl/wget piped to shell OR redirect-then-execute (remote execution)
+//  3. sudo bash / sudo /bin/bash / sudo zsh (root shell escalation)
+//  4. chmod 777 / 0777 / a+rwx (world-writable escalation)
+//  5. > /dev/sd* / nvme* / dd of=/dev/* (raw block-device overwrite)
 var dangerousPatternsRE = regexp.MustCompile(
 	// rm -rf against root: handles -rf, -r -f, -f -r, --recursive --force
 	`rm\s+(?:` +

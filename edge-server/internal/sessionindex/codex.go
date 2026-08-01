@@ -32,10 +32,13 @@ func listCodexSessions(sessionsRoot, indexPath string) ([]SessionSummary, error)
 		return nil, nil
 	}
 
-	index := loadCodexSessionIndex(indexPath)
-	var out []SessionSummary
+	return collectCodexSessions(sessionsRoot, loadCodexSessionIndex(indexPath))
+}
 
-	err = filepath.WalkDir(sessionsRoot, func(path string, d os.DirEntry, walkErr error) error {
+// collectCodexSessions walks sessionsRoot and collects rollout session summaries.
+func collectCodexSessions(sessionsRoot string, index map[string]codexIndexLine) ([]SessionSummary, error) {
+	var out []SessionSummary
+	err := filepath.WalkDir(sessionsRoot, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			// Skip unreadable branches.
 			if d != nil && d.IsDir() {
@@ -57,38 +60,41 @@ func listCodexSessions(sessionsRoot, indexPath string) ([]SessionSummary, error)
 		if id == "" {
 			return nil
 		}
-		fi, err := d.Info()
-		if err != nil {
-			return nil
+		if fi, statErr := d.Info(); statErr == nil {
+			out = append(out, codexSessionSummary(path, id, fi, index))
 		}
-		title := id
-		updated := fi.ModTime().UTC().Format(time.RFC3339)
-		if meta, ok := index[id]; ok {
-			if meta.ThreadName != "" {
-				title = meta.ThreadName
-			}
-			if meta.UpdatedAt != "" {
-				if t, err := time.Parse(time.RFC3339Nano, meta.UpdatedAt); err == nil {
-					updated = t.UTC().Format(time.RFC3339)
-				} else if t, err := time.Parse(time.RFC3339, meta.UpdatedAt); err == nil {
-					updated = t.UTC().Format(time.RFC3339)
-				}
-			}
-		}
-		out = append(out, SessionSummary{
-			Runtime:    RuntimeCodex,
-			ID:         id,
-			Title:      truncateTitle(title, 120),
-			Path:       path,
-			UpdatedAt:  updated,
-			SourceMode: SourceModeImport,
-		})
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// codexSessionSummary builds a session summary enriched with index metadata.
+func codexSessionSummary(path, id string, fi os.FileInfo, index map[string]codexIndexLine) SessionSummary {
+	title := id
+	updated := fi.ModTime().UTC().Format(time.RFC3339)
+	if meta, ok := index[id]; ok {
+		if meta.ThreadName != "" {
+			title = meta.ThreadName
+		}
+		if meta.UpdatedAt != "" {
+			if t, err := time.Parse(time.RFC3339Nano, meta.UpdatedAt); err == nil {
+				updated = t.UTC().Format(time.RFC3339)
+			} else if t, err := time.Parse(time.RFC3339, meta.UpdatedAt); err == nil {
+				updated = t.UTC().Format(time.RFC3339)
+			}
+		}
+	}
+	return SessionSummary{
+		Runtime:    RuntimeCodex,
+		ID:         id,
+		Title:      truncateTitle(title, 120),
+		Path:       path,
+		UpdatedAt:  updated,
+		SourceMode: SourceModeImport,
+	}
 }
 
 func codexSessionIDFromFilename(name string) string {
