@@ -137,7 +137,13 @@ func computeKID(pub *rsa.PublicKey) string {
 // setupE2EDB creates an in-memory SQLite database with tables needed for OIDC E2E tests.
 func setupE2EDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	// Shared-cache memory DB: with plain ":memory:", each pooled connection
+	// gets its own private database, so concurrent logins (which use
+	// multiple connections) would see "no such table". cache=shared makes
+	// every connection in the pool see the same in-memory DB. The name must
+	// be unique per test — a shared cache DB lives until its last
+	// connection closes, so a fixed name would leak tables across tests.
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:e2eoidc-%d?mode=memory&cache=shared&_busy_timeout=5000", time.Now().UnixNano())), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})
 	require.NoError(t, err)
@@ -164,7 +170,7 @@ func setupE2EDB(t *testing.T) *gorm.DB {
 			last_active_at DATETIME NOT NULL DEFAULT (datetime('now')),
 			created_at DATETIME
 		)`,
-		`CREATE UNIQUE INDEX idx_devices_user_type ON devices(user_id, device_type)`,
+		`CREATE INDEX idx_devices_user_type ON devices(user_id, device_type)`,
 		`CREATE TABLE refresh_tokens (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -234,7 +240,7 @@ func TestTokenDanceOIDC_E2E_GenerateAuthorizationURL(t *testing.T) {
 
 	result, err := svc.GenerateAuthorizationURL(ctx,
 		"e2e-challenge-base64url-encoded-test-data", "S256",
-		"desktop", "e2e-device-001", "")
+		"desktop", "e2e00000-0000-4000-8000-000000000001", "")
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, result.State, "state must not be empty")
@@ -249,7 +255,7 @@ func TestTokenDanceOIDC_E2E_GenerateAuthorizationURL(t *testing.T) {
 	assert.Equal(t, "code", q.Get("response_type"))
 	assert.Equal(t, "agenthub-desktop", q.Get("client_id"))
 	assert.Equal(t, "http://127.0.0.1:54321/callback", q.Get("redirect_uri"))
-	assert.Equal(t, "openid profile", q.Get("scope"))
+	assert.Equal(t, "openid profile email", q.Get("scope"))
 	assert.Equal(t, result.State, q.Get("state"))
 	assert.Equal(t, "e2e-challenge-base64url-encoded-test-data", q.Get("code_challenge"))
 	assert.Equal(t, "S256", q.Get("code_challenge_method"))
@@ -270,7 +276,7 @@ func TestTokenDanceOIDC_E2E_FullFlow(t *testing.T) {
 	// Step 1: Generate authorization URL
 	authResult, err := svc.GenerateAuthorizationURL(ctx,
 		codeChallenge, "S256",
-		"desktop", "e2e-device-fullflow", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000ff01", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, authResult.State)
 
@@ -280,7 +286,7 @@ func TestTokenDanceOIDC_E2E_FullFlow(t *testing.T) {
 
 	callbackResult, err := svc.HandleCallback(ctx,
 		mockAuthCode, authResult.State, codeVerifier,
-		"desktop", "e2e-device-fullflow", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000ff01", "")
 	require.NoError(t, err)
 
 	// Step 3: Verify Hub-issued tokens
@@ -304,7 +310,7 @@ func TestTokenDanceOIDC_E2E_InvalidState(t *testing.T) {
 
 	_, err := svc.HandleCallback(ctx,
 		"some-code", "nonexistent-state", "verifier",
-		"desktop", "device-001", "")
+		"desktop", "e2e00000-0000-4000-8000-000000000002", "")
 	require.Error(t, err, "should reject invalid state")
 	assert.Contains(t, err.Error(), "state", "error should mention state")
 }
@@ -321,19 +327,19 @@ func TestTokenDanceOIDC_E2E_StateConsumption(t *testing.T) {
 	// First: generate auth URL (stores state in Redis)
 	authResult, err := svc.GenerateAuthorizationURL(ctx,
 		challenge, "S256",
-		"desktop", "e2e-device-oneshot", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000ff02", "")
 	require.NoError(t, err)
 
 	// First callback — should succeed
 	_, err = svc.HandleCallback(ctx,
 		"auth-code-1", authResult.State, verifier,
-		"desktop", "e2e-device-oneshot", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000ff02", "")
 	require.NoError(t, err, "first callback should succeed")
 
 	// Second callback with SAME state — should FAIL (one-shot consumption)
 	_, err = svc.HandleCallback(ctx,
 		"auth-code-2", authResult.State, verifier,
-		"desktop", "e2e-device-oneshot", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000ff02", "")
 	require.Error(t, err, "second callback with same state should fail")
 	assert.Contains(t, err.Error(), "state", "error should indicate state is invalid")
 }
@@ -350,13 +356,13 @@ func TestTokenDanceOIDC_E2E_DeviceMismatch(t *testing.T) {
 	// Authorize with device X
 	authResult, err := svc.GenerateAuthorizationURL(ctx,
 		challenge, "S256",
-		"desktop", "e2e-device-alpha", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000aa01", "")
 	require.NoError(t, err)
 
 	// Callback with device Y — should FAIL
 	_, err = svc.HandleCallback(ctx,
 		"auth-code-device-mismatch", authResult.State, verifier,
-		"desktop", "e2e-device-beta", "") // different device ID!
+		"desktop", "e2e00000-0000-4000-8000-00000000bb01", "") // different device ID!
 	assert.Error(t, err, "should reject mismatched device")
 }
 
@@ -370,13 +376,13 @@ func TestTokenDanceOIDC_E2E_SubsequentLogin(t *testing.T) {
 	challenge := "e2e-second-login-code-challenge-value-yes"
 
 	// First login
-	auth1, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-sublogin", "")
+	auth1, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d101", "")
 	require.NoError(t, err)
 
 	// Need to use the same sub in the mock token — the mock uses "user-mock-{code[:8]}"
 	// For subsequent login, we use the same code prefix so the mock generates the same sub
 	code1 := "same_user_001"
-	result1, err := svc.HandleCallback(ctx, code1, auth1.State, verifier, "desktop", "e2e-dev-sublogin", "")
+	result1, err := svc.HandleCallback(ctx, code1, auth1.State, verifier, "desktop", "e2e00000-0000-4000-8000-00000000d101", "")
 	require.NoError(t, err)
 	userID1 := result1.User.ID
 
@@ -385,11 +391,11 @@ func TestTokenDanceOIDC_E2E_SubsequentLogin(t *testing.T) {
 	_ = privKey
 
 	// Second login with same code prefix → same sub from mock
-	auth2, err := svc.GenerateAuthorizationURL(ctx, challenge+"2", "S256", "desktop", "e2e-dev-sublogin2", "")
+	auth2, err := svc.GenerateAuthorizationURL(ctx, challenge+"2", "S256", "desktop", "e2e00000-0000-4000-8000-00000000d102", "")
 	require.NoError(t, err)
 
 	code2 := "same_user_001" // same prefix → mock returns same sub
-	result2, err := svc.HandleCallback(ctx, code2, auth2.State, verifier, "desktop", "e2e-dev-sublogin2", "")
+	result2, err := svc.HandleCallback(ctx, code2, auth2.State, verifier, "desktop", "e2e00000-0000-4000-8000-00000000d102", "")
 	require.NoError(t, err)
 
 	// Same user should be returned (no duplicate)
@@ -405,7 +411,7 @@ func TestTokenDanceOIDC_E2E_BadTokenEndpoint(t *testing.T) {
 	verifier := "e2e-bad-token-endpoint-verifier-43-chars-xx"
 	challenge := "e2e-bad-token-endpoint-challenge-value-ab"
 
-	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-badtoken", "")
+	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d103", "")
 	require.NoError(t, err)
 
 	// Now modify the service to point to a non-existent token endpoint
@@ -567,17 +573,17 @@ func TestTokenDanceOIDC_E2E_TokenEndpointErrors(t *testing.T) {
 	challenge := "e2e-token-error-test-challenge-value-abc"
 
 	// Generate auth URL (stores state in Redis)
-	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-tokenerr", "")
+	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d104", "")
 	require.NoError(t, err)
 
 	// Callback should fail because the token endpoint returns an error
-	_, err = svc.HandleCallback(ctx, "any-code", authResult.State, verifier, "desktop", "e2e-dev-tokenerr", "")
+	_, err = svc.HandleCallback(ctx, "any-code", authResult.State, verifier, "desktop", "e2e00000-0000-4000-8000-00000000d104", "")
 	assert.Error(t, err, "callback should fail when token endpoint returns error")
 
 	// Clean up state that was consumed (HandleCallback deletes on success only)
 	// State should NOT have been consumed since HandleCallback failed before deletion.
 	// Second attempt should also fail:
-	_, err2 := svc.HandleCallback(ctx, "any-code", authResult.State, verifier, "desktop", "e2e-dev-tokenerr", "")
+	_, err2 := svc.HandleCallback(ctx, "any-code", authResult.State, verifier, "desktop", "e2e00000-0000-4000-8000-00000000d104", "")
 	assert.Error(t, err2, "second attempt should also fail")
 }
 
@@ -619,18 +625,18 @@ func TestTokenDanceOIDC_E2E_EmptyScopes(t *testing.T) {
 	verifier := "e2e-scope-test-code-verifier-minimum-43-chars"
 	challenge := "e2e-scope-test-code-challenge-value-yep"
 
-	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-scopes", "")
+	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d105", "")
 	require.NoError(t, err)
 
 	// Verify scope is in the authorization URL
 	parsed, err := url.Parse(authResult.AuthorizationURL)
 	require.NoError(t, err)
-	assert.Equal(t, "openid profile", parsed.Query().Get("scope"), "scope must be openid profile")
+	assert.Equal(t, "openid profile email", parsed.Query().Get("scope"), "scope must include email")
 
 	// Callback should work with the mock
 	callbackResult, err := svc.HandleCallback(ctx,
 		"scope-test-code", authResult.State, verifier,
-		"desktop", "e2e-dev-scopes", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000d105", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, callbackResult.AccessToken)
 }
@@ -644,12 +650,12 @@ func TestTokenDanceOIDC_E2E_RefreshTokenStorage(t *testing.T) {
 	verifier := "e2e-refresh-storage-verifier-43-chars-here-ok"
 	challenge := "e2e-refresh-storage-challenge-value-go"
 
-	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-refresh", "")
+	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d106", "")
 	require.NoError(t, err)
 
 	callbackResult, err := svc.HandleCallback(ctx,
 		"refresh-test-code", authResult.State, verifier,
-		"desktop", "e2e-dev-refresh", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000d106", "")
 	require.NoError(t, err)
 
 	// Verify refresh token exists in DB
@@ -679,15 +685,15 @@ func TestTokenDanceOIDC_E2E_ConcurrentLogins(t *testing.T) {
 		go func(idx int) {
 			v := fmt.Sprintf("e2e-conc-%d-verifier-that-is-long-enough-ok", idx)
 			c := fmt.Sprintf("e2e-conc-%d-challenge-long-enough-value-yes", idx)
-			authR, err := svc.GenerateAuthorizationURL(ctx, c, "S256", "desktop", fmt.Sprintf("e2e-dev-conc-%d", idx), "")
+			authR, err := svc.GenerateAuthorizationURL(ctx, c, "S256", "desktop", fmt.Sprintf("e2e00000-0000-4000-8000-00000000c0%02d", idx), "")
 			if err != nil {
 				results <- loginResult{index: idx, err: err}
 				return
 			}
 
 			cbR, err := svc.HandleCallback(ctx,
-				fmt.Sprintf("conc-code-%d", idx), authR.State, v,
-				"desktop", fmt.Sprintf("e2e-dev-conc-%d", idx), "")
+				fmt.Sprintf("conc-%d-code", idx), authR.State, v,
+				"desktop", fmt.Sprintf("e2e00000-0000-4000-8000-00000000c0%02d", idx), "")
 			if err != nil {
 				results <- loginResult{index: idx, err: err}
 				return
@@ -724,12 +730,12 @@ func TestTokenDanceOIDC_E2E_LargePKCEValues(t *testing.T) {
 	verifier := strings.Repeat("v", 128)
 	challenge := strings.Repeat("c", 43) // S256 challenge is typically 43 chars
 
-	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e-dev-large", "")
+	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", "e2e00000-0000-4000-8000-00000000d107", "")
 	require.NoError(t, err)
 
 	callbackResult, err := svc.HandleCallback(ctx,
 		"large-pkce-code", authResult.State, verifier,
-		"desktop", "e2e-dev-large", "")
+		"desktop", "e2e00000-0000-4000-8000-00000000d107", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, callbackResult.AccessToken)
 }

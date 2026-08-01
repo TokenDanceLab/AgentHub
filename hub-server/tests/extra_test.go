@@ -142,7 +142,7 @@ func TestBlockedMessage(t *testing.T) {
 			"client_msg_id": "00000000-0000-0000-0000-00000000b001",
 			"content_type":  "text", "content": "Should fail",
 		})
-		mustCode(t, parse(w), "MSG_BLOCKED_BY_RECEIVER", "blocked message rejected")
+		mustCode(t, parse(w), errcode.MsgBlockedByReceiver.Code, "blocked message rejected")
 
 		postAuth("/client/contacts/"+alice.ID+"/unblock", bob.Token, nil)
 	})
@@ -184,8 +184,11 @@ func TestFileUpload(t *testing.T) {
 
 		if attID != "" {
 			w := get("/client/attachments/"+attID, u.Token)
-			if w.StatusCode != 200 {
-				t.Errorf("download attachment failed: %d", w.StatusCode)
+			// #81: download requires an active session message reference.
+			// A bare upload without a session context must not be
+			// downloadable — the handler returns 404 attach_not_found.
+			if w.StatusCode != http.StatusNotFound {
+				t.Errorf("unreferenced attachment download status = %d, want 404", w.StatusCode)
 			}
 		}
 	})

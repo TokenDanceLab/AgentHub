@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"net/http"
 	"testing"
 )
@@ -34,7 +35,7 @@ func TestOIDCAuthorize_MissingFields(t *testing.T) {
 		"device_type": "web",
 	}, "")
 	r := parse(resp)
-	if r.GetCode() == "OK" {
+	if r.GetCode() == errcode.OK.Code {
 		t.Fatal("expected error for missing fields")
 	}
 }
@@ -123,14 +124,14 @@ func TestAgentProfile_UpdateAndDelete(t *testing.T) {
 	// GET after delete should return error.
 	w = get("/web/agent-profiles/"+profileID, u.Token)
 	r = parse(w)
-	if r.GetCode() == "OK" {
+	if r.GetCode() == errcode.OK.Code {
 		t.Fatal("expected error after delete, got OK")
 	}
 }
 
 func TestAgentProfile_Install(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	alice := register(t, "ap_i1a", "pass1234", "AP_Inst1")
+	alice := registerAsAdmin(t, "ap_i1a", "pass1234", "AP_Inst1")
 	bob := register(t, "ap_i1b", "pass1234", "AP_Inst2")
 
 	// Alice creates and publishes a profile.
@@ -156,15 +157,15 @@ func TestAgentProfile_Install(t *testing.T) {
 
 func TestSkill_CreateAndPublish(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	u := register(t, "sk_cp1", "pass1234", "SK_CP")
+	u := registerAsAdmin(t, "sk_cp1", "pass1234", "SK_CP")
 
 	// Create a skill.
 	w := postAuth("/web/skills", u.Token, map[string]interface{}{
-		"name":         "My Code Review Skill",
-		"skill_type":   "agent_skill",
-		"description":  "A skill for code review",
-		"runtime_ids":  `["claude-code"]`,
-		"entry_point":  "code_review.py",
+		"name":          "My Code Review Skill",
+		"skill_type":    "agent_skill",
+		"description":   "A skill for code review",
+		"runtime_ids":   `["claude-code"]`,
+		"entry_point":   "code_review.py",
 		"config_schema": `{"max_files": 10}`,
 	})
 	r := parse(w)
@@ -220,7 +221,7 @@ func TestMCPServer_RejectsSecretInAuthConfig(t *testing.T) {
 		"auth_config": `{"api_key": "sk-very-secret-key-12345"}`,
 	})
 	r := parse(w)
-	if r.GetCode() == "OK" {
+	if r.GetCode() == errcode.OK.Code {
 		t.Fatal("expected error for plaintext api_key in auth_config, got OK")
 	}
 
@@ -232,7 +233,7 @@ func TestMCPServer_RejectsSecretInAuthConfig(t *testing.T) {
 		"auth_config": `{"secret": "my-secret-value"}`,
 	})
 	r = parse(w)
-	if r.GetCode() == "OK" {
+	if r.GetCode() == errcode.OK.Code {
 		t.Fatal("expected error for plaintext secret in auth_config, got OK")
 	}
 
@@ -292,9 +293,13 @@ func TestExecutionTarget_CreateAndPing(t *testing.T) {
 	}
 
 	// Initially is_online should be false.
-	isOnline := extract(r.Data, "is_online")
-	if isOnline != "false" {
-		t.Logf("initial is_online = %s (expected false)", isOnline)
+	// is_online is a JSON boolean; decode it as bool, not via extract().
+	var created struct {
+		IsOnline bool `json:"is_online"`
+	}
+	json.Unmarshal(r.Data, &created)
+	if created.IsOnline {
+		t.Logf("initial is_online = true (expected false)")
 	}
 
 	// Ping the target.
@@ -306,9 +311,12 @@ func TestExecutionTarget_CreateAndPing(t *testing.T) {
 	w = get("/web/execution-targets/"+targetID, u.Token)
 	r = parse(w)
 	mustOK(t, r, "get target after ping")
-	isOnline = extract(r.Data, "is_online")
-	if isOnline != "true" {
-		t.Errorf("expected is_online=true after ping, got %s", isOnline)
+	var got struct {
+		IsOnline bool `json:"is_online"`
+	}
+	json.Unmarshal(r.Data, &got)
+	if !got.IsOnline {
+		t.Errorf("expected is_online=true after ping, got false")
 	}
 }
 
@@ -336,7 +344,7 @@ func TestExecutionTarget_List(t *testing.T) {
 
 func TestAudit_ListEvents(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	u := register(t, "au_ls1", "pass1234", "AU_LS")
+	u := registerAsAdmin(t, "au_ls1", "pass1234", "AU_LS")
 
 	// Initially, audit events should be empty or return successfully.
 	w := get("/web/audit-events", u.Token)
@@ -367,7 +375,7 @@ func TestAudit_ListEventsUnauthorized(t *testing.T) {
 
 func TestMarket_SearchProfiles(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	u := register(t, "mk_sp1", "pass1234", "MK_SP")
+	u := registerAsAdmin(t, "mk_sp1", "pass1234", "MK_SP")
 
 	// Create and publish a profile.
 	w := postAuth("/web/agent-profiles", u.Token, map[string]interface{}{
@@ -396,7 +404,7 @@ func TestMarket_SearchProfiles(t *testing.T) {
 
 func TestMarket_RateProfile(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	alice := register(t, "mk_rt_a", "pass1234", "MK_RT_A")
+	alice := registerAsAdmin(t, "mk_rt_a", "pass1234", "MK_RT_A")
 	bob := register(t, "mk_rt_b", "pass1234", "MK_RT_B")
 
 	// Alice creates and publishes a profile.
