@@ -1,4 +1,4 @@
-import { QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@shared/workbench';
@@ -27,7 +27,7 @@ import {
 } from '@/platform/webPlatform';
 import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
 import { useWebAuth } from '@/hooks/useWebAuth';
-import { getAccessToken } from '@/hooks/useAuth';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { ToastContainer } from '@/components/Toast';
 import styles from './App.module.css';
@@ -53,6 +53,8 @@ function WebWorkbenchRoot() {
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const { ensureAuth } = useWebAuth();
+  const { logout } = useAuth();
+  const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
   const dataModeOverride = useSyncExternalStore(
@@ -179,6 +181,17 @@ function WebWorkbenchRoot() {
     return workbench.projectsActions?.update(projectId, draft);
   }
 
+  const handleLogout = useCallback(async (): Promise<void> => {
+    await logout();
+    sessionQueryClient.clear();
+    setSelectedConversationId(undefined);
+    setSelectedProjectId(undefined);
+    setAgentActionError(undefined);
+    setSavingAgentId(undefined);
+    setDeletingAgentId(undefined);
+    setShowAuthModal(true);
+  }, [logout, sessionQueryClient, setShowAuthModal]);
+
   return (
     <>
       <AgentHubWorkbench
@@ -207,6 +220,7 @@ function WebWorkbenchRoot() {
           setAgentActionError(undefined);
           void agentList.refetch();
         }}
+        onLogout={handleLogout}
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         onApprovalDecision={workbench.onApprovalDecision}

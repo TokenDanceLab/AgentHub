@@ -31,6 +31,13 @@ export default defineConfig({
   ],
   webServer: {
     command: `pnpm dev --host 127.0.0.1 --port ${desktopE2EPort}`,
+    env: {
+      ...process.env,
+      // Keep renderer E2E deterministic and fail closed if a Hub route is
+      // missing; no browser test should reach a live API by default.
+      VITE_HUB_URL: 'https://hub.test.invalid',
+      VITE_HUB_WS_URL: 'wss://hub.test.invalid/client/ws',
+    },
     url: desktopE2EBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 45_000,
