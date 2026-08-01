@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '@/App';
+import { queryClient } from '@/api/queryClient';
 import { useHubStore } from '@/stores/hubStore';
 
 /**
@@ -23,6 +24,8 @@ const useDeleteAgentProfileMock = vi.hoisted(() => vi.fn());
 const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
+const logoutMock = vi.hoisted(() => vi.fn(async () => undefined));
+const getAccessTokenMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const hubClientStub = vi.hoisted(() => ({
   me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
   listPublicSkills: vi.fn(async () => ({ items: [] })),
@@ -61,6 +64,11 @@ vi.mock('@/hooks/useWebAuth', () => ({
   useWebAuth: useWebAuthMock,
 }));
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ logout: logoutMock }),
+  getAccessToken: getAccessTokenMock,
+}));
+
 vi.mock('@/api/hubClient', () => ({
   createHubClient: vi.fn(() => hubClientStub),
 }));
@@ -91,6 +99,8 @@ describe('Web app root', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    queryClient.clear();
+    getAccessTokenMock.mockReturnValue(null);
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock });
     useHubStore.getState().clear();
@@ -243,6 +253,28 @@ describe('Web app root', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'TokenDance ID login' })).not.toBeInTheDocument();
     });
+  });
+
+  it('logs out the Web session, clears private queries, and opens the auth surface', async () => {
+    getAccessTokenMock.mockReturnValue('web-token');
+    logoutMock.mockImplementationOnce(async () => {
+      getAccessTokenMock.mockReturnValue(null);
+      useHubStore.getState().clear();
+    });
+    useHubStore.getState().setAuthenticated(true, 'web-user', 'Web User');
+    queryClient.setQueryData(['private-session'], { secret: true });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^(Web User|user\.fallbackName)$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^(退出登录|Log out|user\.logout)$/ }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
+    });
+    expect(queryClient.getQueryData(['private-session'])).toBeUndefined();
+    expect(useHubStore.getState().authenticated).toBe(false);
   });
 
   it('opens auth instead of silently using mock data for guarded unauthenticated Hub work', async () => {

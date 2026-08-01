@@ -229,9 +229,23 @@ const testQueryClient = new QueryClient();
 const renderWithProviders = (ui: Parameters<typeof render>[0]) =>
   render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>);
 
+function mockAuthSession(user: ReturnType<typeof useAuth>['user']): void {
+  mockedUseAuth.mockReturnValue({
+    isAuthenticated: user !== null,
+    token: user ? 'hub-token' : null,
+    user,
+    loading: false,
+    error: null,
+    loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
+    logout: vi.fn().mockResolvedValue(undefined),
+    tryAutoLogin,
+  } as ReturnType<typeof useAuth>);
+}
+
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    testQueryClient.clear();
     window.localStorage.clear();
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       value: {},
@@ -248,16 +262,7 @@ describe('Desktop App v4 root', () => {
       lastError: null,
       refetch: refetchHealth,
     } as ReturnType<typeof useHealth>);
-    mockedUseAuth.mockReturnValue({
-      isAuthenticated: true,
-      token: 'hub-token',
-      user: null,
-      loading: false,
-      error: null,
-      loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
-      logout: vi.fn(),
-      tryAutoLogin,
-    } as ReturnType<typeof useAuth>);
+    mockAuthSession(null);
     mockedUseHubEventStream.mockReturnValue({
       hubWS: mockHubWS,
       status: 'connected',
@@ -446,7 +451,24 @@ describe('Desktop App v4 root', () => {
     expect(edgeButton).toBeDisabled();
   });
 
-  it('returns to the Desktop login card from the account logout action', () => {
+  it('logs out the real Desktop session before returning to the login card', async () => {
+    let authenticatedUser: { id: string; username: string } | null = {
+      id: 'user-delicious233',
+      username: 'Delicious233',
+    };
+    const logout = vi.fn(async () => {
+      authenticatedUser = null;
+    });
+    mockedUseAuth.mockImplementation(() => ({
+      isAuthenticated: authenticatedUser !== null,
+      token: authenticatedUser ? 'hub-token' : null,
+      user: authenticatedUser,
+      loading: false,
+      error: null,
+      loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
+      logout,
+      tryAutoLogin,
+    }) as ReturnType<typeof useAuth>);
     mockedUseCurrentUser.mockReturnValue({
       data: {
         userId: 'user-delicious233',
@@ -454,17 +476,25 @@ describe('Desktop App v4 root', () => {
         avatarUrl: '',
       },
     } as ReturnType<typeof useCurrentUser>);
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    testQueryClient.setQueryData(['private-session'], { secret: true });
+
     renderWithProviders(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
     fireEvent.click(screen.getByRole('button', { name: railAvatarLabel }));
     fireEvent.click(screen.getByRole('button', { name: logoutLabel }));
 
-    expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
+    });
+    expect(testQueryClient.getQueryData(['private-session'])).toBeUndefined();
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
   });
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
+    mockAuthSession({ id: 'user-delicious233', username: 'Delicious233' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     renderWithProviders(<DesktopWorkbenchApp />);
 
@@ -489,6 +519,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('waits for Desktop device registration before accepting Hub dispatch frames', async () => {
+    mockAuthSession({ id: 'user-delicious233', username: 'Delicious233' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseDeviceRegistration.mockReturnValue({
       deviceId: '00000000-0000-4000-8000-00000000d001',
