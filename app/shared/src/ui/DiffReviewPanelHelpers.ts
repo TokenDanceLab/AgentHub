@@ -5,6 +5,7 @@
 
 import type { DiffHunk } from '../diff';
 import type { SideBySideCell, SideBySideRow } from './DiffReviewPanelTypes';
+import { produceWordDiffTokens } from './diffWordTokens';
 import styles from './DiffReviewPanel.module.css';
 
 // ── Build side-by-side rows from a hunk ────────────────────────────────
@@ -53,13 +54,20 @@ export function buildSideBySideRows(hunk: DiffHunk): SideBySideRow[] {
     ) {
       // Pair consecutive deleted + added as "modified"
       const addedLine = lines[i + 1]!;
-      rows.push(makeRow(
-        makeCell(line.oldLineNumber, line.content),
-        makeCell(addedLine.newLineNumber, addedLine.content),
-        'modified',
-        i,
-        i + 1,
-      ));
+      const oldCell = makeCell(line.oldLineNumber, line.content);
+      const newCell = makeCell(addedLine.newLineNumber, addedLine.content);
+      // Word-level diff for the modified pair (P6 Step 2). Per-column split
+      // (report §4.1): left cell keeps removed+context, right cell keeps
+      // added+context, so each column's tokens join back to its `content`.
+      // produceWordDiffTokens returns null under the size guard — then
+      // wordDiff stays undefined and Step 3 rendering falls back to
+      // whole-line Prism highlight. TODO(P6 Step 3): consume in renderer.
+      const wordDiff = produceWordDiffTokens(line.content, addedLine.content);
+      if (wordDiff) {
+        oldCell.wordDiff = wordDiff.filter((t) => t.type !== 'added');
+        newCell.wordDiff = wordDiff.filter((t) => t.type !== 'removed');
+      }
+      rows.push(makeRow(oldCell, newCell, 'modified', i, i + 1));
       i += 2;
     } else if (line.type === 'deleted') {
       rows.push(makeRow(
