@@ -7,6 +7,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { getI18n } from 'react-i18next';
+import { globalErrorReporter } from '../errors';
 import styles from './ErrorBoundary.module.css';
 
 // ── Types ──────────────────────────────────────────────
@@ -208,6 +209,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     console.error('[ErrorBoundary] render error:', error, info);
+    globalErrorReporter.report(error, { componentStack: info.componentStack });
 
     // Chunk load failures: auto-reload with rate limiting
     if (isChunkLoadError(error) && shouldChunkReload()) {
