@@ -73,12 +73,20 @@ func TestWSReconnectReceivesMessages(t *testing.T) {
 
 	// Disconnect conn1.
 	conn1.Close(websocket.StatusNormalClosure, "")
-	// Wait for cleanup goroutines.
-	time.Sleep(200 * time.Millisecond)
 
-	// Verify the manager cleaned up the stale connection.
-	if manager.Count() != 0 {
-		t.Fatalf("after disconnect manager count = %d, want 0", manager.Count())
+	// Wait for the cleanup goroutine to unregister the stale connection.
+	// Poll deterministically instead of a fixed sleep so the test does not
+	// flake under load (cleanup may take longer than a fixed 200ms window) and
+	// does not silently skip the assertion on a fast machine.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if manager.Count() == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("after disconnect manager count = %d, want 0 (cleanup did not complete within 2s)", manager.Count())
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Second connection: reconnect as same user+device.
@@ -125,8 +133,14 @@ func TestWSReconnectReceivesMessages(t *testing.T) {
 }
 
 // TestWSMultipleDevicesPerUser verifies that a single user can have multiple
-// WebSocket connections (e.g., desktop + web) and messages pushed via
-// PushToUser are delivered to all of them.
+// WebSocket connections from different devices (e.g., desktop + web) and
+// messages pushed via PushToUser are fanned out to ALL of them.
+//
+// The previous version of this test dialled TWO DIFFERENT users
+// ("user-multi-dev" and "user-multi-dev-web") and then pushed to each user
+// independently — so it never exercised the per-user multi-device fan-out
+// that its name promises. It now uses ONE user with two different device
+// types and asserts a single PushToUser reaches both connections.
 func TestWSMultipleDevicesPerUser(t *testing.T) {
 	manager := hubws.NewManager()
 	manager.StartHeartbeat()
@@ -134,8 +148,8 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 
 	wsURL := newWSTestServer(t, manager)
 
-	// Connect as desktop.
-	connDesktop := dialWS(t, wsURL, "user-multi-dev")
+	// Same user, two different device types (desktop + web).
+	connDesktop := dialWSWithDevice(t, wsURL, "user-multi-dev", "desktop", "desktop-dev-1")
 	defer connDesktop.Close(websocket.StatusNormalClosure, "")
 
 	frame := readWSFrame(t, connDesktop)
@@ -143,76 +157,60 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 		t.Fatalf("desktop auth: got %s, want auth.ok", frame.Type)
 	}
 
-	// Connect as web.
-	connWeb := dialWS(t, wsURL, "user-multi-dev-web")
+	connWeb := dialWSWithDevice(t, wsURL, "user-multi-dev", "web", "web-dev-1")
 	defer connWeb.Close(websocket.StatusNormalClosure, "")
 
-	// For the web connection we need a different accessToken claim to avoid
-	// route key collision. Use a second user for this multi-device test with
-	// separate manager routes.
 	frame = readWSFrame(t, connWeb)
 	if frame.Type != hubws.TypeAuthOK {
 		t.Fatalf("web auth: got %s, want auth.ok", frame.Type)
 	}
 
+	// Both connections for the SAME user must be registered.
 	if manager.Count() != 2 {
-		t.Fatalf("manager count = %d, want 2", manager.Count())
+		t.Fatalf("manager count = %d, want 2 (both devices for same user)", manager.Count())
 	}
 
-	// Both connections are registered under different users so PushToUser
-	// targets each independently. Verify both receive.
-	msgDesktop := hubws.NewFrame(hubws.TypeMessageNew, map[string]string{"text": "desktop msg"})
-	manager.PushToUser("user-multi-dev", msgDesktop)
+	// A single PushToUser must fan out to BOTH connections of the same user.
+	msg := hubws.NewFrame(hubws.TypeMessageNew, map[string]string{"text": "fanout-to-all-devices"})
+	result := manager.PushToUser("user-multi-dev", msg)
+	if result.Conns != 2 {
+		t.Fatalf("PushToUser result.Conns = %d, want 2 (both user devices)", result.Conns)
+	}
+	if result.Queued != 2 {
+		t.Fatalf("PushToUser result.Queued = %d, want 2 (delivered to both devices)", result.Queued)
+	}
+
 	gotDesktop := readWSFrame(t, connDesktop)
 	if gotDesktop.Type != hubws.TypeMessageNew {
 		t.Errorf("desktop got type=%s, want message.new", gotDesktop.Type)
 	}
-
-	msgWeb := hubws.NewFrame(hubws.TypeMessageNew, map[string]string{"text": "web msg"})
-	manager.PushToUser("user-multi-dev-web", msgWeb)
 	gotWeb := readWSFrame(t, connWeb)
 	if gotWeb.Type != hubws.TypeMessageNew {
 		t.Errorf("web got type=%s, want message.new", gotWeb.Type)
 	}
 }
 
-// TestWSHeartbeatKeepsConnection verifies that the manager's heartbeat
+// TestWSHeartbeatKeepsConnection is intended to verify the manager's heartbeat
 // ping/pong mechanism detects a healthy connection.
+//
+// SKIPPED HONESTLY: the heartbeat ticker runs on config.WSHeartbeatInterval
+// (30s). A single heartbeat cycle therefore cannot be observed in a
+// reasonable unit/integration-test window without either:
+//  1. waiting 30s+ (unacceptable for CI), or
+//  2. refactoring Manager.StartHeartbeat to accept an injectable interval
+//     (a Manager logic change, out of scope for "pure test honesty").
+//
+// The previous version slept only 500ms and asserted the connection was still
+// registered — which is true regardless of whether the heartbeat ever fired,
+// so it verified nothing about the heartbeat ping/pong mechanism. Skipping
+// loudly here so CI does not report a fake green for heartbeat coverage.
+//
+// TODO: once Manager gains a test seam for the heartbeat interval (e.g.
+// StartHeartbeatWithInterval), rewrite this test to use a short interval and
+// assert that a healthy connection's missedPong stays 0 and that a stale
+// (unreachable) connection is closed+unregistered after WSMaxMissedPongs.
 func TestWSHeartbeatKeepsConnection(t *testing.T) {
-	manager := hubws.NewManager()
-	manager.StartHeartbeat()
-	defer manager.Shutdown()
-
-	wsURL := newWSTestServer(t, manager)
-
-	conn := dialWS(t, wsURL, "user-heartbeat")
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
-	frame := readWSFrame(t, conn)
-	if frame.Type != hubws.TypeAuthOK {
-		t.Fatalf("auth: got %s, want auth.ok", frame.Type)
-	}
-
-	if manager.Count() != 1 {
-		t.Fatalf("manager count = %d, want 1", manager.Count())
-	}
-
-	// Wait for at least one heartbeat cycle (WSHeartbeatInterval is typically
-	// 15s, so we wait a short time and verify the connection is still alive).
-	time.Sleep(500 * time.Millisecond)
-
-	// Connection should still be registered — the handler's ping/pong keeps it alive.
-	if manager.Count() != 1 {
-		t.Errorf("after heartbeat wait, manager count = %d, want 1", manager.Count())
-	}
-
-	// Verify we can still send/receive after heartbeat.
-	msg := hubws.NewFrame(hubws.TypeMessageNew, map[string]string{"text": "post-heartbeat"})
-	manager.PushToUser("user-heartbeat", msg)
-	got := readWSFrame(t, conn)
-	if got.Type != hubws.TypeMessageNew {
-		t.Errorf("post-heartbeat got type=%s, want message.new", got.Type)
-	}
+	t.Skip("heartbeat interval is 30s (config.WSHeartbeatInterval); cannot deterministically verify ping/pong without 30s wait or an injectable interval seam on Manager.StartHeartbeat")
 }
 
 // TestWSPushToNonexistentUser is a no-op (no delivery, no panic).
@@ -297,7 +295,16 @@ func newWSTestServer(t *testing.T, manager *hubws.Manager) string {
 
 func dialWS(t *testing.T, url, userID string) *websocket.Conn {
 	t.Helper()
-	accessToken, err := generateWSAccessToken(userID, "web", "test-device-"+userID, wsTestSecret, time.Hour)
+	return dialWSWithDevice(t, url, userID, "web", "test-device-"+userID)
+}
+
+// dialWSWithDevice dials a WebSocket connection authenticating as userID with
+// an explicit deviceType and deviceID. Tests that need to exercise per-user
+// multi-device fan-out (e.g. desktop + web for the same user) must use this
+// helper so the device claims differ; dialWS always claims deviceType "web".
+func dialWSWithDevice(t *testing.T, url, userID, deviceType, deviceID string) *websocket.Conn {
+	t.Helper()
+	accessToken, err := generateWSAccessToken(userID, deviceType, deviceID, wsTestSecret, time.Hour)
 	if err != nil {
 		t.Fatalf("generate ws access token: %v", err)
 	}
