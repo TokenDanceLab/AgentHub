@@ -9,7 +9,12 @@ function Fail([string]$Message) {
 }
 
 function Get-JobBlock([string]$Workflow, [string]$JobName) {
-    $pattern = "(?ms)^  $([regex]::Escape($JobName)):\r?\n(?<body>.*?)(?=^  [A-Za-z0-9_-]+:|\z)"
+    # Comments between sibling jobs belong to neither job. Stop before those
+    # comments when they are immediately followed by the next two-space job
+    # key; otherwise policy checks can accidentally inspect the next job's
+    # heading text (for example "PostgreSQL + Redis").
+    $nextJob = "(?:  \#.*\r?\n|[ \t]*\r?\n)*  [A-Za-z0-9_-]+:"
+    $pattern = "(?ms)^  $([regex]::Escape($JobName)):\r?\n(?<body>.*?)(?=^$nextJob|\z)"
     $match = [regex]::Match($Workflow, $pattern)
     if (-not $match.Success) {
         Fail "missing job '$JobName'"
