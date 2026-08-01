@@ -180,50 +180,50 @@ func TestDecideRecovery(t *testing.T) {
 	defaultPolicies := DefaultFailurePolicies()
 
 	tests := []struct {
-		name              string
-		category          FailureCategory
-		state             *RecoveryState
-		policies          map[FailureCategory]FailurePolicy
+		name               string
+		category           FailureCategory
+		state              *RecoveryState
+		policies           map[FailureCategory]FailurePolicy
 		alternateAvailable bool
-		wantDecision      FailureDecision
-		wantRetryCount    int
+		wantDecision       FailureDecision
+		wantRetryCount     int
 	}{
 		// ── Transient ──
 		{
-			name:              "transient with retries remaining",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          defaultPolicies,
+			name:               "transient with retries remaining",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionRetry,
-			wantRetryCount:    1,
+			wantDecision:       DecisionRetry,
+			wantRetryCount:     1,
 		},
 		{
-			name:              "transient mid-retry",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 2},
-			policies:          defaultPolicies,
+			name:               "transient mid-retry",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 2},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionRetry,
-			wantRetryCount:    3,
+			wantDecision:       DecisionRetry,
+			wantRetryCount:     3,
 		},
 		{
-			name:              "transient exhausted retries",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 3},
-			policies:          defaultPolicies,
+			name:               "transient exhausted retries",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 3},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionFail,
-			wantRetryCount:    3,
+			wantDecision:       DecisionFail,
+			wantRetryCount:     3,
 		},
 		{
-			name:              "transient exceeds max retries",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 5},
-			policies:          defaultPolicies,
+			name:               "transient exceeds max retries",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 5},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionFail,
-			wantRetryCount:    5,
+			wantDecision:       DecisionFail,
+			wantRetryCount:     5,
 		},
 		// ── Capability ──
 		{
@@ -246,52 +246,52 @@ func TestDecideRecovery(t *testing.T) {
 		},
 		// ── Cancel ──
 		{
-			name:              "cancel always skips",
-			category:          FailureCancel,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          defaultPolicies,
+			name:               "cancel always skips",
+			category:           FailureCancel,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionSkip,
-			wantRetryCount:    0,
+			wantDecision:       DecisionSkip,
+			wantRetryCount:     0,
 		},
 		{
-			name:              "cancel always skips even with alternate",
-			category:          FailureCancel,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          defaultPolicies,
+			name:               "cancel always skips even with alternate",
+			category:           FailureCancel,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           defaultPolicies,
 			alternateAvailable: true,
-			wantDecision:      DecisionSkip,
-			wantRetryCount:    0,
+			wantDecision:       DecisionSkip,
+			wantRetryCount:     0,
 		},
 		// ── Unknown category (not in policies) ──
 		{
-			name:              "unknown category fails",
-			category:          FailureCategory("unknown"),
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          defaultPolicies,
+			name:               "unknown category fails",
+			category:           FailureCategory("unknown"),
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionFail,
-			wantRetryCount:    0,
+			wantDecision:       DecisionFail,
+			wantRetryCount:     0,
 		},
 		// ── Nil policies fallback ──
 		{
-			name:              "nil policies uses defaults (transient retry)",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          nil,
+			name:               "nil policies uses defaults (transient retry)",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           nil,
 			alternateAvailable: false,
-			wantDecision:      DecisionRetry,
-			wantRetryCount:    1,
+			wantDecision:       DecisionRetry,
+			wantRetryCount:     1,
 		},
 		// ── State not mutated on skip/fail without retry ──
 		{
-			name:              "LastRetry updated on retry decision",
-			category:          FailureTransient,
-			state:             &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
-			policies:          defaultPolicies,
+			name:               "LastRetry updated on retry decision",
+			category:           FailureTransient,
+			state:              &RecoveryState{AgentID: "a1", TaskID: "t1", RetryCount: 0},
+			policies:           defaultPolicies,
 			alternateAvailable: false,
-			wantDecision:      DecisionRetry,
-			wantRetryCount:    1,
+			wantDecision:       DecisionRetry,
+			wantRetryCount:     1,
 		},
 	}
 
@@ -506,7 +506,7 @@ func TestTruncateError(t *testing.T) {
 		},
 		{
 			name:   "slightly over limit",
-			err:    errors.New("1234567890!"),
+			err:    errors.New("1234567890x"),
 			maxLen: 10,
 			want:   "1234567890...",
 		},
@@ -718,7 +718,7 @@ func TestBuildReflexionCritique(t *testing.T) {
 			err:       errors.New("connection refused\nretry later\r\n\tbackoff"),
 			wantSubs: []string{
 				"error=connection refused retry later", // newlines collapsed to spaces
-				"backoff", // trailing part still present
+				"backoff",                              // trailing part still present
 			},
 		},
 		{

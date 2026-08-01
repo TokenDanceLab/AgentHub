@@ -585,33 +585,33 @@ func TestScopedLookups(t *testing.T) {
 		"t1": {ID: "t1", ProjectID: "p1"},
 		"t2": {ID: "t2", ProjectID: "p2"},
 	}
-	if _, ok := lookupThreadInProject(threads, "t1", "p1"); !ok {
+	if !lookupThreadInProject(threads, "t1", "p1") {
 		t.Fatal("lookupThreadInProject match should succeed")
 	}
-	if _, ok := lookupThreadInProject(threads, "t1", "p2"); ok {
+	if lookupThreadInProject(threads, "t1", "p2") {
 		t.Fatal("lookupThreadInProject project mismatch should fail")
 	}
-	if _, ok := lookupThreadInProject(threads, "missing", "p1"); ok {
+	if lookupThreadInProject(threads, "missing", "p1") {
 		t.Fatal("lookupThreadInProject missing should fail")
 	}
 
 	runs := map[string]Run{
 		"r1": {ID: "r1", ThreadID: "t1"},
 	}
-	if _, ok := lookupRunInThread(runs, "r1", "t1"); !ok {
+	if !lookupRunInThread(runs, "r1", "t1") {
 		t.Fatal("lookupRunInThread match should succeed")
 	}
-	if _, ok := lookupRunInThread(runs, "r1", "t2"); ok {
+	if lookupRunInThread(runs, "r1", "t2") {
 		t.Fatal("lookupRunInThread thread mismatch should fail")
 	}
 
 	items := map[string]Item{
 		"i1": {ID: "i1", ThreadID: "t1"},
 	}
-	if _, ok := lookupItemInThread(items, "i1", "t1"); !ok {
+	if !lookupItemInThread(items, "i1", "t1") {
 		t.Fatal("lookupItemInThread match should succeed")
 	}
-	if _, ok := lookupItemInThread(items, "i1", "t2"); ok {
+	if lookupItemInThread(items, "i1", "t2") {
 		t.Fatal("lookupItemInThread thread mismatch should fail")
 	}
 }
@@ -640,9 +640,12 @@ func TestTouchAgentProfileAndEnsureSettingsMap(t *testing.T) {
 	if got := ensureSettingsMap(src); got["theme"] != "dark" {
 		t.Fatalf("ensureSettingsMap keep = %#v", got)
 	}
-	// Same map identity when non-nil.
-	if got := ensureSettingsMap(src); &got == nil {
-		t.Fatal("unexpected nil")
+	// Same map identity when non-nil (Go cannot compare maps directly, so
+	// mutate the result and verify the source map reflects the change).
+	got := ensureSettingsMap(src)
+	got["theme"] = "light"
+	if src["theme"] != "light" {
+		t.Fatalf("ensureSettingsMap should return the same map, got %#v", got)
 	}
 }
 
@@ -1097,20 +1100,20 @@ func TestResolveCreateHelpers(t *testing.T) {
 	t.Parallel()
 	now := "2026-07-18T00:00:00Z"
 
-	project, err, created := resolveCreateProject(Project{}, false, "p1", "", "owner", now)
+	project, created, err := resolveCreateProject(Project{}, false, "p1", "", "owner", now)
 	if err != nil || !created || project.ID != "p1" || project.Name != "Local Project" {
 		t.Fatalf("resolveCreateProject create = %#v err=%v created=%v", project, err, created)
 	}
-	project, err, created = resolveCreateProject(Project{ID: "p1", Name: "Existing"}, true, "p1", "x", "o", now)
+	project, created, err = resolveCreateProject(Project{ID: "p1", Name: "Existing"}, true, "p1", "x", "o", now)
 	if err != ErrProjectExists || created || project.Name != "Existing" {
 		t.Fatalf("resolveCreateProject exists = %#v err=%v created=%v", project, err, created)
 	}
 
-	thread, err, created := resolveCreateThread(Thread{}, false, false, "t1", "p1", "title", "chat", "blue", "A", now)
+	thread, created, err := resolveCreateThread(Thread{}, false, false, "t1", "p1", "title", "chat", "blue", "A", now)
 	if err != ErrNotFound || created {
 		t.Fatalf("resolveCreateThread missing project = err=%v created=%v", err, created)
 	}
-	thread, err, created = resolveCreateThread(
+	thread, created, err = resolveCreateThread(
 		Thread{ID: "t1", ProjectID: "other"}, true, true,
 		"t1", "p1", "title", "chat", "blue", "A", now,
 	)
@@ -1118,37 +1121,37 @@ func TestResolveCreateHelpers(t *testing.T) {
 		t.Fatalf("resolveCreateThread conflict = %#v err=%v created=%v", thread, err, created)
 	}
 	existing := Thread{ID: "t1", ProjectID: "p1", Title: "keep"}
-	thread, err, created = resolveCreateThread(existing, true, true, "t1", "p1", "title", "chat", "blue", "A", now)
+	thread, created, err = resolveCreateThread(existing, true, true, "t1", "p1", "title", "chat", "blue", "A", now)
 	if err != nil || created || thread.Title != "keep" {
 		t.Fatalf("resolveCreateThread reuse = %#v err=%v created=%v", thread, err, created)
 	}
-	thread, err, created = resolveCreateThread(Thread{}, false, true, "t1", "p1", "", "chat", "blue", "A", now)
+	thread, created, err = resolveCreateThread(Thread{}, false, true, "t1", "p1", "", "chat", "blue", "A", now)
 	if err != nil || !created || thread.Title != "New Thread" {
 		t.Fatalf("resolveCreateThread create = %#v err=%v created=%v", thread, err, created)
 	}
 
-	run, err, created := resolveCreateRun(Run{}, false, false, "r1", "p1", "t1", now)
+	run, created, err := resolveCreateRun(Run{}, false, false, "r1", "p1", "t1", now)
 	if err != ErrNotFound || created {
 		t.Fatalf("resolveCreateRun refs fail = err=%v created=%v", err, created)
 	}
-	run, err, created = resolveCreateRun(Run{ID: "r1", Status: "started"}, true, true, "r1", "p1", "t1", now)
+	run, created, err = resolveCreateRun(Run{ID: "r1", Status: "started"}, true, true, "r1", "p1", "t1", now)
 	if err != nil || created || run.Status != "started" {
 		t.Fatalf("resolveCreateRun reuse = %#v err=%v created=%v", run, err, created)
 	}
-	run, err, created = resolveCreateRun(Run{}, false, true, "r1", "p1", "t1", now)
+	run, created, err = resolveCreateRun(Run{}, false, true, "r1", "p1", "t1", now)
 	if err != nil || !created || run.Status != "queued" {
 		t.Fatalf("resolveCreateRun create = %#v err=%v created=%v", run, err, created)
 	}
 
-	item, err, created := resolveCreateItem(Item{}, false, false, Item{ID: "i1"}, now)
+	item, created, err := resolveCreateItem(Item{}, false, false, Item{ID: "i1"}, now)
 	if err != ErrNotFound || created {
 		t.Fatalf("resolveCreateItem refs fail = err=%v created=%v", err, created)
 	}
-	item, err, created = resolveCreateItem(Item{ID: "i1", Type: "old"}, true, true, Item{ID: "i1"}, now)
+	item, created, err = resolveCreateItem(Item{ID: "i1", Type: "old"}, true, true, Item{ID: "i1"}, now)
 	if err != nil || created || item.Type != "old" {
 		t.Fatalf("resolveCreateItem reuse = %#v err=%v created=%v", item, err, created)
 	}
-	item, err, created = resolveCreateItem(Item{}, false, true, Item{ID: "i1"}, now)
+	item, created, err = resolveCreateItem(Item{}, false, true, Item{ID: "i1"}, now)
 	if err != nil || !created || item.Type != "event" || item.Status != "created" {
 		t.Fatalf("resolveCreateItem create = %#v err=%v created=%v", item, err, created)
 	}
@@ -1162,15 +1165,15 @@ func TestResolveCreateHelpers(t *testing.T) {
 		t.Fatalf("resolveCreateUserProfile create = %#v created=%v", profile, created)
 	}
 
-	agent, err, created := resolveCreateAgentProfile(AgentProfile{}, false, AgentProfile{ID: "", AdapterID: "a"}, now)
+	agent, created, err := resolveCreateAgentProfile(false, AgentProfile{ID: "", AdapterID: "a"}, now)
 	if err == nil || created {
 		t.Fatalf("resolveCreateAgentProfile invalid = err=%v created=%v", err, created)
 	}
-	agent, err, created = resolveCreateAgentProfile(AgentProfile{ID: "ag1"}, true, AgentProfile{ID: "ag1", AdapterID: "claude"}, now)
+	agent, created, err = resolveCreateAgentProfile(true, AgentProfile{ID: "ag1", AdapterID: "claude"}, now)
 	if err == nil || created || err.Error() != "agent profile \"ag1\" already exists" {
 		t.Fatalf("resolveCreateAgentProfile exists = err=%v created=%v", err, created)
 	}
-	agent, err, created = resolveCreateAgentProfile(AgentProfile{}, false, AgentProfile{ID: "ag1", AdapterID: "claude", Name: ""}, now)
+	agent, created, err = resolveCreateAgentProfile(false, AgentProfile{ID: "ag1", AdapterID: "claude", Name: ""}, now)
 	if err != nil || !created || agent.Name != "Unnamed Agent" || agent.UpdatedAt != now {
 		t.Fatalf("resolveCreateAgentProfile create = %#v err=%v created=%v", agent, err, created)
 	}
@@ -1178,7 +1181,8 @@ func TestResolveCreateHelpers(t *testing.T) {
 
 func TestApplySettingsUpsert(t *testing.T) {
 	t.Parallel()
-	settings, view := applySettingsUpsert(nil, map[string]string{" theme ": "dark", "": "x"}, "now")
+	paddedKey := " theme " // intentionally padded: keys must be trimmed before storing
+	settings, view := applySettingsUpsert(nil, map[string]string{paddedKey: "dark", "": "x"}, "now")
 	if settings["theme"] != "dark" || view.Values["theme"] != "dark" || view.UpdatedAt != "now" {
 		t.Fatalf("applySettingsUpsert = settings=%#v view=%#v", settings, view)
 	}

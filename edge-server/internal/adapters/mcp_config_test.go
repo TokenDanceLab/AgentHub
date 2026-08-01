@@ -302,4 +302,3 @@ func TestWriteMCPConfigTempFileHasMatchingPrefix(t *testing.T) {
 }
 
 // --- MCPServerConfig types tests ---
-

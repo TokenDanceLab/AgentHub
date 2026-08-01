@@ -63,14 +63,9 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	defer h.Bus.Unsubscribe(subID)
 
 	// Send replayed events, filtered by ownership under Hub JWT (AH-SR-045).
-	for _, evt := range replay {
-		if !eventVisibleToUser(repo, evt, userID) {
-			continue
-		}
-		if err := conn.WriteJSON(evt); err != nil {
-			slog.Info("websocket write error during replay", "error", err)
-			return
-		}
+	if err := replayEventsToClient(conn, repo, replay, userID); err != nil {
+		slog.Info("websocket write error during replay", "error", err)
+		return
 	}
 
 	// Heartbeat ticker: every 30 seconds.
@@ -85,6 +80,30 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 	readDone := make(chan struct{})
 	defer close(done)
+	startClientReadLoop(conn, done, readDone, clientControl)
+
+	// Write loop: push events and heartbeats.
+	_ = writeEventsLoop(conn, repo, ch, clientControl, heartbeat, readDone, subID, userID)
+}
+
+// replayEventsToClient sends the replayed events, filtered by ownership under
+// Hub JWT (AH-SR-045).
+func replayEventsToClient(conn *websocket.Conn, repo store.Repository, replay []events.EventEnvelope, userID string) error {
+	for _, evt := range replay {
+		if !eventVisibleToUser(repo, evt, userID) {
+			continue
+		}
+		if err := conn.WriteJSON(evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// startClientReadLoop runs the WebSocket read goroutine that detects client
+// closes, refreshes the pong deadline, and forwards control frames to the
+// clientControl channel. It closes readDone when the connection dies.
+func startClientReadLoop(conn *websocket.Conn, done <-chan struct{}, readDone chan<- struct{}, clientControl chan<- map[string]any) {
 	go func() {
 		defer close(readDone)
 		defer conn.Close()
@@ -112,20 +131,24 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+}
 
-	// Write loop: push events and heartbeats.
+// writeEventsLoop is the WebSocket write loop: it pushes live events, control
+// responses, and heartbeats until the connection is done. Write failures are
+// logged with their specific message before the error is returned.
+func writeEventsLoop(conn *websocket.Conn, repo store.Repository, ch <-chan events.EventEnvelope, clientControl <-chan map[string]any, heartbeat *time.Ticker, readDone <-chan struct{}, subID int64, userID string) error {
 	for {
 		select {
 		case <-readDone:
-			return
+			return nil
 		case response := <-clientControl:
 			if err := conn.WriteJSON(response); err != nil {
 				slog.Info("websocket control write error", "error", err)
-				return
+				return err
 			}
 		case evt, ok := <-ch:
 			if !ok {
-				return
+				return nil
 			}
 			if evt.Type == events.GapEventType {
 				slog.Warn("event bus gap detected, closing websocket to force client resync",
@@ -133,19 +156,19 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				closeMsg := websocket.FormatCloseMessage(CloseCodeEventGap,
 					"event gap: dropped events detected, reconnect to resync")
 				_ = conn.WriteMessage(websocket.CloseMessage, closeMsg)
-				return
+				return nil
 			}
 			if !eventVisibleToUser(repo, evt, userID) {
 				continue
 			}
 			if err := conn.WriteJSON(evt); err != nil {
 				slog.Info("websocket write error", "error", err)
-				return
+				return err
 			}
 		case <-heartbeat.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				slog.Info("websocket heartbeat error", "error", err)
-				return
+				return err
 			}
 		}
 	}

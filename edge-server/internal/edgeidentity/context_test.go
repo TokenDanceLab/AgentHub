@@ -105,11 +105,11 @@ func TestFromContextWrongKey(t *testing.T) {
 // TestFromContextTableDriven is a table-driven test for various context scenarios.
 func TestFromContextTableDriven(t *testing.T) {
 	cases := []struct {
-		name          string
-		userIDVal     any
-		deviceIDVal   any
-		wantUserID    string
-		wantDeviceID  string
+		name         string
+		userIDVal    any
+		deviceIDVal  any
+		wantUserID   string
+		wantDeviceID string
 	}{
 		{"empty context", nil, nil, "", ""},
 		{"user only", "u1", nil, "u1", ""},

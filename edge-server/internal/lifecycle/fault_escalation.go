@@ -67,10 +67,10 @@ func FaultEscalationConfigFromEnv() FaultEscalationConfig {
 type EscalationPhase string
 
 const (
-	EscalationPhaseNone    EscalationPhase = "none"     // no escalation active
-	EscalationPhaseRetry   EscalationPhase = "retry"    // Layer 1: auto-retry in progress
-	EscalationPhaseReview  EscalationPhase = "review"   // Layer 2: AI analysis of error
-	EscalationPhaseReplan  EscalationPhase = "replan"   // Layer 3: plan regeneration
+	EscalationPhaseNone    EscalationPhase = "none"      // no escalation active
+	EscalationPhaseRetry   EscalationPhase = "retry"     // Layer 1: auto-retry in progress
+	EscalationPhaseReview  EscalationPhase = "review"    // Layer 2: AI analysis of error
+	EscalationPhaseReplan  EscalationPhase = "replan"    // Layer 3: plan regeneration
 	EscalationPhaseExhaust EscalationPhase = "exhausted" // all layers exhausted
 )
 

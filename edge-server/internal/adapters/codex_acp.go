@@ -121,7 +121,7 @@ func (a *CodexACPAadapter) BuildCommand(ctx RunProcessContext) (cmdPath string, 
 // legacy codex CLI behavior.)
 func (a *CodexACPAadapter) PreflightCheck() error {
 	if !a.Available() {
-		return fmt.Errorf("codex-acp launcher %q not found on PATH (install Node.js/npx)", a.AcpAdapter.agentBinary)
+		return fmt.Errorf("codex-acp launcher %q not found on PATH (install Node.js/npx)", a.agentBinary)
 	}
 	return nil
 }

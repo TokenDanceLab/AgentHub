@@ -409,22 +409,22 @@ func findUnqualifiedTypeRefs(file *ast.File, targetTypes map[string]bool, found 
 func formatCycleReport(r importCycleReport) string {
 	var b strings.Builder
 	b.WriteString("═══ A-V1 RFC §6 提取预检：导入环风险分析 ═══\n")
-	b.WriteString(fmt.Sprintf("Orchestrator 源文件数: %d\n", len(orchestratorSourceFiles)))
-	b.WriteString(fmt.Sprintf("Orchestrator 测试文件数: %d\n", len(orchestratorTestFiles)))
+	fmt.Fprintf(&b, "Orchestrator 源文件数: %d\n", len(orchestratorSourceFiles))
+	fmt.Fprintf(&b, "Orchestrator 测试文件数: %d\n", len(orchestratorTestFiles))
 
 	if len(r.ParentTypesUsedByOrch) > 0 {
-		b.WriteString(fmt.Sprintf("\nOrchestrator → Adapts 上游类型引用 (%d):\n", len(r.ParentTypesUsedByOrch)))
+		fmt.Fprintf(&b, "\nOrchestrator → Adapts 上游类型引用 (%d):\n", len(r.ParentTypesUsedByOrch))
 		for _, typ := range r.ParentTypesUsedByOrch {
-			b.WriteString(fmt.Sprintf("  - %s\n", typ))
+			fmt.Fprintf(&b, "  - %s\n", typ)
 		}
 	} else {
 		b.WriteString("\nOrchestrator → Adapts 上游类型引用: 无\n")
 	}
 
 	if len(r.OrchTypesUsedByParent) > 0 {
-		b.WriteString(fmt.Sprintf("\nAdapts → Orchestrator 下游类型引用 (%d):\n", len(r.OrchTypesUsedByParent)))
+		fmt.Fprintf(&b, "\nAdapts → Orchestrator 下游类型引用 (%d):\n", len(r.OrchTypesUsedByParent))
 		for _, typ := range r.OrchTypesUsedByParent {
-			b.WriteString(fmt.Sprintf("  - %s\n", typ))
+			fmt.Fprintf(&b, "  - %s\n", typ)
 		}
 	} else {
 		b.WriteString("\nAdapts → Orchestrator 下游类型引用: 无\n")
@@ -432,7 +432,7 @@ func formatCycleReport(r importCycleReport) string {
 
 	if r.CycleRisk {
 		b.WriteString("\n循环风险: 是\n")
-		b.WriteString(fmt.Sprintf("   详情: %s\n", r.CycleDetails))
+		fmt.Fprintf(&b, "   详情: %s\n", r.CycleDetails)
 		b.WriteString("   建议: 提取前将共享类型移到第三方包，或将使用方一并提取。\n")
 	} else {
 		b.WriteString("\n循环风险: 否\n")

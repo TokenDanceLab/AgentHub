@@ -40,7 +40,7 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 			// Jitter prevents thundering herd when multiple sub-agents
 			// retry simultaneously after a provider-wide outage.
 			delay := openaiRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
-			delay = delay + time.Duration(rand.Int63n(int64(delay/4)))
+			delay += time.Duration(rand.Int63n(int64(delay / 4)))
 			slog.Info("openai-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,

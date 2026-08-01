@@ -112,6 +112,8 @@ func runEvidenceGate(workDir string) EvidenceGateResult {
 		result.Checks = runGoEvidenceChecks(workDir)
 	case projectTypeTypeScript:
 		result.Checks = runTypeScriptEvidenceChecks(workDir)
+	case projectTypeGeneric:
+		result.Checks = runGenericEvidenceChecks(workDir)
 	default:
 		result.Checks = runGenericEvidenceChecks(workDir)
 	}

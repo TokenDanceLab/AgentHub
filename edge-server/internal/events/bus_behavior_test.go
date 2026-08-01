@@ -102,7 +102,7 @@ func TestBusPublishMultipleSubscribersAllReceive(t *testing.T) {
 
 	for i := 0; i < numSubs; i++ {
 		id, ch, _ := b.Subscribe(0)
-		ids[i] = int64(id)
+		ids[i] = id
 		chs[i] = ch
 	}
 
@@ -581,10 +581,8 @@ drain:
 	}
 	if gapPayload == nil {
 		t.Error("gap payload should not be nil")
-	} else {
-		if gapPayload.DroppedCount <= 0 {
-			t.Errorf("gap DroppedCount = %d, want > 0", gapPayload.DroppedCount)
-		}
+	} else if gapPayload.DroppedCount <= 0 {
+		t.Errorf("gap DroppedCount = %d, want > 0", gapPayload.DroppedCount)
 	}
 }
 
@@ -617,7 +615,7 @@ func TestBusCloseShutsDownWorkers(t *testing.T) {
 
 func TestBusPersistErrorDropsEvent(t *testing.T) {
 	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
-		return assertAnError
+		return errAssert
 	}))
 
 	// Subscribe and expect to receive NOTHING because persist fails.
@@ -645,12 +643,12 @@ func TestBusPersistErrorDropsEvent(t *testing.T) {
 	}
 }
 
-// assertAnError is a sentinel error for persist-failure tests.
-var assertAnError = errSentinel{}
+// errAssert is a sentinel error for persist-failure tests.
+var errAssert = assertError{}
 
-type errSentinel struct{}
+type assertError struct{}
 
-func (e errSentinel) Error() string { return "assert error" }
+func (e assertError) Error() string { return "assert error" }
 
 // ---------------------------------------------------------------------------
 // HistoryLen and DroppedCount
@@ -782,7 +780,7 @@ func TestBus_PersistErrorDoesNotCrashBus(t *testing.T) {
 
 	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
 		if failNext.CompareAndSwap(true, false) {
-			return assertAnError
+			return errAssert
 		}
 		return nil
 	}))

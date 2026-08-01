@@ -172,16 +172,17 @@ func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin i
 	// Wait for decision: if a decider is configured, block until Desktop responds.
 	// Otherwise fall back to auto-approve.
 	var decision PermissionDecision
-	if waitForBrokerDecision != nil {
+	switch {
+	case waitForBrokerDecision != nil:
 		decision = waitForBrokerDecision(ctx)
-	} else if brokerRegisterFailed {
+	case brokerRegisterFailed:
 		decision = PermissionDecision{
 			Behavior: "deny",
 			Message:  "permission request could not be registered for approval",
 		}
-	} else if h.decider != nil {
+	case h.decider != nil:
 		decision = h.decider(ctx, req)
-	} else {
+	default:
 		decision = PermissionDecision{Behavior: "allow"}
 	}
 	decision = normalizePermissionDecision(decision)

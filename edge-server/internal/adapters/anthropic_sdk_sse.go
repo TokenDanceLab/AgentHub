@@ -13,20 +13,25 @@ import (
 // Residual pure-helper peel #1142: Anthropic SSE stream parse + event dispatch.
 // Same package adapters; ParseStream continues to call parseSSEStream.
 
+// anthropicSSEState accumulates cross-event state while parsing an SSE stream.
+type anthropicSSEState struct {
+	currentContentType string
+	currentText        strings.Builder
+	currentToolID      string
+	currentToolName    string
+	currentToolInput   strings.Builder
+	inputStarted       bool
+	inputTokens        int64
+	outputTokens       int64
+}
+
 // parseSSEStream reads the Server-Sent Events stream from the Anthropic API
 // and emits Edge typed events.
 func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, emitter EventEmitter, scope map[string]any, model string) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 256*1024), anthropicMaxResponseSize)
 
-	var currentContentType string // "text", "thinking", or "tool_use"
-	var currentText strings.Builder
-	var currentToolID string
-	var currentToolName string
-	var currentToolInput strings.Builder
-	var inputStarted bool
-
-	var inputTokens, outputTokens int64
+	st := &anthropicSSEState{}
 
 	for scanner.Scan() {
 		if ctx.Err() != nil {
@@ -38,11 +43,9 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 			continue
 		}
 
-		// SSE lines start with "data: " or "event: "
+		// SSE lines start with "data: " or "event: ". "event: " lines carry
+		// the event type; we skip them and extract data from the "data: " line.
 		if !strings.HasPrefix(line, "data: ") {
-			// "event: " lines carry the event type; we skip them and
-			// extract data from the "data: " line.
-			_ = strings.HasPrefix(line, "event: ")
 			continue
 		}
 
@@ -57,135 +60,8 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 			continue
 		}
 
-		switch event.Type {
-		case "message_start":
-			if event.Message != nil {
-				inputTokens = event.Message.Usage.InputTokens
-				emitter.Emit(BusEventStatusChange, scope, map[string]any{
-					"status":   "running",
-					"model":    event.Message.Model,
-					"provider": "anthropic",
-				})
-			}
-
-		case "content_block_start":
-			if event.ContentBlock != nil {
-				currentContentType = event.ContentBlock.Type
-				currentText.Reset()
-				currentToolInput.Reset()
-				inputStarted = false
-
-				switch event.ContentBlock.Type {
-				case "thinking":
-					emitter.Emit(BusEventThinking, scope, map[string]any{
-						"content":  "",
-						"provider": "anthropic",
-						"status":   "started",
-					})
-				case "tool_use":
-					currentToolID = event.ContentBlock.ID
-					currentToolName = event.ContentBlock.Name
-					if event.ContentBlock.PartialJSON != "" {
-						currentToolInput.WriteString(event.ContentBlock.PartialJSON)
-						inputStarted = true
-					}
-				}
-			}
-
-		case "content_block_delta":
-			if event.Delta == nil {
-				continue
-			}
-			switch event.Delta.Type {
-			case "text_delta":
-				if event.Delta.Text != "" {
-					emitter.Emit(BusEventTextDelta, scope, map[string]any{
-						"content":  event.Delta.Text,
-						"provider": "anthropic",
-					})
-					currentText.WriteString(event.Delta.Text)
-				}
-			case "thinking_delta":
-				if event.Delta.Thinking != "" {
-					emitter.Emit(BusEventThinking, scope, map[string]any{
-						"content":  event.Delta.Thinking,
-						"provider": "anthropic",
-					})
-				}
-			case "input_json_delta":
-				if event.Delta.PartialJSON != "" {
-					currentToolInput.WriteString(event.Delta.PartialJSON)
-					inputStarted = true
-				}
-			}
-
-		case "content_block_stop":
-			switch currentContentType {
-			case "text":
-				text := currentText.String()
-				if text != "" {
-					emitter.Emit(BusEventTextBlock, scope, map[string]any{
-						"content":  text,
-						"provider": "anthropic",
-					})
-				}
-			case "tool_use":
-				inputJSON := currentToolInput.String()
-				if !inputStarted {
-					inputJSON = "{}"
-				}
-				var input any
-				if err := json.Unmarshal([]byte(inputJSON), &input); err != nil {
-					input = map[string]any{"raw": inputJSON}
-				}
-				emitter.Emit(BusEventToolCall, scope, map[string]any{
-					"callId":   currentToolID,
-					"toolName": currentToolName,
-					"input":    input,
-					"status":   "pending",
-					"provider": "anthropic",
-				})
-			}
-			currentContentType = ""
-
-		case "message_delta":
-			if event.Delta != nil {
-				if event.Delta.StopReason != "" {
-					outputTokens = event.Usage.OutputTokens
-				}
-			}
-
-		case "message_stop":
-			// Emit final result
-			usageMap := map[string]any{
-				"inputTokens":  inputTokens,
-				"outputTokens": outputTokens,
-				"model":        model,
-			}
-			emitter.Emit(BusEventContextUsage, scope, usageMap)
-			emitter.Emit(BusEventResult, scope, map[string]any{
-				"success":        true,
-				"terminalReason": "completed",
-				"provider":       "anthropic",
-				"model":          model,
-				"usage":          usageMap,
-			})
-
-		case "error":
-			errMsg := "unknown error"
-			if event.Error != nil {
-				errMsg = event.Error.Message
-			}
-			emitter.Emit(BusEventResult, scope, map[string]any{
-				"success":        false,
-				"error":          errMsg,
-				"terminalReason": "error",
-				"provider":       "anthropic",
-			})
-			return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: API error: %s", errMsg))
-
-		default:
-			slog.Debug("anthropic-sdk: unhandled SSE event type", "type", event.Type)
+		if err := handleAnthropicSSEEvent(event, emitter, scope, model, st); err != nil {
+			return err
 		}
 	}
 
@@ -197,4 +73,164 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 	}
 
 	return nil
+}
+
+// handleAnthropicSSEEvent dispatches a single parsed SSE event to its
+// type-specific handler.
+func handleAnthropicSSEEvent(event anthropicSSEEvent, emitter EventEmitter, scope map[string]any, model string, st *anthropicSSEState) error {
+	switch event.Type {
+	case "message_start":
+		handleAnthropicMessageStart(event, emitter, scope, st)
+	case "content_block_start":
+		handleAnthropicContentBlockStart(event, emitter, scope, st)
+	case "content_block_delta":
+		handleAnthropicContentBlockDelta(event, emitter, scope, st)
+	case "content_block_stop":
+		handleAnthropicContentBlockStop(emitter, scope, st)
+	case "message_delta":
+		handleAnthropicMessageDelta(event, st)
+	case "message_stop":
+		handleAnthropicMessageStop(emitter, scope, model, st)
+	case "error":
+		return handleAnthropicStreamError(event, emitter, scope)
+	default:
+		slog.Debug("anthropic-sdk: unhandled SSE event type", "type", event.Type)
+	}
+	return nil
+}
+
+func handleAnthropicMessageStart(event anthropicSSEEvent, emitter EventEmitter, scope map[string]any, st *anthropicSSEState) {
+	if event.Message == nil {
+		return
+	}
+	st.inputTokens = event.Message.Usage.InputTokens
+	emitter.Emit(BusEventStatusChange, scope, map[string]any{
+		"status":   "running",
+		"model":    event.Message.Model,
+		"provider": "anthropic",
+	})
+}
+
+func handleAnthropicContentBlockStart(event anthropicSSEEvent, emitter EventEmitter, scope map[string]any, st *anthropicSSEState) {
+	if event.ContentBlock == nil {
+		return
+	}
+	st.currentContentType = event.ContentBlock.Type
+	st.currentText.Reset()
+	st.currentToolInput.Reset()
+	st.inputStarted = false
+
+	switch event.ContentBlock.Type {
+	case "thinking":
+		emitter.Emit(BusEventThinking, scope, map[string]any{
+			"content":  "",
+			"provider": "anthropic",
+			"status":   "started",
+		})
+	case "tool_use":
+		st.currentToolID = event.ContentBlock.ID
+		st.currentToolName = event.ContentBlock.Name
+		if event.ContentBlock.PartialJSON != "" {
+			st.currentToolInput.WriteString(event.ContentBlock.PartialJSON)
+			st.inputStarted = true
+		}
+	}
+}
+
+func handleAnthropicContentBlockDelta(event anthropicSSEEvent, emitter EventEmitter, scope map[string]any, st *anthropicSSEState) {
+	if event.Delta == nil {
+		return
+	}
+	switch event.Delta.Type {
+	case "text_delta":
+		if event.Delta.Text != "" {
+			emitter.Emit(BusEventTextDelta, scope, map[string]any{
+				"content":  event.Delta.Text,
+				"provider": "anthropic",
+			})
+			st.currentText.WriteString(event.Delta.Text)
+		}
+	case "thinking_delta":
+		if event.Delta.Thinking != "" {
+			emitter.Emit(BusEventThinking, scope, map[string]any{
+				"content":  event.Delta.Thinking,
+				"provider": "anthropic",
+			})
+		}
+	case "input_json_delta":
+		if event.Delta.PartialJSON != "" {
+			st.currentToolInput.WriteString(event.Delta.PartialJSON)
+			st.inputStarted = true
+		}
+	}
+}
+
+func handleAnthropicContentBlockStop(emitter EventEmitter, scope map[string]any, st *anthropicSSEState) {
+	switch st.currentContentType {
+	case "text":
+		text := st.currentText.String()
+		if text != "" {
+			emitter.Emit(BusEventTextBlock, scope, map[string]any{
+				"content":  text,
+				"provider": "anthropic",
+			})
+		}
+	case "tool_use":
+		inputJSON := st.currentToolInput.String()
+		if !st.inputStarted {
+			inputJSON = "{}"
+		}
+		var input any
+		if err := json.Unmarshal([]byte(inputJSON), &input); err != nil {
+			input = map[string]any{"raw": inputJSON}
+		}
+		emitter.Emit(BusEventToolCall, scope, map[string]any{
+			"callId":   st.currentToolID,
+			"toolName": st.currentToolName,
+			"input":    input,
+			"status":   "pending",
+			"provider": "anthropic",
+		})
+	}
+	st.currentContentType = ""
+}
+
+func handleAnthropicMessageDelta(event anthropicSSEEvent, st *anthropicSSEState) {
+	if event.Delta == nil {
+		return
+	}
+	if event.Delta.StopReason != "" {
+		st.outputTokens = event.Usage.OutputTokens
+	}
+}
+
+func handleAnthropicMessageStop(emitter EventEmitter, scope map[string]any, model string, st *anthropicSSEState) {
+	// Emit final result
+	usageMap := map[string]any{
+		"inputTokens":  st.inputTokens,
+		"outputTokens": st.outputTokens,
+		"model":        model,
+	}
+	emitter.Emit(BusEventContextUsage, scope, usageMap)
+	emitter.Emit(BusEventResult, scope, map[string]any{
+		"success":        true,
+		"terminalReason": "completed",
+		"provider":       "anthropic",
+		"model":          model,
+		"usage":          usageMap,
+	})
+}
+
+func handleAnthropicStreamError(event anthropicSSEEvent, emitter EventEmitter, scope map[string]any) error {
+	errMsg := "unknown error"
+	if event.Error != nil {
+		errMsg = event.Error.Message
+	}
+	emitter.Emit(BusEventResult, scope, map[string]any{
+		"success":        false,
+		"error":          errMsg,
+		"terminalReason": "error",
+		"provider":       "anthropic",
+	})
+	return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: API error: %s", errMsg))
 }

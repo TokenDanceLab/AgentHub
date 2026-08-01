@@ -7,7 +7,8 @@
 //
 // 输入为 coder/acp-go-sdk（v0.13.5）typed SessionUpdate/PromptResponse，
 // 见 acp_events.go。参考：docs/analysis/acp-spike-phase1.md §3（翻译映射）
-//       api/events.md §3.3（live-streaming 事件表）
+//
+//	api/events.md §3.3（live-streaming 事件表）
 package adapters
 
 import (

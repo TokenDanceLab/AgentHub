@@ -6,14 +6,14 @@ import (
 )
 
 var cliAdapterIDs = map[string]struct{}{
-	"claude-code":    {},
-	"codex":          {},
-	"codex-acp":      {}, // official @agentclientprotocol/codex-acp (ACP migration, first target)
-	"opencode":       {},
-	"opencode-acp":   {}, // native `opencode acp` subcommand (ACP migration, second target)
-	"claude-acp":     {}, // official @agentclientprotocol/claude-agent-acp (ACP migration, third target)
-	"anthropic-sdk":  {},
-	"openai-sdk":     {},
+	"claude-code":   {},
+	"codex":         {},
+	"codex-acp":     {}, // official @agentclientprotocol/codex-acp (ACP migration, first target)
+	"opencode":      {},
+	"opencode-acp":  {}, // native `opencode acp` subcommand (ACP migration, second target)
+	"claude-acp":    {}, // official @agentclientprotocol/claude-agent-acp (ACP migration, third target)
+	"anthropic-sdk": {},
+	"openai-sdk":    {},
 }
 
 // sdkAdapterIDs tracks adapters that use direct HTTP API calls instead of CLI subprocesses.

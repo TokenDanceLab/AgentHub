@@ -239,12 +239,12 @@ func (h *Handler) createNewFileFromHunk(targetPath string, hunk unifiedHunk) err
 
 	var buf strings.Builder
 	for _, line := range hunk.lines {
-		switch line.lineType {
-		case '+':
-			buf.WriteString(line.content)
-			if !strings.HasSuffix(line.content, "\n") {
-				buf.WriteByte('\n')
-			}
+		if line.lineType != '+' {
+			continue
+		}
+		buf.WriteString(line.content)
+		if !strings.HasSuffix(line.content, "\n") {
+			buf.WriteByte('\n')
 		}
 	}
 
@@ -356,6 +356,7 @@ func parseHunkHeader(line string) (oldStart, oldLines, newStart, newLines int) {
 }
 
 // parseRangeSpec parses a range spec like "-1,5" into (start=1, count=5).
+// Unparseable specs leave the named return values at their zero defaults.
 func parseRangeSpec(spec string) (start, count int) {
 	spec = strings.TrimSpace(spec)
 	if len(spec) == 0 {
@@ -363,10 +364,10 @@ func parseRangeSpec(spec string) (start, count int) {
 	}
 	spec = spec[1:] // strip leading - or +
 	if idx := strings.Index(spec, ","); idx >= 0 {
-		fmt.Sscanf(spec[:idx], "%d", &start)
-		fmt.Sscanf(spec[idx+1:], "%d", &count)
+		_, _ = fmt.Sscanf(spec[:idx], "%d", &start)
+		_, _ = fmt.Sscanf(spec[idx+1:], "%d", &count)
 	} else {
-		fmt.Sscanf(spec, "%d", &start)
+		_, _ = fmt.Sscanf(spec, "%d", &start)
 		count = 1
 	}
 	return

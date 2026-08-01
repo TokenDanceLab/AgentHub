@@ -27,37 +27,34 @@ func commonSDKPayload(event SDKFixtureEvent, provider string, fields map[string]
 		payload["metadata"] = sanitizeSDKValue(event.Metadata)
 	}
 	for key, value := range fields {
-		switch v := value.(type) {
-		case string:
-			if strings.TrimSpace(v) == "" {
-				continue
-			}
-		case int64:
-			if v == 0 {
-				continue
-			}
-		case map[string]any:
-			if len(v) == 0 {
-				continue
-			}
-		case []string:
-			if len(v) == 0 {
-				continue
-			}
-		case []map[string]any:
-			if len(v) == 0 {
-				continue
-			}
-		case float64:
-			if v == 0 {
-				continue
-			}
-		case nil:
+		if sdkFieldIsEmpty(value) {
 			continue
 		}
 		payload[key] = sanitizeSDKValue(value)
 	}
 	return payload
+}
+
+// sdkFieldIsEmpty reports whether a mapped field carries no usable value and
+// should be omitted from the emitted payload.
+func sdkFieldIsEmpty(value any) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v) == ""
+	case int64:
+		return v == 0
+	case map[string]any:
+		return len(v) == 0
+	case []string:
+		return len(v) == 0
+	case []map[string]any:
+		return len(v) == 0
+	case float64:
+		return v == 0
+	case nil:
+		return true
+	}
+	return false
 }
 
 func oneSDKMappedEvent(eventType string, scope map[string]any, payload map[string]any) []SDKMappedEvent {

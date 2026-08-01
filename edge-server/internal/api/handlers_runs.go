@@ -28,49 +28,47 @@ func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 // POST /v1/runs
 // ---------------------------------------------------------------------------
 
-func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
-		return
-	}
+// runRequest is the POST /v1/runs request body.
+type runRequest struct {
+	ProjectID               string                               `json:"projectId"`
+	ThreadID                string                               `json:"threadId"`
+	Prompt                  string                               `json:"prompt"`
+	AgentID                 string                               `json:"agentId"`
+	ProfileID               string                               `json:"profileId"`
+	Model                   string                               `json:"model"`
+	Provider                string                               `json:"provider"`
+	ModelAlias              string                               `json:"modelAlias"`
+	ModelMappingEnabled     bool                                 `json:"modelMappingEnabled"`
+	ProviderFallbackEnabled bool                                 `json:"providerFallbackEnabled"`
+	SessionID               string                               `json:"sessionId"`
+	Continue                bool                                 `json:"continue"`
+	Fork                    bool                                 `json:"fork"`
+	ReasoningEffort         string                               `json:"reasoningEffort"`
+	ThinkingMode            string                               `json:"thinkingMode"`
+	MaxThinkingTokens       int                                  `json:"maxThinkingTokens"`
+	PermissionMode          string                               `json:"permissionMode"`
+	WorkDir                 string                               `json:"workDir"`
+	IncludePartial          bool                                 `json:"includePartial"`
+	StructuredOutputSchema  string                               `json:"structuredOutputSchema"`
+	SystemPrompt            string                               `json:"systemPrompt"`
+	AppendSystemPrompt      string                               `json:"appendSystemPrompt"`
+	AllowedTools            []string                             `json:"allowedTools"`
+	ConfigOverrides         map[string]string                    `json:"configOverrides"`
+	AgentDefinitions        map[string]runnerctx.AgentDefinition `json:"agentDefinitions"`
+	MCPConfig               string                               `json:"mcpConfig"`
+	Ephemeral               bool                                 `json:"ephemeral"`
+	HubTaskID               string                               `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+	Messages                []runnerctx.Message                  `json:"messages,omitempty"`
+	PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
+}
 
-	var req struct {
-		ProjectID               string                               `json:"projectId"`
-		ThreadID                string                               `json:"threadId"`
-		Prompt                  string                               `json:"prompt"`
-		AgentID                 string                               `json:"agentId"`
-		ProfileID               string                               `json:"profileId"`
-		Model                   string                               `json:"model"`
-		Provider                string                               `json:"provider"`
-		ModelAlias              string                               `json:"modelAlias"`
-		ModelMappingEnabled     bool                                 `json:"modelMappingEnabled"`
-		ProviderFallbackEnabled bool                                 `json:"providerFallbackEnabled"`
-		SessionID               string                               `json:"sessionId"`
-		Continue                bool                                 `json:"continue"`
-		Fork                    bool                                 `json:"fork"`
-		ReasoningEffort         string                               `json:"reasoningEffort"`
-		ThinkingMode            string                               `json:"thinkingMode"`
-		MaxThinkingTokens       int                                  `json:"maxThinkingTokens"`
-		PermissionMode          string                               `json:"permissionMode"`
-		WorkDir                 string                               `json:"workDir"`
-		IncludePartial          bool                                 `json:"includePartial"`
-		StructuredOutputSchema  string                               `json:"structuredOutputSchema"`
-		SystemPrompt            string                               `json:"systemPrompt"`
-		AppendSystemPrompt      string                               `json:"appendSystemPrompt"`
-		AllowedTools            []string                             `json:"allowedTools"`
-		ConfigOverrides         map[string]string                    `json:"configOverrides"`
-		AgentDefinitions        map[string]runnerctx.AgentDefinition `json:"agentDefinitions"`
-		MCPConfig               string                               `json:"mcpConfig"`
-		Ephemeral               bool                                 `json:"ephemeral"`
-		HubTaskID               string                               `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
-		Messages                []runnerctx.Message                  `json:"messages,omitempty"`
-		PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
-	}
+// decodeRunRequest decodes the POST /v1/runs body and enforces the
+// structured output schema size limit at the Edge entry point.
+func decodeRunRequest(r *http.Request) (runRequest, *errcode.Error) {
+	var req runRequest
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid json body")))
-		return
+		return req, errcode.ErrBadRequest.WithMessage("invalid json body")
 	}
-
 	// Defense-in-depth: validate structured output schema size at the Edge
 	// entry point. The Hub already enforces MaxOutputSchemaSize (16 KB) at
 	// create/update time, but this check guards against direct Edge POSTs
@@ -78,45 +76,275 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	// CustomAgent.OutputSchema validation).
 	const maxOutputSchemaSize = 16 << 10
 	if len(req.StructuredOutputSchema) > maxOutputSchemaSize {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("structuredOutputSchema exceeds 16KB limit")))
+		return req, errcode.ErrBadRequest.WithMessage("structuredOutputSchema exceeds 16KB limit")
+	}
+	return req, nil
+}
+
+// applyProfileDefaults merges agent profile defaults into the run request:
+// profile fields fill in blanks, request fields win.
+func (h *Handler) applyProfileDefaults(req *runRequest) {
+	if req.ProfileID == "" {
+		return
+	}
+	profile, ok := ensureStore(h).GetAgentProfile(req.ProfileID)
+	if !ok {
+		return
+	}
+	if req.AgentID == "" {
+		req.AgentID = profile.AdapterID
+	}
+	if req.Model == "" {
+		req.Model = profile.Model
+	}
+	if req.Provider == "" {
+		req.Provider = profile.Provider
+	}
+	if req.ReasoningEffort == "" {
+		req.ReasoningEffort = profile.ReasoningEffort
+	}
+	if req.ThinkingMode == "" {
+		req.ThinkingMode = profile.ThinkingMode
+	}
+	if req.MaxThinkingTokens == 0 {
+		req.MaxThinkingTokens = profile.MaxThinkingTokens
+	}
+	if req.PermissionMode == "" {
+		req.PermissionMode = profile.PermissionMode
+	}
+	if req.SystemPrompt == "" {
+		req.SystemPrompt = profile.SystemPrompt
+	}
+	if len(req.AllowedTools) == 0 && len(profile.AllowedTools) > 0 {
+		req.AllowedTools = profile.AllowedTools
+	}
+	if req.MCPConfig == "" {
+		req.MCPConfig = profile.MCPConfig
+	}
+}
+
+// validateCapabilityRequest enforces the dual-token capability policy
+// (AH-SR-046): when a Hub user identity is present on the request, PostRuns
+// requires BOTH that identity (middleware) AND a per-run capability token
+// that binds user/device/target/project. Pure local-auth (no Hub identity)
+// remains allowed without capability when HubJWTSecret is empty. If Hub
+// identity is present but the secret is empty/misconfigured, fail closed —
+// never soft-skip capability. Returns nil when the request passes.
+func (h *Handler) validateCapabilityRequest(r *http.Request, req *runRequest) *errcode.Error {
+	hubUserID := hubUserFromRequest(r)
+	if hubUserID != "" && h.HubJWTSecret == "" {
+		return errcode.ErrNotConfigured.WithMessage("Hub JWT secret not configured; dual-token capability validation required when Hub identity is present")
+	}
+	if h.HubJWTSecret == "" {
+		return nil
+	}
+	capToken := strings.TrimSpace(r.Header.Get("X-AgentHub-Capability-Token"))
+	if capToken == "" {
+		return errcode.ErrCapabilityTokenInvalid.WithMessage("missing capability token; dual-token auth requires X-AgentHub-Capability-Token header")
+	}
+	capClaims, err := jwtutil.ValidateCapabilityToken(capToken, []byte(h.HubJWTSecret), h.EdgeDeviceID)
+	if err != nil {
+		return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token validation failed: %v", err)
+	}
+	if strings.TrimSpace(capClaims.Purpose) != "run-start" {
+		return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token purpose %q must be run-start", capClaims.Purpose)
+	}
+	// Action binding: when set, must match purpose (run-start for PostRuns).
+	if action := strings.TrimSpace(capClaims.Action); action != "" && action != "run-start" {
+		return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token action %q must be run-start", action)
+	}
+	// Cross-check capability claims against the request.
+	if capClaims.ProjectID != req.ProjectID {
+		return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token project_id %q does not match request project %q", capClaims.ProjectID, req.ProjectID)
+	}
+	// Thread/workspace binding when capability includes thread_id.
+	if threadID := strings.TrimSpace(capClaims.ThreadID); threadID != "" && threadID != req.ThreadID {
+		return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token thread_id %q does not match request thread %q", threadID, req.ThreadID)
+	}
+	// Target binding when capability includes target_id (header or query).
+	if targetID := strings.TrimSpace(capClaims.TargetID); targetID != "" {
+		reqTarget := strings.TrimSpace(r.Header.Get("X-AgentHub-Target-Id"))
+		if reqTarget == "" {
+			reqTarget = strings.TrimSpace(r.URL.Query().Get("targetId"))
+		}
+		if reqTarget == "" || reqTarget != targetID {
+			return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token target_id %q does not match request target %q", targetID, reqTarget)
+		}
+	}
+	// Cross-check identity: if the middleware injected Hub identity into the
+	// context, verify the capability token binds the same user.
+	if id := edgeidentity.FromContext(r.Context()); id.UserID != "" {
+		if capClaims.UserID != id.UserID {
+			return errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token user_id %q does not match identity user %q", capClaims.UserID, id.UserID)
+		}
+	}
+	return nil
+}
+
+// validateRunCreateState performs the pre-create validation under the
+// run-create mutex, in the historical PostRuns order. Returns an HTTP status
+// and a response body when the request is rejected (body != nil).
+func (h *Handler) validateRunCreateState(repository store.Repository, req *runRequest) (int, map[string]any) {
+	thread, ok := repository.GetThread(req.ThreadID)
+	if !ok || thread.ProjectID != req.ProjectID {
+		return http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found"))
+	}
+	if _, ok := repository.GetProject(req.ProjectID); !ok {
+		return http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found"))
+	}
+	req.WorkDir = strings.TrimSpace(req.WorkDir)
+	if err := h.validateRunWorkDir(req.WorkDir); err != nil {
+		if errors.Is(err, errcode.ErrWorkDirRequired) {
+			return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrWorkDirRequired)
+		}
+		return http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error()))
+	}
+	if err := validatePermissionMode(req.PermissionMode); err != nil {
+		return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPermissionMode.WithMessage(err.Error()))
+	}
+	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
+		return http.StatusConflict, activeRunExistsResponse(active)
+	}
+	if h.Executor == nil {
+		return http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrExecutorUnavailable.WithMessage("no Agent Runtime executor configured"))
+	}
+	// #175: Reject unknown agentId — do not fall back to default adapter.
+	if req.AgentID != "" && h.AdapterRegistry != nil {
+		if _, ok := h.AdapterRegistry.Get(req.AgentID); !ok {
+			return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidAgentID.WithMessagef("unknown agent adapter: %q", req.AgentID))
+		}
+	}
+	return 0, nil
+}
+
+// publishRunPromptItem stores the run prompt as a user_message item and
+// publishes message.created / item.created events. Failure is non-fatal.
+func publishRunPromptItem(h *Handler, run store.Run, prompt string) {
+	if strings.TrimSpace(prompt) == "" {
+		return
+	}
+	item, err := ensureStore(h).CreateItem(store.Item{
+		ID:        genID("item_"),
+		ProjectID: run.ProjectID,
+		ThreadID:  run.ThreadID,
+		RunID:     run.ID,
+		Type:      "user_message",
+		Role:      "user",
+		Status:    "created",
+		Content:   prompt,
+	})
+	if err != nil {
+		return
+	}
+	itemScope := map[string]any{
+		"projectId": item.ProjectID,
+		"threadId":  item.ThreadID,
+		"runId":     item.RunID,
+		"itemId":    item.ID,
+	}
+	h.Bus.Publish("message.created", itemScope, item)
+	h.Bus.Publish("item.created", itemScope, item)
+}
+
+// publishRunQueuedItem records the queued run marker item in the timeline.
+func publishRunQueuedItem(h *Handler, run store.Run) {
+	_, _ = ensureStore(h).CreateItem(store.Item{
+		ID:        genID("item_"),
+		ProjectID: run.ProjectID,
+		ThreadID:  run.ThreadID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "queued",
+		Content:   "Run queued",
+	})
+}
+
+// startRunExecutor builds the run process context (skills, memory, MCP
+// config) and starts the executor. On start failure the run is marked failed
+// and a run.failed event is published; the error is returned for HTTP mapping.
+func (h *Handler) startRunExecutor(run store.Run, req *runRequest, scope map[string]any) error {
+	if h.Executor == nil {
+		return nil
+	}
+	runCtx := lifecycle.RunProcessContext{
+		Run:                    run,
+		Prompt:                 req.Prompt,
+		AgentID:                req.AgentID,
+		Model:                  req.Model,
+		SessionID:              req.SessionID,
+		ContinueLast:           req.Continue,
+		ForkSession:            req.Fork,
+		ReasoningEffort:        req.ReasoningEffort,
+		ThinkingMode:           req.ThinkingMode,
+		MaxThinkingTokens:      req.MaxThinkingTokens,
+		PermissionMode:         req.PermissionMode,
+		WorkDir:                req.WorkDir,
+		IncludePartial:         req.IncludePartial,
+		StructuredOutputSchema: req.StructuredOutputSchema,
+		SystemPrompt:           req.SystemPrompt,
+		AppendSystemPrompt:     req.AppendSystemPrompt,
+		AllowedTools:           req.AllowedTools,
+		ConfigOverrides:        req.ConfigOverrides,
+		AgentDefinitions:       req.AgentDefinitions,
+		MCPConfig:              req.MCPConfig,
+		Ephemeral:              req.Ephemeral,
+		HubTaskID:              req.HubTaskID,
+		Messages:               req.Messages,
+		PinnedMessages:         req.PinnedMessages,
+	}
+	// Inject Skills directory context (SKILL.md discovery) into the system prompt.
+	// The SkillRegistry is shared across runs and lazily lists name+description.
+	if h.SkillRegistry != nil {
+		runCtx.SkillsPrompt = h.SkillRegistry.SystemPromptContext()
+	}
+	// Inject AgentHub memory from .agenthub/memory/ files into the system prompt.
+	// Memory is read from the workspace directory and prepended to SkillsPrompt
+	// so agents have persistent context across runs.
+	// Ensure the memory directory exists on first use (seeds project.md if new).
+	if req.WorkDir != "" {
+		if err := runnerctx.EnsureMemoryDir(req.WorkDir); err != nil {
+			slog.Warn("memory: failed to ensure memory directory", "workDir", req.WorkDir, "error", err)
+		}
+	}
+	if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
+		if runCtx.SkillsPrompt != "" {
+			runCtx.SkillsPrompt = memPrompt + "\n\n" + runCtx.SkillsPrompt
+		} else {
+			runCtx.SkillsPrompt = memPrompt
+		}
+	}
+	// Merge Hub-synced MCP server configs into the run's MCPConfig.
+	// Run-level config wins on key conflicts; Hub configs fill in the gaps.
+	if h.MCPConfigStore != nil {
+		runCtx.MCPConfig = adapters.MergeConfigJSON(runCtx.MCPConfig, h.MCPConfigStore)
+	}
+	if err := h.Executor.Start(run, runCtx); err != nil {
+		if failed, ok := ensureStore(h).SetRunStatusIf(run.ID, "failed", "queued"); ok {
+			h.Bus.Publish("run.failed", scope, map[string]any{
+				"runId":  failed.ID,
+				"status": failed.Status,
+				"error":  err.Error(),
+			})
+		}
+		return err
+	}
+	return nil
+}
+
+func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+
+	req, decodeErr := decodeRunRequest(r)
+	if decodeErr != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(decodeErr))
 		return
 	}
 
 	// Merge profile defaults: profile fields fill in blanks, request fields win.
-	if req.ProfileID != "" {
-		if profile, ok := ensureStore(h).GetAgentProfile(req.ProfileID); ok {
-			if req.AgentID == "" {
-				req.AgentID = profile.AdapterID
-			}
-			if req.Model == "" {
-				req.Model = profile.Model
-			}
-			if req.Provider == "" {
-				req.Provider = profile.Provider
-			}
-			if req.ReasoningEffort == "" {
-				req.ReasoningEffort = profile.ReasoningEffort
-			}
-			if req.ThinkingMode == "" {
-				req.ThinkingMode = profile.ThinkingMode
-			}
-			if req.MaxThinkingTokens == 0 {
-				req.MaxThinkingTokens = profile.MaxThinkingTokens
-			}
-			if req.PermissionMode == "" {
-				req.PermissionMode = profile.PermissionMode
-			}
-			if req.SystemPrompt == "" {
-				req.SystemPrompt = profile.SystemPrompt
-			}
-			if len(req.AllowedTools) == 0 && len(profile.AllowedTools) > 0 {
-				req.AllowedTools = profile.AllowedTools
-			}
-			if req.MCPConfig == "" {
-				req.MCPConfig = profile.MCPConfig
-			}
-		}
-	}
+	h.applyProfileDefaults(&req)
 
 	if req.ProjectID == "" {
 		req.ProjectID = "proj_local"
@@ -128,100 +356,19 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
-	// Dual-token auth (AH-SR-046): when a Hub user identity is present on the
-	// request, PostRuns requires BOTH that identity (middleware) AND a
-	// per-run capability token that binds user/device/target/project.
-	// Pure local-auth (no Hub identity) remains allowed without capability
-	// when HubJWTSecret is empty. If Hub identity is present but the secret
-	// is empty/misconfigured, fail closed — never soft-skip capability.
-	hubUserID := hubUserFromRequest(r)
-	if hubUserID != "" && h.HubJWTSecret == "" {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrNotConfigured.WithMessage("Hub JWT secret not configured; dual-token capability validation required when Hub identity is present")))
+	// Dual-token auth (AH-SR-046): see validateCapabilityRequest for the
+	// full policy. Failures are always 403.
+	if err := h.validateCapabilityRequest(r, &req); err != nil {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(err))
 		return
-	}
-	if h.HubJWTSecret != "" {
-		capToken := strings.TrimSpace(r.Header.Get("X-AgentHub-Capability-Token"))
-		if capToken == "" {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessage("missing capability token; dual-token auth requires X-AgentHub-Capability-Token header")))
-			return
-		}
-		capClaims, err := jwtutil.ValidateCapabilityToken(capToken, []byte(h.HubJWTSecret), h.EdgeDeviceID)
-		if err != nil {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token validation failed: %v", err)))
-			return
-		}
-		if strings.TrimSpace(capClaims.Purpose) != "run-start" {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token purpose %q must be run-start", capClaims.Purpose)))
-			return
-		}
-		// Action binding: when set, must match purpose (run-start for PostRuns).
-		if action := strings.TrimSpace(capClaims.Action); action != "" && action != "run-start" {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token action %q must be run-start", action)))
-			return
-		}
-		// Cross-check capability claims against the request.
-		if capClaims.ProjectID != req.ProjectID {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token project_id %q does not match request project %q", capClaims.ProjectID, req.ProjectID)))
-			return
-		}
-		// Thread/workspace binding when capability includes thread_id.
-		if threadID := strings.TrimSpace(capClaims.ThreadID); threadID != "" && threadID != req.ThreadID {
-			writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token thread_id %q does not match request thread %q", threadID, req.ThreadID)))
-			return
-		}
-		// Target binding when capability includes target_id (header or query).
-		if targetID := strings.TrimSpace(capClaims.TargetID); targetID != "" {
-			reqTarget := strings.TrimSpace(r.Header.Get("X-AgentHub-Target-Id"))
-			if reqTarget == "" {
-				reqTarget = strings.TrimSpace(r.URL.Query().Get("targetId"))
-			}
-			if reqTarget == "" || reqTarget != targetID {
-				writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token target_id %q does not match request target %q", targetID, reqTarget)))
-				return
-			}
-		}
-		// Cross-check identity: if the middleware injected Hub identity into the
-		// context, verify the capability token binds the same user.
-		if id := edgeidentity.FromContext(r.Context()); id.UserID != "" {
-			if capClaims.UserID != id.UserID {
-				writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrCapabilityTokenInvalid.WithMessagef("capability token user_id %q does not match identity user %q", capClaims.UserID, id.UserID)))
-				return
-			}
-		}
 	}
 
 	repository := ensureStore(h)
 	h.runCreateMu.Lock()
 	cleanupRuns(repository)
-	thread, ok := repository.GetThread(req.ThreadID)
-	if !ok || thread.ProjectID != req.ProjectID {
+	if status, body := h.validateRunCreateState(repository, &req); body != nil {
 		h.runCreateMu.Unlock()
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found")))
-		return
-	}
-	if _, ok := repository.GetProject(req.ProjectID); !ok {
-		h.runCreateMu.Unlock()
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found")))
-		return
-	}
-	req.WorkDir = strings.TrimSpace(req.WorkDir)
-	if err := h.validateRunWorkDir(req.WorkDir); err != nil {
-		h.runCreateMu.Unlock()
-		if errors.Is(err, errcode.ErrWorkDirRequired) {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrWorkDirRequired))
-			return
-		}
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
-		return
-	}
-	if err := validatePermissionMode(req.PermissionMode); err != nil {
-		h.runCreateMu.Unlock()
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPermissionMode.WithMessage(err.Error())))
-		return
-	}
-	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
-		h.runCreateMu.Unlock()
-		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
+		writeJSON(w, status, body)
 		return
 	}
 	// Auto-detect continue: when the thread has prior assistant messages,
@@ -230,21 +377,6 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.Continue = true
 	}
 	// Each run creates a fresh CC conversation via --session-id.
-
-	if h.Executor == nil {
-		h.runCreateMu.Unlock()
-		writeJSON(w, http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrExecutorUnavailable.WithMessage("no Agent Runtime executor configured")))
-		return
-	}
-
-	// #175: Reject unknown agentId — do not fall back to default adapter.
-	if req.AgentID != "" && h.AdapterRegistry != nil {
-		if _, ok := h.AdapterRegistry.Get(req.AgentID); !ok {
-			h.runCreateMu.Unlock()
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidAgentID.WithMessagef("unknown agent adapter: %q", req.AgentID)))
-			return
-		}
-	}
 
 	// Resolve adapter label for debug logging.
 	resolvedAdapterID := req.AgentID
@@ -284,105 +416,16 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	// Emit run.queued
 	h.Bus.Publish("run.queued", scope, run)
 	slog.Debug("run.queued", "runId", runID, "agentId", req.AgentID)
-	if strings.TrimSpace(req.Prompt) != "" {
-		if item, err := ensureStore(h).CreateItem(store.Item{
-			ID:        genID("item_"),
-			ProjectID: run.ProjectID,
-			ThreadID:  run.ThreadID,
-			RunID:     run.ID,
-			Type:      "user_message",
-			Role:      "user",
-			Status:    "created",
-			Content:   req.Prompt,
-		}); err == nil {
-			itemScope := map[string]any{
-				"projectId": item.ProjectID,
-				"threadId":  item.ThreadID,
-				"runId":     item.RunID,
-				"itemId":    item.ID,
-			}
-			h.Bus.Publish("message.created", itemScope, item)
-			h.Bus.Publish("item.created", itemScope, item)
-		}
-	}
-	_, _ = ensureStore(h).CreateItem(store.Item{
-		ID:        genID("item_"),
-		ProjectID: run.ProjectID,
-		ThreadID:  run.ThreadID,
-		RunID:     run.ID,
-		Type:      "run",
-		Status:    "queued",
-		Content:   "Run queued",
-	})
+	publishRunPromptItem(h, run, req.Prompt)
+	publishRunQueuedItem(h, run)
 
-	if h.Executor != nil {
-		runCtx := lifecycle.RunProcessContext{
-			Run:                    run,
-			Prompt:                 req.Prompt,
-			AgentID:                req.AgentID,
-			Model:                  req.Model,
-			SessionID:              req.SessionID,
-			ContinueLast:           req.Continue,
-			ForkSession:            req.Fork,
-			ReasoningEffort:        req.ReasoningEffort,
-			ThinkingMode:           req.ThinkingMode,
-			MaxThinkingTokens:      req.MaxThinkingTokens,
-			PermissionMode:         req.PermissionMode,
-			WorkDir:                req.WorkDir,
-			IncludePartial:         req.IncludePartial,
-			StructuredOutputSchema: req.StructuredOutputSchema,
-			SystemPrompt:           req.SystemPrompt,
-			AppendSystemPrompt:     req.AppendSystemPrompt,
-			AllowedTools:           req.AllowedTools,
-			ConfigOverrides:        req.ConfigOverrides,
-			AgentDefinitions:       req.AgentDefinitions,
-			MCPConfig:              req.MCPConfig,
-			Ephemeral:              req.Ephemeral,
-			HubTaskID:              req.HubTaskID,
-			Messages:               req.Messages,
-			PinnedMessages:         req.PinnedMessages,
-		}
-		// Inject Skills directory context (SKILL.md discovery) into the system prompt.
-		// The SkillRegistry is shared across runs and lazily lists name+description.
-		if h.SkillRegistry != nil {
-			runCtx.SkillsPrompt = h.SkillRegistry.SystemPromptContext()
-		}
-		// Inject AgentHub memory from .agenthub/memory/ files into the system prompt.
-		// Memory is read from the workspace directory and prepended to SkillsPrompt
-		// so agents have persistent context across runs.
-		// Ensure the memory directory exists on first use (seeds project.md if new).
-		if req.WorkDir != "" {
-			if err := runnerctx.EnsureMemoryDir(req.WorkDir); err != nil {
-				slog.Warn("memory: failed to ensure memory directory", "workDir", req.WorkDir, "error", err)
-			}
-		}
-		if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
-			if runCtx.SkillsPrompt != "" {
-				runCtx.SkillsPrompt = memPrompt + "\n\n" + runCtx.SkillsPrompt
-			} else {
-				runCtx.SkillsPrompt = memPrompt
-			}
-		}
-		// Merge Hub-synced MCP server configs into the run's MCPConfig.
-		// Run-level config wins on key conflicts; Hub configs fill in the gaps.
-		if h.MCPConfigStore != nil {
-			runCtx.MCPConfig = adapters.MergeConfigJSON(runCtx.MCPConfig, h.MCPConfigStore)
-		}
-		if err := h.Executor.Start(run, runCtx); err != nil {
-			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
-				h.Bus.Publish("run.failed", scope, map[string]any{
-					"runId":  failed.ID,
-					"status": failed.Status,
-					"error":  err.Error(),
-				})
-			}
-			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
-				writeJSON(w, http.StatusTooManyRequests, errcode.ErrorBody(errcode.ErrTooManyConcurrentRuns.WithMessage(err.Error())))
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrExecutorStartFailed.WithMessagef("failed to start run executor: %v", err)))
+	if err := h.startRunExecutor(run, &req, scope); err != nil {
+		if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
+			writeJSON(w, http.StatusTooManyRequests, errcode.ErrorBody(errcode.ErrTooManyConcurrentRuns.WithMessage(err.Error())))
 			return
 		}
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrExecutorStartFailed.WithMessagef("failed to start run executor: %v", err)))
+		return
 	}
 	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
 }

@@ -28,7 +28,7 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 			// Jitter prevents thundering herd when multiple sub-agents
 			// retry simultaneously after a provider-wide outage.
 			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
-			delay = delay + time.Duration(rand.Int63n(int64(delay/4)))
+			delay += time.Duration(rand.Int63n(int64(delay / 4)))
 			slog.Info("anthropic-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,

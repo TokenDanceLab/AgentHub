@@ -20,7 +20,7 @@ func (h *abortOnErrorHook) PostToolUse(ctx context.Context, toolName string, out
 func (h *abortOnErrorHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
-func (h *abortOnErrorHook) OnError(ctx context.Context, err error) ErrorAction     { return ErrAbort }
+func (h *abortOnErrorHook) OnError(ctx context.Context, err error) ErrorAction       { return ErrAbort }
 func (h *abortOnErrorHook) PrePrompt(ctx context.Context, prompt string) string      { return prompt }
 func (h *abortOnErrorHook) PostResponse(ctx context.Context, response string) string { return response }
 
@@ -30,11 +30,13 @@ type denyHook struct{}
 func (h *denyHook) PreToolUse(ctx context.Context, toolName string, input map[string]any) (map[string]any, bool, string) {
 	return input, false, ""
 }
-func (h *denyHook) PostToolUse(ctx context.Context, toolName string, output string) string { return output }
+func (h *denyHook) PostToolUse(ctx context.Context, toolName string, output string) string {
+	return output
+}
 func (h *denyHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermDeny
 }
-func (h *denyHook) OnError(ctx context.Context, err error) ErrorAction      { return ErrRetry }
+func (h *denyHook) OnError(ctx context.Context, err error) ErrorAction       { return ErrRetry }
 func (h *denyHook) PrePrompt(ctx context.Context, prompt string) string      { return prompt }
 func (h *denyHook) PostResponse(ctx context.Context, response string) string { return response }
 
@@ -46,12 +48,16 @@ type prefixPromptHook struct {
 func (h *prefixPromptHook) PreToolUse(ctx context.Context, toolName string, input map[string]any) (map[string]any, bool, string) {
 	return input, false, ""
 }
-func (h *prefixPromptHook) PostToolUse(ctx context.Context, toolName string, output string) string { return output }
+func (h *prefixPromptHook) PostToolUse(ctx context.Context, toolName string, output string) string {
+	return output
+}
 func (h *prefixPromptHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
 func (h *prefixPromptHook) OnError(ctx context.Context, err error) ErrorAction { return ErrRetry }
-func (h *prefixPromptHook) PrePrompt(ctx context.Context, prompt string) string { return h.prefix + prompt }
+func (h *prefixPromptHook) PrePrompt(ctx context.Context, prompt string) string {
+	return h.prefix + prompt
+}
 func (h *prefixPromptHook) PostResponse(ctx context.Context, response string) string {
 	return response
 }
@@ -64,11 +70,13 @@ type suffixResponseHook struct {
 func (h *suffixResponseHook) PreToolUse(ctx context.Context, toolName string, input map[string]any) (map[string]any, bool, string) {
 	return input, false, ""
 }
-func (h *suffixResponseHook) PostToolUse(ctx context.Context, toolName string, output string) string { return output }
+func (h *suffixResponseHook) PostToolUse(ctx context.Context, toolName string, output string) string {
+	return output
+}
 func (h *suffixResponseHook) PermissionRequest(ctx context.Context, toolName string, risk RiskLevel) PermDecision {
 	return PermAllow
 }
-func (h *suffixResponseHook) OnError(ctx context.Context, err error) ErrorAction { return ErrRetry }
+func (h *suffixResponseHook) OnError(ctx context.Context, err error) ErrorAction  { return ErrRetry }
 func (h *suffixResponseHook) PrePrompt(ctx context.Context, prompt string) string { return prompt }
 func (h *suffixResponseHook) PostResponse(ctx context.Context, response string) string {
 	return response + h.suffix
@@ -296,10 +304,10 @@ func TestInvocationPathNameOnly(t *testing.T) {
 
 func TestAppendUniqueString(t *testing.T) {
 	cases := []struct {
-		name   string
-		slice  []string
-		value  string
-		want   []string
+		name  string
+		slice []string
+		value string
+		want  []string
 	}{
 		{"add to empty", nil, "a", []string{"a"}},
 		{"add new", []string{"a", "b"}, "c", []string{"a", "b", "c"}},
@@ -437,9 +445,9 @@ func TestHookChainRunOnErrorDefault(t *testing.T) {
 
 func TestHookChainRunOnErrorFirstNonRetryWins(t *testing.T) {
 	chain := HookChain{
-		&blockAllHook{},                         // returns ErrRetry
-		&abortOnErrorHook{},                     // returns ErrAbort
-		&blockAllHook{},                         // should not be reached
+		&blockAllHook{},     // returns ErrRetry
+		&abortOnErrorHook{}, // returns ErrAbort
+		&blockAllHook{},     // should not be reached
 	}
 	action := chain.RunOnError(context.Background(), fmt.Errorf("test"))
 	if action != ErrAbort {
@@ -492,8 +500,8 @@ func TestHookChainRunPermissionRequestFirstDenyWins(t *testing.T) {
 
 func TestHookChainRunPermissionRequestAllAllow(t *testing.T) {
 	chain := HookChain{
-		&modifyInputHook{},     // returns PermAllow
-		&appendToOutputHook{},  // returns PermAllow
+		&modifyInputHook{},    // returns PermAllow
+		&appendToOutputHook{}, // returns PermAllow
 	}
 	decision := chain.RunPermissionRequest(context.Background(), "Read", RiskLow)
 	if decision != PermAllow {
@@ -522,4 +530,3 @@ func TestHookChainRunPostResponseChain(t *testing.T) {
 		t.Errorf("RunPostResponse = %q, want 'response [X] [Y]'", result)
 	}
 }
-

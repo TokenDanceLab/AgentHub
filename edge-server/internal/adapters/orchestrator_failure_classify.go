@@ -113,65 +113,28 @@ func ClassifyFailure(err error, runErr *RunError) (FailureCategory, string) {
 	}
 
 	// Build a unified message for pattern matching.
-	msg := ""
-	if err != nil {
-		msg = err.Error()
-	}
-	if runErr != nil && runErr.Message != "" {
-		if msg != "" {
-			msg = msg + ": " + runErr.Message
-		} else {
-			msg = runErr.Message
-		}
-	}
-	msgLower := strings.ToLower(msg)
+	msgLower := strings.ToLower(failureMessageText(err, runErr))
 
-	// Priority 1: Context cancellation is always cancel.
-	if strings.Contains(msgLower, "context canceled") ||
-		strings.Contains(msgLower, "context cancelled") {
-		return FailureCancel, "context cancelled"
-	}
-
-	// Priority 2: Deadline/timeout is always transient.
-	if strings.Contains(msgLower, "deadline exceeded") ||
-		strings.Contains(msgLower, "timeout") ||
-		strings.Contains(msgLower, "timed out") {
-		return FailureTransient, "deadline or timeout detected"
+	// Priority 1-2: context signals are handled before any other checks.
+	if category, reason := classifyByContextSignal(msgLower); category != "" {
+		return category, reason
 	}
 
 	// Priority 3: RunError code mapping.
-	if runErr != nil && runErr.Code != "" {
-		switch runErr.Code {
-		case "TIMEOUT":
-			return FailureTransient, "run error code: TIMEOUT"
-		case "BINARY_NOT_FOUND":
-			return FailureCapability, "run error code: BINARY_NOT_FOUND"
-		case "PERMISSION_DENIED":
-			return FailureCapability, "run error code: PERMISSION_DENIED"
-		case "CANCELLED":
-			return FailureCancel, "run error code: CANCELLED"
-		}
+	if category, reason := classifyByRunErrorCode(runErr); category != "" {
+		return category, reason
 	}
 
-	// Priority 4: Cancel patterns (check first as they are terminal).
-	for _, pattern := range cancelPatterns {
-		if strings.Contains(msgLower, strings.ToLower(pattern)) {
-			return FailureCancel, fmt.Sprintf("cancel pattern matched: %s", pattern)
-		}
+	// Priority 4-6: pattern matching loops. Cancel patterns are checked
+	// first (they are terminal), then capability, then transient.
+	if category, reason := matchFailurePattern(msgLower, cancelPatterns, FailureCancel, "cancel"); category != "" {
+		return category, reason
 	}
-
-	// Priority 5: Capability patterns.
-	for _, pattern := range capabilityPatterns {
-		if strings.Contains(msgLower, strings.ToLower(pattern)) {
-			return FailureCapability, fmt.Sprintf("capability pattern matched: %s", pattern)
-		}
+	if category, reason := matchFailurePattern(msgLower, capabilityPatterns, FailureCapability, "capability"); category != "" {
+		return category, reason
 	}
-
-	// Priority 6: Transient patterns.
-	for _, pattern := range transientPatterns {
-		if strings.Contains(msgLower, strings.ToLower(pattern)) {
-			return FailureTransient, fmt.Sprintf("transient pattern matched: %s", pattern)
-		}
+	if category, reason := matchFailurePattern(msgLower, transientPatterns, FailureTransient, "transient"); category != "" {
+		return category, reason
 	}
 
 	// Priority 7: Repeated identical action — sub-agent stuck in a deterministic
@@ -183,6 +146,68 @@ func ClassifyFailure(err error, runErr *RunError) (FailureCategory, string) {
 
 	// Default: transient — optimistic assumption that retry may succeed.
 	return FailureTransient, "default: assuming transient"
+}
+
+// failureMessageText merges the error message and the optional RunError
+// message into a single lowercase-friendly source string for pattern matching.
+func failureMessageText(err error, runErr *RunError) string {
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	if runErr != nil && runErr.Message != "" {
+		if msg != "" {
+			msg = msg + ": " + runErr.Message
+		} else {
+			msg = runErr.Message
+		}
+	}
+	return msg
+}
+
+// classifyByContextSignal returns the cancel/transient category for context
+// cancellation and deadline/timeout messages, or "" when neither applies.
+func classifyByContextSignal(msgLower string) (FailureCategory, string) {
+	if strings.Contains(msgLower, "context canceled") ||
+		strings.Contains(msgLower, "context cancelled") {
+		return FailureCancel, "context cancelled"
+	}
+	if strings.Contains(msgLower, "deadline exceeded") ||
+		strings.Contains(msgLower, "timeout") ||
+		strings.Contains(msgLower, "timed out") {
+		return FailureTransient, "deadline or timeout detected"
+	}
+	return "", ""
+}
+
+// classifyByRunErrorCode maps a known RunError code to its failure category,
+// or returns "" when no mapping applies.
+func classifyByRunErrorCode(runErr *RunError) (FailureCategory, string) {
+	if runErr == nil || runErr.Code == "" {
+		return "", ""
+	}
+	switch runErr.Code {
+	case "TIMEOUT":
+		return FailureTransient, "run error code: TIMEOUT"
+	case "BINARY_NOT_FOUND":
+		return FailureCapability, "run error code: BINARY_NOT_FOUND"
+	case "PERMISSION_DENIED":
+		return FailureCapability, "run error code: PERMISSION_DENIED"
+	case "CANCELLED":
+		return FailureCancel, "run error code: CANCELLED"
+	}
+	return "", ""
+}
+
+// matchFailurePattern returns the given category when any pattern in the list
+// matches the lower-cased message, along with a human-readable reason.
+func matchFailurePattern(msgLower string, patterns []string, category FailureCategory, label string) (FailureCategory, string) {
+	for _, pattern := range patterns {
+		if strings.Contains(msgLower, strings.ToLower(pattern)) {
+			return category, fmt.Sprintf("%s pattern matched: %s", label, pattern)
+		}
+	}
+	return "", ""
 }
 
 // RunError is a mirror of lifecycle.RunError for use in the adapters package

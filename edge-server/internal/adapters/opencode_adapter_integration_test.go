@@ -165,8 +165,8 @@ func TestOpenCodeBuildCommandArgs(t *testing.T) {
 
 	t.Run("session_resume", func(t *testing.T) {
 		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
-			Run:       run,
-			Prompt:    "hi",
+			Run:          run,
+			Prompt:       "hi",
 			SessionID:    "ses_abc",
 			ContinueLast: true, // OpenCode requires ContinueLast to pass --session
 		})

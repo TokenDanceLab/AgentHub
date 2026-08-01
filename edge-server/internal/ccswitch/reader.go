@@ -17,12 +17,15 @@ import (
 	"strings"
 	"sync"
 
+	// modernc.org/sqlite registers its "sqlite" driver via init; the blank
+	// import is required for database/sql to find it without importing the
+	// driver's API surface.
 	_ "modernc.org/sqlite"
 )
 
-// CCSwitchStatus describes whether cc-switch is installed and active on this
+// Status describes whether cc-switch is installed and active on this
 // machine.
-type CCSwitchStatus struct {
+type Status struct {
 	Installed     bool   `json:"installed"`
 	DBPath        string `json:"dbPath,omitempty"`
 	ConfigDir     string `json:"configDir,omitempty"`
@@ -36,17 +39,17 @@ type CCSwitchStatus struct {
 // ProviderModelMapping describes a single cc-switch provider and its model
 // alias configuration (the transparent proxy mapping).
 type ProviderModelMapping struct {
-	ProviderID   string            `json:"providerId"`
-	ProviderName string            `json:"providerName"`
-	AppType      string            `json:"appType"`
-	ProviderType string            `json:"providerType,omitempty"`
-	BaseURL      string            `json:"baseUrl,omitempty"`
-	APIKeySet    bool              `json:"apiKeySet"`
-	IsCurrent    bool              `json:"isCurrent"`
-	InFailover   bool              `json:"inFailover"`
-	IsActive     bool              `json:"isActive"`
-	CostMultiplier string          `json:"costMultiplier,omitempty"`
-	ModelAliases map[string]string `json:"modelAliases,omitempty"`
+	ProviderID     string            `json:"providerId"`
+	ProviderName   string            `json:"providerName"`
+	AppType        string            `json:"appType"`
+	ProviderType   string            `json:"providerType,omitempty"`
+	BaseURL        string            `json:"baseUrl,omitempty"`
+	APIKeySet      bool              `json:"apiKeySet"`
+	IsCurrent      bool              `json:"isCurrent"`
+	InFailover     bool              `json:"inFailover"`
+	IsActive       bool              `json:"isActive"`
+	CostMultiplier string            `json:"costMultiplier,omitempty"`
+	ModelAliases   map[string]string `json:"modelAliases,omitempty"`
 	// SettingsConfigJSON is the raw settings_config JSON (redacted).
 	SettingsConfigJSON string `json:"-"`
 }
@@ -93,11 +96,11 @@ func DBPath() string {
 
 // Detect probes the local filesystem for a cc-switch installation and returns
 // a status summary.
-func Detect() CCSwitchStatus {
+func Detect() Status {
 	dir := ConfigDir()
 	dbPath := DBPath()
 
-	status := CCSwitchStatus{
+	status := Status{
 		ConfigDir: dir,
 		DBPath:    dbPath,
 	}
@@ -377,13 +380,13 @@ func parseModelAliases(settingsConfigJSON string) map[string]string {
 
 	// Map from env var key to a short alias name.
 	aliasMap := map[string]string{
-		"ANTHROPIC_DEFAULT_OPUS_MODEL":      "opus",
-		"ANTHROPIC_DEFAULT_SONNET_MODEL":    "sonnet",
-		"ANTHROPIC_DEFAULT_HAIKU_MODEL":     "haiku",
-		"ANTHROPIC_REASONING_MODEL":         "reasoning",
-		"CLAUDE_CODE_SUBAGENT_MODEL":        "subagent",
-		"ANTHROPIC_MODEL":                   "default",
-		"ANTHROPIC_DEFAULT_OPUS_MODEL_NAME":  "opus_name",
+		"ANTHROPIC_DEFAULT_OPUS_MODEL":        "opus",
+		"ANTHROPIC_DEFAULT_SONNET_MODEL":      "sonnet",
+		"ANTHROPIC_DEFAULT_HAIKU_MODEL":       "haiku",
+		"ANTHROPIC_REASONING_MODEL":           "reasoning",
+		"CLAUDE_CODE_SUBAGENT_MODEL":          "subagent",
+		"ANTHROPIC_MODEL":                     "default",
+		"ANTHROPIC_DEFAULT_OPUS_MODEL_NAME":   "opus_name",
 		"ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "sonnet_name",
 		"ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME":  "haiku_name",
 	}
