@@ -136,4 +136,12 @@
   transition: opacity var(--duration-fast);
 }
 
-.fileRow:hover .previewHint { opacity: 1; }
+/* Hover-reveal (mouse) + focus-within (keyboard a11y): the preview hint
+ * shows on row hover/focus so keyboard users also get the affordance.
+ * Touch screens (hover:none) show it persistently — no hover state exists. */
+.fileRow:hover .previewHint,
+.fileRow:focus-within .previewHint { opacity: 1; }
+
+@media (hover: none) {
+  .previewHint { opacity: 1; }
+}
