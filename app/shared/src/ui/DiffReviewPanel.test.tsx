@@ -267,4 +267,46 @@ describe('DiffReviewPanel', () => {
     const diffContent = container.querySelector('[class*="diffContent"]');
     expect(diffContent?.className).toContain('custom-diff');
   });
+
+  // ── Word-diff rendering (P6 Step 4) ─────────────────────────────────
+  // modified pair in mockFileModified: 'const old = true;' -> 'const updated = false;'
+  // Left column carries removed+context tokens (old, true); right column
+  // carries added+context tokens (updated, false). highlightLineWithWordDiff
+  // (P6 Step 3) wraps each changed word in a scoped .wordAdded/.wordRemoved
+  // span nested inside Prism token spans. The test-env CSS module proxy
+  // resolves every key to a scoped name containing the local name as a
+  // substring (e.g. _wordAdded_<id>), so [class*="wordAdded"] queries land.
+  // NOTE: this asserts span INJECTION, not colour — jsdom css:false cannot
+  // render the color-mix() backgrounds or forced-colors HC mapping; those
+  // need Windows实机 visual verification (report §8.3, tokens-base.css:586).
+
+  it('renders wordRemoved spans in the left (old) column of a modified row', () => {
+    const { container } = render(<DiffReviewPanel files={[mockFileModified]} />);
+    const wordRemovedSpans = container.querySelectorAll('[class*="wordRemoved"]');
+    expect(wordRemovedSpans.length).toBeGreaterThan(0);
+    const texts = Array.from(wordRemovedSpans).map((s) => s.textContent ?? '');
+    expect(texts).toContain('old');
+    expect(texts).toContain('true');
+  });
+
+  it('renders wordAdded spans in the right (new) column of a modified row', () => {
+    const { container } = render(<DiffReviewPanel files={[mockFileModified]} />);
+    const wordAddedSpans = container.querySelectorAll('[class*="wordAdded"]');
+    expect(wordAddedSpans.length).toBeGreaterThan(0);
+    const texts = Array.from(wordAddedSpans).map((s) => s.textContent ?? '');
+    expect(texts).toContain('updated');
+    expect(texts).toContain('false');
+  });
+
+  it('does not render word-diff spans on context rows', () => {
+    const { container } = render(<DiffReviewPanel files={[mockFileModified]} />);
+    const contextRows = container.querySelectorAll('[class*="diffRowContext"]');
+    expect(contextRows.length).toBeGreaterThan(0);
+    contextRows.forEach((row) => {
+      const wordSpans = row.querySelectorAll(
+        '[class*="wordAdded"], [class*="wordRemoved"]',
+      );
+      expect(wordSpans.length).toBe(0);
+    });
+  });
 });
