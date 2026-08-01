@@ -13,6 +13,7 @@ import {
   type WorkbenchProfileSource,
 } from '../../profileRegistry';
 import { EmptyState } from '../../../ui';
+import { Tooltip } from '../../../ui/Tooltip';
 import styles from '../DocsPage.module.css';
 import type { DocRow } from './types';
 
@@ -72,9 +73,11 @@ function DocTableRow({
             <button type="button" className={styles.cancelDeleteBtn} onClick={handleCancelDelete}>取消</button>
           </>
         ) : onDelete ? (
-          <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} title="删除文档">
-            <DesignNavIcon name="close" size={14} />
-          </button>
+          <Tooltip label="删除文档">
+            <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} aria-label="删除文档">
+              <DesignNavIcon name="close" size={14} />
+            </button>
+          </Tooltip>
         ) : (
           <DesignNavIcon name="more" size={14} />
         )}

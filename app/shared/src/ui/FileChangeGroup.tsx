@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, ChevronDown, ExternalLink, Eye } from 'lucide-react';
 import styles from './FileChangeGroup.module.css';
+import { Tooltip } from './Tooltip';
 
 export interface FileChangeItem {
   fileName: string;
@@ -72,18 +73,19 @@ export default function FileChangeGroup({
                   <span className={styles.deletions}>-{file.deletions}</span>
                 )}
                 {onDiffClick && (
-                  <button
-                    className={styles.diffBtn}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDiffClick(file);
-                    }}
-                    title="View diff"
-                    aria-label={`View diff for ${file.fileName}`}
-                    type="button"
-                  >
-                    <Eye size={14} />
-                  </button>
+                  <Tooltip label="View diff">
+                    <button
+                      className={styles.diffBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDiffClick(file);
+                      }}
+                      aria-label={`View diff for ${file.fileName}`}
+                      type="button"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  </Tooltip>
                 )}
                 {onFileClick && (
                   <ExternalLink size={12} className={styles.previewHint} />

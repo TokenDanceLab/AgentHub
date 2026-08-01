@@ -2,6 +2,7 @@ import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 }
 import { formatComposerAttachmentSize as formatSize } from '../composer/attachments';
 import styles from './ArtifactCard.module.css';
 import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
+import { Tooltip } from './Tooltip';
 
 export interface ArtifactCardProps {
   artifactId: string;
@@ -46,19 +47,20 @@ export default function ArtifactCard({
         {sizeLabel && <span className={styles.size}>{sizeLabel}</span>}
         <div className={styles.actions}>
           {canApplyDiff && !diffApplied && (
-            <button
-              className={styles.applyBtn}
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId } }),
-                )
-              }
-              title="Apply diff"
-              aria-label="Apply diff"
-            >
-              <CheckCircle2 size={14} />
-              <span className={styles.applyLabel}>Apply</span>
-            </button>
+            <Tooltip label="Apply diff">
+              <button
+                className={styles.applyBtn}
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId } }),
+                  )
+                }
+                aria-label="Apply diff"
+              >
+                <CheckCircle2 size={14} />
+                <span className={styles.applyLabel}>Apply</span>
+              </button>
+            </Tooltip>
           )}
           {diffApplied && (
             <span className={styles.appliedBadge}>
@@ -67,27 +69,29 @@ export default function ArtifactCard({
             </span>
           )}
           {url && (
-            <a
-              className={styles.actionBtn}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open artifact"
-              aria-label="Open artifact"
-            >
-              <ExternalLink size={14} />
-            </a>
+            <Tooltip label="Open artifact">
+              <a
+                className={styles.actionBtn}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open artifact"
+              >
+                <ExternalLink size={14} />
+              </a>
+            </Tooltip>
           )}
           {url && (
-            <a
-              className={styles.actionBtn}
-              href={url}
-              download
-              title="Download artifact"
-              aria-label="Download artifact"
-            >
-              <Download size={14} />
-            </a>
+            <Tooltip label="Download artifact">
+              <a
+                className={styles.actionBtn}
+                href={url}
+                download
+                aria-label="Download artifact"
+              >
+                <Download size={14} />
+              </a>
+            </Tooltip>
           )}
         </div>
       </div>

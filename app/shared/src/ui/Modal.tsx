@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useFocusTrap } from './focusTrap';
+import { Tooltip } from './Tooltip';
 import styles from './Modal.module.css';
 
 export interface ModalProps {
@@ -81,25 +82,27 @@ export default function Modal({
           <div className={styles.header}>
             {title != null && <span className={styles.title}>{title}</span>}
             {onToggleFullscreen != null && (
+              <Tooltip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
               <button
                 className={styles.fullscreenBtn}
                 onClick={onToggleFullscreen}
-                title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                 aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                 type="button"
               >
                 {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
+            </Tooltip>
             )}
-            <button
-              className={styles.closeBtn}
-              onClick={onClose}
-              title="Close"
-              aria-label="Close"
-              type="button"
-            >
-              <X size={16} />
-            </button>
+            <Tooltip label="Close">
+              <button
+                className={styles.closeBtn}
+                onClick={onClose}
+                aria-label="Close"
+                type="button"
+              >
+                <X size={16} />
+              </button>
+            </Tooltip>
           </div>
         )}
         <div className={styles.body}>{children}</div>
