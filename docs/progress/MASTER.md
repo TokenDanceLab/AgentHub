@@ -93,7 +93,7 @@ Research off-repo: `D:\Code\Temp\codeg-research\` — SYNTHESIS.md（v0.21.9 基
 
 - `validate` 硬门禁：doc-ssot · ci-gates · web/mobile-hub-boundary · pure-packages · token-ssot · coverage-baseline · openapi-contract · hubclient-ssot · shared-boundary · shared-barrel · hub-layering · conventions · shared-rest-contract · shared-ui-hubclient（**14 层全部合入**）
 - 观测：`/metrics`（admin server，basic auth）+ 36 Prometheus counter（11 基线 + 25 新增）
-- 供应链：Dependabot 0 open（brace-expansion fix #1370/#1397 + alerts #31/#44 dismissed；uuid override `978eb27b`）
+- 供应链：Dependabot 1 open（#1 glib medium，Rust cargo Tauri gtk ^0.18，Linux-only 跟踪上游无解）+ alerts #31/#44 dismissed/#45 auto_dismissed；brace-expansion fix #1370/#1397；uuid override `978eb27b`
 - 综合审计 off-repo：`agenthub-comprehensive-audit-2026-07-29.md`（D 32 + T 13 + A 17，top 10 落地 **10/10**：#1461(1) · #1462(2/3/4) · #1463(5/6/7) · #1464(9) · #1465(8) · #1475(10，实测仅 1 处真 tautology，审计「52 处」高估)）+ T-M1 dispatch 成功路径 #1476
 - residual out of scope: live OIDC evidence · full Mobile redesign · QA>89
 
