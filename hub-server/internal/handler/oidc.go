@@ -183,7 +183,10 @@ func safeOIDCServiceError(err error) *errcode.Error {
 	case errcode.OIDCSubNotFound.Code:
 		return errcode.OIDCSubNotFound
 	default:
-		return nil
+		// Other errcode errors (e.g. ErrBadRequest from input validation)
+		// carry their own HTTP status and message; only non-errcode internal
+		// failures should be flattened to ErrInternal by the caller.
+		return e
 	}
 }
 

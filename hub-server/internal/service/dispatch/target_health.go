@@ -37,6 +37,14 @@ func ResolveExecutionTargetHealthState(target *model.ExecutionTarget, now time.T
 	if !target.IsOnline {
 		return "offline"
 	}
+	// A successful manual ping (Ping sets is_online + health_state="online" +
+	// last_seen_at) is live evidence on its own, even before the edge device
+	// has registered its heartbeat / binding. Dispatch still independently
+	// rejects unbound targets via BoundDeviceID, so this does not weaken
+	// routing safety — it just stops pinged targets from showing as offline.
+	if state == "online" && target.LastSeenAt != nil && now.Sub(*target.LastSeenAt) <= DesktopTargetStaleAfter {
+		return "online"
+	}
 	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
 		return "mismatch"
 	}
