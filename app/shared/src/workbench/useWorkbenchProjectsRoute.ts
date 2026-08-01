@@ -106,7 +106,10 @@ export function useWorkbenchProjectsRoute({
     loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const response = await hubClient.listWorkspaceProjects({ pageSize: 50, pageCursor: cursor });
+      const response = await hubClient.listWorkspaceProjects({
+        pageSize: 50,
+        ...(cursor !== undefined ? { pageCursor: cursor } : {}),
+      });
       setHubProjects((prev) => [
         ...prev,
         ...(response.items ?? []).map(workspaceProjectToProjectInfo),

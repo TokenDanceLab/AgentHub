@@ -111,7 +111,11 @@ function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
         <span className={styles.cardBody}>
           <span className={styles.cardLabel}>{entry.displayName}</span>
           <span className={`${styles.cardStatus} ${presentation.colorClass}`}>
-            <Icon name={presentation.icon} size={14} className={styles.statusIcon} />
+            <Icon
+              name={presentation.icon}
+              size={14}
+              {...(styles.statusIcon !== undefined ? { className: styles.statusIcon } : {})}
+            />
             {presentation.label}
           </span>
         </span>
@@ -124,7 +128,11 @@ function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
             <SubagentTranscript events={streamEvents} />
           ) : (
             <div className={styles.detailHint} role="status">
-              <Icon name="hourglass_empty" size={14} className={styles.detailHintIcon} />
+              <Icon
+                name="hourglass_empty"
+                size={14}
+                {...(styles.detailHintIcon !== undefined ? { className: styles.detailHintIcon } : {})}
+              />
               <span>暂无详细事件流</span>
             </div>
           )}

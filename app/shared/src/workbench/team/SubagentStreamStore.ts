@@ -92,12 +92,20 @@ export function createSubagentStreamStore(): SubagentStreamStore {
       team_run_id: String(data.team_run_id ?? data.teamRunId ?? ''),
       team_id: String(data.team_id ?? data.teamId ?? ''),
       session_id: String(data.session_id ?? data.sessionId ?? ''),
-      assignment_id: (data.assignment_id ?? data.assignmentId) as string | undefined,
-      team_task_id: (data.team_task_id ?? data.teamTaskId) as string | undefined,
-      member_id: (data.member_id ?? data.memberId) as string | undefined,
+      ...((data.assignment_id ?? data.assignmentId) !== undefined
+        ? { assignment_id: String(data.assignment_id ?? data.assignmentId) }
+        : {}),
+      ...((data.team_task_id ?? data.teamTaskId) !== undefined
+        ? { team_task_id: String(data.team_task_id ?? data.teamTaskId) }
+        : {}),
+      ...((data.member_id ?? data.memberId) !== undefined
+        ? { member_id: String(data.member_id ?? data.memberId) }
+        : {}),
       agent_task_id: agentTaskId,
       agent_instance_id: String(data.agent_instance_id ?? data.agentInstanceId ?? ''),
-      edge_run_id: (data.edge_run_id ?? data.edgeRunId) as string | undefined,
+      ...((data.edge_run_id ?? data.edgeRunId) !== undefined
+        ? { edge_run_id: String(data.edge_run_id ?? data.edgeRunId) }
+        : {}),
       event_seq: eventSeq,
       event_type: String(data.event_type ?? data.eventType ?? ''),
       payload: data.payload,

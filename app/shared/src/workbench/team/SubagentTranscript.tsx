@@ -148,7 +148,11 @@ export function SubagentTranscript({
     if (!showEmpty) return <></>;
     return (
       <div className={styles.emptyState} role="status">
-        <Icon name="hourglass_empty" size={18} className={styles.emptyIcon} />
+        <Icon
+          name="hourglass_empty"
+          size={18}
+          {...(styles.emptyIcon !== undefined ? { className: styles.emptyIcon } : {})}
+        />
         <span className={styles.emptyText}>等待 agent 启动…</span>
       </div>
     );
@@ -168,7 +172,7 @@ export function SubagentTranscript({
             <Icon
               name={config.icon}
               size={16}
-              className={styles.entryIcon}
+              {...(styles.entryIcon !== undefined ? { className: styles.entryIcon } : {})}
             />
             <span className={styles.entryLabel}>{config.label}</span>
             <span className={styles.entrySeq}>#{event.event_seq}</span>

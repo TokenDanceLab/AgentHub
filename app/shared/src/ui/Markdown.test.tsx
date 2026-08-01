@@ -11,7 +11,7 @@ import styles from './Markdown.module.css';
 // CSS-contract test against the module source (same pattern as
 // chatview/components/Transcript.css.test.ts).
 const markdownCss = readFileSync(
-  path.resolve(process.cwd(), 'src/ui/Markdown.module.css'),
+  path.resolve(process.cwd(), '../shared/src/ui/Markdown.module.css'),
   'utf8',
 );
 
