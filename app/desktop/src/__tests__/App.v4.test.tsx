@@ -141,6 +141,7 @@ vi.mock('@/api/sessionQueries', () => ({
   useHubPinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubUnpinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubMarkRead: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubPinnedMessages: vi.fn(() => ({ data: undefined })),
 }));
 
 vi.mock('@/stores/hubStore', () => ({
