@@ -83,11 +83,17 @@ export function CollapsibleBlock({
         </div>
       ) : null}
 
-      {expanded && (
-        <div id={contentId} className={styles.content}>
-          {children}
-        </div>
-      )}
+      {/*
+       * Always-mounted content (exit fade): the content div never unmounts,
+       * so the CSS opacity transition can play on collapse. Visibility is
+       * driven by the parent's data-state attribute. aria-hidden mirrors the
+       * collapsed state so AT cannot reach the hidden content (matches the
+       * RightInspector.tsx aria-hidden={collapsed} precedent), preserving the
+       * prior a11y contract where unmounted content was unreachable.
+       */}
+      <div id={contentId} className={styles.content} aria-hidden={!expanded}>
+        <div className={styles.contentInner}>{children}</div>
+      </div>
     </div>
   );
 }

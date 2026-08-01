@@ -89,23 +89,76 @@
   font-style: italic;
 }
 
+/*
+ * Always-mounted content with CSS-only exit fade (P5/O2).
+ *
+ * The content div is always in the DOM; the parent .block's data-state
+ * attribute drives visibility. We use the grid 1fr/0fr trick (boundary-free,
+ * unlike max-height which clips tall content) so the collapsed track is 0
+ * height without a height *smooth* animation — per the codeg instant-
+ * collapsible paradigm: give up height animation, keep the exit fade.
+ *
+ * Layout:
+ *   .content     = grid container whose single track is 1fr (open) or 0fr
+ *                  (closed). overflow:hidden clips the collapsed child.
+ *   .contentInner = the actual content box (padding + border-top). min-height:0
+ *                   lets the 0fr track squash it; opacity lives here.
+ *
+ * Motion (decorative — wrapped in prefers-reduced-motion: no-preference so
+ * it degrades to instant under reduce):
+ *   - Exit  (open→closed): opacity 1→0 over 150ms; grid track stays 1fr for
+ *     150ms (transition-delay) so the fade is visible, then snaps to 0fr
+ *     (0s duration = no smooth height animation) once content is invisible.
+ *   - Enter (closed→open): grid track snaps to 1fr instantly (no transition
+ *     in the open direction); entrance fade via the collapsibleFadeIn keyframe
+ *     scoped to [data-state="open"] (so it only plays when open, never on the
+ *     always-mounted collapsed state).
+ */
 .content {
+  display: grid;
+  overflow: hidden;
+}
+
+.contentInner {
+  overflow: hidden;
+  min-height: 0;
   padding: 8px 12px 12px;
   border-top: 1px solid var(--border);
 }
 
-/* Entrance fade: content fades in over 150ms when expanded */
+[data-state="open"] .content {
+  grid-template-rows: 1fr;
+}
+
+[data-state="open"] .contentInner {
+  opacity: 1;
+}
+
+[data-state="closed"] .content {
+  grid-template-rows: 0fr;
+}
+
+[data-state="closed"] .contentInner {
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .content {
+  /* Exit fade: opacity over 150ms; grid snaps to 0fr after a 150ms delay so
+     the fade completes before the track collapses (0s = instant snap). */
+  [data-state="closed"] .content {
+    transition: grid-template-rows 0s 150ms ease;
+  }
+  [data-state="closed"] .contentInner {
+    transition: opacity 150ms ease;
+  }
+  /* Entrance fade — scoped to open state so it never fires on collapsed
+     (always-mounted) content. Plays on initial mount-open and on re-expand. */
+  [data-state="open"] .contentInner {
     animation: collapsibleFadeIn 150ms ease-out;
   }
 }
 
-/*
- * TODO: 退场 presence — 当前 content 在收起时立即从 DOM 移除，无退场动画。
- * 后续可引入轻量 <Presence> 包装（或 framer AnimatePresence），
- * 在 expanded=false 时保留 DOM 元素 150ms 让 opacity transition 完成再移除。
- */
 @keyframes collapsibleFadeIn {
   from {
     opacity: 0;
