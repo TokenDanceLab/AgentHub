@@ -253,10 +253,17 @@ func cleanDBTables(database *gorm.DB) error {
 
 func TestCleanDBDiscoversNewTables(t *testing.T) {
 	CleanDB(t, db)
+	if err := db.Exec("DROP TABLE IF EXISTS cleanup_probe").Error; err != nil {
+		t.Fatalf("drop stale cleanup probe: %v", err)
+	}
 	if err := db.Exec("CREATE TABLE cleanup_probe (id integer PRIMARY KEY)").Error; err != nil {
 		t.Fatalf("create cleanup probe: %v", err)
 	}
-	defer db.Exec("DROP TABLE IF EXISTS cleanup_probe")
+	t.Cleanup(func() {
+		if err := db.Exec("DROP TABLE IF EXISTS cleanup_probe").Error; err != nil {
+			t.Errorf("drop cleanup probe: %v", err)
+		}
+	})
 	if err := db.Exec("INSERT INTO cleanup_probe (id) VALUES (1)").Error; err != nil {
 		t.Fatalf("seed cleanup probe: %v", err)
 	}
