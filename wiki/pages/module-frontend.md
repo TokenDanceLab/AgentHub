@@ -67,7 +67,7 @@ interface AgentHubPlatform {
 }
 ```
 
-见 [architecture.md](../docs/architecture.md) 和 [04-frontend-data-flow.md](../docs/architecture/04-frontend-data-flow.md)。
+见 [architecture.md](../../docs/architecture.md) 和 [04-frontend-data-flow.md](../../docs/architecture/04-frontend-data-flow.md)。
 
 ## Desktop/Web 共享与差异
 
@@ -107,7 +107,7 @@ Hub / Edge / fixture / mock source
   → UserMessage / AgentGroup / RowItem
 ```
 
-**稳定行为**（来源：[04-frontend-data-flow.md](../docs/architecture/04-frontend-data-flow.md)）：
+**稳定行为**（来源：[04-frontend-data-flow.md](../../docs/architecture/04-frontend-data-flow.md)）：
 
 1. **乐观插入**：用户消息 submit 后立即出现；refetch、replay 或 runtime event 不得使其闪消。
 2. **单时间线**：所有来源按 event time 排序，然后 stable input order。用户文本、Agent 文本、tool call/result、approval、subagent report、diff、artifact、deploy、context usage 和 preview 保持在一条线性 transcript 中。
@@ -160,10 +160,10 @@ Stubbed Hub、fixture、readiness-only 和 manifest-only 输出必须设 `real_t
 | 旧 Tauri Mobile **不再恢复** | [AGENTS.md](../AGENTS.md) 第 2 节 |
 | 当前 UI/UX 主线优先 Desktop/Web；Mobile 深度重构另开任务 | [AGENTS.md](../AGENTS.md) 第 2 节 |
 | Mobile RN Expo Web 端口 `5177` | [AGENTS.md](../AGENTS.md) 第 2 节 |
-| Mobile adapter 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval | [04-frontend-data-flow.md](../docs/architecture/04-frontend-data-flow.md) |
-| Mobile native capability proof 另走 Mobile gates | [04-frontend-data-flow.md](../docs/architecture/04-frontend-data-flow.md) |
-| Mobile **暂不深挖**；发布前再做 Android/iOS development build 证据 | [security-risk-register.md](../docs/governance/security-risk-register.md) AH-SR-042 |
-| Mobile 不能直连 Local Edge 或 raw runtime | [architecture.md](../docs/architecture.md) 非协商边界 |
+| Mobile adapter 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval | [04-frontend-data-flow.md](../../docs/architecture/04-frontend-data-flow.md) |
+| Mobile native capability proof 另走 Mobile gates | [04-frontend-data-flow.md](../../docs/architecture/04-frontend-data-flow.md) |
+| Mobile **暂不深挖**；发布前再做 Android/iOS development build 证据 | [security-risk-register.md](../../docs/governance/security-risk-register.md) AH-SR-042 |
+| Mobile 不能直连 Local Edge 或 raw runtime | [architecture.md](../../docs/architecture.md) 非协商边界 |
 
 **Mobile 与 Desktop/Web 共享**：
 - 与 Web 相同的 Hub-only 路径（不持有 Local Edge）

@@ -101,7 +101,7 @@ NeedsStdin() → bool
 Available() → bool
 ```
 
-已注册 adapter（详见 [03-runtime-adapters.md](../docs/architecture/03-runtime-adapters.md)）：
+已注册 adapter（详见 [03-runtime-adapters.md](../../docs/architecture/03-runtime-adapters.md)）：
 
 | Adapter | ID | 类型 | 状态 |
 |---|---|---|---|
