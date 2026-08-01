@@ -420,6 +420,7 @@ func register(t *testing.T, username, password, nickname string) testUser {
 	}
 
 	deviceID := testDeviceID(username, "web")
+	seedTestDevice(t, user.ID, "web", deviceID)
 	token, err := jwtutil.GenerateAccessToken(user.ID, "web", deviceID, testJWT.Secret, testJWT.AccessTTL)
 	if err != nil {
 		t.Fatalf("generate token for %s: %v", username, err)
@@ -465,6 +466,7 @@ func registerAsAdmin(t *testing.T, username, password, nickname string) testUser
 // seeded first (a real login registers it via device registration).
 func seedRefreshToken(t *testing.T, userID, deviceType, deviceID string) string {
 	t.Helper()
+	seedTestDevice(t, userID, deviceType, deviceID)
 
 	device := &model.Device{
 		ID:           deviceID,
@@ -493,6 +495,24 @@ func seedRefreshToken(t *testing.T, userID, deviceType, deviceID string) string 
 	return raw
 }
 
+// seedTestDevice persists the device identity carried by test access and
+// refresh tokens. Production OIDC login always upserts the device before it
+// issues tokens, and the refresh_tokens.device_id foreign key requires tests
+// to preserve that ordering as well.
+func seedTestDevice(t *testing.T, userID, deviceType, deviceID string) {
+	t.Helper()
+	if err := repository.UpsertDevice(db, &model.Device{
+		ID:           deviceID,
+		UserID:       userID,
+		DeviceType:   deviceType,
+		AppVersion:   "integration-test",
+		Capabilities: "[]",
+		LastActiveAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("seed device %s for user %s: %v", deviceID, userID, err)
+	}
+}
+
 func TestSetupRegisterCreatesHubSession(t *testing.T) {
 	CleanDB(t, db)
 
@@ -506,6 +526,14 @@ func TestSetupRegisterCreatesHubSession(t *testing.T) {
 	id := extract(r.Data, "id")
 	if id != u.ID {
 		t.Fatalf("me returned id %s, want %s", id, u.ID)
+	}
+
+	device, err := repository.GetDeviceByID(db, testDeviceID(u.Username, "web"))
+	if err != nil {
+		t.Fatalf("registered test session must persist its device: %v", err)
+	}
+	if device.UserID != u.ID || device.DeviceType != "web" {
+		t.Fatalf("registered device owner/type = %s/%s, want %s/web", device.UserID, device.DeviceType, u.ID)
 	}
 }
 
