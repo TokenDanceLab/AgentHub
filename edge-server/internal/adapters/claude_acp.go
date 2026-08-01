@@ -111,7 +111,7 @@ func (a *ClaudeACPAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string, 
 // mirroring the legacy claude CLI behavior.)
 func (a *ClaudeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
-		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.AcpAdapter.agentBinary)
+		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.agentBinary)
 	}
 	return nil
 }

@@ -13,9 +13,9 @@ import (
 // Each run gets its own temp file under os.TempDir().
 // On Close(), the temp file is deleted.
 type RunOutputStore struct {
-	mu   sync.Mutex
-	file *os.File
-	path string
+	mu    sync.Mutex
+	file  *os.File
+	path  string
 	runID string
 }
 

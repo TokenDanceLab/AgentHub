@@ -58,9 +58,9 @@ type SubAgentAggregatedResult struct {
 	Succeeded     int              `json:"succeeded"`
 	Failed        int              `json:"failed"`
 	Cancelled     int              `json:"cancelled"`
-	Pending       int              `json:"pending"`  // children that never completed (timeout)
+	Pending       int              `json:"pending"` // children that never completed (timeout)
 	Results       []SubAgentResult `json:"results"`
-	Partial       bool             `json:"partial"`  // true if timeout fallback triggered
+	Partial       bool             `json:"partial"`           // true if timeout fallback triggered
 	Summary       string           `json:"summary,omitempty"` // human-readable synthesis
 }
 
@@ -484,7 +484,7 @@ func isTerminalStatus(status agents.Status) bool {
 	switch status {
 	case agents.StatusCompleted, agents.StatusError, agents.StatusDisconnected:
 		return true
-	case agents.StatusOnline, agents.StatusBusy, agents.StatusIdle, agents.StatusWaitingInput:
+	case agents.StatusOnline, agents.StatusBusy, agents.StatusIdle, agents.StatusWaitingInput, agents.StatusDraining:
 		return false
 	}
 	return false

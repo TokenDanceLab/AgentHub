@@ -163,11 +163,6 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 		runCtx = rc
 	}
 
-	prompt := runCtx.Prompt
-	if prompt == "" {
-		prompt = "Continue."
-	}
-
 	model := a.model
 	if runCtx.Model != "" {
 		model = ResolveModel(openaiSDKAdapterID, runCtx.Model)

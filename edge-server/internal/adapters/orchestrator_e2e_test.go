@@ -94,12 +94,12 @@ func TestDispatchInterceptor_DetectsDispatchJSON(t *testing.T) {
 
 	inner := NewBusEventEmitter(bus)
 	interceptor := &dispatchInterceptor{
-		inner:     inner,
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      inner,
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -135,12 +135,12 @@ func TestDispatchInterceptor_IgnoresNonDispatchJSON(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -170,12 +170,12 @@ func TestDispatchInterceptor_ThreadIDPropagation(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  "thread-1",
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   "thread-1",
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -199,13 +199,13 @@ func TestDispatchInterceptor_ModelPropagation(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
-		model:     "claude-sonnet-4-6",
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
+		model:      "claude-sonnet-4-6",
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -229,12 +229,12 @@ func TestDispatchInterceptor_AgentRegistered(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -274,12 +274,12 @@ func TestDispatchInterceptor_SpawnerErrorEmitsFailure(t *testing.T) {
 
 	inner := NewBusEventEmitter(bus)
 	interceptor := &dispatchInterceptor{
-		inner:     inner,
-		registry:  reg,
-		spawner:   &failingSpawner{err: fmt.Errorf("capacity exhausted")},
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      inner,
+		registry:   reg,
+		spawner:    &failingSpawner{err: fmt.Errorf("capacity exhausted")},
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -312,12 +312,12 @@ func TestDispatchInterceptor_NoSpawnerNoCrash(t *testing.T) {
 
 	// No spawner — should not panic when dispatch is detected.
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   nil,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    nil,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -334,12 +334,12 @@ func TestDispatchInterceptor_MultipleDispatches(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -362,12 +362,12 @@ func TestDispatchInterceptor_DepthIncrements(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     2,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      2,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -391,12 +391,12 @@ func TestDispatchInterceptor_RolePropagation(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -423,12 +423,12 @@ func TestDispatchInterceptor_NoRegistryNoCrash(t *testing.T) {
 
 	// No registry, no spawner — should still not panic.
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  nil,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
+		inner:      &stubEmitter{},
+		registry:   nil,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -564,13 +564,13 @@ func TestDispatchInterceptor_BudgetPropagation(t *testing.T) {
 	budget.Track(100_000) // 100k used, 200k remaining
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
-		budget:    budget,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
+		budget:     budget,
 		dispatched: make(map[string]dispatchEvent),
 	}
 
@@ -597,13 +597,13 @@ func TestDispatchInterceptor_NilBudget(t *testing.T) {
 	run, _ := st.GetRun("run-1")
 
 	interceptor := &dispatchInterceptor{
-		inner:     &stubEmitter{},
-		registry:  reg,
-		spawner:   spawner,
-		parentRun: run,
-		depth:     0,
-		threadID:  run.ThreadID,
-		budget:    nil,
+		inner:      &stubEmitter{},
+		registry:   reg,
+		spawner:    spawner,
+		parentRun:  run,
+		depth:      0,
+		threadID:   run.ThreadID,
+		budget:     nil,
 		dispatched: make(map[string]dispatchEvent),
 	}
 

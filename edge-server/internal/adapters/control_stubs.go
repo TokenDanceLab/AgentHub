@@ -41,13 +41,13 @@ func (h *DefaultPermissionHandler) handleGetContextUsage(ctx context.Context, st
 	var req contextUsageControlRequest
 	decodeControlInput(inner.Input, &req)
 	slog.Debug("control: get_context_usage unsupported", "sessionId", req.SessionID)
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "context_usage", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "context_usage")
 }
 
 func (h *DefaultPermissionHandler) handleMCPStatus(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
 	_ = ctx
 	slog.Debug("control: mcp_status unsupported")
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "mcp_status", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "mcp_status")
 }
 
 func (h *DefaultPermissionHandler) handleMCPSetServers(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
@@ -55,13 +55,13 @@ func (h *DefaultPermissionHandler) handleMCPSetServers(ctx context.Context, stdi
 	var req mcpSetServersControlRequest
 	decodeControlInput(inner.Input, &req)
 	slog.Debug("control: mcp_set_servers unsupported", "serverCount", len(req.Servers))
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "mcp_dynamic_servers", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "mcp_dynamic_servers")
 }
 
 func (h *DefaultPermissionHandler) handleGetSettings(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
 	_ = ctx
 	slog.Debug("control: get_settings unsupported")
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "runtime_settings", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "runtime_settings")
 }
 
 func (h *DefaultPermissionHandler) handleApplyFlagSettings(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
@@ -69,7 +69,7 @@ func (h *DefaultPermissionHandler) handleApplyFlagSettings(ctx context.Context, 
 	var req applyFlagSettingsControlRequest
 	decodeControlInput(inner.Input, &req)
 	slog.Debug("control: apply_flag_settings unsupported", "flagCount", len(req.Flags))
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "runtime_flag_settings", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "runtime_flag_settings")
 }
 
 func (h *DefaultPermissionHandler) handleHookCallback(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
@@ -77,7 +77,7 @@ func (h *DefaultPermissionHandler) handleHookCallback(ctx context.Context, stdin
 	var req hookCallbackControlRequest
 	decodeControlInput(inner.Input, &req)
 	slog.Debug("control: hook_callback unsupported", "hookName", req.HookName, "phase", req.Phase, "toolName", req.ToolName)
-	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "hook_callbacks", nil)
+	return writeUnsupportedControlResponse(stdin, requestID, inner.Subtype, "hook_callbacks")
 }
 
 func decodeControlInput(input any, out any) {
@@ -91,7 +91,7 @@ func decodeControlInput(input any, out any) {
 	_ = json.Unmarshal(raw, out)
 }
 
-func writeUnsupportedControlResponse(stdin io.Writer, requestID, requestedSubtype, capability string, details map[string]any) error {
+func writeUnsupportedControlResponse(stdin io.Writer, requestID, requestedSubtype, capability string) error {
 	message := fmt.Sprintf("control subtype %q is recognized but %q is not wired in the Edge adapter", requestedSubtype, capability)
 	payload := map[string]any{
 		"request_id":       requestID,
@@ -102,9 +102,6 @@ func writeUnsupportedControlResponse(stdin io.Writer, requestID, requestedSubtyp
 		"status":           "unsupported",
 		"applied":          false,
 		"message":          message,
-	}
-	for key, value := range details {
-		payload[key] = value
 	}
 
 	innerResp := ControlResponseInner{

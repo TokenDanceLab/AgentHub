@@ -225,19 +225,19 @@ func TestUsagePercentUnusualUsable(t *testing.T) {
 
 func TestShouldCompactVariousThresholds(t *testing.T) {
 	tests := []struct {
-		name       string
-		maxTokens  int
-		reserved   int64
-		useTokens  int
+		name        string
+		maxTokens   int
+		reserved    int64
+		useTokens   int
 		wantCompact bool
 	}{
-		{"below threshold", 100_000, 10_000, 70000, false},   // ~78%
-		{"at threshold", 100_000, 10_000, 76500, true},       // 85%
-		{"above threshold", 100_000, 10_000, 80000, true},    // ~89%
-		{"exhausted", 100_000, 10_000, 90000, true},          // 100%
-		{"zero used", 100_000, 10_000, 0, false},              // 0%
-		{"barely below", 100_000, 10_000, 76499, false},      // ~84.998%
-		{"small budget exhausted", 5000, 10_000, 0, true},    // usable <= 0
+		{"below threshold", 100_000, 10_000, 70000, false}, // ~78%
+		{"at threshold", 100_000, 10_000, 76500, true},     // 85%
+		{"above threshold", 100_000, 10_000, 80000, true},  // ~89%
+		{"exhausted", 100_000, 10_000, 90000, true},        // 100%
+		{"zero used", 100_000, 10_000, 0, false},           // 0%
+		{"barely below", 100_000, 10_000, 76499, false},    // ~84.998%
+		{"small budget exhausted", 5000, 10_000, 0, true},  // usable <= 0
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -306,10 +306,10 @@ func TestRemainingVarious(t *testing.T) {
 
 func TestIsExhaustedVarious(t *testing.T) {
 	tests := []struct {
-		name         string
-		maxTokens    int
-		reserved     int64
-		useTokens    int
+		name          string
+		maxTokens     int
+		reserved      int64
+		useTokens     int
 		wantExhausted bool
 	}{
 		{"below", 100_000, 10_000, 89999, false},

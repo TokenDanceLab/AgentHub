@@ -134,12 +134,14 @@ func (f *FileStore) persistLoop() {
 		select {
 		case _, ok := <-f.persistCh:
 			if !ok {
-				f.syncPersist()
+				// Failure is surfaced via LastPersistError, matching Flush() semantics.
+				_ = f.syncPersist()
 				return
 			}
 			timer.Reset(debounceInterval)
 		case <-timer.C:
-			f.syncPersist()
+			// Failure is surfaced via LastPersistError, matching Flush() semantics.
+			_ = f.syncPersist()
 		}
 	}
 }

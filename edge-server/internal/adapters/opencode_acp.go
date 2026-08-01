@@ -118,7 +118,7 @@ func (a *OpenCodeACPAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string
 // mirroring the legacy opencode CLI behavior.)
 func (a *OpenCodeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
-		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.AcpAdapter.agentBinary, opencodeACPVersionPin)
+		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.agentBinary, opencodeACPVersionPin)
 	}
 	return nil
 }

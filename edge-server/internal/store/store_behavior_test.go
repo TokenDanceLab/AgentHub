@@ -583,7 +583,7 @@ func TestIsPortablePathAbsolute(t *testing.T) {
 		{"relative/path", false},
 		{"C:/windows", true},
 		{"//unc/path", true},
-		{"C:relative", false},       // drive letter without slash is not absolute
+		{"C:relative", false}, // drive letter without slash is not absolute
 		{"file.txt", false},
 		{"", false},
 	}
@@ -627,10 +627,10 @@ func TestIsWindowsDriveQualifiedPath(t *testing.T) {
 		{"C:", true},
 		{"C:/windows", true},
 		{"x:file.txt", true},
-		{"1:", false},         // digit is not alpha
+		{"1:", false}, // digit is not alpha
 		{"file.txt", false},
 		{"", false},
-		{"C", false},          // no colon
+		{"C", false}, // no colon
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

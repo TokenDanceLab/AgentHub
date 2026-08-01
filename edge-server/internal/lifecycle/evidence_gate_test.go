@@ -252,9 +252,9 @@ func testEvidenceGateGenericProjectDetection(t *testing.T) {
 // testEvidenceGateConfigFromEnv verifies AGENTHUB_EVIDENCE_GATE_ENABLED parsing.
 func testEvidenceGateConfigFromEnv(t *testing.T) {
 	tests := []struct {
-		name    string
-		envVal  string
-		want    bool
+		name   string
+		envVal string
+		want   bool
 	}{
 		{"unset_defaults_true", "", true},
 		{"true_is_true", "true", true},

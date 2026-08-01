@@ -194,10 +194,10 @@ func startEdgeWithHubCallbacks(t *testing.T, hubURL string) (*httptest.Server, *
 // TestHubE2E_RunCompletes_FiresDoneCallback verifies the full Edge→Hub
 // callback chain when a run completes successfully:
 //
-//	1. Edge receives POST /v1/runs with hubTaskId
-//	2. Edge creates a run and starts the executor
-//	3. When the run finishes, Edge calls POST /edge/agent-tasks/:id/done
-//	4. Mock Hub verifies the callback was received with correct payload
+//  1. Edge receives POST /v1/runs with hubTaskId
+//  2. Edge creates a run and starts the executor
+//  3. When the run finishes, Edge calls POST /edge/agent-tasks/:id/done
+//  4. Mock Hub verifies the callback was received with correct payload
 func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode (launches subprocess)")
@@ -214,7 +214,7 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "E2E test: complete run",
 		"hubTaskId": taskID,
-		"workDir": edgeH.WorkspaceAllowlist[0],
+		"workDir":   edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -513,7 +513,7 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 		"threadId":  "thread_local",
 		"prompt":    "Complete round trip test",
 		"hubTaskId": taskID,
-		"workDir": edgeH.WorkspaceAllowlist[0],
+		"workDir":   edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {

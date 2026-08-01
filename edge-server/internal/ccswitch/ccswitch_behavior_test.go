@@ -23,8 +23,8 @@ func TestStripContextSuffix_EdgeCases(t *testing.T) {
 		{"just spaces no bracket", "  foo  ", "foo"},
 
 		// Bracket but no context suffix pattern (no closing bracket)
-		{"only open bracket", "[", "["}, // idx=0, not >0, so returns TrimSpace("[")
-		{"bracket at start", "[abc", "[abc"}, // idx=0
+		{"only open bracket", "[", "["},                         // idx=0, not >0, so returns TrimSpace("[")
+		{"bracket at start", "[abc", "[abc"},                    // idx=0
 		{"bracket as first char of word", "foo[bar", "foo[bar"}, // idx>0 but no closing ]
 
 		// Normal context suffixes
@@ -40,7 +40,7 @@ func TestStripContextSuffix_EdgeCases(t *testing.T) {
 		{"bracket mid-name and suffix", "foo[bar]baz[1M]", "foo[bar]baz"}, // LastIndex finds second [
 
 		// Context tag in middle of name (not a suffix)
-		{"mid-word bracket", "[1M] at start", "[1M] at start"}, // idx=0, not >0
+		{"mid-word bracket", "[1M] at start", "[1M] at start"},                   // idx=0, not >0
 		{"trailing bracket but closed mid-word", "model[1M] v2", "model[1M] v2"}, // bracket not at end, suffix doesn't end with ]
 
 		// Already clean names (no brackets)

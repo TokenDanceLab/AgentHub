@@ -173,38 +173,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		fmt.Sprintf("--max-turns=%d", a.maxTurns),
 	)
 
-	// Model: runCtx override first, fallback to adapter default.
-	// Uses cc-switch dynamic resolution when available.
-	if ctx.Model != "" {
-		args = append(args, "--model", a.resolveModelForAdapter(ctx.Model))
-	} else if a.model != "" {
-		args = append(args, "--model", a.model)
-	}
-
-	// Permission mode: runCtx override first, fallback to adapter default
-	permMode := ctx.PermissionMode
-	if permMode == "" {
-		permMode = a.permissionMode
-	}
-	if permMode != "" {
-		args = append(args, "--permission-mode", permMode)
-	}
-
-	// Reasoning effort (--effort)
-	if ctx.ReasoningEffort != "" {
-		effort := ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
-		args = append(args, "--effort", effort)
-	}
-
-	// Thinking mode (--thinking) replaces deprecated --max-thinking-tokens.
-	// Ref: claude-code-source/src/main.tsx line 976 — --max-thinking-tokens is hidden & deprecated.
-	// Accepted values: "enabled", "adaptive", "disabled".
-	if ctx.ThinkingMode != "" {
-		args = append(args, "--thinking", ctx.ThinkingMode)
-	} else if ctx.MaxThinkingTokens > 0 {
-		// Fallback for callers still using the deprecated field: enable thinking.
-		args = append(args, "--thinking", "enabled")
-	}
+	args = a.appendModelAndPermissionArgs(args, ctx)
 
 	// Structured output (--json-schema)
 	if ctx.StructuredOutputSchema != "" {
@@ -216,47 +185,13 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	// os.TempDir() (e.g. C:\Users\<user>\AppData\Local\Temp). Grant the
 	// agent write access to the system temp directory and inject a hint so
 	// it knows to use the native path.
-	var windowsTmpHint string
-	if runtime.GOOS == "windows" {
-		if tmpDir := os.TempDir(); tmpDir != "" {
-			windowsTmpHint = fmt.Sprintf(
-				"[Windows path note] The system temp directory is %s. "+
-					"When the user references /tmp, use this Windows path instead. "+
-					"Example: /tmp/hello.py → %s\\hello.py",
-				tmpDir, tmpDir,
-			)
-		}
-	}
+	windowsTmpHint := claudeWindowsTmpHint()
 
 	// System prompt customization
 	if ctx.SystemPrompt != "" {
 		args = append(args, "--system-prompt", ctx.SystemPrompt)
 	}
-	appendPrompt := ctx.AppendSystemPrompt
-	if ctx.SkillsPrompt != "" {
-		if appendPrompt != "" {
-			appendPrompt = ctx.SkillsPrompt + "\n\n" + appendPrompt
-		} else {
-			appendPrompt = ctx.SkillsPrompt
-		}
-	}
-	// Context continuity: inject thread history + pinned messages into system prompt
-	// so Claude Code has full conversation context even without --continue/--resume.
-	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
-		if appendPrompt != "" {
-			appendPrompt = contextPreface + "\n\n" + appendPrompt
-		} else {
-			appendPrompt = contextPreface
-		}
-	}
-	// Inject Windows temp directory hint if applicable.
-	if windowsTmpHint != "" {
-		if appendPrompt != "" {
-			appendPrompt = windowsTmpHint + "\n\n" + appendPrompt
-		} else {
-			appendPrompt = windowsTmpHint
-		}
-	}
+	appendPrompt := buildClaudeAppendPrompt(ctx, windowsTmpHint)
 	if appendPrompt != "" {
 		args = append(args, "--append-system-prompt", appendPrompt)
 	}
@@ -309,17 +244,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	// Each run creates a fresh CC conversation via --session-id.
 	// When ContinueLast is set with a SessionID, use --resume to rejoin
 	// the existing session; otherwise use --continue without a session ID.
-	if ctx.SessionID != "" && ctx.ContinueLast {
-		args = append(args, "--resume", ctx.SessionID)
-	} else if ctx.SessionID != "" {
-		args = append(args, "--session-id", ctx.SessionID)
-	}
-	if ctx.ContinueLast && ctx.SessionID == "" {
-		args = append(args, "--continue")
-	}
-	if ctx.ForkSession {
-		args = append(args, "--fork-session")
-	}
+	args = appendClaudeSessionArgs(args, ctx)
 
 	// Allow tool access to the working directory when an explicit workDir is set.
 	// Empty workDir is rejected at the REST/MCP gate (#854); do not invent a
@@ -345,6 +270,118 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	//     leak ANTHROPIC_API_KEY etc. into the child and override settings.json.
 	//     Explicitly filter out auth-related vars so only settings.json is used.
 	//   - native/standalone: CC needs explicit auth credentials from OS env.
+	env := buildClaudeAuthEnv()
+
+	return a.binaryPath, args, env, workDir
+}
+
+// appendModelAndPermissionArgs appends --model/--permission-mode/--effort/
+// --thinking flags from the run context, falling back to adapter defaults.
+func (a *ClaudeCodeAdapter) appendModelAndPermissionArgs(args []string, ctx RunProcessContext) []string {
+	// Model: runCtx override first, fallback to adapter default.
+	// Uses cc-switch dynamic resolution when available.
+	if ctx.Model != "" {
+		args = append(args, "--model", a.resolveModelForAdapter(ctx.Model))
+	} else if a.model != "" {
+		args = append(args, "--model", a.model)
+	}
+
+	// Permission mode: runCtx override first, fallback to adapter default
+	permMode := ctx.PermissionMode
+	if permMode == "" {
+		permMode = a.permissionMode
+	}
+	if permMode != "" {
+		args = append(args, "--permission-mode", permMode)
+	}
+
+	// Reasoning effort (--effort)
+	if ctx.ReasoningEffort != "" {
+		effort := ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
+		args = append(args, "--effort", effort)
+	}
+
+	// Thinking mode (--thinking) replaces deprecated --max-thinking-tokens.
+	// Ref: claude-code-source/src/main.tsx line 976 — --max-thinking-tokens is hidden & deprecated.
+	// Accepted values: "enabled", "adaptive", "disabled".
+	if ctx.ThinkingMode != "" {
+		args = append(args, "--thinking", ctx.ThinkingMode)
+	} else if ctx.MaxThinkingTokens > 0 {
+		// Fallback for callers still using the deprecated field: enable thinking.
+		args = append(args, "--thinking", "enabled")
+	}
+	return args
+}
+
+// claudeWindowsTmpHint returns a hint string pointing agents at the native
+// Windows temp directory, or "" when not on Windows / no temp dir is set.
+func claudeWindowsTmpHint() string {
+	if runtime.GOOS != "windows" {
+		return ""
+	}
+	if tmpDir := os.TempDir(); tmpDir != "" {
+		return fmt.Sprintf(
+			"[Windows path note] The system temp directory is %s. "+
+				"When the user references /tmp, use this Windows path instead. "+
+				"Example: /tmp/hello.py → %s\\hello.py",
+			tmpDir, tmpDir,
+		)
+	}
+	return ""
+}
+
+// buildClaudeAppendPrompt assembles the --append-system-prompt content from
+// the skills prompt, context preface, and the Windows temp hint.
+func buildClaudeAppendPrompt(ctx RunProcessContext, windowsTmpHint string) string {
+	appendPrompt := ctx.AppendSystemPrompt
+	if ctx.SkillsPrompt != "" {
+		if appendPrompt != "" {
+			appendPrompt = ctx.SkillsPrompt + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = ctx.SkillsPrompt
+		}
+	}
+	// Context continuity: inject thread history + pinned messages into system prompt
+	// so Claude Code has full conversation context even without --continue/--resume.
+	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
+		if appendPrompt != "" {
+			appendPrompt = contextPreface + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = contextPreface
+		}
+	}
+	// Inject Windows temp directory hint if applicable.
+	if windowsTmpHint != "" {
+		if appendPrompt != "" {
+			appendPrompt = windowsTmpHint + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = windowsTmpHint
+		}
+	}
+	return appendPrompt
+}
+
+// appendClaudeSessionArgs appends the session handling flags (--resume,
+// --session-id, --continue, --fork-session).
+func appendClaudeSessionArgs(args []string, ctx RunProcessContext) []string {
+	if ctx.SessionID != "" && ctx.ContinueLast {
+		args = append(args, "--resume", ctx.SessionID)
+	} else if ctx.SessionID != "" {
+		args = append(args, "--session-id", ctx.SessionID)
+	}
+	if ctx.ContinueLast && ctx.SessionID == "" {
+		args = append(args, "--continue")
+	}
+	if ctx.ForkSession {
+		args = append(args, "--fork-session")
+	}
+	return args
+}
+
+// buildClaudeAuthEnv assembles the child-process environment for the claude
+// CLI: filtered parent env for cc-switch managed setups, or explicit auth
+// variable injection for native/standalone setups.
+func buildClaudeAuthEnv() []string {
 	var env []string
 	if ccSwitchManaged() {
 		for _, e := range os.Environ() {
@@ -370,8 +407,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 			env = append(env, "ANTHROPIC_BASE_URL="+url)
 		}
 	}
-
-	return a.binaryPath, args, env, workDir
+	return env
 }
 
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {

@@ -44,11 +44,11 @@ type MemoryEntry struct {
 
 // MemoryReadResult contains the result of reading memory files from a workspace.
 type MemoryReadResult struct {
-	Entries        []MemoryEntry `json:"entries"`
-	PromptText     string        `json:"promptText"`
-	EstimatedTokens int          `json:"estimatedTokens"`
-	FilesRead      int           `json:"filesRead"`
-	Warnings       []string      `json:"warnings,omitempty"`
+	Entries         []MemoryEntry `json:"entries"`
+	PromptText      string        `json:"promptText"`
+	EstimatedTokens int           `json:"estimatedTokens"`
+	FilesRead       int           `json:"filesRead"`
+	Warnings        []string      `json:"warnings,omitempty"`
 }
 
 // ── File Naming ──────────────────────────────────────────────────────────────
@@ -217,49 +217,45 @@ func readMemoryFile(path string) ([]MemoryEntry, error) {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "---" {
-			if !inFrontmatter {
-				// Start of frontmatter. If we had accumulated body text,
-				// flush the previous entry first.
-				if len(pendingFrontmatter) > 0 && len(bodyLines) > 0 {
-					body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
-					if body != "" {
-						entry, err := parseFrontmatter(
-							strings.Join(pendingFrontmatter, "\n"), body)
-						if err == nil {
-							entries = append(entries, entry)
-						}
-					}
-				}
-				inFrontmatter = true
-				yamlLines = nil
-				bodyLines = nil
-			} else {
-				// End of frontmatter — body follows.
-				inFrontmatter = false
-				pendingFrontmatter = append([]string{}, yamlLines...)
-				bodyLines = nil
-			}
-		} else if inFrontmatter {
+		switch {
+		case trimmed == "---" && !inFrontmatter:
+			// Start of frontmatter. If we had accumulated body text,
+			// flush the previous entry first.
+			flushMemoryEntry(&entries, pendingFrontmatter, bodyLines)
+			inFrontmatter = true
+			yamlLines = make([]string, 0, 1)
+			bodyLines = make([]string, 0, 1)
+		case trimmed == "---":
+			// End of frontmatter — body follows.
+			inFrontmatter = false
+			pendingFrontmatter = append([]string{}, yamlLines...)
+			bodyLines = make([]string, 0, 1)
+		case inFrontmatter:
 			yamlLines = append(yamlLines, line)
-		} else {
+		default:
 			bodyLines = append(bodyLines, line)
 		}
 	}
 
 	// Flush the last entry.
-	if len(pendingFrontmatter) > 0 && len(bodyLines) > 0 {
-		body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
-		if body != "" {
-			entry, err := parseFrontmatter(
-				strings.Join(pendingFrontmatter, "\n"), body)
-			if err == nil {
-				entries = append(entries, entry)
-			}
-		}
-	}
+	flushMemoryEntry(&entries, pendingFrontmatter, bodyLines)
 
 	return entries, nil
+}
+
+// flushMemoryEntry appends the pending frontmatter+body entry when complete.
+func flushMemoryEntry(entries *[]MemoryEntry, pendingFrontmatter, bodyLines []string) {
+	if len(pendingFrontmatter) == 0 || len(bodyLines) == 0 {
+		return
+	}
+	body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
+	if body == "" {
+		return
+	}
+	entry, err := parseFrontmatter(strings.Join(pendingFrontmatter, "\n"), body)
+	if err == nil {
+		*entries = append(*entries, entry)
+	}
 }
 
 // parseFrontmatter parses a minimal YAML frontmatter block into a MemoryEntry.
@@ -307,13 +303,13 @@ func parseFrontmatter(yaml, body string) (MemoryEntry, error) {
 	}
 
 	return MemoryEntry{
-		ID:        id,
-		Content:   body,
-		Tags:      tags,
-		CreatedAt: created,
-		UpdatedAt: updated,
-		Source:    source,
-		ExpiresAt: parseOptionalTime(fields["expires_at"]),
+		ID:           id,
+		Content:      body,
+		Tags:         tags,
+		CreatedAt:    created,
+		UpdatedAt:    updated,
+		Source:       source,
+		ExpiresAt:    parseOptionalTime(fields["expires_at"]),
 		LastAccessed: parseOptionalTime(fields["last_accessed"]),
 	}, nil
 }
@@ -459,18 +455,18 @@ func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
 	}
 	var sb strings.Builder
 	sb.WriteString("---\n")
-	sb.WriteString(fmt.Sprintf("id: %s\n", entry.ID))
-	sb.WriteString(fmt.Sprintf("source: %s\n", entry.Source))
+	fmt.Fprintf(&sb, "id: %s\n", entry.ID)
+	fmt.Fprintf(&sb, "source: %s\n", entry.Source)
 	if tagsLine != "" {
 		sb.WriteString(tagsLine + "\n")
 	}
-	sb.WriteString(fmt.Sprintf("created: %s\n", entry.CreatedAt))
-	sb.WriteString(fmt.Sprintf("updated: %s\n", entry.UpdatedAt))
+	fmt.Fprintf(&sb, "created: %s\n", entry.CreatedAt)
+	fmt.Fprintf(&sb, "updated: %s\n", entry.UpdatedAt)
 	if entry.ExpiresAt != nil {
-		sb.WriteString(fmt.Sprintf("expires_at: %s\n", entry.ExpiresAt.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "expires_at: %s\n", entry.ExpiresAt.Format(time.RFC3339))
 	}
 	if entry.LastAccessed != nil {
-		sb.WriteString(fmt.Sprintf("last_accessed: %s\n", entry.LastAccessed.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "last_accessed: %s\n", entry.LastAccessed.Format(time.RFC3339))
 	}
 	sb.WriteString("---\n\n")
 	sb.WriteString(entry.Content + "\n")

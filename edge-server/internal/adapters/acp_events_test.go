@@ -118,10 +118,10 @@ func TestMapACPSessionUpdate_NonTextBlockNoEmit(t *testing.T) {
 
 func TestMapACPPromptResult(t *testing.T) {
 	tests := []struct {
-		name       string
-		res        acp.PromptResponse
-		wantNil    bool
-		reason     string
+		name    string
+		res     acp.PromptResponse
+		wantNil bool
+		reason  string
 	}{
 		{name: "end_turn", res: acp.PromptResponse{StopReason: acp.StopReasonEndTurn}, reason: "end_turn"},
 		{name: "tool_use", res: acp.PromptResponse{StopReason: acp.StopReasonMaxTurnRequests}, reason: "max_turn_requests"},

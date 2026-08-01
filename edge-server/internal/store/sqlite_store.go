@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	// modernc.org/sqlite registers its pure-Go sqlite driver via a side-effect import.
 	_ "modernc.org/sqlite"
 )
 

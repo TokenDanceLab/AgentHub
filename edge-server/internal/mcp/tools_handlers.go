@@ -113,6 +113,66 @@ func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 	return marshalResult(result)
 }
 
+// startRunParams is the parsed agenthub_start_run tool call arguments.
+type startRunParams struct {
+	ProjectID string `json:"projectId"`
+	ThreadID  string `json:"threadId"`
+	Prompt    string `json:"prompt"`
+	AgentID   string `json:"agentId"`
+	Model     string `json:"model"`
+	WorkDir   string `json:"workDir"`
+}
+
+// decodeStartRunArgs parses and validates the required start_run fields.
+func decodeStartRunArgs(args json.RawMessage) (startRunParams, error) {
+	var params startRunParams
+	if err := json.Unmarshal(args, &params); err != nil {
+		return params, fmt.Errorf("invalid arguments: %w", err)
+	}
+	if params.ProjectID == "" {
+		return params, errcode.ErrProjectIDRequired
+	}
+	if params.ThreadID == "" {
+		return params, errcode.ErrThreadIDRequired
+	}
+	if strings.TrimSpace(params.Prompt) == "" {
+		return params, errcode.ErrPromptRequired
+	}
+	return params, nil
+}
+
+// validateStartRunWorkDir requires a non-empty workDir for adapter runs
+// (#854), then applies the shared REST/MCP workspace allowlist policy
+// (AH-SR-006 / #998): EvalSymlinks + IsPathWithin via
+// security.ValidateWorkDirAgainstAllowlist. Returns the trimmed workDir.
+func validateStartRunWorkDir(workDir string, allowlist []string) (string, error) {
+	workDir = strings.TrimSpace(workDir)
+	if workDir == "" {
+		return "", errcode.ErrWorkDirRequired
+	}
+	if err := security.ValidateWorkDirAgainstAllowlist(workDir, allowlist); err != nil {
+		if errors.Is(err, security.ErrWorkspaceAllowlistEmpty) {
+			return "", errcode.ErrWorkspaceAllowlistNotConfigured
+		}
+		if errors.Is(err, security.ErrWorkspaceOutsideAllowlist) {
+			return "", errcode.ErrWorkspaceNotAllowed
+		}
+		return "", fmt.Errorf("invalid workDir: %w", err)
+	}
+	return workDir, nil
+}
+
+// errIfActiveRunExists returns an error when the thread already has an active
+// (queued or started) run.
+func errIfActiveRunExists(repo store.Repository, threadID string) error {
+	for _, r := range repo.ListRuns(threadID) {
+		if r.Status == "queued" || r.Status == "started" {
+			return fmt.Errorf("thread already has an active run: %s", r.ID)
+		}
+	}
+	return nil
+}
+
 // toolStartRun implements the agenthub_start_run tool.
 //
 // Requires non-empty workDir and validates it against the workspace allowlist
@@ -133,43 +193,15 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 		return nil, errcode.ErrExecutorNotConfigured
 	}
 
-	var params struct {
-		ProjectID string `json:"projectId"`
-		ThreadID  string `json:"threadId"`
-		Prompt    string `json:"prompt"`
-		AgentID   string `json:"agentId"`
-		Model     string `json:"model"`
-		WorkDir   string `json:"workDir"`
+	params, err := decodeStartRunArgs(args)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.Unmarshal(args, &params); err != nil {
-		return nil, fmt.Errorf("invalid arguments: %w", err)
+	workDir, err := validateStartRunWorkDir(params.WorkDir, s.workspaceAllowlist)
+	if err != nil {
+		return nil, err
 	}
-	if params.ProjectID == "" {
-		return nil, errcode.ErrProjectIDRequired
-	}
-	if params.ThreadID == "" {
-		return nil, errcode.ErrThreadIDRequired
-	}
-	if strings.TrimSpace(params.Prompt) == "" {
-		return nil, errcode.ErrPromptRequired
-	}
-
-	// Require non-empty workDir for adapter runs (#854), then validate against
-	// the shared REST/MCP workspace allowlist policy (AH-SR-006 / #998):
-	// EvalSymlinks + IsPathWithin via security.ValidateWorkDirAgainstAllowlist.
-	params.WorkDir = strings.TrimSpace(params.WorkDir)
-	if params.WorkDir == "" {
-		return nil, errcode.ErrWorkDirRequired
-	}
-	if err := security.ValidateWorkDirAgainstAllowlist(params.WorkDir, s.workspaceAllowlist); err != nil {
-		if errors.Is(err, security.ErrWorkspaceAllowlistEmpty) {
-			return nil, errcode.ErrWorkspaceAllowlistNotConfigured
-		}
-		if errors.Is(err, security.ErrWorkspaceOutsideAllowlist) {
-			return nil, errcode.ErrWorkspaceNotAllowed
-		}
-		return nil, fmt.Errorf("invalid workDir: %w", err)
-	}
+	params.WorkDir = workDir
 
 	// Verify project and thread exist
 	thread, ok := s.store.GetThread(params.ThreadID)
@@ -181,11 +213,8 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	}
 
 	// Check for active run
-	runs := s.store.ListRuns(params.ThreadID)
-	for _, r := range runs {
-		if r.Status == "queued" || r.Status == "started" {
-			return nil, fmt.Errorf("thread already has an active run: %s", r.ID)
-		}
+	if err := errIfActiveRunExists(s.store, params.ThreadID); err != nil {
+		return nil, err
 	}
 
 	// Generate run ID and create the run
