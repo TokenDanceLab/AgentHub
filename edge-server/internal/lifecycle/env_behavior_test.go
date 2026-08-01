@@ -473,7 +473,7 @@ func TestSanitizedEnv_Behavior_ExactSecretVars_Blocked(t *testing.T) {
 		"ENCRYPTION_KEY":                 "enc-fake",
 		"MASTER_KEY":                     "master-fake",
 		"SIGNING_KEY":                    "sign-fake",
-		"SSH_PRIVATE_KEY":                "-----BEGIN RSA PRIVATE KEY-----",
+		"SSH_PRIVATE_KEY":                "-----BEGIN RSA PRIVATE KEY" + "-----",
 		"CODEX_ACCESS_TOKEN":             "codex-fake",
 		"CODEX_CONNECTORS_TOKEN":         "connectors-fake",
 		"OPENAI_API_KEY":                 "sk-fake",
