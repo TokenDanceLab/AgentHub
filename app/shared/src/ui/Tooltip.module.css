@@ -1,0 +1,97 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Tooltip — CSS-positioned a11y tooltip (hover + focus, ESC dismiss)
+   Ported from desktop ShellIconButton iconTooltip; simplified to a
+   fade-only enter animation so the side `transform` centering never
+   conflicts with the enter keyframes.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.host {
+  position: relative;
+  display: inline-block;
+  overflow: visible;
+  /* The host is a zero-padding wrapper; its box tracks the child's box so
+     the absolutely-positioned tooltip anchors to the trigger element. */
+}
+
+.tooltip {
+  position: absolute;
+  z-index: var(--z-tooltip, 600);
+  max-width: 220px;
+  padding: 5px 8px 6px;
+  border: 1px solid var(--glass-border, var(--border));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--glass-input-bg-hover, var(--card));
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  box-shadow: 0 10px 28px var(--glass-shadow-subtle, rgba(0, 0, 0, 0.34));
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.55;
+  min-height: 1.55em;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .tooltip {
+  border-color: transparent;
+  background: var(--glass-panel, var(--card));
+  box-shadow: 0 14px 32px var(--glass-shadow, rgba(0, 0, 0, 0.52));
+}
+
+/* Enter animation — gated by prefers-reduced-motion. Fade-only so the side
+   `transform` centering is never overridden mid-animation (no glitch). */
+@media (prefers-reduced-motion: no-preference) {
+  .tooltip {
+    animation: tooltipIn 0.12s ease-out backwards;
+  }
+}
+
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Side positioning ───────────────────────────────────────────────
+   transform is reserved for centering only; the enter animation does not
+   touch transform, so positioning stays stable across the fade. */
+
+.tooltip[data-side='top'] {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip[data-side='right'] {
+  top: 50%;
+  left: calc(100% + 9px);
+  transform: translateY(-50%);
+}
+
+.tooltip[data-side='bottom'] {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip[data-side='left'] {
+  top: 50%;
+  right: calc(100% + 9px);
+  transform: translateY(-50%);
+}
+
+/* ── Touch / no-hover fallback ─────────────────────────────────────
+   On touch-only viewports the hover trigger is meaningless; hide the
+   tooltip there to match the desktop ShellIconButton behaviour. Focus
+   trigger still works in principle, but CSS hides it — TODO: a future
+   revision should let focus tooltips render on touch. */
+@media (hover: none), (max-width: 767px) {
+  .tooltip {
+    display: none;
+  }
+}
