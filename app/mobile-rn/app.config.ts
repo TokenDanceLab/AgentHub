@@ -69,7 +69,7 @@ const config = {
   ],
   extra: {
     hubBaseUrl: resolveDefaultHubBaseUrl(),
-    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.vectorcontrol.tech',
+    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.tokendancelab.com',
   },
 } as ExpoConfig;
 
