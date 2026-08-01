@@ -14,6 +14,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -227,8 +228,20 @@ func TestCodexACPAadapterParseStreamWithMockACPPeer(t *testing.T) {
 		t.Fatalf("ParseStream: %v", err)
 	}
 
-	if got := strings.Join(agent.gotMethods(), ","); got != "initialize,session/new,session/prompt" {
-		t.Errorf("request sequence = %q, want initialize,session/new,session/prompt", got)
+	// The fake agent records a request method only AFTER writing its response
+	// (acp_client_test.go fakeACPAgent.run: write-then-record), so the client
+	// can finish ParseStream before the peer goroutine records session/prompt.
+	// Poll briefly instead of asserting immediately — the record must arrive,
+	// just not synchronously with the client's last read.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if got := strings.Join(agent.gotMethods(), ","); got == "initialize,session/new,session/prompt" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("request sequence = %q, want initialize,session/new,session/prompt", strings.Join(agent.gotMethods(), ","))
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	got := emitterAll(emitter)
