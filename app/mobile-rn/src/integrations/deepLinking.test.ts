@@ -17,7 +17,7 @@ describe('AgentHub mobile deep links', () => {
     expect(isAgentHubAuthCallback('agenthub://auth/callback?code=abc&state=123')).toBe(true);
     expect(isAgentHubAuthCallback('agenthub://runs/123')).toBe(false);
     expect(isAgentHubAuthCallback('agenthub://auth/callback-extra?code=abc&state=123')).toBe(false);
-    expect(isAgentHubAuthCallback('https://id.vectorcontrol.tech/callback')).toBe(false);
+    expect(isAgentHubAuthCallback('https://id.tokendancelab.com/callback')).toBe(false);
   });
 
   it('parses TokenDance ID OIDC authorization code callbacks', () => {
@@ -50,7 +50,7 @@ describe('AgentHub mobile deep links', () => {
   });
 
   it('rejects non-AgentHub callbacks and malformed URLs', () => {
-    expect(parseOidcCallback('https://id.vectorcontrol.tech/callback?code=abc&state=123')).toEqual({
+    expect(parseOidcCallback('https://id.tokendancelab.com/callback?code=abc&state=123')).toEqual({
       kind: 'invalid',
       reason: 'invalid_callback',
     });
@@ -131,7 +131,7 @@ describe('AgentHub mobile deep links', () => {
       kind: 'invalid',
       reason: 'invalid_url',
     });
-    expect(parseAgentHubDeepLink('https://id.vectorcontrol.tech/callback')).toEqual({
+    expect(parseAgentHubDeepLink('https://id.tokendancelab.com/callback')).toEqual({
       kind: 'invalid',
       reason: 'invalid_scheme',
     });

@@ -3,7 +3,7 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 const LIVE_BACKEND_HOSTS = new Set([
   'api.hub.vectorcontrol.tech',
   'hub.vectorcontrol.tech',
-  'id.vectorcontrol.tech',
+  'id.tokendancelab.com',
   'api.vectorcontrol.tech',
   'localhost:8080',
   '127.0.0.1:8080',

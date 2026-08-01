@@ -6,7 +6,7 @@ import "log/slog"
 
 // TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
 type TokenDanceIDConfig struct {
-	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.vectorcontrol.tech).
+	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.tokendancelab.com).
 	IssuerURL string `mapstructure:"issuer_url"`
 	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/oidc/jwks when empty.
 	JWKSURI string `mapstructure:"jwks_uri"`

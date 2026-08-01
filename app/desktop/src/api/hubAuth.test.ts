@@ -124,7 +124,7 @@ describe('Hub OIDC API contract (mocked)', () => {
   it('oidcAuthorize sends correct payload to Hub', async () => {
     const mockResponse = {
       state: 'hub-generated-state',
-      authorization_url: 'https://id.vectorcontrol.tech/oidc/auth?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
+      authorization_url: 'https://id.tokendancelab.com/oidc/auth?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
     };
 
     const fetchMock = vi.fn().mockResolvedValue({
@@ -152,7 +152,7 @@ describe('Hub OIDC API contract (mocked)', () => {
 
     const data = await res.json();
     expect(data.state).toBe('hub-generated-state');
-    expect(data.authorization_url).toContain('id.vectorcontrol.tech');
+    expect(data.authorization_url).toContain('id.tokendancelab.com');
     const [, authorizeInit] = fetchMock.mock.calls[0] as [string, RequestInit];
     const sent = JSON.parse(authorizeInit.body as string);
     expect(sent.redirect_uri).toBe('http://127.0.0.1:49152/callback');
