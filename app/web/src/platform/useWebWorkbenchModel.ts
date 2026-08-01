@@ -398,21 +398,27 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   );
 
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
-  const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
-    target.target_type === 'local_edge' &&
-    target.is_online === true &&
-    (target.health_state === 'online' || target.health_state === 'healthy')
+  const onlineLocalEdgeTargets = useMemo(
+    () => (executionTargets.data?.items ?? []).filter((target) =>
+      target.target_type === 'local_edge' &&
+      target.is_online === true &&
+      (target.health_state === 'online' || target.health_state === 'healthy')
+    ),
+    [executionTargets.data],
   );
-  const composerExecutionTargets = hubReady || realMode
-    ? onlineLocalEdgeTargets.map((target) => {
-        const id = String(target.id ?? '');
-        const name = target.name ? String(target.name) : '';
-        return {
-          id,
-          label: name ? `${name} (${id})` : id,
-        };
-      })
-    : undefined;
+  const composerExecutionTargets = useMemo(
+    () => hubReady || realMode
+      ? onlineLocalEdgeTargets.map((target) => {
+          const id = String(target.id ?? '');
+          const name = target.name ? String(target.name) : '';
+          return {
+            id,
+            label: name ? `${name} (${id})` : id,
+          };
+        })
+      : undefined,
+    [hubReady, realMode, onlineLocalEdgeTargets],
+  );
   const executionTargetStatus = useMemo(
     () => resolveWebExecutionTargetStatus({
       hubReady,
@@ -499,6 +505,52 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     void cancelAgentTaskMut.mutateAsync(taskId).catch(() => {});
   }, [activeAgentTask.data?.taskId, cancelAgentTaskMut]);
 
+  const workbenchStatus = useMemo(
+    () => ({
+      dataMode: dataModeContract.statusLabel,
+      targetState: executionTargetStatus.state,
+      targetLabel: executionTargetStatus.selectedTarget
+        ? executionTargetLabel(executionTargetStatus.selectedTarget)
+        : undefined,
+      initialLoading: hubReady
+        && (sessions.isLoading || (Boolean(activeHubSessionId) && messages.isLoading))
+        && conversations.length === 0
+        && !sessions.error
+        && !messages.error,
+      ...(sessions.error || messages.error
+        ? {
+            loadError: errorMessage(
+              sessions.error ?? messages.error,
+              'Hub chat load failed',
+            ),
+          }
+        : {}),
+      replayLabel: activeHubSessionId
+        ? activeAgentTaskId
+          ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length) === 1 ? '' : 's'} observed`
+          : `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
+        : realMode
+          ? 'Hub replay: no active Hub session'
+          : 'Fixture replay: shared demo transcript',
+    }),
+    [
+      dataModeContract,
+      executionTargetStatus,
+      hubReady,
+      realMode,
+      sessions.isLoading,
+      sessions.error,
+      messages.isLoading,
+      messages.error,
+      conversations,
+      activeHubSessionId,
+      activeAgentTaskId,
+      activeAgentTaskSummary.data,
+      mergedRuntimeEvents,
+      liveRuntimeEvents,
+    ],
+  );
+
   return {
     activeConversationId,
     isAgentRunning,
@@ -570,33 +622,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       ? (action: ApprovalDecisionAction) => decideApproval.mutateAsync(action)
       : undefined,
     runtimeEvidence,
-    workbenchStatus: {
-      dataMode: dataModeContract.statusLabel,
-      targetState: executionTargetStatus.state,
-      targetLabel: executionTargetStatus.selectedTarget
-        ? executionTargetLabel(executionTargetStatus.selectedTarget)
-        : undefined,
-      initialLoading: hubReady
-        && (sessions.isLoading || (Boolean(activeHubSessionId) && messages.isLoading))
-        && conversations.length === 0
-        && !sessions.error
-        && !messages.error,
-      ...(sessions.error || messages.error
-        ? {
-            loadError: errorMessage(
-              sessions.error ?? messages.error,
-              'Hub chat load failed',
-            ),
-          }
-        : {}),
-      replayLabel: activeHubSessionId
-        ? activeAgentTaskId
-          ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length) === 1 ? '' : 's'} observed`
-          : `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
-        : realMode
-          ? 'Hub replay: no active Hub session'
-          : 'Fixture replay: shared demo transcript',
-    },
+    workbenchStatus,
     transcript: surfacedTranscript,
     agentActivity,
   };
