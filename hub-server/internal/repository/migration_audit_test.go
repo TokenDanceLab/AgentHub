@@ -164,6 +164,31 @@ func TestMigration0047ExecutionTargetsCreatesActiveLocalEdgeDeviceUniqueness(t *
 	requireSQL(t, normalizedDown, "drop index if exists idx_execution_targets_active_local_edge_device_unique")
 }
 
+func TestMigration0057DevicesRestoresPrimaryKey(t *testing.T) {
+	up := readMigration(t, "0057_devices_primary_key.up.sql")
+	down := readMigration(t, "0057_devices_primary_key.down.sql")
+
+	normalizedUp := normalizeSQL(stripSQLComments(up))
+	requireSQL(t, normalizedUp, "from pg_constraint")
+	requireSQL(t, normalizedUp, "where conrelid = 'devices'::regclass")
+	requireSQL(t, normalizedUp, "and contype = 'p'")
+	const alterPrimaryKey = "alter table devices add constraint devices_pkey primary key (id)"
+	if strings.Count(normalizedUp, alterPrimaryKey) != 1 {
+		t.Fatalf("0057 up migration must contain exactly one guarded primary-key repair: %q", normalizedUp)
+	}
+	ifStart := strings.Index(normalizedUp, "if not exists (")
+	alterIndex := strings.Index(normalizedUp, alterPrimaryKey)
+	endIfIndex := strings.Index(normalizedUp, "end if;")
+	if ifStart < 0 || alterIndex <= ifStart || endIfIndex <= alterIndex {
+		t.Fatalf("0057 primary-key repair must be inside the IF NOT EXISTS block: %q", normalizedUp)
+	}
+
+	normalizedDown := normalizeSQL(stripSQLComments(down))
+	if normalizedDown != "select 1;" {
+		t.Fatalf("0057 down migration must be exactly SELECT 1 after comments, got %q", normalizedDown)
+	}
+}
+
 func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 
@@ -282,6 +307,30 @@ func quotePostgresIdentifier(identifier string) string {
 
 func normalizeSQL(sql string) string {
 	return strings.Join(strings.Fields(strings.ToLower(sql)), " ")
+}
+
+func stripSQLComments(sql string) string {
+	for {
+		start := strings.Index(sql, "/*")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(sql[start+2:], "*/")
+		if end < 0 {
+			sql = sql[:start]
+			break
+		}
+		end += start + 4
+		sql = sql[:start] + " " + sql[end:]
+	}
+
+	lines := strings.Split(sql, "\n")
+	for i, line := range lines {
+		if comment := strings.Index(line, "--"); comment >= 0 {
+			lines[i] = line[:comment]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func requireSQL(t *testing.T, sql string, want string) {
