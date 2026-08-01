@@ -6,8 +6,11 @@
  * protocol coupling. Reuses the existing `diff` (jsdiff v8) dependency — no
  * new deps; `diff.ts` already imports from the same package.
  *
- * Step 1 defines `WordDiffToken` locally. Step 2 will lift it into
- * DiffReviewPanelTypes.ts and wire tokens into SideBySideCell.wordDiff.
+ * Step 2 lift (done): `WordDiffToken` now lives in `DiffReviewPanelTypes.ts`
+ * beside the diff-row types that consume it; this module re-exports it for
+ * backward compatibility with existing callers/tests. Step 3 will wire the
+ * tokens into the HAST word-diff injector in `prismRegistry.ts` (rendering
+ * stays untouched here).
  *
  * Boundaries (see P6 design report §5):
  *  - CJK-dominant lines fall back to `diffChars` (Chinese has no word
@@ -21,18 +24,11 @@ import { diffWords, diffChars } from 'diff';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-/**
- * A single word-diff token.
- *  - `context` = unchanged run, shared by both old and new
- *  - `removed` = exists only in old
- *  - `added`   = exists only in new
- *
- * TODO(P6 Step 2): lift into DiffReviewPanelTypes.ts, then re-export here.
- */
-export interface WordDiffToken {
-  type: 'added' | 'removed' | 'context';
-  text: string;
-}
+// `WordDiffToken` is the canonical type for diff-row consumers; it lives in
+// DiffReviewPanelTypes.ts. Re-export here so existing imports of
+// `diffWordTokens` (e.g. its own test file) keep resolving unchanged.
+import type { WordDiffToken } from './DiffReviewPanelTypes';
+export type { WordDiffToken };
 
 // ── Guards / heuristics ──────────────────────────────────────────────────
 
