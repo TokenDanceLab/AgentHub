@@ -296,7 +296,7 @@ type errPathTeamState struct {
 	DB                 *gorm.DB
 }
 
-func errPathTeamSetup(t *testing.T) *errPathTeamState {
+func errPathTeamSetup(t *testing.T, overrides ...agentteam.AgentTeamGuardrails) *errPathTeamState {
 	t.Helper()
 
 	db := errPathTeamDB(t)
@@ -305,15 +305,21 @@ func errPathTeamSetup(t *testing.T) *errPathTeamState {
 	gin.SetMode(gin.TestMode)
 	mockAgent := &errPathMockAgentService{}
 
-	// Use tight guardrails for error path testing.
+	// Use tight guardrails for error path testing. MaxActiveSubAgentsPerRun
+	// defaults high (8) so the repeat/task/budget limits dominate the tests
+	// that exercise them; TestTeamRunActiveSubAgentLimit passes its own
+	// guardrails with MaxActiveSubAgentsPerRun=2.
 	guardrails := agentteam.AgentTeamGuardrails{
 		MaxDelegationDepth:       3,
-		MaxActiveSubAgentsPerRun: 2,
+		MaxActiveSubAgentsPerRun: 8,
 		MaxRouteRepeats:          3,
 		MaxTasksPerTeamRun:       5,
 		AssignmentTimeout:        30 * time.Minute,
 		MaxTeamRunBudgetTokens:   10, // tiny budget to trigger exceeded easily
 		MaxTeamRunBudgetUsagePct: 5.0,
+	}
+	if len(overrides) > 0 {
+		guardrails = overrides[0]
 	}
 
 	teamSvc := agentteam.NewAgentTeamServiceWithGuardrails(db, mockAgent, nil, guardrails)
@@ -675,7 +681,17 @@ func TestTeamRunBudgetExceeded(t *testing.T) {
 // TestTeamRunActiveSubAgentLimit verifies that when the maximum number of
 // active sub-agents is reached, new route decisions are rejected.
 func TestTeamRunActiveSubAgentLimit(t *testing.T) {
-	st := errPathTeamSetup(t)
+	// This test exercises MaxActiveSubAgentsPerRun=2 specifically, so it
+	// overrides the errPathTeamSetup default (8) with its own guardrails.
+	st := errPathTeamSetup(t, agentteam.AgentTeamGuardrails{
+		MaxDelegationDepth:       3,
+		MaxActiveSubAgentsPerRun: 2,
+		MaxRouteRepeats:          3,
+		MaxTasksPerTeamRun:       5,
+		AssignmentTimeout:        30 * time.Minute,
+		MaxTeamRunBudgetTokens:   10,
+		MaxTeamRunBudgetUsagePct: 5.0,
+	})
 
 	// Guardrails: MaxActiveSubAgentsPerRun=2.
 	// Create 2 pending assignments to saturate the active limit.

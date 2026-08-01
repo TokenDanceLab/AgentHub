@@ -22,6 +22,7 @@ func TestAttachmentDownloadAllowsSessionMemberAfterFileMessage(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 	alice := register(t, "tattshare_a", "pass1234", "AttachShareA")
 	bob := register(t, "tattshare_b", "pass1234", "AttachShareB")
+	acceptFriendRequest(t, alice, bob)
 	if err := clearRateLimitKeys(); err != nil {
 		t.Fatalf("clear rate limits before outsider register: %v", err)
 	}

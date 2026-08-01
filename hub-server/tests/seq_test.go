@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/google/uuid"
 )
 
@@ -126,7 +127,7 @@ func TestConcurrentSendNoDuplicateSeq(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			r := sendMsg(t, a.Token, sid, clientMsgIDs[idx], fmt.Sprintf("concurrent-msg-%d", idx))
-			if r.GetCode() != "OK" {
+			if r.GetCode() != errcode.OK.Code {
 				errCh <- fmt.Errorf("send %d failed: %s %s", idx, r.GetCode(), r.GetMsg())
 			}
 		}(i)
@@ -245,7 +246,7 @@ func TestSendMessageRejectNonMember(t *testing.T) {
 
 	// C is not a member of A-B's private session.
 	r := sendMsg(t, c.Token, sid, uuid.New().String(), "intruder!")
-	mustCode(t, r, "SESSION_NOT_MEMBER", "non-member send rejected")
+	mustCode(t, r, errcode.SessionNotMember.Code, "non-member send rejected")
 
 	t.Logf("non-member send correctly rejected with SESSION_NOT_MEMBER")
 }
@@ -270,7 +271,7 @@ func TestSendMessageToDissolvedSession(t *testing.T) {
 
 	// Now try to send a message.
 	r := sendMsg(t, a.Token, sid, uuid.New().String(), "should fail")
-	mustCode(t, r, "SESSION_DISSOLVED", "send to dissolved session rejected")
+	mustCode(t, r, errcode.SessionDissolved.Code, "send to dissolved session rejected")
 
 	t.Logf("send to dissolved session correctly rejected with SESSION_DISSOLVED")
 }
@@ -292,7 +293,7 @@ func TestRecallNotOwnByNonSender(t *testing.T) {
 
 	// B tries to recall A's message (B is not the sender, not the owner).
 	rec := parse(postAuth("/client/messages/"+msgID+"/recall", b.Token, nil))
-	mustCode(t, rec, "SESSION_NOT_MEMBER", "recall rejected for non-sender non-owner")
+	mustCode(t, rec, errcode.SessionNotMember.Code, "recall rejected for non-sender non-owner")
 
 	t.Logf("recall by non-sender correctly rejected with SESSION_NOT_MEMBER")
 }
