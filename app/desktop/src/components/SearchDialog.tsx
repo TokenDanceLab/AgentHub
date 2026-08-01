@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, User, Bot, MessageSquareText } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
+import { useFocusTrap } from '@shared/ui/focusTrap';
 import type { ChatMessage } from '@shared/types/chat';
 import type { ThreadInfo } from '@shared/types';
 import styles from './SearchDialog.module.css';
@@ -85,6 +86,10 @@ export default function SearchDialog({ messages, onSelect, threads = [], onSelec
       })),
     );
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus trap: saves trigger, wraps Tab/Shift+Tab, returns focus on close.
+  useFocusTrap(dialogRef, open);
 
   // Esc to close (Ctrl+K to open is handled by the central useGlobalKeyboardShortcuts hook)
   useEffect(() => {
@@ -159,6 +164,7 @@ export default function SearchDialog({ messages, onSelect, threads = [], onSelec
   return (
     <div className={styles.overlay} onClick={closeDialog}>
       <div
+        ref={dialogRef}
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
