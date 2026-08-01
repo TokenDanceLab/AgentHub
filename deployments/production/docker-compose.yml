@@ -80,7 +80,7 @@ services:
       AGENTHUB_UPLOAD_DIR: /app/uploads
       AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
       # TokenDance ID OIDC
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: https://id.vectorcontrol.tech
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: https://id.tokendancelab.com
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: https://hub.vectorcontrol.tech/auth/tokendance/callback

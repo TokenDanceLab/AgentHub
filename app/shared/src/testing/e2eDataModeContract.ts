@@ -295,7 +295,7 @@ const LOCAL_EDGE_HOSTS = new Set([
 ]);
 
 const TOKEN_DANCE_ID_HOSTS = new Set([
-  'id.vectorcontrol.tech',
+  'id.tokendancelab.com',
 ]);
 
 const GATEWAY_HOSTS = new Set([

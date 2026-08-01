@@ -17,7 +17,7 @@ fs.mkdirSync(outputDir, { recursive: true });
 const blockedHosts = new Set([
   'api.hub.vectorcontrol.tech',
   'hub.vectorcontrol.tech',
-  'id.vectorcontrol.tech',
+  'id.tokendancelab.com',
   'api.vectorcontrol.tech',
   'localhost:3210',
   '127.0.0.1:3210',

@@ -96,7 +96,7 @@ try {
         $blocked = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
-            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "blocked-discovery.json" '{"issuer":"https://id.vectorcontrol.tech","authorization_endpoint":"https://id.vectorcontrol.tech/oidc/authorize","token_endpoint":"https://id.vectorcontrol.tech/oidc/token","jwks_uri":"https://id.vectorcontrol.tech/oidc/jwks"}')
+            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "blocked-discovery.json" '{"issuer":"https://id.tokendancelab.com","authorization_endpoint":"https://id.tokendancelab.com/oidc/authorize","token_endpoint":"https://id.tokendancelab.com/oidc/token","jwks_uri":"https://id.tokendancelab.com/oidc/jwks"}')
         )
         Assert-True ($blocked.ExitCode -ne 0) "default run blocks when approved env is absent" $blocked.Output
         Assert-True ($blocked.Output -match "Status: BLOCKED") "blocked run reports BLOCKED" $blocked.Output
@@ -106,10 +106,10 @@ try {
         $badDiscovery = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
-            "-IssuerUrl", "https://id.vectorcontrol.tech",
+            "-IssuerUrl", "https://id.tokendancelab.com",
             "-ClientId", "agenthub-approved-client",
             "-TestAccountRef", "approved-test-account:agenthub-login-smoke",
-            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "bad-discovery.json" '{"issuer":"https://wrong.example","authorization_endpoint":"https://id.vectorcontrol.tech/oidc/authorize","token_endpoint":"https://id.vectorcontrol.tech/oidc/token","jwks_uri":"https://id.vectorcontrol.tech/oidc/jwks"}')
+            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "bad-discovery.json" '{"issuer":"https://wrong.example","authorization_endpoint":"https://id.tokendancelab.com/oidc/authorize","token_endpoint":"https://id.tokendancelab.com/oidc/token","jwks_uri":"https://id.tokendancelab.com/oidc/jwks"}')
         )
         Assert-True ($badDiscovery.ExitCode -ne 0) "issuer mismatch blocks readiness" $badDiscovery.Output
         Assert-True ($badDiscovery.Output -match "discovery issuer") "issuer mismatch is explicit" $badDiscovery.Output
@@ -119,10 +119,10 @@ try {
         $secretRun = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
-            "-IssuerUrl", "https://id.vectorcontrol.tech",
+            "-IssuerUrl", "https://id.tokendancelab.com",
             "-ClientId", $secretLike,
             "-TestAccountRef", "approved-test-account:agenthub-login-smoke",
-            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "secret-discovery.json" '{"issuer":"https://id.vectorcontrol.tech","authorization_endpoint":"https://id.vectorcontrol.tech/oidc/authorize","token_endpoint":"https://id.vectorcontrol.tech/oidc/token","jwks_uri":"https://id.vectorcontrol.tech/oidc/jwks"}')
+            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "secret-discovery.json" '{"issuer":"https://id.tokendancelab.com","authorization_endpoint":"https://id.tokendancelab.com/oidc/authorize","token_endpoint":"https://id.tokendancelab.com/oidc/token","jwks_uri":"https://id.tokendancelab.com/oidc/jwks"}')
         )
         Assert-True ($secretRun.ExitCode -ne 0) "secret-like client input fails closed" $secretRun.Output
         Assert-True ($secretRun.Output -match "secret-like") "secret-like failure is generic" $secretRun.Output
@@ -132,10 +132,10 @@ try {
         $ready = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
-            "-IssuerUrl", "https://id.vectorcontrol.tech",
+            "-IssuerUrl", "https://id.tokendancelab.com",
             "-ClientId", "agenthub-approved-client",
             "-TestAccountRef", "approved-test-account:agenthub-login-smoke",
-            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "ready-discovery.json" '{"issuer":"https://id.vectorcontrol.tech","authorization_endpoint":"https://id.vectorcontrol.tech/oidc/authorize","token_endpoint":"https://id.vectorcontrol.tech/oidc/token","jwks_uri":"https://id.vectorcontrol.tech/oidc/jwks","response_types_supported":["code"],"code_challenge_methods_supported":["S256"]}'),
+            "-DiscoveryDocumentPath", (New-DiscoveryFixture $tmpRoot "ready-discovery.json" '{"issuer":"https://id.tokendancelab.com","authorization_endpoint":"https://id.tokendancelab.com/oidc/authorize","token_endpoint":"https://id.tokendancelab.com/oidc/token","jwks_uri":"https://id.tokendancelab.com/oidc/jwks","response_types_supported":["code"],"code_challenge_methods_supported":["S256"]}'),
             "-OutputPath", $outputPath
         )
         Assert-True ($ready.ExitCode -eq 0) "approved metadata and discovery report READY_FOR_OPERATOR" $ready.Output
