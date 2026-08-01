@@ -33,7 +33,7 @@ describe('web Hub auth token auto-login', () => {
             nickname: 'Alice',
             avatar_url: '',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
@@ -64,7 +64,7 @@ describe('web Hub auth token auto-login', () => {
         deviceId: DEVICE_ID,
         redirectUri: `${window.location.origin}/auth/tokendance/callback`,
         createdAt: Date.now(),
-      }),
+      })
     );
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -91,7 +91,7 @@ describe('web Hub auth token auto-login', () => {
               avatar_url: '',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
@@ -109,7 +109,11 @@ describe('web Hub auth token auto-login', () => {
   });
 
   it('uses Hub-issued OIDC session to address a registered Desktop Edge target', async () => {
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=web-code&state=state-web-fixture');
+    window.history.pushState(
+      {},
+      '',
+      '/auth/tokendance/callback?code=web-code&state=state-web-fixture'
+    );
     sessionStorage.setItem(
       'agenthub_oidc_pkce_pending',
       JSON.stringify({
@@ -118,7 +122,7 @@ describe('web Hub auth token auto-login', () => {
         deviceId: DEVICE_ID,
         redirectUri: `${window.location.origin}/auth/tokendance/callback`,
         createdAt: Date.now(),
-      }),
+      })
     );
 
     const requestedUrls: string[] = [];
@@ -148,7 +152,7 @@ describe('web Hub auth token auto-login', () => {
               avatar_url: '',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
@@ -173,7 +177,7 @@ describe('web Hub auth token auto-login', () => {
               page: { hasMore: false },
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
@@ -215,5 +219,122 @@ describe('web Hub auth token auto-login', () => {
     expect(requestedUrlText).not.toContain(localEdgeLoopback);
     expect(requestedUrlText).not.toContain(edgeRunApi);
     expect(requestedUrlText).not.toContain(edgeEventsApi);
+  });
+
+  it('refreshes an expired session, notifies subscribers, and logs out cleanly', async () => {
+    sessionStorage.setItem('agenthub_hub_token', 'expired-token');
+    sessionStorage.setItem('agenthub_hub_refresh_token', 'refresh-token');
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/client/auth/me')) {
+        const auth = getAuthorization(init);
+        if (auth === 'Bearer expired-token')
+          return new Response(
+            JSON.stringify({ error: { code: 'token_expired', message: 'expired' } }),
+            { status: 401 }
+          );
+        return new Response(
+          JSON.stringify({
+            id: 'user-refresh',
+            username: 'refreshed',
+            nickname: 'Refreshed',
+            avatar_url: '',
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith('/client/auth/refresh')) {
+        return new Response(
+          JSON.stringify({
+            access_token: 'fresh-token',
+            refresh_token: 'fresh-refresh',
+            expires_in: 3600,
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith('/client/auth/logout')) return new Response('{}', { status: 200 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { createHubAuth } = await loadAuthModule();
+    const auth = createHubAuth();
+    const seen: boolean[] = [];
+    const unsubscribe = auth.subscribe((state) => seen.push(state.isAuthenticated));
+
+    await expect(auth.tryAutoLogin()).resolves.toBe(true);
+    await auth.logout();
+    unsubscribe();
+
+    expect(auth.getState()).toMatchObject({
+      token: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+      tokenSource: null,
+    });
+    expect(seen).toEqual([true, false]);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/client/auth/refresh'))).toBe(
+      true
+    );
+  });
+
+  it('clears credentials when refresh fails after an unauthorized profile', async () => {
+    sessionStorage.setItem('agenthub_hub_token', 'bad-token');
+    sessionStorage.setItem('agenthub_hub_refresh_token', 'bad-refresh');
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/client/auth/me'))
+        return new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'no' } }), {
+          status: 401,
+        });
+      if (url.endsWith('/client/auth/refresh'))
+        return new Response(JSON.stringify({ error: { code: 'refresh_failed', message: 'no' } }), {
+          status: 401,
+        });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { createHubAuth } = await loadAuthModule();
+
+    await expect(createHubAuth().tryAutoLogin()).resolves.toBe(false);
+    expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
+    expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+  });
+
+  it('rejects malformed, mismatched, and expired browser callbacks without exchanging tokens', async () => {
+    const { createHubAuth } = await loadAuthModule();
+    const auth = createHubAuth();
+
+    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=s');
+    sessionStorage.setItem('agenthub_oidc_pkce_pending', '{bad-json');
+    await expect(auth.tryAutoLogin()).resolves.toBe(false);
+
+    sessionStorage.setItem(
+      'agenthub_oidc_pkce_pending',
+      JSON.stringify({
+        state: 'expected',
+        codeVerifier: 'v',
+        deviceId: DEVICE_ID,
+        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        createdAt: Date.now(),
+      })
+    );
+    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=other');
+    await expect(auth.tryAutoLogin()).rejects.toThrow(/state mismatch/i);
+
+    sessionStorage.setItem(
+      'agenthub_oidc_pkce_pending',
+      JSON.stringify({
+        state: 'old',
+        codeVerifier: 'v',
+        deviceId: DEVICE_ID,
+        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        createdAt: Date.now() - 11 * 60 * 1000,
+      })
+    );
+    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=old');
+    await expect(auth.tryAutoLogin()).rejects.toThrow(/expired/i);
   });
 });
