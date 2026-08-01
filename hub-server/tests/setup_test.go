@@ -67,6 +67,15 @@ func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Contex
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
+		// -short path: this package's integration tests require PostgreSQL and
+		// Redis (see repository.InitDB / cache.InitRedis / RunMigrationsFrom
+		// below), which the -short coverage/race CI runs do not provision.
+		// Skip the whole package LOUDLY (not a silent os.Exit(0)) so CI logs
+		// record why zero tests ran instead of reporting a fake green pass.
+		// The dedicated backend-integration CI job runs this package WITHOUT
+		// -short against real Postgres + Redis service containers, which is
+		// where these integration tests actually execute.
+		fmt.Println("--- SKIP: hub-server/tests integration package: requires PostgreSQL + Redis; run `go test ./tests/ -count=1` (no -short) with PG+Redis to execute (see backend-integration CI job)")
 		os.Exit(0)
 	}
 
