@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -26,7 +27,7 @@ func TestMessagePinRejectsCrossSessionMessage(t *testing.T) {
 	resp := parse(postAuth("/client/messages/"+otherMessageID+"/pin", alice.Token, map[string]string{
 		"session_id": aliceSessionID,
 	}))
-	mustCode(t, resp, "MSG_NOT_FOUND", "pin message from another session")
+	mustCode(t, resp, errcode.MsgNotFound.Code, "pin message from another session")
 }
 
 func TestMessagePinsRejectHistoricalCrossSessionPinAtDatabase(t *testing.T) {

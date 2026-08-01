@@ -92,9 +92,9 @@ func newEdgeGinCtx(method, path string, body any, kv ...string) (*gin.Context, *
 	return c, w
 }
 
-func parseEdgeResp(t *testing.T, w *httptest.ResponseRecorder) handler.Response {
+func parseEdgeResp(t *testing.T, w *httptest.ResponseRecorder) apiResp {
 	t.Helper()
-	var resp handler.Response
+	var resp apiResp
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestEdgeDeviceRegister(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "OK" {
+	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.deviceID != testDeviceID {
@@ -227,7 +227,7 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "OK" {
+	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if ackedTaskID != "task-001" {
@@ -261,7 +261,7 @@ func TestEdgeAgentTaskAckNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "agent_task_not_found" {
+	if resp.GetCode() != errcode.AgentTaskNotFound.Code {
 		t.Errorf("expected agent_task_not_found, got %s", resp.Code)
 	}
 }
@@ -299,7 +299,7 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "OK" {
+	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-002" {
@@ -416,7 +416,7 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "OK" {
+	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-005" {
@@ -512,7 +512,7 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "OK" {
+	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-008" {

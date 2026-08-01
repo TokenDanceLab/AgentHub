@@ -3,6 +3,8 @@ package tests
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 // ============================================================
@@ -39,7 +41,7 @@ func TestLeaveAndRejoinGroup(t *testing.T) {
 
 	// C tries to leave again - should fail (not a member)
 	w := postAuth("/client/sessions/"+sid+"/leave", c.Token, nil)
-	mustCode(t, parse(w), "SESSION_NOT_MEMBER", "C leave again")
+	mustCode(t, parse(w), errcode.SessionNotMember.Code, "C leave again")
 
 	// A adds C back
 	mustOK(t, parse(postAuth("/client/sessions/"+sid+"/members", a.Token, map[string]interface{}{
@@ -74,7 +76,7 @@ func TestLeaveAsLastOwner(t *testing.T) {
 
 	// A (owner) tries to leave while other members exist - should fail
 	w := postAuth("/client/sessions/"+sid+"/leave", a.Token, nil)
-	mustCode(t, parse(w), "GROUP_OWNER_CANNOT_LEAVE", "owner cannot leave with others present")
+	mustCode(t, parse(w), errcode.GroupOwnerCannotLeave.Code, "owner cannot leave with others present")
 }
 
 func TestDissolveByNonOwner(t *testing.T) {
@@ -104,7 +106,7 @@ func TestDissolveByNonOwner(t *testing.T) {
 
 	// B tries to dissolve - should fail (not owner)
 	w := postAuth("/client/sessions/"+sid+"/dissolve", b.Token, nil)
-	mustCode(t, parse(w), "GROUP_NOT_OWNER", "non-owner cannot dissolve")
+	mustCode(t, parse(w), errcode.GroupNotOwner.Code, "non-owner cannot dissolve")
 }
 
 // ============================================================
@@ -158,7 +160,7 @@ func TestDuplicateFriendRequest(t *testing.T) {
 	w := postAuth("/client/contacts/friend-requests", a.Token, map[string]interface{}{
 		"friend_id": b.ID, "message": "Hi again",
 	})
-	mustCode(t, parse(w), "FRIEND_ALREADY", "duplicate friend request")
+	mustCode(t, parse(w), errcode.FriendAlready.Code, "duplicate friend request")
 }
 
 func TestAcceptNonPendingRequest(t *testing.T) {
@@ -179,11 +181,11 @@ func TestAcceptNonPendingRequest(t *testing.T) {
 	w2 := postAuth("/client/contacts/friend-requests", a.Token, map[string]interface{}{
 		"friend_id": b.ID, "message": "Hi again",
 	})
-	mustCode(t, parse(w2), "FRIEND_ALREADY", "request to existing friend")
+	mustCode(t, parse(w2), errcode.FriendAlready.Code, "request to existing friend")
 
 	// Try accepting a random UUID that isn't a valid request
 	w3 := postAuth("/client/contacts/friend-requests/00000000-0000-0000-0000-00000000dead/accept", a.Token, nil)
-	mustCode(t, parse(w3), "FRIEND_REQUEST_NOT_FOUND", "accept random uuid")
+	mustCode(t, parse(w3), errcode.FriendRequestNotFound.Code, "accept random uuid")
 }
 
 func TestSelfBlock(t *testing.T) {
@@ -192,7 +194,7 @@ func TestSelfBlock(t *testing.T) {
 
 	// Try to block self
 	w := postAuth("/client/contacts/"+a.ID+"/block", a.Token, nil)
-	mustCode(t, parse(w), "USER_INVALID_PARAM", "self block")
+	mustCode(t, parse(w), errcode.UserInvalidParam.Code, "self block")
 }
 
 // ============================================================
@@ -252,5 +254,5 @@ func TestGetMessagesWithoutMembership(t *testing.T) {
 
 	// C is not a member and not a friend of either - try to get messages
 	w2 := get("/client/sessions/"+sid+"/messages?limit=10", c.Token)
-	mustCode(t, parse(w2), "SESSION_NOT_MEMBER", "non-member cannot get messages")
+	mustCode(t, parse(w2), errcode.SessionNotMember.Code, "non-member cannot get messages")
 }

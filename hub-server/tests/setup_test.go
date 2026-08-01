@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
@@ -83,6 +84,12 @@ func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 	metrics.Register()
 
+	// Pre-declare one admin user so admin-gated endpoints (publish, audit)
+	// can be exercised by integration tests. RequireAdmin reads
+	// AGENTHUB_ADMIN_USERS once at first use, so this must happen before any
+	// request; TestMain runs before every test.
+	os.Setenv("AGENTHUB_ADMIN_USERS", testAdminUserID)
+
 	cfg, err := config.Load("../configs/config.yaml")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load config: %v", err))
@@ -142,6 +149,17 @@ func TestMain(m *testing.M) {
 	publicHandler := handler.NewPublicHandler(service.NewPublicStatsService(db), time.Now())
 
 	// Phase 1-7 handlers
+	// config.yaml ships production-empty TokenDance ID values (client_id "",
+	// redirect_uri "", allowed_redirect_uris []), which makes the OIDC
+	// authorize success path unreachable in tests. Inject a deterministic
+	// test redirect URI so authorize/callback flows are exercisable.
+	if cfg.TokenDanceID.RedirectURI == "" {
+		cfg.TokenDanceID.RedirectURI = "http://127.0.0.1:54321/callback"
+	}
+	if len(cfg.TokenDanceID.AllowedRedirectURIs) == 0 {
+		cfg.TokenDanceID.AllowedRedirectURIs = []string{"http://127.0.0.1:54321/callback"}
+	}
+
 	oidcService := oidc.NewService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
 	oidcHandler := handler.NewOIDCHandler(oidcService)
 	profileService := service.NewAgentProfileService(db)
@@ -410,13 +428,53 @@ func register(t *testing.T, username, password, nickname string) testUser {
 	return testUser{Username: username, Password: password, Token: token, ID: user.ID}
 }
 
+// testAdminUserID is pre-declared in AGENTHUB_ADMIN_USERS (see TestMain), so
+// registerAsAdmin users pass middleware.RequireAdmin for admin-gated
+// endpoints (profile/skill publish, audit list, market publish).
+const testAdminUserID = "11111111-1111-4111-8111-111111111111"
+
+func registerAsAdmin(t *testing.T, username, password, nickname string) testUser {
+	t.Helper()
+
+	user := model.User{
+		ID:       testAdminUserID,
+		Username: username,
+		Nickname: nickname,
+	}
+	// SkipHooks bypasses User.BeforeCreate (which always generates a UUIDv7
+	// ID), keeping the pre-declared admin ID.
+	if err := db.Session(&gorm.Session{SkipHooks: true}).Create(&user).Error; err != nil {
+		t.Fatalf("create admin test user %s failed: %v", username, err)
+	}
+
+	deviceID := testDeviceID(username, "web")
+	token, err := jwtutil.GenerateAccessToken(user.ID, "web", deviceID, testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate token for %s: %v", username, err)
+	}
+
+	return testUser{Username: username, Password: password, Token: token, ID: user.ID}
+}
+
 // seedRefreshToken stores a refresh token for the given user/device directly
 // in the DB — the same shape the OIDC callback persists (hash-only, TTL from
 // config) — and returns the raw token for use against /client/auth/refresh.
 // Password login used to be how tests obtained refresh tokens; it was removed
 // with the OIDC migration (#1367), so tests seed the row directly (#1369).
+// refresh_tokens.device_id has an FK to devices.id, so the device row is
+// seeded first (a real login registers it via device registration).
 func seedRefreshToken(t *testing.T, userID, deviceType, deviceID string) string {
 	t.Helper()
+
+	device := &model.Device{
+		ID:           deviceID,
+		UserID:       userID,
+		DeviceType:   deviceType,
+		Capabilities: "[]",
+	}
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(device).Error; err != nil {
+		t.Fatalf("seed device %s for refresh token: %v", deviceID, err)
+	}
 
 	raw, err := jwtutil.GenerateRefreshToken()
 	if err != nil {
