@@ -7,9 +7,39 @@ import type { DiffHunk } from '../diff';
 
 // ── Side-by-side row types ──────────────────────────────────────────────
 
+/**
+ * A single word-diff token (P6 Step 2).
+ *
+ * Lifted here from `diffWordTokens.ts` so it lives beside the diff-row types
+ * that consume it (`SideBySideCell.wordDiff`). `diffWordTokens.ts` re-exports
+ * it for backward compatibility with its existing callers/tests.
+ *
+ *  - `context` = unchanged run, shared by both old and new
+ *  - `removed` = exists only in old
+ *  - `added`   = exists only in new
+ */
+export interface WordDiffToken {
+  type: 'added' | 'removed' | 'context';
+  text: string;
+}
+
 export interface SideBySideCell {
   lineNumber?: number;
   content: string;
+  /**
+   * Word-diff tokens for a modified row pair (P6 Step 2). Filled only on the
+   * `modified` rowType by `buildSideBySideRows`; `undefined` on
+   * added/deleted/context cells and when the size guard skips word-diff.
+   *
+   * Per-column split (report §4.1): the left cell holds `removed`+`context`
+   * tokens (joining reproduces `content`); the right cell holds
+   * `added`+`context`. `null` is permitted because `produceWordDiffTokens`
+   * may return null under its size guard.
+   *
+   * TODO(P6 Step 3): rendering currently ignores this field — Step 3 wires
+   * it into the HAST word-diff injector in `prismRegistry.ts`.
+   */
+  wordDiff?: WordDiffToken[] | null;
 }
 
 export interface SideBySideRow {
