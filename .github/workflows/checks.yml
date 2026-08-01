@@ -231,6 +231,76 @@ jobs:
       - name: Edge focused backend packages
         run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
 
+  # ── Backend: Integration (real PostgreSQL + Redis) ──────────
+  # Q1: hub-server/tests integration suite (OIDC e2e / WS reconnect / seq
+  # continuity / edge-callback security / phase1-7) was silent-skipped by
+  # TestMain os.Exit(0) under -short, so CI was green but the suite never
+  # ran. This job provisions PostgreSQL + Redis service containers and runs
+  # the tests package WITHOUT -short so the integration suite actually
+  # executes. The -short jobs (go-hub / backend-focused-subset) keep their
+  # honest "SKIP" log from TestMain and continue to cover unit tests.
+  backend-integration:
+    name: Backend integration (PostgreSQL + Redis)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agenthub
+          POSTGRES_PASSWORD: agenthub
+          POSTGRES_DB: agenthub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenthub -d agenthub"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+    env:
+      # config.Load uses viper AutomaticEnv with AGENTHUB_ prefix; these wire
+      # the test config at the service containers (host=127.0.0.1 on the
+      # runner-host network for services with mapped ports).
+      AGENTHUB_DB_HOST: 127.0.0.1
+      AGENTHUB_DB_PORT: "5432"
+      AGENTHUB_DB_USER: agenthub
+      AGENTHUB_DB_PASSWORD: agenthub
+      AGENTHUB_DB_NAME: agenthub
+      AGENTHUB_DB_SSLMODE: disable
+      AGENTHUB_REDIS_HOST: 127.0.0.1
+      AGENTHUB_REDIS_PORT: "6379"
+      AGENTHUB_JWT_SECRET: "ci-integration-jwt-secret-min-32-chars-ok!!"
+      AGENTHUB_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      - name: Build hub-server
+        working-directory: hub-server
+        run: go build ./...
+
+      - name: Integration tests (no -short; real PostgreSQL + Redis)
+        working-directory: hub-server
+        run: go test ./tests/ -count=1 -timeout=20m
+
   # ── Cross-Platform Build ─────────────────────
   # Windows 构建保留在 release / release-readiness；日常 CI 只跑 ubuntu。
   cross-build:
