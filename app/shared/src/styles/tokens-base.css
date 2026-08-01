@@ -476,3 +476,118 @@ body {
     --td-border-hairline: color-mix(in oklch, var(--foreground) 13%, transparent);
   }
 }
+
+/* ═══ Forced colors (Windows High Contrast) baseline — a11y #20 ═══════════
+   tri-scan P2/N1: 全仓零 forced-colors / prefers-contrast 媒体查询。
+   Windows 高对比模式用户无适配——玻璃 alpha 背景被系统色覆盖、品牌色不映射
+   系统语义色。本块保证 HC 模式下文字可见、边框不消失、焦点环用系统色。
+   与 prefers-reduced-motion 正交（reduced-motion 已在各组件 css + dead
+   chatview/design/global.css 标注）。仅作用于 forced-colors: active 媒体，
+   屏幕渲染零影响。
+
+   选址说明: 简报指定 app/shared/src/styles/global.css，但该文件不存在；
+   仅有的 global.css (chatview/design/) 头部标注 DEAD CODE 未被任何
+   @import / JS import 引用。tokens-base.css 是 live 全局文件（经 tokens.css
+   re-export，由 desktop/web main.tsx 导入），含全局 reset + --ring +
+   --glass-* token，是简报授权的 fallback（"如不够再加 tokens-base.css"）。 */
+@media (forced-colors: active) {
+  /* ── 1. 设计 token → 系统语义色 ─────────────────────────────────
+     !important 为压过 themes.css / presets-base.css 中同 token 的主题声明
+     （同 specificity (0,1,0) + 更晚 source order 会盖过 :root）。所有消费
+     这些 token 的组件自动获得系统色，无需逐组件改。box-shadow 焦点环的色
+     分量随之变为 Highlight。 */
+  :root {
+    /* 焦点环 → 系统高亮色（键盘焦点永远可见） */
+    --ring: Highlight !important;
+    --bdr-focus: Highlight !important;
+
+    /* 分隔 hairline → CanvasText：低 alpha 边框在 HC 下会消失，映射到系统
+       文字色后边框不丢。 */
+    --bdr: CanvasText !important;
+    --bdr-strong: CanvasText !important;
+    --border: CanvasText !important;
+    --border-subtle: CanvasText !important;
+    --color-border: CanvasText !important;
+    --glass-border-subtle: CanvasText !important;
+    --glass-border: CanvasText !important;
+    --glass-border-strong: CanvasText !important;
+    --glass-border-heavy: CanvasText !important;
+    --glass-card-border: CanvasText !important;
+    --elevated-card-border: CanvasText !important;
+    --td-border-hairline: CanvasText !important;
+    --td-glass-content-border: CanvasText !important;
+    --chat-thinking-border: CanvasText !important;
+    --input-panel-border: CanvasText !important;
+
+    /* 语义强调色 → 系统语义色（图标/状态点保留区分度） */
+    --primary: LinkText !important;
+    --brand: LinkText !important;
+    --info: LinkText !important;
+    --success: Highlight !important;
+    --danger: LinkText !important;
+    --destructive: LinkText !important;
+    --warning: MarkText !important;
+  }
+
+  /* ── 2. 根 + HTML 元素系统色 ───────────────────────────────────
+     元素选择器 (0,0,1) → 任意组件类 (0,1,0) 仍可覆盖，作为未样式化
+     原生元素的 baseline。 */
+  html,
+  body,
+  #root {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  a,
+  a:link,
+  a:visited {
+    color: LinkText;
+  }
+
+  button,
+  [role='button'],
+  input[type='submit'],
+  input[type='button'],
+  input[type='reset'] {
+    background-color: ButtonFace;
+    color: ButtonText;
+    border-color: ButtonBorder;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'] {
+    color: GrayText;
+  }
+
+  ::placeholder {
+    color: GrayText;
+  }
+
+  ::selection {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  /* ── 3. 玻璃材质：forced-color-adjust: none 保留视觉 ──────────────
+     frosted glass 的 blur + alpha 背景不强制为不透明 Canvas，保留材质感。
+     forced-color-adjust 可继承，故交互元素（链接/按钮/输入）显式重新
+     opt-in 系统色映射 (auto)，确保 chrome 可识别。:where() 零特异性 →
+     组件自身规则仍可覆盖。 */
+  [class*='glass' i] {
+    forced-color-adjust: none;
+  }
+
+  [class*='glass' i] :where(a, button, input, textarea, select,
+                            [role='button'], [contenteditable]) {
+    forced-color-adjust: auto;
+  }
+
+  /* TODO(a11y #20): 深色主题玻璃面板在用户选择 *浅色* HC 主题（Canvas=白、
+     CanvasText=黑）时，保留的 alpha 玻璃底 + 被强制为黑色的文字可能对比
+     不足（glass 依赖已知 app-bg 配色，HC 把 app-bg 换成 Canvas 打破假设）。
+     彻底修法是逐组件将玻璃「装饰背景层」与「文字层」分离，仅在装饰层
+     forced-color-adjust: none。本全局块无法做该分离；jsdom css:false 亦
+     无法实机验证 HC 表现，留作 per-component 后续。Firefox 的
+     prefers-contrast: more 媒体查询未覆盖（本块仅 forced-colors）。 */
+}
