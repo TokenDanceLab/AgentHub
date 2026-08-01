@@ -107,5 +107,7 @@ export type { StepCardProps, StepCardSubStep, StepCardStatus, SubStepKind } from
 export { RiskBadge } from './RiskBadge';
 export type { RiskBadgeProps, RiskLevel } from './RiskBadge';
 export { cx } from './cx';
+export { Tooltip } from './Tooltip';
+export type { TooltipProps, TooltipSide } from './Tooltip';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export type { ErrorConfig, ErrorBoundaryExtension } from './ErrorBoundary';
