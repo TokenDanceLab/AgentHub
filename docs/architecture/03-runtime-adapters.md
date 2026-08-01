@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-06-17
+> 最后更新：2026-08-01
 
 ## 概述
 
@@ -12,9 +12,23 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| Claude Code | `claude-code` | `claude_code.go` | 真实 CLI 执行验证通过，`claude --output-format stream-json` |
-| Codex | `codex` | `codex.go` | PreflightAdapter 预检 `OPENAI_API_KEY`，env var 透传 |
-| OpenCode | `opencode` | `opencode.go` | `--session` 仅在 resume 时传递 |
+| Claude Code (ACP) | `claude-acp` | `claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.62.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
+| Codex (ACP) | `codex` | `codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
+| OpenCode (ACP) | `opencode` | `opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
+| Claude Code (legacy) | `claude-code` | `claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，保留作 fallback；ACP 迁移后将移除 |
+| Codex (legacy) | — | `codex.go` ⚠️ DEPRECATED | 旧手写 parser，fallback |
+| OpenCode (legacy) | — | `opencode.go` ⚠️ DEPRECATED | 旧手写 parser，fallback |
+
+### ACP 迁移（2026-08，对标 codeg 官方 Wrapper）
+
+用户产品纠正：ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已切换官方 ACP：
+
+- **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
+- **runtime 共享层**：`acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`，修正 3 旧手写错误）+ `acp_client.go`（client skeleton）
+- **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议；3 CLI parser 迁移完成）
+- **诚实 TODO**：`AcpAdapter` 无注册点（spike，main.go flag 默认 off）；fs/terminal 帧设计待管理员 RFC；无超时；真跑验证需 ANTHROPIC_API_KEY/OPENAI_API_KEY + npx registry 网络
+
+详见 memory `agenthub-acp-official-wrapper` + 调研报告 `D:\Code\Temp\codeg-research\agenthub-acp-go-migration.md`。
 
 ### CLI 执行模式
 
