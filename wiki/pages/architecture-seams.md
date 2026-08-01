@@ -100,7 +100,7 @@ Hub Server (Hub-local membership/resource/action 决定权限)
 
 ## 产品模型缝合
 
-[AgentHub 架构概览](../docs/architecture.md) 定义了七个核心概念，每个概念有自己的 owner 层：
+[AgentHub 架构概览](../../docs/architecture.md) 定义了七个核心概念，每个概念有自己的 owner 层：
 
 | 概念 | Owner 层 | 跨层缝合规则 |
 |---|---|---|
