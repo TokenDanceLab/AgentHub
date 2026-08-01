@@ -1,6 +1,6 @@
 # Contributing to AgentHub
 
-最后更新：2026-07-18
+最后更新：2026-08-01
 
 本文件是唯一贡献入口。旧详细贡献指南见 [docs/history.md](docs/history.md)。
 
@@ -8,7 +8,7 @@
 
 1. Read [AGENTS.md](AGENTS.md) first. It is the project rule SSOT.
 2. Read [docs/developer-quickstart.md](docs/developer-quickstart.md) for local setup.
-3. Start work from `dev/delicious233`; use a feature branch or `.worktrees/` worktree.
+3. Start from the latest `master`: create a `feat/<topic>` (or `docs/<topic>`) branch, or use a `.worktrees/` worktree. `master` 禁直接 push，全部通过 PR squash merge（AGENTS.md §6 是 SSOT）。
 
 ## Commit Format
 
