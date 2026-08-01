@@ -5,6 +5,7 @@ import {
   DesignNavIcon,
   type DesignNavIconName,
 } from '../designIcons';
+import { Tooltip } from '../../ui/Tooltip';
 import styles from '../AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -61,23 +62,25 @@ function TabMark({
   onClose: (mode: InspectorMode) => void;
   t: (key: string) => string;
 }) {
+  const closeLabel = t('inspector.closeTab').replace('{{label}}', inspectorTabLabel(mode, t));
   return (
-    <span
-      aria-label={t('inspector.closeTab').replace('{{label}}', inspectorTabLabel(mode, t))}
-      className={styles.inspectorTabMark}
-      data-inspector-close
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose(mode);
-      }}
-      role="button"
-      tabIndex={-1}
-      title={t('inspector.closeTab').replace('{{label}}', inspectorTabLabel(mode, t))}
-    >
-      {children}
-      <b>{char}</b>
-    </span>
+    <Tooltip label={closeLabel}>
+      <span
+        aria-label={closeLabel}
+        className={styles.inspectorTabMark}
+        data-inspector-close
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose(mode);
+        }}
+        role="button"
+        tabIndex={-1}
+      >
+        {children}
+        <b>{char}</b>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -188,16 +191,17 @@ export function InspectorMonitorHead({
         })}
       </div>
       <div className={styles.inspectorWindowActions}>
-        <button
-          type="button"
-          title="新建右侧窗口"
-          aria-label="新建右侧窗口"
-          aria-expanded={quickOpenVisible}
-          aria-haspopup="menu"
-          onClick={onToggleQuickOpen}
-        >
-          <DesignNavIcon name="plus" size={15} />
-        </button>
+        <Tooltip label="新建右侧窗口">
+          <button
+            type="button"
+            aria-label="新建右侧窗口"
+            aria-expanded={quickOpenVisible}
+            aria-haspopup="menu"
+            onClick={onToggleQuickOpen}
+          >
+            <DesignNavIcon name="plus" size={15} />
+          </button>
+        </Tooltip>
         {quickOpenVisible && (
           <div className={styles.inspectorAddMenu} role="menu" aria-label="右侧窗口菜单">
             {quickOpenItems.map((item) => (

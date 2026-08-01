@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { languageFromPath } from '../../ui/syntaxHighlight';
 import { DesignFileIcon, DesignNavIcon, DesignOpenWithIcon } from '../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
+import { Tooltip } from '../../ui/Tooltip';
 import {
   defaultPreviewMode,
   fileTypeLabel,
@@ -126,17 +127,18 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           </button>
         </div>
         <div className={styles.openWithWrap}>
-          <button
-            aria-expanded={openMenuVisible}
-            aria-haspopup="menu"
-            aria-label={t('aria.openWith')}
-            className={styles.openWithBtn}
-            onClick={() => setOpenMenuVisible((value) => !value)}
-            title="打开方式"
-            type="button"
-          >
-            <DesignNavIcon name="tools" size={14} />
-          </button>
+          <Tooltip label="打开方式">
+            <button
+              aria-expanded={openMenuVisible}
+              aria-haspopup="menu"
+              aria-label={t('aria.openWith')}
+              className={styles.openWithBtn}
+              onClick={() => setOpenMenuVisible((value) => !value)}
+              type="button"
+            >
+              <DesignNavIcon name="tools" size={14} />
+            </button>
+          </Tooltip>
           {openMenuVisible && (
             <div className={styles.openWithMenu} role="menu" aria-label={t('aria.openWithMenu')}>
               {openWithItems.map((item) => (
@@ -162,15 +164,16 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             </div>
           )}
         </div>
-        <button
-          className={styles.closeBtn}
-          type="button"
-          onClick={onClose}
-          title="返回概览"
-          aria-label={t('aria.backToOverview')}
-        >
-          <DesignNavIcon name="close" size={15} />
-        </button>
+        <Tooltip label="返回概览">
+          <button
+            className={styles.closeBtn}
+            type="button"
+            onClick={onClose}
+            aria-label={t('aria.backToOverview')}
+          >
+            <DesignNavIcon name="close" size={15} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Meta bar ── */}

@@ -5,6 +5,7 @@ import type {
   TerminalSessionId,
 } from '../../platform/types';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
+import { Tooltip } from '../../ui/Tooltip';
 import styles from './TerminalPanel.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -257,50 +258,53 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                 <span className={styles.tabStatus}>
                   {sessionStatusLabel(session.status, labels)}
                 </span>
-                <span
-                  className={styles.tabClose}
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={`${labels.closeSession}: ${session.title}`}
-                  title={labels.closeSession}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    void handleCloseSession(session.id);
-                  }}
-                >
-                  ×
-                </span>
+                <Tooltip label={labels.closeSession}>
+                  <span
+                    className={styles.tabClose}
+                    role="button"
+                    tabIndex={-1}
+                    aria-label={`${labels.closeSession}: ${session.title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void handleCloseSession(session.id);
+                    }}
+                  >
+                    ×
+                  </span>
+                </Tooltip>
               </button>
             );
           })}
         </div>
 
-        <button
-          type="button"
-          className={styles.toolBtn}
-          aria-label={labels.newSession}
-          title={labels.newSession}
-          disabled={!terminal || busy}
-          data-terminal-action="spawn"
-          onClick={() => {
-            void handleSpawn();
-          }}
-        >
-          <DesignNavIcon name="plus" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-        </button>
-
-        {onClose ? (
+        <Tooltip label={labels.newSession}>
           <button
             type="button"
             className={styles.toolBtn}
-            aria-label={labels.closePanel}
-            title={labels.closePanel}
-            data-terminal-action="close-panel"
-            onClick={onClose}
+            aria-label={labels.newSession}
+            disabled={!terminal || busy}
+            data-terminal-action="spawn"
+            onClick={() => {
+              void handleSpawn();
+            }}
           >
-            <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+            <DesignNavIcon name="plus" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
           </button>
+        </Tooltip>
+
+        {onClose ? (
+          <Tooltip label={labels.closePanel}>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              aria-label={labels.closePanel}
+              data-terminal-action="close-panel"
+              onClick={onClose}
+            >
+              <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
+            </button>
+          </Tooltip>
         ) : null}
       </div>
 

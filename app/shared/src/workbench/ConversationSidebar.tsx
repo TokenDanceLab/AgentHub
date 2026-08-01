@@ -5,6 +5,7 @@ import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import { ContextMenu, type ContextMenuItem } from './floating';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { Tooltip } from '../ui/Tooltip';
 import styles from './AgentHubWorkbench.module.css';
 
 const SORT_STORAGE_KEY = 'agenthub.conversationSort';
@@ -353,7 +354,7 @@ export function ConversationSidebar({
                       )}
                     </span>
                     {isPinned && (
-                      <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')} title={t('aria.pinned')}>
+                      <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')}>
                         <DesignNavIcon name="pin" size={12} />
                       </span>
                     )}
@@ -378,45 +379,48 @@ export function ConversationSidebar({
                     ) : null}
                     <span className={styles.conversationActions} onClick={(e) => e.stopPropagation()}>
                       {onPinConversation && (
-                        <button
-                          aria-label={isPinned ? '取消置顶' : '置顶'}
-                          className={styles.conversationActionBtn}
-                          data-active={isPinned ? 'true' : undefined}
-                          onClick={() => onPinConversation(conversation.id, !isPinned)}
-                          tabIndex={-1}
-                          title={isPinned ? '取消置顶' : '置顶'}
-                          type="button"
-                        >
-                          <DesignNavIcon name="pin" size={14} />
-                        </button>
+                        <Tooltip label={isPinned ? '取消置顶' : '置顶'}>
+                          <button
+                            aria-label={isPinned ? '取消置顶' : '置顶'}
+                            className={styles.conversationActionBtn}
+                            data-active={isPinned ? 'true' : undefined}
+                            onClick={() => onPinConversation(conversation.id, !isPinned)}
+                            tabIndex={-1}
+                            type="button"
+                          >
+                            <DesignNavIcon name="pin" size={14} />
+                          </button>
+                        </Tooltip>
                       )}
                       {onArchiveConversation && !showArchived && (
-                        <button
-                          aria-label={t('aria.archive')}
-                          className={styles.conversationActionBtn}
-                          onClick={() => {
-                            if (window.confirm('Archive this conversation?')) {
-                              onArchiveConversation(conversation.id, true);
-                            }
-                          }}
-                          tabIndex={-1}
-                          title="归档"
-                          type="button"
-                        >
-                          <DesignNavIcon name="archive" size={14} />
-                        </button>
+                        <Tooltip label="归档">
+                          <button
+                            aria-label={t('aria.archive')}
+                            className={styles.conversationActionBtn}
+                            onClick={() => {
+                              if (window.confirm('Archive this conversation?')) {
+                                onArchiveConversation(conversation.id, true);
+                              }
+                            }}
+                            tabIndex={-1}
+                            type="button"
+                          >
+                            <DesignNavIcon name="archive" size={14} />
+                          </button>
+                        </Tooltip>
                       )}
                       {onArchiveConversation && showArchived && (
-                        <button
-                          aria-label={t('aria.unarchive')}
-                          className={styles.conversationActionBtn}
-                          onClick={() => onArchiveConversation(conversation.id, false)}
-                          tabIndex={-1}
-                          title="取消归档"
-                          type="button"
-                        >
-                          <DesignNavIcon name="inbox" size={14} />
-                        </button>
+                        <Tooltip label="取消归档">
+                          <button
+                            aria-label={t('aria.unarchive')}
+                            className={styles.conversationActionBtn}
+                            onClick={() => onArchiveConversation(conversation.id, false)}
+                            tabIndex={-1}
+                            type="button"
+                          >
+                            <DesignNavIcon name="inbox" size={14} />
+                          </button>
+                        </Tooltip>
                       )}
                     </span>
                   </button>
