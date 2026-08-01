@@ -98,15 +98,13 @@ export function createMessageDelegationStore(): MessageDelegationStore {
       // Without a message link we cannot attach the card — skip silently.
       return;
     }
+    const sessionId = entry.sessionId ?? existing?.sessionId;
+    const agentInstanceId = entry.agentInstanceId ?? existing?.agentInstanceId;
     const merged: DelegationEntry = {
       taskId: entry.taskId,
       triggerMessageId,
-      ...(entry.sessionId ?? existing?.sessionId ? {
-        sessionId: entry.sessionId ?? existing?.sessionId,
-      } : {}),
-      ...(entry.agentInstanceId ?? existing?.agentInstanceId ? {
-        agentInstanceId: entry.agentInstanceId ?? existing?.agentInstanceId,
-      } : {}),
+      ...(sessionId ? { sessionId } : {}),
+      ...(agentInstanceId ? { agentInstanceId } : {}),
       displayName: entry.displayName || existing?.displayName || taskShortCode(entry.taskId),
       status: entry.status,
       updatedAt: entry.updatedAt,

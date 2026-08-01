@@ -192,7 +192,6 @@ describe('edgeCapabilityMapper', () => {
   it('treats online Edge with runtime inventory but no healthy status as degraded', () => {
     const snapshot: EdgeRuntimeInventorySnapshot = {
       edgeOnline: true,
-      healthStatus: undefined,
       agents: [
         {
           id: 'codex-local',
