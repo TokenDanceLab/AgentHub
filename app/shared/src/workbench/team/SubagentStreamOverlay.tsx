@@ -19,6 +19,7 @@ import {
 import { SubagentTranscript } from './SubagentTranscript';
 import { SubagentSessionDialog } from './SubagentSessionDialog';
 import { Icon } from '../../ui/Icon';
+import { Tooltip } from '../../ui/Tooltip';
 import styles from './SubagentStreamOverlay.module.css';
 
 // ── Status derivation ───────────────────────────────────────────────────────
@@ -242,15 +243,16 @@ function SubagentStreamChip({ entry, defaultExpanded, onOpenSession }: SubagentS
           <Icon name={expanded ? 'expand_more' : 'expand_less'} size={16} />
         </button>
         {/* Drill-down: open the full-session dialog (#1406 follow-up) */}
-        <button
-          type="button"
-          className={styles.chipExpandBtn}
-          onClick={() => onOpenSession(entry.taskId)}
-          aria-label={t('subagentStream.openSession')}
-          title={t('subagentStream.openSession')}
-        >
-          <Icon name="open_in_full" size={14} />
-        </button>
+        <Tooltip label={t('subagentStream.openSession')}>
+          <button
+            type="button"
+            className={styles.chipExpandBtn}
+            onClick={() => onOpenSession(entry.taskId)}
+            aria-label={t('subagentStream.openSession')}
+          >
+            <Icon name="open_in_full" size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Expanded transcript (#1406 Phase 3) ── */}

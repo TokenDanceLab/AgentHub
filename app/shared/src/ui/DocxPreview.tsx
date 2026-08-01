@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, RotateCcw, X } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 import DOMPurify from 'dompurify';
 import type { Config as DOMPurifyConfig } from 'dompurify';
 import styles from './DocxPreview.module.css';
@@ -95,15 +96,16 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
           <span className={styles.badge}>DOCX</span>
         </div>
         {onClose && (
-          <button
-            className={styles.closeBtn}
-            type="button"
-            onClick={onClose}
-            aria-label="关闭预览"
-            title="关闭预览"
-          >
-            <X size={16} />
-          </button>
+          <Tooltip label="关闭预览">
+            <button
+              className={styles.closeBtn}
+              type="button"
+              onClick={onClose}
+              aria-label="关闭预览"
+            >
+              <X size={16} />
+            </button>
+          </Tooltip>
         )}
       </div>
 

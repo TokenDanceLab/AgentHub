@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ProfilePopover, Toast } from './floating';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { Tooltip } from '../ui/Tooltip';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══ Page routing ═══ */
@@ -201,26 +202,28 @@ export function GlobalRail({
 
       <div className={styles.railSpacer} />
 
-      <button
-        aria-label={t('aria.settings')}
-        className={styles.railButton}
-        data-rail-page="settings"
-        onClick={() => handleNavigate('settings')}
-        tabIndex={rovingIndex === pageIds.length - 1 ? 0 : -1}
-        title={t('user.settings')}
-        type="button"
-      >
-        <DesignNavIcon name="railSettings" size={18} />
-      </button>
-      <button
-        aria-label={t('aria.toggleTheme')}
-        className={styles.railButton}
-        onClick={onToggleTheme}
-        title={t('user.toggleTheme')}
-        type="button"
-      >
-        <DesignNavIcon name="sun" size={18} />
-      </button>
+      <Tooltip label={t('user.settings')}>
+        <button
+          aria-label={t('aria.settings')}
+          className={styles.railButton}
+          data-rail-page="settings"
+          onClick={() => handleNavigate('settings')}
+          tabIndex={rovingIndex === pageIds.length - 1 ? 0 : -1}
+          type="button"
+        >
+          <DesignNavIcon name="railSettings" size={18} />
+        </button>
+      </Tooltip>
+      <Tooltip label={t('user.toggleTheme')}>
+        <button
+          aria-label={t('aria.toggleTheme')}
+          className={styles.railButton}
+          onClick={onToggleTheme}
+          type="button"
+        >
+          <DesignNavIcon name="sun" size={18} />
+        </button>
+      </Tooltip>
 
       {connectionStatus && (
         <span

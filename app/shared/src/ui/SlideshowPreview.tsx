@@ -18,6 +18,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import styles from './SlideshowPreview.module.css';
+import { Tooltip } from './Tooltip';
 
 export interface SlideshowPreviewProps {
   fileUrl: string;
@@ -234,15 +235,16 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
           {totalSlides > 0 ? `${currentSlide + 1} / ${totalSlides}` : '—'}
         </span>
         {onClose && (
-          <button
-            className={styles.closeBtn}
-            type="button"
-            onClick={onClose}
-            aria-label="关闭预览"
-            title="关闭预览"
-          >
-            <X size={16} />
-          </button>
+          <Tooltip label="关闭预览">
+            <button
+              className={styles.closeBtn}
+              type="button"
+              onClick={onClose}
+              aria-label="关闭预览"
+            >
+              <X size={16} />
+            </button>
+          </Tooltip>
         )}
       </div>
 
@@ -269,16 +271,17 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
       {/* ── Slide view ── */}
       {!loading && !error && currentSlideData && (
         <div className={styles.slideArea}>
-          <button
-            className={styles.navBtn}
-            onClick={prevSlide}
-            disabled={currentSlide === 0}
-            type="button"
-            aria-label="上一张"
-            title="上一张"
-          >
-            <ChevronLeft size={20} />
-          </button>
+          <Tooltip label="上一张">
+            <button
+              className={styles.navBtn}
+              onClick={prevSlide}
+              disabled={currentSlide === 0}
+              type="button"
+              aria-label="上一张"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          </Tooltip>
 
           <div className={styles.slideCanvas}>
             <div className={styles.slideContent}>
@@ -298,16 +301,17 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
             </div>
           </div>
 
-          <button
-            className={styles.navBtn}
-            onClick={nextSlide}
-            disabled={currentSlide >= totalSlides - 1}
-            type="button"
-            aria-label="下一张"
-            title="下一张"
-          >
-            <ChevronRight size={20} />
-          </button>
+          <Tooltip label="下一张">
+            <button
+              className={styles.navBtn}
+              onClick={nextSlide}
+              disabled={currentSlide >= totalSlides - 1}
+              type="button"
+              aria-label="下一张"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </Tooltip>
         </div>
       )}
 
