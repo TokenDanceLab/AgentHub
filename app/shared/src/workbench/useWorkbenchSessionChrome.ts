@@ -136,18 +136,36 @@ export function useWorkbenchSessionChrome({
     onActiveConversationChange?.(conversationId);
   }
 
-  const evidence = collectTranscriptEvidence(transcript);
-  const mainchainSummary = buildMainchainSummary({
-    composerTargetLabel: resolveComposerTargetLabel(composerExecutionTargets, selectedExecutionTargetId),
-    evidence,
-    platformSurface: platform.surface,
-    runtimeEvidence,
-    selectedExecutionTargetId,
-    targetRequired: Boolean(composerExecutionTargets),
-    transcript,
-    workbenchStatus,
-    t,
-  });
+  // Perf #21 residual: `evidence` / `mainchainSummary` feed ConversationHost
+  // (MainchainStatusStrip) and the evidence-export callback. Memoized so their
+  // identity survives shell re-renders (keystrokes etc.) — transcript /
+  // runtimeEvidence / composerExecutionTargets / workbenchStatus are
+  // shell-derived (memoized or state) and only change identity when the
+  // underlying data actually changes.
+  const evidence = useMemo(() => collectTranscriptEvidence(transcript), [transcript]);
+  const mainchainSummary = useMemo(
+    () => buildMainchainSummary({
+      composerTargetLabel: resolveComposerTargetLabel(composerExecutionTargets, selectedExecutionTargetId),
+      evidence,
+      platformSurface: platform.surface,
+      runtimeEvidence,
+      selectedExecutionTargetId,
+      targetRequired: Boolean(composerExecutionTargets),
+      transcript,
+      workbenchStatus,
+      t,
+    }),
+    [
+      composerExecutionTargets,
+      evidence,
+      platform.surface,
+      runtimeEvidence,
+      selectedExecutionTargetId,
+      transcript,
+      workbenchStatus,
+      t,
+    ],
+  );
 
   const inspectorViews = useMemo(() => buildInspectorTranscriptViews(transcript), [transcript]);
   const activeConversation = findConversationById(conversations, currentConversationId);
@@ -272,7 +290,12 @@ export function useWorkbenchSessionChrome({
     showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
   }, [openInspector, t]);
 
-  function exportMainchainEvidence(): void {
+  // Stable: evidence/mainchainSummary are memoized above (identity changes
+  // only when the underlying data changes) and platform / workbenchStatus /
+  // runtimeEvidence / t are shell-stable, so the callback survives shell
+  // re-renders and the ConversationHost / MainchainStatusStrip memo gates
+  // hold (perf #21 residual).
+  const exportMainchainEvidence = useCallback((): void => {
     if (!mainchainSummary.exportEnabled) {
       showWorkbenchToastRef.current(t('toast.noEvidence'));
       return;
@@ -286,7 +309,7 @@ export function useWorkbenchSessionChrome({
       runtimeEvidence,
     })));
     showWorkbenchToastRef.current(t('toast.evidenceCopied'));
-  }
+  }, [mainchainSummary, evidence, platform, runtimeEvidence, workbenchStatus, t]);
 
   return {
     settingsService,
