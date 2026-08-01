@@ -69,7 +69,7 @@ Phases 73–80 **closed**. Historical `docs/plan/task-breakdown.md` is **HISTORI
 | 主题 | Issue / PR |
 |---|---|
 | G12 sendFrame 走 PushToConn 修复（M，待管理员定档） | #1446 PR body 建议 |
-| ACP spike（紧迫度↑：Phase 2 prep 已落地——pure ACP→Edge 事件映射器 + 单测，待真 binary 集成） | #1404 |
+| ACP 迁移（✅调研+spike `f7158728` + 审批链 `81f1cab3` + codex/opencode/claude-code 三切换 `688f1648`/`1d82fd55`/`1b00844f` 全完成；⏳AcpAdapter 无注册点（spike，main.go flag 默认 off）/fs/terminal 帧设计/无超时/真跑验证（需 API key + npx registry 网络）） | #1404 |
 | agentteam 子任务直播（#1478 Phase A 已合入 `d4270360`：后端归属 + bus fan-out；**Phase C 前端起点 S1 已落地** `bef0a5f8`：SubagentStreamStore + webHubRealtime handler + 测试，前端零消费→有消费；Phase B/C DRAFT 待定档） | #1478 |
 | @agent 派单（产品 RFC top 1，不碰协议；**Phase 1-3 全闭环**：P1 `5b836599` composer dispatchRole + submit 触发 triggerAgentTask + metadata；P2 `05032e41` SubagentStreamOverlay 浮层栈；**P3 `35b52cda` 委派卡钻取子会话 transcript**——SubagentTranscript 7 类事件分类+中文标签+payload 格式化，chip 展开 inline 渲染，20 test。北极星三阶段闭环：@agent 派单→委派状态可见→钻取子会话） | #1406 |
 | Automations / 会话导入 / 观察池 | #1405 · #1407 |
