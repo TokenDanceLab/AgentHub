@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../../ui/focusTrap';
 import type {
   AccountMenuRow,
@@ -133,15 +134,8 @@ export function ProfilePopover({
   const shellClassName = `${styles.popover} ${variantClass} ${isOpen ? styles.open : ''}`;
   const ariaLabel = profileDialogAriaLabel(name, variant);
 
-  if (variant === 'account') {
-    return (
-      <section
-        ref={popoverRef}
-        className={shellClassName}
-        role="dialog"
-        aria-label={ariaLabel}
-        tabIndex={-1}
-      >
+  const body = variant === 'account'
+    ? (
         <AccountProfileBody
           accountMenu={accountMenu}
           actions={actions}
@@ -156,11 +150,21 @@ export function ProfilePopover({
           org={org}
           status={status}
         />
-      </section>
-    );
-  }
+      )
+    : (
+        <DefaultProfileBody
+          actions={actions}
+          avatar={avatar}
+          avatarColor={avatarColor}
+          badge={badge}
+          meta={meta}
+          name={name}
+          onAction={onAction}
+          subtitle={subtitle}
+        />
+      );
 
-  return (
+  const popover = (
     <section
       ref={popoverRef}
       className={shellClassName}
@@ -168,16 +172,14 @@ export function ProfilePopover({
       aria-label={ariaLabel}
       tabIndex={-1}
     >
-      <DefaultProfileBody
-        actions={actions}
-        avatar={avatar}
-        avatarColor={avatarColor}
-        badge={badge}
-        meta={meta}
-        name={name}
-        onAction={onAction}
-        subtitle={subtitle}
-      />
+      {body}
     </section>
   );
+
+  // The workbench shell and sidebar deliberately clip their children. Keep
+  // viewport-positioned profile menus outside those stacking contexts so the
+  // visible menu is also the element that receives pointer events.
+  return typeof document === 'undefined'
+    ? popover
+    : createPortal(popover, document.body);
 }

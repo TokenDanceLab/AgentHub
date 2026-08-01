@@ -31,6 +31,17 @@ export default defineConfig({
   ],
   webServer: {
     command: `pnpm dev --host 127.0.0.1 --port ${webE2EPort}`,
+    env: {
+      ...process.env,
+      // The browser auth client defaults its callback to the origin root.
+      // Keep renderer E2E on that same base instead of Vite's production
+      // /workbench/ asset base.
+      VITE_BASE_PATH: '/',
+      // Renderer specs must intercept every Hub call. Reserved origins make a
+      // missing route fail closed instead of reaching localhost or production.
+      VITE_HUB_URL: 'https://hub.test.invalid',
+      VITE_HUB_WS_URL: 'wss://hub.test.invalid/client/ws',
+    },
     url: webE2EBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 45_000,
