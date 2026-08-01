@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccessToken } from '@/hooks/useAuth';
 import {
   fetchExecutionTargets,
+  selectOnlineLocalEdgeExecutionTarget,
   summarizeExecutionTargets,
   type ExecutionTargetInventoryItem,
 } from './executionTargetQueries';
@@ -42,7 +43,7 @@ describe('web execution target queries', () => {
             page: { hasMore: false },
           },
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -140,10 +141,17 @@ describe('web execution target queries', () => {
 
   it('surfaces 401 unauthorized from execution target inventory as AppError', async () => {
     vi.mocked(getAccessToken).mockReturnValue('stale-token');
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
-      JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
-      { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
-    )));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 'unauthorized', message: 'bad token' }), {
+            status: 401,
+            statusText: 'Unauthorized',
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
 
     await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
       code: 'unauthorized',
@@ -154,10 +162,17 @@ describe('web execution target queries', () => {
 
   it('surfaces 404 from execution target inventory as AppError', async () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
-      JSON.stringify({ code: 'NOT_FOUND', message: 'targets missing' }),
-      { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'application/json' } },
-    )));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 'NOT_FOUND', message: 'targets missing' }), {
+            status: 404,
+            statusText: 'Not Found',
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
 
     await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -167,14 +182,162 @@ describe('web execution target queries', () => {
 
   it('surfaces 500 from execution target inventory as AppError', async () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
-      JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }),
-      { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } },
-    )));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }), {
+            status: 500,
+            statusText: 'Internal Server Error',
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
 
     await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
       status: 500,
+    });
+  });
+
+  it('normalizes malformed inventory fields without leaking backend dialects into UI state', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              code: 'OK',
+              data: {
+                items: [
+                  {
+                    id: 'array',
+                    name: 'Array',
+                    target_type: 'remote_ssh',
+                    workspace_allowlist: [' /workspace ', '', 4],
+                    trust_level: 'cloud',
+                    health_state: 'healthy',
+                    is_online: true,
+                  },
+                  {
+                    id: 'bad-json',
+                    name: 'Bad JSON',
+                    target_type: 'bogus',
+                    workspace_allowlist: '[bad',
+                    trust_level: 'bogus',
+                    health_state: 'bogus',
+                    is_online: 1,
+                  },
+                  {
+                    id: 'empty',
+                    name: 'Empty',
+                    target_type: undefined,
+                    workspace_allowlist: '',
+                    trust_level: undefined,
+                    health_state: undefined,
+                    is_online: false,
+                  },
+                  {
+                    id: 'object',
+                    name: 'Object',
+                    target_type: 'tailscale',
+                    workspace_allowlist: '{"not":"array"}',
+                    trust_level: 'remote',
+                    health_state: 'stale',
+                    is_online: false,
+                  },
+                ],
+                page: { hasMore: false },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+      )
+    );
+
+    const result = await fetchExecutionTargets(true);
+    expect(result.items).toMatchObject([
+      {
+        target_type: 'remote_ssh',
+        workspace_allowlist: [' /workspace '],
+        trust_level: 'cloud',
+        health_state: 'healthy',
+        is_online: true,
+      },
+      {
+        target_type: 'local_edge',
+        workspace_allowlist: [],
+        trust_level: 'local',
+        health_state: 'unknown',
+        is_online: false,
+      },
+      {
+        target_type: 'local_edge',
+        workspace_allowlist: [],
+        trust_level: 'local',
+        health_state: 'unknown',
+        is_online: false,
+      },
+      {
+        target_type: 'tailscale',
+        workspace_allowlist: [],
+        trust_level: 'remote',
+        health_state: 'stale',
+        is_online: false,
+      },
+    ]);
+  });
+
+  it('selects only an online healthy local edge target', () => {
+    const targets = [
+      {
+        id: 'offline',
+        target_type: 'local_edge' as const,
+        is_online: false,
+        health_state: 'healthy' as const,
+      },
+      {
+        id: 'degraded',
+        target_type: 'local_edge' as const,
+        is_online: true,
+        health_state: 'degraded' as const,
+      },
+      {
+        id: 'relay',
+        target_type: 'hub_relay' as const,
+        is_online: true,
+        health_state: 'healthy' as const,
+      },
+      {
+        id: 'winner',
+        target_type: 'local_edge' as const,
+        is_online: true,
+        health_state: 'healthy' as const,
+      },
+    ];
+    expect(selectOnlineLocalEdgeExecutionTarget(targets)?.id).toBe('winner');
+    expect(selectOnlineLocalEdgeExecutionTarget([])).toBeUndefined();
+  });
+
+  it('counts unknown health states and preserves zero-filled type buckets', () => {
+    expect(
+      summarizeExecutionTargets([
+        {
+          id: 'unknown',
+          name: 'Unknown',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'unexpected',
+          is_online: false,
+        },
+      ])
+    ).toMatchObject({
+      total: 1,
+      unknown: 1,
+      online: 0,
+      byType: { local_edge: 1, hub_relay: 0, remote_ssh: 0, tailscale: 0, cloud_edge: 0 },
     });
   });
 });
