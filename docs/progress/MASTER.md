@@ -16,9 +16,11 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | Doc SSOT | `docs/progress/MASTER.md` exceeded the 150-line active-entry gate because completed session history was appended indefinitely | `docs/master-ssot-compaction`; keep only live work and pointers |
 | Desktop typecheck | TypeScript 5.8 rejected `ignoreDeprecations: "6.0"`; removing it exposed real `exactOptionalPropertyTypes` debt | `fix/desktop-typescript-config`; fix the types rather than disabling strictness |
 | Shared frontend tests | CSS-contract tests depended on `process.cwd()`, so the same suite behaved differently under shared and Desktop runners | Make fixture paths relative to each test module |
-| Edge tests on Linux | Backup test reads a file after applying a permission mode that denies the CI user; ACP request-sequence assertion is also timing-sensitive | `fix/edge-linux-test-portability` and `fix/acp-test-synchronization` |
-| Hub integration | Real PostgreSQL/Redis job now executes and reveals device UUID/FK drift, stale fixtures, and missing friendship setup | Rebase and validate #1479 before creating overlapping fixes |
-| TokenDance ID defaults | Current issuer migration is validated locally; remote branch was stale | PR #1480 rebased and repushed; keep fixture/readiness evidence distinct from real login |
+| ~~Edge tests on Linux~~ | **RESOLVED 2026-08-02** — backup permission-mode test portability (#1491's CI sweep verified); ACP request-sequence race fixed by recording the method before answering (`acp_client_test.go`) | merged in #1491 |
+| ~~Hub integration~~ | **RESOLVED 2026-08-02** — errcode lowercase contract, admin fixture (AGENTHUB_ADMIN_USERS), OIDC config injection, refresh_token FK device seeding, OIDC E2E UUID/scopes/shared-cache SQLite, TeamRun guardrail messages, execution-target ping projection | merged in #1489 |
+| ~~TokenDance ID defaults~~ | **RESOLVED 2026-08-02** — issuer default switched to id.tokendancelab.com; check-secrets.sh now exempts `*_URL` endpoint assignments (TOKENDANCE name contains "token" → false positive) | merged in #1480 |
+| ~~Frontend coverage gate~~ | **RESOLVED 2026-08-02** — web 63.14→66.72 lines (executionTargetQueries/hubAuth/toastStore tests, #1490); desktop tests (#1488); master CI green on 36a24a4b | merged #1490/#1488 |
+| ~~Edge lint debt~~ | **RESOLVED 2026-08-02** — 102→0 golangci-lint issues via pure extraction refactors (RegisterRoutes 69→14 sub-functions, PostRuns 123→~12, parseSSEStream 74→state+handlers…); zero .golangci.yml exclusions; `*.go text eol=lf` in .gitattributes fixes Windows CRLF gofmt churn | merged in #1491 |
 
 ## Active product and architecture work
 
