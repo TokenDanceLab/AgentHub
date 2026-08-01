@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,7 +171,9 @@ func TestMain(m *testing.M) {
 	ts = httptest.NewServer(r)
 	client = ts.Client()
 
-	cleanDBTables(db)
+	if err := cleanDBTables(db); err != nil {
+		panic(fmt.Sprintf("failed to clean integration database: %v", err))
+	}
 	if err := clearRateLimitKeys(); err != nil {
 		panic(fmt.Sprintf("failed to clear test rate limits: %v", err))
 	}
@@ -178,54 +181,96 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// CleanDB truncates all tables between tests for isolation.
-// Tables are deleted in FK-safe order (children before parents).
+// CleanDB truncates all business tables between tests for isolation.
 func CleanDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	cleanDBTables(db)
+	if err := cleanDBTables(db); err != nil {
+		t.Fatalf("clean integration database: %v", err)
+	}
 	if err := clearRateLimitKeys(); err != nil {
 		t.Fatalf("clear test rate limits: %v", err)
 	}
 }
 
-func cleanDBTables(database *gorm.DB) {
-	database.Exec("DELETE FROM message_attachments")
-	database.Exec("DELETE FROM message_pins")
-	database.Exec("DELETE FROM message_reads")
-	database.Exec("DELETE FROM pending_agent_tasks")
-	database.Exec("DELETE FROM agent_instances")
-	database.Exec("DELETE FROM messages")
-	database.Exec("DELETE FROM session_members")
-	database.Exec("DELETE FROM sessions")
-	database.Exec("DELETE FROM notifications")
-	database.Exec("DELETE FROM friendships")
-	database.Exec("DELETE FROM attachments")
-	database.Exec("DELETE FROM custom_agents")
-	database.Exec("DELETE FROM workspaces")
-	deleteAuditEvents(database)
-	database.Exec("DELETE FROM provider_bindings")
-	database.Exec("DELETE FROM mcp_servers")
-	database.Exec("DELETE FROM skills")
-	database.Exec("DELETE FROM execution_targets")
-	database.Exec("DELETE FROM agent_profiles")
-	database.Exec("DELETE FROM refresh_tokens")
-	database.Exec("DELETE FROM devices")
-	database.Exec("DELETE FROM users")
+func cleanDBTables(database *gorm.DB) error {
+	if database.Dialector.Name() != "postgres" {
+		return fmt.Errorf("integration database cleanup requires PostgreSQL, got %s", database.Dialector.Name())
+	}
+
+	rows, err := database.Raw(`
+		SELECT tablename
+		FROM pg_catalog.pg_tables
+		WHERE schemaname = current_schema()
+		  AND tablename <> 'schema_migrations'
+		ORDER BY tablename
+	`).Rows()
+	if err != nil {
+		return fmt.Errorf("list integration tables: %w", err)
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var table string
+		if err := rows.Scan(&table); err != nil {
+			return fmt.Errorf("scan integration table: %w", err)
+		}
+		tables = append(tables, table)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate integration tables: %w", err)
+	}
+	if len(tables) == 0 {
+		return nil
+	}
+
+	quoted := make([]string, 0, len(tables))
+	hasAuditEvents := false
+	for _, table := range tables {
+		quoted = append(quoted, `"`+strings.ReplaceAll(table, `"`, `""`)+`"`)
+		hasAuditEvents = hasAuditEvents || table == "audit_events"
+	}
+
+	if hasAuditEvents {
+		if err := database.Exec("ALTER TABLE audit_events DISABLE TRIGGER USER").Error; err != nil {
+			return fmt.Errorf("disable audit_events cleanup trigger: %w", err)
+		}
+	}
+
+	truncateErr := database.Exec("TRUNCATE TABLE " + strings.Join(quoted, ", ") + " RESTART IDENTITY CASCADE").Error
+	var enableErr error
+	if hasAuditEvents {
+		enableErr = database.Exec("ALTER TABLE audit_events ENABLE TRIGGER USER").Error
+	}
+	if truncateErr != nil {
+		return fmt.Errorf("truncate integration tables: %w", truncateErr)
+	}
+	if enableErr != nil {
+		return fmt.Errorf("enable audit_events cleanup trigger: %w", enableErr)
+	}
+	return nil
 }
 
-func deleteAuditEvents(database *gorm.DB) {
-	if database.Dialector.Name() != "postgres" {
-		database.Exec("DELETE FROM audit_events")
-		return
+func TestCleanDBDiscoversNewTables(t *testing.T) {
+	CleanDB(t, db)
+	if err := db.Exec("CREATE TABLE cleanup_probe (id integer PRIMARY KEY)").Error; err != nil {
+		t.Fatalf("create cleanup probe: %v", err)
+	}
+	defer db.Exec("DROP TABLE IF EXISTS cleanup_probe")
+	if err := db.Exec("INSERT INTO cleanup_probe (id) VALUES (1)").Error; err != nil {
+		t.Fatalf("seed cleanup probe: %v", err)
 	}
 
-	if err := database.Exec("ALTER TABLE audit_events DISABLE TRIGGER USER").Error; err != nil {
-		database.Exec("DELETE FROM audit_events")
-		return
+	if err := cleanDBTables(db); err != nil {
+		t.Fatalf("clean integration database: %v", err)
 	}
-	defer database.Exec("ALTER TABLE audit_events ENABLE TRIGGER USER")
-
-	database.Exec("DELETE FROM audit_events")
+	var count int64
+	if err := db.Table("cleanup_probe").Count(&count).Error; err != nil {
+		t.Fatalf("count cleanup probe: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("cleanup probe retained %d rows; new tables must be discovered automatically", count)
+	}
 }
 
 func clearRateLimitKeys() error {
