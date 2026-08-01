@@ -432,7 +432,10 @@ func createBackup(targetPath string, content []byte) error {
 	if _, err := os.Stat(backupPath); err == nil {
 		return nil // backup already exists
 	}
-	return os.WriteFile(backupPath, content, 0)
+	// Backups may contain source code or credentials. Keep them readable by the
+	// Edge process for rollback without exposing them to other users. A zero
+	// mode is ignored on Windows but creates an unreadable file on Unix.
+	return os.WriteFile(backupPath, content, 0o600)
 }
 
 // decodeApplyJSON decodes the JSON request body for apply endpoints.
