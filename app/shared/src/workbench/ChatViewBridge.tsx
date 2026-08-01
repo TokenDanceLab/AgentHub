@@ -118,7 +118,9 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
 
   // #1406 Phase 3: mount the inline delegation card below each user message.
   const renderUserFooter = useCallback(
-    (item: TranscriptUserItem) => <InlineDelegationCard messageId={item.id} />,
+    (item: TranscriptUserItem) => (
+      <InlineDelegationCard {...(item.id !== undefined ? { messageId: item.id } : {})} />
+    ),
     [],
   );
 
@@ -133,7 +135,6 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
     <>
       <ChatViewTranscript
         transcript={displayTranscript}
-        sessionId={activeConversation?.id}
         chatMode={chatMode}
         unreadDivider={unreadDivider}
         onAgentClick={onAgentClick}
@@ -152,6 +153,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         connectionStatus={connectionStatus}
         typingUserNames={typingUserNames}
         renderUserFooter={renderUserFooter}
+        {...(activeConversation?.id !== undefined ? { sessionId: activeConversation.id } : {})}
       />
       <SubagentStreamOverlay />
     </>

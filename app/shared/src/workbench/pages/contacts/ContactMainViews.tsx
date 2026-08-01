@@ -163,8 +163,8 @@ export function ContactMain({
             actionLabel="添加外部联系人"
             rows={externalContacts ?? []}
             sectionTitle="外部联系人"
-            hasMore={hasMore}
-            loadingMore={loadingMore}
+            {...(hasMore !== undefined ? { hasMore } : {})}
+            {...(loadingMore !== undefined ? { loadingMore } : {})}
             onLoadMore={onLoadMore}
             activeMemberId={activeMemberId}
             onAddContact={onAddContact}
@@ -201,8 +201,8 @@ export function ContactMain({
             actionLabel="管理星标"
             rows={starredContacts ?? []}
             sectionTitle="TokenDance"
-            hasMore={hasMore}
-            loadingMore={loadingMore}
+            {...(hasMore !== undefined ? { hasMore } : {})}
+            {...(loadingMore !== undefined ? { loadingMore } : {})}
             onLoadMore={onLoadMore}
             activeMemberId={activeMemberId}
             onAddContact={onAddContact}
@@ -243,8 +243,8 @@ export function ContactMain({
             rows={members}
             sectionTitle="TokenDance"
             showQuickGrid
-            hasMore={hasMore}
-            loadingMore={loadingMore}
+            {...(hasMore !== undefined ? { hasMore } : {})}
+            {...(loadingMore !== undefined ? { loadingMore } : {})}
             onLoadMore={onLoadMore}
             activeMemberId={activeMemberId}
             onAddContact={onAddContact}
