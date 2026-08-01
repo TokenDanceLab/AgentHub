@@ -234,10 +234,14 @@ function partitionWithDates(
   if (compactDividers && compactDividers.length > 0) {
     for (const cd of compactDividers) {
       const list = compactByIndex.get(cd.index)
+      const divider = {
+        ...(cd.trigger !== undefined ? { trigger: cd.trigger } : {}),
+        ...(cd.preTokens !== undefined ? { preTokens: cd.preTokens } : {}),
+      }
       if (list) {
-        list.push({ trigger: cd.trigger, preTokens: cd.preTokens })
+        list.push(divider)
       } else {
-        compactByIndex.set(cd.index, [{ trigger: cd.trigger, preTokens: cd.preTokens }])
+        compactByIndex.set(cd.index, [divider])
       }
     }
   }
