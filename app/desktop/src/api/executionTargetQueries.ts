@@ -58,7 +58,11 @@ const executionTargetTypes: ExecutionTargetType[] = [
 ];
 
 const trustLevels: ExecutionTargetTrustLevel[] = ['local', 'remote', 'cloud', 'relay'];
-const healthStates: ExecutionTargetHealthState[] = ['unknown', 'healthy', 'degraded', 'offline'];
+// #1544: health states projected from evidence — online (fresh proof),
+// stale (expired evidence window), mismatch (observed identity disagrees),
+// registered (bound but not yet proven live). Keep them in the pass-through
+// list so the UI shows the real state instead of collapsing to unknown.
+const healthStates: ExecutionTargetHealthState[] = ['unknown', 'online', 'healthy', 'degraded', 'offline', 'stale', 'mismatch', 'registered'];
 
 const emptyExecutionTargets: ExecutionTargetInventoryResponse = {
   items: [],

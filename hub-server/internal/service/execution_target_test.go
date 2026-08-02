@@ -16,7 +16,22 @@ import (
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
+
+// assertLatestEvidence asserts the recorded evidence for a target without
+// coupling to the projected readable fields (#1544): health writes go to the
+// evidence table, the target row fields are projections only.
+func assertLatestEvidence(t *testing.T, db *gorm.DB, targetID string, wantSource, wantStatus, wantRouteKey string) {
+	t.Helper()
+	ev, err := repository.GetExecutionTargetEvidence(db, targetID)
+	require.NoError(t, err)
+	require.Equal(t, wantSource, ev.Source)
+	require.Equal(t, wantStatus, ev.Status)
+	require.Equal(t, wantRouteKey, ev.RouteKey)
+	require.NotNil(t, ev.ExpiresAt)
+}
 
 // newExecutionTargetSvc builds the service with a test-only egress policy:
 // loopback + plain http allowed (httptest servers listen on 127.0.0.1).
@@ -74,6 +89,21 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 		ON execution_targets(owner_id, target_type, device_id)
 		WHERE deleted_at IS NULL AND target_type = 'local_edge' AND device_id IS NOT NULL
 	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE execution_target_evidence (
+			id TEXT PRIMARY KEY,
+			target_id TEXT NOT NULL UNIQUE,
+			source TEXT NOT NULL,
+			status TEXT NOT NULL,
+			failure_category TEXT DEFAULT '',
+			observed_target_id TEXT DEFAULT '',
+			route_key TEXT DEFAULT '',
+			observed_at DATETIME NOT NULL,
+			expires_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)
+	`).Error)
 	return db
 }
 
@@ -130,11 +160,16 @@ func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.False(t, target.IsOnline)
 
-	require.NoError(t, svc.Ping(context.Background(), "target-1", "owner-1"))
+	// 未绑定 local_edge：Ping 只触发 probe，不得产生 online（#1544）。
+	// seed 的 target 无 DeviceID → probe 无 route 可查 → 不可路由。
+	err = svc.Ping(context.Background(), "target-1", "owner-1")
+	require.ErrorIs(t, err, errcode.TargetNotRoutable)
+	require.ErrorContains(t, err, "not bound to a device")
+
+	// 失败 probe 写 offline evidence（missing_device_binding），投影仍非 online。
+	assertLatestEvidence(t, db, "target-1", dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, "")
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
-	require.True(t, target.IsOnline)
-	require.NotNil(t, target.LastSeenAt)
-	require.Equal(t, "online", target.HealthState)
+	require.False(t, target.IsOnline)
 }
 
 func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
@@ -301,10 +336,14 @@ func TestExecutionTargetPingMarksMismatchWhenEdgeReportsDifferentTarget(t *testi
 	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
 
 	require.ErrorIs(t, err, errcode.TargetNotRoutable)
-	var target model.ExecutionTarget
-	require.NoError(t, db.Where("id = ?", "target-cloud").First(&target).Error)
-	require.False(t, target.IsOnline)
-	require.Equal(t, "mismatch", target.HealthState)
+	// observed target id mismatch 写入 mismatch evidence（#1544）；投影层
+	// 将其映射为 mismatch 状态（Get/List 与调度器共享同一投影）。
+	assertLatestEvidence(t, db, "target-cloud", dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusMismatch, "")
+
+	got, err := svc.Get(context.Background(), "target-cloud", "owner-1")
+	require.NoError(t, err)
+	require.Equal(t, "mismatch", got.HealthState)
+	require.False(t, got.IsOnline)
 }
 
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
@@ -457,12 +496,17 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineT
 	require.Equal(t, device.ID, *target.DeviceID)
 	require.Equal(t, "local_edge", target.TargetType)
 	require.Equal(t, "local", target.TrustLevel)
-	require.Equal(t, "online", target.HealthState)
-	require.True(t, target.IsOnline)
-	require.NotNil(t, target.LastSeenAt)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch","agent.control"]}`, target.Capabilities)
 	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.0","health_basis":"desktop_check_in_freshness_not_ws_route"}`, target.Metadata)
+
+	// 注册 check-in 写 registration evidence；健康由投影得出（#1544）。
+	assertLatestEvidence(t, db, target.ID, dispatch.EvidenceSourceRegistration, dispatch.EvidenceStatusOnline, "owner-1:desktop:11111111-1111-4111-8111-111111111111")
+	got, err := svc.Get(context.Background(), target.ID, "owner-1")
+	require.NoError(t, err)
+	require.Equal(t, "online", got.HealthState)
+	require.True(t, got.IsOnline)
+	require.NotNil(t, got.LastSeenAt)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
@@ -505,8 +549,11 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesWinnerAfterCreat
 	require.True(t, insertedWinner, "test must inject a conflicting first-registration winner")
 	require.Equal(t, "target-race-winner", target.ID)
 	require.Equal(t, "Desktop Local Edge 15151515", target.Name)
-	require.True(t, target.IsOnline)
-	require.Equal(t, "online", target.HealthState)
+	assertLatestEvidence(t, db, target.ID, dispatch.EvidenceSourceRegistration, dispatch.EvidenceStatusOnline, "owner-1:desktop:"+deviceID)
+	got, err := svc.Get(context.Background(), target.ID, "owner-1")
+	require.NoError(t, err)
+	require.True(t, got.IsOnline)
+	require.Equal(t, "online", got.HealthState)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch"]}`, target.Capabilities)
 
@@ -585,8 +632,11 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesGeneratedNameTar
 	require.Equal(t, "target-generated-name", target.ID)
 	require.NotNil(t, target.DeviceID)
 	require.Equal(t, deviceID, *target.DeviceID)
-	require.True(t, target.IsOnline)
-	require.Equal(t, "online", target.HealthState)
+	assertLatestEvidence(t, db, target.ID, dispatch.EvidenceSourceRegistration, dispatch.EvidenceStatusOnline, "owner-1:desktop:"+deviceID)
+	got, err := svc.Get(context.Background(), target.ID, "owner-1")
+	require.NoError(t, err)
+	require.True(t, got.IsOnline)
+	require.Equal(t, "online", got.HealthState)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND target_type = ?", "owner-1", "local_edge").Count(&count).Error)
@@ -656,10 +706,13 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOffline
 	})
 	require.NoError(t, err)
 	require.Equal(t, "target-existing", target.ID)
-	require.Equal(t, "online", target.HealthState)
-	require.True(t, target.IsOnline)
-	require.NotNil(t, target.LastSeenAt)
-	require.True(t, target.LastSeenAt.After(oldSeenAt))
+	assertLatestEvidence(t, db, target.ID, dispatch.EvidenceSourceRegistration, dispatch.EvidenceStatusOnline, "owner-1:desktop:"+deviceID)
+	got, err := svc.Get(context.Background(), target.ID, "owner-1")
+	require.NoError(t, err)
+	require.Equal(t, "online", got.HealthState)
+	require.True(t, got.IsOnline)
+	require.NotNil(t, got.LastSeenAt)
+	require.True(t, got.LastSeenAt.After(oldSeenAt))
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge"]}`, target.Capabilities)
 	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.1","health_basis":"desktop_check_in_freshness_not_ws_route"}`, target.Metadata)
