@@ -7,20 +7,29 @@ The shared package carries Edge surfaces (eventClient.ts, transcript/edge*.ts,
 edgeQueryKeys) that are meant for Desktop only. Web and Mobile RN are Hub-only
 and must not import these Edge-specific shared modules.
 
-This is a NON-BLOCKING lint per A-V3 §4.2 step 2. It reports violations but
-always exits 0. Harden to -ErrorAction Stop + exit 1 after A-V3 sign-off
-confirms gate strength and 15-layer index merge.
+HARD GATE since 2026-08-03 (#1525): violations exit 1; missing scan
+directories fail; internal errors fail. Self-tests live in
+scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1.
 
-A-V3 建议：shared 不做全量三分，但对 edge 表面补一条隔离门禁——web/mobile-rn
+A-V3 裁决（2026-08-03）：shared 不做全量三分，edge 表面补硬门禁——web/mobile-rn
 不得 import @shared/eventClient、@shared/transcript/edge*、edgeQueryKeys。
 本条门禁与 #1463 shared-boundary 互补：#1463 守 shared 内部 workbench/chatview/ui
 不出现 Edge 客户端实现；本条守 shared 内已存在的 edge 表面不被 hub-only 消费者引入。
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # 测试注入点：用临时 fixture 根替代仓库根（默认从脚本位置推导）
+    [string]$RepoRootOverride = ""
+)
 
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$ErrorActionPreference = "Stop"
+
+if ($RepoRootOverride) {
+    $RepoRoot = Resolve-Path -LiteralPath $RepoRootOverride
+} else {
+    $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+}
 
 $Passed = 0
 $Failed = 0
@@ -30,9 +39,9 @@ function Pass([string]$Text) {
     Write-Host "  PASS  $Text" -ForegroundColor Green
 }
 
-function Warn([string]$Text) {
+function Fail([string]$Text) {
     $script:Failed++
-    Write-Host "  WARN  $Text" -ForegroundColor Yellow
+    Write-Host "  FAIL  $Text" -ForegroundColor Red
 }
 
 function Relative([string]$Path) {
@@ -65,7 +74,7 @@ $ForbiddenPatterns = @(
     }
 )
 
-Write-Host "`n=== Shared Edge surface isolation (non-blocking lint, A-V3 §4.2 step 2) ===" -ForegroundColor Cyan
+Write-Host "`n=== Shared Edge surface isolation (HARD GATE, A-V3 裁决 2026-08-03) ===" -ForegroundColor Cyan
 Write-Host "Policy: app/web/src and app/mobile-rn/src (Hub-only clients) must not"
 Write-Host "import @shared/eventClient, @shared/transcript/edge*, or edgeQueryKeys."
 Write-Host ""
@@ -74,11 +83,15 @@ Write-Host ""
 $Files = @()
 foreach ($dir in $ScanDirs) {
     $full = Join-Path $RepoRoot $dir
-    if (Test-Path -LiteralPath $full) {
+    if (-not (Test-Path -LiteralPath $full)) {
+        Fail "scan directory missing: $dir — Hub-only surface gate cannot prove anything; treat as violation"
+        continue
+    }
+    try {
         $Files += Get-ChildItem -LiteralPath $full -Recurse -File |
             Where-Object { $_.Extension -in @(".ts", ".tsx", ".js", ".jsx") }
-    } else {
-        Warn "scan directory missing: $dir"
+    } catch {
+        Fail "scan error in $dir : $($_.Exception.Message)"
     }
 }
 
@@ -89,11 +102,16 @@ Write-Host ""
 $TotalHits = 0
 
 foreach ($entry in $ForbiddenPatterns) {
-    $matches = $Files | Select-String -Pattern $entry.Pattern
+    try {
+        $matches = $Files | Select-String -Pattern $entry.Pattern
+    } catch {
+        Fail "$($entry.Label): scan error — $($_.Exception.Message)"
+        continue
+    }
     if ($matches) {
         foreach ($match in $matches) {
             $TotalHits++
-            Warn "$($entry.Label) found in $(Relative $match.Path):$($match.LineNumber)"
+            Fail "$($entry.Label) found in $(Relative $match.Path):$($match.LineNumber)"
         }
     } else {
         Pass "$($entry.Label) absent from Hub-only surfaces"
@@ -102,17 +120,14 @@ foreach ($entry in $ForbiddenPatterns) {
 
 # ── Summary ─────────────────────────────────────────────
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Passed: $Passed  |  Warnings: $Failed" -ForegroundColor $(if ($Failed -eq 0) { "Green" } else { "Yellow" })
+Write-Host "  Passed: $Passed  |  Failed: $Failed" -ForegroundColor $(if ($Failed -eq 0) { "Green" } else { "Red" })
 Write-Host "========================================" -ForegroundColor Cyan
 
 if ($Failed -eq 0) {
     Write-Host "`nNo Edge surface isolation violations detected. Hub-only surfaces are clean." -ForegroundColor Green
+    exit 0
 } else {
-    Write-Host "`n$Failed violation(s) found — review above warnings." -ForegroundColor Yellow
-    Write-Host "This is a NON-BLOCKING lint (A-V3 §4.2 step 2). Violations are reported"
-    Write-Host "but do not fail the build. Harden after A-V3 sign-off." -ForegroundColor Yellow
+    Write-Host "`n$Failed violation(s) found — HARD GATE (A-V3 裁决 2026-08-03, #1525)." -ForegroundColor Red
+    Write-Host "Web/Mobile must not import Edge-only shared surfaces; fix imports or escalate." -ForegroundColor Red
+    exit 1
 }
-
-# Always exit 0 — non-blocking lint per A-V3 §4.2 step 2.
-# Harden to exit 1 after sign-off confirms gate strength and 15-layer index merge.
-exit 0
