@@ -272,9 +272,8 @@ export const chatviewResources = {
     'context.createTopic': '创建话题',
     'context.multiSelect': '多选',
     'context.pinMessage': '置顶消息',
-    // Unpin entry is planned but gated on message-level pin state
-    // (block.pinned), which the backend/adapter does not expose yet —
-    // see TODO(unpinMenu) in workbenchTranscriptChromeActionMappers.ts.
+    // Unpin toggles off block.pinned（pinMap store 落地后由 adapter 写入，
+    // 菜单切换见 workbenchTranscriptChromeActionMappers.ts）。
     'context.unpin': '取消置顶',
     'context.recall': '撤回消息',
     'context.copyLink': '复制消息链接',
@@ -778,9 +777,8 @@ export const chatviewResources = {
     'context.createTopic': 'Create topic',
     'context.multiSelect': 'Multi-select',
     'context.pinMessage': 'Pin message',
-    // Unpin entry is planned but gated on message-level pin state
-    // (block.pinned), which the backend/adapter does not expose yet —
-    // see TODO(unpinMenu) in workbenchTranscriptChromeActionMappers.ts.
+    // Unpin toggles off block.pinned (written by the adapter from the
+    // pinMap store; menu toggle in workbenchTranscriptChromeActionMappers.ts).
     'context.unpin': 'Unpin message',
     'context.recall': 'Recall message',
     'context.copyLink': 'Copy message link',

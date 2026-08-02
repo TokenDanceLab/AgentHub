@@ -107,7 +107,7 @@ export function planContextAction(options: {
     effects.push({ type: 'copy', text: copyText });
   }
   if (action === 'link') {
-    // TODO(copyLink): `agenthub://card/<blockId>` is a custom scheme with no
+    // TODO(#1504 copyLink): `agenthub://card/<blockId>` is a custom scheme with no
     // registered handler — copying it yields a dead link. Needs a product
     // decision (scheme handler registration or a real shareable URL) before
     // this copy can be useful; see cardLinkForBlock in
@@ -504,11 +504,10 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.createTopic'), icon: 'groups', onClick: () => onAction('topic', blockId) },
       { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => onEnterSelection(blockId) },
       // #1449: the pin entry toggles — pinned blocks show the unpin action
-      // (`context.unpin` i18n pre-seeded with the J-planner unpin branch:
-      // effect + toast + pulse). `block.pinned` is written by the adapter
-      // from message-level pin state; until the pinMap store lands (see
-      // TODO(pinMap) in normalizeHubMessages.ts) it stays false and the
-      // item pins as before.
+      // (`context.unpin` i18n + effect + toast + pulse). `block.pinned` is
+      // written by the adapter from message-level pin state, which the
+      // pinMap store provides (getPinMapStore → withPinnedState merged in
+      // web/desktop workbench model, see pinMap.ts).
       {
         label: block?.pinned ? t('context.unpin') : t('context.pinMessage'),
         icon: 'bell',

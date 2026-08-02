@@ -127,7 +127,7 @@ func (a *OpenCodeACPAdapter) PreflightCheck() error {
 // (via the embedded AcpAdapter).
 var _ AgentAdapter = (*OpenCodeACPAdapter)(nil)
 
-// TODO(真跑验证): an end-to-end run against the real `opencode acp` process
+// TODO(#1404 真跑验证): an end-to-end run against the real `opencode acp` process
 // requires an opencode >= 1.18.5 binary on PATH with provider credentials
 // (API key or opencode auth login). Not present in this workspace —
 // verification is limited to the registry registration, command shape, and a

@@ -93,7 +93,7 @@ function CodeBlock({
 }
 
 // ── Custom component map ──────────────────────────
-/* TODO(codeg parity #8): heading anchor links (rehype-slug +
+/* TODO(#1506 codeg parity #8): heading anchor links (rehype-slug +
    rehype-autolink-headings) need new dependencies — skipped deliberately. */
 const components: Components = {
   code: CodeBlock,
