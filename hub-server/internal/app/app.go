@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sync"
 	"net/http"
 	"time"
 
@@ -92,20 +93,19 @@ type App struct {
 	// Settings
 	UserSettingsHandler *handler.UserSettingsHandler
 
-	// Goroutine lifecycle
-	coreCtx    context.Context
-	coreCancel context.CancelFunc
+	// Goroutine lifecycle (#1542)
+	bg          *BackgroundGroup
+	shutdownOnce sync.Once
+	shutdownErr  error
 }
 
 // New creates a new App with the given infrastructure dependencies.
 // cfg, db, and cacheClient are expected to be fully initialized by the caller.
 func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
-	coreCtx, coreCancel := context.WithCancel(context.Background())
 	return &App{
 		Config:      cfg,
 		DB:          db,
 		CacheClient: cacheClient,
-		coreCtx:     coreCtx,
-		coreCancel:  coreCancel,
+		bg:          newBackgroundGroup(context.Background()),
 	}
 }

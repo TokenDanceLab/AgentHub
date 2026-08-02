@@ -22,7 +22,7 @@ func (a *App) setupWSManager() {
 	a.mgr.OnRouteSet = a.onRouteSet
 	a.mgr.OnRouteDel = a.onRouteDel
 	a.mgr.ResolveMembers = func(sessionID string) []string {
-		ctx := a.coreCtx
+		ctx := a.bg.Ctx()
 		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
 			members, err := a.SessionService.ListActiveMembers(sessionID)
 			if err != nil {
@@ -358,7 +358,7 @@ func payloadStringSlice(payload map[string]interface{}, key string) []string {
 // ── WebSocket route callbacks ──────────────────────────────────────────────
 
 func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
-	ctx := a.coreCtx
+	ctx := a.bg.Ctx()
 
 	if oldConnID != "" && oldConnID != connID {
 		_ = a.CacheClient.MarkKicked(ctx, oldConnID)
@@ -519,7 +519,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 }
 
 func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
-	ctx := a.coreCtx
+	ctx := a.bg.Ctx()
 
 	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {

@@ -123,7 +123,7 @@ func (a *App) hubStateDumper() debugpkg.StateDumper {
 
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
 func (a *App) startMetricsCollector(ctx context.Context) {
-	go func() {
+	a.bg.Go(func() error {
 		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
 		// G11: redis.PoolStats().Hits is a cumulative monotonic counter; we track
@@ -156,10 +156,10 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 					metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
 				}
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

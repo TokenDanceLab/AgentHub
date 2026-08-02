@@ -2,74 +2,135 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-// Shutdown gracefully stops all servers and background goroutines with
-// the following order: HTTP → Admin → WS → EventBus → cancel background → DB → Redis.
+// BackgroundGroup supervises long-lived goroutines (#1542). Every background
+// task derives from the same root context, registers at start, and is
+// awaited at shutdown with a bounded deadline. A task error propagates to
+// Wait (and cancels the group context), so a fatal background failure is no
+// longer only a log line.
+type BackgroundGroup struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	eg     *errgroup.Group
+}
+
+// newBackgroundGroup creates a group whose context derives from parent.
+func newBackgroundGroup(parent context.Context) *BackgroundGroup {
+	ctx, cancel := context.WithCancel(parent)
+	eg, _ := errgroup.WithContext(ctx)
+	return &BackgroundGroup{ctx: ctx, cancel: cancel, eg: eg}
+}
+
+// Ctx is the root context for background tasks; it is cancelled by Cancel.
+func (g *BackgroundGroup) Ctx() context.Context { return g.ctx }
+
+// Go registers a background task. fn must return when g.Ctx() is done.
+func (g *BackgroundGroup) Go(fn func() error) { g.eg.Go(fn) }
+
+// Cancel stops the group root context; all registered tasks must exit.
+func (g *BackgroundGroup) Cancel() { g.cancel() }
+
+// Wait blocks until every registered task has returned, or ctx expires.
+// Returns the first task error, or ctx.Err on deadline.
+func (g *BackgroundGroup) Wait(ctx context.Context) error {
+	done := make(chan error, 1)
+	go func() { done <- g.eg.Wait() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return fmt.Errorf("background group wait: %w", ctx.Err())
+	}
+}
+
+// Shutdown gracefully stops all servers and background goroutines with the
+// following order (#1542): HTTP → Admin → cancel background root → wait
+// background (bounded) → event bus (producers already stopped) → audit
+// drain → WS connections → DB → Redis. Idempotent: subsequent calls no-op.
 func (a *App) Shutdown(ctx context.Context) error {
+	a.shutdownOnce.Do(func() {
+		a.shutdownErr = a.shutdown(ctx)
+	})
+	return a.shutdownErr
+}
+
+func (a *App) shutdown(ctx context.Context) error {
+	var errs []error
+	record := func(stage string, err error) {
+		if err != nil {
+			slog.Error("shutdown stage failed", "stage", stage, "error", err)
+			errs = append(errs, fmt.Errorf("%s: %w", stage, err))
+		}
+	}
+
 	// 1. Stop accepting new HTTP requests.
 	if a.HTTPServer != nil {
-		if err := a.HTTPServer.Shutdown(ctx); err != nil {
-			slog.Error("http server shutdown failed", "error", err)
-		}
+		record("http", a.HTTPServer.Shutdown(ctx))
 	}
+
 	// 2. Stop admin server (pprof/metrics).
 	if a.AdminServer != nil {
-		if err := a.AdminServer.Shutdown(ctx); err != nil {
-			slog.Error("admin server shutdown failed", "error", err)
-		}
+		record("admin", a.AdminServer.Shutdown(ctx))
 	}
 
-	// 3. Close all WebSocket connections.
-	if a.mgr != nil {
-		a.mgr.Shutdown()
+	// 3. Cancel background root: scheduler, heartbeat, metrics collector,
+	// delivery outbox retry, legacy seq sync all observe this context.
+	if a.bg != nil {
+		a.bg.Cancel()
 	}
 
-	// 4. Close event bus (stop publishing events).
+	// 4. Wait for every background goroutine to exit (bounded by ctx).
+	if a.bg != nil {
+		record("background", a.bg.Wait(ctx))
+	}
+
+	// 5. Close event bus — producers are stopped and awaited above, so no
+	// publish-after-close can occur (bus.Close drains the pool).
 	if a.bus != nil {
 		a.bus.Close()
 	}
 
-	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector, delivery outbox retry).
-	if a.coreCancel != nil {
-		a.coreCancel()
-	}
-
-	// 5b. Shutdown audit service (drains retry queue, closes file sink).
+	// 6. Shutdown audit service (drains retry queue, closes file sink).
 	if a.AuditService != nil {
 		a.AuditService.Shutdown()
 	}
 
-	// 6. Close database connection pool.
+	// 7. Close WebSocket connections and stop heartbeat.
+	if a.mgr != nil {
+		a.mgr.Shutdown()
+	}
+
+	// 8. Close database connection pool.
 	if a.DB != nil {
 		if sqlDB, err := a.DB.DB(); err == nil {
-			if closeErr := sqlDB.Close(); closeErr != nil {
-				slog.Error("db close failed", "error", closeErr)
-			}
+			record("db", sqlDB.Close())
 		}
 	}
 
-	// 7. Close Redis connection pool.
+	// 9. Close Redis connection pool.
 	if a.CacheClient != nil {
-		if err := a.CacheClient.Close(); err != nil {
-			slog.Error("redis close failed", "error", err)
-		}
+		record("redis", a.CacheClient.Close())
 	}
 
 	slog.Info("shutdown complete")
-	return nil
+	return errors.Join(errs...)
 }
 
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
 // It also terminates timed-out agentteam assignments so they do not remain active forever.
 func (a *App) startTaskScheduler(ctx context.Context) {
-	go func() {
+	a.bg.Go(func() error {
 		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for {
@@ -85,10 +146,10 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				}
 				a.failTimedOutTeamAssignments(ctx)
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // failTimedOutTeamAssignments is the write-side counterpart of the route
@@ -135,13 +196,14 @@ func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingA
 }
 
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.
+// The heartbeat loop observes the group context and stops at shutdown.
 func (a *App) startWebSocketCleanup(ctx context.Context) {
-	a.mgr.StartHeartbeat()
+	a.mgr.StartHeartbeat(ctx)
 }
 
 // syncLegacySeqs copies existing session next_seq values from DB into Redis.
-func (a *App) syncLegacySeqs() {
-	ctx := a.coreCtx
+// It observes ctx: cancelled at shutdown, the loop stops promptly.
+func (a *App) syncLegacySeqs(ctx context.Context) {
 	var sessions []model.Session
 	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Order("created_at ASC").Limit(5000).Find(&sessions).Error; err != nil {
 		slog.Warn("failed to query sessions for seq sync", "error", err)
@@ -152,6 +214,10 @@ func (a *App) syncLegacySeqs() {
 	}
 	count := 0
 	for _, sess := range sessions {
+		if err := ctx.Err(); err != nil {
+			slog.Info("legacy session seq sync cancelled", "synced", count)
+			return
+		}
 		if err := a.CacheClient.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
 			slog.Warn("failed to init seq in redis", "session_id", sess.ID, "error", err)
 		} else {

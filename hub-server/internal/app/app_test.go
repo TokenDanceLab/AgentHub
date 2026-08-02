@@ -785,7 +785,7 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 		DB:           db,
 		CacheClient:  cacheClient,
 		mgr:          mgr,
-		coreCtx:      context.Background(),
+		bg:           newBackgroundGroup(context.Background()),
 		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"task-dev-b","target_id":"target-dev-b"}`))
@@ -855,7 +855,7 @@ func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
 		DB:           db,
 		CacheClient:  cacheClient,
 		mgr:          mgr,
-		coreCtx:      context.Background(),
+		bg:           newBackgroundGroup(context.Background()),
 		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	const payload = `{"task_id":"task-dev-b-full","target_id":"target-dev-b"}`
@@ -903,7 +903,7 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 		DB:           db,
 		CacheClient:  cacheClient,
 		mgr:          mgr,
-		coreCtx:      context.Background(),
+		bg:           newBackgroundGroup(context.Background()),
 		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"missing-task","target_id":"target-dev-b"}`))
@@ -965,7 +965,7 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 	a := &App{
 		DB:           db,
 		bus:          bus,
-		coreCtx:      context.Background(),
+		bg:           newBackgroundGroup(context.Background()),
 		AgentService: service.NewAgentService(db, bus, nil, nil, nil),
 	}
 	staleScannedTask := model.PendingAgentTask{
@@ -1004,7 +1004,7 @@ func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
 	a := &App{
 		CacheClient: cacheClient,
 		mgr:         mgr,
-		coreCtx:     context.Background(),
+		bg:          newBackgroundGroup(context.Background()),
 	}
 	require.NoError(t, cacheClient.PushPendingAgentControl(context.Background(), "user-1", "dev-b", `{"kind":"permission.decide","approval_id":"approval-b"}`))
 
@@ -1057,7 +1057,7 @@ func TestOnRouteSetKeepsPendingAgentControlsWhenDeliveryBufferFull(t *testing.T)
 	a := &App{
 		CacheClient: cacheClient,
 		mgr:         mgr,
-		coreCtx:     context.Background(),
+		bg:          newBackgroundGroup(context.Background()),
 	}
 	const payload = `{"kind":"permission.decide","approval_id":"approval-b"}`
 	require.NoError(t, cacheClient.PushPendingAgentControl(context.Background(), "user-1", "dev-b", payload))
@@ -1086,7 +1086,7 @@ func TestPushPendingTasksRequeuesWhenDeliveryBufferFull(t *testing.T) {
 	a := &App{
 		CacheClient: cacheClient,
 		mgr:         mgr,
-		coreCtx:     context.Background(),
+		bg:          newBackgroundGroup(context.Background()),
 	}
 	const payload = `{"type":"agent.dispatch","body":"retry-me"}`
 	require.NoError(t, cacheClient.PushPendingTask(context.Background(), "user-1", payload))
