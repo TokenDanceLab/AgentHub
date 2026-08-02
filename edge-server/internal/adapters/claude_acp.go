@@ -120,7 +120,7 @@ func (a *ClaudeACPAdapter) PreflightCheck() error {
 // (via the embedded AcpAdapter).
 var _ AgentAdapter = (*ClaudeACPAdapter)(nil)
 
-// TODO(真跑验证): an end-to-end run against the real `npx -y
+// TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
 // @agentclientprotocol/claude-agent-acp` process requires a Node.js/npx
 // environment with Claude authentication (ANTHROPIC_API_KEY or Claude Code
 // login) and network access to the npm registry. Not present in this

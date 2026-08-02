@@ -32,7 +32,7 @@ const acpSDKVersion = "v0.13.5"
 // a JSON-RPC error instead of a silent hang. session/request_permission no
 // longer goes through this sentinel — it is bridged to the Edge approval
 // chain via PermissionDecisionBroker.
-var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO: frame design)")
+var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1404: frame design)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
 // inbound JSON-RPC to the acp.Client interface methods:
@@ -248,7 +248,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 
 // ReadTextFile handles fs/read_text_file.
 //
-// TODO(帧设计): the Edge-side fs frame + allowlist enforcement (see
+// TODO(#1404 帧设计): the Edge-side fs frame + allowlist enforcement (see
 // tool_allowlist_hook.go) is not designed for ACP yet; for the spike the
 // capability is advertised in initialize but the endpoint answers with an
 // error so the agent can surface it instead of hanging. (Permission-style
@@ -263,7 +263,7 @@ func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTe
 }
 
 func fsEndpointError(method, path string) error {
-	return fmt.Errorf("acp: %s %q not wired (TODO: Edge fs frame design + allowlist): %w",
+	return fmt.Errorf("acp: %s %q not wired (TODO #1404: Edge fs frame design + allowlist): %w",
 		method, path, errACPEndpointNotWired)
 }
 
@@ -293,7 +293,7 @@ func (h *acpClientHandler) WaitForTerminalExit(ctx context.Context, params acp.W
 }
 
 func terminalEndpointError(method string) error {
-	return fmt.Errorf("acp: %s not wired (TODO: Edge terminal frame design): %w", method, errACPEndpointNotWired)
+	return fmt.Errorf("acp: %s not wired (TODO #1404: Edge terminal frame design): %w", method, errACPEndpointNotWired)
 }
 
 // runACPSession runs one ACP turn with the SDK client runtime: initialize
@@ -309,7 +309,7 @@ func terminalEndpointError(method string) error {
 // Prompt and workdir come from the RunProcessContext attached to ctx via
 // SDKAdapterContext (same pattern as the anthropic/openai SDK adapters).
 //
-// TODO(真跑验证): spawning the official adapter binary (`npx -y
+// TODO(#1404 真跑验证): spawning the official adapter binary (`npx -y
 // @agentclientprotocol/codex-acp`, version-pinned per the migration report)
 // and a live end-to-end run require an environment with npx + agent keys —
 // left for environment verification. The SDK connection layer and typed
@@ -329,9 +329,9 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 1. initialize handshake. Capabilities: fs read/write + terminal are
 	// advertised; the endpoints answer with errors until the fs/terminal
-	// frame design lands (see handler TODO comments). Tool permission gates
-	// use session/request_permission, which is bridged to the Edge approval
-	// chain.
+	// frame design lands (#1404; see handler TODO comments). Tool permission
+	// gates use session/request_permission, which is bridged to the Edge
+	// approval chain.
 	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		ClientCapabilities: acp.ClientCapabilities{
@@ -354,7 +354,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	// 2. session/new.
 	sessResp, err := conn.NewSession(ctx, acp.NewSessionRequest{
 		Cwd:        rc.WorkDir,
-		McpServers: []acp.McpServer{}, // TODO: wire RunProcessContext.MCPConfig
+		McpServers: []acp.McpServer{}, // TODO(#1404): wire RunProcessContext.MCPConfig
 	})
 	if err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
@@ -363,7 +363,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 3. session/prompt. During this call the SDK dispatches all inbound
 	// session/update notifications (→ SessionUpdate → run.agent.*) and
-	// blocking requests (→ handler TODOs) concurrently.
+	// blocking requests (→ handler TODOs, #1404) concurrently.
 	promptResp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sessResp.SessionId,
 		Prompt:    []acp.ContentBlock{acp.TextBlock(rc.Prompt)},

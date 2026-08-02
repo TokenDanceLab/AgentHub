@@ -107,7 +107,7 @@ export function TaskMain({
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const title = PANE_TITLES[activePane] ?? '我负责的';
 
-  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO) ──
+  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
   onLoadMoreRef.current = onLoadMore;
