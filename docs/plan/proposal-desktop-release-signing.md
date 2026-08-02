@@ -173,7 +173,7 @@ Codeg 明确没有做 Windows 签名（SmartScreen 告警），并非疏忽而�
 
 `TAURI_SIGNING_PRIVATE_KEY` 已在：
 - `release.yml:96` (build-desktop job env)
-- `release.yml:191` (build-desktop-macos job env)  
+- `release.yml:191` (build-desktop-macos job env)
 - `cd-desktop.yml:59` (build-desktop-windows job env)
 
 需确认 GitHub Actions secrets 中该值实际存在且正确。验证方法：
