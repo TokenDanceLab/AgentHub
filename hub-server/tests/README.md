@@ -1,17 +1,17 @@
 # Hub Server Integration Tests
 
-最后更新：2026-06-27
+最后更新：2026-08-03
 
-`hub-server/tests/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis. The old helper walkthrough is indexed in [../../docs/history.md](../../docs/history.md).
+`hub-server/tests/integration/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis. The old helper walkthrough is indexed in [../../docs/history.md](../../docs/history.md).
 
 ## Commands
 
-```powershell
-# Fixture-only short path; skips DB/Redis startup in TestMain.
-go test ./hub-server/tests/ -short -count=1
+The lane is `//go:build integration` (mechanical lane manifest): the default `-short` lanes never compile it, so the suite cannot silently vanish. Run it explicitly:
 
-# Full integration path; requires configured PostgreSQL and Redis.
-go test ./hub-server/tests/ -count=1
+```powershell
+# Integration lane; requires configured PostgreSQL and Redis.
+cd hub-server
+go test -tags integration ./tests/integration/ -count=1
 ```
 
 Full mode reads `hub-server/configs/config.yaml`.

@@ -152,7 +152,15 @@ jobs:
           args: --timeout=5m
 
       - name: Test (unit only, skip integration)
-        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+        run: |
+          go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee unit-test.log
+          PASS_COUNT=$(grep -c "^--- PASS" unit-test.log || true)
+          echo "unit lane PASS count: ${PASS_COUNT}"
+          if [ "${PASS_COUNT}" -lt 1 ]; then
+            echo "::error::unit lane executed 0 tests — hub-server/tests must not hide behind a package-wide -short exit"
+            tail -50 unit-test.log
+            exit 1
+          fi
 
       - name: Coverage check (overall >= 40%)
         run: |
@@ -232,13 +240,13 @@ jobs:
         run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
 
   # ── Backend: Integration (real PostgreSQL + Redis) ──────────
-  # Q1: hub-server/tests integration suite (OIDC e2e / WS reconnect / seq
-  # continuity / edge-callback security / phase1-7) was silent-skipped by
-  # TestMain os.Exit(0) under -short, so CI was green but the suite never
-  # ran. This job provisions PostgreSQL + Redis service containers and runs
-  # the tests package WITHOUT -short so the integration suite actually
-  # executes. The -short jobs (go-hub / backend-focused-subset) keep their
-  # honest "SKIP" log from TestMain and continue to cover unit tests.
+  # hub-server/tests/integration is `//go:build integration` (lane manifest):
+  # the default -short lanes never compile it, so the suite can no longer
+  # silently vanish via a package-wide TestMain escape hatch. This job
+  # provisions PostgreSQL + Redis service containers and runs the lane with
+  # `-tags integration`, asserting non-zero PASS count so a 0-test lane fails.
+  # The -short jobs (go-hub / backend-focused-subset) cover unit tests and
+  # prove non-zero execution the same way.
   backend-integration:
     name: Backend integration (PostgreSQL + Redis)
     needs: changes
@@ -299,7 +307,15 @@ jobs:
 
       - name: Integration tests (no -short; real PostgreSQL + Redis)
         working-directory: hub-server
-        run: go test ./tests/ -count=1 -timeout=20m
+        run: |
+          go test -tags integration ./tests/integration/ -count=1 -timeout=20m -v 2>&1 | tee integration-test.log
+          PASS_COUNT=$(grep -c "^--- PASS" integration-test.log || true)
+          echo "integration lane PASS count: ${PASS_COUNT}"
+          if [ "${PASS_COUNT}" -lt 1 ]; then
+            echo "::error::integration lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 integration-test.log
+            exit 1
+          fi
 
   # ── Cross-Platform Build ─────────────────────
   # Windows 构建保留在 release / release-readiness；日常 CI 只跑 ubuntu。
