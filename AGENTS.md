@@ -317,3 +317,16 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 5. 专项完成后，把 `docs/analysis/`、本专项 `docs/plan/` 和 `docs/progress/` 外迁到 `docs/history.md` 指向的外部归档，并更新历史索引。
 
 短任务（单文件修复、typo、小改动）不需要完整 SPEC，但仍必须遵守本文件的范围、隐私和验证规则。
+
+## 12. 发布流程
+
+唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml（手动触发）与 scripts/release/release.ps1（本地直传）已于 2026-08-02 删除，不再提供。
+
+打 tag SOP：
+
+1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.ps1`）。
+2. 打 tag：`git tag vX.Y.Z`（正式版）或 `git tag vX.Y.Z-rc.N`（候选版）；tag 指向的 commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml 的 tag-guard job 双重守卫，任一不满足则 job 失败、不触发构建）。
+3. push：`git push origin <tag>` → release.yml 构建出包并发布。
+4. 发布产物：build-desktop（Windows NSIS + portable）、build-desktop-macos（DMG）、build-mobile（Android APK）。
+
+冻结开关：`scripts/release/verify-release-gate.ps1` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。
