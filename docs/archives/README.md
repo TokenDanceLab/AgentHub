@@ -3,6 +3,19 @@
 | 项目 | 描述 | 时间 | 归档路径 |
 |---|---|---|---|
 | cleanup-baseline | knowledge-first strangler cleanup + SDD closeout；Issues #424–#445 closed；Phase 7 residual #447–#451；Project [cleanup-baseline](https://github.com/users/DeliciousBuding/projects/6)；PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | 2026-07-16 | [cleanup-baseline/](./cleanup-baseline/) |
+| wiki-consolidation | wiki 孤儿知识面处置：14 个文件（pages/ 10 + 根 4）；module-hub 鉴权增量并入 01-hub-server、module-edge lifecycle/store 增量并入 02-edge-server，其余为重复/过时编译层归档；`wiki/` 目录移除 | 2026-08-02 | [wiki/](./wiki/) |
+
+## wiki-consolidation
+
+Archive of the orphan `wiki/` compiled-knowledge tree (cleanup-baseline Phase 2 llmwiki), removed 2026-08-02 after merging the two incremental pages into `docs/architecture/` and archiving the rest.
+
+- Date: 2026-08-02
+- Branch / worktree: `chore/wiki-consolidation`
+- Disposition: 14 files archived as-is（原样移动，未改内容）; PR link in commit message
+- Incremental content merged:
+  - `wiki/pages/module-hub.md` → `docs/architecture/01-hub-server.md`（Auth 中间件链与路由分组）
+  - `wiki/pages/module-edge.md` → `docs/architecture/02-edge-server.md`（Run Lifecycle 状态机 + Store/EventBus 持久化细节）
+- Everything else (module-frontend / architecture-seams / flow-control-event / hotspots / risks-open / overview / ops-hk3 / cleanup-playbook + 4 root files) was duplicate of or stale against `docs/architecture*`, `api/events.md`, `docs/governance/*`, `docs/analysis/*` and archived unmodified.
 
 ## cleanup-baseline
 
