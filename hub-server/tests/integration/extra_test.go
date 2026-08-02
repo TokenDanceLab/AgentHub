@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"bytes"
 	"encoding/json"
 	"mime/multipart"
@@ -308,7 +309,7 @@ func TestWebSocketUpgrade(t *testing.T) {
 		// 挂 WSAuthMiddleware + ServeWS，认证/升级语义与主 server 一致。
 		u := register(t, "wsupg_auth", "pass1234", "WsUpgAuth")
 		manager := ws.NewManager()
-		manager.StartHeartbeat()
+		manager.StartHeartbeat(context.Background())
 		defer manager.Shutdown()
 
 		wsURL := newWSTestServer(t, manager)

@@ -27,7 +27,7 @@ const wsTestSecret = "test-ws-secret-32-characters-long!!"
 // via PushToUser are delivered to the new connection.
 func TestWSReconnectReceivesMessages(t *testing.T) {
 	manager := hubws.NewManager()
-	manager.StartHeartbeat()
+	manager.StartHeartbeat(context.Background())
 	defer manager.Shutdown()
 
 	// Track connection drops and route-sets to verify reconnect lifecycle.
@@ -145,7 +145,7 @@ func TestWSReconnectReceivesMessages(t *testing.T) {
 // types and asserts a single PushToUser reaches both connections.
 func TestWSMultipleDevicesPerUser(t *testing.T) {
 	manager := hubws.NewManager()
-	manager.StartHeartbeat()
+	manager.StartHeartbeat(context.Background())
 	defer manager.Shutdown()
 
 	wsURL := newWSTestServer(t, manager)
@@ -214,7 +214,7 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 func TestWSHeartbeatKeepsConnection(t *testing.T) {
 	manager := hubws.NewManager()
 	// 时钟注入 seam（#1533）：用 100ms interval 确定性验证心跳，不等真实 30s。
-	manager.StartHeartbeatWithInterval(100 * time.Millisecond)
+	manager.StartHeartbeatWithInterval(context.Background(), 100*time.Millisecond)
 	defer manager.Shutdown()
 
 	wsURL := newWSTestServer(t, manager)
@@ -264,7 +264,7 @@ func TestWSPushToConnBufferFull(t *testing.T) {
 	manager := hubws.NewManager()
 	// 容量注入 seam（#1533）：2 帧的小 send buffer 确定性触发背压，不等真实 256 帧。
 	manager.SetSendBufferSize(2)
-	manager.StartHeartbeat()
+	manager.StartHeartbeat(context.Background())
 	defer manager.Shutdown()
 
 	wsURL := newWSTestServer(t, manager)
