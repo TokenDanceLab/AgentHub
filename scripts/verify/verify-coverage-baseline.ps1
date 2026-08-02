@@ -4,14 +4,19 @@
   Frontend coverage baseline gate (baseline must not regress).
 
 .DESCRIPTION
-  Runs vitest --coverage for the three frontend packages (@agenthub/shared,
-  agenthub-web, agenthub-desktop), parses the json-summary coverage report and
-  the json test-results report, then asserts:
+  Runs vitest --coverage for the four frontend packages (@agenthub/shared,
+  agenthub-web, agenthub-desktop, agenthub-mobile-rn), parses the json-summary
+  coverage report and the json test-results report, then asserts:
     1. Every coverage metric (lines/branches/functions/statements) is >= the
        value recorded in scripts/verify/coverage-baseline.json (no regression).
-    2. Skipped test count == 0 for every package (defeats .skip / .todo as a
+    2. Every coverage.include file with statements but 0% lines is an
+       imported-by-nobody production module; their count must not grow past
+       the baseline's uncoveredFiles (0% ratchet — new untested code or a
+       deleted test both trip it). production_files == 0 (include glob broken)
+       is a failure.
+    3. Skipped test count == 0 for every package (defeats .skip / .todo as a
        way to silently mask a coverage drop).
-  Exit 0 on pass, exit 1 on any regression or skipped test.
+  Exit 0 on pass, exit 1 on any regression, uncovered growth, or skipped test.
 
   Reproducible: v8 coverage is execution-path based, so the numbers are
   cross-platform deterministic (Windows measure == ubuntu CI).
@@ -160,6 +165,37 @@ foreach ($pkgProp in $baseline.packages.PSObject.Properties) {
                 $failures.Add("[$pkgFilter] $m coverage regressed: current $current% < baseline $base%")
             }
         }
+    }
+
+    # --- uncovered production modules (include contract, #1535) -------------
+    # coverage-summary.json lists every file matched by coverage.include.
+    # Files with statements but 0% lines are production modules no test
+    # imports. The baseline records uncoveredFiles; it must not grow (new
+    # untested code or a deleted test both trip it). production_files == 0
+    # means the include glob matched nothing — broken config, fail-closed.
+    if ($parsedCoverage -and $totals) {
+        $productionFiles = 0
+        $uncoveredFiles = 0
+        foreach ($prop in $cs.PSObject.Properties) {
+            if ($prop.Name -eq 'total') { continue }
+            $productionFiles++
+            $linesInfo = $prop.Value.lines
+            if ($null -ne $linesInfo -and [int]$linesInfo.total -gt 0 -and [double]$linesInfo.pct -eq 0.0) {
+                $uncoveredFiles++
+            }
+        }
+        if ($productionFiles -eq 0) {
+            $failures.Add("[$pkgFilter] coverage include matched 0 production files — include glob broken (fail-closed)")
+        }
+        if ($null -ne $pkg.uncoveredFiles) {
+            $baseUncovered = [int]$pkg.uncoveredFiles
+            if ($uncoveredFiles -gt $baseUncovered) {
+                $failures.Add("[$pkgFilter] uncovered (0%) production modules grew: $uncoveredFiles > baseline $baseUncovered (new untested code or deleted test)")
+            }
+        }
+        $uncLine = "$pkgFilter coverage: production_files=$productionFiles uncovered_files=$uncoveredFiles"
+        $packageSummaries.Add($uncLine)
+        Write-Host $uncLine -ForegroundColor DarkYellow
     }
 
     # --- console summary line ----------------------------------------------
