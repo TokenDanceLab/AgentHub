@@ -87,6 +87,18 @@ var (
 	AgentHeartbeatFailures         prometheus.Counter
 	SessionTouchFailures           prometheus.Counter
 
+	// Audit-D2 (#1543) — Async audit queue reliability. The audit retry
+	// queue previously dropped events silently when full, drained without
+	// bound on shutdown, and retried with a non-cancellable sleep. These
+	// metrics make every loss/retry visible. AuditQueueDepth is maintained
+	// by audit.Record (enqueue) and the retryLoop (dequeue); it is set to
+	// the remaining count when a bounded drain abandons events.
+	AuditQueueDrops       prometheus.Counter
+	AuditQueueDepth       prometheus.Gauge
+	AuditRetries          prometheus.Counter
+	AuditFinalFailures    prometheus.Counter
+	AuditFileSinkFailures prometheus.Counter
+
 	once sync.Once
 )
 
@@ -367,6 +379,38 @@ func Register() {
 			},
 		)
 
+		// Audit-D2 — Async audit queue reliability metrics (#1543).
+		AuditQueueDrops = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "audit_queue_drops_total",
+				Help: "Total number of audit events dropped because the async retry queue was full.",
+			},
+		)
+		AuditQueueDepth = prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "audit_queue_depth",
+				Help: "Number of audit events currently pending in the async retry queue.",
+			},
+		)
+		AuditRetries = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "audit_retries_total",
+				Help: "Total number of transient audit persistence failures retried.",
+			},
+		)
+		AuditFinalFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "audit_final_failures_total",
+				Help: "Total number of audit events dropped after exhausting retries or aborting on shutdown/lifecycle cancellation.",
+			},
+		)
+		AuditFileSinkFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "audit_file_sink_failures_total",
+				Help: "Total number of JSONL audit file sink write failures (async and sync paths).",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
@@ -403,6 +447,11 @@ func Register() {
 		prometheus.MustRegister(NotificationDeliveryFailures)
 		prometheus.MustRegister(AgentHeartbeatFailures)
 		prometheus.MustRegister(SessionTouchFailures)
+		prometheus.MustRegister(AuditQueueDrops)
+		prometheus.MustRegister(AuditQueueDepth)
+		prometheus.MustRegister(AuditRetries)
+		prometheus.MustRegister(AuditFinalFailures)
+		prometheus.MustRegister(AuditFileSinkFailures)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

@@ -187,6 +187,10 @@ func (a *App) initServices(ctx context.Context) error {
 	auditSvc := service.NewAuditService(a.DB, &service.AuditServiceConfig{
 		AuditLogFile:    a.Config.Server.AuditLogFile,
 		RetryBufferSize: 1024,
+		// Lifecycle governs the async retry loop: on process shutdown the
+		// background root is cancelled (bg.Cancel) so retries abort instead
+		// of sleeping on a dead process.
+		LifecycleContext: a.bg.Ctx(),
 	})
 	a.AuditService = auditSvc
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)

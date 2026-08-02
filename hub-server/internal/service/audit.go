@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
@@ -63,9 +65,21 @@ type AuditService struct {
 	fileSink *auditFileSink
 
 	// Retry queue for transient DB failures.
-	retryCh chan *model.AuditEvent
-	wg      sync.WaitGroup
-	done    chan struct{}
+	retryCh      chan *model.AuditEvent
+	retryBufSize int
+	wg           sync.WaitGroup
+	done         chan struct{}
+
+	// lifecycle is the process-lifetime context for the retry loop; retry
+	// backoff and persistence abort when it is cancelled. Defaults to
+	// context.Background when AuditServiceConfig.LifecycleContext is nil.
+	lifecycle context.Context
+	// shutdownCtx is set by Shutdown (before close(done)) so the retry loop's
+	// bounded drain aborts at the shutdown deadline. atomic.Value because the
+	// retry loop reads it concurrently; the happens-before edge through
+	// close(done) covers writes, but Load is race-free regardless.
+	shutdownCtx atomic.Value // context.Context; nil until Shutdown
+	shutdownOnce sync.Once
 }
 
 // AuditServiceConfig holds optional configuration for the AuditService.
@@ -75,6 +89,10 @@ type AuditServiceConfig struct {
 	AuditLogFile string
 	// RetryBufferSize is the channel buffer size for the retry queue (default 1024).
 	RetryBufferSize int
+	// LifecycleContext is the process-lifetime context that governs the
+	// async retry loop. When nil, context.Background is used. Cancel it to
+	// abort retries and persistence on process shutdown.
+	LifecycleContext context.Context
 }
 
 // NewAuditService creates a new AuditService.
@@ -88,16 +106,23 @@ func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
 		bufSize = cfg.RetryBufferSize
 	}
 
+	lifecycle := context.Background()
+	if cfg != nil && cfg.LifecycleContext != nil {
+		lifecycle = cfg.LifecycleContext
+	}
+
 	fileSink, err := newAuditFileSink(cfg.AuditLogFile)
 	if err != nil {
 		slog.Error("audit: failed to open audit log file, file sink disabled", "path", cfg.AuditLogFile, "error", err)
 	}
 
 	svc := &AuditService{
-		db:       db,
-		fileSink: fileSink,
-		retryCh:  make(chan *model.AuditEvent, bufSize),
-		done:     make(chan struct{}),
+		db:           db,
+		fileSink:     fileSink,
+		retryCh:      make(chan *model.AuditEvent, bufSize),
+		retryBufSize: bufSize,
+		done:         make(chan struct{}),
+		lifecycle:    lifecycle,
 	}
 
 	if bufSize > 0 {
@@ -109,63 +134,122 @@ func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
 }
 
 // retryLoop processes the retry queue with exponential backoff.
-// It drains the channel on shutdown before exiting.
+// On Shutdown it drains remaining events until the shutdown deadline
+// (bounded), then abandons the rest (counted via AuditQueueDepth).
 func (s *AuditService) retryLoop() {
 	defer s.wg.Done()
 	for {
 		select {
 		case <-s.done:
-			// Drain remaining events before shutting down.
-			for {
-				select {
-				case event := <-s.retryCh:
-					s.persistWithRetry(event)
-				default:
-					return
-				}
-			}
+			s.drain()
+			return
 		case event := <-s.retryCh:
-			s.persistWithRetry(event)
+			metrics.AuditQueueDepth.Set(float64(len(s.retryCh)))
+			s.persistWithRetry(s.persistCtx(), event)
+		}
+	}
+}
+
+// persistCtx returns the context governing persistence: the shutdown
+// deadline once Shutdown has been called, otherwise the lifecycle context.
+func (s *AuditService) persistCtx() context.Context {
+	if v := s.shutdownCtx.Load(); v != nil {
+		if ctx, ok := v.(context.Context); ok && ctx != nil {
+			return ctx
+		}
+	}
+	return s.lifecycle
+}
+
+// drain processes queued events until the queue is empty or the shutdown
+// deadline expires (whichever comes first).
+func (s *AuditService) drain() {
+	shutdownCtx := s.persistCtx()
+	for {
+		select {
+		case event := <-s.retryCh:
+			s.persistWithRetry(shutdownCtx, event)
+		case <-shutdownCtx.Done():
+			metrics.AuditQueueDepth.Set(float64(len(s.retryCh)))
+			slog.Warn("audit: shutdown deadline reached, abandoning queued events", "remaining", len(s.retryCh), "queue_capacity", s.retryBufSize)
+			return
+		default:
+			metrics.AuditQueueDepth.Set(0)
+			return
 		}
 	}
 }
 
 // persistWithRetry attempts to persist an event with up to 3 retries
-// using exponential backoff (100ms, 200ms, 400ms).
-func (s *AuditService) persistWithRetry(event *model.AuditEvent) {
+// using exponential backoff (100ms, 200ms, 400ms). The backoff sleep is
+// cancellable via ctx, so a shutdown or lifecycle cancellation aborts the
+// retry early instead of sleeping on a dead process.
+func (s *AuditService) persistWithRetry(ctx context.Context, event *model.AuditEvent) {
 	const maxRetries = 3
 	backoff := 100 * time.Millisecond
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := repository.CreateAuditEvent(s.db.WithContext(ctx), event)
+		if ctx.Err() != nil {
+			metrics.AuditFinalFailures.Inc()
+			slog.Warn("audit: persist aborted by shutdown/lifecycle cancellation", "event_type", event.EventType, "error", ctx.Err())
+			return
+		}
+		opCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err := repository.CreateAuditEvent(s.db.WithContext(opCtx), event)
 		cancel()
 		if err == nil {
 			// Write to JSONL file sink.
 			if writeErr := s.fileSink.write(event.HashChainEntry()); writeErr != nil {
+				metrics.AuditFileSinkFailures.Inc()
 				slog.Error("audit: failed to write file sink", "error", writeErr)
 			}
 			return
 		}
 		if attempt < maxRetries {
+			metrics.AuditRetries.Inc()
 			slog.Warn("audit: persist failed, retrying", "attempt", attempt+1, "error", err)
-			time.Sleep(backoff)
+			timer := time.NewTimer(backoff)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				metrics.AuditFinalFailures.Inc()
+				slog.Warn("audit: persist backoff aborted by shutdown/lifecycle cancellation", "event_type", event.EventType)
+				return
+			}
 			backoff *= 2
 		} else {
+			metrics.AuditFinalFailures.Inc()
 			slog.Error("audit: failed to persist event after retries, event dropped", "event_type", event.EventType, "error", err)
 		}
 	}
 }
 
 // Shutdown gracefully stops the retry loop and closes the file sink.
-func (s *AuditService) Shutdown() {
-	close(s.done)
-	s.wg.Wait()
-	if s.fileSink != nil {
-		if err := s.fileSink.close(); err != nil {
-			slog.Error("audit: failed to close file sink", "error", err)
+// It is idempotent (subsequent calls no-op). The retry loop drains the
+// queue but aborts at ctx's deadline, so shutdown is bounded even when the
+// queue is full and persistence is slow.
+func (s *AuditService) Shutdown(ctx context.Context) {
+	s.shutdownOnce.Do(func() {
+		s.shutdownCtx.Store(ctx)
+		close(s.done)
+		// Bounded wait: the retry loop exits by itself once the drain hits
+		// the deadline (persistWithRetry aborts on ctx cancellation).
+		done := make(chan struct{})
+		go func() { s.wg.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			metrics.AuditQueueDepth.Set(float64(len(s.retryCh)))
+			slog.Warn("audit: shutdown deadline reached before retry loop exited", "remaining", len(s.retryCh), "queue_capacity", s.retryBufSize)
 		}
-	}
+		if s.fileSink != nil {
+			if err := s.fileSink.close(); err != nil {
+				metrics.AuditFileSinkFailures.Inc()
+				slog.Error("audit: failed to close file sink", "error", err)
+			}
+		}
+	})
 }
 
 // AuditListResult holds a page of audit event results.
@@ -175,9 +259,14 @@ type AuditListResult struct {
 	Cursor  string             `json:"next_cursor,omitempty"`
 }
 
-// Record writes an audit event. Events are enqueued to a buffered channel and
-// persisted asynchronously with a retry mechanism, so audit logging never blocks
-// the caller's request. Transient DB failures are retried with backoff.
+// Record writes an audit event (asynchronous, best-effort). Events are
+// enqueued to a buffered channel and persisted asynchronously with a retry
+// mechanism, so audit logging never blocks the caller's request. Transient
+// DB failures are retried with backoff. If the queue is full the event is
+// DROPPED and counted in audit_queue_drops_total — callers for whom event
+// loss is unacceptable (security-critical decisions) must use RecordSync
+// instead. Reliability levels: Record = at-most-once, RecordSync = at-least-
+// once (waits for persistence).
 func (s *AuditService) Record(ctx context.Context, userID, eventType, severity, summary string, details map[string]interface{}, profileID, targetID *string, clientIP string) {
 	detailsJSON := "{}"
 	if details != nil {
@@ -200,8 +289,10 @@ func (s *AuditService) Record(ctx context.Context, userID, eventType, severity, 
 	// Non-blocking send to retry channel; drop if channel is full.
 	select {
 	case s.retryCh <- event:
+		metrics.AuditQueueDepth.Set(float64(len(s.retryCh)))
 	default:
-		slog.Error("audit: retry queue full, dropping event", "event_type", eventType)
+		metrics.AuditQueueDrops.Inc()
+		slog.Error("audit: retry queue full, dropping event", "event_type", eventType, "queue_capacity", s.retryBufSize)
 	}
 }
 
@@ -233,6 +324,7 @@ func (s *AuditService) RecordSync(ctx context.Context, userID, eventType, severi
 	// Write to JSONL file sink.
 	if s.fileSink != nil {
 		if err := s.fileSink.write(event.HashChainEntry()); err != nil {
+			metrics.AuditFileSinkFailures.Inc()
 			slog.Error("audit: failed to write file sink (sync)", "error", err)
 		}
 	}
