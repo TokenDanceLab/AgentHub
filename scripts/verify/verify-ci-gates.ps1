@@ -163,7 +163,7 @@ Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.ps1" "valida
 Assert-Contains $validate "Self-test coverage include contract" "validate job must run the coverage include negative self-test"
 Assert-Contains $validate "coverage-include\.Tests\.ps1" "validate job must call the coverage include self-test"
 Assert-StepContinueOnError $validate "Verify coverage baseline" $false
-Assert-StepContinueOnError $validate "Self-test coverage include contract" $false
+Assert-StepContinueOnError $validate "Self-test coverage include contract (negative)" $false
 
 Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
 Assert-Contains $validate "scripts/verify/verify-ci-gates\.ps1" "validate job must call scripts/verify/verify-ci-gates.ps1"
