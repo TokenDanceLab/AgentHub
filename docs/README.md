@@ -24,9 +24,9 @@ docs/
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
 ├── architecture/                      ← 模块化架构文档
 ├── progress/MASTER.md                 ← 活进度 SSOT（Phase 里程碑 / open issues）
-├── plan/                              ← cleanup-baseline 历史 plan（冻结；非 live backlog）
-├── analysis/                          ← 分析与 strangler 证据（部分 historical）
-├── archives/                          ← 已关闭程序快照（cleanup-baseline 等）
+├── plan/                              ← 现役 SPEC（历史 plan 见 archives/plan/）
+├── analysis/                          ← 现役分析（历史 analysis 见 archives/analysis/）
+├── archives/                          ← 已关闭程序快照（cleanup-baseline 等）与历史文档归档
 ├── decisions.md                       ← 当前架构决策摘要
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
 ├── governance/                        ← 治理：执行映射、安全风险、威胁模型
@@ -43,8 +43,8 @@ docs/
 | 总路线与验收边界 | [roadmap.md](roadmap.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
-| cleanup-baseline 历史 plan | [plan/](plan/)（historical banner）· [archives/cleanup-baseline/](archives/cleanup-baseline/) |
-| 分析 / boundary map | [analysis/](analysis/) · [analysis/root-layout.md](analysis/root-layout.md) · [analysis/engineering-loop-capability-map.md](analysis/engineering-loop-capability-map.md) (P71) |
+| 现役 SPEC | [plan/](plan/)（历史 plan 见 [archives/plan/](archives/plan/)） |
+| 分析 / boundary map | [analysis/](analysis/) · [analysis/root-layout.md](analysis/root-layout.md) · [analysis/engineering-loop-capability-map.md](analysis/engineering-loop-capability-map.md) (P71)；历史分析见 [archives/analysis/](archives/analysis/) |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |

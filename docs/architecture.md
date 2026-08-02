@@ -120,7 +120,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 | API/协议 | OpenAPI YAML parse + affected handler/service tests |
 | Hub/Edge 逻辑 | focused Go tests; broad changes run `go test ./... -short -count=1` in touched service |
 | Backend performance/leak | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) maps behavior gates, microbenchmarks, load smoke, and pprof/leak blockers |
-| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；P74 gate 视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（见 [visual-qa-scorecard](analysis/visual-qa-scorecard.md)） |
+| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；P74 gate 视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（见 [visual-qa-scorecard](archives/analysis/visual-qa-scorecard.md)） |
 | Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
 

@@ -183,7 +183,7 @@ cd app/desktop && corepack pnpm tauri dev         # native
 | Edge / Hub | `go test ./... -short -count=1`（touched service） | 大量 `*_test.go` |
 | Desktop | `pnpm test` + `pnpm typecheck` | Vite ≠ packaged |
 | Web | `pnpm typecheck` + `vite build` | Hub-only |
-| UI 行为 | shared unit/contract + Playwright + Visual QA | P74 gate `1440x810` light+dark · `visual:qa:shell` · [scorecard](visual-qa-scorecard.md) |
+| UI 行为 | shared unit/contract + Playwright + Visual QA | P74 gate `1440x810` light+dark · `visual:qa:shell` · [scorecard](archives/analysis/visual-qa-scorecard.md) |
 | 真实登录 / 模型 / API | `.agents/skills/real-e2e-acceptance/SKILL.md` | 禁止 readiness 冒充 real |
 | 性能 / 泄漏 | `docs/reference/backend-performance-gates.md` | path-level |
 

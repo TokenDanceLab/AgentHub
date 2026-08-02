@@ -2,6 +2,7 @@
 
 | 项目 | 描述 | 时间 | 归档路径 |
 |---|---|---|---|
+| docs-hygiene | 历史 analysis/plan 收拢：post-polish 双轨、一次性 inventory、rescore 系列移入 archives | 2026-08-02 | [analysis/](./analysis/) · [plan/](./plan/) |
 | cleanup-baseline | knowledge-first strangler cleanup + SDD closeout；Issues #424–#445 closed；Phase 7 residual #447–#451；Project [cleanup-baseline](https://github.com/users/DeliciousBuding/projects/6)；PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | 2026-07-16 | [cleanup-baseline/](./cleanup-baseline/) |
 
 ## cleanup-baseline
