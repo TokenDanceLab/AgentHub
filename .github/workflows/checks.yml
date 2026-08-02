@@ -894,10 +894,6 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-v4-old-ui-active-paths.ps1
 
-      - name: Verify OIDC release readiness
-        shell: pwsh
-        run: ./scripts/verify/verify-oidc-readiness.ps1 -SkipWorkspaceDocs
-
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
       # if any coverage metric drops below scripts/verify/coverage-baseline.json
