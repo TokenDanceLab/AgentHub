@@ -28,7 +28,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 |---|---|---|
 | Agent-team subtask live stream | SPEC merged (`docs/plan/agentteam-live-streaming.md`); Phase A and frontend starting slice exist; remaining protocol/UI phases require explicit scope | #1478 |
 | ACP migration | Official ACP adapters exist; filesystem/terminal frames, timeout policy, registration, and approved real-run evidence remain | #1404 |
-| Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆（D-V1 已解拆分动机）；adapters 定向抽取 orchestrator 子域，先解决合同导入环（PlanTask/TaskStatus 等 owner 重定），后移动文件 | #1526（原 #1471） |
+| Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆；Step 0 合同 SSOT 抽离完成（#1526：合同迁入 `internal/orchestration`，adapters alias 零调用点改动，3 项回归门禁）；Step 2 采用插件式单向依赖（叶子包 import 根包、composition root 装配、不保留根 alias）—— 进行中，未关闭 | #1526（原 #1471） |
 | Shared boundary hardening | A-V3 已裁决（#1523）：拒绝全量 shared 三分；quick-wins 与隔离门禁硬化均已落地（apiClient.ts 删除、`workspace:*` 显式依赖、edge 隔离门禁违规 exit 1 + 正负向自测） | #1525 |
 | Release signing | SPEC draft on `docs/spec-release-signing` (proposal-desktop-release-signing.md, unmerged); needs review + merge | #1403 |
 | WebSocket incremental sync | SPEC draft on `docs/spec-ws-incremental-sync` (proposal-ws-incremental-sync.md, unmerged); needs review + merge | #1411 |

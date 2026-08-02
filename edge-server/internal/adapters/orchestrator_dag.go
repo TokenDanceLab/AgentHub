@@ -14,35 +14,9 @@ var (
 )
 
 // --- Plan types ---
-
-// TaskStatus represents the execution status of a plan task.
-type TaskStatus string
-
-const (
-	TaskPending   TaskStatus = "pending"
-	TaskRunning   TaskStatus = "running"
-	TaskCompleted TaskStatus = "completed"
-	TaskFailed    TaskStatus = "failed"
-)
-
-// PlanTask represents a single task within an execution plan.
-type PlanTask struct {
-	ID             string     `json:"id"`
-	Agent          string     `json:"agent"`
-	Description    string     `json:"description"`
-	Mode           string     `json:"mode,omitempty"` // "parallel" or "sequential" execution hint for this task
-	TargetFiles    []string   `json:"targetFiles,omitempty"`
-	DependsOn      []string   `json:"dependsOn,omitempty"`
-	ExpectedOutput string     `json:"expectedOutput,omitempty"`
-	Status         TaskStatus `json:"status"`
-}
-
-// ExecutionPlan represents a structured plan output by the orchestrator.
-type ExecutionPlan struct {
-	Summary string     `json:"summary,omitempty"` // one-line description of the overall plan
-	Mode    string     `json:"mode"`              // "parallel", "sequential", "pipeline"
-	Tasks   []PlanTask `json:"tasks"`
-}
+// TaskStatus / PlanTask / ExecutionPlan 的唯一权威定义在
+// internal/orchestration（A-V1 Step 1, #1526）；本包通过 contract_aliases.go
+// 的 type alias 继续使用，调用点零改动。
 
 // PlanParseError is returned when all plan parsing strategies fail.
 // It wraps the original text and all errors encountered during parsing,
