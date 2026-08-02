@@ -394,7 +394,7 @@ CREATE TABLE im_channel_configs (
     user_id         UUID NOT NULL REFERENCES users(id),
     channel_type    VARCHAR(32) NOT NULL,  -- 'feishu', 'telegram', 'wechat_work'
     enabled         BOOLEAN NOT NULL DEFAULT false,
-    
+
     -- 飞书字段
     app_id          VARCHAR(64),
     app_secret_encrypted BYTEA,           -- AES-256-GCM 加密
@@ -404,14 +404,14 @@ CREATE TABLE im_channel_configs (
     webhook_url     VARCHAR(512),
     encrypt_key     VARCHAR(64),          -- 飞书事件加密 key（可选）
     verification_token VARCHAR(128),      -- 飞书验证 token
-    
+
     -- 元数据
     verified_at     TIMESTAMPTZ,          -- 飞书事件签名校验通过后置位
     last_connected_at TIMESTAMPTZ,        -- 最近一次飞书 WS 连接成功时间
     error_message   TEXT,                 -- 最近错误信息（诊断用）
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    
+
     UNIQUE(user_id, channel_type)
 );
 
@@ -426,7 +426,7 @@ CREATE TABLE im_user_bindings (
     bind_expires_at TIMESTAMPTZ,
     bound_at        TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    
+
     UNIQUE(user_id, channel_type),
     UNIQUE(channel_type, external_id)
 );
@@ -435,20 +435,20 @@ CREATE TABLE im_user_bindings (
 CREATE TABLE im_thread_bindings (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     channel_config_id UUID NOT NULL REFERENCES im_channel_configs(id),
-    
+
     -- 飞书侧标识
     feishu_chat_id  VARCHAR(128),          -- 群聊 ID
     feishu_message_id VARCHAR(128),        -- 根消息 ID（用于 thread 回复）
-    
+
     -- AgentHub 侧标识
     project_id      UUID,
     conversation_id UUID,
     thread_id       UUID,
-    
+
     binding_type    VARCHAR(32) NOT NULL DEFAULT 'manual', -- 'manual' | 'auto'
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    
+
     UNIQUE(channel_config_id, feishu_chat_id, feishu_message_id)
 );
 
@@ -475,7 +475,7 @@ CREATE INDEX idx_im_push_logs_user_time ON im_push_logs(user_id, created_at DESC
 users ──1:N── im_channel_configs ──1:N── im_thread_bindings
   │                │
   └──1:1── im_user_bindings (per channel_type)
-  
+
 agent_run_events ──N:1── im_push_logs (可选关联，非 FK)
 ```
 
