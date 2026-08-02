@@ -2,6 +2,7 @@ package model
 
 import (
 	"testing"
+	"time"
 )
 
 func validAuditEvent() *AuditEvent {
@@ -49,37 +50,81 @@ func TestAuditEvent_Validate_WithAllOptionalFields(t *testing.T) {
 	}
 }
 
-// --- ComputeHash tests ---
+// --- ComputeLinkHash tests (#1541 content-authenticated chain) ---
 
-func TestComputeHash_Deterministic(t *testing.T) {
-	h1 := ComputeHash("event-1", "prev-hash-abc")
-	h2 := ComputeHash("event-1", "prev-hash-abc")
+func TestComputeLinkHash_Deterministic(t *testing.T) {
+	e := &AuditEvent{ID: "event-1", UserID: "user-1", EventType: "login", Severity: "info", Summary: "s", PrevHash: "prev-hash-abc"}
+	h1 := ComputeLinkHash(e)
+	h2 := ComputeLinkHash(e)
 	if h1 != h2 {
-		t.Fatalf("ComputeHash not deterministic: %q != %q", h1, h2)
+		t.Fatalf("ComputeLinkHash not deterministic: %q != %q", h1, h2)
 	}
 }
 
-func TestComputeHash_DifferentInputsProduceDifferentOutputs(t *testing.T) {
-	h1 := ComputeHash("event-1", "prev-hash")
-	h2 := ComputeHash("event-2", "prev-hash")
-	if h1 == h2 {
-		t.Fatalf("different IDs should produce different hashes, both = %q", h1)
+func TestComputeLinkHash_DifferentInputsProduceDifferentOutputs(t *testing.T) {
+	base := func() *AuditEvent { return &AuditEvent{ID: "event-1", UserID: "user-1", EventType: "login", Severity: "info", Summary: "s", PrevHash: "prev-hash"} }
+	h1 := ComputeLinkHash(base())
+
+	diffID := base()
+	diffID.ID = "event-2"
+	if h2 := ComputeLinkHash(diffID); h2 == h1 {
+		t.Fatal("different IDs should produce different hashes")
 	}
 
-	h3 := ComputeHash("event-1", "prev-hash-a")
-	h4 := ComputeHash("event-1", "prev-hash-b")
-	if h3 == h4 {
-		t.Fatalf("different prevHashes should produce different hashes, both = %q", h3)
+	diffPrev := base()
+	diffPrev.PrevHash = "prev-hash-b"
+	if h3 := ComputeLinkHash(diffPrev); h3 == h1 {
+		t.Fatal("different prevHashes should produce different hashes")
 	}
 }
 
-func TestComputeHash_GenesisEmptyInputs(t *testing.T) {
-	h := ComputeHash("", "")
-	if h == "" {
-		t.Fatal("genesis hash should not be empty")
+// TestComputeLinkHash_ContentSensitive is the core #1541 fix: the link hash
+// must cover the event content, so tampering with any field (while keeping
+// id and prev_hash) changes the hash.
+func TestComputeLinkHash_ContentSensitive(t *testing.T) {
+	base := func() *AuditEvent {
+		pid := "profile-1"
+		tid := "target-1"
+		return &AuditEvent{
+			ID: "event-1", UserID: "user-1", ProfileID: &pid, TargetID: &tid,
+			EventType: "login", Severity: "info", Summary: "s", Details: `{"a":1}`,
+			ClientIP: "1.2.3.4", PrevHash: "prev-hash", CreatedAt: time.Unix(1700000000, 0),
+		}
 	}
-	if len(h) != 64 {
-		t.Fatalf("SHA-256 hex length should be 64, got %d", len(h))
+	mutations := map[string]func(*AuditEvent){
+		"user_id":    func(e *AuditEvent) { e.UserID = "user-2" },
+		"profile_id": func(e *AuditEvent) { e.ProfileID = nil },
+		"target_id":  func(e *AuditEvent) { *e.TargetID = "target-2" },
+		"event_type": func(e *AuditEvent) { e.EventType = "logout" },
+		"severity":   func(e *AuditEvent) { e.Severity = "high" },
+		"summary":    func(e *AuditEvent) { e.Summary = "changed" },
+		"details":    func(e *AuditEvent) { e.Details = `{"b":2}` },
+		"client_ip":  func(e *AuditEvent) { e.ClientIP = "9.9.9.9" },
+		"created_at": func(e *AuditEvent) { e.CreatedAt = time.Unix(1700000001, 0) },
+	}
+	baseline := ComputeLinkHash(base())
+	for name, mutate := range mutations {
+		e := base()
+		mutate(e)
+		if h := ComputeLinkHash(e); h == baseline {
+			t.Errorf("content field %q mutation did not change the link hash — content not authenticated", name)
+		}
+	}
+}
+
+func TestComputeLinkHash_GenesisNil(t *testing.T) {
+	if h := ComputeLinkHash(nil); h != "" {
+		t.Fatalf("genesis (nil prev) hash should be empty, got %q", h)
+	}
+}
+
+// TestCanonicalContent_LengthPrefixUnambiguous proves two events with
+// different field boundaries (e.g. "ab" vs "a"+"b") do not collide.
+func TestCanonicalContent_LengthPrefixUnambiguous(t *testing.T) {
+	a := &AuditEvent{ID: "x", UserID: "ab", EventType: "t", Severity: "i", Summary: "s", PrevHash: ""}
+	b := &AuditEvent{ID: "x", UserID: "a", EventType: "tb", Severity: "i", Summary: "s", PrevHash: ""}
+	if canonicalContent(a) == canonicalContent(b) {
+		t.Fatal("length-prefixed encoding must distinguish field boundaries")
 	}
 }
 
@@ -102,7 +147,7 @@ func TestHashChainEntry_ComputesCorrectHash(t *testing.T) {
 	if entry.PrevHash != e.PrevHash {
 		t.Errorf("entry.PrevHash = %q, want %q", entry.PrevHash, e.PrevHash)
 	}
-	expected := ComputeHash(e.ID, e.PrevHash)
+	expected := ComputeLinkHash(e)
 	if entry.Hash != expected {
 		t.Errorf("entry.Hash = %q, want %q", entry.Hash, expected)
 	}
@@ -114,13 +159,9 @@ func TestHashChainEntry_ComputesCorrectHash(t *testing.T) {
 // --- VerifyChain tests ---
 
 func TestVerifyChain_ValidChain(t *testing.T) {
-	genesis := AuditEvent{ID: "evt-0", PrevHash: ""}
-	hash0 := ComputeHash(genesis.ID, genesis.PrevHash)
-
-	evt1 := AuditEvent{ID: "evt-1", PrevHash: hash0}
-	hash1 := ComputeHash(evt1.ID, evt1.PrevHash)
-
-	evt2 := AuditEvent{ID: "evt-2", PrevHash: hash1}
+	genesis := AuditEvent{ID: "evt-0", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ""}
+	evt1 := AuditEvent{ID: "evt-1", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ComputeLinkHash(&genesis)}
+	evt2 := AuditEvent{ID: "evt-2", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ComputeLinkHash(&evt1)}
 
 	chain := []AuditEvent{genesis, evt1, evt2}
 	if idx := VerifyChain(chain); idx != -1 {
@@ -141,19 +182,39 @@ func TestVerifyChain_EmptyChain(t *testing.T) {
 	}
 }
 
-func TestVerifyChain_TamperedEvent(t *testing.T) {
-	genesis := AuditEvent{ID: "evt-0", PrevHash: ""}
-	hash0 := ComputeHash(genesis.ID, genesis.PrevHash)
+// TestVerifyChain_ContentTamperDetected is the #1541 regression test: an
+// attacker edits the summary of evt-1 while keeping id and prev_hash intact.
+// The old chain (hash over id+prev_hash only) verified clean; the
+// content-authenticated chain must report the break.
+func TestVerifyChain_ContentTamperDetected(t *testing.T) {
+	genesis := AuditEvent{ID: "evt-0", UserID: "u", EventType: "t", Severity: "i", Summary: "genesis", PrevHash: ""}
+	evt1 := AuditEvent{ID: "evt-1", UserID: "u", EventType: "t", Severity: "i", Summary: "original", PrevHash: ComputeLinkHash(&genesis)}
+	evt2 := AuditEvent{ID: "evt-2", UserID: "u", EventType: "t", Severity: "i", Summary: "tail", PrevHash: ComputeLinkHash(&evt1)}
 
-	evt1 := AuditEvent{ID: "evt-1", PrevHash: hash0}
+	chain := []AuditEvent{genesis, evt1, evt2}
+	if idx := VerifyChain(chain); idx != -1 {
+		t.Fatalf("clean chain must verify, got break at %d", idx)
+	}
+
+	// Tamper with evt-1's content only — id/prev_hash untouched.
+	chain[1].Summary = "ATTACKER EDITED THIS"
+
+	idx := VerifyChain(chain)
+	if idx != 2 {
+		t.Fatalf("content tamper must break the chain at index 2 (evt2's prev_hash no longer matches), got %d", idx)
+	}
+}
+
+func TestVerifyChain_TamperedEvent(t *testing.T) {
+	genesis := AuditEvent{ID: "evt-0", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ""}
+	evt1 := AuditEvent{ID: "evt-1", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ComputeLinkHash(&genesis)}
 
 	// Tamper with evt-1's PrevHash (simulating data modification).
 	tamperedEvt1 := evt1
 	tamperedEvt1.PrevHash = "tampered-hash"
 
 	// Rebuild evt-2's PrevHash based on the tampered evt-1.
-	tamperedHash1 := ComputeHash(tamperedEvt1.ID, tamperedEvt1.PrevHash)
-	tamperedEvt2 := AuditEvent{ID: "evt-2", PrevHash: tamperedHash1}
+	tamperedEvt2 := AuditEvent{ID: "evt-2", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ComputeLinkHash(&tamperedEvt1)}
 
 	chain := []AuditEvent{genesis, tamperedEvt1, tamperedEvt2}
 	idx := VerifyChain(chain)
@@ -163,8 +224,8 @@ func TestVerifyChain_TamperedEvent(t *testing.T) {
 }
 
 func TestVerifyChain_BrokenLink(t *testing.T) {
-	genesis := AuditEvent{ID: "evt-0", PrevHash: ""}
-	evt1 := AuditEvent{ID: "evt-1", PrevHash: "wrong-hash-not-matching-genesis"}
+	genesis := AuditEvent{ID: "evt-0", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: ""}
+	evt1 := AuditEvent{ID: "evt-1", UserID: "u", EventType: "t", Severity: "i", Summary: "s", PrevHash: "wrong-hash-not-matching-genesis"}
 
 	chain := []AuditEvent{genesis, evt1}
 	idx := VerifyChain(chain)
