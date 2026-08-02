@@ -87,7 +87,7 @@ services:
 
   # ── Hub Server ─────────────────────────────
   hub-server:
-    image: ${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}
+    image: ${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub-server:latest}
     pull_policy: never
     container_name: agenthub-hub
     restart: unless-stopped

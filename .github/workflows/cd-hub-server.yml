@@ -44,8 +44,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
+          # latest 由 cd-production.yml（Release 成功后）独占，本 workflow 不推 latest。
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value={{date 'YYYYMMDD'}},enable=${{ github.ref == 'refs/heads/master' }}
             type=sha,prefix=,format=short
             type=semver,pattern={{version}}
