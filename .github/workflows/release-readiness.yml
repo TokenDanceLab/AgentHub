@@ -10,7 +10,6 @@ on:
       - "app/desktop/src-tauri/Cargo.lock"
       - "app/desktop/src-tauri/tauri.conf.json"
       - "scripts/release/**"
-      - "tests/contract/scripts/**"
   workflow_dispatch:
     inputs:
       run_windows_package_dry:
