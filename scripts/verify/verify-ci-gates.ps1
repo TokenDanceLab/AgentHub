@@ -82,9 +82,15 @@ Assert-StepContinueOnError $edge "Lint" $true
 Assert-StepContinueOnError $hub "Lint" $true
 Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
-Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $true
-Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $true
 Assert-StepContinueOnError $edge "Coverage per-package minimums" $false
+
+# #1534：vuln 扫描收敛到独立 job（vuln-scan-go / vuln-scan-js）且 fail-closed；
+# go-hub/go-edge 内不再要求重复的 continue-on-error govulncheck step。
+$vulnGo = Get-JobBlock $workflow "vuln-scan-go"
+$vulnJs = Get-JobBlock $workflow "vuln-scan-js"
+Assert-Contains $vulnGo ([regex]::Escape("verify-vulnerability-gates.sh govulncheck")) "vuln-scan-go must run the fail-closed govulncheck verifier"
+Assert-Contains $vulnJs ([regex]::Escape("verify-vulnerability-gates.sh pnpm-audit")) "vuln-scan-js must run the fail-closed pnpm audit verifier"
+Assert-Contains $validate "Self-test vulnerability gates" "validate must self-test the vulnerability gates"
 
 Assert-Contains $backendFixture "working-directory:\s+hub-server" "backend-e2e-fixture must run from hub-server"
 Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must name the TeamRun fixture step"

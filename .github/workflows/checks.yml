@@ -93,11 +93,6 @@ jobs:
       - name: Security scan (gosec)
         continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
-      - name: Vulnerability check (govulncheck)
-        # S1 cost throttle: informational in daily CI; not a hard merge gate.
-        continue-on-error: true
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-
       - name: Vet
         run: go vet ./...
 
@@ -178,11 +173,6 @@ jobs:
       - name: Security scan (gosec)
         continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
-
-      - name: Vulnerability check (govulncheck)
-        # S1 cost throttle: informational in daily CI; not a hard merge gate.
-        continue-on-error: true
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
         run: go vet ./...
@@ -488,10 +478,6 @@ jobs:
         continue-on-error: true
         run: pnpm lint --max-warnings 10
 
-      - name: Vuln audit (pnpm audit)
-        continue-on-error: true
-        run: pnpm audit --prod
-
       - name: Test Desktop
         run: pnpm test:ci
 
@@ -531,10 +517,6 @@ jobs:
 
       - name: Lint Web
         run: pnpm lint
-
-      - name: Vuln audit (pnpm audit)
-        continue-on-error: true
-        run: pnpm audit --prod
 
       - name: Build Web
         run: pnpm build
@@ -840,6 +822,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-doc-ssot.ps1
 
+      - name: Self-test vulnerability gates (fail-closed contract)
+        shell: bash
+        run: ./scripts/verify/tests/verify-vulnerability-gates.Tests.sh
+
       - name: Verify Web Hub-only boundary
         shell: pwsh
         run: ./scripts/verify/verify-web-hub-boundary.ps1
@@ -960,48 +946,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm audit --prod (severity-gated)
+      - name: pnpm audit --prod (fail-closed, #1534)
         shell: bash
         run: |
           set -o pipefail
-          AUDIT_OUTPUT=$(pnpm audit --prod --json 2>/dev/null) || true
-          if [ -z "$AUDIT_OUTPUT" ]; then
-            echo "::notice::No production vulnerabilities found (clean audit)"
-            exit 0
-          fi
-          echo "$AUDIT_OUTPUT" | python3 -c "
-          import json, sys
-          raw = sys.stdin.read().strip()
-          if not raw:
-              print('::notice::No production vulnerabilities found')
-              sys.exit(0)
-          try:
-              data = json.loads(raw)
-          except Exception:
-              # Non-JSON output usually means no vulnerabilities found
-              print('::notice::pnpm audit produced no actionable JSON (likely clean)')
-              sys.exit(0)
-          advisories = data.get('advisories', {}) if isinstance(data, dict) else {}
-          if not advisories:
-              print('::notice::No production vulnerabilities found')
-              sys.exit(0)
-          has_critical = False
-          for adv_id, adv in advisories.items():
-              severity = adv.get('severity', 'unknown')
-              title = adv.get('title', adv_id)
-              module_name = adv.get('module_name', '')
-              vulnerable = adv.get('vulnerable_versions', '')
-              msg = f'{module_name}: {title} (vulnerable: {vulnerable}) [{severity.upper()}]'
-              if severity == 'critical':
-                  print(f'::error title=CRITICAL CVE::{msg}')
-                  has_critical = True
-              else:
-                  print(f'::warning title={severity.upper()} CVE (non-blocking)::{msg}')
-          if has_critical:
-              print('::error::Critical CVE(s) found in production dependencies — failing build')
-              sys.exit(1)
-          print('::notice::No critical CVEs found (non-critical warnings above are non-blocking)')
-          "
+          # JSON 输出经 verifier 校验 vulnerabilities schema；空输出/非 JSON/
+          # schema 缺失一律 fail-closed。旧实现把非 JSON 当 likely clean ——
+          # 假绿已修（#1534）。
+          pnpm audit --prod --json 2>&1             | ../../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
+
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
   vuln-scan-go:
@@ -1022,57 +975,11 @@ jobs:
           cache: true
           cache-dependency-path: ${{ matrix.module }}/go.sum
 
-      - name: govulncheck (severity-gated)
+      - name: govulncheck (fail-closed, #1534)
         shell: bash
         run: |
           set -o pipefail
-          VULN_OUTPUT=$(go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>/dev/null) || true
-          if [ -z "$VULN_OUTPUT" ]; then
-            echo "::notice::No Go vulnerabilities found in ${{ matrix.module }}"
-            exit 0
-          fi
-          echo "$VULN_OUTPUT" | python3 -c "
-          import json, sys
-          raw = sys.stdin.read().strip()
-          if not raw:
-              print('::notice::No Go vulnerabilities found')
-              sys.exit(0)
-          try:
-              data = json.loads(raw)
-          except Exception:
-              print('::warning::Could not parse govulncheck JSON output')
-              sys.exit(0)
-          findings = data.get('findings', []) if isinstance(data, dict) else []
-          if not findings:
-              print('::notice::No Go vulnerabilities found')
-              sys.exit(0)
-          has_critical = False
-          for f in findings:
-              osv = f.get('osv', {})
-              aliases = ', '.join(osv.get('aliases', [])[:3]) or 'N/A'
-              summary = osv.get('summary', '') or osv.get('details', '')[:200]
-              sev = 'unknown'
-              # Try database_specific severity field first
-              db_sev = osv.get('database_specific', {}).get('severity', '')
-              combined = f'{db_sev} {summary}'.lower()
-              if 'critical' in combined:
-                  sev = 'critical'
-              elif 'high' in combined:
-                  sev = 'high'
-              elif 'medium' in combined or 'moderate' in combined:
-                  sev = 'medium'
-              elif 'low' in combined:
-                  sev = 'low'
-              msg = f'{aliases}: {summary[:180]} [{sev.upper()}]'
-              if sev == 'critical':
-                  print(f'::error title=CRITICAL Go CVE::{msg}')
-                  has_critical = True
-              elif sev in ('high', 'medium'):
-                  print(f'::warning title=Go CVE ({sev})::{msg}')
-              else:
-                  print(f'::warning title=Go CVE::{msg}')
-          if has_critical:
-              print('::error::Critical Go CVE(s) found — failing build')
-              sys.exit(1)
-          print('::notice::No critical Go CVEs found (non-critical warnings above are non-blocking)')
-          "
+          # 事件流（NDJSON）经 verifier 按 summary 事件判定；解析失败/工具故障
+          # 一律 fail-closed。旧实现把整段输出当单个 JSON 对象解析，
+          # 解析失败后 exit 0 —— 假绿已修（#1534）。
+          go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>&1             | ../../../scripts/verify/verify-vulnerability-gates.sh govulncheck
