@@ -1,8 +1,8 @@
 # RFC A-V3 — `@agenthub/shared` 拆 hub/edge 边界评估
 
-> 状态: **DRAFT — 待管理员定档** · P3 裁决项 A-V3 (#1472)
-> 作者: senior-architect agent · 日期: 2026-07-30
-> 权威: `docs/progress/MASTER.md` P3 裁决段（A-V1/A-V3 需管理员定档）
+> 状态: **已裁决 2026-08-03** — 驳回全量三分；quick-wins 已落地；软门禁硬化独立任务 #1525
+> 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐）
+> 权威: `docs/progress/MASTER.md`；裁决由审核 leader 拍板
 > 证据: 实际 `grep` 导入路径、`wc -l` 行数、消费者 package.json 与 tsconfig path 别名；Go 侧零 TS 依赖（仅 `hub-server/internal/ws/frame.go:11` 注释引用 `app/shared/src/hubEvents.ts` 作为 SSOT 镜像）
 
 ## 0. 摘要（先读）
@@ -194,15 +194,13 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 - **审计隐含的"三分能解耦"**：实测 web/mobile 已被边界门禁守住不碰 edge 表面，desktop 双消费是设计意图（desktop 本就是 dual 客户端）。**三分不改变任何消费者的实际 import 集合，只改包名。** 这与 A-V1 对 lifecycle 的裁决同构——"god function 已被 D-V1 解，拆包是命名洁癖"。
 - **类比 D-V2 PostRuns**：D-V2 被评估为低价值（358 行但线性、有 D-V1 前置）；A-V3 同样——边界已被门禁守，剩下的三分是结构性洁癖。**诚实结论：A-V3 是 P3 中第二个"评估为低价值/驳回"的裁决项。**
 
-## 8. 是否需要管理员 RFC sign-off
+## 8. RFC sign-off 记录
 
-**部分需要。** 拆分与不拆的两个不同 sign-off 门槛：
+**已裁决 2026-08-03（#1523）**：采纳"驳回全量三分 + quick-wins 落地 + 软门禁硬化待定"路径。理由：
 
-1. **Quick-wins（§6.1）不需要 sign-off**：删零消费死文件 + 补 package.json 声明，属 AGENTS.md §1 小步提交范畴，非 §5 高风险项。可直接开 PR，PR 描述回链本 RFC 与 #1472。
-2. **新增 CI 硬门禁（§4.2 Step 2 / §5.2）需要 sign-off**：MASTER P3 裁决段明示"A-V3 需管理员定档"，且新增 validate 硬门禁会并入 14→15 层门禁索引，属工程治理基线变更——需管理员确认门禁强度与索引归并。
-3. **若管理员坚持全量三分**（本 RFC 建议驳回的方案）：属 AGENTS.md §5.2"大规模删除/移动文件"（578 文件移动 + 3 包重建），**必须 sign-off**。
-
-**推荐裁决**：管理员采纳本 RFC 的"驳回三分 + 采纳 quick-wins + 硬化 edge 隔离门禁"路径；quick-wins 即可执行，门禁硬化待 sign-off 后开 PR。
+1. 全量三分牵动 ~578 文件 + 3 包重建，churn 高一个数量级；既有 14 层门禁已守住 shared 不泄漏 Edge 客户端、shared UI 不 runtime-import hubClient 两条关键边。
+2. Quick-wins 已执行（apiClient.ts 删除 + web/desktop 显式 `workspace:*` 依赖，随 41309678 落地）。
+3. 隔离门禁已按软门禁建（`verify-shared-edge-surface-isolation.ps1`，NON-BLOCKING）；硬化成硬门禁（违规即失败 + 正负向自测）转独立任务 **#1525**。
 
 ## 9. 参考
 
