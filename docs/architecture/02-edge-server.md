@@ -46,6 +46,26 @@ Web shared workbench
 | Artifact index | Agent 产物的索引、预览和应用 |
 | EventStore | 执行事件的持久化存储 |
 
+## Run Lifecycle 状态机
+
+`RunExecutor` 接口（`internal/lifecycle/executor.go`）定义运行状态转换入口：`queued → started → running → finished / failed / cancelled / completed_with_issues`。
+
+| 组件 | 文件 | 职责 |
+|---|---|---|
+| ProcessExecutor | `internal/lifecycle/process_executor.go` | 启动 agent CLI 子进程、管理 stdin/stdout pipe、超时与优雅关闭 |
+| DecisionLoop | `internal/lifecycle/decision_loop.go` | 包装 adapter 事件流，step 计数、maxSteps 强制、工具审批门控 |
+| EvidenceGate | `internal/lifecycle/evidence_gate.go` | 运行前/后证据验证门 |
+| FaultEscalation | `internal/lifecycle/fault_escalation.go` | 三层故障升级链：自动重试 → AI review → replan |
+| EnvSanitizer | `internal/lifecycle/env_sanitizer.go` | 运行环境变量脱敏 |
+
+ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod`（默认 10 秒），Unix 下先 SIGTERM 再 SIGKILL。
+
+## Store 与事件持久化
+
+`Store`（`internal/store/store.go`）是核心内存数据结构，管理 Project、Thread、Run、Item、Pin、Diff、Artifact、Preview、UserProfile、AgentProfile、Settings 的全量 CRUD。`SQLiteStore`（`internal/store/sqlite_store.go`）通过 snapshot 持久化到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。终端状态 runs（completed/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items。
+
+`EventBus`（`internal/events/bus.go`）是基于 channel 的发布/订阅模型：4 worker 并发 observer、子 channel 缓冲（256）、gap detection（`system.gap` 事件）；通过 `PersistFn` 钩子先持久化再广播。`EventLog` 是 append-only JSON-lines 事件日志（默认 50 MiB 上限，超限截断保留尾部 75%）。
+
 ## Source Map
 
 | 方向 | Source |
