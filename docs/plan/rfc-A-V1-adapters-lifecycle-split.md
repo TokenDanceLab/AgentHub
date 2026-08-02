@@ -1,8 +1,8 @@
 # RFC A-V1 — adapters/ 12.3k + lifecycle/ 7.6k 包拆分评估
 
-> 状态: **DRAFT — 待管理员定档** · P3 裁决项 A-V1 (#1471)
-> 作者: senior-architect agent · 日期: 2026-07-30
-> 权威: `docs/progress/MASTER.md` P3 裁决段（A-V1/A-V3 需管理员定档）
+> 状态: **已裁决 2026-08-03** — 采纳定向抽取；驳回 lifecycle 拆分与 adapters 全量叶子包化 · 执行入口 #1526（先合同解环，后移动文件）
+> 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐）
+> 权威: `docs/progress/MASTER.md`；裁决由审核 leader 拍板，实际移动文件仍需 AGENTS.md §5 审批（见 §9）
 > 证据: 真实行数来自 `wc -l`，文件名来自 `edge-server/internal/{adapters,lifecycle}/*.go`
 
 ## 0. 摘要（先读）
@@ -159,15 +159,15 @@ A-V4（commit `c006e9f8`）已验证的模式：把类型/构造器从原包移�
 | **收益** | adapters 根包从 ~12.3k 降至 ~9.3k 非测试行；orchestrator 子域获得独立边界，利于 #1404 ACP spike 并行迭代（failure 子系统可在叶子包内演进不污染根）。 |
 | **建议** | **采纳 adapters/orchestrator 定向抽取；驳回 lifecycle 拆分与 adapters 全量叶子包化。** |
 
-## 9. 是否需要管理员 RFC sign-off
+## 9. RFC sign-off 记录
 
-**需要。** 三条独立理由叠加：
+**已裁决 2026-08-03（#1523）**：采纳"adapters/orchestrator 定向抽取、驳回 lifecycle 拆分与全量叶子包化"路径。理由：
 
-1. MASTER P3 裁决段明示 "A-V1/A-V3 需管理员定档"。
-2. AGENTS.md §5.2 将"大规模删除/移动文件"列为高风险审批项——本 RFC 移动 13 个生产文件 + 调整 101 文件中的 package 声明边界，属此范畴。
-3. 一旦合入会引入新的 edge-server 包边界门禁（虽软），属于 §5.7 "修改网络拓扑与关键 ACL" 的代码层类比——需管理员确认门禁强度（lint vs hard-fail）。
+1. lifecycle 拆分动机已被 D-V1 覆盖（run() 418→246 行），诚实结论是不拆。
+2. 全量叶子包化牵动 31 个外部导入点，churn 巨大、收益线性；orchestrator 子域（13 文件）是唯一高内聚、边界清晰的抽取候选。
+3. 新包边界门禁按软门禁先落地，硬化与否由 #1526 阶段再定。
 
-**sign-off 后**方可开 PR；PR 需在描述中回链本 RFC 与 #1471。
+**执行前置（不可省略）**：实际移动 13 个生产文件仍属 AGENTS.md §5 高风险审批项（"大规模删除/移动文件"），需在 #1526 开移动 PR 时获管理员批准；PR 需回链本 RFC 与 #1471。
 
 ## 10. 参考
 

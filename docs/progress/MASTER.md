@@ -28,8 +28,8 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 |---|---|---|
 | Agent-team subtask live stream | SPEC merged (`docs/plan/agentteam-live-streaming.md`); Phase A and frontend starting slice exist; remaining protocol/UI phases require explicit scope | #1478 |
 | ACP migration | Official ACP adapters exist; filesystem/terminal frames, timeout policy, registration, and approved real-run evidence remain | #1404 |
-| Targeted adapter extraction | RFC merged (`docs/plan/rfc-A-V1-adapters-lifecycle-split.md`); implementation pending, avoid broad leaf-package churn | #1471 |
-| Shared boundary hardening | RFC merged (`docs/plan/rfc-A-V3-shared-split.md`); implementation pending, avoid a big-bang shared split | #1472 |
+| Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆（D-V1 已解拆分动机）；adapters 定向抽取 orchestrator 子域，先解决合同导入环（PlanTask/TaskStatus 等 owner 重定），后移动文件 | #1526（原 #1471） |
+| Shared boundary hardening | A-V3 已裁决（#1523）：拒绝全量 shared 三分（边界已被既有门禁守住）；quick-wins 已落地（apiClient.ts 删除、web/desktop 显式 `workspace:*` 依赖）；仅软门禁是否硬化是独立任务 | #1525（原 #1472） |
 | Release signing | SPEC draft on `docs/spec-release-signing` (proposal-desktop-release-signing.md, unmerged); needs review + merge | #1403 |
 | WebSocket incremental sync | SPEC draft on `docs/spec-ws-incremental-sync` (proposal-ws-incremental-sync.md, unmerged); needs review + merge | #1411 |
 | IM bridge (Feishu first) | SPEC draft on `docs/spec-im-bridge` (proposal-im-bridge.md, unmerged); not yet an issue | — |
@@ -48,11 +48,12 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 ### Database tests
 
-1. Replace the hand-written 22-table cleanup with catalog-driven `TRUNCATE ... CASCADE`, excluding migration metadata, and fail on cleanup errors.
-2. Split self-contained fixture tests from real PostgreSQL/Redis integration tests; remove the package-wide `-short` escape hatch.
-3. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
-4. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
-5. Add race evidence to concurrency tests after isolation is trustworthy.
+Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/setup_test.go` 动态扫描当前 schema、排除 `schema_migrations`、`TRUNCATE ... RESTART IDENTITY CASCADE`、错误即失败，新表自动发现。
+
+1. Split self-contained fixture tests from real PostgreSQL/Redis integration tests; remove the package-wide `-short` escape hatch.
+2. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
+3. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
+4. Add race evidence to concurrency tests after isolation is trustworthy.
 
 ### Frontend architecture
 
