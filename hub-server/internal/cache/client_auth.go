@@ -29,6 +29,13 @@ func (c *Client) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int6
 	return c.rdb.SetNX(ctx, "session:seq:"+sessionID, seq, 30*24*time.Hour).Err()
 }
 
+// SetSeq force-sets the seq key to seq (recovery path after Redis data loss:
+// restart / FLUSH / key expiry). Mirrors the DB seq mirror so allocation
+// continues without repeating values (#1533).
+func (c *Client) SetSeq(ctx context.Context, sessionID string, seq int64) error {
+	return c.rdb.Set(ctx, "session:seq:"+sessionID, seq, 30*24*time.Hour).Err()
+}
+
 // PeekSeq returns the current seq value for a session (diagnostics only).
 func (c *Client) PeekSeq(ctx context.Context, sessionID string) (int64, error) {
 	s, err := c.rdb.Get(ctx, "session:seq:"+sessionID).Result()

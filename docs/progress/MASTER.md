@@ -52,6 +52,8 @@ Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/int
 
 测试分层已落地（#1524）：integration lane 移入 `hub-server/tests/integration/`（`//go:build integration` 作 lane manifest，默认 -short lane 不再编译它）；package-wide `-short` 逃生口已移除；默认 lane 与 integration lane 均在 CI 断言非零测试数。
 
+弱断言修复已落地（#1533）：WS upgrade（401/101+auth.ok 硬断言）、agent-task callbacks（seed DB 全状态机 + 状态转换断言 + negative 分离）、buffer-full（容量 seam 必命中）、heartbeat（interval seam 确定性验证）、Redis restart seq 连续性（DB 镜像 + 恢复，修复并发分配重复 seq 回归）；integration 全量 126 PASS / 0 FAIL。
+
 1. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
 2. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
 3. Add race evidence to concurrency tests after isolation is trustworthy.
