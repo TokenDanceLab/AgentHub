@@ -8,9 +8,14 @@ import (
 	"mime/multipart"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 func TestPinAndForward(t *testing.T) {
@@ -279,7 +284,9 @@ func TestRemainingREST(t *testing.T) {
 
 func TestWebSocketUpgrade(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	t.Run("WSUpgrade", func(t *testing.T) {
+
+	t.Run("UnauthorizedUpgradeRejected", func(t *testing.T) {
+		// 无认证裸握手必须被拒绝（negative case，401 是明确预期，不是"may be expected"）。
 		req, _ := http.NewRequest("GET", ts.URL+"/client/ws", nil)
 		req.Header.Set("Connection", "Upgrade")
 		req.Header.Set("Upgrade", "websocket")
@@ -290,113 +297,176 @@ func TestWebSocketUpgrade(t *testing.T) {
 			t.Fatalf("ws upgrade request failed: %v", err)
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusSwitchingProtocols {
-			t.Logf("WS upgrade returned %d (may be expected with test server)", resp.StatusCode)
-		} else {
-			t.Log("WS upgrade successful (101 Switching Protocols)")
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("unauthorized ws upgrade: got %d, want 401", resp.StatusCode)
+		}
+	})
+
+	t.Run("AuthorizedUpgradeSucceeds", func(t *testing.T) {
+		// 有效认证握手必须建立连接并收到 auth.ok 帧（happy path 硬断言）。
+		// 走 newWSTestServer + dialWS（同包已验证路径）：该 server 同样
+		// 挂 WSAuthMiddleware + ServeWS，认证/升级语义与主 server 一致。
+		u := register(t, "wsupg_auth", "pass1234", "WsUpgAuth")
+		manager := ws.NewManager()
+		manager.StartHeartbeat()
+		defer manager.Shutdown()
+
+		wsURL := newWSTestServer(t, manager)
+		conn := dialWS(t, wsURL, u.Username)
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		frame := readWSFrame(t, conn)
+		if frame.Type != ws.TypeAuthOK {
+			t.Fatalf("authorized upgrade: got frame %s, want auth.ok", frame.Type)
 		}
 	})
 }
 
+// TestAgentTaskCallbacks exercises the full Edge task callback state machine
+// with tasks seeded directly in PostgreSQL (deterministic — no real Edge
+// required): dispatched → ack(running) → stream → done; plus fail and cancel
+// paths; plus not_found/bad_request negatives. Every step hard-asserts both
+// the HTTP envelope and the persisted status transition.
 func TestAgentTaskCallbacks(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 	alice := register(t, "tagtcb1", "pass1234", "AgentT")
-	bob := register(t, "tagtcb2", "pass1234", "BobT")
 
-	postAuth("/client/contacts/friend-requests", alice.Token, map[string]interface{}{"friend_id": bob.ID, "message": "Hi"})
-	w := get("/client/contacts/friend-requests", bob.Token)
-	var arr []map[string]interface{}
-	json.Unmarshal(parse(w).Data, &arr)
-	if len(arr) > 0 {
-		postAuth("/client/contacts/friend-requests/"+arr[0]["request_id"].(string)+"/accept", bob.Token, nil)
-	}
-
-	gr := parse(postAuth("/client/sessions/group", alice.Token, map[string]interface{}{
-		"name": "AgentGrp2", "member_ids": []string{bob.ID},
-	}))
-	sid := extract(gr.Data, "session_id")
-
-	ag := parse(postAuth("/client/sessions/"+sid+"/agents", alice.Token, map[string]interface{}{
-		"agent_type": "claude-code", "display_name": "Claude",
-	}))
-	mustOK(t, ag, "add agent")
-
-	msg := parse(postAuth("/client/sessions/"+sid+"/messages", alice.Token, map[string]interface{}{
-		"client_msg_id": "00000000-0000-0000-0000-00000000d001",
-		"content_type":  "text", "content": "@Claude help",
-	}))
-	mustOK(t, msg, "send trigger message")
-
-	tr := parse(postAuth("/web/agent-tasks", alice.Token, map[string]interface{}{
-		"trigger_message_id": extract(msg.Data, "message_id"),
-	}))
-	taskID := extract(tr.Data, "id")
-	t.Logf("trigger task result: code=%s taskID=%s", tr.GetCode(), taskID)
-	if taskID == "" {
-		t.Skip("no task created (agent needs edge online)")
-		return
-	}
-
-	// /edge/* requires a desktop-type token (DeviceTypeCheck middleware); mint
-	// it directly like TestEdgeDevice does (password login was removed in #1367).
+	// Edge callbacks require a desktop-type token (DeviceTypeCheck middleware);
+	// mint it directly like TestEdgeDevice does (password login was removed in #1367).
+	deskDeviceID := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01"
+	seedTestDevice(t, alice.ID, "desktop", deskDeviceID)
 	deskTok, err := jwtutil.GenerateAccessToken(alice.ID, "desktop",
-		"eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01", testJWT.Secret, testJWT.AccessTTL)
+		deskDeviceID, testJWT.Secret, testJWT.AccessTTL)
 	if err != nil {
 		t.Fatalf("generate desktop token: %v", err)
 	}
 
-	t.Run("TaskAck", func(t *testing.T) {
-		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/ack", deskTok, nil))
-		t.Logf("task ack: code=%s", r.GetCode())
+	// ── helpers（seed 一个真实 session + agent 实例 + 指定状态 task）──
+	bob := register(t, "tagtcb2", "pass1234", "BobT")
+	// privateSession 需要好友关系：先建好友（幂等）。
+	postAuth("/client/contacts/friend-requests", alice.Token, map[string]interface{}{"friend_id": bob.ID, "message": "Hi"})
+	w := get("/client/contacts/friend-requests", bob.Token)
+	var reqs []map[string]interface{}
+	json.Unmarshal(parse(w).Data, &reqs)
+	for _, req := range reqs {
+		if rid, ok := req["request_id"].(string); ok {
+			postAuth("/client/contacts/friend-requests/"+rid+"/accept", bob.Token, nil)
+		}
+	}
+
+	seedAgentAndTask := func(status string) string {
+		t.Helper()
+		sid := privateSession(t, alice, bob)
+		// pending_agent_tasks.trigger_message_id 有 FK 到 messages：先发一条真实消息。
+		msg := parse(postAuth("/client/sessions/"+sid+"/messages", alice.Token, map[string]interface{}{
+			"client_msg_id": uuid.New().String(),
+			"content_type":  "text",
+			"content":       "seed task trigger",
+		}))
+		mustOK(t, msg, "seed trigger message")
+		triggerMsgID := extract(msg.Data, "message_id")
+		ai := &model.AgentInstance{
+			AgentType:     "claude-code",
+			SessionID:     sid,
+			InviterUserID: alice.ID,
+			DisplayName:   "Claude",
+		}
+		if err := db.Create(ai).Error; err != nil {
+			t.Fatalf("seed agent instance: %v", err)
+		}
+		task := &model.PendingAgentTask{
+			AgentInstanceID:   ai.ID,
+			TriggeredByUserID: alice.ID,
+			TriggerMessageID:  triggerMsgID,
+			Status:            status,
+			EdgeDeviceID:      deskDeviceID,
+			ExpireAt:          time.Now().Add(time.Hour),
+		}
+		if err := db.Create(task).Error; err != nil {
+			t.Fatalf("seed pending agent task: %v", err)
+		}
+		return task.ID
+	}
+	taskStatus := func(taskID string) string {
+		t.Helper()
+		var task model.PendingAgentTask
+		if err := db.First(&task, "id = ?", taskID).Error; err != nil {
+			t.Fatalf("load pending task %s: %v", taskID, err)
+		}
+		return task.Status
+	}
+
+	t.Run("TaskAckTransitionsDispatchedToRunning", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusDispatched)
+		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/ack", deskTok, map[string]string{
+			"edge_run_id": "run-ack-001",
+		}))
+		mustOK(t, r, "task ack")
+		if got := taskStatus(taskID); got != model.TaskStatusRunning {
+			t.Fatalf("after ack: status %s, want running", got)
+		}
 	})
 
-	t.Run("TaskStream", func(t *testing.T) {
+	t.Run("TaskStreamWhileRunning", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusRunning)
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/stream", deskTok, map[string]string{
-			"content": "streaming output...",
+			"edge_run_id": "run-str-001",
+			"content":     "streaming output...",
 		}))
-		t.Logf("task stream: code=%s", r.GetCode())
+		mustOK(t, r, "task stream")
 	})
 
-	t.Run("TaskDone", func(t *testing.T) {
+	t.Run("TaskDoneTransitionsRunningToDone", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusRunning)
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/done", deskTok, map[string]string{
-			"content": "all done!",
+			"edge_run_id": "run-done-001",
+			"content":     "all done!",
 		}))
-		t.Logf("task done: code=%s", r.GetCode())
-	})
-
-	t.Run("CancelTask", func(t *testing.T) {
-		msg2 := parse(postAuth("/client/sessions/"+sid+"/messages", alice.Token, map[string]interface{}{
-			"client_msg_id": "00000000-0000-0000-0000-00000000d002",
-			"content_type":  "text", "content": "@Claude again",
-		}))
-		tr2 := parse(postAuth("/web/agent-tasks", alice.Token, map[string]interface{}{
-			"trigger_message_id": extract(msg2.Data, "message_id"),
-		}))
-		tid2 := extract(tr2.Data, "id")
-		if tid2 != "" {
-			r := parse(postAuth("/web/agent-tasks/"+tid2+"/cancel", alice.Token, nil))
-			t.Logf("cancel task: code=%s", r.GetCode())
-		} else {
-			t.Log("no second task to cancel")
+		mustOK(t, r, "task done")
+		if got := taskStatus(taskID); got != model.TaskStatusDone {
+			t.Fatalf("after done: status %s, want done", got)
 		}
 	})
 
-	t.Run("TaskFail", func(t *testing.T) {
-		msg3 := parse(postAuth("/client/sessions/"+sid+"/messages", alice.Token, map[string]interface{}{
-			"client_msg_id": "00000000-0000-0000-0000-00000000d003",
-			"content_type":  "text", "content": "@Claude last one",
+	t.Run("TaskFailTransitionsRunningToFailed", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusRunning)
+		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/fail", deskTok, map[string]string{
+			"edge_run_id": "run-fail-001",
+			"error":       "edge crashed",
 		}))
-		tr3 := parse(postAuth("/web/agent-tasks", alice.Token, map[string]interface{}{
-			"trigger_message_id": extract(msg3.Data, "message_id"),
-		}))
-		tid3 := extract(tr3.Data, "id")
-		if tid3 != "" {
-			r := parse(postAuth("/edge/agent-tasks/"+tid3+"/fail", deskTok, map[string]string{
-				"error": "boom",
-			}))
-			t.Logf("task fail: code=%s", r.GetCode())
-		} else {
-			t.Log("no third task to fail")
+		mustOK(t, r, "task fail")
+		if got := taskStatus(taskID); got != model.TaskStatusFailed {
+			t.Fatalf("after fail: status %s, want failed", got)
 		}
+	})
+
+	t.Run("CancelTaskTransitionsRunningToCancelled", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusRunning)
+		r := parse(postAuth("/web/agent-tasks/"+taskID+"/cancel", alice.Token, nil))
+		mustOK(t, r, "task cancel")
+		if got := taskStatus(taskID); got != model.TaskStatusCancelled {
+			t.Fatalf("after cancel: status %s, want cancelled", got)
+		}
+	})
+
+	t.Run("AckUnknownTaskNotFound", func(t *testing.T) {
+		r := parse(postAuth("/edge/agent-tasks/00000000-0000-0000-0000-00000000ffff/ack",
+			deskTok, map[string]string{"edge_run_id": "run-nf-001"}))
+		mustCode(t, r, errcode.AgentTaskNotFound.Code, "ack unknown task")
+	})
+
+	t.Run("AckWrongDeviceRejected", func(t *testing.T) {
+		taskID := seedAgentAndTask(model.TaskStatusDispatched)
+		// 另一个桌面设备（edge_device_id 不匹配）→ not_found（authorize 不泄露存在性）
+		otherDev := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02"
+		otherTok, err := jwtutil.GenerateAccessToken(alice.ID, "desktop",
+			otherDev, testJWT.Secret, testJWT.AccessTTL)
+		if err != nil {
+			t.Fatalf("generate other desktop token: %v", err)
+		}
+		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/ack", otherTok, map[string]string{
+			"edge_run_id": "run-wrong-dev",
+		}))
+		mustCode(t, r, errcode.AgentTaskNotFound.Code, "ack with wrong device")
 	})
 }

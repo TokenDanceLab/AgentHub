@@ -3,9 +3,9 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 
@@ -229,10 +229,42 @@ func TestForwardToMultipleSessions(t *testing.T) {
 
 func TestSeqAfterRedisRestart(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	if os.Getenv("AGENTHUB_REDIS_RESTART_TEST") != "1" {
-		t.Skip("TestSeqAfterRedisRestart: requires Redis restart. Set AGENTHUB_REDIS_RESTART_TEST=1 to run.")
+	a, b := friendPair(t, "tseqr_a", "tseqr_b")
+	sid := privateSession(t, a, b)
+
+	seqOf := func(clientMsgID string) int64 {
+		t.Helper()
+		msgs := fetchMessages(t, a.Token, sid, 50)
+		for _, m := range msgs {
+			if m["client_msg_id"] == clientMsgID {
+				return int64(m["seq_id"].(float64))
+			}
+		}
+		t.Fatalf("message %s not found in history", clientMsgID)
+		return 0
 	}
-	t.Log("seq-after-restart test skipped (no Redis restart access)")
+
+	msg1 := uuid.New().String()
+	r1 := sendMsg(t, a.Token, sid, msg1, "before redis restart")
+	mustOK(t, r1, "send before restart")
+	seq1 := seqOf(msg1)
+
+	// 模拟 Redis 重启数据丢失（FLUSHALL 等价于重启后空 key；真容器重启
+	// 在 CI 中不可控，数据丢失语义与 FLUSHALL 等价）。
+	if err := testCacheClient.GetRDB().FlushAll(context.Background()).Err(); err != nil {
+		t.Fatalf("flush redis (simulate restart): %v", err)
+	}
+
+	msg2 := uuid.New().String()
+	r2 := sendMsg(t, a.Token, sid, msg2, "after redis restart")
+	mustOK(t, r2, "send after restart")
+	seq2 := seqOf(msg2)
+
+	// 连续性合同（#1533）：重启后 seq 不得回退（也不得重复）。
+	if seq2 <= seq1 {
+		t.Fatalf("seq regressed after redis restart: %d -> %d (must be > %d)", seq1, seq2, seq1)
+	}
+	t.Logf("seq continuity after redis restart preserved: %d -> %d", seq1, seq2)
 }
 
 // =============================================================================

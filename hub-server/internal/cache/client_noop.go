@@ -16,6 +16,7 @@ type NoOpCache struct{}
 func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error                   { return nil }
 func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)              { return false, nil }
 func (NoOpCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error { return nil }
+func (NoOpCache) SetSeq(ctx context.Context, sessionID string, seq int64) error          { return nil }
 func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	return 0, ErrCacheUnavailable
 }
