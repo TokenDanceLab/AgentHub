@@ -256,7 +256,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | checks.yml go-edge 内联步骤 | checks.yml → go-edge |
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
-| 真实登录/OIDC e2e 链路（需真实服务与凭据，脚本已归档 `docs/archives/scripts/`） | 无 | 无 |
+| 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.ps1` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
 
 ## 10. 验证纪律
