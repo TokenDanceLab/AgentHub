@@ -188,10 +188,10 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
-  // TODO(reduced-motion): jsdom does not honor prefers-reduced-motion, so the
+  // TODO(#1507 reduced-motion): jsdom does not honor prefers-reduced-motion, so the
   // CSS animation gating cannot be asserted here — verify on a real browser.
-  // TODO(viewport-flip): first version does not flip the tooltip when it would
+  // TODO(#1507 viewport-flip): first version does not flip the tooltip when it would
   // overflow the viewport (no portal/IntersectionObserver); add later.
-  // TODO(real-positioning): jsdom has no layout, so absolute side positioning
+  // TODO(#1507 real-positioning): jsdom has no layout, so absolute side positioning
   // cannot be measured — verify visually in the desktop shell.
 });

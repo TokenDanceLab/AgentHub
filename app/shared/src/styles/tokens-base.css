@@ -583,7 +583,7 @@ body {
     forced-color-adjust: auto;
   }
 
-  /* TODO(a11y #20): 深色主题玻璃面板在用户选择 *浅色* HC 主题（Canvas=白、
+  /* TODO(a11y #20 → #1509): 深色主题玻璃面板在用户选择 *浅色* HC 主题（Canvas=白、
      CanvasText=黑）时，保留的 alpha 玻璃底 + 被强制为黑色的文字可能对比
      不足（glass 依赖已知 app-bg 配色，HC 把 app-bg 换成 Canvas 打破假设）。
      彻底修法是逐组件将玻璃「装饰背景层」与「文字层」分离，仅在装饰层

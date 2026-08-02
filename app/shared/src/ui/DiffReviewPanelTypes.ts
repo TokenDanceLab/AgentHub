@@ -36,8 +36,8 @@ export interface SideBySideCell {
    * `added`+`context`. `null` is permitted because `produceWordDiffTokens`
    * may return null under its size guard.
    *
-   * TODO(P6 Step 3): rendering currently ignores this field — Step 3 wires
-   * it into the HAST word-diff injector in `prismRegistry.ts`.
+   * Consumed by the renderer via `highlightLineWithWordDiff`
+   * (prismRegistry.ts HAST word-diff injector, P6 Step 3).
    */
   wordDiff?: WordDiffToken[] | null;
 }
