@@ -51,6 +51,15 @@ func TouchSessionLastMessage(db *gorm.DB, sessionID string) error {
 		Update("last_message_at", time.Now()).Error
 }
 
+// SyncSessionSeq advances the persistent seq mirror to at least seq (never
+// regresses). Redis is the live allocation source; this mirror lets a fresh
+// Redis (restart / FLUSH / key expiry) recover the sequence without repeating
+// or regressing values (AH seq continuity contract, #1533).
+func SyncSessionSeq(db *gorm.DB, sessionID string, seq int64) error {
+	return db.Model(&model.Session{}).Where("id = ? AND next_seq < ?", sessionID, seq).
+		Update("next_seq", seq).Error
+}
+
 func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
 	var result []SessionWithMeta
 	err := db.Raw(`
