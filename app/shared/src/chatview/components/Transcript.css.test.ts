@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const cssPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'Transcript.css');
+const css = readFileSync(cssPath, 'utf8');
 
 const pinnedClassNames = [
   'chatview',
@@ -32,17 +36,12 @@ function cssRule(css: string, selector: string) {
 
 describe('ChatViewTranscript CSS contract', () => {
   it('keeps pinned announcement classes styled', () => {
-    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
-    const css = readFileSync(cssPath, 'utf8');
-
     for (const className of pinnedClassNames) {
       expect(css, className).toMatch(new RegExp(`\\.${className}\\b`));
     }
   });
 
   it('keeps agent markdown replies on a stable readable column', () => {
-    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
-    const css = readFileSync(cssPath, 'utf8');
     const groupRule = cssRule(css, '.bubble-group');
     const nestedBubbleRule = cssRule(css, '.bubble-group > .agent-bubble');
 
@@ -52,8 +51,6 @@ describe('ChatViewTranscript CSS contract', () => {
   });
 
   it('keeps the ChatView root constrained so the transcript owns vertical scrolling', () => {
-    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
-    const css = readFileSync(cssPath, 'utf8');
     const chatviewRule = cssRule(css, '.chatview');
 
     expect(chatviewRule).toMatch(/\bdisplay\s*:\s*flex\b/);
@@ -64,8 +61,6 @@ describe('ChatViewTranscript CSS contract', () => {
   });
 
   it('keeps Hub message metadata styled as compact non-card chrome', () => {
-    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
-    const css = readFileSync(cssPath, 'utf8');
     const metaRule = cssRule(css, '.message-display-meta');
     const detailRule = cssRule(css, '.message-display-detail');
 
@@ -78,8 +73,6 @@ describe('ChatViewTranscript CSS contract', () => {
   });
 
   it('uses dense row rhythm tokens for transcript messages (P76 #1311)', () => {
-    const cssPath = path.resolve(process.cwd(), '../shared/src/chatview/components/Transcript.css');
-    const css = readFileSync(cssPath, 'utf8');
     const rowRule = cssRule(css, '.grp-row');
     const contentRule = cssRule(css, '.grp-content');
 

@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-const primitivesDir = join(process.cwd(), 'src', 'components', 'primitives');
+const primitivesDir = dirname(fileURLToPath(import.meta.url));
 
 function readPrimitive(name: string): string {
   return readFileSync(join(primitivesDir, name), 'utf8');
