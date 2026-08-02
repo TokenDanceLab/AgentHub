@@ -3,7 +3,7 @@
 状态: PROPOSAL（管理员已批立项，设计待批）
 日期: 2026-07-27
 作者: AgentHub 架构设计
-追踪: 见 issue #1407（实施追踪，label 后端）
+追踪: 见 issue #1496（实施追踪）
 
 ---
 
@@ -160,7 +160,7 @@ im_channel_configs 表：
 hub 现有事件路径：
 
 ```
-Edge → Hub callback (/v1/edge/callback) → agent_run_events 表
+Edge → Hub 回调（/edge/agent-tasks/:id/{ack|stream|done|fail}）→ agent_run_events 表
                                            → WS PushToUser (agent.stream)
                                            → NotificationService.Notify (app 内通知)
 ```
@@ -487,7 +487,7 @@ Phase 1 迁移（4 张表）：
 - `mYYYYMMDD_000003_im_thread_bindings.up.sql`
 - `mYYYYMMDD_000004_im_push_logs.up.sql`
 
-全部使用 `CREATE TABLE IF NOT EXISTS`，遵循 hub 现有 migration 命名惯例（`db/migration/`）。
+全部使用 `CREATE TABLE IF NOT EXISTS`，遵循 hub 现有 migration 命名惯例（`hub-server/migrations/`）。
 
 ---
 
@@ -500,7 +500,7 @@ Phase 1 迁移（4 张表）：
  ┌──────────────────────────────────────────────────────────────────────┐
  │                                                                      │
  │  Edge callback                              ┌──────────────────┐    │
- │  POST /v1/edge/callback                     │ IMEventSubscriber│    │
+ │  POST /edge/agent-tasks/:id/*              │ IMEventSubscriber│    │
  │        │                                     │                  │    │
  │        ▼                                     │ filter(event):   │    │
  │  agent_run_events 表 ◄── 写入 ──┐           │  fail-closed     │    │
@@ -519,7 +519,7 @@ Phase 1 迁移（4 张表）：
  │  ┌──────────────────────────────┘           │ WS 长连          │    │
  │  │                                          └────────┬─────────┘    │
  │  │ 审批决定回写                                       │              │
- │  │ POST /api/v1/tasks/{id}/approvals/{id}/decide      │              │
+ │  │ POST /web/agent-tasks/{id}/approvals/{id}/decide   │              │
  │  │ （web/mobile/IM 共用同一端点）                      │              │
  │  │                                          ┌────────▼─────────┐    │
  │  └──────────────────────────────────────────► agent_run_events │    │
@@ -917,7 +917,7 @@ agent 配置管理        不支持        不支持        支持
 
 ## 附录 C：GitHub Issue 引用
 
-- 实施追踪：#1407（本文档）
+- 实施追踪：#1496（本文档）
 - @提及派单（独立立项）：#1406
 - 本提案产出的 command dispatcher 可被 #1406 引用
 
