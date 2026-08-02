@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -13,9 +15,10 @@ import (
 
 // AuditEvent represents a recorded audit event.
 // Each event includes a PrevHash field that creates a SHA-256 hash chain,
-// making the audit log tamper-evident. The hash chain links each record to
-// its predecessor: hash = SHA-256(previous_id || previous_prev_hash).
-// The first record (genesis) uses an empty string as its previous values.
+// making the audit log tamper-evident. Since #1541 the link hash covers the
+// predecessor's full event content (not only id + prev_hash), so tampering
+// with any content field breaks the chain. The first record (genesis) uses
+// an empty PrevHash.
 type AuditEvent struct {
 	ID        string    `gorm:"primaryKey;type:uuid" json:"id"`
 	UserID    string    `gorm:"column:user_id;type:uuid;not null" json:"user_id"`
@@ -42,11 +45,53 @@ type AuditChainEntry struct {
 	Summary   string `json:"summary"`
 }
 
-// ComputeHash computes the SHA-256 hash of (prevID || prevHash).
-func ComputeHash(prevID, prevHash string) string {
+// canonicalContent serializes the tamper-relevant fields of an audit event as
+// a length-prefixed concatenation ("len:value" per field, in this exact
+// order): user_id, profile_id, target_id, event_type, severity, summary,
+// details, client_ip, created_at (UnixNano decimal). The length prefix makes
+// the encoding unambiguous for arbitrary field values. Migration 0058
+// implements the identical encoding in SQL (audit_canonical_content), so a
+// re-linked chain verifies with the Go implementation and vice versa.
+func canonicalContent(e *AuditEvent) string {
+	if e == nil {
+		return ""
+	}
+	var b strings.Builder
+	appendField := func(s string) {
+		b.WriteString(strconv.Itoa(len(s)))
+		b.WriteByte(':')
+		b.WriteString(s)
+	}
+	ptr := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
+	appendField(e.UserID)
+	appendField(ptr(e.ProfileID))
+	appendField(ptr(e.TargetID))
+	appendField(e.EventType)
+	appendField(e.Severity)
+	appendField(e.Summary)
+	appendField(e.Details)
+	appendField(e.ClientIP)
+	appendField(strconv.FormatInt(e.CreatedAt.UnixNano(), 10))
+	return b.String()
+}
+
+// ComputeLinkHash computes the hash linking the event AFTER prev to prev:
+// SHA-256(prev.ID || prev.PrevHash || canonicalContent(prev)). The content
+// is included so that tampering with any field of prev breaks the chain
+// (#1541). A nil prev (genesis) produces the empty hash.
+func ComputeLinkHash(prev *AuditEvent) string {
+	if prev == nil {
+		return ""
+	}
 	h := sha256.New()
-	h.Write([]byte(prevID))
-	h.Write([]byte(prevHash))
+	h.Write([]byte(prev.ID))
+	h.Write([]byte(prev.PrevHash))
+	h.Write([]byte(canonicalContent(prev)))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -56,7 +101,7 @@ func (e *AuditEvent) HashChainEntry() AuditChainEntry {
 	return AuditChainEntry{
 		ID:        e.ID,
 		PrevHash:  e.PrevHash,
-		Hash:      ComputeHash(e.ID, e.PrevHash),
+		Hash:      ComputeLinkHash(e),
 		UserID:    e.UserID,
 		EventType: e.EventType,
 		Severity:  e.Severity,
@@ -66,9 +111,12 @@ func (e *AuditEvent) HashChainEntry() AuditChainEntry {
 
 // VerifyChain verifies the integrity of an ordered list of audit events.
 // Returns the index of the first invalid link, or -1 if the chain is valid.
+// Because ComputeLinkHash covers the full predecessor content, an event
+// whose content was tampered with (while keeping id/prev_hash) is detected
+// as a broken link.
 func VerifyChain(events []AuditEvent) int {
 	for i := 1; i < len(events); i++ {
-		expectedPrev := ComputeHash(events[i-1].ID, events[i-1].PrevHash)
+		expectedPrev := ComputeLinkHash(&events[i-1])
 		if events[i].PrevHash != expectedPrev {
 			return i
 		}
