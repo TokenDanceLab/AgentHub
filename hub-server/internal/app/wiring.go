@@ -95,8 +95,12 @@ func (a *App) initInfra(ctx context.Context) error {
 		jwtutil.SetJWKSURI(a.Config.TokenDanceID.JWKSURI)
 	}
 
-	// Legacy: sync existing session seq numbers to Redis
-	go a.syncLegacySeqs()
+	// Legacy: sync existing session seq numbers to Redis (tracked in the
+	// background group — cancellable and awaited at shutdown, #1542)
+	a.bg.Go(func() error {
+		a.syncLegacySeqs(a.bg.Ctx())
+		return nil
+	})
 
 	// WebSocket manager + callbacks
 	a.setupWSManager()
@@ -255,27 +259,29 @@ func (a *App) startServer(ctx context.Context) error {
 	}
 
 	// Event subscriptions
-	a.startEventSubscriptions(a.coreCtx)
+	a.startEventSubscriptions(a.bg.Ctx())
 
 	// Background goroutines
-	a.startTaskScheduler(a.coreCtx)
-	a.startWebSocketCleanup(a.coreCtx)
+	a.startTaskScheduler(a.bg.Ctx())
+	a.startWebSocketCleanup(a.bg.Ctx())
 	// AH-SR-049: durable Hub->Edge delivery retry loop (delivery_outbox).
 	if a.AgentService != nil {
-		a.AgentService.StartDeliveryRetryLoop(a.coreCtx)
+		a.AgentService.StartDeliveryRetryLoop(a.bg.Ctx())
 	}
 
 	// Admin server (pprof + metrics)
 	a.startAdminServer()
 
 	// Periodic metrics collection
-	a.startMetricsCollector(a.coreCtx)
+	a.startMetricsCollector(a.bg.Ctx())
 
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// HTTP server
+	// HTTP server. A bind/serve failure must cancel the whole task group and
+	// surface as Run's error — not only a log line (#1542 must-test 9).
+	serveErrCh := make(chan error, 1)
 	a.HTTPServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
 		Handler:           r,
@@ -290,6 +296,7 @@ func (a *App) startServer(ctx context.Context) error {
 		slog.Info("server starting", "port", a.Config.Server.Port)
 		if err := a.HTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server failed", "error", err)
+			serveErrCh <- err
 			quit <- syscall.SIGTERM
 		}
 	}()
@@ -302,5 +309,16 @@ func (a *App) startServer(ctx context.Context) error {
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), config.DefaultShutdownTimeout)
 	defer cancel()
-	return a.Shutdown(ctxShutdown)
+	shutdownErr := a.Shutdown(ctxShutdown)
+
+	// Surface a fatal serve error (e.g. bind failure) instead of only the
+	// signal-driven clean shutdown result.
+	select {
+	case serveErr := <-serveErrCh:
+		if serveErr != nil {
+			return fmt.Errorf("http server: %w", serveErr)
+		}
+	default:
+	}
+	return shutdownErr
 }
