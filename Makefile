@@ -98,15 +98,10 @@ ci: test lint sec
 
 # ── Release ─────────────────────────────────────
 
+# 发布入口已收敛（2026-08-02）：唯一入口 = git tag vX.Y.Z[-rc.N] → push → release.yml（AGENTS.md §12）。
+# release.ps1 已删除；本地不再上传二进制。
 release:
-	@if [ -z "$(VER)" ]; then echo "Usage: make release VER=v0.1.1"; exit 1; fi
-	@if command -v pwsh >/dev/null 2>&1; then \
-		pwsh -File scripts/release/release.ps1 $(VER); \
-	elif command -v powershell >/dev/null 2>&1; then \
-		powershell -File scripts/release/release.ps1 $(VER); \
-	else \
-		echo "Error: PowerShell (pwsh or powershell) is required for release"; exit 1; \
-	fi
+	@echo "发布只走 release.yml：git tag vX.Y.Z[-rc.N] && git push origin <tag>（见 AGENTS.md §12）"
 
 # ── Clean ────────────────────────────────────────
 

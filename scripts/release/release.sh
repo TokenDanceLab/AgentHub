@@ -462,23 +462,10 @@ else
 fi
 
 # ── Upload (if applicable) ────────────────────────────────
-# The full binary-release upload uses release.ps1 which handles
-# Go cross-compilation + Tauri bundling + GitHub Release upload.
-# This shell script focuses on version-bump + test + tag + push.
-# For full binary release with upload, use: make release VER=$TAG
+# 发布入口已收敛（2026-08-02）：唯一入口 = git tag vX.Y.Z[-rc.N] → push → release.yml。
+# 本脚本只负责 version-bump + test + tag + push；二进制上传由 release.yml 承担（AGENTS.md §12）。
 if [[ "$SKIP_UPLOAD" != "true" ]] && [[ -n "${UPLOAD_BINARIES:-}" ]]; then
-  step "Upload binaries to GitHub Release"
-  if [[ -f "$SCRIPT_DIR/release.ps1" ]]; then
-    if command -v pwsh &>/dev/null; then
-      pwsh -File "$SCRIPT_DIR/release.ps1" "$TAG"
-    elif command -v powershell &>/dev/null; then
-      powershell -File "$SCRIPT_DIR/release.ps1" "$TAG"
-    else
-      warn "PowerShell not available for binary upload. Run manually: make release VER=$TAG"
-    fi
-  else
-    warn "release.ps1 not found. Upload binaries manually or use: make release VER=$TAG"
-  fi
+  warn "UPLOAD_BINARIES 已弃用：发布只走 tag push → release.yml（AGENTS.md §12），不再本地上传。"
 fi
 
 # ── Done ──────────────────────────────────────────────────
