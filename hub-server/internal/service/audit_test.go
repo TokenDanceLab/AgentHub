@@ -24,7 +24,7 @@ func TestNewAuditServiceAllowsNilConfig(t *testing.T) {
 	if svc == nil {
 		t.Fatal("NewAuditService returned nil")
 	}
-	svc.Shutdown()
+	svc.Shutdown(context.Background())
 }
 
 func testAuditChainEntry() model.AuditChainEntry {
@@ -194,7 +194,7 @@ func TestAuditFileSinkClose(t *testing.T) {
 
 func TestNewAuditServiceDefaultConfig(t *testing.T) {
 	svc := NewAuditService(nil, nil)
-	defer svc.Shutdown()
+	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 1024 {
 		t.Fatalf("default retryCh cap = %d, want 1024", got)
 	}
@@ -205,7 +205,7 @@ func TestNewAuditServiceDefaultConfig(t *testing.T) {
 
 func TestNewAuditServiceCustomRetryBuffer(t *testing.T) {
 	svc := NewAuditService(nil, &AuditServiceConfig{RetryBufferSize: 5})
-	defer svc.Shutdown()
+	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 5 {
 		t.Fatalf("retryCh cap = %d, want 5", got)
 	}
@@ -214,7 +214,7 @@ func TestNewAuditServiceCustomRetryBuffer(t *testing.T) {
 func TestNewAuditServiceWithAuditLogFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.jsonl")
 	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
-	defer svc.Shutdown()
+	defer svc.Shutdown(context.Background())
 	if svc.fileSink == nil {
 		t.Fatal("fileSink = nil, want non-nil when AuditLogFile is set")
 	}
@@ -228,7 +228,7 @@ func TestNewAuditServiceBadAuditLogFile(t *testing.T) {
 	// fail service construction.
 	path := filepath.Join(t.TempDir(), "no-such-dir", "audit.jsonl")
 	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
-	defer svc.Shutdown()
+	defer svc.Shutdown(context.Background())
 	if svc == nil {
 		t.Fatal("service must still be created when the file sink fails")
 	}
@@ -264,7 +264,7 @@ func TestAuditShutdownNoHang(t *testing.T) {
 	svc := NewAuditService(nil, nil)
 	done := make(chan struct{})
 	go func() {
-		svc.Shutdown()
+		svc.Shutdown(context.Background())
 		close(done)
 	}()
 	select {
@@ -276,7 +276,7 @@ func TestAuditShutdownNoHang(t *testing.T) {
 
 func TestAuditRecordAfterShutdown(t *testing.T) {
 	svc := NewAuditService(nil, nil)
-	svc.Shutdown()
+	svc.Shutdown(context.Background())
 
 	// Shutdown only closes s.done; retryCh stays open, so Record still
 	// enqueues without panicking or blocking. The event is never persisted
