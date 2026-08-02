@@ -27,7 +27,7 @@ while read local_ref local_sha remote_ref remote_sha; do
             fi
             # 删除 master 引用（remote_sha 全零 = 删除）
             if [ "$remote_sha" = "$z40" ]; then
-                echo "🚫 pre-push: 禁止删除 master 分支（AGENTS.md §6 + branch protection）。" >&2
+                echo "🚫 pre-push: 禁止向 master 推送（目标分支不存在时新建也算——master 只能通过 PR squash merge 建立）。AGENTS.md §6。" >&2
                 exit 1
             fi
             echo "🚫 pre-push: 检测到向 master 直接推送（$local_sha → $remote_ref）。" >&2
