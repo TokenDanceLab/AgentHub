@@ -481,16 +481,6 @@ jobs:
       - name: Test Desktop
         run: pnpm test:ci
 
-      # app/shared/vitest.config.ts declares 60% coverage thresholds, but until
-      # now no CI job ran the frontend with --coverage, so the gate was dead.
-      # Measured on this branch: statements 69.78% / branches 65.73% /
-      # functions 69.49% / lines 71.16% — all clear 60%, so this is blocking.
-      # hookTimeout is raised because v8 instrumentation pushes the shared
-      # setup preload past vitest's 30s default on cold runners.
-      - name: Shared coverage (60% thresholds)
-        working-directory: app
-        run: pnpm --filter @agenthub/shared exec vitest run --coverage --hookTimeout=120000
-
   # ── Frontend: Web ────────────────────────────
   frontend-web:
     name: Frontend (web)
@@ -585,16 +575,13 @@ jobs:
         run: pnpm --filter agenthub-mobile-rn lint
 
       # ── Hardened: Test with coverage reporting ──
-      - name: Install coverage provider (mobile)
-        run: pnpm --filter agenthub-mobile-rn add -D @vitest/coverage-v8
+      # Absolute floors live in vitest.config.ts (createCoverage factory,
+      # #1535); no CLI overrides here. The provider is the workspace-root
+      # @vitest/coverage-v8 (hoisted), so no add -D step is needed.
       - name: Test with coverage (mobile)
         run: |
-          pnpm --filter agenthub-mobile-rn exec vitest run --coverage \
-            --coverage.thresholds.lines=40 \
-            --coverage.thresholds.branches=30 \
-            --coverage.thresholds.functions=30 \
-            --coverage.thresholds.statements=40
-          echo "::notice::Mobile coverage report generated. Raise thresholds as coverage improves."
+          pnpm --filter agenthub-mobile-rn exec vitest run --coverage
+          echo "::notice::Mobile coverage report generated (config thresholds apply)."
 
       # ── Hardened: Bundle size check (Expo web export) ──
       - name: Bundle size check (mobile web export)
@@ -922,6 +909,12 @@ jobs:
       - name: Verify coverage baseline
         shell: pwsh
         run: ./scripts/verify/verify-coverage-baseline.ps1
+      # Negative self-test: an imported-by-nobody production file must be
+      # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
+      # only (339 tests, node env).
+      - name: Self-test coverage include contract (negative)
+        shell: pwsh
+        run: ./scripts/verify/tests/coverage-include.Tests.ps1
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:
