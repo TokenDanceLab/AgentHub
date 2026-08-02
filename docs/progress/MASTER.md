@@ -48,12 +48,13 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 ### Database tests
 
-Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/setup_test.go` 动态扫描当前 schema、排除 `schema_migrations`、`TRUNCATE ... RESTART IDENTITY CASCADE`、错误即失败，新表自动发现。
+Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/integration/setup_test.go` 动态扫描当前 schema、排除 `schema_migrations`、`TRUNCATE ... RESTART IDENTITY CASCADE`、错误即失败，新表自动发现。
 
-1. Split self-contained fixture tests from real PostgreSQL/Redis integration tests; remove the package-wide `-short` escape hatch.
-2. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
-3. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
-4. Add race evidence to concurrency tests after isolation is trustworthy.
+测试分层已落地（#1524）：integration lane 移入 `hub-server/tests/integration/`（`//go:build integration` 作 lane manifest，默认 -short lane 不再编译它）；package-wide `-short` 逃生口已移除；默认 lane 与 integration lane 均在 CI 断言非零测试数。
+
+1. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
+2. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
+3. Add race evidence to concurrency tests after isolation is trustworthy.
 
 ### Frontend architecture
 
