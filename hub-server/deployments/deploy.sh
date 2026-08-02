@@ -7,7 +7,7 @@ COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
 ENV_FILE="$SCRIPT_DIR/.env.production"
 BACKUP_DIR="$SCRIPT_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}"
+HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub-server:latest}"
 COMPOSE_CMD=()
 
 # Colors
@@ -118,8 +118,8 @@ cleanup() {
 
 # Rollback — requires manual image swap first:
 #   1. docker load < rollback-image.tar  (load the previous working image)
-#   2. docker tag <old-image-id> ghcr.io/tokendancelab/agenthub-hub:rollback
-#   3. AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub:rollback ./deploy.sh rollback
+#   2. docker tag <old-image-id> ghcr.io/tokendancelab/agenthub-hub-server:rollback
+#   3. AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub-server:rollback ./deploy.sh rollback
 # The compose file uses pull_policy: never, so it will use the locally-loaded tag.
 rollback() {
     log "Rolling back to $HUB_IMAGE..."
