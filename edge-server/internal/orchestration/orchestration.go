@@ -1,6 +1,6 @@
 // Package orchestration holds the neutral, side-effect-free contract types
 // shared between the adapters root package and the orchestrator sub-domain
-// (A-V1 Step 1, #1526).
+// (A-V1 Step 0, #1526).
 //
 // Dependency direction: orchestration imports nothing from adapters;
 // adapters (and the future adapters/orchestrator leaf package) import this

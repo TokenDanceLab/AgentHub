@@ -1,6 +1,6 @@
 package adapters
 
-// 合同类型唯一权威在 internal/orchestration（A-V1 Step 1, #1526）。
+// 合同类型唯一权威在 internal/orchestration（A-V1 Step 0, #1526）。
 // 以下 alias 保持本包所有现有调用点（orchestrator*.go、plan_approval.go、
 // 测试、外部 handlers）零改动；alias 不复制行为，不是双 SSOT。
 import (

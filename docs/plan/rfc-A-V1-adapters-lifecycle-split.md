@@ -83,7 +83,7 @@
 edge-server/internal/adapters/
   adapter.go            # AgentAdapter / EventEmitter / Registry 留根
   registry.go
-  orchestrator/         # 新叶子包
+  orchestrator/         # 新叶子包（插件式单向依赖，见 §6.1）
     orchestrator.go
     orchestrator_dag.go
     orchestrator_dispatch_{handle,interceptor,parse,results}.go
@@ -93,13 +93,7 @@ edge-server/internal/adapters/
   # 其余 cli/sdk/ndjson/hooks/surfacing/config/acp 保持扁平
 ```
 
-回根包的 type alias（仿 A-V4 `eventbus.go`）：
-```go
-// adapters/adapter.go 追加
-type OrchestratorAdapter = orchestrator.OrchestratorAdapter
-type ExecutionPlan       = orchestrator.ExecutionPlan
-type PlanApprovalBroker  = orchestrator.PlanApprovalBroker
-```
+依赖方向（Step 2 裁决，与 §6.1 一致）：`orchestrator` 叶子包只 import 根 `adapters`；根包**不**反向 import 叶子包、不保留 `OrchestratorAdapter` alias；注册/构造/装配由 composition root（`cmd/agenthub-edge`）承担。
 
 ## 4. lifecycle/ 拆分建议
 
