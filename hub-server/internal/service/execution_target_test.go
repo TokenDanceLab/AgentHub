@@ -13,9 +13,23 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
+
+// newExecutionTargetSvc builds the service with a test-only egress policy:
+// loopback + plain http allowed (httptest servers listen on 127.0.0.1).
+// Tests of the default-deny behavior pass an explicit config instead.
+func newExecutionTargetSvc(t *testing.T, db *gorm.DB) *ExecutionTargetService {
+	t.Helper()
+	svc, err := NewExecutionTargetService(db, egress.Config{
+		AllowCIDRs:     []string{"127.0.0.0/8"},
+		AllowPlainHTTP: true,
+	})
+	require.NoError(t, err)
+	return svc
+}
 
 func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -94,7 +108,7 @@ func seedExecutionTarget(t *testing.T, db *gorm.DB, id, ownerID string) {
 func TestExecutionTargetGetIsOwnerScoped(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.Get(context.Background(), "target-1", "owner-1")
 	require.NoError(t, err)
@@ -107,7 +121,7 @@ func TestExecutionTargetGetIsOwnerScoped(t *testing.T) {
 func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	err := svc.Ping(context.Background(), "target-1", "other-owner")
 	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
@@ -129,7 +143,7 @@ func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
 		INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, "target-unknown", "owner-1", "Unknown target", "unknown", "[]", "local", "unknown", "{}", "{}").Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	err := svc.Ping(context.Background(), "target-unknown", "owner-1")
 	require.Error(t, err)
@@ -165,7 +179,7 @@ func TestExecutionTargetPingRequiresLiveProofForRemoteTargets(t *testing.T) {
 				Capabilities:       "{}",
 				Metadata:           "{}",
 			}).Error)
-			svc := NewExecutionTargetService(db)
+			svc := newExecutionTargetSvc(t, db)
 
 			err := svc.Ping(context.Background(), "target-"+tt.targetType, "owner-1")
 			require.ErrorIs(t, err, errcode.TargetNotRoutable)
@@ -177,6 +191,48 @@ func TestExecutionTargetPingRequiresLiveProofForRemoteTargets(t *testing.T) {
 			require.Equal(t, "unknown", target.HealthState)
 		})
 	}
+}
+
+// TestExecutionTargetPingRefusedWithoutEgressAllowlist proves the core
+// #1540 decision: with the default (empty) egress policy, hub-initiated
+// pings to user-supplied addresses fail closed — even to localhost.
+func TestExecutionTargetPingRefusedWithoutEgressAllowlist(t *testing.T) {
+	edge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(edge.Close)
+
+	edgeURL, err := url.Parse(edge.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(edgeURL.Port())
+	require.NoError(t, err)
+
+	db := newExecutionTargetTestDB(t)
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-cloud",
+		OwnerID:            "owner-1",
+		Name:               "Cloud target",
+		TargetType:         "cloud_edge",
+		Host:               edgeURL.Hostname(),
+		Port:               port,
+		WorkspaceRoot:      "/workspace",
+		WorkspaceAllowlist: `["/workspace"]`,
+		TrustLevel:         "cloud",
+		HealthState:        "unknown",
+		Capabilities:       "{}",
+		Metadata:           "{}",
+	}).Error)
+
+	svc, err := NewExecutionTargetService(db, egress.Config{}) // default-deny
+	require.NoError(t, err)
+
+	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
+	require.ErrorIs(t, err, errcode.TargetNotRoutable)
+	require.Contains(t, err.Error(), "not allowed", "error must name the egress policy denial")
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-cloud").First(&target).Error)
+	require.False(t, target.IsOnline, "target must not be marked online after a refused ping")
 }
 
 func TestExecutionTargetPingDoesNotUseAuthMethodAsBearerCredential(t *testing.T) {
@@ -208,7 +264,7 @@ func TestExecutionTargetPingDoesNotUseAuthMethodAsBearerCredential(t *testing.T)
 		Capabilities:       "{}",
 		Metadata:           "{}",
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	require.NoError(t, svc.Ping(context.Background(), "target-cloud", "owner-1"))
 	require.Empty(t, gotAuth, "auth_method is a public strategy enum and must not be reused as a bearer credential")
@@ -240,7 +296,7 @@ func TestExecutionTargetPingMarksMismatchWhenEdgeReportsDifferentTarget(t *testi
 		Capabilities:       "{}",
 		Metadata:           "{}",
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
 
@@ -253,7 +309,7 @@ func TestExecutionTargetPingMarksMismatchWhenEdgeReportsDifferentTarget(t *testi
 
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{Name: "Local"})
 	require.NoError(t, err)
@@ -266,7 +322,7 @@ func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 func TestExecutionTargetCreateRejectsForeignDeviceBinding(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedDevice(t, db, "44444444-4444-4444-8444-444444444444", "owner-2", "desktop")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 	deviceID := "44444444-4444-4444-8444-444444444444"
 
 	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
@@ -283,7 +339,7 @@ func TestExecutionTargetCreateRejectsForeignDeviceBinding(t *testing.T) {
 
 func TestExecutionTargetCreateRejectsClientManagedHealthState(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
 		Name:        "Forged healthy target",
@@ -299,7 +355,7 @@ func TestExecutionTargetCreateRejectsClientManagedHealthState(t *testing.T) {
 func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
 		Name:        "Forged healthy target",
@@ -317,7 +373,7 @@ func TestExecutionTargetUpdateRejectsForeignDeviceBinding(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
 	seedDevice(t, db, "55555555-5555-4555-8555-555555555555", "owner-2", "desktop")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 	deviceID := "55555555-5555-4555-8555-555555555555"
 
 	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
@@ -332,7 +388,7 @@ func TestExecutionTargetUpdateRejectsForeignDeviceBinding(t *testing.T) {
 
 func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
 		Name:               "Invalid",
@@ -344,7 +400,7 @@ func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
 func TestExecutionTargetUpdateClearsJSONLikeFields(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
 		WorkspaceAllowlist: `[]`,
@@ -371,7 +427,7 @@ func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newExecutionTargetTestDB(t)
 			seedExecutionTarget(t, db, "target-1", "owner-1")
-			svc := NewExecutionTargetService(db)
+			svc := newExecutionTargetSvc(t, db)
 
 			var err error
 			require.NotPanics(t, func() {
@@ -384,7 +440,7 @@ func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
 
 func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineTarget(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 	seedDevice(t, db, "11111111-1111-4111-8111-111111111111", "owner-1", "desktop")
 	device := &model.Device{
 		ID:           "11111111-1111-4111-8111-111111111111",
@@ -415,7 +471,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineT
 
 func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesWinnerAfterCreateConflict(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 	deviceID := "15151515-1515-4151-8151-151515151515"
 	seedDevice(t, db, deviceID, "owner-1", "desktop")
 
@@ -486,7 +542,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsAmbiguousDuplicate
 		Capabilities:       `{}`,
 		Metadata:           `{}`,
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:         deviceID,
@@ -516,7 +572,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesGeneratedNameTar
 		Capabilities:       `{}`,
 		Metadata:           `{}`,
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:           deviceID,
@@ -555,7 +611,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsGeneratedNameBound
 		Capabilities:       `{}`,
 		Metadata:           `{}`,
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:         deviceID,
@@ -589,7 +645,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOffline
 		Capabilities:       `{"old":true}`,
 		Metadata:           `{"source":"old"}`,
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:           deviceID,
@@ -630,7 +686,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceIgnoresForgedForeignBindi
 		Capabilities:       `{}`,
 		Metadata:           `{}`,
 	}).Error)
-	svc := NewExecutionTargetService(db)
+	svc := newExecutionTargetSvc(t, db)
 
 	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:         deviceID,
