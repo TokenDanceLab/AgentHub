@@ -2,6 +2,7 @@
 
 | 项目 | 描述 | 时间 | 归档路径 |
 |---|---|---|---|
+| branch-hygiene | 分支混乱清理：删除 fork/* 48 个历史分支 + origin/dev/* 3 个早期 dev 分支，保留分支曾存在的痕迹；PR [#1504](https://github.com/TokenDanceLab/AgentHub/pull/1504) | 2026-08-02 | [branch-hygiene.md](./branch-hygiene.md) |
 | cleanup-baseline | knowledge-first strangler cleanup + SDD closeout；Issues #424–#445 closed；Phase 7 residual #447–#451；Project [cleanup-baseline](https://github.com/users/DeliciousBuding/projects/6)；PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | 2026-07-16 | [cleanup-baseline/](./cleanup-baseline/) |
 
 ## cleanup-baseline
