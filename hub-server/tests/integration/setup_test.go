@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 	// request; TestMain runs before every test.
 	os.Setenv("AGENTHUB_ADMIN_USERS", testAdminUserID)
 
-	cfg, err := config.Load("../configs/config.yaml")
+	cfg, err := config.Load("../../configs/config.yaml")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
@@ -99,7 +99,7 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("failed to init db: %v", err))
 	}
 	db = database
-	if err := repository.RunMigrationsFrom(&cfg.DB, "file://../migrations"); err != nil {
+	if err := repository.RunMigrationsFrom(&cfg.DB, "file://../../migrations"); err != nil {
 		panic(fmt.Sprintf("failed to run migrations: %v", err))
 	}
 	rdb, err := cache.InitRedis(&cfg.Redis)
