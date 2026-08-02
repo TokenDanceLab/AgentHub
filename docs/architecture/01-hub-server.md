@@ -42,6 +42,29 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | Deployment boundary | [05-deployment.md](05-deployment.md) |
 | Security risk status | [../governance/security-risk-register.md](../governance/security-risk-register.md) |
 
+## Auth 中间件链与路由分组
+
+Hub 鉴权区分**身份证明**与**产品会话**：TokenDance ID RS256 JWT 只证明身份（"我是谁"），Hub-issued HS256 JWT 才是产品会话（"我能操作 Hub 资源"）。中间件实现在 `internal/middleware/`，路由注册见 `internal/router/router.go`。
+
+| 中间件 | 作用 | 应用于 |
+|---|---|---|
+| `AuthMiddleware` | 解析任意 Bearer token（先试 RS256 TokenDance，fallback HS256 Hub），注入 `auth_source` | `/client/*`、`/web/*`、`/edge/*`、`/cloud/*` 受保护路由 |
+| `RequireHubSession()` | 拒绝 `auth_source != "hub_local"`，即拒绝 TokenDance bearer 直接操作产品 API | `/client/auth/me`、`/client/contacts`、`/client/sessions`、`/client/messages`、`/client/agent-tasks`、`/client/attachments`、`/client/notifications`、`/client/settings` 等 |
+| `WSAuthMiddleware` | 只接受 Hub-issued HS256 session；TokenDance bearer 不能在 WS 升级时通过 | `/client/ws` |
+| `RequireAdmin()` | `AGENTHUB_ADMIN_USERS` 逗号分隔白名单；空列表 = fail-closed | `/admin/*`、审计查询 |
+| `RequireLocalAuth()` | `RequireHubSession()` 的别名，兼容历史调用点 | 旧路由 |
+
+路由分组（`router.go`）：
+
+```text
+/health、/api/public            → 无鉴权
+/client/auth/oidc/*、/client/auth/refresh → 仅 rate limit（登录入口）
+/client/ws                      → WSAuthMiddleware（只接受 Hub session）
+/client/*（me、logout、profile、contacts、sessions、messages、agent-tasks、edge、attachments、notifications、settings）→ AuthMiddleware + RequireHubSession
+/edge/*、/cloud/*、/web/*       → AuthMiddleware + RequireHubSession
+/admin/*                        → AuthMiddleware + RequireAdmin
+```
+
 ## Data Flow
 
 ```text
