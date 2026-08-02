@@ -277,10 +277,10 @@ rollback() {
 
     # Find most recent rollback tag
     local rollback_image
-    rollback_image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "agenthub-hub:rollback-" | sort -r | head -1 || true)
+    rollback_image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "agenthub-hub-server:rollback-" | sort -r | head -1 || true)
 
     if [ -z "$rollback_image" ]; then
-        err "No rollback image found. Manual rollback required: load previous image and tag as ghcr.io/tokendancelab/agenthub-hub:rollback"
+        err "No rollback image found. Manual rollback required: load previous image and tag as ghcr.io/tokendancelab/agenthub-hub-server:rollback"
     fi
 
     log "Rolling back to: $rollback_image"
