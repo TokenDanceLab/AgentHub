@@ -285,4 +285,19 @@ function Assert-AgentsMdMappingTable {
 
 Assert-AgentsMdMappingTable
 
+# --- 脚本镜像防线:scripts/ 脚本文件名禁止在 tests/ 出现同名(SSOT 收敛) ---
+function Assert-NoScriptMirror {
+    $scriptLeaves = @(git ls-files "scripts/" | ForEach-Object { Normalize-Path $_ } | ForEach-Object { Split-Path $_ -Leaf })
+    $mirrors = @(git ls-files "tests/" | ForEach-Object { Normalize-Path $_ } |
+        Where-Object { $_ -match '\.(ps1|sh|mjs|py)$' } |
+        ForEach-Object { Split-Path $_ -Leaf } |
+        Where-Object { $scriptLeaves -contains $_ })
+    if ($mirrors.Count -gt 0) {
+        Fail ("tests/ must not mirror scripts/ script names: " + (($mirrors | Sort-Object -Unique) -join ", "))
+    }
+    Write-Host "script mirror check ok (no tests/ file shares a scripts/ script name)"
+}
+
+Assert-NoScriptMirror
+
 Write-Host "doc SSOT ok"

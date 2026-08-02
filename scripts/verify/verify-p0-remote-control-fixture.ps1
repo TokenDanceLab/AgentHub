@@ -262,10 +262,10 @@ if ($Failed -eq 0) {
     )
 
     Step "Remote-control fixture E2E script tests"
-    Invoke-RequiredScriptGate "tests/contract/scripts/verify-remote-control-fixture-e2e.ps1" "tests\contract\scripts\verify-remote-control-fixture-e2e.ps1" @("-RepoRoot", $RepoRoot)
+    Invoke-RequiredScriptGate "verify-remote-control-fixture-e2e.ps1" "scripts\verify\verify-remote-control-fixture-e2e.ps1" @("-RepoRoot", $RepoRoot)
 
     Step "TeamRun demo contract tests"
-    Invoke-RequiredScriptGate "tests/contract/scripts/verify-teamrun-demo-contract.ps1" "tests\contract\scripts\verify-teamrun-demo-contract.ps1" @("-RepoRoot", $RepoRoot)
+    Invoke-RequiredScriptGate "verify-teamrun-demo-contract.ps1" "scripts\verify\verify-teamrun-demo-contract.ps1" @("-RepoRoot", $RepoRoot)
 
     Step "Edge SDK fixture focused gate"
     Invoke-RequiredNativeGate "go test ./internal/adapters -run SDKFixture -short -count=1" "go" @(
