@@ -886,6 +886,14 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-shared-ui-hubclient.ps1
 
+      - name: Verify Shared Edge surface isolation (web/mobile-rn)
+        shell: pwsh
+        run: ./scripts/verify/verify-shared-edge-surface-isolation.ps1
+
+      - name: Verify v4 old UI active paths
+        shell: pwsh
+        run: ./scripts/verify/verify-v4-old-ui-active-paths.ps1
+
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
       # if any coverage metric drops below scripts/verify/coverage-baseline.json

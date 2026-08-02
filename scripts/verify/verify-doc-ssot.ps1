@@ -166,7 +166,7 @@ foreach ($file in $files) {
 }
 
 $maxLines = @{
-    "AGENTS.md" = 280
+    "AGENTS.md" = 340  # 含 §9.5 规则→验证映射表（约 40 行）
     "CHANGELOG.md" = 90
     "CONTRIBUTING.md" = 90
     "reference/INDEX.md" = 80
@@ -241,5 +241,47 @@ function Assert-AgentsMdPaths {
 }
 
 Assert-AgentsMdPaths
+
+# --- AGENTS.md §9.5 规则→验证映射表检查（脚本路径 + CI 文件必须存在） ---
+function Assert-AgentsMdMappingTable {
+    $content = Get-Content -LiteralPath "AGENTS.md" -Raw
+    $sectionMatch = [regex]::Match($content, '(?ms)^## 9\.5 .*?^## ')
+    if (-not $sectionMatch.Success) {
+        Fail "AGENTS.md is missing the ## 9.5 rule-to-verifier mapping table section"
+    }
+    $checkedScripts = 0
+    $checkedCiFiles = 0
+    foreach ($line in ($sectionMatch.Value -split "`r?`n")) {
+        if ($line -notmatch '^\s*\|') { continue }
+        $cells = $line -split '\|'
+        if ($cells.Count -lt 5) { continue }   # 表头/分隔行/短行跳过（[空,规则,脚本,CI,空]）
+        $scriptCell = $cells[2]
+        $ciCell = $cells[3]
+        # 脚本列：反引号内为仓库内路径（无/内联 等裸文本行跳过）；{a,b} 花括号展开
+        # 用 [regex]::Match 缓存局部变量，不依赖自动变量 $matches（前序函数的 -match 会污染它）
+        $scriptMatch = [regex]::Match($scriptCell, '`([^`]*)`')
+        if ($scriptMatch.Success) {
+            $ref = $scriptMatch.Groups[1].Value.Trim()
+            foreach ($cand in (Expand-BracePath $ref)) {
+                if (-not (Test-Path -LiteralPath $cand)) {
+                    Fail "AGENTS.md mapping table references missing path: $cand"
+                }
+                $checkedScripts++
+            }
+        }
+        # CI 列：识别 workflow 文件引用，必须存在
+        $ciMatch = [regex]::Match($ciCell, '(?i)(checks\.yml|release-readiness\.yml|cd-[a-z-]+\.yml|release\.yml)')
+        if ($ciMatch.Success) {
+            $ciFile = $ciMatch.Groups[1].Value
+            if (-not (Test-Path -LiteralPath ".github/workflows/$ciFile")) {
+                Fail "AGENTS.md mapping table references missing CI file: .github/workflows/$ciFile"
+            }
+            $checkedCiFiles++
+        }
+    }
+    Write-Host "AGENTS.md mapping table check ok ($checkedScripts script paths, $checkedCiFiles CI files)"
+}
+
+Assert-AgentsMdMappingTable
 
 Write-Host "doc SSOT ok"
