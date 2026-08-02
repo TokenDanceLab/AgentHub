@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# pre-push — master 直 push 本地拦截（第二道防线）
+#
+# 层 1: GitHub branch protection（master 禁 force push / 禁直接 push，已配置）
+# 层 2: 本 hook — 本地提前拦截，报错更友好
+# 层 3: CI verify-ci-gates
+#
+# 灵活性设计：
+#   - 只拦 master 直 push；其他分支（feat/fix/docs/chore/*）完全放行
+#   - 非 master 分支允许 --force-with-lease（rebase 后的正常更新）
+#   - 紧急情况可 git push --no-verify 绕过（GitHub 层 protection 仍兜底）
+#   - 一次性跳过: git -c core.hooksPath=/dev/null push
+
+remote="$1"
+url="$2"
+
+z40=0000000000000000000000000000000000000000
+
+while read local_ref local_sha remote_ref remote_sha; do
+    # 只关心推到 master 的 ref
+    case "$remote_ref" in
+        refs/heads/master)
+            # 新分支推送（local_sha 全零）不会发生——master 已存在；防御性检查
+            if [ "$local_sha" = "$z40" ]; then
+                echo "🚫 pre-push: 禁止向 master 推送（创建/覆盖）。所有变更走 PR squash merge（AGENTS.md §6）。" >&2
+                exit 1
+            fi
+            # 删除 master 引用（remote_sha 全零 = 删除）
+            if [ "$remote_sha" = "$z40" ]; then
+                echo "🚫 pre-push: 禁止删除 master 分支（AGENTS.md §6 + branch protection）。" >&2
+                exit 1
+            fi
+            echo "🚫 pre-push: 检测到向 master 直接推送（$local_sha → $remote_ref）。" >&2
+            echo "   AGENTS.md §6: master 禁止直接 push；所有变更通过 PR squash merge。" >&2
+            echo "   正确流程: git worktree add .worktrees/<topic> -b <type>/<topic> origin/master" >&2
+            echo "   紧急绕过: git push --no-verify（GitHub branch protection 仍会兜底）" >&2
+            exit 1
+            ;;
+        *)
+            # 其他分支放行；force-with-lease 也放行（rebase 后正常更新）
+            ;;
+    esac
+done
+
+exit 0
