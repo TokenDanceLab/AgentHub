@@ -157,6 +157,12 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
 - 不在共享分支 force-push（amend 后 force-with-lease 除外）。
 
+防线（三层，防 master 直 push / 历史重写）：
+
+- **GitHub branch protection**（已配置，最强）：master 禁止 force push、禁止直接 push（必须 PR）、要求线性历史（squash）、要求 `validate`/`go-hub`/`go-edge` 通过；`enforce_admins: true` 管理员也不能绕过。
+- **本地 pre-push hook**（`scripts/git-hooks/pre-push`，clone 后跑 `bash scripts/git-hooks/install.sh` 启用）：往 master 直 push 本地提前拦截；feat/fix/docs/chore/* 分支放行；非 master 允许 force-with-lease；紧急绕过 `git push --no-verify`（GitHub 层仍兜底）。
+- **CI**：`checks.yml` 校验 Conventional Commits 提交格式；`verify-ci-gates.ps1` 校验 job 结构。
+
 提交格式：
 
 ```text
