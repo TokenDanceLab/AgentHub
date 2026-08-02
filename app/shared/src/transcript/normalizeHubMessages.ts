@@ -45,11 +45,11 @@ export interface HubMessageTranscriptInput {
   content?: unknown;
   recalled?: boolean;
   /**
-   * Message-level pin state. Not present on hub messages today — pin lives in
-   * the `message_pins` table and the MESSAGE_PIN/MESSAGE_UNPIN WS frames, and
-   * neither the REST message list nor HubMessage carries it (see
-   * TODO(pinMap) below). Set by callers that maintain pin state before
-   * normalizing; the adapter writes it through to `block.pinned`.
+   * Message-level pin state. Hub REST messages carry no pin field — pin lives
+   * in the `message_pins` table, surfaced via MESSAGE_PIN/MESSAGE_UNPIN WS
+   * frames and `GET /client/sessions/{id}/pins`; callers merge the pinMap
+   * store snapshot via `withPinnedState` before normalizing (see below). The
+   * adapter writes it through to `block.pinned`.
    */
   pinned?: boolean;
   created_at?: string;
@@ -70,7 +70,7 @@ const RECALLED_TEXT_FALLBACK = '消息已撤回';
 export type NormalizeHubTranslate = (key: string) => string;
 
 /**
- * TODO(pinMap): message-level pin state has no normalize-time source today.
+ * pin 状态来源（已落地，2026-08-02 TODO 清理时确认闭环）：
  *
  * Survey (2026-08-01, sonnet-unpin-recall 续23 → unpin menu entry):
  * - hub-server `model.Message` has no `pinned` field; pins live in the
@@ -86,14 +86,14 @@ export type NormalizeHubTranslate = (key: string) => string;
  * - `hubClientDomainTypes.HubMessage.pinned` was deliberately NOT added:
  *   the REST message shape has no such field, so it would be a dead field.
  *
- * Planned store path (out of scope here, do not fake the data): the web /
- * desktop WS handlers maintain a session-scoped `messageId → pinned` map
- * (fed by the MESSAGE_PIN/MESSAGE_UNPIN frames, seeded from
- * `GET /client/sessions/{id}/pins`), and the normalize callers
- * (webWorkbenchTranscript.ts / useDesktopWorkbenchModel.ts) merge the map
- * into `HubMessageTranscriptInput.pinned` before calling this function —
- * the adapter below already writes it through to `block.pinned`, and the
- * context menu already toggles pin/unpin off `block.pinned`.
+ * Landed store path: the web / desktop WS handlers maintain a
+ * session-scoped `messageId → pinned` map (pinMap.ts, fed by the
+ * MESSAGE_PIN/MESSAGE_UNPIN frames, seeded from `GET /client/sessions/{id}/pins`),
+ * and the normalize callers (webWorkbenchTranscript.ts /
+ * useDesktopWorkbenchModel.ts) merge the map via `withPinnedState` into
+ * `HubMessageTranscriptInput.pinned` before calling this function — the
+ * adapter below writes it through to `block.pinned`, and the context menu
+ * toggles pin/unpin off `block.pinned`.
  */
 
 export function normalizeHubMessagesToTranscript(
