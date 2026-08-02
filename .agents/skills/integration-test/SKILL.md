@@ -5,7 +5,7 @@ description: Use when AgentHub adapter, executor, Edge runtime event pipeline, W
 
 # Integration Test
 
-The current local runtime smoke entrypoint is `scripts/smoke/edge-runtime-smoke.ps1`. The older `scripts/smoke/integration-e2e.ps1` is a deprecated forwarding entrypoint and must not be documented as the primary gate.
+The current local runtime smoke entrypoint is `scripts/smoke/edge-runtime-smoke.ps1`; the legacy forwarding entrypoint was removed and must not be reintroduced as the primary gate.
 
 ## CI-Safe Fixture Smoke
 
