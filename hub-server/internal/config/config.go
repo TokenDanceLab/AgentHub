@@ -24,6 +24,18 @@ type Config struct {
 	S3           S3Config           `mapstructure:"s3"`
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
 	AgentTeam    AgentTeamConfig    `mapstructure:"agent_team"`
+	Egress       EgressConfig       `mapstructure:"egress"`
+}
+
+// EgressConfig is the outbound HTTP policy (#1540). Default-deny: an empty
+// allowlist refuses every dial to loopback/private/link-local/metadata
+// networks. Ping of user-supplied execution-target addresses therefore
+// fails closed until an administrator explicitly allows the target ranges.
+type EgressConfig struct {
+	AllowCIDRs     []string      `mapstructure:"allow_cidrs"`
+	AllowHostnames []string      `mapstructure:"allow_hostnames"`
+	AllowPlainHTTP bool          `mapstructure:"allow_plain_http"`
+	Timeout        time.Duration `mapstructure:"timeout"`
 }
 
 func Load(configPath string) (*Config, error) {

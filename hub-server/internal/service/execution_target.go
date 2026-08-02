@@ -8,13 +8,13 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -23,8 +23,9 @@ import (
 
 // ExecutionTargetService handles CRUD for execution targets.
 type ExecutionTargetService struct {
-	db    *gorm.DB
-	cache ExecutionTargetCache
+	db     *gorm.DB
+	cache  ExecutionTargetCache
+	egress *egress.Client
 }
 
 // ExecutionTargetCache is the subset of *cache.Client methods used by ExecutionTargetService.
@@ -39,8 +40,15 @@ type TargetListResult struct {
 	Cursor  string                  `json:"next_cursor,omitempty"`
 }
 
-func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
-	return &ExecutionTargetService{db: db}
+// NewExecutionTargetService wires the fail-closed egress policy (#1540):
+// outbound pings use the canonical egress transport and refuse restricted
+// networks unless the administrator allowlisted them.
+func NewExecutionTargetService(db *gorm.DB, egressCfg egress.Config) (*ExecutionTargetService, error) {
+	c, err := egress.New(egressCfg)
+	if err != nil {
+		return nil, fmt.Errorf("execution target service: %w", err)
+	}
+	return &ExecutionTargetService{db: db, egress: c}, nil
 }
 
 // SetCache injects an optional cache client for hub_relay health checks.
@@ -396,7 +404,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 			port = 3210
 		}
 		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
-		return pingEdgeServer(ctx, addr, t.AuthCredential, t.ID, s.db)
+		return s.pingEdgeServer(ctx, addr, t.ID)
 	case "hub_relay":
 		// hub_relay health depends on whether the owner has an active
 		// WebSocket connection that can relay tasks.
@@ -415,29 +423,21 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	}
 }
 
-// pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
-// and updates the target's online status and last_seen_at accordingly.
-func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID string, db *gorm.DB) error {
-	scheme := "http"
-	url := scheme + "://" + addr + "/v1/health"
+// pingEdgeServer performs an HTTP GET /v1/health against the Edge Server
+// through the fail-closed egress transport (#1540): default-deny on
+// restricted networks (loopback/private/link-local/metadata) unless an
+// administrator allowlist covers the address. No credential is attached —
+// AuthCredential is not persisted (no secret source), and hub-initiated
+// pings must not carry secrets to arbitrary targets.
+func (s *ExecutionTargetService) pingEdgeServer(ctx context.Context, addr, targetID string) error {
+	// Scheme comes from the egress policy: https default, plain http only
+	// with explicit egress.allow_plain_http (trusted local policy).
+	url := s.egress.Scheme() + "://" + addr + "/v1/health"
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
-		return errcode.TargetNotRoutable.WithMessage("failed to build ping request: " + err.Error())
-	}
-
-	// auth_method is a public strategy enum; only a trusted internal credential
-	// value may become an Authorization header.
-	if authCredential != "" {
-		req.Header.Set("Authorization", "Bearer "+authCredential)
-	}
-
-	resp, err := client.Do(req)
+	resp, err := s.egress.Get(ctx, url)
 	if err != nil {
 		slog.Debug("execution target ping failed", "target_id", targetID, "addr", addr, "error", err)
-		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+		_ = repository.UpdateTargetOnlineStatus(s.db, targetID, false)
 		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
 	}
 	defer resp.Body.Close()
@@ -445,14 +445,14 @@ func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID s
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 		if observedTargetID := observedTargetIDFromHealthBody(body); observedTargetID != "" && observedTargetID != targetID {
-			_ = repository.UpdateTargetHealthState(db, targetID, "mismatch", false)
+			_ = repository.UpdateTargetHealthState(s.db, targetID, "mismatch", false)
 			return errcode.TargetNotRoutable.WithMessage("execution target health mismatch")
 		}
-		_ = repository.UpdateTargetOnlineStatus(db, targetID, true)
+		_ = repository.UpdateTargetOnlineStatus(s.db, targetID, true)
 		return nil
 	}
 
-	_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+	_ = repository.UpdateTargetOnlineStatus(s.db, targetID, false)
 	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
 }
 

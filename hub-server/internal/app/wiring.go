@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
@@ -136,7 +137,17 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 
 	// Execution Target service (needed by DeviceService).
-	targetSvc := service.NewExecutionTargetService(a.DB)
+	// Egress policy (#1540): default-deny; the administrator must explicitly
+	// allowlist target ranges for hub-initiated pings.
+	targetSvc, err := service.NewExecutionTargetService(a.DB, egress.Config{
+		AllowCIDRs:     a.Config.Egress.AllowCIDRs,
+		AllowHostnames: a.Config.Egress.AllowHostnames,
+		AllowPlainHTTP: a.Config.Egress.AllowPlainHTTP,
+		Timeout:        a.Config.Egress.Timeout,
+	})
+	if err != nil {
+		return fmt.Errorf("execution target service: %w", err)
+	}
 	targetSvc.SetCache(a.CacheClient)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
