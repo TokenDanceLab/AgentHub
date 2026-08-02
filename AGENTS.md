@@ -13,6 +13,27 @@
 
 不要在 roadmap、MASTER、治理报告或 skill 里复制本文件的规则。规则变更改这里；其他文档只链接或保留一句摘要。
 
+## 0.5 根级目录地图
+
+【活】= 维护中的源码/文档；【产物】= 构建/临时产物（gitignored，勿提交）；【参考】= 只读副本。
+
+| 目录 | 分类 | 职责 |
+|---|---|---|
+| `api/` | 活 | API 契约 SSOT（openapi.yaml/events.md/conventions.md） |
+| `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared） |
+| artifacts/ | 产物 | 本地构建输出（gitignored） |
+| `deployments/` | 活 | 部署模板（hk2/、production/） |
+| dist/ | 产物 | 本地构建输出（gitignored，已清理） |
+| `docs/` | 活 | 知识库（architecture/progress/plan/analysis/governance/reference/archives） |
+| `edge-server/` | 活 | Go Edge 服务（local runtime、adapters、lifecycle） |
+| `hub-server/` | 活 | Go Hub 服务（REST/WS/OIDC/dispatch/agentteam） |
+| node_modules/ | 产物 | 依赖（gitignored） |
+| `pkg/` | 活 | Go 共享包（errcode 等） |
+| `reference/` | 参考 | 第三方源码只读副本（gitignored，INDEX.md 管理） |
+| `scripts/` | 活 | 验证/开发/发布脚本（verify/dev/release/smoke/lib/） |
+| `tests/` | 活 | 跨服务测试 |
+| tmp/ | 产物 | 本地临时文件（gitignored，已清理） |
+
 ## 1. 渐进式加载
 
 人类同学先读：
@@ -56,7 +77,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 - API 契约写在 `api/`。
 - 通用 UI、transcript、composer、inspector、platform contract 放 `app/shared/`。
-- Hub REST/WS 方法与 DTO 的 SSOT 是 `app/shared/src/hubClient.ts`（及拆出的 payload/extended 模块）。Desktop/Web/Mobile 的 `src/api/hubClient.ts` 只能是 thin shell（平台默认 baseUrl、Tauri proxy、SecureStore token、fixture snapshot、WS URL 等胶水）；禁止在客户端再分叉 REST 实现。
+- Hub REST/WS 方法与 DTO 的 SSOT 是 `app/shared/src/hubClient.ts`（及拆出的 payload/extended 模块）。Desktop/Web/Mobile 的 `app/{desktop,web,mobile-rn}/src/api/hubClient.ts` 只能是 thin shell（平台默认 baseUrl、Tauri proxy、SecureStore token、fixture snapshot、WS URL 等胶水）；禁止在客户端再分叉 REST 实现。
 - Desktop 只能把 Tauri/Rust native 能力放在 `app/desktop/src-tauri/`。
 - Web 只能通过 Hub/Web adapter 访问远端能力，不能直连 Local Edge 或 runtime。
 - Mobile（Expo/RN）同样 **Hub-only**：只走 Hub 合同与 shared hubClient；不得直连 Local Edge、raw runtime 或 Desktop host。详见 `app/mobile-rn/README.md`。
@@ -66,7 +87,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 概念 | 含义 | 权威位置 |
 |---|---|---|
-| Agent Runtime | Codex、OpenCode、Claude Code 等 CLI/SDK 运行时适配器，回答“用什么运行” | Edge `internal/adapters/` |
+| Agent Runtime | Codex、OpenCode、Claude Code 等 CLI/SDK 运行时适配器，回答“用什么运行” | Edge `edge-server/internal/adapters/` |
 | Agent Profile | 用户选择和管理的 Agent 实体，回答“谁来做事” | Hub profile store / Edge local profile |
 | Agent Configuration | Profile 的上下文、Skill、MCP、模型参数、审批策略等配置集合 | Edge Context Builder + Hub store |
 | Execution Target | 一次 Run 的执行位置：Local Edge、Remote Edge、Cloud Edge、Hub Relay target | Edge registration + Hub routing |
@@ -94,7 +115,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - REST 入口：`api/openapi.yaml`。
 - WebSocket 事件入口：`api/events.md`。
 - Protobuf、Connect-RPC、JSON-RPC 只作为历史参考，不是当前主线。
-- 早期独立 `runner/` 目录已废弃；执行生命周期在 `edge-server/internal/lifecycle/`，runtime 适配在 `edge-server/internal/adapters/`。
+- 早期独立 runner 目录已废弃；执行生命周期在 `edge-server/internal/lifecycle/`，runtime 适配在 `edge-server/internal/adapters/`。
 - `edge-server/internal/runners/` 是兼容摘要包；`/v1/runners` 不代表新的业务 Agent 模型。
 
 前端规范：
@@ -102,7 +123,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 通用组件在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，禁止复制本地 UI 副本。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
-- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/archives/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
 - 当前 Visual QA gate: **89/100 Ship**（Phases 74-78，2026-07-20）。7/9 维度满分。剩余 Type/Motion/Empty 需交互测试或跨组件改动，已触及静态截图方法论天花板。
 
 前端 CI 易踩坑（站立规则）：
@@ -112,7 +133,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
 - Nav 图标只用 `DesignNavIcon`（有效名称见 `DesignNavIconName` 类型）；禁止散落的 nav glyph 组件。
 - 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。
-- CI 使用统一 `changes` job（`dorny/paths-filter@v3`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`verify-ci-gates.ps1` 校验 job 结构。
+- CI 使用统一 `changes` job（`dorny/paths-filter@v3`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.ps1` 校验 job 结构。
 
 ## 6. Git 和 worktree
 
@@ -184,7 +205,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
 - 修改目录、协议、分工或稳定规则后，同步 README、roadmap、architecture、governance owner 文档和 verifier。
-- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件、`docs/progress/MASTER.md` 与 GitHub issues（指针见 `docs/analysis/local-memory-pointer.md`）。
+- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件、`docs/progress/MASTER.md` 与 GitHub issues（指针见 `docs/archives/analysis/local-memory-pointer.md`）。
 
 ## 9. 安全和隐私
 
