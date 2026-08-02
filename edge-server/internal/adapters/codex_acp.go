@@ -130,7 +130,7 @@ func (a *CodexACPAadapter) PreflightCheck() error {
 // (via the embedded AcpAdapter).
 var _ AgentAdapter = (*CodexACPAadapter)(nil)
 
-// TODO(真跑验证): an end-to-end run against the real `npx -y
+// TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
 // @agentclientprotocol/codex-acp` process requires a Node.js/npx environment
 // with Codex authentication (OPENAI_API_KEY or ChatGPT login) and network
 // access to the npm registry. Not present in this workspace — verification is

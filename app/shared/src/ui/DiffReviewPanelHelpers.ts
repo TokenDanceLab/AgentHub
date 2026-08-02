@@ -60,8 +60,8 @@ export function buildSideBySideRows(hunk: DiffHunk): SideBySideRow[] {
       // (report §4.1): left cell keeps removed+context, right cell keeps
       // added+context, so each column's tokens join back to its `content`.
       // produceWordDiffTokens returns null under the size guard — then
-      // wordDiff stays undefined and Step 3 rendering falls back to
-      // whole-line Prism highlight. TODO(P6 Step 3): consume in renderer.
+      // wordDiff stays undefined and the renderer falls back to
+      // whole-line Prism highlight (DiffReviewPanelParts.tsx).
       const wordDiff = produceWordDiffTokens(line.content, addedLine.content);
       if (wordDiff) {
         oldCell.wordDiff = wordDiff.filter((t) => t.type !== 'added');

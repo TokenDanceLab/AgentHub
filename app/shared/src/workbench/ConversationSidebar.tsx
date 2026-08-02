@@ -226,7 +226,7 @@ export function ConversationSidebar({
         onClick: () => onArchiveConversation(conversation.id, !showArchived),
       });
     }
-    // TODO(uiux gap #9): 重命名 / 删除 / 复制链接 — 需上层新增
+    // TODO(#1508 uiux gap #9): 重命名 / 删除 / 复制链接 — 需上层新增
     // onRenameConversation / onDeleteConversation / onCopyConversationLink
     // 回调后再启用，当前不硬造空操作。
     return items;

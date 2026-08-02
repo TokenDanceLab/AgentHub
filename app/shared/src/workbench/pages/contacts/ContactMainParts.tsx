@@ -67,7 +67,7 @@ export function ContactListPage({
   onMemberClick?: ((member: ContactMember) => void) | undefined;
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
-  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO) ──
+  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
   onLoadMoreRef.current = onLoadMore;

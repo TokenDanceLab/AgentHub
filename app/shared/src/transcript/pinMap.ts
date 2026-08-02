@@ -1,4 +1,6 @@
-// pinMap — session-scoped messageId → pinned store (TODO(pinMap) 落地).
+// pinMap — session-scoped messageId → pinned store（已落地：web/desktop
+// workbench model 经 getPinMapStore/withPinnedState 接入，见
+// webWorkbenchTranscript.ts / useDesktopWorkbenchModel.ts）。
 //
 // Hub 消息本身不带 pin 状态（model.Message 无 pinned 字段；pin 存在独立的
 // message_pins 表）。本 store 由两条链路维护，消费已有协议、不新增 WS/REST：

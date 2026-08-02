@@ -150,7 +150,7 @@ func acpBinaryAvailable(binary string, lookPath func(string) (string, error)) bo
 // ParseStream runs one ACP turn via the coder/acp-go-sdk client runtime:
 // initialize handshake → session/new → session/prompt → session/update
 // stream → prompt response. See runACPSession in acp_client.go for the
-// full flow and the TODO list (fs/terminal frames, live adapter
+// full flow and the TODO list (#1404: fs/terminal frames, live adapter
 // verification). session/request_permission is bridged to the Edge
 // approval chain via the permission broker installed by
 // SetPermissionBroker.
