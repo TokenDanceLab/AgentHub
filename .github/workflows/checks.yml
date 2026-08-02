@@ -890,6 +890,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-shared-edge-surface-isolation.ps1
 
+      - name: Self-test Shared Edge surface isolation gate
+        shell: pwsh
+        run: ./scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1
+
       - name: Verify v4 old UI active paths
         shell: pwsh
         run: ./scripts/verify/verify-v4-old-ui-active-paths.ps1
