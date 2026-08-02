@@ -63,3 +63,14 @@ tokendance_id:
   client_secret: ""
   redirect_uri: ""
   allowed_redirect_uris: []
+
+# Outbound HTTP egress policy (#1540). Default-deny: an empty allowlist
+# refuses every dial to loopback/private/link-local/metadata networks, so
+# hub-initiated execution-target pings fail closed until an administrator
+# explicitly allows the target ranges (CIDR or hostname). Plain http is
+# refused unless allow_plain_http is set — https is the default.
+egress:
+  allow_cidrs: []
+  allow_hostnames: []
+  allow_plain_http: false
+  timeout: 5s
