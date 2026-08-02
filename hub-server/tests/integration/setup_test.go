@@ -1,10 +1,11 @@
-package tests
+//go:build integration
+
+package integration
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -67,19 +68,12 @@ func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Contex
 }
 
 func TestMain(m *testing.M) {
-	flag.Parse()
-	if testing.Short() {
-		// -short path: this package's integration tests require PostgreSQL and
-		// Redis (see repository.InitDB / cache.InitRedis / RunMigrationsFrom
-		// below), which the -short coverage/race CI runs do not provision.
-		// Skip the whole package LOUDLY (not a silent os.Exit(0)) so CI logs
-		// record why zero tests ran instead of reporting a fake green pass.
-		// The dedicated backend-integration CI job runs this package WITHOUT
-		// -short against real Postgres + Redis service containers, which is
-		// where these integration tests actually execute.
-		fmt.Println("--- SKIP: hub-server/tests integration package: requires PostgreSQL + Redis; run `go test ./tests/ -count=1` (no -short) with PG+Redis to execute (see backend-integration CI job)")
-		os.Exit(0)
-	}
+	// No -short escape hatch: this package is `//go:build integration` and only
+	// compiles/runs under `-tags integration` (backend-integration CI job with
+	// real PostgreSQL + Redis containers). The default/coverage/race lanes
+	// never compile it, so the package cannot silently vanish from a lane.
+	// Dependencies are explicit: repository.InitDB + RunMigrationsFrom require
+	// PostgreSQL, cache.InitRedis requires Redis; failures below are loud.
 
 	gin.SetMode(gin.TestMode)
 	metrics.Register()
