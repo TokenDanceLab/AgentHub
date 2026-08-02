@@ -224,7 +224,9 @@ type importCycleReport struct {
 //
 // 分析逻辑：
 //   - 如果 orchestrator→adapters 且 adapters→orchestrator → 必然环
-//   - 当前已知风险：plan_approval.go 使用 orchestrator_dag.go 的 PlanTask 类型
+//   - 合同解环（#1526）后该测试是硬门禁：合同类型唯一权威在
+//     internal/orchestration，adapters 只留 type alias，因此
+//     Adapts → Orchestrator 下游引用必须为空；有环即失败。
 func TestImportCycleRisk(t *testing.T) {
 	edgeRoot, err := edgeServerRoot()
 	if err != nil {
@@ -236,15 +238,110 @@ func TestImportCycleRisk(t *testing.T) {
 	t.Logf("\n%s", formatCycleReport(report))
 
 	if report.CycleRisk {
-		t.Logf("⚠ 检测到潜在导入环: %s", report.CycleDetails)
-		t.Logf("⚠ 提取前需处理以下跨包引用:")
-		for _, typ := range report.OrchTypesUsedByParent {
-			t.Logf("  - upstream 文件使用了 orchestrator 类型 %s", typ)
-		}
-		for _, typ := range report.ParentTypesUsedByOrch {
-			t.Logf("  - orchestrator 文件使用了 upstream 类型 %s", typ)
+		t.Fatalf("检测到潜在导入环: %s — 合同解环（#1526）后不允许出现 orchestrator/adapters 双向类型引用；请把共享类型迁入 internal/orchestration 并保留 adapters alias。上游使用了 orchestrator 类型: %v；orchestrator 使用了上游类型: %v",
+			report.CycleDetails, report.OrchTypesUsedByParent, report.ParentTypesUsedByOrch)
+	}
+}
+
+// ── 阶段 0d2：中立合同包依赖方向门禁 ──────────────────────────────────────────
+
+// TestOrchestrationContractNeutral 断言 internal/orchestration 是中立合同包：
+// 不得 import adapters（或任何 adapters 内部实现）。合同方向必须是
+// adapters → orchestration，不能反向。
+func TestOrchestrationContractNeutral(t *testing.T) {
+	edgeRoot, err := edgeServerRoot()
+	if err != nil {
+		t.Fatalf("查找 edge-server 根目录: %v", err)
+	}
+
+	cmd := exec.Command("go", "list", "-deps", "./internal/orchestration/")
+	cmd.Dir = edgeRoot
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -deps ./internal/orchestration/ 失败: %v", err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.Contains(line, "internal/adapters") {
+			t.Fatalf("中立合同包 internal/orchestration 不得依赖 internal/adapters，实际依赖: %s", line)
 		}
 	}
+	t.Logf("orchestration 合同包依赖方向正确（无 adapters 依赖）")
+}
+
+// ── 阶段 0d3：合同类型归属门禁 ─────────────────────────────────────────────────
+
+// contractTypes 是 A-V1 合同词汇表：唯一权威定义必须在 internal/orchestration；
+// adapters 包内只允许 `type X = orchestration.X` 的 alias，不允许 struct/string
+// 定义（防双 SSOT 与环回退）。
+var contractTypes = []string{
+	"TaskStatus",
+	"PlanTask",
+	"ExecutionPlan",
+	"PlanApprovalConfig",
+	"PendingPlan",
+	"PlanDecision",
+}
+
+// TestContractTypesOwnedByOrchestration 断言合同类型的唯一权威在
+// internal/orchestration：adapters 目录中这些类型只能以 alias 形式出现。
+func TestContractTypesOwnedByOrchestration(t *testing.T) {
+	edgeRoot, err := edgeServerRoot()
+	if err != nil {
+		t.Fatalf("查找 edge-server 根目录: %v", err)
+	}
+	parentPath := filepath.Join(edgeRoot, parentDir)
+
+	entries, err := os.ReadDir(parentPath)
+	if err != nil {
+		t.Fatalf("读取 adapters 目录失败: %v", err)
+	}
+	fset := token.NewFileSet()
+	var violations []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		fullPath := filepath.Join(parentPath, e.Name())
+		f, err := parser.ParseFile(fset, fullPath, nil, 0)
+		if err != nil {
+			t.Errorf("解析 %s 失败: %v", e.Name(), err)
+			continue
+		}
+		for _, decl := range f.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok || gd.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				if !containsString(contractTypes, ts.Name.Name) {
+					continue
+				}
+				if !ts.Assign.IsValid() {
+					// 非 alias 的 type 定义（struct/string 等）在 adapters 属于双 SSOT
+					violations = append(violations, fmt.Sprintf("%s:%d 定义 %s（唯一权威应在 internal/orchestration，此处只允许 type alias）",
+						e.Name(), fset.Position(ts.Pos()).Line, ts.Name.Name))
+				}
+			}
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("adapters 包内合同类型出现非 alias 定义（%d 处）:\n  %s",
+			len(violations), strings.Join(violations, "\n  "))
+	}
+	t.Logf("合同类型在 adapters 中仅以 alias 形式存在（唯一权威在 internal/orchestration）")
+}
+
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // ── 阶段 0e：go build 自检 ─────────────────────────────────────────────────────
