@@ -101,9 +101,9 @@ func (a *App) shutdown(ctx context.Context) error {
 		a.bus.Close()
 	}
 
-	// 6. Shutdown audit service (drains retry queue, closes file sink).
+	// 6. Shutdown audit service (bounded drain of retry queue, closes file sink).
 	if a.AuditService != nil {
-		a.AuditService.Shutdown()
+		a.AuditService.Shutdown(ctx)
 	}
 
 	// 7. Close WebSocket connections and stop heartbeat.
