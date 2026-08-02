@@ -48,7 +48,7 @@ const CJK_RE = /[一-鿿぀-ヿ가-힯]/g;
  *
  * Thresholds are empirical estimates from the P6 design report (§5.1) and
  * have NOT been benchmarked against real AgentHub edge-run diff samples.
- * TODO: calibrate thresholds against real large-diff samples.
+ * TODO(#1505): calibrate thresholds against real large-diff samples.
  */
 export function shouldSkipWordDiff(oldContent: string, newContent: string): boolean {
   if (oldContent.length > MAX_LINE_CHARS || newContent.length > MAX_LINE_CHARS) {

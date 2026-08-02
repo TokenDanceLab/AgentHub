@@ -107,7 +107,7 @@ export function planContextAction(options: {
     effects.push({ type: 'copy', text: copyText });
   }
   if (action === 'link') {
-    // TODO(copyLink): `agenthub://card/<blockId>` is a custom scheme with no
+    // TODO(#1504 copyLink): `agenthub://card/<blockId>` is a custom scheme with no
     // registered handler — copying it yields a dead link. Needs a product
     // decision (scheme handler registration or a real shareable URL) before
     // this copy can be useful; see cardLinkForBlock in
