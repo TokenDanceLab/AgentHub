@@ -351,7 +351,7 @@ TypeTeamSubagentSubscription = "team.subagent.subscribe"  // C→S 订阅 / 重�
 - **#1385**（投影层抽取，closed）：本 SPEC 的 Phase B 直接复用 `agent_team_projection.go` 的 `projectTeamRuntimeSummaries` 模式，新增 `projectTeamSubagentStreams` 与之并列。`GetTeamRunState` 是 #1385 留下的扩展点（注释 `// Follow-up (#1385): StartTeamRun is still a large orchestration function... leave that split out of this projection PR`）。
 - **#1478**（本 issue）：agentteam 子任务直播，本 SPEC 即其设计文档。
 - **#1404**（ACP spike）：codeg 的 `subagent-transcript` 是 ACP 0.63.0 客户端能力。AgentHub 走 edge 自研 adapter 路线，不依赖 ACP，但若未来 ACP spike 产出 ACP adapter，本 SPEC 的事件模型与 ACP `SessionUpdate` 的映射需对齐（`AgentMessageChunk→run.agent.text_delta` 等已天然对齐）。
-- **docs/plan/rfc-A-V1-adapters-lifecycle-split.md §3.1(L)** + **docs/analysis/acp-spike-phase1.md §4**（共享耦合面——failure/permission 分类）：RFC A-V1 §3.1(L) 将 `acp.go` 骨架留在 adapters 根包（等 spike 成熟）；ACP spike §4 的 `AcpAdapter` 未来需处理 permission 阻塞往返（`session/request_permission`）与故障分类恢复，而 RFC A-V1 提议的 `adapters/orchestrator` 叶子包已包含 `orchestrator_failure{,_circuit,_classify,_recovery}.go` 全套 failure 子系统。两条演进路径的 failure type 与 permission 分类共享同一耦合面——提前在此标注，防止未来独立演进时产生重复的 failure type 或 permission 枚举。
+- **docs/plan/rfc-A-V1-adapters-lifecycle-split.md §3.1(L)** + **docs/archives/analysis/acp-spike-phase1.md §4**（共享耦合面——failure/permission 分类）：RFC A-V1 §3.1(L) 将 `acp.go` 骨架留在 adapters 根包（等 spike 成熟）；ACP spike §4 的 `AcpAdapter` 未来需处理 permission 阻塞往返（`session/request_permission`）与故障分类恢复，而 RFC A-V1 提议的 `adapters/orchestrator` 叶子包已包含 `orchestrator_failure{,_circuit,_classify,_recovery}.go` 全套 failure 子系统。两条演进路径的 failure type 与 permission 分类共享同一耦合面——提前在此标注，防止未来独立演进时产生重复的 failure type 或 permission 枚举。
 - **#1406**（@提及=派单）：本 SPEC 不涉及 @ 派单交互，只涉及派单后的可见性。两者正交。
 
 ---
