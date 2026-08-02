@@ -294,7 +294,7 @@ Server → Client (gap=11 ≤ 64 → replay):
   "events":[
     {"seq":48,"type":"message.new","payload":{...}},
     {"seq":49,"type":"message.reaction_added","payload":{...}},
-    ... 
+    ...
     {"seq":58,"type":"message.new","payload":{...}}
   ],
   "high_water_seq":58
