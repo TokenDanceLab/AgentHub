@@ -1,6 +1,6 @@
 # AgentHub Progress Tracker
 
-> **Last updated**: 2026-08-01
+> **Last updated**: 2026-08-02
 > **Mode**: `GITHUB_FULL`
 > **Authority**: current source and tests > this tracker > historical analysis. Use `git status`, `git log`, and live GitHub state before acting.
 
@@ -12,10 +12,10 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 | Surface | Current evidence | Owner / next action |
 |---|---|---|
-| CI policy parser | Root cause confirmed: sibling job comments leaked into the previous PowerShell job block; Bash held a stale duplicate implementation | PR #1481; PowerShell is the implementation SSOT and Bash is a launcher |
-| Doc SSOT | `docs/progress/MASTER.md` exceeded the 150-line active-entry gate because completed session history was appended indefinitely | `docs/master-ssot-compaction`; keep only live work and pointers |
-| Desktop typecheck | TypeScript 5.8 rejected `ignoreDeprecations: "6.0"`; removing it exposed real `exactOptionalPropertyTypes` debt | `fix/desktop-typescript-config`; fix the types rather than disabling strictness |
-| Shared frontend tests | CSS-contract tests depended on `process.cwd()`, so the same suite behaved differently under shared and Desktop runners | Make fixture paths relative to each test module |
+| ~~CI policy parser~~ | **RESOLVED 2026-08-02** — root cause confirmed (sibling job comments leaked into the previous PowerShell job block; Bash held a stale duplicate); PowerShell is the implementation SSOT, Bash is a launcher | merged in #1481 |
+| ~~Doc SSOT~~ | **RESOLVED 2026-08-02** — MASTER.md compacted below the 150-line gate; only live work and pointers remain | merged in #1482/#1492 |
+| ~~Desktop typecheck~~ | **RESOLVED 2026-08-02** — strict TypeScript restored without disabling strictness; `exactOptionalPropertyTypes` debt fixed by typing | merged in #1484 |
+| Shared frontend tests | CSS-contract tests depended on `process.cwd()`, so the same suite behaved differently under shared and Desktop runners | Work in `refactor/default-test-layering` (uncommitted): fixture paths via `import.meta.url` + Vitest 4 projects consolidation; needs commit + PR |
 | ~~Edge tests on Linux~~ | **RESOLVED 2026-08-02** — backup permission-mode test portability (#1491's CI sweep verified); ACP request-sequence race fixed by recording the method before answering (`acp_client_test.go`) | merged in #1491 |
 | ~~Hub integration~~ | **RESOLVED 2026-08-02** — errcode lowercase contract, admin fixture (AGENTHUB_ADMIN_USERS), OIDC config injection, refresh_token FK device seeding, OIDC E2E UUID/scopes/shared-cache SQLite, TeamRun guardrail messages, execution-target ping projection | merged in #1489 |
 | ~~TokenDance ID defaults~~ | **RESOLVED 2026-08-02** — issuer default switched to id.tokendancelab.com; check-secrets.sh now exempts `*_URL` endpoint assignments (TOKENDANCE name contains "token" → false positive) | merged in #1480 |
@@ -26,12 +26,13 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 | Track | State | Link |
 |---|---|---|
-| Agent-team subtask live stream | Phase A and frontend starting slice exist; remaining protocol/UI phases require explicit scope | #1478 |
+| Agent-team subtask live stream | SPEC merged (`docs/plan/agentteam-live-streaming.md`); Phase A and frontend starting slice exist; remaining protocol/UI phases require explicit scope | #1478 |
 | ACP migration | Official ACP adapters exist; filesystem/terminal frames, timeout policy, registration, and approved real-run evidence remain | #1404 |
-| Targeted adapter extraction | RFC pending; avoid broad leaf-package churn | #1471 |
-| Shared boundary hardening | RFC pending; avoid a big-bang shared split | #1472 |
-| Release signing | SPEC pending | #1403 |
-| WebSocket incremental sync | SPEC pending | #1411 |
+| Targeted adapter extraction | RFC merged (`docs/plan/rfc-A-V1-adapters-lifecycle-split.md`); implementation pending, avoid broad leaf-package churn | #1471 |
+| Shared boundary hardening | RFC merged (`docs/plan/rfc-A-V3-shared-split.md`); implementation pending, avoid a big-bang shared split | #1472 |
+| Release signing | SPEC draft on `docs/spec-release-signing` (proposal-desktop-release-signing.md, unmerged); needs review + merge | #1403 |
+| WebSocket incremental sync | SPEC draft on `docs/spec-ws-incremental-sync` (proposal-ws-incremental-sync.md, unmerged); needs review + merge | #1411 |
+| IM bridge (Feishu first) | SPEC draft on `docs/spec-im-bridge` (proposal-im-bridge.md, unmerged); not yet an issue | — |
 | Automations and session import | Product backlog | #1405, #1407 |
 
 ## Maintainability program
