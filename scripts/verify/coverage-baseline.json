@@ -1,9 +1,9 @@
 {
   "$schema": "coverage-baseline.v1",
-  "measuredAt": "2026-08-01",
-  "masterSha": "2d99fe286eebad4ec57b5373ffbad829a76556b2",
-  "masterShaShort": "2d99fe28",
-  "measuredOn": "Windows (post apiClient.ts removal per RFC A-V3 §4.1; freshly measured with vitest --coverage; mobile-rn first baseline 2026-08-01)",
+  "measuredAt": "2026-08-02",
+  "masterSha": "3dd1cd7dacfdc2e17306726f401bf282ed44a0a6",
+  "masterShaShort": "3dd1cd7d",
+  "measuredOn": "Windows (Vitest 4 projects consolidation in app/vitest.config.ts; freshly measured with verify-coverage-baseline.ps1 per-package runs; every package above prior baseline — net optimization, not a relaxation)",
   "ciPlatform": "ubuntu-latest (v8 coverage is execution-path based; numbers are cross-platform deterministic)",
   "policy": "Coverage baseline gate — numbers must not regress. If a metric drops below the value recorded here (minus the v8 run-to-run tolerance), the gate fails (exit 1). A second assertion requires skipped tests == 0 so .skip / .todo cannot silently mask a regression. To raise the bar, update this file with freshly measured numbers + a new measuredAt/masterSha; never lower a number without an explicit baseline re-baseline decision.",
   "tolerance": 0.08,
@@ -12,15 +12,15 @@
     "@agenthub/shared": {
       "dir": "app/shared",
       "coverage": {
-        "lines": 72.07,
-        "statements": 70.69,
-        "functions": 70.67,
-        "branches": 66.44
+        "lines": 76.43,
+        "statements": 74.82,
+        "functions": 74.01,
+        "branches": 70.48
       },
-      "coverageNote": "Remeasured 2026-07-30 after removing apiClient.ts + apiClient.test.ts (RFC A-V3 §4.1, zero external consumers). Lines 71.57→72.07, functions 69.71→70.67, statements 70.21→70.69, branches 66.18→66.44 — net gain on lines/branches, slight function dip from removing the tested module; all above prior baseline so gate holds without re-baselining-down.",
+      "coverageNote": "Remeasured 2026-08-02 (baseline 72.07→76.43 lines, all metrics up) after Vitest 4 projects consolidation; net gain from master test additions since 2026-08-01 baseline — optimization, gate holds.",
       "tests": {
-        "total": 1302,
-        "passed": 1302,
+        "total": 1738,
+        "passed": 1738,
         "failed": 0,
         "skipped": 0
       }
@@ -28,14 +28,15 @@
     "agenthub-web": {
       "dir": "app/web",
       "coverage": {
-        "lines": 63.61,
-        "statements": 62.19,
-        "functions": 53.42,
-        "branches": 59.48
+        "lines": 66.96,
+        "statements": 65.84,
+        "functions": 55.95,
+        "branches": 60.25
       },
+      "coverageNote": "Remeasured 2026-08-02 (baseline 63.61→66.96 lines, all metrics up) — optimization, gate holds.",
       "tests": {
-        "total": 182,
-        "passed": 182,
+        "total": 220,
+        "passed": 220,
         "failed": 0,
         "skipped": 0
       }
@@ -45,21 +46,22 @@
       "config": "vitest.desktop-ci.config.ts",
       "configNote": "Default vitest.config.ts includes src/__tests__/integration/edge-real.test.ts which needs a live edge-server binary; vitest.desktop-ci.config.ts excludes src/__tests__/integration/** — the same desktop unit subset CI runs via test:ci. Using this subset keeps the baseline honest and reproducible without a real Edge process.",
       "coverage": {
-        "lines": 67.13,
-        "statements": 63.72,
-        "functions": 61.8,
-        "branches": 55.35
+        "lines": 71.91,
+        "statements": 68.36,
+        "functions": 65.38,
+        "branches": 57.54
       },
+      "coverageNote": "Remeasured 2026-08-02 (baseline 67.13→71.91 lines, all metrics up) — optimization, gate holds.",
       "tests": {
-        "total": 601,
-        "passed": 601,
+        "total": 587,
+        "passed": 587,
         "failed": 0,
         "skipped": 0
       }
     },
     "agenthub-mobile-rn": {
       "dir": "app/mobile-rn",
-      "configNote": "First baseline (Q11). Default vitest.config.ts covers src/**/*.test.ts only (node environment); no integration tests to exclude, so no special config file needed.",
+      "configNote": "Default vitest.config.ts covers src/**/*.test.ts only (node environment); no integration tests to exclude, so no special config file needed.",
       "coverage": {
         "lines": 80.5,
         "statements": 79.18,

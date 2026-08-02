@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import { HUB_EVENTS, type HubEventType } from './hubEvents';
 
-const repoRoot = resolve(process.cwd(), '../..');
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('HUB_EVENTS', () => {
   it('exports the Hub-to-Edge agent control event type', () => {

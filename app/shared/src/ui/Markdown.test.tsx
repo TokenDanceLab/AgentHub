@@ -1,6 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import MarkdownContent from './Markdown';
 import styles from './Markdown.module.css';
@@ -11,7 +12,7 @@ import styles from './Markdown.module.css';
 // CSS-contract test against the module source (same pattern as
 // chatview/components/Transcript.css.test.ts).
 const markdownCss = readFileSync(
-  path.resolve(process.cwd(), '../shared/src/ui/Markdown.module.css'),
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'Markdown.module.css'),
   'utf8',
 );
 
