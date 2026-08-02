@@ -10,7 +10,7 @@
  * jsdom is the test env (vitest.config.ts) but these are string-in/string-out
  * assertions — no real Prism DOM rendering is exercised (jsdom cannot render
  * Prism's CSS colors; that limitation is inherited from the existing
- * `tokens-base.css:586` TODO (#1509) and applies to word-diff colors too).
+ * `tokens-base.css:586` 注释（#1509）and applies to word-diff colors too).
  */
 import { describe, expect, it } from 'vitest';
 

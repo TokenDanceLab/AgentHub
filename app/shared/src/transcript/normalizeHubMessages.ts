@@ -70,7 +70,7 @@ const RECALLED_TEXT_FALLBACK = '消息已撤回';
 export type NormalizeHubTranslate = (key: string) => string;
 
 /**
- * pin 状态来源（已落地，2026-08-02 TODO 清理时确认闭环）：
+ * pin 状态来源（已落地，2026-08-02 专项清理时确认闭环）：
  *
  * Survey (2026-08-01, sonnet-unpin-recall 续23 → unpin menu entry):
  * - hub-server `model.Message` has no `pinned` field; pins live in the
