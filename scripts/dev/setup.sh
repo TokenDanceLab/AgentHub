@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-git config core.hooksPath scripts/dev/git-hooks
-echo "Git hooks enabled: scripts/dev/git-hooks"
+git config core.hooksPath scripts/git-hooks
+echo "Git hooks enabled: scripts/git-hooks"
 
 if [[ "${1:-}" == "--reference-core" ]]; then
   if ! command -v pwsh >/dev/null 2>&1; then
