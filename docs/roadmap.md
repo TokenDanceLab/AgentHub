@@ -15,9 +15,9 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 - 产物必须内联展示：Diff、Preview、文件附件、审批、部署状态和生成资产不应散落在后台日志里。
 - Mock、fixture、observed、approved-real、production 必须显式区分。
 
-## 当前 SPEC
+## 已完成波次（历史，勿重启）
 
-活进度只看 [progress/MASTER.md](progress/MASTER.md)。
+活进度只看 [progress/MASTER.md](progress/MASTER.md)。下表是已关闭波次的归档指针，只作追溯，不表示当前工作。
 
 | Program | Status | Pointer |
 |---|---|---|
