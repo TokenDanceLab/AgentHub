@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+# KNOWN-OBSOLETE (2026-08-02): asserts hub-server/internal/service/oidc.go (removed) and old ws_test.go test names; not wired to CI; rewrite tracked separately.
 <#
 AgentHub TokenDance ID OIDC release-readiness checks.
 

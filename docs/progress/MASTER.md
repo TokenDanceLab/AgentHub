@@ -62,6 +62,10 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 4. Reduce the 56-prop workbench contract incrementally through domain assemblers (`session`, `conversation`, `agents`, `projects`, `market`, `transcript`, `runtimeEvidence`).
 5. Move CSS ownership to existing component boundaries in small slices. Each UI slice needs Web and Desktop behavior tests plus `1440x810` light/dark Visual QA.
 
+#### Visual QA gate 状态
+
+当前 Visual QA gate: **89/100 Ship**（Phases 74-78，2026-07-20）。7/9 维度满分。剩余 Type/Motion/Empty 需交互测试或跨组件改动，已触及静态截图方法论天花板。规则本身见 `AGENTS.md` §5 前端规范（UI 改动用自动化 Playwright + Visual QA 证明）。
+
 ### Deployment and knowledge SSOT
 
 1. Land #1480 before editing the overlapping issuer line in the production compose template.

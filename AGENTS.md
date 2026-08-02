@@ -124,7 +124,6 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
 - UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/archives/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
-- 当前 Visual QA gate: **89/100 Ship**（Phases 74-78，2026-07-20）。7/9 维度满分。剩余 Type/Motion/Empty 需交互测试或跨组件改动，已触及静态截图方法论天花板。
 
 前端 CI 易踩坑（站立规则）：
 
@@ -222,6 +221,43 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - Critical/High 且 Open、rotate required 或 *verification required 阻断公开发布；Accepted 与当前队列以 `docs/governance/security-risk-register.md` 为准。
 
 需要示例配置时只提交 `.env.example`，值用占位符。新增本地生成目录、缓存、数据库、日志或私钥目录前，先更新 `.gitignore`。
+
+## 9.5 规则 → 机器验证映射
+
+下表列出有机器管的规则与其验证脚本、CI job。脚本路径与 CI 文件由 `verify-doc-ssot.ps1` 校验存在性；`无` 表示暂无机器验证，靠人工自觉，规则本身不因此失效。
+
+| 规则 | 验证脚本 | CI job |
+|---|---|---|
+| CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
+| skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
+| 文档 SSOT：路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.ps1` | checks.yml → validate |
+| Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.ps1` | checks.yml → validate |
+| Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.ps1` | checks.yml → validate |
+| Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.ps1` | checks.yml → validate |
+| hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.ps1` | checks.yml → validate |
+| Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.ps1` | checks.yml → validate |
+| 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.ps1` | checks.yml → validate |
+| OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.ps1` | checks.yml → validate |
+| shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.ps1` | checks.yml → validate |
+| shared barrel 不泄漏 Edge 导出 | `scripts/verify/verify-shared-barrel.ps1` | checks.yml → validate |
+| Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.ps1` | checks.yml → validate |
+| router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.ps1` | checks.yml → validate |
+| shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.ps1` | checks.yml → validate |
+| shared UI 依赖 hubClient 门禁 | `scripts/verify/verify-shared-ui-hubclient.ps1` | checks.yml → validate |
+| 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.ps1` | checks.yml → validate |
+| shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.ps1` | checks.yml → validate |
+| v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.ps1` | checks.yml → validate |
+| OIDC 配置形状与边界（issuer/redirect/无 secret；`verify-oidc-readiness.ps1` 因断言旧服务/测试名已 KNOWN-OBSOLETE，重写待办） | `scripts/verify/verify-oidc-readiness.ps1`（未挂 CI） | — |
+| P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.ps1` | checks.yml → backend-e2e-fixture |
+| 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.ps1` | checks.yml → backend-perf-leak-gates |
+| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.ps1` | release-readiness.yml |
+| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.ps1` | release-readiness.yml |
+| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.ps1` | release-readiness.yml |
+| secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
+| 提交格式 `type(scope): 中文摘要`（PR 时） | checks.yml go-edge 内联步骤 | checks.yml → go-edge |
+| UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
+| 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.ps1` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
+| 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
 
 ## 10. 验证纪律
 
