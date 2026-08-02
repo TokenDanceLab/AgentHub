@@ -111,6 +111,19 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			updated_at DATETIME,
 			deleted_at DATETIME
 		)`,
+		`CREATE TABLE execution_target_evidence (
+			id TEXT PRIMARY KEY,
+			target_id TEXT NOT NULL UNIQUE,
+			source TEXT NOT NULL,
+			status TEXT NOT NULL,
+			failure_category TEXT DEFAULT '',
+			observed_target_id TEXT DEFAULT '',
+			route_key TEXT DEFAULT '',
+			observed_at DATETIME NOT NULL,
+			expires_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL DEFAULT '',
@@ -530,12 +543,13 @@ func TestScenarioDispatch_PingAllTargetTypes(t *testing.T) {
 			require.NoError(t, target.Validate())
 			require.NoError(t, db.Create(target).Error)
 
-			// Ping the target — local_edge succeeds directly (sets online status).
-			// hub_relay checks Redis cache (not configured in this test, fails gracefully).
-			// remote_ssh/tailscale/cloud_edge attempt HTTP health check (server not running).
+			// #1544: manual ping only triggers a probe and never writes online
+			// on its own. This fixture environment has no cache route registry
+			// and no running edge, so every type fails its proof — the code
+			// paths are exercised without panicking, and none may end online.
 			err := targetSvc.Ping(context.Background(), target.ID, userID)
 			if targetType == "local_edge" {
-				require.NoError(t, err, "local_edge ping should succeed")
+				require.Error(t, err, "local_edge ping must not succeed without a route proof (#1544)")
 			}
 			// For other types, failure is expected in this test environment.
 			// The key point is the code path is exercised without panicking.

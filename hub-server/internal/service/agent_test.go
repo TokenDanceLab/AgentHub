@@ -1624,6 +1624,7 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 		"dev-target", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-local", "user-1", "dev-target", "Local workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now(), "{}", "{}").Error)
+	seedEvidenceForTarget(t, db, "target-local", "online", -time.Minute, dispatch.DesktopTargetStaleAfter)
 	cache := &mockAgentCache{}
 	svc := &AgentService{db: db, cacheClient: cache}
 
@@ -1652,6 +1653,7 @@ func TestTriggerAgentTaskPrebindsOwnedTargetDevice(t *testing.T) {
 		"dev-local", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-local-device", "user-1", "dev-local", "Local workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now(), "{}", "{}").Error)
+	seedEvidenceForTarget(t, db, "target-local-device", "online", -time.Minute, dispatch.DesktopTargetStaleAfter)
 	cache := &mockAgentCache{}
 	svc := &AgentService{db: db, cacheClient: cache}
 
@@ -1671,6 +1673,8 @@ func TestTriggerAgentTaskRejectsStaleTargetHealth(t *testing.T) {
 		"dev-stale", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-stale", "user-1", "dev-stale", "Stale workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now().Add(-dispatch.DesktopTargetStaleAfter-time.Second), "{}", "{}").Error)
+	// 证据窗口已过期 → 投影 stale → 调度拒绝。
+	seedEvidenceForTarget(t, db, "target-stale", "online", -3*time.Minute, -time.Minute)
 	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-stale")
@@ -1687,6 +1691,8 @@ func TestTriggerAgentTaskRejectsMismatchTargetHealth(t *testing.T) {
 		"dev-mismatch", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-mismatch", "user-1", "dev-mismatch", "Mismatched workstation", "local_edge", `["/workspace"]`, "local", "mismatch", false, time.Now(), "{}", "{}").Error)
+	// observed identity mismatch 证据 → 投影 mismatch → 调度拒绝。
+	seedEvidenceForTarget(t, db, "target-mismatch", "mismatch", -time.Minute, dispatch.DesktopTargetStaleAfter)
 	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-mismatch")
@@ -1695,6 +1701,16 @@ func TestTriggerAgentTaskRejectsMismatchTargetHealth(t *testing.T) {
 	var count int64
 	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
 	require.Equal(t, int64(0), count)
+}
+
+// seedEvidenceForTarget seeds a health evidence row for dispatch-contract
+// tests (#1544): health validation reads evidence, not the legacy columns.
+func seedEvidenceForTarget(t *testing.T, db *gorm.DB, targetID, status string, observedAgo, expiresIn time.Duration) {
+	t.Helper()
+	observed := time.Now().Add(observedAgo)
+	expires := time.Now().Add(expiresIn)
+	require.NoError(t, db.Exec(`INSERT INTO execution_target_evidence (id, target_id, source, status, observed_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"ev-"+targetID, targetID, "registration", status, observed, expires).Error)
 }
 
 func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
@@ -1788,6 +1804,19 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 			capabilities TEXT DEFAULT '{}',
 			metadata TEXT DEFAULT '{}',
 			deleted_at DATETIME
+		)`,
+		`CREATE TABLE execution_target_evidence (
+			id TEXT PRIMARY KEY,
+			target_id TEXT NOT NULL UNIQUE,
+			source TEXT NOT NULL,
+			status TEXT NOT NULL,
+			failure_category TEXT DEFAULT '',
+			observed_target_id TEXT DEFAULT '',
+			route_key TEXT DEFAULT '',
+			observed_at DATETIME NOT NULL,
+			expires_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
 		)`,
 	} {
 		require.NoError(t, db.Exec(ddl).Error)
