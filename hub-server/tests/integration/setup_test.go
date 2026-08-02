@@ -111,7 +111,7 @@ func TestMain(m *testing.M) {
 	testCacheClient = cacheClient
 
 	mgr = ws.NewManager()
-	mgr.StartHeartbeat()
+	mgr.StartHeartbeat(context.Background())
 
 	b, err := service.NewBus()
 	if err != nil {

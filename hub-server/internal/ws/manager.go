@@ -173,6 +173,10 @@ type Manager struct {
 	// channel (see NewConnWithBufferSize). Defaults to config.WSSendBufferSize;
 	// SetSendBufferSize overrides it for backpressure tests.
 	sendBufferSize int
+
+	// pingHook is a test-only seam replacing pingAll's body (heartbeat
+	// lifecycle tests count ticks without needing real connections).
+	pingHook func()
 }
 
 func NewManager() *Manager {
@@ -182,6 +186,14 @@ func NewManager() *Manager {
 		userConnCount:  make(map[string]int),
 		sendBufferSize: config.WSSendBufferSize,
 	}
+}
+
+// SetPingHook installs a test-only heartbeat probe; nil restores the real
+// pingAll body.
+func (m *Manager) SetPingHook(hook func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pingHook = hook
 }
 
 // SetSendBufferSize overrides the per-connection send-buffer capacity for
@@ -561,22 +573,34 @@ func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 	return nil
 }
 
-func (m *Manager) StartHeartbeat() {
-	m.StartHeartbeatWithInterval(config.WSHeartbeatInterval)
+// StartHeartbeat runs the heartbeat pinger until ctx is cancelled (#1542:
+// the loop must be stoppable — previously it ran forever and leaked at
+// shutdown).
+func (m *Manager) StartHeartbeat(ctx context.Context) {
+	m.StartHeartbeatWithInterval(ctx, config.WSHeartbeatInterval)
 }
 
-// StartHeartbeatWithInterval runs the heartbeat pinger at an explicit cadence.
-// Test-only override point (clock configuration seam): intervals <= 0 fall back
-// to the production default so default semantics never change.
-func (m *Manager) StartHeartbeatWithInterval(interval time.Duration) {
+// StartHeartbeatWithInterval runs the heartbeat pinger at an explicit cadence
+// until ctx is cancelled. Test-only override point (clock configuration
+// seam): intervals <= 0 fall back to the production default so default
+// semantics never change.
+func (m *Manager) StartHeartbeatWithInterval(ctx context.Context, interval time.Duration) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if interval <= 0 {
 		interval = config.WSHeartbeatInterval
 	}
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-		for range ticker.C {
-			m.pingAll()
+		for {
+			select {
+			case <-ticker.C:
+				m.pingAll()
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 }
@@ -599,6 +623,13 @@ func (m *Manager) Shutdown() {
 }
 
 func (m *Manager) pingAll() {
+	m.mu.RLock()
+	hook := m.pingHook
+	m.mu.RUnlock()
+	if hook != nil {
+		hook()
+		return
+	}
 	m.mu.RLock()
 	conns := make([]*Conn, 0, len(m.conns))
 	for _, c := range m.conns {
