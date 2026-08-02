@@ -28,6 +28,7 @@ type Bus interface {
 // Implemented by *cache.Client and cache.NoOpCache.
 type Cache interface {
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
+	SetSeq(ctx context.Context, sessionID string, seq int64) error
 }
 
 // Service owns IM message orchestration: send/edit/recall, pin/unpin/list-pins,

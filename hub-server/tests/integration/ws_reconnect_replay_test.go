@@ -212,7 +212,32 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 // assert that a healthy connection's missedPong stays 0 and that a stale
 // (unreachable) connection is closed+unregistered after WSMaxMissedPongs.
 func TestWSHeartbeatKeepsConnection(t *testing.T) {
-	t.Skip("heartbeat interval is 30s (config.WSHeartbeatInterval); cannot deterministically verify ping/pong without 30s wait or an injectable interval seam on Manager.StartHeartbeat")
+	manager := hubws.NewManager()
+	// 时钟注入 seam（#1533）：用 100ms interval 确定性验证心跳，不等真实 30s。
+	manager.StartHeartbeatWithInterval(100 * time.Millisecond)
+	defer manager.Shutdown()
+
+	wsURL := newWSTestServer(t, manager)
+
+	conn := dialWS(t, wsURL, "user-heartbeat")
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	frame := readWSFrame(t, conn)
+	if frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("auth: got %s, want auth.ok", frame.Type)
+	}
+
+	// 等 3 个心跳 interval：若心跳链路失效（ping 失败 / 连接被关），
+	// 下面推送的消息将永远收不到；收到即证明连接被心跳维持。
+	time.Sleep(350 * time.Millisecond)
+
+	manager.PushToUser("user-heartbeat", hubws.NewFrame(hubws.TypeMessageNew, map[string]string{
+		"text": "heartbeat-alive-check",
+	}))
+	frame2 := readWSFrame(t, conn)
+	if frame2.Type != hubws.TypeMessageNew {
+		t.Fatalf("connection died under heartbeat: got %s, want message.new", frame2.Type)
+	}
 }
 
 // TestWSPushToNonexistentUser is a no-op (no delivery, no panic).
@@ -237,6 +262,8 @@ func TestWSPushToNonexistentUser(t *testing.T) {
 // full send buffer returns a buffer-full status without blocking indefinitely.
 func TestWSPushToConnBufferFull(t *testing.T) {
 	manager := hubws.NewManager()
+	// 容量注入 seam（#1533）：2 帧的小 send buffer 确定性触发背压，不等真实 256 帧。
+	manager.SetSendBufferSize(2)
 	manager.StartHeartbeat()
 	defer manager.Shutdown()
 
@@ -256,12 +283,10 @@ func TestWSPushToConnBufferFull(t *testing.T) {
 		t.Fatal("connection not found")
 	}
 
-	// Fill the send buffer by sending many frames without reading them.
-	// Each frame is small, but the buffer has limited capacity.
-	// We send enough to overflow the buffer, then verify at least one
-	// PushToConn returns BufferFull.
+	// 不读连接 + buffer 容量 2：第 3 帧起必须命中 buffer full。
+	// 硬断言（未命中即 FAIL），不再 Log 后通过。
 	bufferFullHit := false
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 50; i++ {
 		msg := hubws.NewFrame(hubws.TypeMessageNew, map[string]string{
 			"text": "fill-buffer-message-number-" + strings.Repeat("x", 200),
 		})
@@ -273,7 +298,7 @@ func TestWSPushToConnBufferFull(t *testing.T) {
 	}
 
 	if !bufferFullHit {
-		t.Log("buffer full not hit — buffer may be larger than expected or messages drained quickly")
+		t.Fatal("buffer full not hit with 2-frame send buffer — backpressure contract broken")
 	}
 
 	// Drain and verify connection still works.

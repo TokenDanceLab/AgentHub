@@ -42,6 +42,7 @@ tests/results/
 edge-server/cov_full
 hub-server/uploads/
 hub-server/tests/uploads/
+hub-server/tests/integration/uploads/
 test_store.json
 
 # Temp/dev artifacts

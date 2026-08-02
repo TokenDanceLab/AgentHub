@@ -57,6 +57,14 @@ func (m *mockMsgCache) AllocateSeq(ctx context.Context, sessionID string) (int64
 	return m.seq, m.err
 }
 
+func (m *mockMsgCache) SetSeq(ctx context.Context, sessionID string, seq int64) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.seq = seq
+	return nil
+}
+
 // recordingMsgBus is a Bus test double that records Publish calls.
 type recordingMsgBus struct {
 	events []service.Event

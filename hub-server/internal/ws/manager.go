@@ -168,14 +168,35 @@ type Manager struct {
 	// userConnCount tracks the number of active connections per user.
 	// Updated atomically with byUser under mu.
 	userConnCount map[string]int
+
+	// sendBufferSize is the capacity of each new connection's outgoing send
+	// channel (see NewConnWithBufferSize). Defaults to config.WSSendBufferSize;
+	// SetSendBufferSize overrides it for backpressure tests.
+	sendBufferSize int
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		conns:         make(map[string]*Conn),
-		byUser:        make(map[string]map[string]string),
-		userConnCount: make(map[string]int),
+		conns:          make(map[string]*Conn),
+		byUser:         make(map[string]map[string]string),
+		userConnCount:  make(map[string]int),
+		sendBufferSize: config.WSSendBufferSize,
 	}
+}
+
+// SetSendBufferSize overrides the per-connection send-buffer capacity for
+// tests that must deterministically hit backpressure (capacity configuration
+// seam). Sizes <= 0 reset to the production default.
+func (m *Manager) SetSendBufferSize(n int) {
+	if n <= 0 {
+		n = config.WSSendBufferSize
+	}
+	m.sendBufferSize = n
+}
+
+// SendBufferSize returns the send-buffer capacity used for new connections.
+func (m *Manager) SendBufferSize() int {
+	return m.sendBufferSize
 }
 
 func (m *Manager) Count() int {
@@ -185,13 +206,23 @@ func (m *Manager) Count() int {
 }
 
 func NewConn(ws *websocket.Conn) *Conn {
+	return NewConnWithBufferSize(ws, config.WSSendBufferSize)
+}
+
+// NewConnWithBufferSize builds a Conn with an explicit send-buffer capacity.
+// Test-only override point (capacity configuration seam): sizes <= 0 fall back
+// to the production default so default semantics never change.
+func NewConnWithBufferSize(ws *websocket.Conn, size int) *Conn {
+	if size <= 0 {
+		size = config.WSSendBufferSize
+	}
 	r := rate.Every(time.Second / time.Duration(config.WSMessageRateLimit))
 	if ws != nil {
 		ws.SetReadLimit(512 * 1024)
 	}
 	return &Conn{
 		W:          ws,
-		Send:       make(chan []byte, config.WSSendBufferSize),
+		Send:       make(chan []byte, size),
 		msgLimiter: rate.NewLimiter(r, config.WSMessageBurst),
 	}
 }
@@ -531,8 +562,18 @@ func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 }
 
 func (m *Manager) StartHeartbeat() {
+	m.StartHeartbeatWithInterval(config.WSHeartbeatInterval)
+}
+
+// StartHeartbeatWithInterval runs the heartbeat pinger at an explicit cadence.
+// Test-only override point (clock configuration seam): intervals <= 0 fall back
+// to the production default so default semantics never change.
+func (m *Manager) StartHeartbeatWithInterval(interval time.Duration) {
+	if interval <= 0 {
+		interval = config.WSHeartbeatInterval
+	}
 	go func() {
-		ticker := time.NewTicker(config.WSHeartbeatInterval)
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
 			m.pingAll()
