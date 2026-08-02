@@ -824,7 +824,7 @@ jobs:
 
       - name: Self-test vulnerability gates (fail-closed contract)
         shell: bash
-        run: ./scripts/verify/tests/verify-vulnerability-gates.Tests.sh
+        run: bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
 
       - name: Verify Web Hub-only boundary
         shell: pwsh
@@ -953,7 +953,7 @@ jobs:
           # JSON 输出经 verifier 校验 vulnerabilities schema；空输出/非 JSON/
           # schema 缺失一律 fail-closed。旧实现把非 JSON 当 likely clean ——
           # 假绿已修（#1534）。
-          pnpm audit --prod --json 2>&1             | ../../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
+          pnpm audit --prod --json 2>&1             | ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
 
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
@@ -982,4 +982,4 @@ jobs:
           # 事件流（NDJSON）经 verifier 按 summary 事件判定；解析失败/工具故障
           # 一律 fail-closed。旧实现把整段输出当单个 JSON 对象解析，
           # 解析失败后 exit 0 —— 假绿已修（#1534）。
-          go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>&1             | ../../../scripts/verify/verify-vulnerability-gates.sh govulncheck
+          go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>&1             | ../scripts/verify/verify-vulnerability-gates.sh govulncheck
