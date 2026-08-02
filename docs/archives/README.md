@@ -7,6 +7,18 @@
 | cleanup-baseline | knowledge-first strangler cleanup + SDD closeout；Issues #424–#445 closed；Phase 7 residual #447–#451；Project [cleanup-baseline](https://github.com/users/DeliciousBuding/projects/6)；PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | 2026-07-16 | [cleanup-baseline/](./cleanup-baseline/) |
 | wiki-consolidation | wiki 孤儿知识面处置：14 个文件（pages/ 10 + 根 4）；module-hub 鉴权增量并入 01-hub-server、module-edge lifecycle/store 增量并入 02-edge-server，其余为重复/过时编译层归档；`wiki/` 目录移除 | 2026-08-02 | [wiki/](./wiki/) |
 
+Archive of orphan `scripts/verify/` verifiers, moved 2026-08-02 as-is (git mv, unmodified).
+
+- Date: 2026-08-02
+- Branch / worktree: `chore/rule-enforcement`
+- Disposition: 15 files archived as-is
+- Archived because obsolete / approval-gate by design / needs live services:
+  - approved-real 老批次（`verify-approved-real-{demo-readiness,edge-cli-evidence,preflight}.ps1`、`verify-p0-approved-real-gold-path.ps1`）— 流程已被 `.agents/skills/real-e2e-acceptance/` 取代
+  - edge-cli / runtime / fixture 过时项（`verify-edge-cli-{dispatch-evidence,json-readiness,real-readiness}.ps1`、`verify-runtime-readiness.{ps1,sh}`、`verify-login-fixture-topology.ps1`、`verify-teamrun-demo-readiness.ps1`）
+  - `verify-live-chain-topology.ps1` — 源码重构（agent_team 拆分、useHubIntegration 拆分、handlers 拆分）后 28/88 断言失效；Web Hub-only 边界由活门禁 `verify-web-hub-boundary.ps1` 覆盖
+  - 登录/OIDC approval-gate（`verify-login-e2e-readiness.ps1`、`verify-token-dance-id-login-readiness.ps1` 需人工批准元数据/凭据，`verify-oidc-flow.ps1` 需真实 TokenDance ID + Hub 服务）— 非 CI 静态门禁；OIDC 配置形状由活门禁 `verify-oidc-readiness.ps1`（validate job）覆盖
+- 归档后 `scripts/verify/` 剩余脚本全部挂载 CI（checks.yml / release-readiness.yml），无孤儿
+
 ## wiki-consolidation
 
 Archive of the orphan `wiki/` compiled-knowledge tree (cleanup-baseline Phase 2 llmwiki), removed 2026-08-02 after merging the two incremental pages into `docs/architecture/` and archiving the rest.
