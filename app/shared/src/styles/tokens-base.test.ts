@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const tokensPath = path.resolve(process.cwd(), '../shared/src/styles/tokens-base.css');
-const themesPath = path.resolve(process.cwd(), '../shared/src/styles/themes.css');
+const stylesDir = path.dirname(fileURLToPath(import.meta.url));
+const tokensPath = path.resolve(stylesDir, 'tokens-base.css');
+const themesPath = path.resolve(stylesDir, 'themes.css');
 
 function readCss(p: string): string {
   return readFileSync(p, 'utf8');
