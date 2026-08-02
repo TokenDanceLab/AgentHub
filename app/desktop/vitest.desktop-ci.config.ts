@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { createCoverage } from '../test-config/coverage';
 
 export default defineConfig({
   resolve: {
@@ -33,5 +34,14 @@ export default defineConfig({
         },
       },
     },
+    coverage: createCoverage({
+      // 绝对 floors（2026-08-03 实测，含全部生产源码进分母后）：
+      // lines 49.29 / stmt 47.44 / fn 41.79 / br 40.96 — 每维 floor(实测)-1。
+      // 全部低于 60 是提升目标（见 coverage-baseline.json note），非永久豁免。
+      thresholds: { lines: 48, branches: 39, functions: 40, statements: 46 },
+      // src/main.tsx — 纯入口（ReactDOM.createRoot 挂载），无业务逻辑（shared
+      // 的 index.ts 同先例）
+      exclude: ['src/main.tsx'],
+    }),
   },
 });
