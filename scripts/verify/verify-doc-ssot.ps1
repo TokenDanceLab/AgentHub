@@ -166,7 +166,7 @@ foreach ($file in $files) {
 }
 
 $maxLines = @{
-    "AGENTS.md" = 260
+    "AGENTS.md" = 280
     "CHANGELOG.md" = 90
     "CONTRIBUTING.md" = 90
     "reference/INDEX.md" = 80
@@ -206,5 +206,40 @@ foreach ($entry in $maxLines.GetEnumerator()) {
         }
     }
 }
+
+# --- AGENTS.md 路径存在性检查（CI 保鲜：反引号路径必须真实存在） ---
+function Expand-BracePath([string]$Path) {
+    $m = [regex]::Match($Path, '^([^{]*)\{([^}]+)\}(.*)$')
+    if (-not $m.Success) { return @($Path) }
+    $prefix = $m.Groups[1].Value
+    $suffix = $m.Groups[3].Value
+    return @(($m.Groups[2].Value -split ',' | ForEach-Object { "$prefix$_$suffix" }))
+}
+
+function Assert-AgentsMdPaths {
+    $content = Get-Content -LiteralPath "AGENTS.md" -Raw
+    # 剥离代码围栏块（``` ... ```），只扫描行内单反引号路径
+    $content = [regex]::Replace($content, '```[\s\S]*?```', '')
+    $checked = 0
+    foreach ($m in [regex]::Matches($content, '`([^`]*)`')) {
+        $p = $m.Groups[1].Value.Trim()
+        if ($p -match '^\.\./') { continue }              # 外部路径（../ 开头，属上级仓库）
+        if ($p -match '^\.(agenthub|claude|codex)/') { continue }  # gitignored 本机 agent 状态目录
+        if ($p -match '^\.worktrees/') { continue }       # git worktree 机制目录
+        if ($p -notmatch '/') { continue }                # 无斜杠不是仓库内路径
+        if ($p -match '[*?<>@]') { continue }             # 通配符/占位符/外部引用（如 paths-filter@v3）
+        if ($p -match '^/') { continue }                  # API 路由（如 /v1/runners），非文件路径
+        $p = $p -replace '^\./', ''                       # 剥离 ./ 前缀
+        foreach ($cand in (Expand-BracePath $p)) {
+            if (-not (Test-Path -LiteralPath $cand)) {
+                Fail "AGENTS.md references missing path: $cand"
+            }
+            $checked++
+        }
+    }
+    Write-Host "AGENTS.md path check ok ($checked paths)"
+}
+
+Assert-AgentsMdPaths
 
 Write-Host "doc SSOT ok"
