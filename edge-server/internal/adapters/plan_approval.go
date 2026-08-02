@@ -8,17 +8,9 @@ import (
 	"time"
 )
 
-// PlanApprovalConfig controls the plan approval gate behavior.
-type PlanApprovalConfig struct {
-	// Enabled controls whether the plan approval gate is active.
-	// When false, dispatches proceed immediately without waiting for approval.
-	Enabled bool `json:"enabled"`
-
-	// AutoApproveTimeout is the duration after which a pending plan is
-	// automatically approved if no user decision arrives. Zero means
-	// wait indefinitely (not recommended). Default: 60 seconds.
-	AutoApproveTimeout time.Duration `json:"autoApproveTimeout"`
-}
+// PlanApprovalConfig / PendingPlan / PlanDecision 的唯一权威定义在
+// internal/orchestration（A-V1 Step 1, #1526）；本文件通过 contract_aliases.go
+// 的 type alias 使用它们，broker 行为实现仍在本包。
 
 // DefaultPlanApprovalConfig returns the default plan approval configuration.
 func DefaultPlanApprovalConfig() PlanApprovalConfig {
@@ -26,24 +18,6 @@ func DefaultPlanApprovalConfig() PlanApprovalConfig {
 		Enabled:            false,
 		AutoApproveTimeout: 60 * time.Second,
 	}
-}
-
-// PendingPlan represents a plan proposed by the orchestrator that is awaiting
-// user approval before sub-agent dispatches proceed.
-type PendingPlan struct {
-	RunID     string     `json:"runId"`
-	ProjectID string     `json:"projectId,omitempty"`
-	ThreadID  string     `json:"threadId,omitempty"`
-	Tasks     []PlanTask `json:"tasks"`
-	Mode      string     `json:"mode"` // "parallel" or "sequential"
-	CreatedAt time.Time  `json:"createdAt"`
-	Status    string     `json:"status"` // "pending", "approved", "rejected", "expired"
-}
-
-// PlanDecision is the user's decision on a proposed plan.
-type PlanDecision struct {
-	Approved bool   `json:"approved"`
-	Reason   string `json:"reason,omitempty"`
 }
 
 // planKey is the map key for pending plans, keyed by runID.

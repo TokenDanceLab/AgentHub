@@ -123,6 +123,33 @@ type PlanApprovalBroker  = orchestrator.PlanApprovalBroker
 
 ## 6. 迁移路径（type alias 反向兼容，仿 A-V4）
 
+### 6.0 Step 1 已完成（#1526）：合同解环
+
+合同类型已从根 adapters 迁入中立包 `edge-server/internal/orchestration/`（唯一权威）：`TaskStatus`（+4 常量）、`PlanTask`、`ExecutionPlan`、`PlanApprovalConfig`、`PendingPlan`、`PlanDecision`。根 `adapters` 通过 `contract_aliases.go` 的 type alias 保持零调用点改动（含外部 `internal/api/handlers_approvals.go` 的 `adapters.PlanDecision`）。
+
+新依赖图：
+
+```text
+internal/orchestration（无依赖，中立合同）
+      ↑
+internal/adapters（contract_aliases.go 引用合同）
+      ↑
+internal/adapters/orchestrator（Step 2 叶子包；import 根 adapters 用 EventEmitter/AgentAdapter/Registry/PlanApprovalBroker）
+```
+
+回归门禁（`internal/adapters/orchestrator/orchestrator_extract_preflight_test.go`）：
+
+- `TestImportCycleRisk`：硬门禁——adapters→orchestrator 下游类型引用必须为空（有环即 FAIL，不再是日志警报）。
+- `TestOrchestrationContractNeutral`：orchestration 不得依赖 adapters（`go list -deps` 断言）。
+- `TestContractTypesOwnedByOrchestration`：合同类型在 adapters 只允许 alias 形式（防双 SSOT 与环回退）。
+
+### 6.1 Step 2 可移动文件清单（依赖 #1526 合并）
+
+源文件（13）：`orchestrator.go`、`orchestrator_dag.go`、`orchestrator_dispatch_handle.go`、`orchestrator_dispatch_interceptor.go`、`orchestrator_dispatch_parse.go`、`orchestrator_dispatch_results.go`、`orchestrator_failure.go`、`orchestrator_failure_circuit.go`、`orchestrator_failure_classify.go`、`orchestrator_failure_recovery.go`、`orchestrator_ids.go`、`orchestrator_payloads.go`、`orchestrator_prompt.go`。
+测试文件（5）：`orchestrator_dag_robust_test.go`、`orchestrator_dag_test.go`、`orchestrator_e2e_test.go`、`orchestrator_failure_test.go`、`orchestrator_residual_test.go`。
+
+移动后 `adapters/adapter.go` 追加 alias：`OrchestratorAdapter`、`PlanParseError`、构造器（如外部使用）。
+
 A-V4（commit `c006e9f8`）已验证的模式：把类型/构造器从原包移到新叶子包，原包留 `type X = leaf.X` alias + `var NewX = leaf.NewX`，**零调用点改动**。
 
 对 `adapters/orchestrator` 抽取：
