@@ -101,8 +101,13 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 		return nil, err
 	}
 	// Pure ownership / type / health / binding checks (#768/#902) — order matches
-	// prior behavior so error precedence stays stable.
-	healthState := dispatch.ResolveExecutionTargetHealthState(target, time.Now())
+	// prior behavior so error precedence stays stable. Health is projected from
+	// the same evidence the API uses (#1544), so scheduling and UI agree.
+	evidence, err := repository.GetExecutionTargetEvidence(s.db.WithContext(ctx), target.ID)
+	if err != nil && !repository.IsEvidenceNotFound(err) {
+		return nil, err
+	}
+	healthState := dispatch.ResolveExecutionTargetHealthState(target, evidence, time.Now())
 	if err := dispatch.PreDeviceTargetValidation(target.OwnerID, userID, target.TargetType, healthState); err != nil {
 		return nil, err
 	}

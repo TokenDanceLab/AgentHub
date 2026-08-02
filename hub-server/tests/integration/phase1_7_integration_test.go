@@ -304,12 +304,17 @@ func TestExecutionTarget_CreateAndPing(t *testing.T) {
 		t.Logf("initial is_online = true (expected false)")
 	}
 
-	// Ping the target.
+	// Ping the target. #1544: 未绑定 local_edge 的 manual ping 只触发 probe，
+	// 不得自行写 online（无绑定 → 无 route 可查 → 不可路由）。
 	w = postAuth("/web/execution-targets/"+targetID+"/ping", u.Token, nil)
 	r = parse(w)
-	mustOK(t, r, "ping target")
+	if r.Error == nil {
+		t.Fatalf("ping unbound local_edge must not succeed: no route can be proven (#1544)")
+	}
+	t.Logf("ping unbound local_edge failed as expected (evidence probe): %s", r.Error.Message)
 
-	// Get target — is_online should be true after ping.
+	// Get target — is_online must stay false: a failed probe is not online
+	// evidence, and the manual ping itself never wrote the health fields.
 	w = get("/web/execution-targets/"+targetID, u.Token)
 	r = parse(w)
 	mustOK(t, r, "get target after ping")
@@ -317,8 +322,8 @@ func TestExecutionTarget_CreateAndPing(t *testing.T) {
 		IsOnline bool `json:"is_online"`
 	}
 	json.Unmarshal(r.Data, &got)
-	if !got.IsOnline {
-		t.Errorf("expected is_online=true after ping, got false")
+	if got.IsOnline {
+		t.Errorf("expected is_online=false after failed probe on unbound local_edge, got true (#1544)")
 	}
 }
 
