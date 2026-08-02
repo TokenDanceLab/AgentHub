@@ -21,6 +21,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
@@ -165,7 +166,7 @@ func TestMain(m *testing.M) {
 	marketHandler := handler.NewMarketHandler(profileService) // uses AgentProfileService
 	pbService := service.NewProviderBindingService(db)
 	pbHandler := handler.NewProviderBindingHandler(pbService)
-	targetService := service.NewExecutionTargetService(db)
+	targetService, _ := service.NewExecutionTargetService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
 	auditService := service.NewAuditService(db, nil)
 	auditHandler := handler.NewAuditHandler(auditService)
