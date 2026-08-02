@@ -1,3 +1,4 @@
+# DEPRECATED 2026-08-02: 发布入口收敛，唯一入口 = tag push → release.yml（见 #K）
 <#
 .SYNOPSIS
     AgentHub release builder — builds all binaries, packages, uploads to GitHub Release.
