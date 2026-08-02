@@ -4,7 +4,7 @@
 > 提案日期：2026-07-27
 > 追踪 Issue：[#1411](https://github.com/TokenDanceLab/AgentHub/issues/1411)
 > 前置阅读：[web-module.md（Codeg 参考实现）](../../../../Temp/codeg-research/web-module.md) · [backend.md §事件流](../../../../Temp/codeg-research/backend.md)
-> 替代对象：`sync.request` / `sync.events` 死协议面（正由 chore/ws-dead-surface worktree 删除）
+> 替代对象：`sync.request` / `sync.events` 死协议面（已由 chore/ws-dead-surface 删除并合入 master）
 
 ---
 
@@ -16,7 +16,7 @@ AgentHub 当前 WS 层缺乏断线增量恢复能力：
 
 - **无服务端事件缓存**：所有事件推送即忘，无 ring buffer，无 seq 索引。
 - **断线恢复靠 REST 全量**：`runEventReplay.ts` 调用 `GET /web/agent-tasks/:id/events?after_seq=<N>`，RTT 高、全量扫描 DB。
-- **`sync.request` 协议面已死**：`hubEvents.ts` 中 `SYNC_REQUEST`/`SYNC_EVENTS` 常量仅在前端有声明和路由，hub-server 无任何实现。该死面正由另一 agent 删除。
+- **`sync.request` 协议面已死**：`hubEvents.ts` 中 `SYNC_REQUEST`/`SYNC_EVENTS` 常量仅在前端有声明和路由，hub-server 无任何实现。该死面已由另一 agent 删除（chore/ws-dead-surface 已合入 master）。
 - **seq_id 仅 per-conn**（PR #1378）：重连即重置，可检测丢帧但无法跨连接恢复。
 
 ### 1.2 目标
@@ -241,7 +241,7 @@ attach (handler/ws.go: handleAttach)
 | **B3** | emit 接 EventLog | `manager.go` `PushToSession` 路径接入 EventLog（emit→ring push→fanout 三步）；`app/events.go` 33 个订阅无需改动（PushToSession 内部透明接入） | M | B1 | `go test ./internal/ws/... ./internal/app/... -short` |
 | **B4** | Snapshot 构造 | 复用 service 层已有方法构造 `subscribe.snapshot` payload；IM 走 `SessionService`，task 走 `AgentService` | L | B2 | `go test ./internal/handler/... -short` |
 | **B5** | Debug metrics 端点 | `GET /api/debug/event_metrics` 暴露 9 计数器瞬时值 | S | B1 | `go test ./internal/handler/... -short` |
-| **B6** | 移除 sync.request 死面 | 清理 `hubEvents.ts` 中 `SYNC_REQUEST`/`SYNC_EVENTS` 常量及所有引用（与 chore/ws-dead-surface worktree 协调，可能已经完成） | S | B2 | `corepack pnpm typecheck && corepack pnpm test` |
+| **B6** | 移除 sync.request 死面 | 清理 `hubEvents.ts` 中 `SYNC_REQUEST`/`SYNC_EVENTS` 常量及所有引用（已由 chore/ws-dead-surface 完成，合并前验证 master 无残留） | S | B2 | `corepack pnpm typecheck && corepack pnpm test` |
 
 #### 前端阶段
 
@@ -249,8 +249,8 @@ attach (handler/ws.go: handleAttach)
 |-------|----|------|------|------|---------|
 | **F1** | hubWS attach API | `hubWS.ts` 新增 `attach(subscription_id, since_seq?)` / `detach(subscription_id)` / `onSnapshot` / `onReplay`；移除 `sendSync` | M | B2 | `corepack pnpm test -- --run` |
 | **F2** | 恢复逻辑切换 | `runEventReplay.ts` 重写：WS attach replay 为首选，REST `after_seq` 为 fallback；`webHubRealtime.ts` 重连后走 attach 而非 `sync.request` + REST | M | F1, B3 | Playwright: reconnect gap fill |
-| **F3** | Desktop attach | `useHubEventStream.ts` 移除 `SYNC_REQUEST`/`SYNC_EVENTS` 路由；接入 attach/detach；与 Web 共享 hubClient 路径 | M | F2 | Desktop `pnpm test && pnpm typecheck` |
-| **F4** | Mobile attach | `hubClient.ts` 移除 `SYNC_REQUEST` 客户端类型；`hubEvents.ts` 移除死常量 | S | F2 | Mobile `pnpm typecheck` |
+| **F3** | Desktop attach | `useHubEventStream.ts` 接入 attach/detach；与 Web 共享 hubClient 路径（`SYNC_REQUEST`/`SYNC_EVENTS` 路由已随 chore/ws-dead-surface 移除） | M | F2 | Desktop `pnpm test && pnpm typecheck` |
+| **F4** | Mobile attach | `hubClient.ts` 接入 attach/detach（`SYNC_REQUEST` 客户端类型与 `hubEvents.ts` 死常量已随 chore/ws-dead-surface 移除） | S | F2 | Mobile `pnpm typecheck` |
 
 #### 总规模估计
 
@@ -368,16 +368,15 @@ Client → Server:
 
 | 位置 | 内容 | 状态 |
 |------|------|------|
-| `app/shared/src/hubEvents.ts:48-49` | `SYNC_REQUEST` / `SYNC_EVENTS` 常量 | 正由 chore/ws-dead-surface worktree 删除 |
-| `app/web/src/api/hubWS.ts:214-216` | `sendSync()` 方法 | 同上 |
-| `app/desktop/src/hooks/useHubWebSocket.ts:49` | `sync.request` 类型引用 | 同上 |
-| `app/mobile-rn/src/api/hubClient.ts:100` | `sync.request` 联合类型 | 同上 |
+| `app/shared/src/hubEvents.ts` | `SYNC_REQUEST` / `SYNC_EVENTS` 常量 | 已删除（chore/ws-dead-surface 已合入 master） |
+| `app/web/src/api/hubWS.ts` | `sendSync()` 方法 | 已删除（同上） |
+| `app/mobile-rn/src/api/hubClient.ts` | `sync.request` 联合类型 | 已删除（同上） |
 | `hub-server` | **无任何实现** | 从未实现 |
 
 衔接：
-1. chore/ws-dead-surface 删除前端死面 → merge 后前端无 `sync.request` 消费。
+1. chore/ws-dead-surface 已删除前端死面并合入 master，前端已无 `sync.request` 消费。
 2. 本 SPEC 的 B2（attach 帧）在服务端提供新协议 → 前端重建恢复逻辑时直接调 `subscribe.attach`。
-3. 时间上可并行：死面删除 PR 可先合，不影响本 SPEC 的任何阶段（因为死面本就无服务端实现）。
+3. 时间上可并行：死面删除已完成，不影响本 SPEC 的任何阶段（因为死面本就无服务端实现）。
 
 ---
 
