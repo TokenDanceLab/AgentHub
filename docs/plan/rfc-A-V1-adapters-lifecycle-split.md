@@ -121,21 +121,21 @@ type PlanApprovalBroker  = orchestrator.PlanApprovalBroker
 - **lifecycle**：D-V1 的目标正是 lifecycle 最大的 god function（`run()` 418 行）。它完成后，lifecycle 包不再有"必须拆包才能读懂"的函数。本 RFC 据此把 lifecycle 从"可考虑拆 `executor/`+`pure/`"调整为"不拆"。这是 D-V1 带来的新结论，不是原 issue 设想时的判断。
 - **adapters**：D-V1 完全在 lifecycle 包内，未触及 adapters。adapters 的体量问题（28.5k 行）与 D-V1 无关，结论不变。
 
-## 6. 迁移路径（type alias 反向兼容，仿 A-V4）
+## 6. 迁移路径（Step 0 已完成；Step 2 采用插件式单向依赖）
 
-### 6.0 Step 1 已完成（#1526）：合同解环
+### 6.0 Step 0 已完成（#1526）：plan contract SSOT 抽离
 
 合同类型已从根 adapters 迁入中立包 `edge-server/internal/orchestration/`（唯一权威）：`TaskStatus`（+4 常量）、`PlanTask`、`ExecutionPlan`、`PlanApprovalConfig`、`PendingPlan`、`PlanDecision`。根 `adapters` 通过 `contract_aliases.go` 的 type alias 保持零调用点改动（含外部 `internal/api/handlers_approvals.go` 的 `adapters.PlanDecision`）。
 
-新依赖图：
+合同依赖方向（本步已验证）：
 
 ```text
 internal/orchestration（无依赖，中立合同）
       ↑
 internal/adapters（contract_aliases.go 引用合同）
-      ↑
-internal/adapters/orchestrator（Step 2 叶子包；import 根 adapters 用 EventEmitter/AgentAdapter/Registry/PlanApprovalBroker）
 ```
+
+**边界**：本步只收敛合同 SSOT，**不解决** Step 2 叶子包的完整依赖环（orchestrator.go 对根包 `AgentAdapter`/`EventEmitter`/`Registry`/`PlanApprovalBroker` 等符号的强依赖仍在；其解环方案见 §6.1 裁决）。
 
 回归门禁（`internal/adapters/orchestrator/orchestrator_extract_preflight_test.go`）：
 
@@ -143,30 +143,28 @@ internal/adapters/orchestrator（Step 2 叶子包；import 根 adapters 用 Even
 - `TestOrchestrationContractNeutral`：orchestration 不得依赖 adapters（`go list -deps` 断言）。
 - `TestContractTypesOwnedByOrchestration`：合同类型在 adapters 只允许 alias 形式（防双 SSOT 与环回退）。
 
-### 6.1 Step 2 可移动文件清单（依赖 #1526 合并）
+### 6.1 Step 2 方向（已裁决 2026-08-03）：插件式单向依赖
 
-源文件（13）：`orchestrator.go`、`orchestrator_dag.go`、`orchestrator_dispatch_handle.go`、`orchestrator_dispatch_interceptor.go`、`orchestrator_dispatch_parse.go`、`orchestrator_dispatch_results.go`、`orchestrator_failure.go`、`orchestrator_failure_circuit.go`、`orchestrator_failure_classify.go`、`orchestrator_failure_recovery.go`、`orchestrator_ids.go`、`orchestrator_payloads.go`、`orchestrator_prompt.go`。
-测试文件（5）：`orchestrator_dag_robust_test.go`、`orchestrator_dag_test.go`、`orchestrator_e2e_test.go`、`orchestrator_failure_test.go`、`orchestrator_residual_test.go`。
+**否决** A-V4 式"根包 alias 叶子包"迁移路径（原方案：根包 `type OrchestratorAdapter = orchestrator.OrchestratorAdapter` + `var NewOrchestratorAdapter = ...`，同时叶子包 import 根包）——根包反向 import 叶子包 + 叶子包 import 根包必然成环。且 orchestrator.go 对根包的强依赖远不止六个 plan 类型（`ClaudeCodeAdapter`、`SubAgentSpawner`、`AdapterMetadata`、`AgentCapabilities`、`RunProcessContext`、`FailureRecoveryManager`、`CtxBudgetKey` 等），不可能靠继续抽合同解开；继续抽会把定向拆分扩散成 adapters 全面合同重构（已被驳回的大拆包）。
 
-移动后 `adapters/adapter.go` 追加 alias：`OrchestratorAdapter`、`PlanParseError`、构造器（如外部使用）。
+**采用插件式单向依赖**：
 
-A-V4（commit `c006e9f8`）已验证的模式：把类型/构造器从原包移到新叶子包，原包留 `type X = leaf.X` alias + `var NewX = leaf.NewX`，**零调用点改动**。
+```text
+internal/adapters
+       ↑ import 根合同/实现
+internal/adapters/orchestrator（叶子包，只 import 根 adapters）
 
-对 `adapters/orchestrator` 抽取：
+cmd/agenthub-edge（composition root）
+       ├── import adapters
+       └── import adapters/orchestrator（注册/构造/装配）
+```
 
-1. 新建 `edge-server/internal/adapters/orchestrator/`，移入 13 个 `orchestrator_*.go`（含测试），改 `package orchestrator`。
-2. `adapters/adapter.go` 追加 alias：
-   - `type OrchestratorAdapter = orchestrator.OrchestratorAdapter`
-   - `type ExecutionPlan = orchestrator.ExecutionPlan`
-   - `type PlanTask = orchestrator.PlanTask`
-   - `type PlanApprovalBroker = orchestrator.PlanApprovalBroker`
-   - `type PlanParseError = orchestrator.PlanParseError`
-   - 构造器：`var NewOrchestratorAdapter = orchestrator.NewOrchestratorAdapter`（若被外部用）
-3. orchestrator 内部对根包符号（`EventEmitter`/`AgentAdapter`/`Registry`/`AgentHook` 等）的引用，改为 import 根 `adapters` 包。检查不形成循环：orchestrator → adapters（根），根不再 import orchestrator（只通过 alias，alias 不产生编译期依赖循环——Go type alias 是纯编译期替换，但 `var New... = leaf.New` 会产生根→叶子的 import；这是单向下行边，合法）。
-4. 受影响外部点（≤13）因 alias 零改动；仅在 grep 确认无 `package orchestrator` 字面量残留后合入。
-5. `go build ./edge-server/...` + `go test ./edge-server/internal/adapters/... ./edge-server/internal/lifecycle/...` 全过为合入门禁。
+- 新 orchestrator 包允许依赖根 adapters；根 adapters **绝不**反向 import orchestrator。
+- 不保留根包 `OrchestratorAdapter` alias；orchestrator 的注册、构造、装配移到 composition root（`cmd/agenthub-edge`）。
+- 少量调用点（≤15 处）直接迁移到新包，接受真实 import 调整，换取真正单向依赖。
+- 移动文件清单不变（13 源 + 5 测试，见 §1 子域图谱 E）。
 
-**风险点**：orchestrator 子域内部对 `adapters.EventEmitter`/`adapters.HookChain` 等根符号的引用会变成 `orchestrator` → `adapters`（根）的上行边；由于根通过 `var New...` 反向引用叶子构造器，需确认这不会在测试中形成 import cycle。A-V4 已演示同一形态（`service` ↔ `bus`）可行，但 adapters 内部互引密度更高，**Step 0 须先跑 `goimports` 预演 + `go vet` 验无环**。
+Step 2 合入门禁：`go build ./...`、`go test ./internal/adapters/... ./internal/lifecycle/...`、`go vet ./...`、`golangci-lint run ./...` 全过；`go list -deps ./internal/adapters/` 证明根包不含 `internal/adapters/orchestrator`。
 
 ## 7. 门禁影响
 
