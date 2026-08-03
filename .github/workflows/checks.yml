@@ -122,16 +122,17 @@ jobs:
         with:
           working-directory: hub-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=5m
+          args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json
 
       # #1573: finding fingerprint ratchet — any finding NOT in the baseline
       # (new linter, new rule, escalated severity, replacement with same count)
       # hard-fails this job even though the raw Lint step above stays advisory
-      # until the debt is repaid to zero.
+      # until the debt is repaid to zero. Reads the same JSON report the Lint
+      # step just produced (single source, no version drift).
       - name: Verify Hub lint fingerprint ratchet (#1573)
         working-directory: .
         shell: pwsh
-        run: ./scripts/verify/verify-hub-lint-ratchet.ps1
+        run: ./scripts/verify/verify-hub-lint-ratchet.ps1 -LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
 
       - name: Self-test Hub lint fingerprint ratchet
         working-directory: .

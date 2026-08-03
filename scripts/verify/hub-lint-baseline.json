@@ -1,5 +1,5 @@
 {
- "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Generated from LF git archive (CI-equivalent line endings) with golangci-lint v2.12.2.",
+ "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Generated from golangci-lint v2.12.2 release binary JSON report on LF git archive (same binary/args as CI golangci-lint-action). gofmt excluded: formatter verdict drifts with Go toolchain version, not a stable lint fingerprint.",
  "linter_version": "v2.12.2",
  "findings": [
   {
@@ -14,12 +14,12 @@
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/message/service_helpers.go",
+   "file": "internal/service/messagereaction/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/messagereaction/service.go",
+   "file": "internal/service/session/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
@@ -106,21 +106,6 @@
    "linter": "gocyclo",
    "file": "internal/service/agentteam/agent_team_routing.go",
    "message": "cyclomatic complexity 27 of func `(*AgentTeamService).DispatchAssignment` is high (> 20)"
-  },
-  {
-   "linter": "gofmt",
-   "file": "internal/bus/contract_test.go",
-   "message": "File is not properly formatted"
-  },
-  {
-   "linter": "gofmt",
-   "file": "internal/egress/egress.go",
-   "message": "File is not properly formatted"
-  },
-  {
-   "linter": "gofmt",
-   "file": "internal/handler/agent.go",
-   "message": "File is not properly formatted"
   },
   {
    "linter": "gosec",

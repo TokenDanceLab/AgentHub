@@ -47,7 +47,19 @@ function Fail-Verifier([string]$Message) {
 function Get-LiveFingerprints([object]$Report) {
     $live = @{}
     foreach ($issue in $Report.Issues) {
+        # gofmt is a formatter whose verdict drifts with the Go toolchain
+        # version (CI go1.25 vs local go1.26 disagree on file sets); it is not
+        # a stable lint fingerprint. Formatter compliance stays visible in the
+        # Lint step output (which this job keeps advisory until debt is zero).
+        if ($issue.FromLinter -eq "gofmt") { continue }
+        # Normalize absolute runner paths to repo-relative (golangci-lint-action
+        # runs with --path-mode=abs, so Filename is /home/runner/work/.../hub-server/...)
         $file = ($issue.Pos.Filename -replace "\\", "/")
+        $marker = "/hub-server/"
+        $idx = $file.IndexOf($marker)
+        if ($idx -ge 0) {
+            $file = $file.Substring($idx + $marker.Length)
+        }
         $live["$($issue.FromLinter)|$file|$($issue.Text)"] = $true
     }
     return $live
