@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -105,9 +106,9 @@ func TestPublishTeamSubagentStream_NoTeamRun_NoEvent(t *testing.T) {
 		EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
 
-	for b.Running() > 0 || b.Pending() > 0 {
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
 	require.False(t, got.Load(), "no team.subagent.stream event when session has no team run")
 }
 
@@ -166,9 +167,9 @@ func TestPublishTeamSubagentStream_UsesCacheOnSecondEvent(t *testing.T) {
 		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
 		EventSeq: 1, EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
-	for b.Running() > 0 || b.Pending() > 0 {
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
 	require.Equal(t, int32(1), count.Load())
 
 	// Mutate the DB to "lose" the team run. A second event for the same task
@@ -181,9 +182,9 @@ func TestPublishTeamSubagentStream_UsesCacheOnSecondEvent(t *testing.T) {
 		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
 		EventSeq: 2, EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
-	for b.Running() > 0 || b.Pending() > 0 {
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
 	require.Equal(t, int32(2), count.Load(), "second event should publish from cache without DB")
 }
 
@@ -256,9 +257,9 @@ func TestHandleTaskStream_NonTeamRun_PublishesOnlyAgentStream(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("agent.stream event was not published")
 	}
-	for b.Running() > 0 || b.Pending() > 0 {
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
 	require.False(t, teamGot.Load(), "team.subagent.stream must not fire for non-team-run session")
 }
 

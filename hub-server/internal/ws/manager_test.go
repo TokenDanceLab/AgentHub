@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/require"
 )
@@ -73,16 +74,18 @@ func TestManagerShutdown_UnblocksWriteLoopGoroutines(t *testing.T) {
 	m.mu.Unlock()
 
 	// Simulate a writeLoop goroutine blocked on the Send channel.
+	writeLoopStarted := make(chan struct{})
 	writeLoopExited := make(chan struct{})
 	go func() {
+		close(writeLoopStarted)
 		defer close(writeLoopExited)
 		for range c.Send {
 			// In real code this would write to WebSocket; here we just drain.
 		}
 	}()
 
-	// Give the goroutine time to block on range.
-	time.Sleep(50 * time.Millisecond)
+	// Wait until the goroutine is blocking on range instead of a fixed sleep.
+	testkit.WaitFor(t, 2*time.Second, writeLoopStarted, "writeLoop goroutine did not start")
 
 	m.Shutdown()
 
@@ -434,16 +437,18 @@ func TestWebSocketManagerShutdownFullLifecycle(t *testing.T) {
 		t.Fatalf("dial websocket: %v", err)
 	}
 
-	// Wait for registration.
-	time.Sleep(100 * time.Millisecond)
-	if manager.Count() != 1 {
-		t.Fatalf("Count = %d, want 1", manager.Count())
-	}
+	// Wait for registration (deadline poll instead of a fixed sleep).
+	testkit.Eventually(t, 2*time.Second, func() bool { return manager.Count() == 1 },
+		"connection never registered", func() string {
+			return fmt.Sprintf("Count = %d", manager.Count())
+		})
 
 	// Shutdown the manager (close channels, connections).
 	manager.Shutdown()
 
-	time.Sleep(200 * time.Millisecond)
+	// Wait for the connection to be unregistered instead of a fixed sleep.
+	testkit.Eventually(t, 2*time.Second, func() bool { return manager.Count() == 0 },
+		"connection not closed after Shutdown", nil)
 
 	// Connection should have been closed by shutdown.
 	_, _, err = conn.Read(context.Background())
@@ -731,8 +736,8 @@ func TestManagerConcurrentPushToConn(t *testing.T) {
 	// Verify all messages were delivered (none dropped).
 	for _, c := range conns {
 		count := len(c.Send)
-		require.GreaterOrEqual(t, count, 3)   // at least some per conn
-		require.LessOrEqual(t, count, 20)     // not more than total sends
+		require.GreaterOrEqual(t, count, 3) // at least some per conn
+		require.LessOrEqual(t, count, 20)   // not more than total sends
 	}
 	require.Equal(t, numConns, m.Count())
 }
