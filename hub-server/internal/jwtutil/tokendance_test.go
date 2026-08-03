@@ -22,8 +22,9 @@ func TestParseTokenDanceJWTRequiresExpectedIssuerAndAudience(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	// Instance-owned verifier (#1551): no process-global JWKS state.
-	v := NewTokenDanceVerifier(server.URL)
+	// Instance-owned verifier (#1551/#1564): no process-global JWKS state;
+	// the transport/cache policy is injected explicitly.
+	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
 
 	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
 
@@ -104,8 +105,8 @@ func TestTokenDanceVerifierInstancesIndependent(t *testing.T) {
 	// Token signed with B's key — only verifier B must accept it.
 	tokenB := signTokenDanceTestToken(t, privB, "https://issuer.example", "agenthub-client")
 
-	vA := NewTokenDanceVerifier(srvA.URL)
-	vB := NewTokenDanceVerifier(srvB.URL)
+	vA := NewTokenDanceVerifier(srvA.URL, VerifierConfig{})
+	vB := NewTokenDanceVerifier(srvB.URL, VerifierConfig{})
 
 	// Force A's cache to populate first (it fetches B's server URL — no,
 	// A points at srvA which serves jwksA; the token needs B's key, so A

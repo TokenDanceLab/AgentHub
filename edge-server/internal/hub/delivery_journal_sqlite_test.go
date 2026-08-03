@@ -3,6 +3,8 @@ package hub
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/agenthub/edge-server/internal/edgehttp"
 )
 
 func TestSQLiteDeliveryJournal_PersistsAcrossOpen(t *testing.T) {
@@ -64,7 +66,7 @@ func TestSQLiteDeliveryJournal_HasSuccessful(t *testing.T) {
 func TestCallbackClient_DurableSnapshotPrefersSQLite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "journal.db")
-	c := NewCallbackClient("http://example.invalid", "")
+	c := NewCallbackClient("http://example.invalid", "", edgehttp.NewClient(0), DefaultCallbackConfig())
 	if err := c.EnableSQLiteJournal(path); err != nil {
 		t.Fatalf("enable: %v", err)
 	}
@@ -91,7 +93,7 @@ func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
 	path := filepath.Join(dir, "journal.db")
 
 	// 1. Enable SQLite journal and record a mixed offline window.
-	c1 := NewCallbackClient("http://example.invalid", "")
+	c1 := NewCallbackClient("http://example.invalid", "", edgehttp.NewClient(0), DefaultCallbackConfig())
 	if err := c1.EnableSQLiteJournal(path); err != nil {
 		t.Fatalf("enable: %v", err)
 	}
@@ -107,7 +109,7 @@ func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
 	}
 
 	// 2. Reopen as a fresh CallbackClient (simulates Edge restart).
-	c2 := NewCallbackClient("http://example.invalid", "")
+	c2 := NewCallbackClient("http://example.invalid", "", edgehttp.NewClient(0), DefaultCallbackConfig())
 	if err := c2.EnableSQLiteJournal(path); err != nil {
 		t.Fatalf("reopen enable: %v", err)
 	}

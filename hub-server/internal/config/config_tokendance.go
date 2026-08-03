@@ -1,6 +1,9 @@
 package config
 
-import "log/slog"
+import (
+	"log/slog"
+	"time"
+)
 
 // Residual pure-helper peel #1134: TokenDance ID OIDC/OAuth2 config section.
 
@@ -18,6 +21,13 @@ type TokenDanceIDConfig struct {
 	RedirectURI string `mapstructure:"redirect_uri"`
 	// AllowedRedirectURIs lists additional browser/native callbacks accepted for one OIDC round trip.
 	AllowedRedirectURIs []string `mapstructure:"allowed_redirect_uris"`
+	// HTTPTimeout bounds the OIDC token-exchange and JWKS fetch requests
+	// (#1564). Zero falls back to 10s. Env: AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT.
+	HTTPTimeout time.Duration `mapstructure:"http_timeout"`
+	// MaxResponseBodyBytes is the fail-closed cap on provider token/JWKS
+	// response bodies (#1564). Zero falls back to 64 KiB.
+	// Env: AGENTHUB_TOKENDANCE_ID_MAX_RESPONSE_BODY_BYTES.
+	MaxResponseBodyBytes int64 `mapstructure:"max_response_body_bytes"`
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -29,5 +39,7 @@ func (t TokenDanceIDConfig) LogValue() slog.Value {
 		slog.String("client_secret", "[REDACTED]"),
 		slog.String("redirect_uri", t.RedirectURI),
 		slog.Any("allowed_redirect_uris", t.AllowedRedirectURIs),
+		slog.Duration("http_timeout", t.HTTPTimeout),
+		slog.Int64("max_response_body_bytes", t.MaxResponseBodyBytes),
 	)
 }

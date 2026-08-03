@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/agenthub/hub-server/internal/outboundhttp"
 )
 
 // TokenDanceClaims holds OIDC standard claims from a TokenDance ID-issued JWT.
@@ -22,6 +24,36 @@ type TokenDanceClaims struct {
 	jwt.RegisteredClaims
 }
 
+// VerifierConfig is the explicit URI/transport/cache policy for a
+// TokenDanceVerifier (#1564). Zero fields fall back to the defaults below;
+// the HTTP client, body cap and refresh TTL are all injected — never read
+// from package globals.
+type VerifierConfig struct {
+	// HTTPClient is the outbound client used for JWKS fetches. Built by the
+	// composition root (outboundhttp.NewClient); nil falls back to the
+	// default policy client.
+	HTTPClient *http.Client
+	// CacheTTL is how long a fetched JWKS is trusted before refresh
+	// (default 1h).
+	CacheTTL time.Duration
+	// MaxBodyBytes is the fail-closed cap on the JWKS response body
+	// (default 64 KiB).
+	MaxBodyBytes int64
+}
+
+func (c VerifierConfig) withDefaults() VerifierConfig {
+	if c.HTTPClient == nil {
+		c.HTTPClient = outboundhttp.NewClient(0)
+	}
+	if c.CacheTTL <= 0 {
+		c.CacheTTL = time.Hour
+	}
+	if c.MaxBodyBytes <= 0 {
+		c.MaxBodyBytes = 64 * 1024
+	}
+	return c
+}
+
 // jwksCache caches the JWKS response from TokenDance ID.
 type jwksCache struct {
 	mu      sync.RWMutex
@@ -29,6 +61,8 @@ type jwksCache struct {
 	fetched time.Time
 	jwksURI string
 	ttl     time.Duration
+	client  *http.Client
+	maxBody int64
 }
 
 // TokenDanceVerifier validates TokenDance ID-issued RS256 JWTs against a
@@ -39,9 +73,17 @@ type TokenDanceVerifier struct {
 	cache *jwksCache
 }
 
-// NewTokenDanceVerifier builds a verifier for the given JWKS endpoint.
-func NewTokenDanceVerifier(jwksURI string) *TokenDanceVerifier {
-	return &TokenDanceVerifier{cache: &jwksCache{jwksURI: jwksURI, ttl: 1 * time.Hour}}
+// NewTokenDanceVerifier builds a verifier for the given JWKS endpoint with an
+// explicit transport/cache policy (#1564). Pass VerifierConfig{} for the
+// defaults.
+func NewTokenDanceVerifier(jwksURI string, cfg VerifierConfig) *TokenDanceVerifier {
+	cfg = cfg.withDefaults()
+	return &TokenDanceVerifier{cache: &jwksCache{
+		jwksURI: jwksURI,
+		ttl:     cfg.CacheTTL,
+		client:  cfg.HTTPClient,
+		maxBody: cfg.MaxBodyBytes,
+	}}
 }
 
 // jwksResponse is the JSON structure returned by an OIDC JWKS endpoint.
@@ -78,8 +120,7 @@ func (c *jwksCache) fetchJWKS() error {
 		return fmt.Errorf("jwks_uri not configured")
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(c.jwksURI)
+	resp, err := c.client.Get(c.jwksURI)
 	if err != nil {
 		return fmt.Errorf("jwks fetch failed: %w", err)
 	}
@@ -89,8 +130,15 @@ func (c *jwksCache) fetchJWKS() error {
 		return fmt.Errorf("jwks fetch returned %d", resp.StatusCode)
 	}
 
+	// Fail-closed body cap: an oversized JWKS document is a protocol
+	// anomaly and is refused, never streamed into memory unbounded.
+	body, err := outboundhttp.ReadLimited(resp.Body, c.maxBody)
+	if err != nil {
+		return fmt.Errorf("jwks fetch body limit: %w", err)
+	}
+
 	var jwks jwksResponse
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+	if err := json.Unmarshal(body, &jwks); err != nil {
 		return fmt.Errorf("jwks parse failed: %w", err)
 	}
 

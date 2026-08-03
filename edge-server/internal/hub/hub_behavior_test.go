@@ -35,7 +35,7 @@ func TestNewCallbackClient_TrimsTrailingSlash(t *testing.T) {
 	defer srv.Close()
 
 	// Re-create client pointing at the test server with trailing slash.
-	client := hub.NewCallbackClient(srv.URL+"/", "token")
+	client := newTestCallbackClient(srv.URL+"/", "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -44,7 +44,7 @@ func TestNewCallbackClient_TrimsTrailingSlash(t *testing.T) {
 
 func TestNewCallbackClient_EmptyURL(t *testing.T) {
 	// An empty URL should not panic; the request will just fail at HTTP level.
-	client := hub.NewCallbackClient("", "token")
+	client := newTestCallbackClient("", "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for empty base URL")
@@ -135,7 +135,7 @@ func TestCallbackClient_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(ctx, "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected timeout error")
@@ -158,7 +158,7 @@ func TestCallbackClient_MaxRetriesExhausted(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error after exhausting 3 retries")
@@ -183,7 +183,7 @@ func TestCallbackClient_SuccessWithoutJSONBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("expected success for 2xx without JSON body, got: %v", err)
@@ -207,7 +207,7 @@ func TestCallbackClient_SuccessWithUnknownAppCode(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for non-OK app code")
@@ -234,7 +234,7 @@ func TestCallbackClient_SuccessWithMalformedJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("expected success for 2xx with malformed JSON, got: %v", err)
@@ -260,7 +260,7 @@ func TestCallbackClient_TaskStreamReader_Empty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", strings.NewReader(""))
 	if err != nil {
 		t.Fatalf("unexpected error for empty reader: %v", err)
@@ -289,7 +289,7 @@ func TestCallbackClient_TaskStreamReader_SingleByteChunks(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	// Use a reader with chunk size = 1 byte
 	reader := bytes.NewReader([]byte("ABC"))
 	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", reader)
@@ -329,7 +329,7 @@ func TestCallbackClient_TaskStreamReader_ServerErrorsContinue(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	reader := strings.NewReader("chunk1\nchunk2\nchunk3\n")
 	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", reader)
 	if err != nil {
@@ -357,7 +357,7 @@ func TestCallbackClient_SpecialTaskID(t *testing.T) {
 	defer srv.Close()
 
 	// TaskID with spaces and special chars that should be URL-encoded
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task with spaces & symbols?", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -388,7 +388,7 @@ func TestCallbackClient_Concurrent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 
 	const goroutines = 10
 	var wg sync.WaitGroup
@@ -440,7 +440,7 @@ func TestCallbackClient_RetryStopsAt4xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for 400 response")
@@ -465,7 +465,7 @@ func TestCallbackClient_Non200Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("expected success for 201 with OK code, got: %v", err)
@@ -492,7 +492,7 @@ func TestCallbackClient_TaskDoneSendsAllFields(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "token")
+	client := newTestCallbackClient(srv.URL, "token")
 	err := client.TaskDone(context.Background(), "task-001", hub.TaskResult{
 		RunID:        "run-xyz",
 		FinalContent: "multi\nline\noutput",

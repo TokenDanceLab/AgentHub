@@ -452,7 +452,7 @@ func TestTokenDanceOIDC_E2E_JWKSValidation(t *testing.T) {
 
 	// Parse the token with an instance verifier (#1551) — fetches JWKS from
 	// the mock server without touching process-global state.
-	claims, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(idToken, issuer, aud)
+	claims, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(idToken, issuer, aud)
 	require.NoError(t, err)
 	assert.Equal(t, sub, claims.Subject)
 	assert.Equal(t, sub+"@tokendance.test", claims.Email)
@@ -476,7 +476,7 @@ func TestTokenDanceOIDC_E2E_WrongIssuer(t *testing.T) {
 	idToken := signMockIDToken(t, privKey, kid, aud, badIssuer, sub)
 
 	// Parse should reject — issuer mismatch
-	_, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(idToken, mockSrv.URL, aud)
+	_, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(idToken, mockSrv.URL, aud)
 	assert.Error(t, err, "should reject token from wrong issuer")
 
 	_ = ctx
@@ -497,7 +497,7 @@ func TestTokenDanceOIDC_E2E_WrongAudience(t *testing.T) {
 	idToken := signMockIDToken(t, privKey, kid, badAud, issuer, sub)
 
 	// Parse should reject — audience mismatch
-	_, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(idToken, issuer, "agenthub-desktop")
+	_, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(idToken, issuer, "agenthub-desktop")
 	assert.Error(t, err, "should reject token for wrong audience")
 
 	_ = ctx
@@ -533,7 +533,7 @@ func TestTokenDanceOIDC_E2E_ExpiredToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Parse should reject as expired (30s leeway won't cover 1h)
-	_, err = jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(signed, issuer, aud)
+	_, err = jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(signed, issuer, aud)
 	assert.Error(t, err, "should reject expired token")
 
 	_ = ctx
@@ -614,18 +614,18 @@ func TestTokenDanceOIDC_E2E_MultipleClients(t *testing.T) {
 
 	// Client A
 	tokenA := signMockIDToken(t, privKey, kid, "client-a", issuer, "user-x")
-	claimsA, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(tokenA, issuer, "client-a")
+	claimsA, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(tokenA, issuer, "client-a")
 	require.NoError(t, err)
 	assert.Equal(t, "user-x", claimsA.Subject)
 
 	// Client B
 	tokenB := signMockIDToken(t, privKey, kid, "client-b", issuer, "user-y")
-	claimsB, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(tokenB, issuer, "client-b")
+	claimsB, err := jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(tokenB, issuer, "client-b")
 	require.NoError(t, err)
 	assert.Equal(t, "user-y", claimsB.Subject)
 
 	// Cross-validation should fail: client-a token with client-b aud
-	_, err = jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks").ParseJWT(tokenB, issuer, "client-a")
+	_, err = jwtutil.NewTokenDanceVerifier(mockSrv.URL+"/oidc/jwks", jwtutil.VerifierConfig{}).ParseJWT(tokenB, issuer, "client-a")
 	assert.Error(t, err, "cross-client validation should fail")
 
 	_ = ctx
