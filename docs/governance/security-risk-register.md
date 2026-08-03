@@ -4,6 +4,10 @@
 
 本文件只记录当前安全风险队列、发布门禁和验证入口。2026-06-27 前的完整历史登记表见 [../history.md](../history.md)。
 
+## SAST 门禁（gosec，#1574）
+
+Hub/Edge 的 `Security scan (gosec)` step 自 #1574 起 hard fail（不再 `continue-on-error`），`quality-debt-baseline.json` 中两条 gosec soft gate 已删除。当前 gosec 告警数为 0，处置记录见 PR #1574：真实修复（G104 unhandled error、G301/G302/G306 权限收紧、G115 溢出防护、G401/G501/G505 弱哈希替换、G306 WriteFile 权限）；窄抑制（G101 常量、G304 服务端/配置路径、G404 jitter、G204 子进程、G202 参数化 SQL、G703 受 isPathWithin 防护、G122 本地打包 walk）；负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`。
+
 ## 发布门禁
 
 - `Critical` / `High` 且状态为 `Open`、`rotate required`、`deploy verification required`、`client verification required` 或 `runtime/log verification required` 的风险，默认阻断公开发布。

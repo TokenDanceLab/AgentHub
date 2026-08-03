@@ -25,6 +25,7 @@ func NewRunOutputStore(runID string) (*RunOutputStore, error) {
 	dir := os.TempDir()
 	filename := fmt.Sprintf("agenthub-run-%s.log", runID)
 	path := filepath.Join(dir, filename)
+	// #nosec G304 -- server-generated temp path (os.TempDir + runID filename)
 	f, err := os.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("create run output file %s: %w", path, err)

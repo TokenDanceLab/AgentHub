@@ -66,7 +66,9 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, event)
+	if err := s.bus.Publish(ctx, event); err != nil {
+		slog.Warn("failed to publish contact event", "event_type", event.Type, "error", err)
+	}
 }
 
 // resolveCache returns c, falling back to cache.NoOpCache when c is nil or a

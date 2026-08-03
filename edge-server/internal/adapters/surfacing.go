@@ -8,7 +8,7 @@
 package adapters
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"io/fs"
@@ -46,7 +46,7 @@ const (
 type fileRecord struct {
 	Size    int64
 	ModTime time.Time
-	Hash    string // MD5 hex digest
+	Hash    string // SHA-256 hex digest
 	Content string // pre-run content (text files, capped at maxSnapshotFileBytes)
 }
 
@@ -122,18 +122,19 @@ func captureSnapshotEntry(s *WorkdirSnapshot, workDir, path string, d fs.DirEntr
 		ModTime: fi.ModTime(),
 	}
 
-	// Compute MD5 hash.
+	// #nosec G304 -- path comes from walking the user's own run workdir
 	f, err := os.Open(path)
 	if err != nil {
 		return
 	}
-	h := md5.New()
+	h := sha256.New()
 	_, _ = io.Copy(h, io.LimitReader(f, maxSnapshotFileBytes))
-	f.Close()
+	_ = f.Close()
 	rec.Hash = hex.EncodeToString(h.Sum(nil))
 
 	// Store content for text files (enables diff generation).
 	if isTextFilePath(relPath) && fi.Size() <= maxSnapshotFileBytes {
+		// #nosec G304 -- path comes from walking the user's own run workdir
 		data, err := os.ReadFile(path)
 		if err == nil {
 			rec.Content = string(data)

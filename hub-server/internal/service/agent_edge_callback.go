@@ -45,6 +45,17 @@ func (f seqAllocatorFunc) allocateSeq(ctx context.Context, sessionID string) (in
 	return f(ctx, sessionID)
 }
 
+// publishToBus best-effort 发布总线事件：bus 未注入或发布失败都只记日志，
+// 永不失败调用方（#1478 语义延续；#1574 显式处理返回值）。
+func (s *EdgeCallbackService) publishToBus(ctx context.Context, event bus.Event, warnMsg string, warnAttrs ...any) {
+	if s.bus == nil {
+		return
+	}
+	if err := s.bus.Publish(ctx, event); err != nil {
+		slog.Warn(warnMsg, append(warnAttrs, "error", err)...)
+	}
+}
+
 // EdgeCallbackService owns Edge task ack/stream/done/fail orchestration.
 // Pure validation/normalization lives in service/agentevent; bus/seq/outbox are injected.
 type EdgeCallbackService struct {
@@ -263,8 +274,8 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
-		s.bus.Publish(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent})
+		s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
+		s.publishToBus(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}, "failed to publish agent-stream event", "task_id", taskID)
 		// #1478 Phase A: fan the same run event into the team-run view when the
 		// run belongs to a team run. No-op when the session is not a team run;
 		// never fails the chat-side stream path that already succeeded above.
@@ -296,17 +307,15 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 		return
 	}
 
-	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{
-			Type: bus.EventTypeAgentRouteDecision,
-			Payload: RouteDecisionPayload{
-				UserID:   run.TriggerUserID,
-				TeamID:   run.TeamID,
-				RunID:    run.ID,
-				Decision: decision,
-			},
-		})
-	}
+	s.publishToBus(ctx, bus.Event{
+		Type: bus.EventTypeAgentRouteDecision,
+		Payload: RouteDecisionPayload{
+			UserID:   run.TriggerUserID,
+			TeamID:   run.TeamID,
+			RunID:    run.ID,
+			Decision: decision,
+		},
+	}, "failed to publish agent route decision event", "run_id", run.ID)
 }
 
 func (s *EdgeCallbackService) transitionDispatchedTaskToRunning(taskID string) error {
@@ -407,7 +416,7 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 			}
 		}
 		if s.bus != nil {
-			s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
+			s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
 		}
 	}
 
@@ -415,11 +424,11 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
+		s.publishToBus(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
 			TaskID:          taskID,
 			AgentInstanceID: task.AgentInstanceID,
 			SessionID:       ai.SessionID,
-		}})
+		}}, "failed to publish agent-done event", "task_id", taskID)
 	}
 
 	return nil
@@ -461,14 +470,14 @@ func (s *EdgeCallbackService) HandleTaskFail(ctx context.Context, edgeUserID, ed
 	}
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: "agent.failed", Payload: bus.AgentFailedPayload{
+		s.publishToBus(ctx, bus.Event{Type: "agent.failed", Payload: bus.AgentFailedPayload{
 			AgentTaskPayload: bus.AgentTaskPayload{
 				TaskID:          taskID,
 				AgentInstanceID: task.AgentInstanceID,
 				SessionID:       ai.SessionID,
 			},
 			Error: errMsg,
-		}})
+		}}, "failed to publish agent-failed event", "task_id", taskID)
 	}
 
 	return nil
