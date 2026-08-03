@@ -347,6 +347,8 @@ func readSettings(db *sql.DB, keys ...string) (map[string]string, error) {
 			placeholders[i] = "?"
 			args = append(args, k)
 		}
+		// #nosec G202 -- only static "?" placeholders are concatenated; all
+		// values are bound via args (parameterized query, no injection).
 		query += ` WHERE key IN (` + strings.Join(placeholders, ",") + `)`
 	}
 

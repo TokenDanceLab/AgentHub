@@ -89,7 +89,6 @@ jobs:
         run: go test ./... -count=1 -short -race
 
       - name: Security scan (gosec)
-        continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vet
         run: go vet ./...
@@ -164,7 +163,6 @@ jobs:
         run: go test ./... -count=1 -short -race
 
       - name: Security scan (gosec)
-        continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vet

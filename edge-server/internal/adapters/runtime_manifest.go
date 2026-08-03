@@ -63,6 +63,7 @@ type RuntimeManifestAdapter struct {
 }
 
 func LoadRuntimeManifestFile(path string) (RuntimeManifestV1, error) {
+	// #nosec G304 -- manifest path comes from operator config
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return RuntimeManifestV1{}, fmt.Errorf("read runtime manifest %q: %w", path, err)

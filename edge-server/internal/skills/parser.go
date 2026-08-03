@@ -11,6 +11,7 @@ import (
 // (name, description, triggers) without reading the full body.
 // This is the lightweight parse used during Discover.
 func ParseFrontmatter(path string) (*Skill, error) {
+	// #nosec G304 -- skill paths come from the configured skills dir (operator)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("skills: open %s: %w", path, err)
@@ -61,6 +62,7 @@ func ParseFrontmatter(path string) (*Skill, error) {
 // ParseBody reads only the markdown body (content after the closing "---"
 // delimiter) from a SKILL.md file.
 func ParseBody(path string) (string, error) {
+	// #nosec G304 -- skill paths come from the configured skills dir (operator)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("skills: read %s: %w", path, err)

@@ -29,7 +29,8 @@ func newAuditFileSink(filePath string) (*auditFileSink, error) {
 	if filePath == "" {
 		return nil, nil
 	}
-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// #nosec G304 -- path comes from operator config (AuditLogFile), not request input
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, err
 	}

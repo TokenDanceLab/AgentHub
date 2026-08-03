@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -183,6 +183,6 @@ func persistSurfacedArtifact(writer store.Writer, run store.Run, sf SurfacedFile
 }
 
 func surfacedArtifactID(runID, relPath string) string {
-	h := md5.Sum([]byte(runID + ":" + relPath))
+	h := sha256.Sum256([]byte(runID + ":" + relPath))
 	return "surfaced_" + hex.EncodeToString(h[:8])
 }

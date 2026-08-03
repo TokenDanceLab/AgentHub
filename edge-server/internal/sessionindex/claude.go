@@ -102,6 +102,7 @@ func loadClaudeHistoryTitles(historyPath string) map[string]string {
 	if historyPath == "" {
 		return out
 	}
+	// #nosec G304 -- history path is built from the user's Claude config dir
 	f, err := os.Open(historyPath)
 	if err != nil {
 		return out

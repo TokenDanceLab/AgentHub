@@ -32,6 +32,7 @@ import (
 // Query access_token is intentionally not accepted: it leaks into proxy logs,
 // browser history, and Referer headers. Clients must migrate to Bearer,
 // X-AgentHub-Edge-Token, or Sec-WebSocket-Protocol.
+// #nosec G101 -- constant WS subprotocol marker, not a credential
 const WSEdgeBearerSubprotocol = "agenthub.edge.bearer.v1"
 
 // authTokenCandidates extracts all possible auth tokens from a request.

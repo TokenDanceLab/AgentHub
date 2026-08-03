@@ -2,6 +2,7 @@ package messagereaction
 
 import (
 	"context"
+	"log/slog"
 
 	"gorm.io/gorm"
 
@@ -46,7 +47,9 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, event)
+	if err := s.bus.Publish(ctx, event); err != nil {
+		slog.Warn("failed to publish reaction event", "event_type", event.Type, "error", err)
+	}
 }
 
 // MessageReactionResponse is the API/handler summary DTO for one reaction key.

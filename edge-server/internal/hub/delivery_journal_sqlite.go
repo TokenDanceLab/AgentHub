@@ -68,6 +68,9 @@ func (j *SQLiteDeliveryJournal) Record(taskID, runID, action string, ok bool, er
 	if err != nil {
 		return 0, err
 	}
+	if id < 0 {
+		return 0, fmt.Errorf("journal sequence negative: %d", id)
+	}
 	return uint64(id), nil
 }
 

@@ -131,7 +131,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error())))
 		return
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// SCP the archive to the remote host.
 	remotePath := DeployTargetPath() + "/" + req.Slug
@@ -216,6 +216,8 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 			continue
 		}
 
+		// #nosec G304 -- artifact content source is a path recorded by the edge
+		// itself from the run workspace; deploy packages the user's own artifacts.
 		f, err := os.Open(sourcePath)
 		if err != nil {
 			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "error", err)
@@ -223,13 +225,13 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 		}
 		info, err := f.Stat()
 		if err != nil {
-			f.Close()
+			_ = f.Close()
 			continue
 		}
 
 		if info.IsDir() {
 			// If it's a directory, walk and add all files.
-			f.Close()
+			_ = f.Close()
 			if err := addDirToArchive(tw, sourcePath); err != nil {
 				slog.Warn("deploy: failed to add directory", "path", sourcePath, "error", err)
 			}
@@ -242,20 +244,22 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 			Size: info.Size(),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
-			f.Close()
+			_ = f.Close()
 			return fmt.Errorf("write header: %w", err)
 		}
 		if _, err := io.Copy(tw, f); err != nil {
-			f.Close()
+			_ = f.Close()
 			return fmt.Errorf("copy file content: %w", err)
 		}
-		f.Close()
+		_ = f.Close()
 	}
 	return nil
 }
 
 // addDirToArchive recursively adds all files in a directory to the tar archive.
 func addDirToArchive(tw *tar.Writer, dirPath string) error {
+	// #nosec G122,G304 -- walk reads the user's own workspace artifact dir for
+	// deploy packaging; path originates from edge-recorded run content sources.
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip errors
@@ -290,6 +294,7 @@ func addDirToArchive(tw *tar.Writer, dirPath string) error {
 }
 
 // runSSHCommand executes a command on a remote host via SSH.
+// #nosec G204 -- deploy feature launches ssh to an operator-configured host
 func runSSHCommand(host string, args ...string) error {
 	sshArgs := append([]string{host}, args...)
 	cmd := exec.Command("ssh", sshArgs...)
@@ -299,6 +304,7 @@ func runSSHCommand(host string, args ...string) error {
 }
 
 // runSCP copies a local file to a remote host via SCP.
+// #nosec G204 -- deploy feature launches scp to an operator-configured host
 func runSCP(localPath, remoteDest string) error {
 	cmd := exec.Command("scp", "-q", localPath, remoteDest)
 	cmd.Stdout = nil
