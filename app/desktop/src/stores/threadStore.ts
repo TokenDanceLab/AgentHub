@@ -47,12 +47,11 @@ export const useThreadStore = create<ThreadState>()(
 
         selectAgentThread: (agentId, threadId) => {
           const { agentThreadMap } = get();
-          const nextMap = { ...agentThreadMap };
-          if (threadId) {
-            nextMap[agentId] = threadId;
-          } else {
-            delete nextMap[agentId];
-          }
+          const nextMap = threadId
+            ? { ...agentThreadMap, [agentId]: threadId }
+            : Object.fromEntries(
+              Object.entries(agentThreadMap).filter(([id]) => id !== agentId),
+            );
           set({
             selectedAgentId: agentId,
             selectedThreadId: threadId || null,

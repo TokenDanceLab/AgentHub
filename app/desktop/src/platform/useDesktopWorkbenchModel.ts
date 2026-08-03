@@ -123,7 +123,8 @@ function useEdgeAvailableForDemo(enabled: boolean): boolean {
   useEffect(() => {
     mountedRef.current = true;
     if (!enabled) {
-      setAvailable(false);
+      // State reset for the disabled branch happens via the render-time
+      // adjustment below; the effect only manages polling lifecycle.
       return;
     }
     queueMicrotask(() => { void poll(); });
@@ -133,6 +134,15 @@ function useEdgeAvailableForDemo(enabled: boolean): boolean {
       clearInterval(id);
     };
   }, [enabled, poll]);
+
+  // Adjust state during render when the enabled flag flips (sanctioned
+  // "adjusting state when a prop changes" pattern) so the poll result cannot
+  // be stale after re-enabling.
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled);
+    if (!enabled) setAvailable(false);
+  }
 
   return enabled && available;
 }
@@ -192,7 +202,7 @@ export function useDesktopWorkbenchModel(
 
   // Hub sessions & messages — IM conversation path (alongside Edge threads).
   const hubSessionsQuery = useHubSessions({ enabled: hubReady });
-  const hubSessions = hubSessionsQuery.data ?? [];
+  const hubSessions = useMemo(() => hubSessionsQuery.data ?? [], [hubSessionsQuery.data]);
 
   // Contact mutation hooks.
   const searchUserMutation = useHubSearchUser();
@@ -216,7 +226,10 @@ export function useDesktopWorkbenchModel(
   // Enable Edge queries in demo mode when Edge is available.
   const edgeEnabled = !useDemo || useEdgeDemoData;
   const threadsQuery = useThreads(undefined, { enabled: edgeEnabled });
-  const threads = edgeEnabled ? (threadsQuery.data?.items ?? []) : [];
+  const threads = useMemo(
+    () => (edgeEnabled ? (threadsQuery.data?.items ?? []) : []),
+    [edgeEnabled, threadsQuery.data?.items],
+  );
 
   // Determine whether to use Hub sessions as the primary conversation source.
   // Hub sessions provide IM/social conversations; Edge threads provide execution threads.
@@ -248,7 +261,7 @@ export function useDesktopWorkbenchModel(
 
   // Hub session messages (IM path) — only when a Hub session is active.
   const hubMessagesQuery = useHubMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
-  const hubMessages = hubMessagesQuery.data ?? [];
+  const hubMessages = useMemo(() => hubMessagesQuery.data ?? [], [hubMessagesQuery.data]);
 
   // Hub session pins — seed the pinMap store from GET /client/sessions/{id}/pins.
   // Keyed per session (query key matches hubQueryKeys.threads.pins, which
@@ -278,8 +291,8 @@ export function useDesktopWorkbenchModel(
           thread.threadId === activeThread?.threadId ? threadPins : undefined,
         ),
       );
-      const selectedDemoConversation = edgeConversations.some((c) => c.id === selectedConversationId)
-        ? selectedConversationId!
+      const selectedDemoConversation = selectedConversationId && edgeConversations.some((c) => c.id === selectedConversationId)
+        ? selectedConversationId
         : edgeConversations[0]?.id ?? DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
       // Use the already-fetched threadItems from the active thread query.
       const items = threadItems ?? [];
@@ -302,8 +315,8 @@ export function useDesktopWorkbenchModel(
       };
     }
     // Fallback: JS mock store when Edge is unavailable.
-    const selectedDemoConversation = demoSnapshot.conversations.some((conversation) => conversation.id === selectedConversationId)
-      ? selectedConversationId!
+    const selectedDemoConversation = selectedConversationId && demoSnapshot.conversations.some((conversation) => conversation.id === selectedConversationId)
+      ? selectedConversationId
       : DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
 
     return {
@@ -319,7 +332,7 @@ export function useDesktopWorkbenchModel(
       ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
       ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
     };
-  }, [dataModeContract.statusLabel, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread?.threadId, threadPins, threadItems, agentActivity]);
+  }, [dataModeContract.statusLabel, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread, threadPins, threadItems, threadItemsQuery.error, threadItemsQuery.isLoading, threadsQuery.error, threadsQuery.isLoading, agentActivity]);
 
   const conversations = useMemo(() => {
     // Merge Hub sessions + Edge threads into a unified conversation list.

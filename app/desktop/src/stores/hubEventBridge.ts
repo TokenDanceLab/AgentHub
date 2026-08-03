@@ -20,7 +20,6 @@ import type {
   HubNotification,
   HubSession,
   HubFriendEventPayload,
-  HubDeviceKickedPayload,
 } from '@shared/hubClient';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { useConnectionStore } from '@/stores/connectionStore';

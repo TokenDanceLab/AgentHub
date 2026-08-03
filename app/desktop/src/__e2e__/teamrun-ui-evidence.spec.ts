@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const LIVE_BACKEND_HOSTS = new Set([
   'api.hub.vectorcontrol.tech',

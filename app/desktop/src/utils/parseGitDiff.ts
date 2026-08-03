@@ -2,7 +2,7 @@
  * Parse unified diff output (from `git diff` / `git diff --cached`) into
  * structured FileDiff objects suitable for DiffViewer rendering.
  */
-import type { FileDiff, DiffHunk, DiffLine } from '@shared/types/chat';
+import type { FileDiff, DiffHunk } from '@shared/types/chat';
 
 /**
  * Parses raw unified diff output into an array of FileDiff objects.
@@ -83,8 +83,8 @@ export function parseUnifiedDiff(diffText: string): FileDiff[] {
 
       const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
       if (match) {
-        oldStart = parseInt(match[1]!, 10);
-        newStart = parseInt(match[3]!, 10);
+        oldStart = parseInt(match[1] ?? '0', 10);
+        newStart = parseInt(match[3] ?? '0', 10);
       }
 
       currentHunk = {

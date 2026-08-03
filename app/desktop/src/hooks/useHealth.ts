@@ -42,9 +42,8 @@ export function useHealth(options: UseHealthOptions = {}): HealthState {
   useEffect(() => {
     mountedRef.current = true;
     if (!enabled) {
-      setOnline(false);
-      setHealth(null);
-      setLastError(null);
+      // State reset for the disabled branch happens via the render-time
+      // adjustment below; the effect only manages polling lifecycle.
       return () => {
         mountedRef.current = false;
       };
@@ -74,7 +73,20 @@ export function useHealth(options: UseHealthOptions = {}): HealthState {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [poll]);
+  }, [poll, enabled]);
+
+  // Adjust state during render when the enabled flag flips (sanctioned
+  // "adjusting state when a prop changes" pattern) so a stale online/health
+  // result cannot linger after polling is disabled.
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled);
+    if (!enabled) {
+      setOnline(false);
+      setHealth(null);
+      setLastError(null);
+    }
+  }
 
   return { online, health, lastError, refetch: poll };
 }

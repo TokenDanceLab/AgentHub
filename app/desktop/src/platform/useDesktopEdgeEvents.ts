@@ -14,8 +14,16 @@ export function useDesktopEdgeEvents(
   const [events, setEvents] = useState<EventEnvelope[]>([]);
   const knownRunIds = useRef(new Set<string>());
 
-  useEffect(() => {
+  // Reset the transcript when the active thread changes. Adjusted during render
+  // (sanctioned "adjusting state when a prop changes" pattern) so the previous
+  // thread's events never render for the new thread.
+  const [prevThreadId, setPrevThreadId] = useState(activeThreadId);
+  if (prevThreadId !== activeThreadId) {
+    setPrevThreadId(activeThreadId);
     setEvents([]);
+  }
+
+  useEffect(() => {
     knownRunIds.current = new Set<string>();
     if (!activeThreadId) return undefined;
 

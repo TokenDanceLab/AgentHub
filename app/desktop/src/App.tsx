@@ -65,13 +65,16 @@ export default function App() {
   const queryClient = useQueryClient();
   const { isAuthenticated, logout } = useAuth();
 
-  // If a callback or stored session has established auth, leave the entry gate.
-  // Do this as an effect rather than mutating state during render.
+  /* eslint-disable react-hooks/set-state-in-effect -- the entry→workbench
+     transition must remain an effect: auth state arrives asynchronously from
+     useAuth (subscription-less in tests), and deriving the mode instead would
+     leave the workbench stale after logout until the next state change. */
   useEffect(() => {
     if (entryMode === 'entry' && isAuthenticated) {
       setEntryMode('workbench');
     }
   }, [entryMode, isAuthenticated]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function continueDemo(): void {
     writeWorkbenchDataModeOverride('mock');
@@ -190,11 +193,11 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
 
   const documents = useMemo<DocRow[] | undefined>(
     () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map(hubDocToDocRow) : undefined),
-    [liveEdgeEnabled, documentListData?.items],
+    [liveEdgeEnabled, documentListData],
   );
   const documentsActions = useMemo(() => ({
     onCreateDoc: liveEdgeEnabled ? async () => { await createDocumentMutation.mutateAsync({ title: t('doc.untitled') }); } : undefined,
-  }), [liveEdgeEnabled, createDocumentMutation]);
+  }), [liveEdgeEnabled, createDocumentMutation, t]);
 
   const activeRunId = useMemo(() => {
     if (!workbench.activeThreadId && !demoEdgeEnabled) return undefined;
@@ -310,15 +313,20 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         submitRunRef.current = false;
       }
     },
-    [createRun.mutateAsync, queryClient, workbench.activeThreadId, showToast],
+    [createRun, queryClient, workbench.activeThreadId, showToast, t],
   );
 
+  /* eslint-disable react-hooks/refs -- submitRunWithRefresh reads submitRunRef
+     only inside its async event-handler body, never during render; the rule
+     conservatively flags passing a ref-reading callback into the render-time
+     createDesktopPlatform factory. */
   const desktopPlatform = useMemo(() => createDesktopPlatform({
     ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
     ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
     ...(edgeOnline ? { submitRun: submitRunWithRefresh } : {}),
     demoRuntimeFallback: workbench.isDemo && workbench.edgeDemoData !== true,
   }), [submitRunWithRefresh, workbench.activeProjectId, workbench.activeThreadId, edgeOnline, workbench.edgeDemoData, workbench.isDemo]);
+  /* eslint-enable react-hooks/refs */
   const edgeAgents = useMemo(
     () => mapEdgeAgentsToWorkbenchAgents(agentData?.items ?? [], modelCatalog),
     [agentData?.items, modelCatalog],
@@ -387,6 +395,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
   }
 
+  const chatActions = workbench.chatActions;
+
   const handleActiveProjectChange = useCallback((projectId: string) => {
     if (workbench.isDemo) return;
     const thread = threadsData?.items?.find((t) => t.projectId === projectId);
@@ -454,9 +464,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
         onEditMessage={
-          workbench.chatActions
+          chatActions
             ? async (blockId: string, content: string) => {
-                await workbench.chatActions!.editMessage(
+                await chatActions.editMessage(
                   blockId.replace(/^hub-message-/, ''),
                   content,
                 );
