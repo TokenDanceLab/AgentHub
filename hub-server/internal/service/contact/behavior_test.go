@@ -13,10 +13,11 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/testkit"
 )
 
 // ── behavioral test helpers (moved with Contact package #685) ───────────────
@@ -70,12 +71,11 @@ func createFriendship(t *testing.T, db *gorm.DB, userID, friendID string) {
 
 func drainBus(t *testing.T, bus *bus.Bus) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		if bus.Pending() == 0 && bus.Running() == 0 {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	// Shared Eventually helper: a stuck bus fails loudly instead of silently
+	// passing after the bounded loop (#1550).
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return bus.Pending() == 0 && bus.Running() == 0
+	}, "bus did not drain", nil)
 }
 
 // ── ContactService behavioral tests ─────────────────────────────────────────
