@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
+	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -50,6 +51,9 @@ type Config struct {
 	EdgeDeviceID       string                   // local Edge device ID expected in Edge-scoped Hub JWTs
 	HubURL             string                   // Hub server base URL for Edge->Hub direct callbacks
 	HubToken           string                   // JWT bearer token for Hub callback authentication
+	HubCallbackTimeout time.Duration            // per-request timeout for Edge→Hub callbacks; 0 = default (30s)
+	HubCallbackBudget  time.Duration            // total wall-clock retry budget for callbacks; 0 = default (10s)
+	HubCallbackMaxAttempts int                  // total attempts per callback; 0 = default (3)
 	RemoteMode         bool                     // allow non-loopback bind + remote origins (requires auth)
 	AllowedOrigins     []string                 // explicit remote-mode browser origins allowed by CORS
 	Dev                bool                     // dev mode disables auto-generated local auth token
@@ -268,7 +272,21 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 	var hubCallbackClient *hub.CallbackClient
 	// Wire Hub callback client for Edge-to-Hub direct bridge
 	if cfg.HubURL != "" {
-		hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+		// Transport policy assembled here at the composition root (#1564):
+		// timeout / retry budget / attempts are operator-configurable with
+		// fail-closed defaults inside hub.CallbackConfig; the http.Client
+		// (connection reuse, redirect refusal) is built here too and injected.
+		callbackCfg := hub.DefaultCallbackConfig()
+		if cfg.HubCallbackTimeout > 0 {
+			callbackCfg.Timeout = cfg.HubCallbackTimeout
+		}
+		if cfg.HubCallbackBudget > 0 {
+			callbackCfg.RetryBudget = cfg.HubCallbackBudget
+		}
+		if cfg.HubCallbackMaxAttempts > 0 {
+			callbackCfg.MaxAttempts = cfg.HubCallbackMaxAttempts
+		}
+		hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken, edgehttp.NewClient(callbackCfg.Timeout), callbackCfg)
 		hubCallbackClient = hubClient
 		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
 		// Falls back to in-memory journal on open failure so callback path never blocks startup.

@@ -41,8 +41,11 @@ type config struct {
 	Dev                bool // disable auto-generated local auth token for development
 
 	// Hub callback configuration (Edge→Hub direct bridge)
-	HubURL   string // Hub server base URL for Edge callback reporting
-	HubToken string // JWT bearer token for authenticating with Hub
+	HubURL                string // Hub server base URL for Edge callback reporting
+	HubToken              string // JWT bearer token for authenticating with Hub
+	HubCallbackTimeout    string // per-request timeout for Edge→Hub callbacks (default 30s)
+	HubCallbackBudget     string // total wall-clock retry budget for callbacks (default 10s)
+	HubCallbackMaxAttempts string // total attempts per callback (default 3)
 
 	// Tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)
 	Tailscale   bool   // enable tailscale mode
@@ -177,6 +180,8 @@ func main() {
 		EdgeDeviceID:       cfg.EdgeDeviceID,
 		HubURL:             cfg.HubURL,
 		HubToken:           cfg.HubToken,
+		HubCallbackTimeout: parseDurationOrDefault(cfg.HubCallbackTimeout, 0),
+		HubCallbackBudget:  parseDurationOrDefault(cfg.HubCallbackBudget, 0),
 		RemoteMode:         cfg.RemoteMode,
 		AllowedOrigins:     append([]string(nil), cfg.AllowedOrigins...),
 		Dev:                cfg.Dev,
@@ -184,6 +189,16 @@ func main() {
 		SkillsDirs:         append([]string(nil), cfg.SkillsDirs...),
 		EventLogPath:       cfg.EventLogPath,
 		MCPConfigStore:     mcpConfigStore,
+	}
+	if cfg.HubCallbackMaxAttempts != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(cfg.HubCallbackMaxAttempts)); err == nil && n > 0 {
+			serverConfig.HubCallbackMaxAttempts = n
+		} else {
+			slog.Warn("invalid hub-callback-max-attempts, using default",
+				"input", cfg.HubCallbackMaxAttempts,
+				"err", err,
+			)
+		}
 	}
 	if mcpSyncer != nil {
 		serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
@@ -278,6 +293,9 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.EdgeDeviceID, "edge-device-id", getEnv("AGENTHUB_EDGE_DEVICE_ID", ""), "local Edge device ID expected in Edge-scoped Hub JWTs; required with --hub-jwt-secret")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
+	fs.StringVar(&cfg.HubCallbackTimeout, "hub-callback-timeout", getEnv("AGENTHUB_HUB_CALLBACK_TIMEOUT", ""), "per-request timeout for Edge→Hub callbacks (Go duration, default 30s)")
+	fs.StringVar(&cfg.HubCallbackBudget, "hub-callback-retry-budget", getEnv("AGENTHUB_HUB_CALLBACK_RETRY_BUDGET", ""), "total wall-clock retry budget for Edge→Hub callbacks (Go duration, default 10s)")
+	fs.StringVar(&cfg.HubCallbackMaxAttempts, "hub-callback-max-attempts", getEnv("AGENTHUB_HUB_CALLBACK_MAX_ATTEMPTS", ""), "total attempts per Edge→Hub callback (default 3)")
 	fs.BoolVar(&cfg.RemoteMode, "remote-mode", getEnv("AGENTHUB_REMOTE_MODE", "0") == "1", "allow non-loopback bind and remote origins (requires --local-auth-token or --hub-jwt-secret)")
 	cfg.AllowedOrigins = append(cfg.AllowedOrigins, splitCommaList(getEnv("AGENTHUB_ALLOWED_ORIGINS", ""))...)
 	fs.Var(&cfg.AllowedOrigins, "allowed-origin", "browser origin allowed by remote-mode CORS; may be repeated; env AGENTHUB_ALLOWED_ORIGINS uses comma separators")

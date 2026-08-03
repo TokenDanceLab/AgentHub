@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
@@ -131,6 +132,12 @@ func (m *hubCallbackMock) streamCount() int {
 
 // ── Edge server with CallbackClient helper ──────────────────────────────────
 
+// newE2ECallbackClient builds a CallbackClient with the default policy and a
+// composition-root-style policy client (mirrors httpserver wiring, #1564).
+func newE2ECallbackClient(hubURL, authToken string) *hub.CallbackClient {
+	return hub.NewCallbackClient(hubURL, authToken, edgehttp.NewClient(0), hub.DefaultCallbackConfig())
+}
+
 const noopCommandOutput = "hub-output-done"
 
 // noopCommand returns a command+args that emits a stable stdout line and exits
@@ -167,7 +174,7 @@ func startEdgeWithHubCallbacks(t *testing.T, hubURL string) (*httptest.Server, *
 
 	// Wire Hub callback client
 	if hubURL != "" {
-		hubClient := hub.NewCallbackClient(hubURL, "")
+		hubClient := newE2ECallbackClient(hubURL, "")
 		processExecutor.SetHubCallback(hubClient)
 	}
 
@@ -308,7 +315,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 		t.Fatalf("failed to create process executor: %v", err)
 	}
 
-	hubClient := hub.NewCallbackClient(mockHub.URL(), "")
+	hubClient := newE2ECallbackClient(mockHub.URL(), "")
 	processExecutor.SetHubCallback(hubClient)
 
 	workDir := t.TempDir()
@@ -375,7 +382,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 // expects (as defined in hub-server/internal/handler/agent.go).
 func TestHubE2E_CallbackFormat_HubCompatible(t *testing.T) {
 	mockHub := newHubCallbackMock(t)
-	client := hub.NewCallbackClient(mockHub.URL(), "test-jwt")
+	client := newE2ECallbackClient(mockHub.URL(), "test-jwt")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

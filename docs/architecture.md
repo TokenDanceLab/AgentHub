@@ -111,6 +111,7 @@ Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMs
 | Deployment | [architecture/05-deployment.md](architecture/05-deployment.md) |
 | Auth and identity | [architecture/06-auth-identity.md](architecture/06-auth-identity.md) |
 | Design system SSOT | [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md) |
+| Outbound HTTP | [architecture/08-outbound-http.md](architecture/08-outbound-http.md) |
 | Architecture decisions | [decisions.md](decisions.md) |
 
 ## Acceptance Gates
