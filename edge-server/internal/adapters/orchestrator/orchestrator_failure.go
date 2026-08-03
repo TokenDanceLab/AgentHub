@@ -1,4 +1,4 @@
-package adapters
+package orchestrator
 
 import (
 	"context"
@@ -76,7 +76,7 @@ const BusEventFailureClassified = "orchestrator.failure_classified"
 //	  allocation — retry decisions do not further reduce the budget.
 type FailureRecoveryManager struct {
 	policies        map[FailureCategory]FailurePolicy
-	adapterRegistry *Registry
+	adapterRegistry AdapterRegistry
 	spawner         SubAgentSpawner
 
 	mu      map[string]*RecoveryState // agentID -> recovery state (per-dispatch unique)
@@ -106,7 +106,7 @@ type FailureRecoveryManager struct {
 }
 
 // NewFailureRecoveryManager creates a recovery manager with default policies.
-func NewFailureRecoveryManager(adapterRegistry *Registry, spawner SubAgentSpawner) *FailureRecoveryManager {
+func NewFailureRecoveryManager(adapterRegistry AdapterRegistry, spawner SubAgentSpawner) *FailureRecoveryManager {
 	return &FailureRecoveryManager{
 		policies:        DefaultFailurePolicies(),
 		adapterRegistry: adapterRegistry,

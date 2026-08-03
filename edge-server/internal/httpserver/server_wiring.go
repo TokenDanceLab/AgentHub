@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -74,7 +75,7 @@ func runnerCapabilitiesForAdapter(adapterID string, caps adapters.AgentCapabilit
 // wireOrchestrator sets the SubAgentSpawner, AgentRegistry, MessageQueue, and
 // PlanApprovalBroker on the orchestrator adapter so it can spawn sub-agent runs
 // and gate them behind plan approval.
-func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecutor, agentReg *agents.Registry, msgQueue *agents.Queue, planBroker *adapters.PlanApprovalBroker) {
+func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecutor, agentReg *agents.Registry, msgQueue *agents.Queue, planBroker *orchestrator.PlanApprovalBroker) {
 	if adapterReg == nil || executor == nil {
 		return
 	}
@@ -82,7 +83,7 @@ func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecu
 	if !ok {
 		return
 	}
-	orchAdapter, ok := orch.(*adapters.OrchestratorAdapter)
+	orchAdapter, ok := orch.(*orchestrator.Adapter)
 	if !ok {
 		return
 	}

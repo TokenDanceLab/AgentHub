@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
@@ -374,7 +375,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
 	// Plan approval gate (P0 #3): create broker and wire into both orchestrator and handler.
-	planBroker := adapters.NewPlanApprovalBroker(adapters.DefaultPlanApprovalConfig())
+	planBroker := orchestrator.NewPlanApprovalBroker(orchestrator.DefaultPlanApprovalConfig())
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue, planBroker)
 
 	// Build SkillRegistry from configured directories. Discovery failure is

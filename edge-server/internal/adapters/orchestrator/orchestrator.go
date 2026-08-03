@@ -1,4 +1,4 @@
-package adapters
+package orchestrator
 
 import (
 	"context"
@@ -18,19 +18,23 @@ const (
 	DefaultDispatchConcurrency = 10
 )
 
-// OrchestratorAdapter wraps a ClaudeCodeAdapter with an orchestrator system prompt.
+// Adapter wraps an AgentExecutor with an orchestrator system prompt.
 // It is used in group-chat mode to decompose complex tasks and dispatch sub-agents.
 //
-// The orchestrator is Claude Code with a specialized system prompt that instructs
+// The orchestrator is an agent with a specialized system prompt that instructs
 // it to break down user requests, identify sub-tasks, and coordinate other agents.
 // Edge listens for orchestrator events to spawn sub-agent runs.
 //
+// The underlying agent executor is injected through the AgentExecutor port
+// (composition root wires a ClaudeCodeAdapter); the leaf package never imports
+// the concrete adapter package.
+//
 // Residual pure helpers live in orchestrator_*.go companions (peel #1111).
-type OrchestratorAdapter struct {
-	inner               *ClaudeCodeAdapter
+type Adapter struct {
+	inner               AgentExecutor
 	systemPrompt        string
 	agentRegistry       *agents.Registry
-	adapterRegistry     *Registry
+	adapterRegistry     AdapterRegistry
 	messageQueue        *agents.Queue
 	spawner             SubAgentSpawner
 	depth               int
@@ -42,49 +46,50 @@ type OrchestratorAdapter struct {
 	planBroker *PlanApprovalBroker
 }
 
-// NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
-func NewOrchestratorAdapter(claudePath, model, systemPrompt string, subAgents []string) *OrchestratorAdapter {
-	_ = subAgents
-	return &OrchestratorAdapter{
-		inner:        NewClaudeCodeAdapter(claudePath, model, ""),
+// NewOrchestratorAdapter creates an orchestrator wrapping the given agent
+// executor. The executor is injected by the composition root so the leaf
+// package stays decoupled from concrete adapters.
+func NewOrchestratorAdapter(inner AgentExecutor, systemPrompt string) *Adapter {
+	return &Adapter{
+		inner:        inner,
 		systemPrompt: escapePromptLiteral(systemPrompt),
 		depth:        0,
 	}
 }
 
 // WithAgentRegistry attaches an agent instance registry for tracking sub-agents.
-func (a *OrchestratorAdapter) WithAgentRegistry(r *agents.Registry) *OrchestratorAdapter {
+func (a *Adapter) WithAgentRegistry(r *agents.Registry) *Adapter {
 	a.agentRegistry = r
 	return a
 }
 
 // WithMessageQueue attaches a message queue for inter-agent communication.
-func (a *OrchestratorAdapter) WithMessageQueue(q *agents.Queue) *OrchestratorAdapter {
+func (a *Adapter) WithMessageQueue(q *agents.Queue) *Adapter {
 	a.messageQueue = q
 	return a
 }
 
 // WithSpawner attaches a SubAgentSpawner for creating sub-agent runs.
-func (a *OrchestratorAdapter) WithSpawner(s SubAgentSpawner) *OrchestratorAdapter {
+func (a *Adapter) WithSpawner(s SubAgentSpawner) *Adapter {
 	a.spawner = s
 	return a
 }
 
 // WithDepth sets the delegation depth for this orchestrator instance.
-func (a *OrchestratorAdapter) WithDepth(d int) *OrchestratorAdapter {
+func (a *Adapter) WithDepth(d int) *Adapter {
 	a.depth = d
 	return a
 }
 
 // WithDispatchConcurrency sets the max concurrent dispatch goroutines.
 // Values <= 0 use DefaultDispatchConcurrency (10, matching OpenCode default).
-func (a *OrchestratorAdapter) WithDispatchConcurrency(n int) *OrchestratorAdapter {
+func (a *Adapter) WithDispatchConcurrency(n int) *Adapter {
 	a.dispatchConcurrency = n
 	return a
 }
 
 // WithAdapterRegistry attaches the adapter registry for agent name validation (O-01).
-func (a *OrchestratorAdapter) WithAdapterRegistry(r *Registry) *OrchestratorAdapter {
+func (a *Adapter) WithAdapterRegistry(r AdapterRegistry) *Adapter {
 	a.adapterRegistry = r
 	return a
 }
@@ -92,12 +97,12 @@ func (a *OrchestratorAdapter) WithAdapterRegistry(r *Registry) *OrchestratorAdap
 // WithPlanBroker attaches the plan approval broker for the plan confirmation gate (P0 #3).
 // When set, the orchestrator pauses after detecting dispatch events and waits for
 // user approval before spawning sub-agents.
-func (a *OrchestratorAdapter) WithPlanBroker(b *PlanApprovalBroker) *OrchestratorAdapter {
+func (a *Adapter) WithPlanBroker(b *PlanApprovalBroker) *Adapter {
 	a.planBroker = b
 	return a
 }
 
-func (a *OrchestratorAdapter) Metadata() AdapterMetadata {
+func (a *Adapter) Metadata() AdapterMetadata {
 	m := a.inner.Metadata()
 	m.ID = "orchestrator"
 	m.Name = "Orchestrator"
@@ -105,13 +110,13 @@ func (a *OrchestratorAdapter) Metadata() AdapterMetadata {
 	return m
 }
 
-func (a *OrchestratorAdapter) Capabilities() AgentCapabilities {
+func (a *Adapter) Capabilities() AgentCapabilities {
 	c := a.inner.Capabilities()
 	c.SubAgentSpawn = true
 	return c
 }
 
-func (a *OrchestratorAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
+func (a *Adapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	cmdPath, args, env, workDir := a.inner.BuildCommand(ctx)
 	a.parentModel = ctx.Model
 	// Use --append-system-prompt (not --system-prompt) to avoid silently
@@ -124,7 +129,7 @@ func (a *OrchestratorAdapter) BuildCommand(ctx RunProcessContext) (string, []str
 	return cmdPath, args, env, workDir
 }
 
-func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
+func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	effectiveEmitter := emitter
 	if a.agentRegistry != nil || a.spawner != nil {
 		if a.messageQueue != nil {
@@ -158,11 +163,11 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 	return a.inner.ParseStream(ctx, stdout, stdin, effectiveEmitter, run)
 }
 
-func (a *OrchestratorAdapter) NeedsStdin() bool { return true }
+func (a *Adapter) NeedsStdin() bool { return true }
 
-func (a *OrchestratorAdapter) Available() bool {
+func (a *Adapter) Available() bool {
 	available := a.inner.Available()
-	slog.Debug("adapter.availability", "adapter", "orchestrator", "path", a.inner.binaryPath, "available", available)
+	slog.Debug("adapter.availability", "adapter", "orchestrator", "available", available)
 	return available
 }
 
@@ -172,7 +177,7 @@ func (a *OrchestratorAdapter) Available() bool {
 type dispatchInterceptor struct {
 	inner           EventEmitter
 	registry        *agents.Registry
-	adapterRegistry *Registry
+	adapterRegistry AdapterRegistry
 	queue           *agents.Queue
 	spawner         SubAgentSpawner
 	parentRun       store.Run

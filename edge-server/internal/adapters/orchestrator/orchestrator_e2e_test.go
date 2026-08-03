@@ -1,9 +1,8 @@
-package adapters
+package orchestrator
 
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -14,48 +13,8 @@ import (
 )
 
 // ── Test helpers ────────────────────────────────────────────────────────────
-
-// recordingSpawner records SpawnSubAgent calls for test assertions.
-type recordingSpawner struct {
-	mu    sync.Mutex
-	calls []spawnCall
-}
-
-type spawnCall struct {
-	parentRunID string
-	task        SubAgentTask
-}
-
-func (r *recordingSpawner) SpawnSubAgent(parentRun store.Run, task SubAgentTask) (agentInstanceID, runID string, err error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.calls = append(r.calls, spawnCall{parentRunID: parentRun.ID, task: task})
-	return "agent_" + task.TaskID, "run_" + task.TaskID, nil
-}
-
-func (r *recordingSpawner) lastCall() *spawnCall {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if len(r.calls) == 0 {
-		return nil
-	}
-	return &r.calls[len(r.calls)-1]
-}
-
-func (r *recordingSpawner) callCount() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.calls)
-}
-
-// failingSpawner always returns an error.
-type failingSpawner struct {
-	err error
-}
-
-func (f *failingSpawner) SpawnSubAgent(store.Run, SubAgentTask) (string, string, error) {
-	return "", "", f.err
-}
+// recordingSpawner / failingSpawner / spawnCall 与本地 test doubles 共用：
+// 定义见 test_doubles_test.go（叶子包不 import 根实现包）。
 
 // newTestStore creates an in-memory store seeded with a project, thread, and run.
 func newTestStore(t *testing.T) store.RunLifecycleStore {
@@ -92,7 +51,7 @@ func TestDispatchInterceptor_DetectsDispatchJSON(t *testing.T) {
 	spawner := &recordingSpawner{}
 	reg := agents.NewRegistry()
 
-	inner := NewBusEventEmitter(bus)
+	inner := &busEmitter{bus: bus}
 	interceptor := &dispatchInterceptor{
 		inner:      inner,
 		registry:   reg,
@@ -272,7 +231,7 @@ func TestDispatchInterceptor_SpawnerErrorEmitsFailure(t *testing.T) {
 	subID, ch, _ := bus.Subscribe(0)
 	defer bus.Unsubscribe(subID)
 
-	inner := NewBusEventEmitter(bus)
+	inner := &busEmitter{bus: bus}
 	interceptor := &dispatchInterceptor{
 		inner:      inner,
 		registry:   reg,
@@ -444,7 +403,7 @@ func TestDispatchInterceptor_NoRegistryNoCrash(t *testing.T) {
 
 // ── Orchestrator adapter E2E tests ─────────────────────────────────────────
 
-func TestOrchestratorAdapter_E2EDispatchFlow(t *testing.T) {
+func TestAdapter_E2EDispatchFlow(t *testing.T) {
 	bus := newTestBus(t)
 	st := newTestStore(t)
 	run, _ := st.GetRun("run-1")
@@ -457,7 +416,7 @@ func TestOrchestratorAdapter_E2EDispatchFlow(t *testing.T) {
 	defer bus.Unsubscribe(subID)
 
 	// Create orchestrator with all wiring.
-	orch := NewOrchestratorAdapter("echo", "", "You are an orchestrator", []string{"codex", "claude-code"})
+	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "You are an orchestrator")
 	orch.WithAgentRegistry(reg)
 	orch.WithMessageQueue(queue)
 	orch.WithSpawner(spawner)
@@ -493,8 +452,8 @@ func TestOrchestratorAdapter_E2EDispatchFlow(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
-	orch := NewOrchestratorAdapter("claude", "sonnet", "Custom system prompt", nil)
+func TestAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
+	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "Custom system prompt")
 	_, args, _, _ := orch.BuildCommand(RunProcessContext{
 		Run: store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"},
 	})
@@ -512,8 +471,8 @@ func TestOrchestratorAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapter_BuildCommandCapturesModel(t *testing.T) {
-	orch := NewOrchestratorAdapter("claude", "sonnet", "prompt", nil)
+func TestAdapter_BuildCommandCapturesModel(t *testing.T) {
+	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "prompt")
 
 	orch.BuildCommand(RunProcessContext{
 		Run:   store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"},

@@ -1,7 +1,7 @@
 # RFC A-V1 — adapters/ 12.3k + lifecycle/ 7.6k 包拆分评估
 
-> 状态: **已裁决 2026-08-03** — 采纳定向抽取；驳回 lifecycle 拆分与 adapters 全量叶子包化 · 执行入口 #1526（先合同解环，后移动文件）
-> 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐）
+> 状态: **已裁决 2026-08-03** — 采纳定向抽取；驳回 lifecycle 拆分与 adapters 全量叶子包化 · 执行入口 #1526（先合同解环，后移动文件）· **Step 2 已落地 2026-08-03（#1566）**
+> 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐；#1566 Step 2 完成）
 > 权威: `docs/progress/MASTER.md`；裁决由审核 leader 拍板，实际移动文件仍需 AGENTS.md §5 审批（见 §9）
 > 证据: 真实行数来自 `wc -l`，文件名来自 `edge-server/internal/{adapters,lifecycle}/*.go`
 
@@ -137,28 +137,26 @@ internal/adapters（contract_aliases.go 引用合同）
 - `TestOrchestrationContractNeutral`：orchestration 不得依赖 adapters（`go list -deps` 断言）。
 - `TestContractTypesOwnedByOrchestration`：合同类型在 adapters 只允许 alias 形式（防双 SSOT 与环回退）。
 
-### 6.1 Step 2 方向（已裁决 2026-08-03）：插件式单向依赖
+### 6.1 Step 2 方向（已裁决 2026-08-03）：插件式单向依赖 → 实施为"叶子仅依赖合同与窄 ports"
 
-**否决** A-V4 式"根包 alias 叶子包"迁移路径（原方案：根包 `type OrchestratorAdapter = orchestrator.OrchestratorAdapter` + `var NewOrchestratorAdapter = ...`，同时叶子包 import 根包）——根包反向 import 叶子包 + 叶子包 import 根包必然成环。且 orchestrator.go 对根包的强依赖远不止六个 plan 类型（`ClaudeCodeAdapter`、`SubAgentSpawner`、`AdapterMetadata`、`AgentCapabilities`、`RunProcessContext`、`FailureRecoveryManager`、`CtxBudgetKey` 等），不可能靠继续抽合同解开；继续抽会把定向拆分扩散成 adapters 全面合同重构（已被驳回的大拆包）。
+**否决** A-V4 式"根包 alias 叶子包"迁移路径（原方案：根包 `type OrchestratorAdapter = orchestrator.OrchestratorAdapter` + `var NewOrchestratorAdapter = ...`，同时叶子包 import 根包）——根包反向 import 叶子包 + 叶子包 import 根包必然成环。
 
-**采用插件式单向依赖**：
+**#1566 实施裁决（比本 RFC 更严格）**：叶子包**不得** import 根 `internal/adapters` 实现包（verifier 机器断言）。共享合同（`AgentAdapter`/`EventEmitter`/`AdapterMetadata`/`AgentCapabilities`/`SubAgentTask`/`SiblingInfo`/`SubAgentSpawner`/`RunProcessContext`/`CtxBudgetKey`/`BusEvent*`）随叶子包一起迁入 `internal/orchestration`（合同 SSOT 扩大），根包保留 alias 使外部调用点零改动。叶子包定义窄 ports（`AgentExecutor`、`AdapterRegistry`），由 composition root 注入具体实现（`ClaudeCodeAdapter`、`*adapters.Registry`）。
 
 ```text
-internal/adapters
-       ↑ import 根合同/实现
-internal/adapters/orchestrator（叶子包，只 import 根 adapters）
-
-cmd/agenthub-edge（composition root）
-       ├── import adapters
-       └── import adapters/orchestrator（注册/构造/装配）
+internal/orchestration（合同 SSOT：plan 类型 + adapter-domain 合同）
+       ↑                          ↑
+       │（叶子直接依赖合同）        │（根包 alias 引用合同）
+internal/adapters/orchestrator ←── internal/adapters（实现 + Registry 留根）
+       ↑
+cmd/agenthub-edge / internal/httpserver（composition root 装配）
 ```
 
-- 新 orchestrator 包允许依赖根 adapters；根 adapters **绝不**反向 import orchestrator。
-- 不保留根包 `OrchestratorAdapter` alias；orchestrator 的注册、构造、装配移到 composition root（`cmd/agenthub-edge`）。
-- 少量调用点（≤15 处）直接迁移到新包，接受真实 import 调整，换取真正单向依赖。
-- 移动文件清单不变（13 源 + 5 测试，见 §1 子域图谱 E）。
+- 根 adapters **绝不** import 叶子包（机器门禁：`scripts/verify/verify-orchestrator-deps.ps1`）。
+- 不保留根包 `OrchestratorAdapter` alias；orchestrator 的注册、构造、装配移到 composition root（`cmd/agenthub-edge` + `internal/httpserver`）。
+- 移动文件清单不变（13 源 + 5 测试 + plan_approval.go，见 §1 子域图谱 E/K）。
 
-Step 2 合入门禁：`go build ./...`、`go test ./internal/adapters/... ./internal/lifecycle/...`、`go vet ./...`、`golangci-lint run ./...` 全过；`go list -deps ./internal/adapters/` 证明根包不含 `internal/adapters/orchestrator`。
+Step 2 合入门禁：`go build ./...`、`go test ./internal/adapters/... ./internal/lifecycle/...`、`go vet ./...` 全过；`go list -deps ./internal/adapters/orchestrator/...` 证明叶子不含根实现包、`internal/orchestration` 无 adapters 依赖、根包不含 `internal/adapters/orchestrator`；负向自测（`scripts/verify/tests/verify-orchestrator-deps.Tests.ps1`）证明两类违规 fixture 真实 FAIL。
 
 ## 7. 门禁影响
 

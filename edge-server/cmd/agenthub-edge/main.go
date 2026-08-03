@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/httpserver"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/security"
@@ -515,7 +516,7 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 	registerClaudeACPAdapter(reg, cfg)
 	registerManifestAdapters(reg, cfg)
 	registerSDKAdapters(reg, cfg)
-	registerOrchestratorAdapter(reg, cfg)
+	registerAdapter(reg, cfg)
 
 	if cfg.AgentDefault != "" {
 		reg.SetDefault("default", cfg.AgentDefault)
@@ -652,19 +653,17 @@ func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	}
 }
 
-// registerOrchestratorAdapter registers the orchestrator adapter with the
+// registerAdapter registers the orchestrator adapter with the
 // registered child agent IDs when a claude-code binary is configured.
-func registerOrchestratorAdapter(reg *adapters.Registry, cfg config) {
+// The orchestrator leaf package gets the concrete ClaudeCodeAdapter through
+// its AgentExecutor port (composition root injects concrete deps, #1566).
+func registerAdapter(reg *adapters.Registry, cfg config) {
 	if cfg.ClaudeCodePath == "" {
 		return
 	}
 	childAgents := registeredChildAgentIDs(reg)
-	a := adapters.NewOrchestratorAdapter(
-		cfg.ClaudeCodePath,
-		cfg.AgentModel,
-		adapters.DefaultOrchestratorPrompt(childAgents),
-		childAgents,
-	)
+	inner := adapters.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
+	a := orchestrator.NewOrchestratorAdapter(inner, orchestrator.DefaultOrchestratorPrompt(childAgents))
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register orchestrator adapter", "err", err)
 		return
