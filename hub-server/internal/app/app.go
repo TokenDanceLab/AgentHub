@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
@@ -33,7 +34,7 @@ type App struct {
 
 	// Internal runtime state
 	mgr       *ws.Manager
-	bus       *service.Bus
+	bus       *bus.Bus
 	startTime time.Time
 
 	// Version is the build version, settable via -ldflags. Defaults to "dev".

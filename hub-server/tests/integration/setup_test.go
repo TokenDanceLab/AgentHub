@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/egress"
@@ -45,7 +46,7 @@ var (
 	ts              *httptest.Server
 	client          *http.Client
 	mgr             *ws.Manager
-	bus             *service.Bus
+	eventBus        *bus.Bus
 	db              *gorm.DB // hold reference for cleanDB
 	testCacheClient *cache.Client
 	testJWT         config.JWTConfig
@@ -113,27 +114,27 @@ func TestMain(m *testing.M) {
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat(context.Background())
 
-	b, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		panic(fmt.Sprintf("NewBus failed: %v", err))
 	}
-	bus = b
+	eventBus = b
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceService := service.NewDeviceService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
-	contactService := contact.NewService(db, bus, cacheClient)
+	contactService := contact.NewService(db, eventBus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
 	sessionService := session.NewService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
-	messageService := message.NewService(db, bus, cacheClient)
-	messageReactionService := messagereaction.NewService(db, bus)
+	messageService := message.NewService(db, eventBus, cacheClient)
+	messageReactionService := messagereaction.NewService(db, eventBus)
 	messageHandler := handler.NewMessageHandler(testMessageServiceWithReactions{
 		Service:   messageService,
 		reactions: messageReactionService,
 	})
-	agentService := service.NewAgentService(db, bus, mgr, cacheClient, nil)
+	agentService := service.NewAgentService(db, eventBus, mgr, cacheClient, nil)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := attachment.NewService(db, cfg.Upload, attachment.NewLocalStorage(cfg.Upload.Dir))

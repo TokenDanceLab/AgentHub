@@ -15,9 +15,9 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/im"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Residual pure-helper peel #1153: send/edit/recall/pin/forward write paths.
@@ -126,7 +126,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		return nil, err
 	}
 
-	s.publish(ctx, service.Event{Type: "message.new", Payload: msg})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
 
 	return sendMessageResponseFromModel(msg), nil
 }
@@ -157,7 +157,7 @@ func (s *Service) RecallMessage(ctx context.Context, msgID, userID string) error
 		return err
 	}
 
-	s.publish(ctx, service.Event{Type: "message.recall", Payload: msg})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageRecall, Payload: msg})
 
 	return nil
 }
@@ -213,7 +213,7 @@ func (s *Service) EditMessage(ctx context.Context, msgID, userID string, req Edi
 	if err != nil {
 		return nil, err
 	}
-	s.publish(ctx, service.Event{Type: "message.edited", Payload: updated})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageEdited, Payload: updated})
 
 	return &EditMessageResponse{MessageID: msgID, EditedAt: formatMessageTimePtr(updated.EditedAt)}, nil
 }
@@ -246,7 +246,7 @@ func (s *Service) PinMessage(ctx context.Context, userID, sessionID, msgID strin
 		return err
 	}
 
-	s.publish(ctx, service.Event{Type: "message.pin", Payload: pin})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessagePin, Payload: pin})
 
 	return nil
 }
@@ -264,7 +264,7 @@ func (s *Service) UnpinMessage(ctx context.Context, userID, sessionID, msgID str
 		return err
 	}
 
-	s.publish(ctx, service.Event{Type: "message.unpin", Payload: map[string]string{
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageUnpin, Payload: map[string]string{
 		"session_id": sessionID,
 		"message_id": msgID,
 	}})
@@ -357,7 +357,7 @@ func (s *Service) forwardOne(ctx context.Context, userID string, msg *model.Mess
 	}
 
 	// Publish event
-	s.publish(ctx, service.Event{Type: "message.new", Payload: forwarded})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: forwarded})
 
 	return nil
 }

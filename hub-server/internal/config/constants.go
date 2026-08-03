@@ -191,6 +191,11 @@ const WSMaxConnsPerUser = 10
 // EventBusPoolSize is the worker pool size for asynchronous event handlers.
 const EventBusPoolSize = 1024
 
+// EventBusHandlerTimeout bounds each async event handler invocation (#1548).
+// Handlers receive a context with the caller's values but not its
+// cancellation, plus this deadline.
+const EventBusHandlerTimeout = 30 * time.Second
+
 // ── Metrics ──────────────────────────────────────────────────────────────────
 
 // MetricsCollectionInterval controls periodic in-process metric sampling.

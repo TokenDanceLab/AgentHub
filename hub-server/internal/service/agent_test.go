@@ -12,6 +12,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -964,8 +965,8 @@ func TestCancelTask_AtomicFailClosed(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	svc := &AgentService{db: db, bus: bus}
+	b := newTestBus(t)
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-cancel-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -990,8 +991,8 @@ func TestCancelTask_AlreadyTerminal(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	svc := &AgentService{db: db, bus: bus}
+	b := newTestBus(t)
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-done"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1154,12 +1155,12 @@ func TestHandleTaskStream_DispatchedTransitionConflictDoesNotPersist(t *testing.
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	streamEvents := make(chan Event, 1)
-	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+	b := newTestBus(t)
+	streamEvents := make(chan bus.Event, 1)
+	b.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event bus.Event) {
 		streamEvents <- event
 	})
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	taskID := "task-stream-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1198,8 +1199,8 @@ func TestHandleTaskDone_AtomicTransition(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	svc := &AgentService{db: db, bus: bus}
+	b := newTestBus(t)
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-done-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1226,12 +1227,12 @@ func TestHandleTaskDone_AtomicConflictDoesNotPublish(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	doneEvents := make(chan Event, 1)
-	bus.Subscribe("agent.done", func(ctx context.Context, event Event) {
+	b := newTestBus(t)
+	doneEvents := make(chan bus.Event, 1)
+	b.Subscribe("agent.done", func(ctx context.Context, event bus.Event) {
 		doneEvents <- event
 	})
-	svc := &AgentService{db: db, bus: bus}
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-done-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1265,8 +1266,8 @@ func TestHandleTaskFail_AtomicTransition(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	svc := &AgentService{db: db, bus: bus}
+	b := newTestBus(t)
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-fail-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1291,12 +1292,12 @@ func TestHandleTaskFail_AtomicConflictDoesNotPublish(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	failedEvents := make(chan Event, 1)
-	bus.Subscribe("agent.failed", func(ctx context.Context, event Event) {
+	b := newTestBus(t)
+	failedEvents := make(chan bus.Event, 1)
+	b.Subscribe("agent.failed", func(ctx context.Context, event bus.Event) {
 		failedEvents <- event
 	})
-	svc := &AgentService{db: db, bus: bus}
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-fail-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1379,8 +1380,8 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	bus := newTestBus(t)
-	svc := &AgentService{db: db, bus: bus}
+	b := newTestBus(t)
+	svc := &AgentService{db: db, bus: b}
 
 	taskID := "task-dispatched-done"
 	mock.ExpectQuery(sqlmTaskByID).

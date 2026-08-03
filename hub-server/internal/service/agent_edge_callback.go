@@ -9,6 +9,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/metrics"
@@ -22,7 +23,7 @@ import (
 // edgeCallbackBus publishes domain events from edge callback orchestration.
 // Implemented by *Bus.
 type edgeCallbackBus interface {
-	Publish(ctx context.Context, event Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // edgeCallbackSeq allocates message sequence IDs for stream/done projections.
@@ -262,8 +263,8 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
-		s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
+		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
+		s.bus.Publish(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent})
 		// #1478 Phase A: fan the same run event into the team-run view when the
 		// run belongs to a team run. No-op when the session is not a team run;
 		// never fails the chat-side stream path that already succeeded above.
@@ -296,8 +297,8 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 	}
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, Event{
-			Type: "agent.route_decision",
+		s.bus.Publish(ctx, bus.Event{
+			Type: bus.EventTypeAgentRouteDecision,
 			Payload: RouteDecisionPayload{
 				UserID:   run.TriggerUserID,
 				TeamID:   run.TeamID,
@@ -406,7 +407,7 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 			}
 		}
 		if s.bus != nil {
-			s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
+			s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
 		}
 	}
 
@@ -414,10 +415,10 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, Event{Type: "agent.done", Payload: map[string]interface{}{
-			"task_id":           taskID,
-			"agent_instance_id": task.AgentInstanceID,
-			"session_id":        ai.SessionID,
+		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
+			TaskID:          taskID,
+			AgentInstanceID: task.AgentInstanceID,
+			SessionID:       ai.SessionID,
 		}})
 	}
 
@@ -460,11 +461,13 @@ func (s *EdgeCallbackService) HandleTaskFail(ctx context.Context, edgeUserID, ed
 	}
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, Event{Type: "agent.failed", Payload: map[string]interface{}{
-			"task_id":           taskID,
-			"agent_instance_id": task.AgentInstanceID,
-			"session_id":        ai.SessionID,
-			"error":             errMsg,
+		s.bus.Publish(ctx, bus.Event{Type: "agent.failed", Payload: bus.AgentFailedPayload{
+			AgentTaskPayload: bus.AgentTaskPayload{
+				TaskID:          taskID,
+				AgentInstanceID: task.AgentInstanceID,
+				SessionID:       ai.SessionID,
+			},
+			Error: errMsg,
 		}})
 	}
 

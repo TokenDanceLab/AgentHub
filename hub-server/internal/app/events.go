@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -82,7 +82,7 @@ func (a *App) startEventSubscriptions(_ context.Context) {
 // ── Message events ──────────────────────────────────────────────────────
 
 func (a *App) subscribeMessageEvents() {
-	a.bus.Subscribe("message.new", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeMessageNew, func(ctx context.Context, event bus.Event) {
 		msg, ok := event.Payload.(*model.Message)
 		if !ok {
 			return
@@ -94,7 +94,7 @@ func (a *App) subscribeMessageEvents() {
 		a.mgr.PushToSession(msg.SessionID, frame)
 	})
 
-	a.bus.Subscribe("message.recall", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeMessageRecall, func(ctx context.Context, event bus.Event) {
 		msg, ok := event.Payload.(*model.Message)
 		if !ok {
 			return
@@ -106,7 +106,7 @@ func (a *App) subscribeMessageEvents() {
 		a.mgr.PushToSession(msg.SessionID, frame)
 	})
 
-	a.bus.Subscribe("message.pin", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeMessagePin, func(ctx context.Context, event bus.Event) {
 		pin, ok := event.Payload.(*model.MessagePin)
 		if !ok {
 			return
@@ -115,7 +115,7 @@ func (a *App) subscribeMessageEvents() {
 		a.mgr.PushToSession(pin.SessionID, frame)
 	})
 
-	a.bus.Subscribe("message.unpin", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeMessageUnpin, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(map[string]string)
 		if !ok {
 			return
@@ -132,7 +132,7 @@ func (a *App) subscribeMessageEvents() {
 		{eventType: ws.TypeMessageReactionRemoved, frameType: ws.TypeMessageReactionRemoved},
 	} {
 		reactionEvent := reactionEvent
-		a.bus.Subscribe(reactionEvent.eventType, func(ctx context.Context, event service.Event) {
+		a.bus.Subscribe(reactionEvent.eventType, func(ctx context.Context, event bus.Event) {
 			payload, ok := event.Payload.(messagereaction.MessageReactionEventPayload)
 			if !ok {
 				return
@@ -142,7 +142,7 @@ func (a *App) subscribeMessageEvents() {
 		})
 	}
 
-	a.bus.Subscribe("message.read", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeMessageRead, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
 			return
@@ -156,7 +156,7 @@ func (a *App) subscribeMessageEvents() {
 // ── Agent stream events ─────────────────────────────────────────────────
 
 func (a *App) subscribeAgentEvents() {
-	a.bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeAgentStream, func(ctx context.Context, event bus.Event) {
 		runEvent, ok := event.Payload.(*model.AgentRunEvent)
 		if !ok {
 			return
@@ -165,26 +165,24 @@ func (a *App) subscribeAgentEvents() {
 		a.mgr.PushToSession(runEvent.SessionID, frame)
 	})
 
-	a.bus.Subscribe("agent.done", func(ctx context.Context, event service.Event) {
-		payload, ok := event.Payload.(map[string]interface{})
+	a.bus.Subscribe(bus.EventTypeAgentDone, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(bus.AgentTaskPayload)
 		if !ok {
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentDone, payload)
-		sessionID, _ := payload["session_id"].(string)
-		a.mgr.PushToSession(sessionID, frame)
+		a.mgr.PushToSession(payload.SessionID, frame)
 
-		taskID, _ := payload["task_id"].(string)
-		if taskID != "" {
-			task, err := a.AgentService.GetPendingTaskByID(taskID)
+		if payload.TaskID != "" {
+			task, err := a.AgentService.GetPendingTaskByID(payload.TaskID)
 			if err == nil && task != nil {
 				if err := a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
-					"task_id":           payload["task_id"],
-					"agent_instance_id": payload["agent_instance_id"],
-					"session_id":        payload["session_id"],
+					"task_id":           payload.TaskID,
+					"agent_instance_id": payload.AgentInstanceID,
+					"session_id":        payload.SessionID,
 				}); err != nil {
 					slog.Warn("failed to notify agent.done",
-						"task_id", taskID,
+						"task_id", payload.TaskID,
 						"triggered_by_user_id", task.TriggeredByUserID,
 						"error", err,
 					)
@@ -196,34 +194,31 @@ func (a *App) subscribeAgentEvents() {
 		}
 	})
 
-	a.bus.Subscribe("agent.failed", func(ctx context.Context, event service.Event) {
-		payload, ok := event.Payload.(map[string]interface{})
+	a.bus.Subscribe(bus.EventTypeAgentFailed, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(bus.AgentFailedPayload)
 		if !ok {
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentFailed, payload)
-		sessionID, _ := payload["session_id"].(string)
-		a.mgr.PushToSession(sessionID, frame)
+		a.mgr.PushToSession(payload.SessionID, frame)
 	})
 
-	a.bus.Subscribe("agent.timeout", func(ctx context.Context, event service.Event) {
-		payload, ok := event.Payload.(map[string]interface{})
+	a.bus.Subscribe(bus.EventTypeAgentTimeout, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(bus.AgentTaskPayload)
 		if !ok {
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentFailed, payload)
-		sessionID, _ := payload["session_id"].(string)
-		a.mgr.PushToSession(sessionID, frame)
+		a.mgr.PushToSession(payload.SessionID, frame)
 	})
 
-	a.bus.Subscribe("agent.cancel", func(ctx context.Context, event service.Event) {
-		payload, ok := event.Payload.(map[string]string)
+	a.bus.Subscribe(bus.EventTypeAgentCancel, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(bus.AgentCancelPayload)
 		if !ok {
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentCancel, payload)
-		sessionID := payload["session_id"]
-		a.mgr.PushToSession(sessionID, frame)
+		a.mgr.PushToSession(payload.SessionID, frame)
 	})
 }
 
@@ -235,14 +230,14 @@ func (a *App) subscribeTeamEvents() {
 		frameType        string
 		pushUserIfNoSess bool
 	}{
-		{eventType: "team.run.started", frameType: ws.TypeTeamRunStarted, pushUserIfNoSess: true},
-		{eventType: "team.event", frameType: ws.TypeTeamEvent},
-		{eventType: "team.assignment.completed", frameType: ws.TypeTeamAssignmentDone},
-		{eventType: "team.assignment.failed", frameType: ws.TypeTeamAssignmentFailed},
-		{eventType: service.BusEventTeamSubagentStream, frameType: ws.TypeTeamSubagentStream},
+		{eventType: bus.EventTypeTeamRunStarted, frameType: ws.TypeTeamRunStarted, pushUserIfNoSess: true},
+		{eventType: bus.EventTypeTeamEvent, frameType: ws.TypeTeamEvent},
+		{eventType: bus.EventTypeTeamAssignmentDone, frameType: ws.TypeTeamAssignmentDone},
+		{eventType: bus.EventTypeTeamAssignmentFail, frameType: ws.TypeTeamAssignmentFailed},
+		{eventType: bus.EventTypeTeamSubagentStream, frameType: ws.TypeTeamSubagentStream},
 	} {
 		teamEvent := teamEvent
-		a.bus.Subscribe(teamEvent.eventType, func(ctx context.Context, event service.Event) {
+		a.bus.Subscribe(teamEvent.eventType, func(ctx context.Context, event bus.Event) {
 			payload, ok := event.Payload.(map[string]interface{})
 			if !ok {
 				return
@@ -266,7 +261,7 @@ func (a *App) subscribeTeamEvents() {
 // ── Contact / social events ─────────────────────────────────────────────
 
 func (a *App) subscribeContactEvents() {
-	a.bus.Subscribe("friend.request", func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(bus.EventTypeFriendRequest, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
 			return
@@ -285,7 +280,7 @@ func (a *App) subscribeContactEvents() {
 		}
 	})
 
-	a.bus.Subscribe(ws.TypeFriendAccepted, func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(ws.TypeFriendAccepted, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
 			return
@@ -301,7 +296,7 @@ func (a *App) subscribeContactEvents() {
 // ── Session lifecycle events ────────────────────────────────────────────
 
 func (a *App) subscribeSessionEvents() {
-	a.bus.Subscribe(ws.TypeSessionCreated, func(ctx context.Context, event service.Event) {
+	a.bus.Subscribe(ws.TypeSessionCreated, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
 			return
@@ -324,7 +319,7 @@ func (a *App) subscribeSessionEvents() {
 		ws.TypeSessionDissolved,
 	} {
 		eventType := eventType
-		a.bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
+		a.bus.Subscribe(eventType, func(ctx context.Context, event bus.Event) {
 			payload, ok := event.Payload.(map[string]interface{})
 			if !ok {
 				return
