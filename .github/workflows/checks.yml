@@ -86,7 +86,6 @@ jobs:
           exit $FAILED
 
       - name: Race detection
-        continue-on-error: true  # fsnotify hot-reload tests have inherent goroutine races in CI
         run: go test ./... -count=1 -short -race
 
       - name: Security scan (gosec)
