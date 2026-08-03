@@ -23,7 +23,6 @@ import * as path from 'node:path';
 import type {
   AgentInfo,
   ListResponse,
-  RunInfo,
 } from '@shared/types';
 import type { EventEnvelope } from '@shared/events';
 

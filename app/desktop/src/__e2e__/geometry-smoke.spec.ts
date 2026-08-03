@@ -36,8 +36,11 @@ test.describe('Desktop geometry smoke (#1284)', () => {
     const dockBox = await toGeometryRect(dock);
     expect(sidebarBox, 'sidebar bounding box').not.toBeNull();
     expect(dockBox, 'terminal dock bounding box').not.toBeNull();
+    if (sidebarBox === null || dockBox === null) {
+      throw new Error('sidebar/dock bounding boxes were null after assertion');
+    }
 
-    const result = evaluateSidebarVsTerminalDock(sidebarBox!, dockBox!);
+    const result = evaluateSidebarVsTerminalDock(sidebarBox, dockBox);
     expect(result, result.reason ?? 'sidebar vs terminal dock geometry').toMatchObject({ ok: true });
   });
 });

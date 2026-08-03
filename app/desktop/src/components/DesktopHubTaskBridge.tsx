@@ -133,11 +133,15 @@ function DesktopHubTaskBridgeActive() {
 export default function DesktopHubTaskBridge() {
   const hubAuth = useAuth();
 
+  /* eslint-disable react-hooks/exhaustive-deps -- useAuth() returns a fresh
+     object each render; the granular isAuthenticated/token/tryAutoLogin deps
+     below are the stable values the effect actually depends on. */
   useEffect(() => {
     if (!hubAuth.isAuthenticated && !hubAuth.token) {
       void hubAuth.tryAutoLogin();
     }
   }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   if (!hubAuth.isAuthenticated || !hubAuth.token) {
     return null;

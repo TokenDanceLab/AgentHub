@@ -25,14 +25,6 @@ const mockAuthResponse: AuthResponse = {
   expires_in: 900,
 };
 
-function jsonResponse(status: number, data: unknown, statusText = status === 200 ? 'OK' : 'Error') {
-  return new Response(JSON.stringify(data), {
-    status,
-    statusText,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) {
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
   for (const r of responses) {

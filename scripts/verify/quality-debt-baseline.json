@@ -8,15 +8,6 @@
    "owner": "hub-owners",
    "introduced_at": "2026-05-24",
    "review_by": "2026-10-01"
-  },
-  {
-   "location": "frontend-desktop: Lint (debt visibility)",
-   "kind": "continue-on-error",
-   "reason": "frontend lint debt visibility; max-warnings cap keeps new warnings failing locally; full repayment tracked in #1575",
-   "issue": 1575,
-   "owner": "frontend-owners",
-   "introduced_at": "2026-05-26",
-   "review_by": "2026-09-01"
   }
  ],
  "golangci_exclusions": [

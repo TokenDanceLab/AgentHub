@@ -87,10 +87,9 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         const task = s.tasks.find((t) => t.taskId === taskId);
         if (!task) return s;
 
-        const newRunToTask = { ...s.runToTask };
-        if (task.runId) {
-          delete newRunToTask[task.runId];
-        }
+        const newRunToTask = Object.fromEntries(
+          Object.entries(s.runToTask).filter(([runId]) => runId !== task.runId),
+        );
 
         return {
           tasks: s.tasks.filter((t) => t.taskId !== taskId),

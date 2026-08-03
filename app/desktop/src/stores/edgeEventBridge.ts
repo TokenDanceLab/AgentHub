@@ -63,7 +63,7 @@ function onProjectUpdated(qc: QueryClient, _payload: Record<string, unknown>) {
   invalidateAllWithPrefix(qc, edgeQueryKeys.threads.root);
 }
 
-function onThreadCreated(qc: QueryClient, payload: Record<string, unknown>) {
+function onThreadCreated(qc: QueryClient, _payload: Record<string, unknown>) {
   invalidateAllWithPrefix(qc, edgeQueryKeys.threads.root);
 }
 
