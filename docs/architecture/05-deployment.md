@@ -10,7 +10,7 @@
 
 - **Live facts（权威）**：外部 server `projects/agenthub/STATE.md`（运维 SSOT）。本仓库不复制 host 标签、secret 或 IP。
 - **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
-- **非权威遗留**：`hub-server/deployments/*` 下的旧 prod compose / reverse-proxy / env 模板仅作历史参考，不以之为当前生产 SSOT。
+- **构建输入目录**：`hub-server/deployments/` 仅保留镜像构建输入（Dockerfile、docker-entrypoint.sh、README.md），旧 prod/us1/hk2 compose 与 deploy 脚本已在 #1527 PR2 收口删除。
 
 ## 仓库内资产（#1527 inventory）
 
@@ -18,18 +18,20 @@
 |---|---|---|
 | `docker-compose.yml` | 本地开发：PostgreSQL、Redis、Hub Server | local-development shape（#1527 明确不删） |
 | `deployments/production/docker-compose.yml` | 当前生产形状 compose 模板 | **权威 in-repo production shape**（唯一） |
+| `deployments/production/.env.example` | 权威生产 env 占位模板（含 OIDC 回调/交换端点说明） | 保留 |
 | `hub-server/deployments/Dockerfile` | Hub Server 镜像构建输入 | 保留（构建职责） |
-| `hub-server/deployments/docker-compose.prod.yml` | 旧生产形状模板 | 遗留清单（PR2 迁移/删除） |
-| `hub-server/deployments/docker-compose.us1.yml` | 区域（us1）旧模板 | 遗留清单（PR2 迁移/删除） |
-| `hub-server/deployments/hk2/docker-compose.hk2.yml` | 区域（hk2）旧模板 | 遗留清单（PR2 迁移/删除） |
-| `hub-server/deployments/Caddyfile` | reverse-proxy 模板 | 遗留（历史参考） |
-| `hub-server/deployments/Caddyfile.prod` | 生产 reverse-proxy 模板 | 遗留（历史参考） |
-| `hub-server/deployments/.env.production.example` | 生产 env 占位模板 | 遗留（PR2 评估） |
-| `hub-server/deployments/deploy.sh` | 旧部署脚本（preloaded-image 模式） | 遗留（PR2 评估） |
+| `hub-server/deployments/docker-entrypoint.sh` | 镜像 ENTRYPOINT（Dockerfile COPY 的构建输入） | 保留（构建职责） |
+| `hub-server/deployments/README.md` | 构建输入目录说明 | 保留（#1527 PR2 精简） |
+| `hub-server/deployments/docker-compose.prod.yml` | 旧独立 PG+Redis 拓扑模板 | **已删除**（#1527 PR2 收口） |
+| `hub-server/deployments/docker-compose.us1.yml` | 区域（us1）旧模板 | **已删除**（#1527 PR2 收口） |
+| `hub-server/deployments/hk2/`（compose、deploy 脚本、nginx/env 模板） | 区域（hk2）旧部署资产 | **已删除**（#1527 PR2 收口） |
+| `hub-server/deployments/Caddyfile` / `Caddyfile.prod` | 旧 reverse-proxy 模板 | **已删除**（#1527 PR2 收口） |
+| `hub-server/deployments/.env.production.example` | 旧生产 env 占位模板 | **已删除**（env 说明迁至 `deployments/production/.env.example`） |
+| `hub-server/deployments/deploy.sh` / `hk2/deploy-hk2.sh` / `deploy-web-hk2.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
 | `scripts/verify/verify-deployment-shape.ps1` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
 | `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
 
-遗留清单由 `verify-deployment-shape.ps1` 关闭：`hub-server/deployments/` 下出现清单外的新 compose 文件即 FAIL。新增第二份手维护 production compose（`deployments/production/` 下非 `docker-compose.yml` 文件）同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`。
+遗留清单由 `verify-deployment-shape.ps1` 关闭：#1527 PR2 后 `hub-server/deployments/` 下出现**任何** compose 文件即 FAIL（该目录只剩构建输入）；`deployments/production/` 下出现第二份手维护 production compose 同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`。
 
 ## 本地开发
 

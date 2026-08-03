@@ -46,11 +46,9 @@ jobs:
             fi
           }
 
-          check_file "hub-server/deployments/Dockerfile"           "Dockerfile"
+          check_file "hub-server/deployments/Dockerfile"           "Dockerfile (build input)"
           check_file "deployments/production/docker-compose.yml"   "Authoritative production compose"
-          check_file "hub-server/deployments/deploy.sh"            "Deploy script (legacy, PR2 scope)"
-          check_file "hub-server/deployments/.env.production.example" "Env example (legacy, PR2 scope)"
-          check_file "hub-server/deployments/README.md"            "Deploy docs (legacy, PR2 scope)"
+          check_file "hub-server/deployments/README.md"            "Build-input README"
 
           if [ "$FAILED" -eq 1 ]; then
             echo "::error::One or more required deployment files are missing."
@@ -142,77 +140,6 @@ jobs:
         run: |
           echo "::group::Deployment shape verifier self-tests"
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/tests/verify-deployment-shape.Tests.ps1
-          echo "::endgroup::"
-
-      - name: Validate deploy.sh is executable and structurally sound
-        run: |
-          echo "::group::Validating deploy.sh"
-          DEPLOY_SH="hub-server/deployments/deploy.sh"
-
-          # Must be a bash script
-          if ! head -1 "$DEPLOY_SH" | grep -qE '^#!/bin/(bash|sh)'; then
-            echo "::error::deploy.sh is missing a #!/bin/bash shebang"
-            exit 1
-          fi
-
-          # Must have set -e or equivalent
-          if ! grep -qE 'set -[a-z]*e[a-z]*' "$DEPLOY_SH"; then
-            echo "::warning::deploy.sh does not use 'set -e' — consider adding for safety"
-          fi
-
-          # Must have subcommands: deploy and rollback
-          if ! grep -qE '"deploy"\)' "$DEPLOY_SH"; then
-            echo "::warning::deploy.sh missing deploy subcommand"
-          fi
-          if ! grep -qE '"rollback"\)' "$DEPLOY_SH"; then
-            echo "::warning::deploy.sh missing rollback subcommand — required for CD safety"
-          fi
-
-          # Must have health_check function
-          if ! grep -qE 'health_check\(\)' "$DEPLOY_SH"; then
-            echo "::warning::deploy.sh missing health_check() function"
-          fi
-
-          echo "deploy.sh structure looks valid."
-          echo "::endgroup::"
-
-      - name: Validate .env.production.example completeness
-        run: |
-          echo "::group::Validating .env.production.example"
-          ENV_EXAMPLE="hub-server/deployments/.env.production.example"
-
-          REQUIRED_VARS=(
-            "AGENTHUB_DB_PASSWORD"
-            "AGENTHUB_JWT_SECRET"
-            "AGENTHUB_PPROF_PASS"
-          )
-
-          FAILED=0
-          for var in "${REQUIRED_VARS[@]}"; do
-            if grep -qE "^${var}=" "$ENV_EXAMPLE"; then
-              echo "  OK    ${var}"
-            else
-              echo "  MISS  ${var} (required for production)"
-              FAILED=1
-            fi
-          done
-
-          RECOMMENDED_VARS=(
-            "AGENTHUB_DB_HOST"
-            "AGENTHUB_REDIS_HOST"
-            "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET"
-          )
-          for var in "${RECOMMENDED_VARS[@]}"; do
-            if ! grep -qE "^${var}=" "$ENV_EXAMPLE"; then
-              echo "::warning::${var} not found in .env.production.example (may be intentional)"
-            fi
-          done
-
-          if [ "$FAILED" -eq 1 ]; then
-            echo "::error::Required environment variables missing from .env.production.example"
-            exit 1
-          fi
-          echo ".env.production.example looks complete for required vars."
           echo "::endgroup::"
 
   # ── Docker build dry run ───────────────────────
