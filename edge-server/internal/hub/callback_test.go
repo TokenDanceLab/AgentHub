@@ -10,9 +10,21 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/hub"
 )
+
+// newTestCallbackClient builds a CallbackClient with the default policy and a
+// composition-root-style policy client (mirrors httpserver wiring, #1564).
+func newTestCallbackClient(hubURL, authToken string) *hub.CallbackClient {
+	return hub.NewCallbackClient(hubURL, authToken, edgehttp.NewClient(0), hub.DefaultCallbackConfig())
+}
+
+// newPolicyCallbackClient builds a CallbackClient with an explicit policy.
+func newPolicyCallbackClient(hubURL, authToken string, cfg hub.CallbackConfig) *hub.CallbackClient {
+	return hub.NewCallbackClient(hubURL, authToken, edgehttp.NewClient(cfg.Timeout), cfg)
+}
 
 func TestCallbackClient_TaskAck(t *testing.T) {
 	var mu sync.Mutex
@@ -34,7 +46,7 @@ func TestCallbackClient_TaskAck(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -69,7 +81,7 @@ func TestCallbackClient_TaskStream(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskStream(context.Background(), "task-001", "run-001", "Hello from Edge")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -101,7 +113,7 @@ func TestCallbackClient_TaskDone(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskDone(context.Background(), "task-001", hub.TaskResult{
 		RunID:        "run-001",
 		FinalContent: "All done",
@@ -139,7 +151,7 @@ func TestCallbackClient_TaskFail(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskFail(context.Background(), "task-001", "run-001", "execution timeout")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -168,7 +180,7 @@ func TestCallbackClient_AuthHeader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-jwt-token")
+	client := newTestCallbackClient(srv.URL, "test-jwt-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -194,7 +206,7 @@ func TestCallbackClient_NoAuthToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "")
+	client := newTestCallbackClient(srv.URL, "")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -225,7 +237,7 @@ func TestCallbackClient_RetryOnServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("unexpected error after retries: %v", err)
@@ -249,7 +261,7 @@ func TestCallbackClient_NoRetryOnClientError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for 400 response")
@@ -271,7 +283,7 @@ func TestCallbackClient_ErrorDoesNotLeakHubResponseBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for 400 response")
@@ -311,7 +323,7 @@ func TestCallbackClient_AppRejectedErrorDoesNotLeakHubMessage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error for non-OK Hub application code")
@@ -352,7 +364,7 @@ func TestCallbackClient_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	err := client.TaskAck(ctx, "task-001", "run-001")
 	if err == nil {
 		t.Fatal("expected error due to cancelled context")
@@ -375,7 +387,7 @@ func TestCallbackClient_TaskStreamReader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := hub.NewCallbackClient(srv.URL, "test-token")
+	client := newTestCallbackClient(srv.URL, "test-token")
 	reader := strings.NewReader("chunk1\nchunk2\nchunk3")
 	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", reader)
 	if err != nil {
