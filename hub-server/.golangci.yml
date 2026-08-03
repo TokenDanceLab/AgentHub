@@ -53,10 +53,7 @@ linters:
         path: _test\.go
       - linters:
           - gocognit
-        path: internal/handler/.*\.go
-      - linters:
-          - gocognit
-        path: internal/config/.*\.go
+        path: internal/config/config\.go
       - linters:
           - gocognit
         path: internal/router/router\.go
@@ -68,9 +65,6 @@ linters:
       - linters:
           - gocognit
         path: internal/repository/migrate\.go
-      - linters:
-          - gocognit
-        path: internal/httpserver/server\.go
       - linters:
           - gocognit
         path: internal/app/events\.go

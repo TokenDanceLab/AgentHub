@@ -48,7 +48,6 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: edge-server
@@ -95,26 +94,6 @@ jobs:
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vet
         run: go vet ./...
-
-      - name: Commit message check (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"
-          PATTERN="^($TYPES)(\([a-z0-9._-]+\))?: .+"
-          FAILED=0
-          for commit in $(git log --format="%H %s" "origin/${{ github.base_ref }}..HEAD" 2>/dev/null || echo ""); do
-            sha=$(echo "$commit" | cut -d' ' -f1)
-            msg=$(echo "$commit" | cut -d' ' -f2-)
-            if ! echo "$msg" | grep -qE "$PATTERN"; then
-              echo "::warning ::${sha:0:7} 不符合规范: $msg"
-              FAILED=1
-            fi
-          done
-          if [ $FAILED -eq 1 ]; then
-            echo "::error::提交信息需符合 Conventional Commits: type(scope): 中文摘要"
-            exit 1
-          fi
-          echo "✓ 所有提交信息格式正确"
 
   # ── Go: Hub Server ──────────────────────────
   go-hub:
@@ -783,6 +762,18 @@ jobs:
             git diff --check
           fi
 
+      - name: Verify commit messages (PR only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/verify/verify-commit-messages.sh "$BASE_REF" "$PR_HEAD_SHA"
+
+      - name: Self-test commit-message gate
+        shell: bash
+        run: bash scripts/verify/tests/verify-commit-messages.Tests.sh
+
       - name: Secret guard
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -878,6 +869,14 @@ jobs:
       - name: Verify auth dependency ownership (#1551)
         shell: pwsh
         run: ./scripts/verify/verify-auth-dep-ownership.ps1
+
+      - name: Verify quality-debt ratchet (#1536)
+        shell: pwsh
+        run: ./scripts/verify/verify-quality-debt-ratchet.ps1
+
+      - name: Self-test quality-debt ratchet (negative)
+        shell: pwsh
+        run: ./scripts/verify/tests/verify-quality-debt-ratchet.Tests.ps1
 
       - name: Verify Shared REST contract Hub-client to Hub-router
         shell: pwsh
