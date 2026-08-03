@@ -25,7 +25,7 @@ docs/
 ├── architecture/                      ← 模块化架构文档
 ├── progress/MASTER.md                 ← 活进度 SSOT（Phase 里程碑 / open issues）
 ├── plan/                              ← 现役 SPEC（历史 plan 见 archives/plan/）
-├── analysis/                          ← 现役分析（历史 analysis 见 archives/analysis/）
+├── analysis/                          ← 当前 owner 分析/Accepted decision 输入；历史见 archives/
 ├── archives/                          ← 已关闭程序快照（cleanup-baseline 等）与历史文档归档
 ├── decisions.md                       ← 当前架构决策摘要
 ├── roadmap.md                         ← 总路线、当前优先级、验收边界
@@ -39,12 +39,12 @@ docs/
 
 | 需要 | 去看 |
 |------|------|
-| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md)（活 SSOT；Phase 73–74 / milestone 85） |
+| 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md)（活 SSOT） |
 | 总路线与验收边界 | [roadmap.md](roadmap.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
 | 现役 SPEC | [plan/](plan/)（历史 plan 见 [archives/plan/](archives/plan/)） |
-| 分析 / boundary map | [analysis/](analysis/) · [analysis/root-layout.md](analysis/root-layout.md) · [analysis/engineering-loop-capability-map.md](analysis/engineering-loop-capability-map.md) (P71)；历史分析见 [archives/analysis/](archives/analysis/) |
+| 当前仓库布局裁决 | [analysis/root-layout.md](analysis/root-layout.md)；历史分析见 [archives/](archives/) 与 [history.md](history.md) |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
