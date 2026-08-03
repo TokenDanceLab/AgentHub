@@ -69,6 +69,9 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	if err := req.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
+	if err := validateTargetTypeCombination(req); err != nil {
+		return nil, err
+	}
 	if req.DeviceID != nil {
 		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
 			return nil, err
@@ -86,6 +89,12 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	req.OwnerID = ownerID
 	req.ID = ""
 	if err := repository.CreateExecutionTarget(s.db, req); err != nil {
+		// Race with a concurrent same-name create: the DB unique index
+		// (migration 0060) is the authoritative guard — map the violation
+		// to the stable business error instead of a raw 500.
+		if repository.IsUniqueViolation(err) {
+			return nil, errcode.UserInvalidParam.WithMessage("execution target name already exists")
+		}
 		return nil, err
 	}
 	return req, nil
@@ -312,7 +321,13 @@ func (s *ExecutionTargetService) loadEvidence(ctx context.Context, targetID stri
 	return ev, nil
 }
 
-func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
+// Update applies an explicit PATCH to an execution target (#1545).
+// Three-state semantics: absent = keep, value = set, null = clear (nullable
+// fields only). target_type is fixed at creation and health_state is
+// system-managed — neither can be patched. Port reset to 0 and device_id
+// unbind (null) are now expressible, which the old "non-zero means provided"
+// convention made impossible.
+func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -324,48 +339,15 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 		return nil, errcode.AuthDeviceMismatch
 	}
 
-	if req.Name != "" {
-		t.Name = req.Name
-	}
-	if req.TargetType != "" {
-		t.TargetType = req.TargetType
-	}
-	if req.Host != "" {
-		t.Host = req.Host
-	}
-	if req.Port != 0 {
-		t.Port = req.Port
-	}
-	if req.WorkspaceRoot != "" {
-		t.WorkspaceRoot = req.WorkspaceRoot
-	}
-	if req.WorkspaceAllowlist != "" {
-		t.WorkspaceAllowlist = req.WorkspaceAllowlist
-	}
-	if req.TrustLevel != "" {
-		t.TrustLevel = req.TrustLevel
-	}
-	if strings.TrimSpace(req.HealthState) != "" {
-		return nil, errcode.ErrBadRequest.WithMessage("health_state is system-managed")
-	}
-	if req.AuthMethod != "" {
-		t.AuthMethod = req.AuthMethod
-	}
-	if req.DeviceID != nil {
-		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
-			return nil, err
-		}
-		t.DeviceID = req.DeviceID
-	}
-	if req.Capabilities != "" {
-		t.Capabilities = req.Capabilities
-	}
-	if req.Metadata != "" {
-		t.Metadata = req.Metadata
+	if err := applyExecutionTargetPatch(ctx, s.db, ownerID, t, patch); err != nil {
+		return nil, err
 	}
 
 	if err := t.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
+	}
+	if err := validateTargetTypeCombination(t); err != nil {
+		return nil, err
 	}
 	if err := repository.UpdateExecutionTarget(s.db, t); err != nil {
 		return nil, err
@@ -376,6 +358,142 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	}
 	applyExecutionTargetHealthProjection(t, evidence, time.Now())
 	return t, nil
+}
+
+// validateTargetTypeCombination enforces the type × host/device invariants
+// (#1545, service layer): device-routed types (local_edge, hub_relay) must
+// not carry a host, and host-configured types (remote_ssh, tailscale,
+// cloud_edge) require one. Kept out of the DB schema to avoid breaking
+// historical rows; the service returns a stable business error.
+func validateTargetTypeCombination(t *model.ExecutionTarget) error {
+	switch t.TargetType {
+	case "local_edge", "hub_relay":
+		if strings.TrimSpace(t.Host) != "" {
+			return errcode.ErrBadRequest.WithMessage("target_type " + t.TargetType + " cannot configure a host (device-routed)")
+		}
+	case "remote_ssh", "tailscale", "cloud_edge":
+		if strings.TrimSpace(t.Host) == "" {
+			return errcode.ErrBadRequest.WithMessage("target_type " + t.TargetType + " requires a host")
+		}
+	}
+	return nil
+}
+
+// applyExecutionTargetPatch mutates target per the PATCH semantics (#1545).
+// JSON fields are stored as canonical JSON strings; clearing a JSON field
+// resets it to its documented default ([] for workspace_allowlist, {} for
+// capabilities/metadata), clearing a text field sets it to "".
+func applyExecutionTargetPatch(ctx context.Context, db *gorm.DB, ownerID string, target *model.ExecutionTarget, patch *model.ExecutionTargetPatch) error {
+	if patch == nil {
+		return nil
+	}
+	// target_type / health_state are not patchable: type is fixed at
+	// creation and health is system-managed. Reject rather than ignore so
+	// callers cannot believe the update took effect (#1545).
+	if patch.TargetType.Present() {
+		return errcode.ErrBadRequest.WithMessage("target_type is fixed at creation and cannot be updated")
+	}
+	if patch.HealthState.Present() {
+		return errcode.ErrBadRequest.WithMessage("health_state is system-managed")
+	}
+	// Text fields: absent = keep, value = set, null = clear to "".
+	textFields := []struct {
+		f   *model.PatchField[string]
+		dst *string
+	}{
+		{&patch.Name, &target.Name},
+		{&patch.Host, &target.Host},
+		{&patch.WorkspaceRoot, &target.WorkspaceRoot},
+		{&patch.TrustLevel, &target.TrustLevel},
+		{&patch.AuthMethod, &target.AuthMethod},
+	}
+	for _, tf := range textFields {
+		if !tf.f.Present() {
+			continue
+		}
+		if tf.f.Null() {
+			*tf.dst = ""
+			continue
+		}
+		*tf.dst = tf.f.Value()
+	}
+	if patch.Port.Present() {
+		if patch.Port.Null() {
+			// port is not nullable — 0 is the valid "default port" value,
+			// so absent ≠ reset and null is a contract error.
+			return errcode.ErrBadRequest.WithMessage("port cannot be null")
+		}
+		target.Port = patch.Port.Value()
+	}
+	if patch.DeviceID.Present() {
+		if patch.DeviceID.Null() {
+			// Unbind the device.
+			target.DeviceID = nil
+		} else {
+			deviceID := strings.TrimSpace(patch.DeviceID.Value())
+			if deviceID == "" {
+				// Empty string is treated as explicit unbind as well.
+				target.DeviceID = nil
+			} else {
+				if err := requireDeviceBelongsToOwner(ctx, db, ownerID, deviceID, ""); err != nil {
+					return err
+				}
+				target.DeviceID = &deviceID
+			}
+		}
+	}
+	// JSON fields: absent = keep, value = set (canonical JSON), null = reset
+	// to the documented default ([] for allowlist, {} for the object fields).
+	jsonFields := []struct {
+		f          *model.PatchField[json.RawMessage]
+		dst        *string
+		name       string
+		wantArray  bool
+		defaultVal string
+	}{
+		{&patch.WorkspaceAllowlist, &target.WorkspaceAllowlist, "workspace_allowlist", true, "[]"},
+		{&patch.Capabilities, &target.Capabilities, "capabilities", false, "{}"},
+		{&patch.Metadata, &target.Metadata, "metadata", false, "{}"},
+	}
+	for _, jf := range jsonFields {
+		if !jf.f.Present() {
+			continue
+		}
+		if jf.f.Null() {
+			*jf.dst = jf.defaultVal
+			continue
+		}
+		canonical, err := canonicalJSONValue(jf.f.Value(), jf.wantArray)
+		if err != nil {
+			return errcode.ErrBadRequest.WithMessage(jf.name + " must be a JSON " + map[bool]string{true: "array", false: "object"}[jf.wantArray])
+		}
+		*jf.dst = canonical
+	}
+	return nil
+}
+
+// canonicalJSONValue normalizes a raw JSON payload to a canonical JSON string;
+// wantArray requires a JSON array, otherwise a JSON object.
+func canonicalJSONValue(raw json.RawMessage, wantArray bool) (string, error) {
+	var value any
+	if wantArray {
+		var arr []any
+		if err := json.Unmarshal(raw, &arr); err != nil {
+			return "", err
+		}
+		value = arr
+	} else {
+		var obj map[string]any
+		if err := json.Unmarshal(raw, &obj); err != nil {
+			return "", err
+		}
+		value = obj
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return string(canonical), nil
 }
 
 func normalizeExecutionTargetDefaults(t *model.ExecutionTarget) {
