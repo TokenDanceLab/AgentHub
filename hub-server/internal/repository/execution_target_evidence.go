@@ -73,3 +73,9 @@ func GetExecutionTargetEvidenceByTargetIDs(db *gorm.DB, targetIDs []string) (map
 func IsEvidenceNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
+
+// IsUniqueViolation reports whether err is a unique-constraint violation
+// (exported wrapper around the package helper used by service layers).
+func IsUniqueViolation(err error) bool {
+	return isUniqueViolation(err)
+}

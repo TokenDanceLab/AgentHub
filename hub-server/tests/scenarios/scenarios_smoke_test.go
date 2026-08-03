@@ -378,13 +378,20 @@ func TestScenarioDispatch_CreateTargetViaAPI(t *testing.T) {
 	validTypes := []string{"local_edge", "remote_ssh", "hub_relay", "tailscale", "cloud_edge"}
 	for _, targetType := range validTypes {
 		t.Run("create_"+targetType, func(t *testing.T) {
-			resp := doPost("/web/execution-targets", map[string]interface{}{
+			// #1545: device-routed types (local_edge/hub_relay) cannot
+			// configure a host; host-configured types require one.
+			body := map[string]interface{}{
 				"name":        "test-" + targetType,
 				"target_type": targetType,
-				"host":        "127.0.0.1",
-				"port":        3210,
 				"device_id":   deviceID,
-			})
+			}
+			switch targetType {
+			case "local_edge", "hub_relay":
+			default:
+				body["host"] = "127.0.0.1"
+				body["port"] = 3210
+			}
+			resp := doPost("/web/execution-targets", body)
 			require.Equal(t, http.StatusCreated, resp.StatusCode, "create target %s", targetType)
 
 			var r apiResp
@@ -490,16 +497,19 @@ func TestScenarioDispatch_TargetListByType(t *testing.T) {
 		return resp
 	}
 
-	// Create targets of different types
+	// Create targets of different types (#1545: host only for host-configured types).
 	createTypes := []string{"local_edge", "remote_ssh", "tailscale"}
 	for _, targetType := range createTypes {
-		resp := doPost("/web/execution-targets", map[string]interface{}{
+		body := map[string]interface{}{
 			"name":        "list-" + targetType,
 			"target_type": targetType,
 			"device_id":   deviceID,
-			"host":        "127.0.0.1",
-			"port":        3210,
-		})
+		}
+		if targetType != "local_edge" {
+			body["host"] = "127.0.0.1"
+			body["port"] = 3210
+		}
+		resp := doPost("/web/execution-targets", body)
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		resp.Body.Close()
 	}

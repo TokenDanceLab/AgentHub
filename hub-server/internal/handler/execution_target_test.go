@@ -19,8 +19,8 @@ type mockExecutionTargetService struct {
 	createCalled bool
 	updateCalled bool
 
-	createReq *model.ExecutionTarget
-	updateReq *model.ExecutionTarget
+	createReq   *model.ExecutionTarget
+	updatePatch *model.ExecutionTargetPatch
 
 	get  func(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error)
 	list func(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error)
@@ -39,10 +39,14 @@ func (m *mockExecutionTargetService) Get(ctx context.Context, id, ownerID string
 	return nil, nil
 }
 
-func (m *mockExecutionTargetService) Update(ctx context.Context, id, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
+func (m *mockExecutionTargetService) Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error) {
 	m.updateCalled = true
-	m.updateReq = req
-	return &model.ExecutionTarget{ID: id, OwnerID: ownerID, Name: req.Name}, nil
+	m.updatePatch = patch
+	name := id
+	if patch != nil && patch.Name.Present() && !patch.Name.Null() {
+		name = patch.Name.Value()
+	}
+	return &model.ExecutionTarget{ID: id, OwnerID: ownerID, Name: name}, nil
 }
 
 func (m *mockExecutionTargetService) Delete(ctx context.Context, id, ownerID string) error {
@@ -212,9 +216,13 @@ func TestExecutionTargetHandlerUpdateClearsJSONLikeFields(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.True(t, svc.updateCalled)
-	require.JSONEq(t, `[]`, svc.updateReq.WorkspaceAllowlist)
-	require.JSONEq(t, `{}`, svc.updateReq.Capabilities)
-	require.JSONEq(t, `{}`, svc.updateReq.Metadata)
+	require.NotNil(t, svc.updatePatch)
+	require.True(t, svc.updatePatch.WorkspaceAllowlist.Present())
+	require.JSONEq(t, `[]`, string(svc.updatePatch.WorkspaceAllowlist.Value()))
+	require.True(t, svc.updatePatch.Capabilities.Present())
+	require.JSONEq(t, `{}`, string(svc.updatePatch.Capabilities.Value()))
+	require.True(t, svc.updatePatch.Metadata.Present())
+	require.JSONEq(t, `{}`, string(svc.updatePatch.Metadata.Value()))
 }
 
 func TestExecutionTargetHandlerRejectsInvalidJSONLikeField(t *testing.T) {
