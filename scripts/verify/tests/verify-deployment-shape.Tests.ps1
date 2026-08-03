@@ -1,14 +1,15 @@
 #!/usr/bin/env pwsh
 <#
-Negative self-tests for verify-deployment-shape.ps1 (#1527 PR1).
+Negative self-tests for verify-deployment-shape.ps1 (#1527 PR1, inventory
+closed in PR2).
 
 Each case runs against an isolated minimal repository fixture. A negative
 case passes only when the verifier exits non-zero for the expected policy
 reason. Cases:
 
-1. positive: intact authoritative template + registered legacy inventory -> 0
+1. positive: intact authoritative template + empty legacy dir -> 0
 2. second hand-maintained production compose under deployments/production/ -> 1
-3. unregistered legacy compose under hub-server/deployments/ -> 1
+3. any compose file under hub-server/deployments/ (legacy resurrection) -> 1
 4. authoritative template missing required service -> 1
 5. hub-server image off product SSOT -> 1
 #>
@@ -45,13 +46,6 @@ function New-Fixture {
 
     Copy-RepoFile $fixture "deployments/production/docker-compose.yml"
     Copy-RepoFile $fixture $VerifierRelative
-    foreach ($legacy in @(
-        "hub-server/deployments/docker-compose.prod.yml",
-        "hub-server/deployments/docker-compose.us1.yml",
-        "hub-server/deployments/hk2/docker-compose.hk2.yml"
-    )) {
-        Copy-RepoFile $fixture $legacy
-    }
     return $fixture
 }
 
@@ -70,7 +64,7 @@ try {
     if ($result.ExitCode -ne 0) {
         Fail "positive fixture unexpectedly failed:`n$($result.Output)"
     }
-    Pass "positive fixture (authoritative + registered legacy)"
+    Pass "positive fixture (authoritative + empty legacy dir)"
 } finally {
     Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -97,9 +91,10 @@ services:
     Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ── Negative 2: unregistered legacy compose ────────────────────────────────
+# ── Negative 2: compose resurrected under legacy build-input dir ───────────
 $fixture = New-Fixture
 try {
+    New-Item -ItemType Directory -Force -Path (Join-Path $fixture "hub-server/deployments") | Out-Null
     Write-Utf8NoBom (Join-Path $fixture "hub-server/deployments/docker-compose.eu1.yml") @"
 services:
   hub-server:
@@ -107,12 +102,12 @@ services:
 "@
     $result = Invoke-FixtureVerifier $fixture
     if ($result.ExitCode -eq 0) {
-        Fail "unregistered legacy compose must FAIL but verifier exited 0"
+        Fail "legacy compose resurrection must FAIL but verifier exited 0"
     }
-    if ($result.Output -notmatch "unregistered legacy compose") {
-        Fail "unregistered legacy compose failed for the wrong reason:`n$($result.Output)"
+    if ($result.Output -notmatch "legacy compose inventory closed") {
+        Fail "legacy compose resurrection failed for the wrong reason:`n$($result.Output)"
     }
-    Pass "unregistered legacy compose fails closed"
+    Pass "compose under hub-server/deployments/ fails closed"
 } finally {
     Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue
 }

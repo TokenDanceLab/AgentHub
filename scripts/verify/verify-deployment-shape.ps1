@@ -12,10 +12,9 @@ in-repo production compose shape:
    rejected second image name.
 3. No second hand-maintained production compose may appear under
    `deployments/production/` (adding one must FAIL - machine proof).
-4. Legacy files under `hub-server/deployments/**` may exist only as the
-   registered legacy inventory below; any NEW compose file under that tree
-   (beyond the registered names) fails closed until PR2 migrates or removes
-   them.
+4. The legacy compose inventory under `hub-server/deployments/**` is CLOSED
+   since #1527 PR2: any compose file under that tree (the directory now holds
+   build inputs only: Dockerfile, docker-entrypoint.sh, README.md) must FAIL.
 
 This verifier never reads secrets; it only inspects file shapes.
 #>
@@ -42,11 +41,6 @@ $AuthoritativeRelative = "deployments/production/docker-compose.yml"
 $AuthoritativePath = Join-Path $RepoRootPath $AuthoritativeRelative
 $ProductionDir = Split-Path -Parent $AuthoritativePath
 $LegacyDeployDir = Join-Path $RepoRootPath "hub-server/deployments"
-$LegacyComposeNames = @(
-    "docker-compose.prod.yml",
-    "docker-compose.us1.yml",
-    "hk2/docker-compose.hk2.yml"
-)
 
 # ── YAML shape extraction via python (PyYAML; same pattern as
 #    verify-openapi-contract.ps1) ──────────────────────────────────────────
@@ -130,17 +124,16 @@ if ($productionComposes.Count -gt 1) {
     Pass-Verifier "no second production compose under deployments/production/"
 }
 
-# ── 4. Legacy inventory closed ─────────────────────────────────────────────
+# ── 4. Legacy compose inventory closed (PR2) ──────────────────────────────
+# hub-server/deployments/ now holds build inputs only (Dockerfile,
+# docker-entrypoint.sh, README.md). Any compose file there is a legacy
+# resurrection and must FAIL.
 $legacyComposes = @(Get-ChildItem -LiteralPath $LegacyDeployDir -Recurse -Filter "docker-compose*.yml" -File -ErrorAction SilentlyContinue)
-foreach ($legacy in $legacyComposes) {
-    $relative = [IO.Path]::GetRelativePath($RepoRootPath, $legacy.FullName).Replace("\", "/")
-    $relativeToDeploy = $relative.Substring("hub-server/deployments/".Length)
-    if ($LegacyComposeNames -notcontains $relativeToDeploy) {
-        Fail-Verifier "unregistered legacy compose appears: $relative (register or migrate in #1527 PR2)"
-    }
-}
-if ($legacyComposes.Count -gt 0 -and $script:Failed -eq 0) {
-    Pass-Verifier "legacy compose inventory closed ($($legacyComposes.Count) registered file(s))"
+if ($legacyComposes.Count -gt 0) {
+    $found = ($legacyComposes | ForEach-Object { [IO.Path]::GetRelativePath($RepoRootPath, $_.FullName).Replace("\", "/") }) -join ", "
+    Fail-Verifier "legacy compose inventory closed: compose files must not appear under hub-server/deployments/ (found: $found)"
+} else {
+    Pass-Verifier "legacy compose inventory closed (no compose files under hub-server/deployments/)"
 }
 
 if ($script:Failed -gt 0) {
