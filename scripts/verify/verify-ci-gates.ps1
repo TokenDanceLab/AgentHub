@@ -154,7 +154,9 @@ foreach ($job in @(
     @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "visual-qa-shell"; Body = $visualShell; Lockfile = "app/pnpm-lock.yaml" }
 )) {
-    Assert-Contains $job.Body "pnpm/action-setup@v4" "$($job.Name) must install pnpm explicitly"
+    # runtime major is governed by verify-action-runtimes.ps1 (#1580); here we
+    # only require the pnpm setup step to exist with the pnpm cache wired up
+    Assert-Contains $job.Body "pnpm/action-setup@" "$($job.Name) must install pnpm explicitly"
     Assert-Contains $job.Body "cache:\s+pnpm" "$($job.Name) must enable pnpm cache"
     Assert-Contains $job.Body ([regex]::Escape($job.Lockfile)) "$($job.Name) must cache the correct pnpm lockfile"
 }
@@ -262,7 +264,7 @@ Assert-Contains $backendPerf ([regex]::Escape("verify-backend-perf-leak-gates.ps
 Assert-Contains $backendPerf "(?m)^\s+timeout-minutes:\s+20\s*$" "backend-perf-leak-gates must have a hard timeout"
 Assert-NotContains $backendPerf "load-test" "backend-perf-leak-gates must not claim load/capacity smoke"
 
-Assert-Contains $changes "dorny/paths-filter@v3" "changes job must use dorny/paths-filter"
+Assert-Contains $changes "dorny/paths-filter@" "changes job must use dorny/paths-filter (major governed by #1580 runtime gate)"
 Assert-Contains $changes ([regex]::Escape("app/shared/src/workbench/**")) "changes job must watch workbench paths"
 Assert-Contains $changes ([regex]::Escape("app/shared/src/styles/**")) "changes job must watch shared styles"
 Assert-Contains $changes ([regex]::Escape("app/web/scripts/visual-qa*")) "changes job must watch web visual-qa scripts"

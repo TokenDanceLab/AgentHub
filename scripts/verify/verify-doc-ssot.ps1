@@ -265,7 +265,7 @@ function Assert-AgentsMdPaths {
         if ($p -match '^\.(agenthub|claude|codex)/') { continue }  # gitignored 本机 agent 状态目录
         if ($p -match '^\.worktrees/') { continue }       # git worktree 机制目录
         if ($p -notmatch '/') { continue }                # 无斜杠不是仓库内路径
-        if ($p -match '[*?<>@]') { continue }             # 通配符/占位符/外部引用（如 paths-filter@v3）
+        if ($p -match '[*?<>@]') { continue }             # 通配符/占位符/外部引用（如 paths-filter@v4）
         if ($p -match '^/') { continue }                  # API 路由（如 /v1/runners），非文件路径
         if ($p -match '\s') { continue }                  # 含空格 = 命令/短语（如 `bash scripts/x.sh`），非仓库内路径
         $p = $p -replace '^\./', ''                       # 剥离 ./ 前缀

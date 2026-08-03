@@ -313,7 +313,7 @@ assert_release_workflow_prerelease_policy() {
   local release_block
   release_block="$(get_workflow_job_block "$text" "release")" || true
 
-  assert_true "$(echo "$release_block" | grep -q 'softprops/action-gh-release@v2' && echo true || echo false)" "release job creates GitHub Releases through softprops/action-gh-release"
+  assert_true "$(echo "$release_block" | grep -q 'softprops/action-gh-release@v3' && echo true || echo false)" "release job creates GitHub Releases through softprops/action-gh-release"
   assert_true "$(echo "$release_block" | grep -qvP '(?m)^\s*prerelease:\s*false\s*$' && echo true || echo false)" "release job is not fixed stable for all v* tags"
   assert_true "$(echo "$release_block" | grep -qP "prerelease:\s*\\$\\{\\{\\s*contains\(github\.ref_name,\s*'-'\)\s*\\}\\}" && echo true || echo false)" "hyphenated semver tags are marked as GitHub prereleases"
   pass "RC/pre-release tags avoid the stable releases/latest updater channel; stable tags remain prerelease=false"
@@ -529,7 +529,7 @@ assert_true "$(echo "$macos_dry_block" | grep -q 'agenthub-edge-aarch64-apple-da
 assert_true "$(echo "$macos_dry_block" | grep -q 'AgentHub\.app' && echo "$macos_dry_block" | grep -q 'AgentHub_.*aarch64.*\.dmg' && echo true || echo false)" "release readiness workflow documents future macOS app and versioned arm64 DMG bundle boundaries"
 assert_true "$(echo "$macos_dry_block" | grep -q 'workflow artifacts only' && echo true || echo false)" "release readiness workflow scopes future macOS unsigned outputs to workflow artifacts only"
 assert_true "$(echo "$macos_dry_block" | grep -q 'macos-unsigned-dry-policy\.json' && echo true || echo false)" "release readiness workflow writes a macOS unsigned dry policy manifest"
-assert_true "$(echo "$macos_dry_block" | grep -q 'actions/upload-artifact@v4' && echo "$macos_dry_block" | grep -q 'name:\s*macos-unsigned-package-dry' && echo "$macos_dry_block" | grep -q 'path:\s*dist/macos-unsigned-dry-policy\.json' && echo true || echo false)" "release readiness workflow uploads only the macOS policy manifest as a workflow artifact"
+assert_true "$(echo "$macos_dry_block" | grep -q 'actions/upload-artifact@v7' && echo "$macos_dry_block" | grep -q 'name:\s*macos-unsigned-package-dry' && echo "$macos_dry_block" | grep -q 'path:\s*dist/macos-unsigned-dry-policy\.json' && echo true || echo false)" "release readiness workflow uploads only the macOS policy manifest as a workflow artifact"
 assert_true "$(echo "$macos_dry_block" | grep -q 'Apple Developer ID signing' && echo "$macos_dry_block" | grep -q 'notarytool notarization' && echo "$macos_dry_block" | grep -q 'stapler staple' && echo true || echo false)" "release readiness workflow records Apple signing, notarization, and stapling as explicit approval gates"
 assert_true "$(echo "$macos_dry_block" | grep -q 'GitHub Release upload' && echo "$macos_dry_block" | grep -q 'production updater metadata publication' && echo true || echo false)" "release readiness workflow records release upload and updater production metadata as explicit approval gates"
 assert_true "$(echo "$macos_dry_block" | grep -q 'later approval slice' && echo true || echo false)" "release readiness workflow keeps signing, notarization, release upload, and updater metadata as later approval slice"

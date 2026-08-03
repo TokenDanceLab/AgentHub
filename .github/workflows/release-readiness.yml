@@ -37,7 +37,7 @@ jobs:
     name: Static package readiness policy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify Tauri package readiness policy
         shell: pwsh
@@ -48,17 +48,17 @@ jobs:
     needs: readiness-policy
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -75,19 +75,19 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows_package_dry == true }}
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -99,7 +99,7 @@ jobs:
         run: ./scripts/release/verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
 
       - name: Upload dry package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-package-dry
           path: dist/
@@ -110,7 +110,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_unsigned_dry_policy == true }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Record unsigned macOS dry policy boundary
         shell: pwsh
@@ -155,7 +155,7 @@ jobs:
           Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice."
 
       - name: Upload macOS unsigned dry policy artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-unsigned-package-dry
           path: dist/macos-unsigned-dry-policy.json
