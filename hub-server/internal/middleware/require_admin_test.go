@@ -3,7 +3,6 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -14,7 +13,7 @@ import (
 func TestRequireAdminBlocksWhenUserIDMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, w := ginRequest(http.MethodGet, "/admin/something", "")
-	RequireAdmin()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireAdmin()(c)
 
 	assert.True(t, c.IsAborted())
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
@@ -24,13 +23,11 @@ func TestRequireAdminAllowsConfiguredAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("AGENTHUB_ADMIN_USERS", "admin-1,admin-2")
 
-	// Reset the sync.Once to pick up the env var.
-	adminUsersOnce = sync.Once{}
-	adminUsersList = nil
-
+	// The instance reads AGENTHUB_ADMIN_USERS at construction (#1551) —
+	// no package global to reset.
 	c, w := ginRequest(http.MethodGet, "/admin/something", "")
 	c.Set("user_id", "admin-1")
-	RequireAdmin()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireAdmin()(c)
 
 	assert.False(t, c.IsAborted())
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -40,28 +37,30 @@ func TestRequireAdminBlocksNonAdminUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("AGENTHUB_ADMIN_USERS", "admin-1")
 
-	adminUsersOnce = sync.Once{}
-	adminUsersList = nil
-
 	c, w := ginRequest(http.MethodGet, "/admin/something", "")
 	c.Set("user_id", "regular-user")
-	RequireAdmin()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireAdmin()(c)
 
 	assert.True(t, c.IsAborted())
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestGetAdminUsersParsesEnvVar(t *testing.T) {
-	// getAdminUsers uses sync.Once — cannot reset across test runs.
-	// This test only verifies the helper exists and is callable.
-	assert.NotNil(t, getAdminUsers)
+	// parseAdminUsers reads AGENTHUB_ADMIN_USERS per call (instance-owned,
+	// #1551) — a fresh parse picks up the env set here.
+	t.Setenv("AGENTHUB_ADMIN_USERS", "u1, u2 ,,u3")
+	got := parseAdminUsers()
+	assert.Equal(t, []string{"u1", "u2", "u3"}, got)
+
+	t.Setenv("AGENTHUB_ADMIN_USERS", "")
+	assert.Nil(t, parseAdminUsers())
 }
 
 func TestAuditPermissionNoopWhenFnNil(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	auditPermission(c, "user-1", "admin_access", false, nil, "127.0.0.1")
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).auditPermission(c, "user-1", "admin_access", false, nil, "127.0.0.1")
 }
 
 func TestGlobalRateLimitPanicsOnNilClient(t *testing.T) {

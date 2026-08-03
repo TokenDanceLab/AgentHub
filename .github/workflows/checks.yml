@@ -875,6 +875,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-test-sleep-ratchet.ps1
 
+      - name: Verify auth dependency ownership (#1551)
+        shell: pwsh
+        run: ./scripts/verify/verify-auth-dep-ownership.ps1
+
       - name: Verify Shared REST contract Hub-client to Hub-router
         shell: pwsh
         run: ./scripts/verify/verify-shared-rest-contract.ps1

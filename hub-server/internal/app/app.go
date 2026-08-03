@@ -2,16 +2,18 @@ package app
 
 import (
 	"context"
-	"sync"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
@@ -95,7 +97,7 @@ type App struct {
 	UserSettingsHandler *handler.UserSettingsHandler
 
 	// Goroutine lifecycle (#1542)
-	bg          *BackgroundGroup
+	bg           *BackgroundGroup
 	shutdownOnce sync.Once
 	shutdownErr  error
 }
@@ -109,4 +111,28 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 		CacheClient: cacheClient,
 		bg:          newBackgroundGroup(context.Background()),
 	}
+}
+
+// tdVerifier returns the instance-owned TokenDance ID JWKS verifier (#1551),
+// constructed from config — never a process-global. nil when TokenDance ID is
+// not configured (the auth middleware skips the RS256 path).
+func (a *App) tdVerifier() *jwtutil.TokenDanceVerifier {
+	jwksURI := a.Config.TokenDanceID.JWKSURI
+	if jwksURI == "" && a.Config.TokenDanceID.IssuerURL != "" {
+		jwksURI = strings.TrimRight(a.Config.TokenDanceID.IssuerURL, "/") + "/oidc/jwks"
+	}
+	if jwksURI == "" {
+		return nil
+	}
+	return jwtutil.NewTokenDanceVerifier(jwksURI)
+}
+
+// auditPermissionDecision adapts AuditService.RecordPermissionDecision for
+// the AuthMiddleware permission-audit callback (#1551). No-op when the audit
+// service is not yet constructed.
+func (a *App) auditPermissionDecision(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
+	if a.AuditService == nil {
+		return
+	}
+	a.AuditService.RecordPermissionDecision(ctx, userID, decision, allowed, details, clientIP)
 }

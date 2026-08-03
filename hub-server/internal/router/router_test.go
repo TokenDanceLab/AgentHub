@@ -18,6 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
@@ -35,6 +36,7 @@ func TestNoRouteReturnsNotFound(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -102,6 +104,7 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
 		"",
 		cacheClient,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -196,6 +199,7 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,
@@ -228,6 +232,7 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,

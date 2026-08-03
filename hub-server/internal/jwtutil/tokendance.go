@@ -31,7 +31,18 @@ type jwksCache struct {
 	ttl     time.Duration
 }
 
-var defaultJWKSCache = &jwksCache{ttl: 1 * time.Hour}
+// TokenDanceVerifier validates TokenDance ID-issued RS256 JWTs against a
+// JWKS endpoint. Instance-based (#1551): the URI, HTTP client, cache, and
+// refresh policy are owned by the verifier, constructed once in the
+// composition root — never a process-global mutable default.
+type TokenDanceVerifier struct {
+	cache *jwksCache
+}
+
+// NewTokenDanceVerifier builds a verifier for the given JWKS endpoint.
+func NewTokenDanceVerifier(jwksURI string) *TokenDanceVerifier {
+	return &TokenDanceVerifier{cache: &jwksCache{jwksURI: jwksURI, ttl: 1 * time.Hour}}
+}
 
 // jwksResponse is the JSON structure returned by an OIDC JWKS endpoint.
 type jwksResponse struct {
@@ -45,20 +56,6 @@ type jwkKey struct {
 	Kid string `json:"kid"`
 	N   string `json:"n"`
 	E   string `json:"e"`
-}
-
-// SetJWKSURI configures the JWKS endpoint URL for TokenDance ID.
-func SetJWKSURI(uri string) {
-	defaultJWKSCache.jwksURI = uri
-}
-
-// ResetJWKSCache clears the JWKS cache. For use in tests when switching
-// between mock TokenDance ID servers.
-func ResetJWKSCache() {
-	defaultJWKSCache.mu.Lock()
-	defer defaultJWKSCache.mu.Unlock()
-	defaultJWKSCache.keys = nil
-	defaultJWKSCache.fetched = time.Time{}
 }
 
 // fetchJWKS fetches the JWKS from TokenDance ID and caches the parsed RSA public keys.
@@ -138,17 +135,17 @@ func parseJWKKey(k *jwkKey) (*rsa.PublicKey, error) {
 	return &rsa.PublicKey{N: n, E: int(e.Int64())}, nil
 }
 
-// ParseTokenDanceJWT validates a TokenDance ID-issued RS256 JWT.
+// ParseJWT validates a TokenDance ID-issued RS256 JWT.
 // It fetches the JWKS from the configured endpoint, finds the matching key by kid,
 // and verifies signature, issuer, audience, and standard time claims.
-func ParseTokenDanceJWT(tokenString, expectedIssuer, expectedAudience string) (*TokenDanceClaims, error) {
+func (v *TokenDanceVerifier) ParseJWT(tokenString, expectedIssuer, expectedAudience string) (*TokenDanceClaims, error) {
 	if expectedIssuer == "" {
 		return nil, fmt.Errorf("expected issuer is required")
 	}
 	if expectedAudience == "" {
 		return nil, fmt.Errorf("expected audience is required")
 	}
-	if err := defaultJWKSCache.fetchJWKS(); err != nil {
+	if err := v.cache.fetchJWKS(); err != nil {
 		return nil, err
 	}
 
@@ -163,19 +160,19 @@ func ParseTokenDanceJWT(tokenString, expectedIssuer, expectedAudience string) (*
 		return nil, fmt.Errorf("token missing kid header")
 	}
 
-	defaultJWKSCache.mu.RLock()
-	pubKey, ok := defaultJWKSCache.keys[kid]
-	defaultJWKSCache.mu.RUnlock()
+	v.cache.mu.RLock()
+	pubKey, ok := v.cache.keys[kid]
+	v.cache.mu.RUnlock()
 
 	if !ok {
 		// Key not found — refresh cache and retry.
-		defaultJWKSCache.fetched = time.Time{}
-		if err := defaultJWKSCache.fetchJWKS(); err != nil {
+		v.cache.fetched = time.Time{}
+		if err := v.cache.fetchJWKS(); err != nil {
 			return nil, fmt.Errorf("jwks refresh failed: %w", err)
 		}
-		defaultJWKSCache.mu.RLock()
-		pubKey, ok = defaultJWKSCache.keys[kid]
-		defaultJWKSCache.mu.RUnlock()
+		v.cache.mu.RLock()
+		pubKey, ok = v.cache.keys[kid]
+		v.cache.mu.RUnlock()
 		if !ok {
 			return nil, fmt.Errorf("key %q not found in JWKS", kid)
 		}
