@@ -18,6 +18,7 @@ func ExtractImageMetadataJSON(filePath, contentType string) (string, error) {
 		return "{}", nil
 	}
 
+	// #nosec G304 -- path is a server-side temp file created by the handler
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err

@@ -85,7 +85,7 @@ func (r *SkillRegistry) StartWatch(skillsDir string) error {
 	if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
 		if err := watcher.Add(skillsDir); err != nil {
 			slog.Warn("skills: cannot watch skills directory, hot reload disabled", "error", err, "dir", skillsDir)
-			watcher.Close()
+			_ = watcher.Close()
 			return nil
 		}
 		// Add existing subdirectories for recursive watch.

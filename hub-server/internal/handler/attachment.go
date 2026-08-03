@@ -143,6 +143,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 
 	// Commit the blob to object storage (local or S3).
 	// Re-open the temp file for reading.
+	// #nosec G304 -- tmpPath is a server-generated temp file (os.CreateTemp)
 	src, err := os.Open(tmpPath)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
@@ -215,6 +216,7 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 }
 
 func sniffAttachmentMimeType(filePath string) (string, error) {
+	// #nosec G304 -- only called with server-generated temp paths (os.CreateTemp)
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err

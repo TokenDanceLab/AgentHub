@@ -131,7 +131,7 @@ func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
 // multiple times and tolerates a nil *websocket.Conn (useful in tests).
 func (c *Conn) Close() {
 	if c.W != nil {
-		c.W.Close(websocket.StatusNormalClosure, "")
+		_ = c.W.Close(websocket.StatusNormalClosure, "")
 	}
 }
 

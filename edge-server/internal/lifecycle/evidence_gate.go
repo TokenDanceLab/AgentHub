@@ -251,6 +251,8 @@ func runEvidenceCheck(name, workDir string, command string, args ...string) Evid
 	ctx, cancel := context.WithTimeout(context.Background(), evidenceCheckTimeout)
 	defer cancel()
 
+	// #nosec G204 -- evidence-gate checks run operator-approved CLI probes
+	// (e.g. ls/git) with a bounded timeout inside the run workdir.
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()

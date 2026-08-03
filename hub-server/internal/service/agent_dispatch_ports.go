@@ -157,7 +157,9 @@ func (s *DispatchService) publish(ctx context.Context, event bus.Event) {
 	if !dispatch.BusPortAvailable(s != nil, s != nil && s.bus != nil) {
 		return
 	}
-	s.bus.Publish(ctx, event)
+	if err := s.bus.Publish(ctx, event); err != nil {
+		slog.Warn("failed to publish dispatch event", "event_type", event.Type, "error", err)
+	}
 }
 
 // cachePort is a nil-safe accessor for the route / offline-queue cache port.

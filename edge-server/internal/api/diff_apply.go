@@ -233,7 +233,7 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 func (h *Handler) createNewFileFromHunk(targetPath string, hunk unifiedHunk) error {
 	// Ensure parent directory exists.
 	dir := filepath.Dir(targetPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -252,7 +252,7 @@ func (h *Handler) createNewFileFromHunk(targetPath string, hunk unifiedHunk) err
 		return fmt.Errorf("hunk has no added lines to create file from")
 	}
 
-	if err := os.WriteFile(targetPath, []byte(buf.String()), 0o644); err != nil {
+	if err := os.WriteFile(targetPath, []byte(buf.String()), 0o600); err != nil {
 		return fmt.Errorf("failed to create file %s: %w", targetPath, err)
 	}
 
@@ -436,6 +436,8 @@ func createBackup(targetPath string, content []byte) error {
 	// Backups may contain source code or credentials. Keep them readable by the
 	// Edge process for rollback without exposing them to other users. A zero
 	// mode is ignored on Windows but creates an unreadable file on Unix.
+	// #nosec G703 -- backupPath = targetPath+".bak"; targetPath already passed
+	// isPathWithin(absWorkDir, ...) in applyHunkToFile, so it cannot escape workdir.
 	return os.WriteFile(backupPath, content, 0o600)
 }
 

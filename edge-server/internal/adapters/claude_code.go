@@ -138,6 +138,7 @@ func ccSwitchManaged() bool {
 		return false
 	}
 	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	// #nosec G304 -- reads the user's own Claude Code settings file
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
 		return false // file missing → not cc-switch managed

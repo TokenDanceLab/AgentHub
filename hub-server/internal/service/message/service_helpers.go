@@ -21,7 +21,9 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, event)
+	if err := s.bus.Publish(ctx, event); err != nil {
+		slog.Warn("failed to publish message event", "event_type", event.Type, "error", err)
+	}
 }
 
 // seqLocks serializes seq allocation per session. Redis INCR is atomic, but

@@ -555,8 +555,10 @@ func (s *AgentTeamService) publishTeamEvent(ctx context.Context, eventType strin
 	if s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, bus.Event{
+	if err := s.bus.Publish(ctx, bus.Event{
 		Type:    eventType,
 		Payload: payload,
-	})
+	}); err != nil {
+		slog.Warn("failed to publish team event", "event_type", eventType, "error", err)
+	}
 }
