@@ -73,7 +73,11 @@ func (a *App) startAdminServer() error {
 
 	// Synchronous bind: a busy port must be known before AdminServerUp is
 	// set to 1 (previously the goroutine discovered it asynchronously).
-	listener, err := net.Listen("tcp", adminListenAddr(adminPort))
+	listen := net.Listen
+	if a.adminListen != nil {
+		listen = a.adminListen
+	}
+	listener, err := listen("tcp", adminListenAddr(adminPort))
 	if err != nil {
 		if metrics.AdminServerUp != nil {
 			metrics.AdminServerUp.Set(0)
@@ -81,30 +85,61 @@ func (a *App) startAdminServer() error {
 		return fmt.Errorf("admin server bind failed: %w", err)
 	}
 
-	a.AdminServer = &http.Server{
-		Addr:              adminListenAddr(adminPort),
+	server := &http.Server{
+		Addr:              listener.Addr().String(),
 		Handler:           middleware.RecoveryHTTPHandler(adminMux),
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
 		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
+	serveDone := make(chan struct{})
+	a.AdminServer = server
+	a.adminServeDone = serveDone
 	if metrics.AdminServerUp != nil {
 		metrics.AdminServerUp.Set(1)
 	}
 	go func() {
-		slog.Info("admin server starting", "addr", a.AdminServer.Addr, "debug_capabilities", debugEnabled)
-		if err := a.AdminServer.Serve(listener); err != nil && err != http.ErrServerClosed {
-			slog.Error("admin server failed", "error", err)
+		defer close(serveDone)
+		defer func() {
 			if metrics.AdminServerUp != nil {
 				metrics.AdminServerUp.Set(0)
 			}
+		}()
+		slog.Info("admin server starting", "addr", server.Addr, "debug_capabilities", debugEnabled)
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			slog.Error("admin server failed", "error", err)
 		}
 	}()
 	if !debugEnabled {
 		slog.Warn("admin server started without debug capabilities (AGENTHUB_PPROF_USER/PASS not both set): pprof/config/state disabled, metrics+health available")
 	}
 	return nil
+}
+
+// shutdownAdminServer closes the net/http server and waits for the Serve
+// goroutine to relinquish the listener. http.Server.Shutdown can otherwise
+// return before a just-started Serve call has registered its listener.
+func (a *App) shutdownAdminServer(ctx context.Context) error {
+	if a.AdminServer == nil {
+		return nil
+	}
+
+	shutdownErr := a.AdminServer.Shutdown(ctx)
+	done := a.adminServeDone
+	if done == nil {
+		return shutdownErr
+	}
+
+	select {
+	case <-done:
+		return shutdownErr
+	case <-ctx.Done():
+		if shutdownErr != nil {
+			return shutdownErr
+		}
+		return ctx.Err()
+	}
 }
 
 func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
