@@ -28,6 +28,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    // 错误边界仅做开发期诊断输出；用户可见错误由 fallback/ErrorNotice 呈现。
+    // eslint-disable-next-line no-console -- 边界错误日志是受控用途，不属于 UI 噪音
     console.error('[mobile ErrorBoundary] render error:', error, info);
   }
 
