@@ -969,3 +969,43 @@ func TestRateLimitFailOpen(t *testing.T) {
 		}
 	})
 }
+
+func TestEnvOverrideEdgeDispatchConfig(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "edge-override-secret-padded-to-minimum-32-chars")
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:3210")
+	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "env-edge-token")
+	t.Setenv("AGENTHUB_EDGE_DEVICE_ID", "env-device-1")
+	t.Setenv("AGENTHUB_EDGE_TIMEOUT", "7s")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Edge.URL != "http://127.0.0.1:3210" {
+		t.Errorf("Edge.URL = %q, want env value", cfg.Edge.URL)
+	}
+	if cfg.Edge.AuthToken != "env-edge-token" {
+		t.Errorf("Edge.AuthToken = %q, want env value", cfg.Edge.AuthToken)
+	}
+	if cfg.Edge.DeviceID != "env-device-1" {
+		t.Errorf("Edge.DeviceID = %q, want env value", cfg.Edge.DeviceID)
+	}
+	if cfg.Edge.Timeout != 7*time.Second {
+		t.Errorf("Edge.Timeout = %v, want 7s", cfg.Edge.Timeout)
+	}
+}
+
+func TestEdgeDispatchTimeoutDefault(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "edge-default-secret-padded-to-minimum-32-chars")
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:3210")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Edge.Timeout != 10*time.Second {
+		t.Errorf("Edge.Timeout = %v, want default 10s", cfg.Edge.Timeout)
+	}
+}

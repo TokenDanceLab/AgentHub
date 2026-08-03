@@ -14,6 +14,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -305,7 +306,7 @@ func TestEventDispatch_AgentDoneSkipsNotificationWhenNoTask(t *testing.T) {
 	cc := newBehaviorCache(t)
 	b := newBehaviorBus(t)
 
-	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil)
+	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil, config.EdgeDispatchConfig{}, "")
 	a := &App{
 		mgr:          mgr,
 		bus:        b,
