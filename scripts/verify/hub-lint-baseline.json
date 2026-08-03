@@ -1,5 +1,5 @@
 {
- "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Each entry = linter + relative file + message text (line/col excluded). New findings not in this list FAIL the ratchet verifier; removing an entry is the explicit repayment step (owner/issue/review_date filled during repayment). Generated from: golangci-lint v2.12.2 run ./... (hub-server)",
+ "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Generated from LF git archive (CI-equivalent line endings) with golangci-lint v2.12.2.",
  "linter_version": "v2.12.2",
  "findings": [
   {
@@ -14,12 +14,12 @@
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/messagereaction/service.go",
+   "file": "internal/service/message/service_helpers.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/session/service.go",
+   "file": "internal/service/messagereaction/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
