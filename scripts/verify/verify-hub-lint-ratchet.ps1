@@ -21,7 +21,7 @@ JSON report instead of shelling out to the linter (used by the self-tests).
 #>
 [CmdletBinding()]
 param(
-    [string]$RepoRootPath = (Resolve-Path (Join-Path $PSScriptRoot "..\..")),
+    [string]$RepoRootPath = (Get-Location),
     [string]$LintJsonPath = "",
     [switch]$UpdateBaseline
 )
