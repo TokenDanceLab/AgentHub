@@ -234,6 +234,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 |---|---|---|
 | CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.ps1`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.ps1`） | checks.yml → validate |
+| Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.ps1`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.ps1`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.ps1` | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.ps1` | checks.yml → validate |
