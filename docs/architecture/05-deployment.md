@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-07-18
+> 最后更新：2026-08-03
 
 本文件只记录仓库内可维护的部署结构和证据边界。Live host、DNS、TLS、secret、机器路径、发布状态和生产回滚记录由 TokenDance server SSOT 维护，不在本仓库复制。
 
@@ -12,18 +12,24 @@
 - **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
 - **非权威遗留**：`hub-server/deployments/*` 下的旧 prod compose / reverse-proxy / env 模板仅作历史参考，不以之为当前生产 SSOT。
 
-## 仓库内资产
+## 仓库内资产（#1527 inventory）
 
-| 资产 | 用途 |
-|---|---|
-| `docker-compose.yml` | 本地开发：PostgreSQL、Redis、Hub Server |
-| `deployments/production/docker-compose.yml` | 当前生产形状 compose 模板（权威 in-repo shape） |
-| `hub-server/deployments/Dockerfile` | Hub Server 镜像构建 |
-| `hub-server/deployments/docker-compose.prod.yml` | 旧生产形状模板（非权威） |
-| `hub-server/deployments/Caddyfile` | reverse-proxy 模板（非权威；历史参考） |
-| `hub-server/deployments/Caddyfile.prod` | 生产 reverse-proxy 模板（非权威；历史参考） |
-| `hub-server/deployments/.env.production.example` | 生产 env 占位模板（非权威） |
-| `.github/workflows/` | CI、构建、E2E、vuln scan、cross-platform gates |
+| 资产 | 用途 | 状态 |
+|---|---|---|
+| `docker-compose.yml` | 本地开发：PostgreSQL、Redis、Hub Server | local-development shape（#1527 明确不删） |
+| `deployments/production/docker-compose.yml` | 当前生产形状 compose 模板 | **权威 in-repo production shape**（唯一） |
+| `hub-server/deployments/Dockerfile` | Hub Server 镜像构建输入 | 保留（构建职责） |
+| `hub-server/deployments/docker-compose.prod.yml` | 旧生产形状模板 | 遗留清单（PR2 迁移/删除） |
+| `hub-server/deployments/docker-compose.us1.yml` | 区域（us1）旧模板 | 遗留清单（PR2 迁移/删除） |
+| `hub-server/deployments/hk2/docker-compose.hk2.yml` | 区域（hk2）旧模板 | 遗留清单（PR2 迁移/删除） |
+| `hub-server/deployments/Caddyfile` | reverse-proxy 模板 | 遗留（历史参考） |
+| `hub-server/deployments/Caddyfile.prod` | 生产 reverse-proxy 模板 | 遗留（历史参考） |
+| `hub-server/deployments/.env.production.example` | 生产 env 占位模板 | 遗留（PR2 评估） |
+| `hub-server/deployments/deploy.sh` | 旧部署脚本（preloaded-image 模式） | 遗留（PR2 评估） |
+| `scripts/verify/verify-deployment-shape.ps1` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
+| `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
+
+遗留清单由 `verify-deployment-shape.ps1` 关闭：`hub-server/deployments/` 下出现清单外的新 compose 文件即 FAIL。新增第二份手维护 production compose（`deployments/production/` 下非 `docker-compose.yml` 文件）同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`。
 
 ## 本地开发
 
