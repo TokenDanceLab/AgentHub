@@ -134,7 +134,7 @@ func TestMain(m *testing.M) {
 		Service:   messageService,
 		reactions: messageReactionService,
 	})
-	agentService := service.NewAgentService(db, eventBus, mgr, cacheClient, nil)
+	agentService := service.NewAgentService(db, eventBus, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, "")
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := attachment.NewService(db, cfg.Upload, attachment.NewLocalStorage(cfg.Upload.Dir))

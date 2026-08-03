@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
@@ -942,7 +943,7 @@ func TestOutbox_RetryLoopAdapterSoftFailDoesNotMarkSent(t *testing.T) {
 	seedRetryableTaskAndDelivery(t, db, "task-soft", "del-soft", payload, DeliveryStatusRetrying, 1, now)
 
 	cache := &failPushCache{pushErr: errors.New("redis unavailable")}
-	ds := NewDispatchService(db, nil, nil, cache, nil, nil)
+	ds := NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, "")
 	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
 
 	outbox.retryDeliveries(ctx)
@@ -966,7 +967,7 @@ func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) 
 	seedRetryableTaskAndDelivery(t, db, "task-ok", "del-ok", payload, DeliveryStatusSent, 0, old)
 
 	cache := &mockAgentCache{}
-	ds := NewDispatchService(db, nil, nil, cache, nil, nil)
+	ds := NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, "")
 	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
 
 	before := time.Now().UTC()
@@ -1291,7 +1292,7 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 
 	cache := &mockAgentCache{}
 	outbox := NewDeliveryOutbox(db, nil)
-	ds := NewDispatchService(db, nil, nil, cache, nil, outbox)
+	ds := NewDispatchService(db, nil, nil, cache, nil, outbox, config.EdgeDispatchConfig{}, "")
 	outbox.SetRedispatcher(dispatchRedispatcher{d: ds})
 
 	outbox.retryDeliveries(ctx)
