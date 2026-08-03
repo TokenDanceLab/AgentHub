@@ -95,13 +95,13 @@ export function useHubEventStream(
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
 
-  // Derived state: last session event for consumers
-  const [lastSessionEvent, setLastSessionEvent] = useState<{
+  const bridgeHandleRef = useRef<DesktopHubEventBridgeHandle | null>(null);
+
+  // Setter-only state: event fan-out for consumers that only need triggers.
+  const [, setLastSessionEvent] = useState<{
     type: string;
     payload: unknown;
   } | null>(null);
-
-  const bridgeHandleRef = useRef<DesktopHubEventBridgeHandle | null>(null);
 
   useEffect(() => {
     const handle = createHubWS({

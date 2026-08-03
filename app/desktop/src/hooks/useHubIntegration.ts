@@ -480,15 +480,15 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       unsubCancel();
       unsubControl();
     };
-  }, [hubWS, hubClient, edgeBaseUrl, dispatchTarget, onDispatch]);
+  }, [hubWS, hubClient, edgeBaseUrl, dispatchTarget, onDispatch, store]);
 
   // ── Return stable handle ──────────────────────────────
 
-  const getTaskByRunId = useCallback((runId: string) => store.getState().getTaskByRunId(runId), []);
+  const getTaskByRunId = useCallback((runId: string) => store.getState().getTaskByRunId(runId), [store]);
 
   const getRunByTaskId = useCallback(
     (taskId: string) => store.getState().getRunByTaskId(taskId),
-    [],
+    [store],
   );
 
   // Read tasks reactively from the store

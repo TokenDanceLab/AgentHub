@@ -55,9 +55,9 @@ const hoisted = vi.hoisted(() => {
       const task = storeTasks.find((t) => t.taskId === taskId);
       storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
       if (task?.runId) {
-        const next = { ...storeRunToTask };
-        delete next[task.runId];
-        storeRunToTask = next;
+        storeRunToTask = Object.fromEntries(
+          Object.entries(storeRunToTask).filter(([runId]) => runId !== task.runId),
+        );
       }
     },
     getActiveTasks: () => storeTasks.filter((t) => t.status === 'queued' || t.status === 'running'),

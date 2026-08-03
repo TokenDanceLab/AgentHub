@@ -42,7 +42,11 @@ export function DesktopChrome({ children, showNavigationControls = true }: Deskt
       await currentWindow.close();
       return;
     }
-    (await currentWindow.isMaximized()) ? await currentWindow.unmaximize() : await currentWindow.maximize();
+    if (await currentWindow.isMaximized()) {
+      await currentWindow.unmaximize();
+    } else {
+      await currentWindow.maximize();
+    }
   }
 
   return (

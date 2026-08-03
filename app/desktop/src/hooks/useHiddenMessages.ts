@@ -10,9 +10,13 @@ export function useHiddenMessages(activeThreadId: string | null | undefined) {
     () => readHiddenMessageIds(activeThreadId),
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect -- the state must be
+     (re)initialized from localStorage whenever activeThreadId changes; the
+     read is impure so it cannot move into render-time state adjustment. */
   useEffect(() => {
     setHiddenMessageIds(readHiddenMessageIds(activeThreadId));
   }, [activeThreadId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const hideMessage = useCallback(
     (messageId: string) => {

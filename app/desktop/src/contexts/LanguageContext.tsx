@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import i18n from '@/i18n';
 
 type Language = 'en' | 'zh';
@@ -11,7 +11,6 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 const STORAGE_KEY = 'agenthub-language';
-const SUPPORTED: Language[] = ['en', 'zh'];
 
 function getStoredLanguage(): Language {
   try {
@@ -49,12 +48,4 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       {children}
     </LanguageContext.Provider>
   );
-}
-
-export function useLanguage(): LanguageContextValue {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
-  return ctx;
 }

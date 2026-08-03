@@ -38,8 +38,9 @@ export function logHubError(op: string, err: unknown): void {
  * Attach a non-throwing catch logger to a Hub report promise.
  * Returns the same promise so callers can still await/void it if needed.
  */
-export function catchHubReport<T>(op: string, promise: Promise<T>): Promise<T | void> {
-  return promise.catch((err: unknown) => {
+export function catchHubReport<T>(op: string, promise: Promise<T>): Promise<T | undefined> {
+  return promise.catch((err: unknown): T | undefined => {
     logHubError(op, err);
+    return undefined;
   });
 }

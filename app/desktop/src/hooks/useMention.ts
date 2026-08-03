@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { AgentInfo } from '@shared/types';
 
 export type MentionKind = 'agent' | 'file' | 'thread';
@@ -206,10 +206,14 @@ export function useMention({ agents, items, onSelectAgent, onSelectMention }: Us
     .filter((item) => item.kind === 'agent' && item.agent)
     .map((item) => item.agent as AgentInfo);
 
-  // Reset selectedIndex when filtered list changes
-  useEffect(() => {
+  // Reset selectedIndex when the filter query changes. Adjusted during render
+  // (sanctioned "adjusting state when a prop changes" pattern) instead of in
+  // an effect so selection never lags the filtered list by a frame.
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (prevQuery !== query) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   const closeMention = useCallback(() => {
     setIsOpen(false);
