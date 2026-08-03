@@ -273,8 +273,12 @@ func (a *App) startServer(ctx context.Context) error {
 		a.AgentService.StartDeliveryRetryLoop(a.bg.Ctx())
 	}
 
-	// Admin server (pprof + metrics)
-	a.startAdminServer()
+	// Admin server (observability always, debug capabilities fail-closed).
+	// Bind failure is fatal like the main server — a busy admin port must
+	// not leave monitoring silently dark (#1547).
+	if err := a.startAdminServer(); err != nil {
+		return err
+	}
 
 	// Periodic metrics collection
 	a.startMetricsCollector(a.bg.Ctx())
