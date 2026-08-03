@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"

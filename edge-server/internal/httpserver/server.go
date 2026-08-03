@@ -18,8 +18,8 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
-	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/edgehttp"
+	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -41,27 +41,27 @@ func HubUserIDFromContext(ctx context.Context) string {
 
 // Config holds server configuration.
 type Config struct {
-	Addr               string
-	Store              store.Repository
-	ProcessExecutor    lifecycle.ProcessExecutorConfig
-	AdapterRegistry    *adapters.Registry       // agent adapter registry; nil = none registered
-	AgentDefault       string                   // default agent adapter ID; empty = raw stdout capture
-	LocalAuthToken     string                   // optional local bearer token for non-health Edge APIs
-	HubJWTSecret       string                   // shared secret for validating Hub-issued HS256 JWTs
-	EdgeDeviceID       string                   // local Edge device ID expected in Edge-scoped Hub JWTs
-	HubURL             string                   // Hub server base URL for Edge->Hub direct callbacks
-	HubToken           string                   // JWT bearer token for Hub callback authentication
-	HubCallbackTimeout time.Duration            // per-request timeout for Edge→Hub callbacks; 0 = default (30s)
-	HubCallbackBudget  time.Duration            // total wall-clock retry budget for callbacks; 0 = default (10s)
-	HubCallbackMaxAttempts int                  // total attempts per callback; 0 = default (3)
-	RemoteMode         bool                     // allow non-loopback bind + remote origins (requires auth)
-	AllowedOrigins     []string                 // explicit remote-mode browser origins allowed by CORS
-	Dev                bool                     // dev mode disables auto-generated local auth token
-	WorkspaceAllowlist []string                 // optional roots allowed for request workDir
-	SkillsDirs         []string                 // optional SKILL.md search dirs; empty = use defaults
-	EventLogPath       string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
-	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
-	ShutdownHooks      []func()                 // called in order during graceful shutdown, before bus.Close()
+	Addr                   string
+	Store                  store.Repository
+	ProcessExecutor        lifecycle.ProcessExecutorConfig
+	AdapterRegistry        *adapters.Registry       // agent adapter registry; nil = none registered
+	AgentDefault           string                   // default agent adapter ID; empty = raw stdout capture
+	LocalAuthToken         string                   // optional local bearer token for non-health Edge APIs
+	HubJWTSecret           string                   // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID           string                   // local Edge device ID expected in Edge-scoped Hub JWTs
+	HubURL                 string                   // Hub server base URL for Edge->Hub direct callbacks
+	HubToken               string                   // JWT bearer token for Hub callback authentication
+	HubCallbackTimeout     time.Duration            // per-request timeout for Edge→Hub callbacks; 0 = default (30s)
+	HubCallbackBudget      time.Duration            // total wall-clock retry budget for callbacks; 0 = default (10s)
+	HubCallbackMaxAttempts int                      // total attempts per callback; 0 = default (3)
+	RemoteMode             bool                     // allow non-loopback bind + remote origins (requires auth)
+	AllowedOrigins         []string                 // explicit remote-mode browser origins allowed by CORS
+	Dev                    bool                     // dev mode disables auto-generated local auth token
+	WorkspaceAllowlist     []string                 // optional roots allowed for request workDir
+	SkillsDirs             []string                 // optional SKILL.md search dirs; empty = use defaults
+	EventLogPath           string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
+	MCPConfigStore         *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
+	ShutdownHooks          []func()                 // called in order during graceful shutdown, before bus.Close()
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second

@@ -340,11 +340,7 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 
 	for attempt := 0; attempt < c.cfg.MaxAttempts; attempt++ {
 		if attempt > 0 {
-			backoff := c.cfg.RetryBaseDelay << uint(attempt-1) // 1s, 2s, 4s, ...
-			delay := backoff
-			if lastRetryAfter > delay {
-				delay = lastRetryAfter
-			}
+			delay := c.retryDelay(attempt, lastRetryAfter)
 			elapsed := time.Since(startedAt)
 			if elapsed+delay > budget {
 				// Retry budget exhausted — Retry-After or backoff would overrun.
@@ -359,80 +355,16 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 			}
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-		if err != nil {
-			lastErr = fmt.Errorf("hub callback request: %w", err)
-			continue
+		done, retryable, retryAfter, err := c.doAttempt(ctx, url, payload, taskID, runID, action, attempt+1, retryableAction)
+		if done {
+			return err
 		}
-		req.Header.Set("Content-Type", "application/json")
-		if c.authToken != "" {
-			req.Header.Set("Authorization", "Bearer "+c.authToken)
-		}
-
-		resp, err := c.client.Do(req)
-		if err != nil {
-			if ctx.Err() != nil {
-				// Caller deadline/cancellation — retrying is pointless.
-				lastErr = fmt.Errorf("hub callback timeout: %w", err)
-				break
-			}
-			lastErr = fmt.Errorf("hub callback post: %w", err)
-			continue
-		}
-
-		respBody, readErr := readLimitedResponse(resp.Body, c.cfg.MaxResponseBodyBytes)
-		resp.Body.Close()
-		if readErr != nil {
-			// Fail-closed: an oversize response is a protocol anomaly; never
-			// retried, body content never surfaces in logs (#1564).
-			errMsg := fmt.Sprintf("status=%d body_len=over_limit limit=%d category=%s", resp.StatusCode, c.cfg.MaxResponseBodyBytes, callbackCategoryBodyTooLarge)
-			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
-			return fmt.Errorf("hub callback response too large: %s", errMsg)
-		}
-
-		category, retryable, retryAfter := classifyCallbackResponse(resp.StatusCode, resp.Header.Get("Retry-After"))
-
-		if category == callbackCategoryOK {
-			// Validate Hub response format: {"code": "ok", ...} or {"code": "..."}
-			var hubResp struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			}
-			if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
-				c.recordJournal(taskID, runID, action, true, "", attempt+1)
-				return nil
-			}
-			// Non-OK code from Hub is an application-level failure; do not retry
-			if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
-				errMsg := summarizeHubResponse(resp.StatusCode, respBody, callbackCategoryAppRejected)
-				c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
-				return fmt.Errorf("hub callback rejected: %s", errMsg)
-			}
-			// 2xx without JSON body — accept as success
-			c.recordJournal(taskID, runID, action, true, "", attempt+1)
-			return nil
-		}
-
-		if retryable && retryableAction {
-			lastErr = fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, category))
+		if retryable {
+			lastErr = err
 			lastRetryAfter = retryAfter
 			continue
 		}
-
-		// Terminal: 4xx (except 429 with Retry-After), 3xx, or a retryable
-		// status on a non-idempotent action (stream).
-		errMsg := summarizeHubResponse(resp.StatusCode, respBody, category)
-		switch category {
-		case callbackCategoryClientError, callbackCategoryRateLimited:
-			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
-			return fmt.Errorf("hub callback client error: %s", errMsg)
-		case callbackCategoryRedirect:
-			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
-			return fmt.Errorf("hub callback redirect error: %s", errMsg)
-		default:
-			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
-			return fmt.Errorf("hub callback not retried (%s): %s", category, errMsg)
-		}
+		return err
 	}
 
 	errMsg := ""
@@ -441,6 +373,93 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 	}
 	c.recordJournal(taskID, runID, action, false, errMsg, c.cfg.MaxAttempts)
 	return fmt.Errorf("hub callback failed after %d attempts: %w", c.cfg.MaxAttempts, lastErr)
+}
+
+// retryDelay computes the backoff for the given attempt, preferring a server
+// Retry-After delay when the server supplied one (bounded by the budget check
+// in the caller).
+func (c *CallbackClient) retryDelay(attempt int, lastRetryAfter time.Duration) time.Duration {
+	backoff := c.cfg.RetryBaseDelay << uint(attempt-1) // 1s, 2s, 4s, ...
+	if lastRetryAfter > backoff {
+		return lastRetryAfter
+	}
+	return backoff
+}
+
+// doAttempt performs one callback POST and classifies the outcome. It returns
+// done=true when the attempt is terminal (success, terminal error, oversize
+// response, caller cancellation); otherwise it returns whether the attempt is
+// retryable along with any Retry-After hint and the error to record.
+func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []byte, taskID string, runID string, action string, attempt int, retryableAction bool) (done bool, retryable bool, retryAfter time.Duration, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return false, true, 0, fmt.Errorf("hub callback request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			// Caller deadline/cancellation — retrying is pointless.
+			return true, false, 0, fmt.Errorf("hub callback timeout: %w", err)
+		}
+		return false, true, 0, fmt.Errorf("hub callback post: %w", err)
+	}
+
+	respBody, readErr := readLimitedResponse(resp.Body, c.cfg.MaxResponseBodyBytes)
+	resp.Body.Close()
+	if readErr != nil {
+		// Fail-closed: an oversize response is a protocol anomaly; never
+		// retried, body content never surfaces in logs (#1564).
+		errMsg := fmt.Sprintf("status=%d body_len=over_limit limit=%d category=%s", resp.StatusCode, c.cfg.MaxResponseBodyBytes, callbackCategoryBodyTooLarge)
+		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		return true, false, 0, fmt.Errorf("hub callback response too large: %s", errMsg)
+	}
+
+	category, canRetry, retryAfter := classifyCallbackResponse(resp.StatusCode, resp.Header.Get("Retry-After"))
+
+	if category == callbackCategoryOK {
+		// Validate Hub response format: {"code": "ok", ...} or {"code": "..."}
+		var hubResp struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
+			c.recordJournal(taskID, runID, action, true, "", attempt)
+			return true, false, 0, nil
+		}
+		// Non-OK code from Hub is an application-level failure; do not retry
+		if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
+			errMsg := summarizeHubResponse(resp.StatusCode, respBody, callbackCategoryAppRejected)
+			c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+			return true, false, 0, fmt.Errorf("hub callback rejected: %s", errMsg)
+		}
+		// 2xx without JSON body — accept as success
+		c.recordJournal(taskID, runID, action, true, "", attempt)
+		return true, false, 0, nil
+	}
+
+	if canRetry && retryableAction {
+		return false, true, retryAfter, fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, category))
+	}
+
+	// Terminal: 4xx (except 429 with Retry-After), 3xx, or a retryable
+	// status on a non-idempotent action (stream).
+	errMsg := summarizeHubResponse(resp.StatusCode, respBody, category)
+	switch category {
+	case callbackCategoryClientError, callbackCategoryRateLimited:
+		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		return true, false, 0, fmt.Errorf("hub callback client error: %s", errMsg)
+	case callbackCategoryRedirect:
+		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		return true, false, 0, fmt.Errorf("hub callback redirect error: %s", errMsg)
+	default:
+		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		return true, false, 0, fmt.Errorf("hub callback not retried (%s): %s", category, errMsg)
+	}
 }
 
 // classifyCallbackResponse maps an HTTP response to the unified outcome

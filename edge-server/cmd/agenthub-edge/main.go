@@ -41,10 +41,10 @@ type config struct {
 	Dev                bool // disable auto-generated local auth token for development
 
 	// Hub callback configuration (Edge→Hub direct bridge)
-	HubURL                string // Hub server base URL for Edge callback reporting
-	HubToken              string // JWT bearer token for authenticating with Hub
-	HubCallbackTimeout    string // per-request timeout for Edge→Hub callbacks (default 30s)
-	HubCallbackBudget     string // total wall-clock retry budget for callbacks (default 10s)
+	HubURL                 string // Hub server base URL for Edge callback reporting
+	HubToken               string // JWT bearer token for authenticating with Hub
+	HubCallbackTimeout     string // per-request timeout for Edge→Hub callbacks (default 30s)
+	HubCallbackBudget      string // total wall-clock retry budget for callbacks (default 10s)
 	HubCallbackMaxAttempts string // total attempts per callback (default 3)
 
 	// Tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)
