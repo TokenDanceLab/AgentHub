@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"os"
 	"time"
 
 	"gorm.io/gorm"
@@ -280,9 +279,9 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 		return ""
 	}
 	resolved := dispatch.CapabilityMintFromEnv(
-		os.Getenv("AGENTHUB_JWT_SECRET"),
+		s.jwtSecret,
 		dp.EdgeDeviceID,
-		os.Getenv("AGENTHUB_EDGE_DEVICE_ID"),
+		s.edgeCfg.DeviceID,
 		dp.TriggerUserID,
 		dp.TargetID,
 	)

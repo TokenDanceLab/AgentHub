@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -15,9 +14,11 @@ import (
 
 func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
 	// Pure Edge HTTP prep (#946); client/request side-effects stay here.
+	// URL/token come from the injected edgeCfg (composition root), never
+	// os.Getenv (#1549).
 	parts, insecure, err := dispatch.PrepareEdgeHTTPRequest(
-		os.Getenv("AGENTHUB_EDGE_URL"),
-		os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN"),
+		s.edgeCfg.URL,
+		s.edgeCfg.AuthToken,
 		dp.Prompt, dp.AgentType, dp.SystemPrompt, task.ID, dp.DeliveryID,
 		dp.Messages, dp.PinnedMessages, dp.OutputSchema,
 		s.issueRunStartCapability(dp),
@@ -48,8 +49,9 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	}
 	httpReq.Header = parts.Headers
 
-	client := &http.Client{Timeout: parts.Timeout}
-	resp, err := client.Do(httpReq)
+	// Shared client created once at construction: connection reuse and a
+	// single configured timeout instead of a fresh client per dispatch (#1549).
+	resp, err := s.edgeClient.Do(httpReq)
 	if err != nil {
 		// G4: Edge unreachable is a classic silent-outage scenario; raised from
 		// Debug to Warn so production can see it (#audit-G4). Counter quantifies rate.
