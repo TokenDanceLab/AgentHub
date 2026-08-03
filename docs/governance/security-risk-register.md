@@ -55,7 +55,7 @@
 |---|---:|---|
 | `github.com/jackc/pgx/v5` v5.9.2 | critical / low | 等待上游修复或安全替代路径 |
 | `github.com/google/uuid` v1.6.0 | medium | 等待上游修复 |
-| `glib` (Rust/Tauri) | medium | 等待 Tauri 上游依赖更新 |
+| `glib` (Rust/Tauri) `0.18.5` → RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g | medium | 有据临时处置（#1578）：Tauri 2 稳定线全部 Linux 持有 crate（gtk/gdk/atk `0.18.2`、webkit2gtk `2.0.2`、wry `0.56`、tao `0.36`、muda `0.19`、tray-icon `0.24`、tauri `2.11.x`）均钉死 gtk-rs `0.18`/glib `^0.18`，glib `>=0.20` 在稳定线不可达；上游迁移跟踪 tauri-apps/tauri#7335 / #12563（owner: lucasfernog）/ #14684。Owner：AgentHub Desktop 安全评审；评审截止 2026-11-30，过期后 `verify-rust-advisories.sh` 门禁自动 FAIL 强制复审（CI job: `vuln-scan-rust`）。Desktop 依赖已升至 Tauri 2.11.5 / tray-icon 0.24.2（#1578）。 |
 
 ## 验证入口
 

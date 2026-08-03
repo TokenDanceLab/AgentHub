@@ -1,0 +1,11 @@
+[package]
+name = "rust-advisories-fixture-vuln-time"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Negative fixture for verify-rust-advisories.sh (#1578): pins `time 0.1.44`,
+# which hits RUSTSEC-2020-0071 (unsound `localtime_r` handling). This advisory
+# is NOT in the gate's allowlist, so the gate must FAIL on this lockfile.
+[dependencies]
+time = "=0.1.44"
