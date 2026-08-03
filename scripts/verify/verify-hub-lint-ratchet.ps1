@@ -79,7 +79,7 @@ if (-not (Test-Path -LiteralPath $HubDir)) {
 
 $jsonPath = $LintJsonPath
 if ([string]::IsNullOrEmpty($jsonPath)) {
-    $jsonPath = Join-Path $env:TEMP "hub-lint-ratchet.json"
+    $jsonPath = Join-Path ([IO.Path]::GetTempPath()) "hub-lint-ratchet.json"
     $lintArgs = @(
         "run", "./...",
         "--output.json.path=$jsonPath"
