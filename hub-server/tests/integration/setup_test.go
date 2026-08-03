@@ -320,6 +320,10 @@ func postAuth(path string, token string, body interface{}) *http.Response {
 	return do("POST", path, body, token)
 }
 
+func patchAuth(path string, token string, body interface{}) *http.Response {
+	return do("PATCH", path, body, token)
+}
+
 func get(path string, token string) *http.Response {
 	return do("GET", path, nil, token)
 }

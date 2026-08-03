@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -396,9 +397,9 @@ func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
 	seedExecutionTarget(t, db, "target-1", "owner-1")
 	svc := newExecutionTargetSvc(t, db)
 
-	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
-		Name:        "Forged healthy target",
-		HealthState: "healthy",
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTargetPatch{
+		Name:        model.Patch("Forged healthy target"),
+		HealthState: model.Patch("healthy"),
 	})
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
 
@@ -408,6 +409,22 @@ func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
 	require.Equal(t, "unknown", target.HealthState)
 }
 
+func TestExecutionTargetUpdateRejectsTargetTypeChange(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := newExecutionTargetSvc(t, db)
+
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTargetPatch{
+		TargetType: model.Patch("hub_relay"),
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.ErrorContains(t, err, "target_type is fixed at creation")
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
+	require.Equal(t, "local_edge", target.TargetType)
+}
+
 func TestExecutionTargetUpdateRejectsForeignDeviceBinding(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
@@ -415,8 +432,8 @@ func TestExecutionTargetUpdateRejectsForeignDeviceBinding(t *testing.T) {
 	svc := newExecutionTargetSvc(t, db)
 	deviceID := "55555555-5555-4555-8555-555555555555"
 
-	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
-		DeviceID: &deviceID,
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTargetPatch{
+		DeviceID: model.Patch(deviceID),
 	})
 	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
 
@@ -441,10 +458,10 @@ func TestExecutionTargetUpdateClearsJSONLikeFields(t *testing.T) {
 	seedExecutionTarget(t, db, "target-1", "owner-1")
 	svc := newExecutionTargetSvc(t, db)
 
-	target, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
-		WorkspaceAllowlist: `[]`,
-		Capabilities:       `{}`,
-		Metadata:           `{}`,
+	target, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTargetPatch{
+		WorkspaceAllowlist: model.Patch(json.RawMessage(`[]`)),
+		Capabilities:       model.Patch(json.RawMessage(`{}`)),
+		Metadata:           model.Patch(json.RawMessage(`{}`)),
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
@@ -455,11 +472,11 @@ func TestExecutionTargetUpdateClearsJSONLikeFields(t *testing.T) {
 func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
 	tests := []struct {
 		name    string
-		updates model.ExecutionTarget
+		updates model.ExecutionTargetPatch
 	}{
-		{name: "workspace allowlist object", updates: model.ExecutionTarget{WorkspaceAllowlist: `{"path":"/repo"}`}},
-		{name: "capabilities array", updates: model.ExecutionTarget{Capabilities: `["not-object"]`}},
-		{name: "metadata malformed", updates: model.ExecutionTarget{Metadata: `{not-json}`}},
+		{name: "workspace allowlist object", updates: model.ExecutionTargetPatch{WorkspaceAllowlist: model.Patch(json.RawMessage(`{"path":"/repo"}`))}},
+		{name: "capabilities array", updates: model.ExecutionTargetPatch{Capabilities: model.Patch(json.RawMessage(`["not-object"]`))}},
+		{name: "metadata malformed", updates: model.ExecutionTargetPatch{Metadata: model.Patch(json.RawMessage(`{not-json}`))}},
 	}
 
 	for _, tt := range tests {

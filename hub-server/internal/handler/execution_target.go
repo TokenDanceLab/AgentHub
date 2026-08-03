@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,7 +21,7 @@ import (
 type ExecutionTargetService interface {
 	Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error)
 	Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error)
-	Update(ctx context.Context, id, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error)
+	Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error)
 	Ping(ctx context.Context, id, ownerID string) error
@@ -37,21 +37,6 @@ func NewExecutionTargetHandler(service ExecutionTargetService) *ExecutionTargetH
 
 type createTargetReq struct {
 	Name               string `json:"name" binding:"required"`
-	TargetType         string `json:"target_type"`
-	Host               string `json:"host"`
-	Port               int    `json:"port"`
-	WorkspaceRoot      string `json:"workspace_root"`
-	WorkspaceAllowlist any    `json:"workspace_allowlist"`
-	TrustLevel         string `json:"trust_level"`
-	HealthState        string `json:"health_state"`
-	AuthMethod         string `json:"auth_method"`
-	DeviceID           string `json:"device_id"`
-	Capabilities       any    `json:"capabilities"`
-	Metadata           any    `json:"metadata"`
-}
-
-type updateTargetReq struct {
-	Name               string `json:"name"`
 	TargetType         string `json:"target_type"`
 	Host               string `json:"host"`
 	Port               int    `json:"port"`
@@ -272,44 +257,17 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	var req updateTargetReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Fail(c, errcode.ErrBadRequest)
+	// PATCH semantics (#1545): absent = keep, value = set, null = clear
+	// (nullable fields). The DTO uses three-state PatchField so omitted,
+	// empty, and null are distinguishable; target_type / health_state are
+	// not patchable at all.
+	var patch model.ExecutionTargetPatch
+	if err := c.ShouldBindJSON(&patch); err != nil {
+		Fail(c, errcode.ErrBadRequest.WithMessage("invalid patch body: "+err.Error()))
 		return
-	}
-	workspaceAllowlist, normErr := normalizeTargetJSONField("workspace_allowlist", req.WorkspaceAllowlist, false)
-	if normErr != nil {
-		Fail(c, normErr)
-		return
-	}
-	capabilities, normErr := normalizeTargetJSONField("capabilities", req.Capabilities, true)
-	if normErr != nil {
-		Fail(c, normErr)
-		return
-	}
-	metadata, normErr := normalizeTargetJSONField("metadata", req.Metadata, true)
-	if normErr != nil {
-		Fail(c, normErr)
-		return
-	}
-	updates := model.ExecutionTarget{
-		Name:               req.Name,
-		TargetType:         req.TargetType,
-		Host:               req.Host,
-		Port:               req.Port,
-		WorkspaceRoot:      req.WorkspaceRoot,
-		WorkspaceAllowlist: workspaceAllowlist,
-		TrustLevel:         req.TrustLevel,
-		HealthState:        req.HealthState,
-		AuthMethod:         req.AuthMethod,
-		Capabilities:       capabilities,
-		Metadata:           metadata,
-	}
-	if req.DeviceID != "" {
-		updates.DeviceID = &req.DeviceID
 	}
 
-	target, err := h.service.Update(c.Request.Context(), id, userID, &updates)
+	target, err := h.service.Update(c.Request.Context(), id, userID, &patch)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
