@@ -113,7 +113,7 @@ func (f *failingSpawner) SpawnSubAgent(store.Run, SubAgentTask) (string, string,
 // of adapters, keyed by adapter ID. Mirrors the root Registry.Get/ListIDs
 // behavior for tests without importing the root package.
 type fakeAdapterRegistry struct {
-	mu      sync.Mutex
+	mu       sync.Mutex
 	adapters map[string]AgentAdapter
 }
 

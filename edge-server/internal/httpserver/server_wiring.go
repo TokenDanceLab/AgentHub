@@ -83,7 +83,7 @@ func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecu
 	if !ok {
 		return
 	}
-	orchAdapter, ok := orch.(*orchestrator.OrchestratorAdapter)
+	orchAdapter, ok := orch.(*orchestrator.Adapter)
 	if !ok {
 		return
 	}

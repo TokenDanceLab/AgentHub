@@ -516,7 +516,7 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 	registerClaudeACPAdapter(reg, cfg)
 	registerManifestAdapters(reg, cfg)
 	registerSDKAdapters(reg, cfg)
-	registerOrchestratorAdapter(reg, cfg)
+	registerAdapter(reg, cfg)
 
 	if cfg.AgentDefault != "" {
 		reg.SetDefault("default", cfg.AgentDefault)
@@ -653,11 +653,11 @@ func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	}
 }
 
-// registerOrchestratorAdapter registers the orchestrator adapter with the
+// registerAdapter registers the orchestrator adapter with the
 // registered child agent IDs when a claude-code binary is configured.
 // The orchestrator leaf package gets the concrete ClaudeCodeAdapter through
 // its AgentExecutor port (composition root injects concrete deps, #1566).
-func registerOrchestratorAdapter(reg *adapters.Registry, cfg config) {
+func registerAdapter(reg *adapters.Registry, cfg config) {
 	if cfg.ClaudeCodePath == "" {
 		return
 	}

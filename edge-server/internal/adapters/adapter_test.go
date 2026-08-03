@@ -56,7 +56,6 @@ func TestOpenCodeAdapterMetadata(t *testing.T) {
 	}
 }
 
-
 // --- Adapter Capabilities tests ---
 
 func TestClaudeCodeAdapterCapabilities(t *testing.T) {
@@ -122,7 +121,6 @@ func TestOpenCodeAdapterCapabilities(t *testing.T) {
 	}
 }
 
-
 // --- NeedsStdin tests ---
 
 func TestClaudeCodeAdapterNeedsStdin(t *testing.T) {
@@ -145,7 +143,6 @@ func TestOpenCodeAdapterNeedsStdin(t *testing.T) {
 		t.Fatal("OpenCode should not need stdin")
 	}
 }
-
 
 // --- sandboxForPermissionMode tests ---
 

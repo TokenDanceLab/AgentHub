@@ -8,7 +8,7 @@ import (
 // ── Orchestrator adapter behavior tests（随实现迁移到叶子包，#1566）──────────
 // 原位于根包 adapter_test.go；构造函数改为注入 AgentExecutor port。
 
-func TestOrchestratorAdapterMetadata(t *testing.T) {
+func TestAdapterMetadata(t *testing.T) {
 	a := NewOrchestratorAdapter(&fakeAgentExecutor{}, "You are an orchestrator")
 	m := a.Metadata()
 	if m.ID != "orchestrator" {
@@ -22,7 +22,7 @@ func TestOrchestratorAdapterMetadata(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterCapabilities(t *testing.T) {
+func TestAdapterCapabilities(t *testing.T) {
 	a := NewOrchestratorAdapter(&fakeAgentExecutor{}, "You are an orchestrator")
 	c := a.Capabilities()
 	if !c.Streaming {
@@ -33,7 +33,7 @@ func TestOrchestratorAdapterCapabilities(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterNeedsStdin(t *testing.T) {
+func TestAdapterNeedsStdin(t *testing.T) {
 	a := NewOrchestratorAdapter(&fakeAgentExecutor{}, "You are an orchestrator")
 	if !a.NeedsStdin() {
 		t.Fatal("Orchestrator adapter should need stdin")
@@ -43,7 +43,7 @@ func TestOrchestratorAdapterNeedsStdin(t *testing.T) {
 func TestNewOrchestratorAdapter(t *testing.T) {
 	a := NewOrchestratorAdapter(&fakeAgentExecutor{}, "You are an orchestrator")
 	if a == nil {
-		t.Fatal("OrchestratorAdapter should not be nil")
+		t.Fatal("Adapter should not be nil")
 	}
 	if a.systemPrompt != "You are an orchestrator" {
 		t.Fatalf("systemPrompt = %q, want 'You are an orchestrator'", a.systemPrompt)
@@ -107,7 +107,7 @@ func TestEscapePromptLiteral(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterEscapesSystemPrompt(t *testing.T) {
+func TestAdapterEscapesSystemPrompt(t *testing.T) {
 	a := NewOrchestratorAdapter(&fakeAgentExecutor{}, "Use `code` blocks for ${VAR}")
 	// The constructor should escape backticks and ${} in the system prompt.
 	if a.systemPrompt != "Use \\`code\\` blocks for \\${VAR}" {

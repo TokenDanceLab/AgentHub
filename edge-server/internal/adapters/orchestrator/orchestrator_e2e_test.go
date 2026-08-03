@@ -403,7 +403,7 @@ func TestDispatchInterceptor_NoRegistryNoCrash(t *testing.T) {
 
 // ── Orchestrator adapter E2E tests ─────────────────────────────────────────
 
-func TestOrchestratorAdapter_E2EDispatchFlow(t *testing.T) {
+func TestAdapter_E2EDispatchFlow(t *testing.T) {
 	bus := newTestBus(t)
 	st := newTestStore(t)
 	run, _ := st.GetRun("run-1")
@@ -452,7 +452,7 @@ func TestOrchestratorAdapter_E2EDispatchFlow(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
+func TestAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
 	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "Custom system prompt")
 	_, args, _, _ := orch.BuildCommand(RunProcessContext{
 		Run: store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"},
@@ -471,7 +471,7 @@ func TestOrchestratorAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapter_BuildCommandCapturesModel(t *testing.T) {
+func TestAdapter_BuildCommandCapturesModel(t *testing.T) {
 	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "prompt")
 
 	orch.BuildCommand(RunProcessContext{
