@@ -172,7 +172,7 @@ Assert-Contains "edge-server/internal/httpserver/server.go" 'SetHubCallback|With
 Assert-Contains "edge-server/internal/lifecycle/process_executor.go" 'func \(e \*ProcessExecutor\) Start' "ProcessExecutor starts runs"
 Assert-Contains "edge-server/internal/lifecycle/process_executor.go" 'adapter\.BuildCommand' "ProcessExecutor calls adapter BuildCommand"
 Assert-Contains "edge-server/internal/lifecycle/process_executor.go" 'func \(e \*ProcessExecutor\) fireHubDone' "ProcessExecutor supports Hub done callback"
-Assert-Contains "edge-server/internal/adapters/adapter.go" 'BuildCommand\(ctx RunProcessContext\)' "Adapter contract includes BuildCommand"
+Assert-Contains "edge-server/internal/orchestration/contracts.go" 'BuildCommand\(ctx RunProcessContext\)' "Adapter contract includes BuildCommand (SSOT: internal/orchestration)"
 Assert-Contains "edge-server/internal/adapters/codex.go" 'func \(a \*CodexAdapter\) BuildCommand' "Codex adapter builds command"
 Assert-Contains "edge-server/internal/adapters/codex.go" 'args = append\(args, "exec"\)' "Codex adapter invokes codex exec"
 Assert-Contains "edge-server/internal/adapters/codex.go" '--skip-git-repo-check' "Codex adapter supports non-git temporary workspaces"
