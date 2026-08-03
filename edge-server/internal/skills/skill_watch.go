@@ -154,7 +154,7 @@ func (r *SkillRegistry) watchLoop(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			r.handleWatchEvent(event)
+			r.handleWatchEvent(watcher, event)
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
@@ -166,6 +166,11 @@ func (r *SkillRegistry) watchLoop(watcher *fsnotify.Watcher) {
 
 // handleWatchEvent processes a single fsnotify event.
 //
+// The watcher is passed as a parameter (same instance the loop was started
+// with) so event handling never races with StopWatch, which nils the
+// r.watcher field under debounceMu while the loop goroutine may still be
+// draining an in-flight event.
+//
 // Event handling rules:
 //   - Only SKILL.md files are tracked; all other paths are ignored.
 //   - Directory CREATE events are handled specially: the new directory is added
@@ -175,7 +180,7 @@ func (r *SkillRegistry) watchLoop(watcher *fsnotify.Watcher) {
 //   - SKILL.md REMOVE events remove the skill from the registry immediately.
 //
 // Other fsnotify event types (CHMOD, etc.) are ignored.
-func (r *SkillRegistry) handleWatchEvent(event fsnotify.Event) {
+func (r *SkillRegistry) handleWatchEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
 	// We only care about SKILL.md files.
 	if filepath.Base(event.Name) != "SKILL.md" {
 		// If a new directory is created, add it to the watcher and
@@ -183,7 +188,7 @@ func (r *SkillRegistry) handleWatchEvent(event fsnotify.Event) {
 		// event may have been missed before we added the directory).
 		if event.Has(fsnotify.Create) {
 			if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-				if err := r.watcher.Add(event.Name); err != nil {
+				if err := watcher.Add(event.Name); err != nil {
 					slog.Warn("skills: cannot watch new skill directory", "error", err, "dir", event.Name)
 				}
 				// Check if SKILL.md already exists inside the new directory.

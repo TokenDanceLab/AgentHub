@@ -1,15 +1,6 @@
 {
  "soft_gates": [
   {
-   "location": "go-edge: Race detection",
-   "kind": "continue-on-error",
-   "reason": "fsnotify hot-reload tests have inherent goroutine races in CI; known-race isolation tracked in #1571",
-   "issue": 1571,
-   "owner": "edge-owners",
-   "introduced_at": "2026-05-24",
-   "review_by": "2026-09-01"
-  },
-  {
    "location": "go-edge: Security scan (gosec)",
    "kind": "continue-on-error",
    "reason": "gosec findings remain advisory pending #1574 adjudication; required fail-closed vuln-scan-go (govulncheck) is the compensating dependency-vulnerability control but does not replace gosec SAST",
@@ -50,7 +41,9 @@
   {
    "file": "hub-server/.golangci.yml",
    "path": "internal/config/config\\.go",
-   "linters": ["gocognit"],
+   "linters": [
+    "gocognit"
+   ],
    "complexity": {
     "gocognit": 47
    },
@@ -63,7 +56,9 @@
   {
    "file": "hub-server/.golangci.yml",
    "path": "internal/router/router\\.go",
-   "linters": ["gocognit"],
+   "linters": [
+    "gocognit"
+   ],
    "complexity": {
     "gocognit": 19
    },
@@ -76,7 +71,11 @@
   {
    "file": "hub-server/.golangci.yml",
    "path": "internal/ws/manager\\.go",
-   "linters": ["cyclop", "gocognit", "gocyclo"],
+   "linters": [
+    "cyclop",
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 17,
     "gocyclo": 12
@@ -90,7 +89,9 @@
   {
    "file": "hub-server/.golangci.yml",
    "path": "internal/repository/migrate\\.go",
-   "linters": ["gocognit"],
+   "linters": [
+    "gocognit"
+   ],
    "complexity": {
     "gocognit": 3
    },
@@ -103,7 +104,9 @@
   {
    "file": "hub-server/.golangci.yml",
    "path": "internal/app/events\\.go",
-   "linters": ["gocognit"],
+   "linters": [
+    "gocognit"
+   ],
    "complexity": {
     "gocognit": 35
    },
@@ -116,7 +119,11 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/adapters/parser_ndjson\\.go",
-   "linters": ["cyclop", "gocognit", "gocyclo"],
+   "linters": [
+    "cyclop",
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 28,
     "gocyclo": 38
@@ -130,7 +137,11 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/adapters/opencode\\.go",
-   "linters": ["cyclop", "gocognit", "gocyclo"],
+   "linters": [
+    "cyclop",
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 32,
     "gocyclo": 28
@@ -144,7 +155,11 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/adapters/codex\\.go",
-   "linters": ["cyclop", "gocognit", "gocyclo"],
+   "linters": [
+    "cyclop",
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 19,
     "gocyclo": 19
@@ -158,7 +173,12 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/lifecycle/process_executor\\.go",
-   "linters": ["cyclop", "errcheck", "gocognit", "gocyclo"],
+   "linters": [
+    "cyclop",
+    "errcheck",
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 0,
     "gocyclo": 1
@@ -172,7 +192,10 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/api/handlers\\.go",
-   "linters": ["gocognit", "gocyclo"],
+   "linters": [
+    "gocognit",
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 14,
     "gocyclo": 14
@@ -186,7 +209,9 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/store/store\\.go",
-   "linters": ["gocognit"],
+   "linters": [
+    "gocognit"
+   ],
    "complexity": {
     "gocognit": 0
    },
@@ -199,7 +224,9 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/lifecycle/mock_executor\\.go",
-   "linters": ["errcheck"],
+   "linters": [
+    "errcheck"
+   ],
    "complexity": {
     "gocognit": 13,
     "gocyclo": 11
@@ -213,7 +240,9 @@
   {
    "file": "edge-server/.golangci.yml",
    "path": "internal/adapters/claude_code\\.go",
-   "linters": ["gocyclo"],
+   "linters": [
+    "gocyclo"
+   ],
    "complexity": {
     "gocognit": 22,
     "gocyclo": 18
