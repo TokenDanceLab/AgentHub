@@ -1033,4 +1033,3 @@ jobs:
       - name: Self-test Rust advisory gate (fail-closed contract, #1578)
         shell: bash
         run: bash scripts/verify/tests/verify-rust-advisories.Tests.sh
-
