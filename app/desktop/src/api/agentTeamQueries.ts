@@ -372,10 +372,11 @@ export function useAgentTeamDetail(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId) throw new Error('Agent team id is required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.getAgentTeam(teamId!);
+      return client.getAgentTeam(teamId);
     },
     enabled: opts?.enabled ?? !!teamId,
   });
@@ -390,10 +391,11 @@ export function useTeamRuns(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId) throw new Error('Agent team id is required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.listTeamRuns(teamId!);
+      return client.listTeamRuns(teamId);
     },
     enabled: opts?.enabled ?? !!teamId,
   });
@@ -409,10 +411,11 @@ export function useTeamRun(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId || !runId) throw new Error('Agent team id and run id are required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.getTeamRun(teamId!, runId!);
+      return client.getTeamRun(teamId, runId);
     },
     enabled: opts?.enabled ?? (!!teamId && !!runId),
   });
@@ -428,10 +431,11 @@ export function useTeamRunState(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId || !runId) throw new Error('Agent team id and run id are required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.getTeamRunState(teamId!, runId!);
+      return client.getTeamRunState(teamId, runId);
     },
     enabled: opts?.enabled ?? (!!teamId && !!runId),
   });
@@ -447,10 +451,11 @@ export function useTeamEvents(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId || !runId) throw new Error('Agent team id and run id are required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.listTeamEvents(teamId!, runId!);
+      return client.listTeamEvents(teamId, runId);
     },
     enabled: opts?.enabled ?? (!!teamId && !!runId),
   });
@@ -466,10 +471,11 @@ export function useTeamTasks(
     queryFn: async () => {
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
+      if (!teamId || !runId) throw new Error('Agent team id and run id are required');
       const client = createHubClient(
         opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
       );
-      return client.listTeamTasks(teamId!, runId!);
+      return client.listTeamTasks(teamId, runId);
     },
     enabled: opts?.enabled ?? (!!teamId && !!runId),
   });

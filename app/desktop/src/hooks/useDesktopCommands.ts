@@ -60,7 +60,11 @@ export function useDesktopCommands(deps: UseDesktopCommandsDeps): UseDesktopComm
         await windowHandle.close();
         return;
       }
-      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
+      if (await windowHandle.isMaximized()) {
+        await windowHandle.unmaximize();
+      } else {
+        await windowHandle.maximize();
+      }
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
     }

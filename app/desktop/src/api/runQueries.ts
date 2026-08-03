@@ -2,7 +2,7 @@
 // Service-layer data (runs, run lists) managed by TanStack Query.
 // Streaming data is normalized through the v4 shared transcript/event model.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { QueryClient, QueryKey } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import { edgeQueryKeys } from '@shared/stores/queryKeys';

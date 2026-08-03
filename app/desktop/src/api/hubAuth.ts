@@ -68,11 +68,6 @@ function isTauri(): boolean {
 
 // ── PKCE helpers ──────────────────────────────────
 
-// Module-level state bridge for the browser dev path.
-// In Tauri mode PKCE values stay in the async function closure and are never written to storage.
-// In Vite dev mode, we persist PKCE to sessionStorage so it survives the browser redirect round-trip.
-let pendingOidcState = '';
-
 const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
 const OIDC_CALLBACK_PATH = '/auth/tokendance/callback';
 
@@ -379,7 +374,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       //    and emits `oidc-callback` / `oidc-callback-error` events.
       //    The redirect_uri is `http://127.0.0.1:{port}/callback`.
       let callbackResult: Promise<CallbackResult>;
-      let redirectUri = '';
+      let redirectUri: string;
 
       if (isTauri()) {
         const { port, result } = await startCallbackServer();
@@ -460,7 +455,6 @@ export function createHubAuth(client?: HubClient): HubAuth {
           createdAt: Date.now(),
         });
       }
-      pendingOidcState = serverState;
 
       // 4. Open browser for user authentication.
       if (isTauri()) {
