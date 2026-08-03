@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -53,10 +54,14 @@ type AgentService struct {
 	// a lazy facade via dispatchService(). DeliveryOutbox retries call into
 	// DispatchService through Redispatcher (dispatchPayload stays private).
 	dispatch *DispatchService
+	// edgeCfg/jwtSecret are the Hub→Edge dispatch configuration (#1549),
+	// injected by the composition root and forwarded to DispatchService.
+	edgeCfg   config.EdgeDispatchConfig
+	jwtSecret string
 }
 
-func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
-	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
+func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, jwtSecret string) *AgentService {
+	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, jwtSecret: jwtSecret}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
 	// Construct outbox first (nil redispatcher), then inject DispatchService
 	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
@@ -68,7 +73,7 @@ func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *ca
 		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
 	)
 	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
-	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox)
+	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox, edgeCfg, jwtSecret)
 	s.deliveryOutbox.SetRedispatcher(dispatchRedispatcher{s.dispatch})
 	return s
 }

@@ -25,6 +25,20 @@ type Config struct {
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
 	AgentTeam    AgentTeamConfig    `mapstructure:"agent_team"`
 	Egress       EgressConfig       `mapstructure:"egress"`
+	Edge         EdgeDispatchConfig `mapstructure:"edge"`
+}
+
+// EdgeDispatchConfig is the Hub→trusted-Edge dispatch client config (#1549).
+// Env binding: AGENTHUB_EDGE_URL / AGENTHUB_EDGE_AUTH_TOKEN /
+// AGENTHUB_EDGE_DEVICE_ID / AGENTHUB_EDGE_TIMEOUT (viper AutomaticEnv with
+// the "."→"_" replacer), so existing deployments keep working unchanged.
+// Read at startup by the composition root; the service layer never calls
+// os.Getenv.
+type EdgeDispatchConfig struct {
+	URL       string        `mapstructure:"url"`
+	AuthToken string        `mapstructure:"auth_token"`
+	DeviceID  string        `mapstructure:"device_id"`
+	Timeout   time.Duration `mapstructure:"timeout"`
 }
 
 // EgressConfig is the outbound HTTP policy (#1540). Default-deny: an empty
@@ -51,6 +65,15 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("db.conn_max_lifetime", 30*time.Minute)
 	v.SetDefault("db.conn_max_idle_time", 5*time.Minute)
 	v.SetDefault("upload.allowed_mime_types", DefaultAllowedUploadMimeTypes)
+	// #1549: Hub→Edge dispatch timeout default keeps the historical
+	// EdgeHTTPClientTimeoutSeconds=10 semantics. URL/token/device-id are
+	// registered with empty defaults so AutomaticEnv can bind the
+	// AGENTHUB_EDGE_* vars even when the yaml has no edge section (viper's
+	// AllSettings only walks registered keys).
+	v.SetDefault("edge.url", "")
+	v.SetDefault("edge.auth_token", "")
+	v.SetDefault("edge.device_id", "")
+	v.SetDefault("edge.timeout", 10*time.Second)
 	setAgentTeamDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {

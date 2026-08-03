@@ -161,7 +161,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	a.DeviceService = service.NewDeviceService(a.DB, targetSvc)
-	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService)
+	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, a.Config.JWT.Secret)
 
 	// Agent Profile service
 	agentProfileSvc := service.NewAgentProfileService(a.DB)
