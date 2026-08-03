@@ -78,11 +78,16 @@ Assert-Contains $edge ([regex]::Escape('check_pkg "edge-server/internal/lifecycl
 Assert-Contains $edge ([regex]::Escape('check_pkg "edge-server/internal/adapters/" 55 "adapters"')) "go-edge must keep adapters package coverage minimum"
 Assert-Contains $hub "THRESHOLD=40" "go-hub coverage threshold must be 40%"
 
-Assert-StepContinueOnError $edge "Lint" $true
+# #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
+# still carries pre-existing findings (tracked in #1573) and stays
+# warning-only until a finding-fingerprint ratchet exists. Complexity
+# exclusions remain separately owned by #1568.
+Assert-StepContinueOnError $edge "Lint" $false
 Assert-StepContinueOnError $hub "Lint" $true
 Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
 Assert-StepContinueOnError $edge "Coverage per-package minimums" $false
+Assert-NotContains $edge "Commit message check" "commit-message policy must not live in the path-filtered go-edge job"
 
 # #1534：vuln 扫描收敛到独立 job（vuln-scan-go / vuln-scan-js）且 fail-closed；
 # go-hub/go-edge 内不再要求重复的 continue-on-error govulncheck step。
@@ -165,8 +170,26 @@ Assert-Contains $validate "coverage-include\.Tests\.ps1" "validate job must call
 Assert-StepContinueOnError $validate "Verify coverage baseline" $false
 Assert-StepContinueOnError $validate "Self-test coverage include contract (negative)" $false
 
-Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
-Assert-Contains $validate "scripts/verify/verify-ci-gates\.ps1" "validate job must call scripts/verify/verify-ci-gates.ps1"
+$ciPolicyStep = Get-StepBlock $validate "Verify CI gate policy"
+Assert-Contains $ciPolicyStep "scripts/verify/verify-ci-gates\.ps1" "CI policy step must call scripts/verify/verify-ci-gates.ps1"
+
+$commitMessageStep = Get-StepBlock $validate "Verify commit messages (PR only)"
+Assert-Contains $commitMessageStep "scripts/verify/verify-commit-messages\.sh" "commit-message step must call the commit-message verifier"
+Assert-Contains $commitMessageStep ([regex]::Escape('github.event.pull_request.head.sha')) "commit-message step must inspect the real PR head"
+Assert-Contains $commitMessageStep ([regex]::Escape('origin/${{ github.base_ref }}')) "commit-message step must compare with the real base branch"
+Assert-StepContinueOnError $validate "Verify commit messages (PR only)" $false
+
+$commitMessageSelfTestStep = Get-StepBlock $validate "Self-test commit-message gate"
+Assert-Contains $commitMessageSelfTestStep "verify-commit-messages\.Tests\.sh" "commit-message self-test step must call its test script"
+Assert-StepContinueOnError $validate "Self-test commit-message gate" $false
+
+$qualityDebtStep = Get-StepBlock $validate "Verify quality-debt ratchet (#1536)"
+Assert-Contains $qualityDebtStep "scripts/verify/verify-quality-debt-ratchet\.ps1" "quality-debt step must call the ratchet verifier"
+Assert-StepContinueOnError $validate "Verify quality-debt ratchet (#1536)" $false
+
+$qualityDebtSelfTestStep = Get-StepBlock $validate "Self-test quality-debt ratchet (negative)"
+Assert-Contains $qualityDebtSelfTestStep "verify-quality-debt-ratchet\.Tests\.ps1" "quality-debt self-test step must call its test script"
+Assert-StepContinueOnError $validate "Self-test quality-debt ratchet (negative)" $false
 Assert-Contains $validate "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
 Assert-Contains $validate "scripts/verify/verify-project-skills\.ps1" "validate job must call scripts/verify/verify-project-skills.ps1"
 Assert-Contains $validate "Verify doc SSOT" "validate job must run the doc SSOT verifier"

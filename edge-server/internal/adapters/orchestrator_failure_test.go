@@ -1285,7 +1285,7 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 		// observe state transitions. Uses monotonic clock — not flaky.
 
 		// Wait for the window to expire.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms failure window; 30s cooldown is not active (#1550)
 
 		// Next failure resets window, counter starts fresh at 1.
 		_ = cb.Allow()
@@ -1300,7 +1300,7 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 
 		// #1550: fake clock — advance time deterministically instead of sleeping.
 		fakeNow := time.Now()
-		cb.now = func() time.Time { return fakeNow }		// Default threshold is 5.
+		cb.now = func() time.Time { return fakeNow } // Default threshold is 5.
 		for i := 0; i < 4; i++ {
 			_ = cb.Allow()
 			cb.RecordFailure()
@@ -1357,7 +1357,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait for cooldown.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 
 		// Allow() transitions to HalfOpen and returns nil.
 		if err := cb.Allow(); err != nil {
@@ -1379,7 +1379,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 
 		// First Allow() enters HalfOpen.
 		if err := cb.Allow(); err != nil {
@@ -1406,7 +1406,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 
 		// Enter HalfOpen.
 		_ = cb.Allow()
@@ -1437,7 +1437,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait for cooldown, enter HalfOpen, fail the probe.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		_ = cb.Allow()
 		cb.RecordFailure()
 
@@ -1448,13 +1448,13 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 
 		// Wait for the original cooldown — should still be in Open
 		// because the probe failure sets a new cooldown.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		if cb.State() != CircuitOpen {
 			t.Error("should still be Open after probe failure (cooldown was extended)")
 		}
 
 		// Wait the rest of the new cooldown.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		if err := cb.Allow(); err != nil {
 			t.Errorf("Allow() after new cooldown should succeed, got: %v", err)
 		}
@@ -1479,7 +1479,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown, enter HalfOpen.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1492,7 +1492,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown again, enter HalfOpen again.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen on second probe")
@@ -1517,7 +1517,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		cb.RecordFailure()
 
 		// Wait cooldown, enter HalfOpen.
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1616,7 +1616,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		// Trip to Open, wait cooldown.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 
 		// Enter HalfOpen, then succeed.
 		_ = cb.Allow()
@@ -1625,7 +1625,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		// Trip again and wait cooldown — should be able to enter HalfOpen again.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // exceed 10ms cooldown while within 60s failure window (#1550)
 
 		if err := cb.Allow(); err != nil {
 			t.Fatalf("Allow() after second cooldown: %v", err)

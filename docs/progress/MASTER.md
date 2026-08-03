@@ -1,6 +1,6 @@
 # AgentHub Progress Tracker
 
-> **Last updated**: 2026-08-02
+> **Last updated**: 2026-08-03
 > **Mode**: `GITHUB_FULL`
 > **Authority**: current source and tests > this tracker > historical analysis. Use `git status`, `git log`, and live GitHub state before acting.
 
@@ -21,7 +21,8 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | ~~TokenDance ID defaults~~ | **RESOLVED 2026-08-02** — issuer default switched to id.tokendancelab.com; check-secrets.sh now exempts `*_URL` endpoint assignments (TOKENDANCE name contains "token" → false positive) | merged in #1480 |
 | ~~Frontend coverage gate~~ | **RESOLVED 2026-08-02** — web 63.14→66.72 lines (executionTargetQueries/hubAuth/toastStore tests, #1490); desktop tests (#1488); master CI green on 36a24a4b | merged #1490/#1488 |
 | Frontend coverage truth (#1535) | **IMPLEMENTED 2026-08-03, PR in review** — include contract: all four packages count every production `src/**/*.ts(x)` in the denominator via `app/test-config/coverage.ts` factory (behavior-identical for shared: 76.43/74.82/74.01/70.48 unchanged). Untested modules revealed: web 66.96→64.69, desktop 71.82→49.29, mobile 80.5→36.19 lines (previous numbers excluded unimported files). Absolute floors per package (web 63/62/53/57, desktop 48/46/40/39, mobile 35/34/26/21, shared 60) + baseline non-regression + uncovered_files ratchet (0%-line production modules must not grow; negative self-test proves a probe file is counted 0% and trips it) + production_files==0 fail-closed. Narrow exclusions only: `__e2e__` Playwright specs (default), `main.tsx` pure entry. Improvement targets recorded in baseline note (all dims → 60). | #1535 |
-| ~~Edge lint debt~~ | **RESOLVED 2026-08-02** — 102→0 golangci-lint issues via pure extraction refactors (RegisterRoutes 69→14 sub-functions, PostRuns 123→~12, parseSSEStream 74→state+handlers…); zero .golangci.yml exclusions; `*.go text eol=lf` in .gitattributes fixes Windows CRLF gofmt churn | merged in #1491 |
+| ~~Edge lint debt~~ | **RESOLVED 2026-08-02** — 102→0 golangci-lint issues via pure extraction refactors (RegisterRoutes 69→14 sub-functions, PostRuns 123→~12, parseSSEStream 74→state+handlers…); `*.go text eol=lf` in .gitattributes fixes Windows CRLF gofmt churn | merged in #1491 |
+| CI quality-debt ratchet (#1536) | **PHASE 1 IN REVIEW 2026-08-03** — soft gates and exact-file golangci exclusions are registered with issue/owner/introduced_at/review_by; CI self-tests unregistered gates, directory widening, linter drift, zombie entries, runtime dependency mutation, budget increase and unexplained deadline extension. Edge lint is hard-fail. Conventional Commit verification is path-independent and fail-closed in `validate` (#1576). Remaining debt stays separate: Edge race #1571, Hub lint findings #1573, gosec findings #1574, Desktop lint #1575, complexity exclusions #1568/#1569 | #1570; #1536 remains open |
 
 ## Active product and architecture work
 
