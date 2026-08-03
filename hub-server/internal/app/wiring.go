@@ -12,12 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
-	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
@@ -28,7 +27,6 @@ import (
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
-	"github.com/agenthub/hub-server/internal/bus"
 )
 
 type messageServiceWithReactions struct {
@@ -90,11 +88,6 @@ func (a *App) initInfra(ctx context.Context) error {
 
 	log.Init(&a.Config.Server)
 	// Note: defer log.Sync() is in Run() so it fires at shutdown, not after initInfra.
-
-	// Initialize TokenDance ID JWKS URI for JWT validation.
-	if a.Config.TokenDanceID.JWKSURI != "" {
-		jwtutil.SetJWKSURI(a.Config.TokenDanceID.JWKSURI)
-	}
 
 	// Legacy: sync existing session seq numbers to Redis (tracked in the
 	// background group — cancellable and awaited at shutdown, #1542)
@@ -195,11 +188,6 @@ func (a *App) initServices(ctx context.Context) error {
 	})
 	a.AuditService = auditSvc
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
-
-	// Wire audit into middleware for permission decision logging.
-	middleware.AuditPermissionFn = auditSvc.RecordPermissionDecision
-	// Wire access-token jti blacklist for logout revocation (#888).
-	middleware.SetAccessTokenBlacklist(a.CacheClient)
 
 	// AgentTeam service
 	a.AgentTeamService = agentteam.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, agentteam.AgentTeamGuardrails{
