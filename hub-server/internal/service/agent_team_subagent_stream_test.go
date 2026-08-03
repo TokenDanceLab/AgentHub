@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -92,19 +93,19 @@ func TestTeamRunContextCache_UpdateExistingMovesToFront(t *testing.T) {
 
 func TestPublishTeamSubagentStream_NoTeamRun_NoEvent(t *testing.T) {
 	db := newSubagentStreamTestDB(t)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	var got atomic.Bool
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, e Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
 		got.Store(true)
 	})
 
-	svc := &EdgeCallbackService{db: db, bus: bus}
+	svc := &EdgeCallbackService{db: db, bus: b}
 	svc.publishTeamSubagentStream(context.Background(), &model.AgentRunEvent{
 		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
 		EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
 
-	for bus.Running() > 0 || bus.Pending() > 0 {
+	for b.Running() > 0 || b.Pending() > 0 {
 		time.Sleep(5 * time.Millisecond)
 	}
 	require.False(t, got.Load(), "no team.subagent.stream event when session has no team run")
@@ -113,15 +114,15 @@ func TestPublishTeamSubagentStream_NoTeamRun_NoEvent(t *testing.T) {
 func TestPublishTeamSubagentStream_TeamRun_PublishesOwnership(t *testing.T) {
 	db := newSubagentStreamTestDB(t)
 	seedSubagentTeamRun(t, db, model.TeamRunStatusRunning)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	events := make(chan TeamSubagentStreamPayload, 1)
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, e Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
 		if p, ok := e.Payload.(TeamSubagentStreamPayload); ok {
 			events <- p
 		}
 	})
 
-	svc := &EdgeCallbackService{db: db, bus: bus}
+	svc := &EdgeCallbackService{db: db, bus: b}
 	svc.publishTeamSubagentStream(context.Background(), &model.AgentRunEvent{
 		TaskID:          "task-1",
 		SessionID:       "sess-1",
@@ -153,19 +154,19 @@ func TestPublishTeamSubagentStream_TeamRun_PublishesOwnership(t *testing.T) {
 func TestPublishTeamSubagentStream_UsesCacheOnSecondEvent(t *testing.T) {
 	db := newSubagentStreamTestDB(t)
 	seedSubagentTeamRun(t, db, model.TeamRunStatusRunning)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	var count atomic.Int32
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, e Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
 		count.Add(1)
 	})
 
-	svc := &EdgeCallbackService{db: db, bus: bus}
+	svc := &EdgeCallbackService{db: db, bus: b}
 	// First event resolves via DB and populates the cache.
 	svc.publishTeamSubagentStream(context.Background(), &model.AgentRunEvent{
 		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
 		EventSeq: 1, EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
-	for bus.Running() > 0 || bus.Pending() > 0 {
+	for b.Running() > 0 || b.Pending() > 0 {
 		time.Sleep(5 * time.Millisecond)
 	}
 	require.Equal(t, int32(1), count.Load())
@@ -180,7 +181,7 @@ func TestPublishTeamSubagentStream_UsesCacheOnSecondEvent(t *testing.T) {
 		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
 		EventSeq: 2, EventType: "run.agent.text_delta", Payload: "{}",
 	}, "task-1")
-	for bus.Running() > 0 || bus.Pending() > 0 {
+	for b.Running() > 0 || b.Pending() > 0 {
 		time.Sleep(5 * time.Millisecond)
 	}
 	require.Equal(t, int32(2), count.Load(), "second event should publish from cache without DB")
@@ -189,21 +190,21 @@ func TestPublishTeamSubagentStream_UsesCacheOnSecondEvent(t *testing.T) {
 func TestHandleTaskStream_PublishesBothAgentStreamAndTeamSubagentStream(t *testing.T) {
 	db := newSubagentStreamTestDB(t)
 	seedSubagentTeamRun(t, db, model.TeamRunStatusRunning)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	agentStream := make(chan *model.AgentRunEvent, 1)
 	teamStream := make(chan TeamSubagentStreamPayload, 1)
-	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+	b.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event bus.Event) {
 		if p, ok := event.Payload.(*model.AgentRunEvent); ok {
 			agentStream <- p
 		}
 	})
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, event Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, event bus.Event) {
 		if p, ok := event.Payload.(TeamSubagentStreamPayload); ok {
 			teamStream <- p
 		}
 	})
 
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
 		Payload:     json.RawMessage(`{"toolName":"read_file"}`),
@@ -230,19 +231,19 @@ func TestHandleTaskStream_PublishesBothAgentStreamAndTeamSubagentStream(t *testi
 func TestHandleTaskStream_NonTeamRun_PublishesOnlyAgentStream(t *testing.T) {
 	db := newSubagentStreamTestDB(t)
 	// No team run seeded for sess-1.
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	agentStream := make(chan *model.AgentRunEvent, 1)
 	var teamGot atomic.Bool
-	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+	b.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event bus.Event) {
 		if p, ok := event.Payload.(*model.AgentRunEvent); ok {
 			agentStream <- p
 		}
 	})
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, event Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, event bus.Event) {
 		teamGot.Store(true)
 	})
 
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
 		Payload:     json.RawMessage(`{"toolName":"read_file"}`),
@@ -255,7 +256,7 @@ func TestHandleTaskStream_NonTeamRun_PublishesOnlyAgentStream(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("agent.stream event was not published")
 	}
-	for bus.Running() > 0 || bus.Pending() > 0 {
+	for b.Running() > 0 || b.Pending() > 0 {
 		time.Sleep(5 * time.Millisecond)
 	}
 	require.False(t, teamGot.Load(), "team.subagent.stream must not fire for non-team-run session")
@@ -273,14 +274,14 @@ func (s *stubTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID,
 }
 
 func TestSubagentStreamLookup_IsInjectable(t *testing.T) {
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	events := make(chan TeamSubagentStreamPayload, 1)
-	bus.Subscribe(BusEventTeamSubagentStream, func(ctx context.Context, e Event) {
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
 		if p, ok := e.Payload.(TeamSubagentStreamPayload); ok {
 			events <- p
 		}
 	})
-	svc := &EdgeCallbackService{db: nil, bus: bus}
+	svc := &EdgeCallbackService{db: nil, bus: b}
 	svc.SetSubagentStreamLookup(&stubTeamRunLookup{known: map[string]teamRunContext{
 		"task-9": {teamRunID: "run-9", teamID: "team-9", assignmentID: "asg-9", memberID: "mem-9"},
 	}})

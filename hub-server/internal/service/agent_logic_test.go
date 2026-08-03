@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -265,11 +266,12 @@ func TestValidateAgentCallbackEdgeRunID(t *testing.T) {
 // --- DispatchService residual ports (#617) ---
 
 type recordingDispatchBus struct {
-	events []Event
+	events []bus.Event
 }
 
-func (b *recordingDispatchBus) Publish(ctx context.Context, event Event) {
+func (b *recordingDispatchBus) Publish(ctx context.Context, event bus.Event) error {
 	b.events = append(b.events, event)
+	return nil
 }
 
 type recordingDispatchCache struct {
@@ -343,8 +345,8 @@ func (o *recordingDispatchOutbox) MoveDeliveryToDeadLetter(ctx context.Context, 
 
 func TestDispatchService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &DispatchService{}
-	// Must not panic when bus port is unset (partial construction).
-	svc.publish(context.Background(), Event{Type: "agent.cancel", Payload: "x"})
+	// Must not panic when b port is unset (partial construction).
+	svc.publish(context.Background(), bus.Event{Type: "agent.cancel", Payload: "x"})
 }
 
 func TestDispatchService_NilOutboxWrappers(t *testing.T) {
@@ -358,7 +360,7 @@ func TestDispatchService_NilOutboxWrappers(t *testing.T) {
 }
 
 func TestDispatchService_SetPortsComposition(t *testing.T) {
-	bus := &recordingDispatchBus{}
+	b := &recordingDispatchBus{}
 	cachePort := &recordingDispatchCache{routes: map[string]string{"u1:desktop": "conn-1"}}
 	wsPort := &recordingDispatchWS{conn: &ws.Conn{ID: "conn-1", UserID: "u1", DeviceType: "desktop", DeviceID: "dev-1"}}
 	outbox := &recordingDispatchOutbox{}
@@ -366,15 +368,15 @@ func TestDispatchService_SetPortsComposition(t *testing.T) {
 	svc := NewDispatchService(nil, nil, nil, nil, nil, nil)
 	require.NotNil(t, svc)
 
-	svc.SetBus(bus)
+	svc.SetBus(b)
 	svc.SetCache(cachePort)
 	svc.SetManager(wsPort)
 	svc.SetOutbox(outbox)
 	svc.SetRelay(nil)
 
-	svc.publish(context.Background(), Event{Type: "agent.regenerate", Payload: map[string]string{"k": "v"}})
-	require.Len(t, bus.events, 1)
-	assert.Equal(t, "agent.regenerate", bus.events[0].Type)
+	svc.publish(context.Background(), bus.Event{Type: "agent.regenerate", Payload: map[string]string{"k": "v"}})
+	require.Len(t, b.events, 1)
+	assert.Equal(t, "agent.regenerate", b.events[0].Type)
 
 	id, err := svc.recordDelivery(context.Background(), "task-1", `{"task_id":"task-1"}`, "dev-1")
 	require.NoError(t, err)

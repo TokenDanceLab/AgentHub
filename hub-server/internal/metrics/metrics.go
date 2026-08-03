@@ -57,8 +57,10 @@ var (
 	TeamAssignmentTimeouts                prometheus.Counter
 	TeamAssignmentStateTransitionFailures *prometheus.CounterVec
 
-	// G7 — EventBus submit failures (pool full / closed).
+	// G7 — EventBus submit failures (pool full / closed) and events abandoned
+	// when Close hits its drain deadline (#1548).
 	EventBusSubmitFailures prometheus.Counter
+	EventBusDroppedOnClose  prometheus.Counter
 
 	// G10 — Admin server up gauge (1 = running, 0 = not started / failed).
 	AdminServerUp prometheus.Gauge
@@ -316,6 +318,14 @@ func Register() {
 			},
 		)
 
+		// G7 (#1548) — events abandoned when Close hits its drain deadline.
+		EventBusDroppedOnClose = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "eventbus_dropped_on_close_total",
+				Help: "Total number of pending eventbus handlers abandoned when Close reached its drain deadline.",
+			},
+		)
+
 		// G10 — Admin server up gauge.
 		AdminServerUp = prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -439,6 +449,7 @@ func Register() {
 		prometheus.MustRegister(TeamAssignmentTimeouts)
 		prometheus.MustRegister(TeamAssignmentStateTransitionFailures)
 		prometheus.MustRegister(EventBusSubmitFailures)
+		prometheus.MustRegister(EventBusDroppedOnClose)
 		prometheus.MustRegister(AdminServerUp)
 		prometheus.MustRegister(DBErrors)
 		prometheus.MustRegister(DBSlowQueries)

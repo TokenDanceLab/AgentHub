@@ -12,44 +12,45 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // recordingReactionBus is a Bus test double that records Publish calls.
 type recordingReactionBus struct {
-	events []service.Event
+	events []bus.Event
 }
 
-func (b *recordingReactionBus) Publish(ctx context.Context, event service.Event) {
+func (b *recordingReactionBus) Publish(ctx context.Context, event bus.Event) error {
 	b.events = append(b.events, event)
+	return nil
 }
 
-func newTestBus(t *testing.T) *service.Bus {
+func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
-	b, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 	return b
 }
 
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil}
-	// Must not panic when bus port is unset (read-only/partial construction).
-	svc.publish(context.Background(), service.Event{Type: "message.reaction_added", Payload: "x"})
+	// Must not panic when b port is unset (read-only/partial construction).
+	svc.publish(context.Background(), bus.Event{Type: "message.reaction_added", Payload: "x"})
 }
 
 func TestService_SetBusPort(t *testing.T) {
-	bus := &recordingReactionBus{}
+	rec := &recordingReactionBus{}
 	svc := NewService(nil, nil)
 	require.NotNil(t, svc)
 
-	svc.SetBus(bus)
-	svc.publish(context.Background(), service.Event{Type: "message.reaction_removed", Payload: map[string]string{"k": "v"}})
+	svc.SetBus(rec)
+	svc.publish(context.Background(), bus.Event{Type: "message.reaction_removed", Payload: map[string]string{"k": "v"}})
 
-	require.Len(t, bus.events, 1)
-	assert.Equal(t, "message.reaction_removed", bus.events[0].Type)
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "message.reaction_removed", rec.events[0].Type)
 }
 
 func TestService_AddReactionReturnsSummaryAndPublishesEvent(t *testing.T) {
@@ -57,12 +58,12 @@ func TestService_AddReactionReturnsSummaryAndPublishesEvent(t *testing.T) {
 	seedMessageReactionSession(t, db, "sess-react", "user-1", "user-2")
 	seedMessageReactionMessage(t, db, "sess-react", "msg-react")
 
-	bus := newTestBus(t)
-	eventCh := make(chan service.Event, 1)
-	bus.Subscribe("message.reaction_added", func(ctx context.Context, event service.Event) {
+	b := newTestBus(t)
+	eventCh := make(chan bus.Event, 1)
+	b.Subscribe("message.reaction_added", func(ctx context.Context, event bus.Event) {
 		eventCh <- event
 	})
-	svc := NewService(db, bus)
+	svc := NewService(db, b)
 
 	resp, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-react", "msg-react", " heart ")
 	require.NoError(t, err)

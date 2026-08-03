@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 type messageServiceWithReactions struct {
@@ -106,7 +107,7 @@ func (a *App) initInfra(ctx context.Context) error {
 	a.setupWSManager()
 
 	// Event bus
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	if err != nil {
 		return fmt.Errorf("event bus init failed: %w", err)
 	}

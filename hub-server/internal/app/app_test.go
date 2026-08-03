@@ -16,6 +16,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -254,16 +255,16 @@ func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: ws.TypeAgentStream,
 		Payload: &model.AgentRunEvent{
 			ID:              "evt-1",
@@ -308,16 +309,16 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "message.new",
 		Payload: &model.Message{
 			ID:          "msg-agent-1",
@@ -330,7 +331,7 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 		},
 	})
 	require.Eventually(t, func() bool {
-		return bus.Pending() == 0
+		return b.Pending() == 0
 	}, time.Second, 10*time.Millisecond)
 
 	select {
@@ -353,16 +354,16 @@ func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 		mgr.Unregister(accepterConn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: ws.TypeFriendAccepted,
 		Payload: map[string]interface{}{
 			"friendship_id": "friendship-1",
@@ -400,13 +401,13 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	tests := []struct {
@@ -422,7 +423,7 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bus.Publish(context.Background(), service.Event{
+			b.Publish(context.Background(), bus.Event{
 				Type: tt.eventType,
 				Payload: messagereaction.MessageReactionEventPayload{
 					Action:    tt.action,
@@ -463,13 +464,13 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	tests := []struct {
@@ -525,7 +526,7 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bus.Publish(context.Background(), service.Event{
+			b.Publish(context.Background(), bus.Event{
 				Type:    tt.eventType,
 				Payload: tt.payload,
 			})
@@ -548,13 +549,13 @@ func TestStartEventSubscriptionsPushesAgentTeamRunStartedToUserWithoutSession(t 
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	payload := map[string]interface{}{
@@ -562,7 +563,7 @@ func TestStartEventSubscriptionsPushesAgentTeamRunStartedToUserWithoutSession(t 
 		"run_id":  "run-1",
 		"user_id": "user-1",
 	}
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "team.run.started",
 		Payload: payload,
 	})
@@ -590,13 +591,13 @@ func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
-	a := &App{mgr: mgr, bus: bus}
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	tests := []struct {
@@ -653,7 +654,7 @@ func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bus.Publish(context.Background(), service.Event{
+			b.Publish(context.Background(), bus.Event{
 				Type:    tt.event,
 				Payload: tt.payload,
 			})
@@ -688,17 +689,17 @@ func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
 		mgr.Unregister(conn.ID)
 	})
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 
 	a := &App{
 		DB:             db,
-		SessionService: session.NewService(db, nil, bus),
+		SessionService: session.NewService(db, nil, b),
 		mgr:            mgr,
-		bus:            bus,
+		bus:            b,
 	}
 	mgr.ResolveMembers = func(sessionID string) []string {
 		members, err := a.SessionService.ListActiveMembers(sessionID)
@@ -969,21 +970,21 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_run_id, edge_device_id, finished_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"task-timeout-race", "agent-1", "user-1", "msg-1", model.TaskStatusDone, "run-1", "dev-1", finishedAt, time.Now().Add(-time.Hour)).Error)
 
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(bus.Close)
-	timeoutEvents := make(chan service.Event, 1)
-	bus.Subscribe("agent.timeout", func(ctx context.Context, event service.Event) {
+	t.Cleanup(func() { b.Close(context.Background()) })
+	timeoutEvents := make(chan bus.Event, 1)
+	b.Subscribe("agent.timeout", func(ctx context.Context, event bus.Event) {
 		timeoutEvents <- event
 	})
 
 	a := &App{
 		DB:           db,
-		bus:          bus,
+		bus:            b,
 		bg:           newBackgroundGroup(context.Background()),
-		AgentService: service.NewAgentService(db, bus, nil, nil, nil),
+		AgentService: service.NewAgentService(db, b, nil, nil, nil),
 	}
 	staleScannedTask := model.PendingAgentTask{
 		ID:              "task-timeout-race",

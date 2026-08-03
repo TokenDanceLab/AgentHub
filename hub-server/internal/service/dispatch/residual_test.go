@@ -133,21 +133,6 @@ func TestHTTPDispatchHelpers(t *testing.T) {
 	assert.Equal(t, CapabilityTokenHeader, "X-AgentHub-Capability-Token")
 }
 
-func TestEventPayloads(t *testing.T) {
-	cancel := CancelEventPayload("t1", "ai1", "s1", "u1")
-	assert.Equal(t, "t1", cancel["task_id"])
-	assert.Equal(t, "ai1", cancel["agent_instance_id"])
-	assert.Equal(t, "s1", cancel["session_id"])
-	assert.Equal(t, "u1", cancel["triggered_by"])
-
-	regen := RegenerateEventPayload("old", "new", "ai1", "s1", "msg1")
-	assert.Equal(t, "old", regen["original_task_id"])
-	assert.Equal(t, "new", regen["new_task_id"])
-	assert.Equal(t, "msg1", regen["trigger_message_id"])
-	assert.Equal(t, EventTypeAgentCancel, "agent.cancel")
-	assert.Equal(t, EventTypeAgentRegenerate, "agent.regenerate")
-}
-
 func TestPinMessageIDs(t *testing.T) {
 	assert.Nil(t, PinMessageIDs(nil))
 	got := PinMessageIDs([]string{"a", "b"})

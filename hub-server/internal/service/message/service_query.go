@@ -6,7 +6,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Residual pure-helper peel #1153: history/search/pin-list/mark-read query paths.
@@ -102,7 +102,7 @@ func (s *Service) MarkRead(ctx context.Context, userID, sessionID string, lastRe
 		return err
 	}
 
-	s.publish(ctx, service.Event{Type: "message.read", Payload: map[string]interface{}{
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageRead, Payload: map[string]interface{}{
 		"session_id":    sessionID,
 		"user_id":       userID,
 		"last_read_seq": lastReadSeq,

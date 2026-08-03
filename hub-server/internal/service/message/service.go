@@ -12,16 +12,16 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Residual pure-helper peel #1153: Service struct, ports, and constructor glue.
 // Domain send/query methods and orchestration helpers live in companion files.
 
 // Bus publishes domain events from message write/lifecycle paths.
-// *service.Bus satisfies this port via Publish(ctx, service.Event).
+// *bus.Bus satisfies this port via Publish(ctx, bus.Event).
 type Bus interface {
-	Publish(ctx context.Context, event service.Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // Cache is the subset of *cache.Client methods used by Message Service.
