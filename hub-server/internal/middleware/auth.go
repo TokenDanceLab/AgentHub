@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -14,11 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AuditPermissionFn is an optional callback that receives permission-decision
-// audit events. Set by the app during initialization to wire the AuditService
-// into middleware without creating import cycles.
-var AuditPermissionFn func(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string)
-
 // AccessTokenBlacklistChecker is the subset of cache used to reject revoked
 // access JWTs by jti after logout (#888). Optional: when nil, blacklist checks
 // are skipped (unit tests without Redis).
@@ -26,13 +20,40 @@ type AccessTokenBlacklistChecker interface {
 	IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error)
 }
 
-// accessTokenBlacklist is set during app wiring; nil means no blacklist check.
-var accessTokenBlacklist AccessTokenBlacklistChecker
+// AuthDependencies carries the security dependencies of AuthMiddleware.
+// Instance-owned (#1551): the composition root constructs these once per App
+// instead of mutating package-level callbacks/globals, so multiple Apps in
+// one process (parallel tests, in-process servers) stay isolated.
+//
+//   - BlacklistChecker: nil skips jti blacklist checks.
+//   - PermissionAudit: nil makes permission decisions un-audited (no-op).
+//
+// Fail-open/fail-closed semantics live in the implementations: the Redis
+// checker itself fails open on Redis errors (documented policy).
+type AuthDependencies struct {
+	BlacklistChecker AccessTokenBlacklistChecker
+	PermissionAudit  func(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string)
+}
 
-// SetAccessTokenBlacklist wires the Redis-backed access-token jti blacklist
-// checker used by AuthMiddleware and WSAuthMiddleware. Pass nil to disable.
-func SetAccessTokenBlacklist(c AccessTokenBlacklistChecker) {
-	accessTokenBlacklist = c
+// AuthMiddleware is an instance-based Gin auth middleware (#1551). It owns
+// no package-level mutable state; construct via NewAuthMiddleware in the
+// composition root.
+type AuthMiddleware struct {
+	cfg  *config.Config
+	deps AuthDependencies
+	// tdVerifier validates TokenDance ID-issued RS256 JWTs against the
+	// configured JWKS endpoint; constructed once (never per-request).
+	tdVerifier *jwtutil.TokenDanceVerifier
+	// adminUsers is the AGENTHUB_ADMIN_USERS snapshot taken at construction
+	// (#1551); RequireAdmin consults the instance, not a package global.
+	adminUsers []string
+}
+
+// NewAuthMiddleware constructs an AuthMiddleware with its security
+// dependencies. tdVerifier may be nil when TokenDance ID is not configured
+// (the dual-mode validator simply skips the RS256 path).
+func NewAuthMiddleware(cfg *config.Config, deps AuthDependencies, tdVerifier *jwtutil.TokenDanceVerifier) *AuthMiddleware {
+	return &AuthMiddleware{cfg: cfg, deps: deps, tdVerifier: tdVerifier, adminUsers: parseAdminUsers()}
 }
 
 // AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
@@ -43,7 +64,9 @@ func SetAccessTokenBlacklist(c AccessTokenBlacklistChecker) {
 //
 // User identity (user_id, device_type, device_id) is injected into the Gin context.
 // Product APIs must add RequireHubSession after this middleware.
-func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
+// Handler returns the Gin middleware that validates JWT bearer tokens and
+// classifies the auth source.
+func (m *AuthMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
@@ -52,7 +75,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		tokenStr := strings.TrimPrefix(header, "Bearer ")
-		validateToken(c, cfg, tokenStr)
+		m.validateToken(c, tokenStr)
 	}
 }
 
@@ -92,12 +115,13 @@ const WSBearerSubprotocol = "agenthub.bearer.v1"
 //
 // After ParseToken it applies the same hub-session purpose/device gate as
 // RequireHubSession so non-product tokens cannot upgrade WebSocket.
-func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
+// WSHandler returns the WebSocket auth middleware (browser subprotocol JWT).
+func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractWSToken(c)
 		if tokenStr == "" {
 			// G9: WS auth path previously had no audit log and no metric.
-			auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+			m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
 				"reason": "missing_token",
 				"path":   c.FullPath(),
 			}, c.ClientIP())
@@ -112,10 +136,10 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		// WebSocket sessions must be Hub-issued sessions. TokenDance ID bearer
 		// tokens prove identity only and must not bypass the Hub session/device
 		// handshake by authenticating at the upgrade middleware layer.
-		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
+		claims, err := jwtutil.ParseToken(tokenStr, m.cfg.JWT.Secret)
 		if err != nil {
 			// G9: WS auth path previously had no audit log and no metric.
-			auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+			m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
 				"reason": "invalid_token",
 				"path":   c.FullPath(),
 			}, c.ClientIP())
@@ -126,11 +150,11 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if !acceptAccessClaims(c, claims) {
+		if !m.acceptAccessClaims(c, claims) {
 			return
 		}
 		setHubLocalClaims(c, claims)
-		if !enforceHubSession(c) {
+		if !m.enforceHubSession(c) {
 			return
 		}
 		c.Next()
@@ -192,10 +216,10 @@ func tokenFromWSSubprotocols(values []string) string {
 
 // validateToken is a shared helper that validates a JWT token string and sets
 // Gin context values. Used by AuthMiddleware.
-func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
+func (m *AuthMiddleware) validateToken(c *gin.Context, tokenStr string) {
 	// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
-	if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
-		if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr, cfg.TokenDanceID.IssuerURL, cfg.TokenDanceID.ClientID); err == nil {
+	if m.cfg.TokenDanceID.IssuerURL != "" && m.cfg.TokenDanceID.ClientID != "" {
+		if claims, err := m.tdVerifier.ParseJWT(tokenStr, m.cfg.TokenDanceID.IssuerURL, m.cfg.TokenDanceID.ClientID); err == nil {
 			c.Set("user_id", claims.Subject)
 			c.Set("device_type", "tokendance_bearer")
 			c.Set("device_id", "")
@@ -206,9 +230,9 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	}
 
 	// Fallback to local HS256 JWT.
-	claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
+	claims, err := jwtutil.ParseToken(tokenStr, m.cfg.JWT.Secret)
 	if err != nil {
-		auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+		m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
 			"reason": "invalid_token",
 			"path":   c.FullPath(),
 		}, c.ClientIP())
@@ -219,7 +243,7 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 		c.Abort()
 		return
 	}
-	if !acceptAccessClaims(c, claims) {
+	if !m.acceptAccessClaims(c, claims) {
 		return
 	}
 	setHubLocalClaims(c, claims)
@@ -245,7 +269,7 @@ func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 //   - edge / tokendance_bearer device_type (defense in depth)
 // On rejection it audits, fails closed with 403, and aborts the request.
 // Returns true when the session is allowed to proceed.
-func enforceHubSession(c *gin.Context) bool {
+func (m *AuthMiddleware) enforceHubSession(c *gin.Context) bool {
 	authSource := c.GetString("auth_source")
 	deviceType := c.GetString("device_type")
 	purpose := c.GetString("purpose")
@@ -263,7 +287,7 @@ func enforceHubSession(c *gin.Context) bool {
 		return true
 	}
 
-	auditPermission(c, c.GetString("user_id"), "hub_session_required", false, map[string]interface{}{
+	m.auditPermission(c, c.GetString("user_id"), "hub_session_required", false, map[string]interface{}{
 		"auth_source": authSource,
 		"device_type": deviceType,
 		"purpose":     purpose,
@@ -281,7 +305,7 @@ func enforceHubSession(c *gin.Context) bool {
 // acceptAccessClaims enforces the access-token jti blacklist after ParseToken
 // (#888). Policy for legacy tokens without jti: accept-with-log for
 // compatibility until those tokens expire naturally.
-func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
+func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 	if claims.ID == "" {
 		slog.Info("access jwt missing jti; accepting legacy token until TTL",
 			"user_id", claims.UserID,
@@ -294,10 +318,10 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 		}
 		return true
 	}
-	if accessTokenBlacklist == nil {
+	if m.deps.BlacklistChecker == nil {
 		return true
 	}
-	blacklisted, err := accessTokenBlacklist.IsAccessTokenBlacklisted(c.Request.Context(), claims.ID)
+	blacklisted, err := m.deps.BlacklistChecker.IsAccessTokenBlacklisted(c.Request.Context(), claims.ID)
 	if err != nil {
 		// Checker already fail-opens on Redis errors; treat residual errors as open.
 		slog.Warn("access jti blacklist check error, fail-open", "jti", claims.ID, "error", err)
@@ -308,7 +332,7 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 		return true
 	}
 	if blacklisted {
-		auditPermission(c, claims.UserID, "auth_validate", false, map[string]interface{}{
+		m.auditPermission(c, claims.UserID, "auth_validate", false, map[string]interface{}{
 			"reason": "access_jti_blacklisted",
 			"path":   c.FullPath(),
 		}, c.ClientIP())
@@ -326,9 +350,9 @@ func acceptAccessClaims(c *gin.Context, claims *jwtutil.Claims) bool {
 // TokenDance ID bearer tokens prove identity only; they must not authorize Hub
 // product APIs, device routing, Web task dispatch, or user-local resources.
 // WebSocket upgrades share the same post-parse gate via WSAuthMiddleware.
-func RequireHubSession() gin.HandlerFunc {
+func (m *AuthMiddleware) RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !enforceHubSession(c) {
+		if !m.enforceHubSession(c) {
 			return
 		}
 		c.Next()
@@ -337,8 +361,8 @@ func RequireHubSession() gin.HandlerFunc {
 
 // RequireLocalAuth is kept for existing call sites. Local Hub auth and Hub
 // session are the same boundary after TokenDance ID OIDC exchange.
-func RequireLocalAuth() gin.HandlerFunc {
-	return RequireHubSession()
+func (m *AuthMiddleware) RequireLocalAuth() gin.HandlerFunc {
+	return m.RequireHubSession()
 }
 
 // RequireAdmin is a middleware that restricts access to admin users.
@@ -351,13 +375,13 @@ func RequireLocalAuth() gin.HandlerFunc {
 //
 // Permission decisions (denied/granted) are audited via AuditPermissionFn
 // when it is set.
-func RequireAdmin() gin.HandlerFunc {
-	adminUsers := getAdminUsers()
+func (m *AuthMiddleware) RequireAdmin() gin.HandlerFunc {
+	adminUsers := m.adminUsers
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
 		clientIP := c.ClientIP()
 		if userID == "" {
-			auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+			m.auditPermission(c, userID, "admin_access", false, map[string]interface{}{
 				"reason": "missing_user_id",
 			}, clientIP)
 			fail(c, errcode.AuthInvalidToken)
@@ -365,7 +389,7 @@ func RequireAdmin() gin.HandlerFunc {
 			return
 		}
 		if len(adminUsers) == 0 {
-			auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+			m.auditPermission(c, userID, "admin_access", false, map[string]interface{}{
 				"reason": "admin_users_not_configured",
 			}, clientIP)
 			fail(c, errcode.ErrForbidden)
@@ -374,14 +398,14 @@ func RequireAdmin() gin.HandlerFunc {
 		}
 		for _, admin := range adminUsers {
 			if admin == userID {
-				auditPermission(c, userID, "admin_access", true, map[string]interface{}{
+				m.auditPermission(c, userID, "admin_access", true, map[string]interface{}{
 					"path": c.FullPath(),
 				}, clientIP)
 				c.Next()
 				return
 			}
 		}
-		auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+		m.auditPermission(c, userID, "admin_access", false, map[string]interface{}{
 			"reason": "not_in_admin_list",
 			"path":   c.FullPath(),
 		}, clientIP)
@@ -390,42 +414,31 @@ func RequireAdmin() gin.HandlerFunc {
 	}
 }
 
-// getAdminUsers reads and caches the AGENTHUB_ADMIN_USERS env var once at
-// process startup via sync.Once. The admin list is read on the first call
-// (typically during the first admin-authenticated request) and then cached
-// for the lifetime of the process.
-//
-// This means changes to AGENTHUB_ADMIN_USERS require a process restart to
-// take effect. The sync.Once pattern is intentional: it avoids racing on
-// os.Getenv during concurrent requests and prevents mid-flight admin list
-// changes that could bypass access control.
-var (
-	adminUsersOnce sync.Once
-	adminUsersList []string
-)
-
-func getAdminUsers() []string {
-	adminUsersOnce.Do(func() {
-		s := os.Getenv("AGENTHUB_ADMIN_USERS")
-		if s == "" {
-			return
+// parseAdminUsers reads AGENTHUB_ADMIN_USERS once at construction (#1551).
+// The admin list is captured by the AuthMiddleware instance, so multiple
+// instances (parallel tests, in-process servers) do not share mutable state
+// and a restart-free change cannot bypass access control mid-flight.
+func parseAdminUsers() []string {
+	s := os.Getenv("AGENTHUB_ADMIN_USERS")
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	users := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			users = append(users, p)
 		}
-		parts := strings.Split(s, ",")
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				adminUsersList = append(adminUsersList, p)
-			}
-		}
-	})
-	return adminUsersList
+	}
+	return users
 }
 
 // auditPermission is a helper that calls the package-level AuditPermissionFn
 // when set, recording permission decisions for the audit log.
-func auditPermission(c *gin.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
-	if AuditPermissionFn == nil {
+func (m *AuthMiddleware) auditPermission(c *gin.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
+	if m.deps.PermissionAudit == nil {
 		return
 	}
-	AuditPermissionFn(c.Request.Context(), userID, decision, allowed, details, clientIP)
+	m.deps.PermissionAudit(c.Request.Context(), userID, decision, allowed, details, clientIP)
 }

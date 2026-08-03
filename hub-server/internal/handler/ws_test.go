@@ -53,9 +53,6 @@ func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
 		_, _ = w.Write([]byte(jwks))
 	}))
 	t.Cleanup(jwksServer.Close)
-	jwtutil.ResetJWKSCache()
-	jwtutil.SetJWKSURI(jwksServer.URL)
-	t.Cleanup(jwtutil.ResetJWKSCache)
 
 	manager := hubws.NewManager()
 	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
@@ -244,7 +241,7 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 		h.SetOnTyping(func(userID, sessionID string) {
 			called <- map[string]string{"user_id": userID, "session_id": sessionID}
 		})
-	})
+	}, nil)
 	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
@@ -283,7 +280,7 @@ func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
 		h.SetOnTyping(func(userID, sessionID string) {
 			called <- struct{}{}
 		})
-	})
+	}, nil)
 	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
@@ -311,10 +308,10 @@ func newWebSocketTestServer(t *testing.T, manager *hubws.Manager) string {
 }
 
 func newMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config) string {
-	return newConfiguredMiddlewareWebSocketTestServer(t, manager, cfg, nil)
+	return newConfiguredMiddlewareWebSocketTestServer(t, manager, cfg, nil, nil)
 }
 
-func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config, configure func(*handler.WebSocketHandler)) string {
+func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config, configure func(*handler.WebSocketHandler), tdVerifier *jwtutil.TokenDanceVerifier) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -322,7 +319,7 @@ func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Man
 	if configure != nil {
 		configure(h)
 	}
-	r.GET("/client/ws", middleware.WSAuthMiddleware(cfg), h.ServeWS)
+	r.GET("/client/ws", middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, tdVerifier).WSHandler(), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
