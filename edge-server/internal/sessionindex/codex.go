@@ -115,6 +115,7 @@ func loadCodexSessionIndex(indexPath string) map[string]codexIndexLine {
 	if indexPath == "" {
 		return out
 	}
+	// #nosec G304 -- index path is built from the user's Codex config dir
 	f, err := os.Open(indexPath)
 	if err != nil {
 		return out

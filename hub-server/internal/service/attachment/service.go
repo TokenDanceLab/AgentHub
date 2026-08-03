@@ -71,11 +71,12 @@ func NewLocalStorage(baseDir string) *LocalStorage {
 func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
 	absPath := s.pathForKey(key)
 	dir := filepath.Dir(absPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return false, err
 	}
 
-	dst, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	// #nosec G304 -- key is derived from a validated attachment hash (im.PathFromHash)
+	dst, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		if os.IsExist(err) {
 			return false, nil // already exists
@@ -101,6 +102,7 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 
 func (s *LocalStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	absPath := s.pathForKey(key)
+	// #nosec G304 -- key is derived from a validated attachment hash (im.PathFromHash)
 	return os.Open(absPath)
 }
 

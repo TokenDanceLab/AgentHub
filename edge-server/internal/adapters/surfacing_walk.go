@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"io/fs"
@@ -71,18 +71,19 @@ func captureWalkEntry(result map[string]fileRecord, dir, path string, d fs.DirEn
 		ModTime: fi.ModTime(),
 	}
 
-	// Compute hash.
+	// #nosec G304 -- path comes from walking the user's own run workdir
 	f, err := os.Open(path)
 	if err != nil {
 		return
 	}
-	h := md5.New()
+	h := sha256.New()
 	_, _ = io.Copy(h, io.LimitReader(f, maxSurfacedFileBytes))
-	f.Close()
+	_ = f.Close()
 	rec.Hash = hex.EncodeToString(h.Sum(nil))
 
 	// Read content for text files.
 	if isTextFilePath(relPath) && fi.Size() <= maxSurfacedFileBytes {
+		// #nosec G304 -- path comes from walking the user's own run workdir
 		data, err := os.ReadFile(path)
 		if err == nil {
 			rec.Content = string(data)

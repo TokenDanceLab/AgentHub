@@ -1,15 +1,6 @@
 {
  "soft_gates": [
   {
-   "location": "go-edge: Security scan (gosec)",
-   "kind": "continue-on-error",
-   "reason": "gosec findings remain advisory pending #1574 adjudication; required fail-closed vuln-scan-go (govulncheck) is the compensating dependency-vulnerability control but does not replace gosec SAST",
-   "issue": 1574,
-   "owner": "security-owners",
-   "introduced_at": "2026-05-24",
-   "review_by": "2026-09-01"
-  },
-  {
    "location": "go-hub: Lint",
    "kind": "continue-on-error",
    "reason": "pre-existing Hub lint findings keep this step advisory; #1573 owns a finding-fingerprint ratchet and hard-fail conversion, while #1568 only owns complexity exclusions",
@@ -17,15 +8,6 @@
    "owner": "hub-owners",
    "introduced_at": "2026-05-24",
    "review_by": "2026-10-01"
-  },
-  {
-   "location": "go-hub: Security scan (gosec)",
-   "kind": "continue-on-error",
-   "reason": "gosec findings remain advisory pending #1574 adjudication; required fail-closed vuln-scan-go (govulncheck) is the compensating dependency-vulnerability control but does not replace gosec SAST",
-   "issue": 1574,
-   "owner": "security-owners",
-   "introduced_at": "2026-05-24",
-   "review_by": "2026-09-01"
   },
   {
    "location": "frontend-desktop: Lint (debt visibility)",

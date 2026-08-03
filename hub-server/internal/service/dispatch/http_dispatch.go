@@ -12,6 +12,7 @@ const EdgeHTTPResponseBodyLimit = 64 * 1024
 const EdgeHTTPClientTimeoutSeconds = 10
 
 // CapabilityTokenHeader is the dual-token auth header for Hub→Edge run-start.
+// #nosec G101 -- constant header name, not a credential
 const CapabilityTokenHeader = "X-AgentHub-Capability-Token"
 
 // EdgeRunsURL joins a base Edge URL with EdgeRunsPath.

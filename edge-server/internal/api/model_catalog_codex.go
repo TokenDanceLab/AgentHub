@@ -62,6 +62,7 @@ type codexModelConfig struct {
 }
 
 func readCodexModelConfig(path string) (codexModelConfig, error) {
+	// #nosec G304 -- codex config path comes from operator config
 	file, err := os.Open(path)
 	if err != nil {
 		return codexModelConfig{}, err

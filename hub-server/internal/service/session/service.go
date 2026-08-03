@@ -8,6 +8,7 @@ package session
 
 import (
 	"context"
+	"log/slog"
 
 	"gorm.io/gorm"
 
@@ -82,5 +83,7 @@ func (s *Service) publishEvent(ctx context.Context, eventType string, payload ma
 	if s == nil || s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, bus.Event{Type: eventType, Payload: payload})
+	if err := s.bus.Publish(ctx, bus.Event{Type: eventType, Payload: payload}); err != nil {
+		slog.Warn("failed to publish session event", "event_type", eventType, "error", err)
+	}
 }

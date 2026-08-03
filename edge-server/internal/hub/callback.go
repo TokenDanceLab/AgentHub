@@ -410,7 +410,7 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 	}
 
 	respBody, readErr := readLimitedResponse(resp.Body, c.cfg.MaxResponseBodyBytes)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if readErr != nil {
 		// Fail-closed: an oversize response is a protocol anomaly; never
 		// retried, body content never surfaces in logs (#1564).

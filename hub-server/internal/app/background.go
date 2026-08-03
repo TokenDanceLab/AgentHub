@@ -186,14 +186,16 @@ func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingA
 	if ai != nil {
 		sessionID = ai.SessionID
 	}
-	a.bus.Publish(ctx, bus.Event{
+	if err := a.bus.Publish(ctx, bus.Event{
 		Type: bus.EventTypeAgentTimeout,
 		Payload: bus.AgentTaskPayload{
 			TaskID:          task.ID,
 			AgentInstanceID: task.AgentInstanceID,
 			SessionID:       sessionID,
 		},
-	})
+	}); err != nil {
+		slog.Warn("failed to publish agent timeout event", "task_id", task.ID, "error", err)
+	}
 }
 
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.

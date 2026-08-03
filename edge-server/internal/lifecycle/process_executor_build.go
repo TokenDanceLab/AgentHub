@@ -84,6 +84,8 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	}
 	// Use Command (not CommandContext) so cancelling the run context does not
 	// immediately SIGKILL the child and defeat Cancel's grace escalation (#988).
+	// #nosec G204 -- executing the user-configured agent CLI is the core
+	// function of the Edge runtime; cmdPath/args come from profile config.
 	cmd := exec.Command(cmdPath, args...)
 	cmd.Dir = workDir
 	cmd.Env = envForAdapterOrProfile(run, adapter != nil, env, extraEnv)

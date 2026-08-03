@@ -140,6 +140,7 @@ func BackoffDuration(base time.Duration, retryCount int) time.Duration {
 	// Apply true ±25% jitter: randomly shift in [-d/4, +d/4] so the
 	// resulting delay ranges from 0.75d to 1.25d, spreading retries
 	// symmetrically around the base duration.
+	// #nosec G404 -- retry backoff jitter only; randomness is not used for security
 	jitter := time.Duration(rand.Int63n(int64(d/2))) - d/4
 	d += jitter
 	if d > 30*time.Second {

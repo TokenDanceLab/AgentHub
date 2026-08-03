@@ -417,7 +417,7 @@ func (f *FileStore) ListUserProfiles() []UserProfile {
 
 func ensureFileSnapshotDirectory(path string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create store snapshot directory: %w", err)
 	}
 	info, err := os.Stat(dir)
@@ -431,6 +431,7 @@ func ensureFileSnapshotDirectory(path string) error {
 }
 
 func loadFileSnapshot(path string, s *Store) error {
+	// #nosec G304 -- snapshot path is under the edge's own data dir
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil

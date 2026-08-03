@@ -194,6 +194,7 @@ func ReadMemory(workDir, threadID, agentID string) MemoryReadResult {
 // Each entry is a YAML frontmatter block delimited by "---" on its own line,
 // followed by a Markdown body. Multiple entries can appear in one file.
 func readMemoryFile(path string) ([]MemoryEntry, error) {
+	// #nosec G304 -- path is joined under workdir/.agenthub/memory by ReadMemory
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -368,7 +369,7 @@ func EnsureMemoryDir(workDir string) error {
 		return nil
 	}
 	memDir := filepath.Join(workDir, memorySubdir)
-	if err := os.MkdirAll(memDir, 0755); err != nil {
+	if err := os.MkdirAll(memDir, 0750); err != nil {
 		return fmt.Errorf("create memory dir %s: %w", memDir, err)
 	}
 	projectPath := filepath.Join(memDir, projectFile)
@@ -384,7 +385,7 @@ created: ` + time.Now().Format(time.RFC3339) + `
 This is the project memory file. AgentHub will load entries here before each run.
 You can add facts, preferences, and context that the agent should remember.
 `
-	return os.WriteFile(projectPath, []byte(defaultContent), 0644)
+	return os.WriteFile(projectPath, []byte(defaultContent), 0600)
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────
@@ -414,7 +415,7 @@ func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
 	memDir := filepath.Join(req.WorkDir, memorySubdir)
 
 	// Ensure the memory directory exists before writing.
-	if err := os.MkdirAll(memDir, 0755); err != nil {
+	if err := os.MkdirAll(memDir, 0750); err != nil {
 		return MemoryEntry{}, fmt.Errorf("create memory dir: %w", err)
 	}
 
@@ -472,12 +473,14 @@ func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
 	sb.WriteString(entry.Content + "\n")
 
 	if req.Overwrite {
-		if err := os.WriteFile(targetFile, []byte(sb.String()), 0644); err != nil {
+		// #nosec G304 -- target file is joined under workdir/.agenthub/memory
+		if err := os.WriteFile(targetFile, []byte(sb.String()), 0600); err != nil {
 			return MemoryEntry{}, fmt.Errorf("write memory file %s: %w", category, err)
 		}
 	} else {
 		// Append to existing file
-		f, err := os.OpenFile(targetFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		// #nosec G304 -- target file is joined under workdir/.agenthub/memory
+		f, err := os.OpenFile(targetFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return MemoryEntry{}, fmt.Errorf("open memory file %s: %w", category, err)
 		}

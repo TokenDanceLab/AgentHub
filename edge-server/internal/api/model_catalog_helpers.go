@@ -39,6 +39,7 @@ func configHome(envKey, home, fallbackName string) string {
 }
 
 func readJSONFile(path string) (map[string]any, error) {
+	// #nosec G304 -- model catalog config files come from operator config
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err

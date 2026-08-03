@@ -84,8 +84,10 @@ Assert-Contains $hub "THRESHOLD=40" "go-hub coverage threshold must be 40%"
 # exclusions remain separately owned by #1568.
 Assert-StepContinueOnError $edge "Lint" $false
 Assert-StepContinueOnError $hub "Lint" $true
-Assert-StepContinueOnError $edge "Security scan (gosec)" $true
-Assert-StepContinueOnError $hub "Security scan (gosec)" $true
+# #1574: gosec findings triaged and cleared in both servers; the gosec
+# security scan steps are hard-blocking (no continue-on-error).
+Assert-StepContinueOnError $edge "Security scan (gosec)" $false
+Assert-StepContinueOnError $hub "Security scan (gosec)" $false
 Assert-StepContinueOnError $edge "Coverage per-package minimums" $false
 Assert-NotContains $edge "Commit message check" "commit-message policy must not live in the path-filtered go-edge job"
 
