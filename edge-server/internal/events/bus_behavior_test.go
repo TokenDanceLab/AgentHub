@@ -1,10 +1,13 @@
 package events
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 // ---------------------------------------------------------------------------
@@ -225,8 +228,17 @@ func TestBusAddObserverFiresForEveryPublishedEvent(t *testing.T) {
 		b.Publish(et, nil, nil)
 	}
 
-	// Give observer workers time to process (asynchronous dispatch).
-	time.Sleep(50 * time.Millisecond)
+	// Async observer dispatch: poll for the expected count with a deadline
+	// instead of a fixed sleep (#1550).
+	testkit.Eventually(t, 2*time.Second, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) == expectedCount
+	}, "observer did not receive all published events", func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return fmt.Sprintf("received %d events, want %d", len(received), expectedCount)
+	})
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -296,11 +308,16 @@ func TestBusAddObserverCancelStopsDelivery(t *testing.T) {
 	})
 
 	b.Publish("before.cancel", nil, nil)
-	time.Sleep(20 * time.Millisecond)
+
+	// Wait for the pre-cancel delivery (deadline poll, #1550).
+	testkit.Eventually(t, 2*time.Second, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return count >= 1
+	}, "observer did not fire before cancel", nil)
 
 	cancel()
 	b.Publish("after.cancel", nil, nil)
-	time.Sleep(20 * time.Millisecond)
 
 	mu.Lock()
 	if count < 1 {
@@ -309,7 +326,9 @@ func TestBusAddObserverCancelStopsDelivery(t *testing.T) {
 	finalAfter := count
 	mu.Unlock()
 
-	// Publish again; count should not increase.
+	// Negative window: after cancel the count must stay put. A short fixed
+	// window is the only way to assert "did not happen" — kept small and
+	// documented (#1550).
 	time.Sleep(20 * time.Millisecond)
 	mu.Lock()
 	if count != finalAfter {

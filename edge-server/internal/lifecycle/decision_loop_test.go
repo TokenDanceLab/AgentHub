@@ -7,6 +7,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 func TestDecisionLoop_DefaultConfig(t *testing.T) {
@@ -230,12 +231,13 @@ func TestDecisionLoop_Elapsed(t *testing.T) {
 	stdin := &nopWriteCloser{}
 	_ = dl.WrapEmitter(inner, stdin, makeRun("test-run"))
 
-	// A minimal sleep to ensure time has advanced.
-	time.Sleep(time.Millisecond)
+	// Elapsed() must be > 0 after wrap — poll instead of sleeping (#1550).
+	testkit.Eventually(t, 2*time.Second, func() bool { return dl.Elapsed() > 0 },
+		"Elapsed() did not advance after wrap", nil)
 
 	elapsed := dl.Elapsed()
 	if elapsed <= 0 {
-		t.Errorf("expected elapsed > 0 after wrap+sleep, got %v", elapsed)
+		t.Errorf("expected elapsed > 0 after wrap, got %v", elapsed)
 	}
 }
 
