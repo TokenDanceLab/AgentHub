@@ -124,6 +124,20 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
 
+      # #1573: finding fingerprint ratchet — any finding NOT in the baseline
+      # (new linter, new rule, escalated severity, replacement with same count)
+      # hard-fails this job even though the raw Lint step above stays advisory
+      # until the debt is repaid to zero.
+      - name: Verify Hub lint fingerprint ratchet (#1573)
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/verify/verify-hub-lint-ratchet.ps1
+
+      - name: Self-test Hub lint fingerprint ratchet
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.ps1
+
       - name: Test (unit only, skip integration)
         run: |
           go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee unit-test.log
