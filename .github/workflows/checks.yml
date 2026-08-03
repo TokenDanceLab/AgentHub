@@ -1013,3 +1013,23 @@ jobs:
           # 一律 fail-closed。旧实现把整段输出当单个 JSON 对象解析，
           # 解析失败后 exit 0 —— 假绿已修（#1534）。
           go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh govulncheck
+
+  # ── Vuln Scan: Rust (cargo audit, #1578) ───────
+  vuln-scan-rust:
+    name: Vuln scan (cargo audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Rust advisory gate (fail-closed, #1578)
+        shell: bash
+        run: bash scripts/verify/verify-rust-advisories.sh
+
+      - name: Self-test Rust advisory gate (fail-closed contract, #1578)
+        shell: bash
+        run: bash scripts/verify/tests/verify-rust-advisories.Tests.sh
