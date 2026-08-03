@@ -1,1 +1,0 @@
-0 3 * * * cd <REMOTE_WORKSPACE> && ./scripts/backup-db.sh >> /var/log/agenthub-backup.log 2>&1
