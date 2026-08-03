@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [master]
     paths:
+      - "deployments/**"
       - "hub-server/deployments/**"
       - "hub-server/**/Dockerfile*"
       - "hub-server/docker-compose*"
@@ -11,6 +12,8 @@ on:
       - ".github/workflows/cd-*.yml"
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
+      - "scripts/verify/verify-deployment-shape.ps1"
+      - "scripts/verify/tests/verify-deployment-shape.Tests.ps1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -44,10 +47,10 @@ jobs:
           }
 
           check_file "hub-server/deployments/Dockerfile"           "Dockerfile"
-          check_file "hub-server/deployments/docker-compose.prod.yml" "Production compose"
-          check_file "hub-server/deployments/deploy.sh"            "Deploy script"
-          check_file "hub-server/deployments/.env.production.example" "Env example"
-          check_file "hub-server/deployments/README.md"            "Deploy docs"
+          check_file "deployments/production/docker-compose.yml"   "Authoritative production compose"
+          check_file "hub-server/deployments/deploy.sh"            "Deploy script (legacy, PR2 scope)"
+          check_file "hub-server/deployments/.env.production.example" "Env example (legacy, PR2 scope)"
+          check_file "hub-server/deployments/README.md"            "Deploy docs (legacy, PR2 scope)"
 
           if [ "$FAILED" -eq 1 ]; then
             echo "::error::One or more required deployment files are missing."
@@ -86,10 +89,10 @@ jobs:
           echo "Dockerfile structure looks valid."
           echo "::endgroup::"
 
-      - name: Validate docker-compose.prod.yml syntax
+      - name: Validate authoritative production compose shape
         run: |
-          echo "::group::Validating docker-compose.prod.yml"
-          COMPOSE_FILE="hub-server/deployments/docker-compose.prod.yml"
+          echo "::group::Validating deployments/production/docker-compose.yml"
+          COMPOSE_FILE="deployments/production/docker-compose.yml"
 
           python3 -c "
           import sys, pathlib
@@ -101,31 +104,44 @@ jobs:
           try:
               data = yaml.safe_load(pathlib.Path('${COMPOSE_FILE}').read_text(encoding='utf-8'))
           except Exception as e:
-              print(f'::error::docker-compose.prod.yml is not valid YAML: {e}')
+              print(f'::error::${COMPOSE_FILE} is not valid YAML: {e}')
               sys.exit(1)
 
           if not isinstance(data, dict):
-              print('::error::docker-compose.prod.yml root is not a mapping')
+              print(f'::error::${COMPOSE_FILE} root is not a mapping')
               sys.exit(1)
 
           services = data.get('services', {})
           if not services:
-              print('::error::docker-compose.prod.yml has no services defined')
+              print(f'::error::${COMPOSE_FILE} has no services defined')
               sys.exit(1)
 
-          required_services = ['hub-server', 'postgres', 'redis']
+          required_services = ['hub-server', 'redis']
           for svc in required_services:
               if svc not in services:
-                  print(f'::warning::docker-compose.prod.yml missing expected service: {svc}')
+                  print(f'::error::${COMPOSE_FILE} missing required service: {svc}')
+                  sys.exit(1)
 
           hub = services.get('hub-server', {})
           if 'image' not in hub:
               print('::error::hub-server service missing image key')
               sys.exit(1)
 
-          print(f'docker-compose.prod.yml OK — {len(services)} service(s) defined.')
+          print(f'${COMPOSE_FILE} OK — {len(services)} service(s) defined.')
           print(f'Services: {\", \".join(sorted(services.keys()))}')
           "
+          echo "::endgroup::"
+
+      - name: Enforce deployment shape SSOT (#1527)
+        run: |
+          echo "::group::Deployment shape SSOT verifier"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-deployment-shape.ps1
+          echo "::endgroup::"
+
+      - name: Run deployment shape verifier self-tests
+        run: |
+          echo "::group::Deployment shape verifier self-tests"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/tests/verify-deployment-shape.Tests.ps1
           echo "::endgroup::"
 
       - name: Validate deploy.sh is executable and structurally sound
