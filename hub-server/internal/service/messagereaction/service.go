@@ -8,14 +8,14 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/service/im"
 )
 
 // Bus publishes domain events from reaction write paths.
-// *service.Bus satisfies this port via Publish(ctx, service.Event).
+// *bus.Bus satisfies this port via Publish(ctx, bus.Event).
 type Bus interface {
-	Publish(ctx context.Context, event service.Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // Service owns IM message reaction orchestration: add/remove/list summaries +
@@ -42,7 +42,7 @@ func (s *Service) SetBus(bus Bus) {
 }
 
 // publish is a nil-safe wrapper over the bus port.
-func (s *Service) publish(ctx context.Context, event service.Event) {
+func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
@@ -203,7 +203,7 @@ func (s *Service) publishMessageReactionEvent(ctx context.Context, eventType, ac
 	if resp == nil {
 		return
 	}
-	s.publish(ctx, service.Event{
+	s.publish(ctx, bus.Event{
 		Type: eventType,
 		Payload: MessageReactionEventPayload{
 			Action:    action,

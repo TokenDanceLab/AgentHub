@@ -14,6 +14,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -49,12 +50,12 @@ func newBehaviorCache(t *testing.T) *cache.Client {
 	return cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
 }
 
-func newBehaviorBus(t *testing.T) *service.Bus {
+func newBehaviorBus(t *testing.T) *bus.Bus {
 	t.Helper()
-	bus, err := service.NewBus()
+	b, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
-	return bus
+	t.Cleanup(func() { b.Close(context.Background()) })
+	return b
 }
 
 func newBehaviorMgr(t *testing.T) *ws.Manager {
@@ -62,11 +63,11 @@ func newBehaviorMgr(t *testing.T) *ws.Manager {
 	return ws.NewManager()
 }
 
-// waitBusDrain waits for all pending events on the bus to be processed.
-func waitBusDrain(t *testing.T, bus *service.Bus) {
+// waitBusDrain waits for all pending events on the b to be processed.
+func waitBusDrain(t *testing.T, b *bus.Bus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		return bus.Pending() == 0 && bus.Running() == 0
+		return b.Pending() == 0 && b.Running() == 0
 	}, 3*time.Second, 5*time.Millisecond)
 }
 
@@ -112,8 +113,8 @@ func TestEventDispatch_MessageRecall(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	msg := &model.Message{
@@ -121,11 +122,11 @@ func TestEventDispatch_MessageRecall(t *testing.T) {
 		SessionID: "sess-recall-1",
 		SeqID:     1,
 	}
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "message.recall",
 		Payload: msg,
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeMessageRecall, frame.Type)
@@ -144,15 +145,15 @@ func TestEventDispatch_MessageRecallIgnoresWrongPayload(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "message.recall",
 		Payload: "not-a-message",
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	assertNoFrame(t, conn)
 }
 
@@ -172,8 +173,8 @@ func TestEventDispatch_MessagePinUnpin(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	// Test pin
@@ -182,24 +183,24 @@ func TestEventDispatch_MessagePinUnpin(t *testing.T) {
 		MessageID:      "msg-1",
 		PinnedByUserID: "user-a",
 	}
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "message.pin",
 		Payload: pin,
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeMessagePin, frame.Type)
 
 	// Test unpin
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "message.unpin",
 		Payload: map[string]string{
 			"message_id": "msg-1",
 			"session_id": "sess-pin-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame = readFrame(t, conn)
 	require.Equal(t, ws.TypeMessageUnpin, frame.Type)
@@ -221,56 +222,65 @@ func TestEventDispatch_AgentDoneFailedTimeoutCancel(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	// agent.done
-	bus.Publish(context.Background(), service.Event{
-		Type: "agent.done",
-		Payload: map[string]interface{}{
-			"agent_instance_id": "agent-1",
-			"session_id":        "sess-agent-1",
-			"task_id":           "task-1",
+	b.Publish(context.Background(), bus.Event{
+		Type: bus.EventTypeAgentDone,
+		Payload: bus.AgentTaskPayload{
+			TaskID:          "task-1",
+			AgentInstanceID: "agent-1",
+			SessionID:       "sess-agent-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeAgentDone, frame.Type)
 
 	// agent.failed
-	bus.Publish(context.Background(), service.Event{
-		Type: "agent.failed",
-		Payload: map[string]interface{}{
-			"agent_instance_id": "agent-2",
-			"session_id":        "sess-agent-1",
+	b.Publish(context.Background(), bus.Event{
+		Type: bus.EventTypeAgentFailed,
+		Payload: bus.AgentFailedPayload{
+			AgentTaskPayload: bus.AgentTaskPayload{
+				TaskID:          "task-2",
+				AgentInstanceID: "agent-2",
+				SessionID:       "sess-agent-1",
+			},
+			Error: "boom",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	frame = readFrame(t, conn)
 	require.Equal(t, ws.TypeAgentFailed, frame.Type)
 
 	// agent.timeout
-	bus.Publish(context.Background(), service.Event{
-		Type: "agent.timeout",
-		Payload: map[string]interface{}{
-			"agent_instance_id": "agent-3",
-			"session_id":        "sess-agent-1",
+	b.Publish(context.Background(), bus.Event{
+		Type: bus.EventTypeAgentTimeout,
+		Payload: bus.AgentTaskPayload{
+			TaskID:          "task-3",
+			AgentInstanceID: "agent-3",
+			SessionID:       "sess-agent-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	frame = readFrame(t, conn)
 	require.Equal(t, ws.TypeAgentFailed, frame.Type)
 
 	// agent.cancel
-	bus.Publish(context.Background(), service.Event{
-		Type: "agent.cancel",
-		Payload: map[string]string{
-			"agent_instance_id": "agent-4",
-			"session_id":        "sess-agent-1",
+	b.Publish(context.Background(), bus.Event{
+		Type: bus.EventTypeAgentCancel,
+		Payload: bus.AgentCancelPayload{
+			AgentTaskPayload: bus.AgentTaskPayload{
+				TaskID:          "task-4",
+				AgentInstanceID: "agent-4",
+				SessionID:       "sess-agent-1",
+			},
+			TriggeredBy: "user-a",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	frame = readFrame(t, conn)
 	require.Equal(t, ws.TypeAgentCancel, frame.Type)
 }
@@ -293,27 +303,27 @@ func TestEventDispatch_AgentDoneSkipsNotificationWhenNoTask(t *testing.T) {
 
 	db := newBehaviorDB(t)
 	cc := newBehaviorCache(t)
-	bus := newBehaviorBus(t)
+	b := newBehaviorBus(t)
 
 	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil)
 	a := &App{
 		mgr:          mgr,
-		bus:          bus,
+		bus:        b,
 		DB:           db,
 		CacheClient:  cc,
 		AgentService: agentSvc,
 	}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
-		Type: "agent.done",
-		Payload: map[string]interface{}{
-			"agent_instance_id": "agent-nonexistent",
-			"session_id":        "sess-no-task",
-			"task_id":           "nonexistent-task",
+	b.Publish(context.Background(), bus.Event{
+		Type: bus.EventTypeAgentDone,
+		Payload: bus.AgentTaskPayload{
+			TaskID:          "nonexistent-task",
+			AgentInstanceID: "agent-nonexistent",
+			SessionID:       "sess-no-task",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeAgentDone, frame.Type)
@@ -334,11 +344,11 @@ func TestEventDispatch_SessionCreatedPushesToMembers(t *testing.T) {
 		mgr.Unregister(connB.ID)
 	})
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "session.created",
 		Payload: map[string]interface{}{
 			"session_id": "sess-new-1",
@@ -346,7 +356,7 @@ func TestEventDispatch_SessionCreatedPushesToMembers(t *testing.T) {
 			"members":    []string{"user-a", "user-b"},
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frameA := readFrame(t, connA)
 	require.Equal(t, ws.TypeSessionCreated, frameA.Type)
@@ -371,18 +381,18 @@ func TestEventDispatch_SessionCreatedFallsBackToResolveMembers(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-x", "web", "dev-x")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "session.created",
 		Payload: map[string]interface{}{
 			"session_id": "sess-fallback-1",
 			"type":       "private",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeSessionCreated, frame.Type)
@@ -404,8 +414,8 @@ func TestEventDispatch_SessionMemberJoinedLeftInfoDissolved(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	tests := []struct {
@@ -421,14 +431,14 @@ func TestEventDispatch_SessionMemberJoinedLeftInfoDissolved(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bus.Publish(context.Background(), service.Event{
+			b.Publish(context.Background(), bus.Event{
 				Type: tt.eventType,
 				Payload: map[string]interface{}{
 					"session_id": "sess-lifecycle-1",
 					"member_id":  "user-b",
 				},
 			})
-			waitBusDrain(t, bus)
+			waitBusDrain(t, b)
 
 			frame := readFrame(t, conn)
 			require.Equal(t, tt.frameType, frame.Type)
@@ -445,18 +455,18 @@ func TestEventDispatch_SessionMemberEventsSkipEmptySessionID(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "session.member_joined",
 		Payload: map[string]interface{}{
 			"session_id": "",
 			"member_id":  "user-b",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	assertNoFrame(t, conn)
 }
@@ -476,11 +486,11 @@ func TestEventDispatch_MessageReadPushesToSession(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "message.read",
 		Payload: map[string]interface{}{
 			"session_id":    "sess-read-1",
@@ -489,7 +499,7 @@ func TestEventDispatch_MessageReadPushesToSession(t *testing.T) {
 			"last_read_seq": float64(42),
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeMessageRead, frame.Type)
@@ -508,12 +518,12 @@ func TestEventDispatch_MessageNewSkipsAgentPushesUser(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	// Agent message — should NOT push to session
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "message.new",
 		Payload: &model.Message{
 			ID:          "msg-agent",
@@ -524,11 +534,11 @@ func TestEventDispatch_MessageNewSkipsAgentPushesUser(t *testing.T) {
 			Content:     `{"text":"processing"}`,
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	assertNoFrame(t, conn)
 
 	// User message — SHOULD push to session
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "message.new",
 		Payload: &model.Message{
 			ID:          "msg-user",
@@ -539,7 +549,7 @@ func TestEventDispatch_MessageNewSkipsAgentPushesUser(t *testing.T) {
 			Content:     `{"text":"hello"}`,
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeMessageNew, frame.Type)
@@ -560,11 +570,11 @@ func TestEventDispatch_FriendAcceptedPushesToRequester(t *testing.T) {
 		mgr.Unregister(connAcc.ID)
 	})
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: ws.TypeFriendAccepted,
 		Payload: map[string]interface{}{
 			"friendship_id": "friendship-1",
@@ -572,7 +582,7 @@ func TestEventDispatch_FriendAcceptedPushesToRequester(t *testing.T) {
 			"accepter_id":   "accepter-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, connReq)
 	require.Equal(t, ws.TypeFriendAccepted, frame.Type)
@@ -590,11 +600,11 @@ func TestEventDispatch_FriendAcceptedSkipsEmptyUserID(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: ws.TypeFriendAccepted,
 		Payload: map[string]interface{}{
 			"friendship_id": "friendship-1",
@@ -602,7 +612,7 @@ func TestEventDispatch_FriendAcceptedSkipsEmptyUserID(t *testing.T) {
 			"accepter_id":   "accepter-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	assertNoFrame(t, conn)
 }
@@ -616,11 +626,11 @@ func TestEventDispatch_TeamRunStartedPushesToUserWhenNoSession(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "team.run.started",
 		Payload: map[string]interface{}{
 			"team_id": "team-1",
@@ -628,7 +638,7 @@ func TestEventDispatch_TeamRunStartedPushesToUserWhenNoSession(t *testing.T) {
 			"user_id": "user-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeTeamRunStarted, frame.Type)
@@ -650,11 +660,11 @@ func TestEventDispatch_TeamEventsWithSessionPushToSession(t *testing.T) {
 	mgr.SetAuth(conn.ID, "member-1", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type: "team.assignment.completed",
 		Payload: map[string]interface{}{
 			"team_run_id":   "run-1",
@@ -662,7 +672,7 @@ func TestEventDispatch_TeamEventsWithSessionPushToSession(t *testing.T) {
 			"session_id":    "sess-team-1",
 		},
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 
 	frame := readFrame(t, conn)
 	require.Equal(t, ws.TypeTeamAssignmentDone, frame.Type)
@@ -677,23 +687,23 @@ func TestEventDispatch_NonMapPayloadIsIgnored(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
-	bus := newBehaviorBus(t)
-	a := &App{mgr: mgr, bus: bus}
+	b := newBehaviorBus(t)
+	a := &App{mgr: mgr, bus: b}
 	a.startEventSubscriptions(context.Background())
 
 	// String payload for a team event — should be ignored
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "team.event",
 		Payload: "not-a-map",
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	assertNoFrame(t, conn)
 
 	// String payload for session member_left — should be ignored
-	bus.Publish(context.Background(), service.Event{
+	b.Publish(context.Background(), bus.Event{
 		Type:    "session.member_left",
 		Payload: 12345,
 	})
-	waitBusDrain(t, bus)
+	waitBusDrain(t, b)
 	assertNoFrame(t, conn)
 }

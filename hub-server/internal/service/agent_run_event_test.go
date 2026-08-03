@@ -13,10 +13,22 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/ws"
 )
+
+
+func newTestBus(t *testing.T) *bus.Bus {
+	t.Helper()
+	b, err := bus.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { b.Close(context.Background()) })
+	return b
+}
 
 func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -155,15 +167,15 @@ func seedAgentRunEventTeamRun(t *testing.T, db *gorm.DB, status string) {
 
 func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	agentStream := make(chan *model.AgentRunEvent, 1)
-	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+	b.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event bus.Event) {
 		if payload, ok := event.Payload.(*model.AgentRunEvent); ok {
 			agentStream <- payload
 		}
 	})
 
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	payload := json.RawMessage(`{"type":"run.agent.tool_call","callId":"call-1","toolName":"read_file"}`)
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
@@ -195,14 +207,14 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 func TestHandleTaskStreamAutoParsesRunningTeamRunRouteDecision(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	decisions := make(chan RouteDecisionPayload, 1)
-	bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
+	b.Subscribe("agent.route_decision", func(ctx context.Context, event bus.Event) {
 		if payload, ok := event.Payload.(RouteDecisionPayload); ok {
 			decisions <- payload
 		}
 	})
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route","reasoning":"needs backend"}`),
@@ -262,14 +274,14 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 			if tt.status != "" {
 				seedAgentRunEventTeamRun(t, db, tt.status)
 			}
-			bus := newTestBus(t)
+			b := newTestBus(t)
 			decisions := make(chan RouteDecisionPayload, 1)
-			bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
+			b.Subscribe("agent.route_decision", func(ctx context.Context, event bus.Event) {
 				if payload, ok := event.Payload.(RouteDecisionPayload); ok {
 					decisions <- payload
 				}
 			})
-			svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+			svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 			err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 				Payload: tt.payload,
@@ -293,20 +305,20 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
-	bus := newTestBus(t)
+	b := newTestBus(t)
 	// Subscribe and simulate handler error to verify stream still succeeds
-	bus.Subscribe("agent.route_decision", func(ctx context.Context, event Event) {
-		// Simulate a handler that would error — but on the bus, errors only log.
+	b.Subscribe("agent.route_decision", func(ctx context.Context, event bus.Event) {
+		// Simulate a handler that would error — but on the b, errors only log.
 		_ = event
 	})
-	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route"}`),
 	})
 
 	require.NoError(t, err)
-	// Route decision is dispatched async via event bus; stream should never fail due to handler errors.
+	// Route decision is dispatched async via event b; stream should never fail due to handler errors.
 }
 
 func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {

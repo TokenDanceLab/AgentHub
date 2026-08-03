@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -48,7 +49,7 @@ type dispatchOutbox interface {
 // dispatchBus publishes cancel/regenerate domain events from dispatch lifecycle.
 // Implemented by *Bus.
 type dispatchBus interface {
-	Publish(ctx context.Context, event Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // dispatchCache is the route / offline-queue subset of agentCache used by
@@ -137,7 +138,7 @@ func (s *DispatchService) SetRelay(relay relayDispatcher) {
 }
 
 // publish is a nil-safe wrapper over the bus port (cancel/regenerate events).
-func (s *DispatchService) publish(ctx context.Context, event Event) {
+func (s *DispatchService) publish(ctx context.Context, event bus.Event) {
 	if !dispatch.BusPortAvailable(s != nil, s != nil && s.bus != nil) {
 		return
 	}

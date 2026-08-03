@@ -12,13 +12,13 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Bus publishes domain events from session lifecycle paths.
-// *service.Bus satisfies this port via Publish(ctx, service.Event).
+// *bus.Bus satisfies this port via Publish(ctx, bus.Event).
 type Bus interface {
-	Publish(ctx context.Context, event service.Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // Cache is the subset of *cache.Client methods used by Session Service.
@@ -82,5 +82,5 @@ func (s *Service) publishEvent(ctx context.Context, eventType string, payload ma
 	if s == nil || s.bus == nil {
 		return
 	}
-	s.bus.Publish(ctx, service.Event{Type: eventType, Payload: payload})
+	s.bus.Publish(ctx, bus.Event{Type: eventType, Payload: payload})
 }

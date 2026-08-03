@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -30,7 +31,7 @@ type relayDispatcher interface {
 
 type AgentService struct {
 	db          *gorm.DB
-	bus         *Bus
+	bus         *bus.Bus
 	mgr         *ws.Manager
 	cacheClient agentCache
 	relay       relayDispatcher
@@ -54,7 +55,7 @@ type AgentService struct {
 	dispatch *DispatchService
 }
 
-func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
+func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher) *AgentService {
 	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
 	// Construct outbox first (nil redispatcher), then inject DispatchService

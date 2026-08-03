@@ -17,17 +17,17 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 
-func newTestBus(t *testing.T) *service.Bus {
+func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
-	b, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 	return b
 }
 
@@ -67,31 +67,32 @@ func (m *mockMsgCache) SetSeq(ctx context.Context, sessionID string, seq int64) 
 
 // recordingMsgBus is a Bus test double that records Publish calls.
 type recordingMsgBus struct {
-	events []service.Event
+	events []bus.Event
 }
 
-func (b *recordingMsgBus) Publish(ctx context.Context, event service.Event) {
+func (b *recordingMsgBus) Publish(ctx context.Context, event bus.Event) error {
 	b.events = append(b.events, event)
+	return nil
 }
 
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil, cacheClient: &mockMsgCache{seq: 1}}
-	// Must not panic when bus port is unset (read-only/partial construction).
-	svc.publish(context.Background(), service.Event{Type: "message.new", Payload: "x"})
+	// Must not panic when b port is unset (read-only/partial construction).
+	svc.publish(context.Background(), bus.Event{Type: "message.new", Payload: "x"})
 }
 
 func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	bus := &recordingMsgBus{}
+	rec := &recordingMsgBus{}
 	cache := &mockMsgCache{seq: 9}
 	svc := NewService(nil, nil, nil)
 	require.NotNil(t, svc)
 
-	svc.SetBus(bus)
+	svc.SetBus(rec)
 	svc.SetCache(cache)
-	svc.publish(context.Background(), service.Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
+	svc.publish(context.Background(), bus.Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
 
-	require.Len(t, bus.events, 1)
-	assert.Equal(t, "message.read", bus.events[0].Type)
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "message.read", rec.events[0].Type)
 	assert.Equal(t, int64(9), cache.seq)
 }
 
@@ -1006,7 +1007,7 @@ func TestMarkRead_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Test that MarkRead rejects seq <= current last_read_seq (no-op + no bus publish).
+// Test that MarkRead rejects seq <= current last_read_seq (no-op + no b publish).
 func TestMarkRead_SeqNotAdvanced(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
@@ -1021,7 +1022,7 @@ func TestMarkRead_SeqNotAdvanced(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role", "last_read_seq"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "member", 50))
 
-	// No UpdateLastReadSeq and no bus publish expected
+	// No UpdateLastReadSeq and no b publish expected
 
 	svc := &Service{db: db}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)

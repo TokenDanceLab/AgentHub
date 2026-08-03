@@ -14,9 +14,9 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
 // ── behavioral test helpers (moved with Contact package #685) ───────────────
@@ -68,7 +68,7 @@ func createFriendship(t *testing.T, db *gorm.DB, userID, friendID string) {
 	}).Error)
 }
 
-func drainBus(t *testing.T, bus *service.Bus) {
+func drainBus(t *testing.T, bus *bus.Bus) {
 	t.Helper()
 	for i := 0; i < 100; i++ {
 		if bus.Pending() == 0 && bus.Running() == 0 {
@@ -86,9 +86,9 @@ func drainBus(t *testing.T, bus *service.Bus) {
 func TestContactService_SearchToFriendFlow(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")

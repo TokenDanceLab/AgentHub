@@ -9,9 +9,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
 // BackgroundGroup supervises long-lived goroutines (#1542). Every background
@@ -96,9 +96,10 @@ func (a *App) shutdown(ctx context.Context) error {
 	}
 
 	// 5. Close event bus — producers are stopped and awaited above, so no
-	// publish-after-close can occur (bus.Close drains the pool).
+	// publish-after-close can occur. Close drains pending handlers bounded
+	// by the shutdown deadline (#1548).
 	if a.bus != nil {
-		a.bus.Close()
+		a.bus.Close(ctx)
 	}
 
 	// 6. Shutdown audit service (bounded drain of retry queue, closes file sink).
@@ -185,12 +186,12 @@ func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingA
 	if ai != nil {
 		sessionID = ai.SessionID
 	}
-	a.bus.Publish(ctx, service.Event{
-		Type: "agent.timeout",
-		Payload: map[string]interface{}{
-			"task_id":           task.ID,
-			"agent_instance_id": task.AgentInstanceID,
-			"session_id":        sessionID,
+	a.bus.Publish(ctx, bus.Event{
+		Type: bus.EventTypeAgentTimeout,
+		Payload: bus.AgentTaskPayload{
+			TaskID:          task.ID,
+			AgentInstanceID: task.AgentInstanceID,
+			SessionID:       sessionID,
 		},
 	})
 }

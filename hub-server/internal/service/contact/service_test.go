@@ -17,9 +17,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
 // mockContactCache implements Cache for testing.
@@ -42,21 +42,22 @@ func (m *mockContactCache) IsOnline(ctx context.Context, userID string) (bool, e
 
 // recordingContactBus is a Bus test double that records Publish calls.
 type recordingContactBus struct {
-	events []service.Event
+	events []bus.Event
 }
 
-func (b *recordingContactBus) Publish(ctx context.Context, event service.Event) {
+func (b *recordingContactBus) Publish(ctx context.Context, event bus.Event) error {
 	b.events = append(b.events, event)
+	return nil
 }
 
 
-func newTestBus(t *testing.T) *service.Bus {
+func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
-	b, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 	return b
 }
 
@@ -83,22 +84,22 @@ func TestService_ResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
 
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil, cacheClient: &mockContactCache{}}
-	// Must not panic when bus port is unset (read-only/partial construction).
-	svc.publish(context.Background(), service.Event{Type: "friend.request", Payload: "x"})
+	// Must not panic when b port is unset (read-only/partial construction).
+	svc.publish(context.Background(), bus.Event{Type: "friend.request", Payload: "x"})
 }
 
 func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	bus := &recordingContactBus{}
+	rec := &recordingContactBus{}
 	cache := &mockContactCache{}
 	svc := NewService(nil, nil, nil)
 	require.NotNil(t, svc)
 
-	svc.SetBus(bus)
+	svc.SetBus(rec)
 	svc.SetCache(cache)
-	svc.publish(context.Background(), service.Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
+	svc.publish(context.Background(), bus.Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
 
-	require.Len(t, bus.events, 1)
-	assert.Equal(t, "friend.accepted", bus.events[0].Type)
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "friend.accepted", rec.events[0].Type)
 	require.NotNil(t, svc.cacheClient)
 }
 
@@ -368,9 +369,9 @@ func TestSendFriendRequest_PublishesDocumentedEventPayload(t *testing.T) {
 	mock.ExpectExec(sqlcInsertFriend).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "friend.request")
-	svc := NewService(db, bus, nil)
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "friend.request")
+	svc := NewService(db, b, nil)
 	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "please add me")
 	require.NoError(t, err)
 
@@ -490,9 +491,9 @@ func TestAcceptFriendRequest_PublishesAcceptedEventAfterMutation(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "friend.accepted")
-	svc := NewService(db, bus, testCacheClient(t))
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "friend.accepted")
+	svc := NewService(db, b, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	require.NoError(t, err)
 
@@ -875,15 +876,15 @@ func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func captureServiceEvents(bus *service.Bus, eventType string) <-chan service.Event {
-	events := make(chan service.Event, 1)
-	bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
+func captureServiceEvents(b *bus.Bus, eventType string) <-chan bus.Event {
+	events := make(chan bus.Event, 1)
+	b.Subscribe(eventType, func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
 	return events
 }
 
-func waitForServiceEventPayload(t *testing.T, events <-chan service.Event) map[string]interface{} {
+func waitForServiceEventPayload(t *testing.T, events <-chan bus.Event) map[string]interface{} {
 	t.Helper()
 	select {
 	case event := <-events:
