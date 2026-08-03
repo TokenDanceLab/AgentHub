@@ -161,7 +161,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 
 - **GitHub branch protection + repo 设置**（已配置，最强）：master 禁止 force push、禁止直接 push（必须 PR）、要求线性历史；**合并方式已锁死为 squash only**（merge commit / rebase merge 均已禁用，PR 按钮只剩一个选项）；要求 `validate`/`go-hub`/`go-edge` 通过；`enforce_admins: true` 管理员也不能绕过。strict 模式要求 PR 分支基于最新 master——并行 PR 偶尔需要 rebase 属正常预期，rebase 后 force-with-lease 推分支即可。
 - **本地 pre-push hook**（`scripts/git-hooks/pre-push`，clone 后跑 `bash scripts/git-hooks/install.sh` 启用）：往 master 直 push 本地提前拦截；feat/fix/docs/chore/* 分支放行；非 master 允许 force-with-lease；紧急绕过 `git push --no-verify`（GitHub 层仍兜底）。
-- **CI**：`checks.yml` 校验 Conventional Commits 提交格式；`verify-ci-gates.ps1` 校验 job 结构。
+- **CI**：`scripts/verify/verify-commit-messages.sh` 在必跑 `validate` job 中 fail-closed 校验 Conventional Commits；`verify-ci-gates.ps1` 校验 job 结构。
 
 提交格式：
 
@@ -260,7 +260,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.ps1` | release-readiness.yml |
 | Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.ps1` | release-readiness.yml |
 | secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
-| 提交格式 `type(scope): 中文摘要`（PR 时） | checks.yml go-edge 内联步骤 | checks.yml → go-edge |
+| 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.ps1` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
