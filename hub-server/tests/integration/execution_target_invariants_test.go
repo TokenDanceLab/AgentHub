@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 // #1545 — ExecutionTarget DB invariants on PostgreSQL:
