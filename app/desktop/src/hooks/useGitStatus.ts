@@ -69,9 +69,13 @@ export function useGitStatus(workDir: string | null | undefined): UseGitStatusRe
     };
   }, [workDir]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- refresh() sets the
+     loading flag synchronously before the async Tauri invoke; converting this
+     fetch-on-mount hook to TanStack Query is tracked separately. */
   useEffect(() => {
     refresh();
   }, [refresh]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return { status, loading, error, refresh };
 }

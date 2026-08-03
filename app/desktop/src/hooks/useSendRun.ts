@@ -203,7 +203,7 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
         try {
           const renamedThread = await renameThread(renameThreadId, autoTitle);
           updateThreadInCache(renamedThread);
-        } catch (renameError) {
+        } catch {
           queryClient.invalidateQueries({ queryKey: ['threads'] });
         }
       }
@@ -238,7 +238,11 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
     if (runId) {
-      try { await cancelRun(runId); } catch {}
+      try {
+        await cancelRun(runId);
+      } catch {
+        // Cancel is best-effort; the run may already have finished.
+      }
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 

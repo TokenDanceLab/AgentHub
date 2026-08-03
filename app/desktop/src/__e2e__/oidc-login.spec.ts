@@ -25,7 +25,6 @@ interface MockOIDCParams {
 async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
   const {
     state = 'test-state-mock-12345',
-    code = 'test-auth-code-67890',
     authError,
     tokenError,
     deviceId = '00000000-0000-0000-0000-000000000001',
@@ -95,16 +94,6 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
   });
 
   return tokenCalls;
-}
-
-/**
- * Simulate user returning from TokenDance ID callback.
- * The Desktop app reads code from the URL in dev mode,
- * or captures it via the Tauri Rust callback server.
- */
-async function simulateOIDCCallback(page: import('@playwright/test').Page, code: string, state: string) {
-  // Navigate to the callback URL as if TokenDance ID redirected the browser
-  await page.goto(`/auth/tokendance/callback?code=${code}&state=${state}`, { waitUntil: 'networkidle' });
 }
 
 // ── Tests ────────────────────────────────────────

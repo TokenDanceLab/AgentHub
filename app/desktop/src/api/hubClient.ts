@@ -28,11 +28,11 @@ export interface HubClientOptions extends SharedHubClientOptions {
  * fall back to the Rust backend's `reqwest`-based proxy which does.
  * Only used in Tauri mode; returns `{ used: false }` in browser mode.
  */
-async function tauriProxyFallback<T>(
+async function tauriProxyFallback(
   url: string,
   options: RequestInit,
   headers: Record<string, string>,
-  originalError: unknown,
+  _originalError: unknown,
 ): Promise<{ used: true; value: unknown } | { used: false }> {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   if (!isTauri) return { used: false };
