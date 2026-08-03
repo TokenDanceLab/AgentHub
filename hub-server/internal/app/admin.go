@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -16,26 +17,33 @@ import (
 	debugpkg "github.com/agenthub/pkg/debug"
 )
 
-// startAdminServer starts the admin HTTP server with pprof, /metrics, /debug/config, /debug/state endpoints.
-func (a *App) startAdminServer() {
+// startAdminServer starts the admin HTTP server (#1547). Capability split:
+//
+//	observability (always):  /metrics, /health, /ready
+//	high-sensitivity debug:  /debug/pprof/*, /debug/config, /debug/state
+//
+// The debug capabilities are only registered when AGENTHUB_PPROF_USER and
+// AGENTHUB_PPROF_PASS are BOTH set — absent credentials fail closed (routes
+// simply do not exist → 404, never weak defaults). Metrics and health never
+// depend on debug credentials, so a config omission cannot blind production
+// monitoring. The listener is bound synchronously so AdminServerUp reflects
+// the real bind result (no transient 1 before a bind failure is known).
+func (a *App) startAdminServer() error {
 	// Register Prometheus metrics unconditionally so middleware never nil-pointer dereferences.
 	metrics.Register()
 
 	adminPort := a.Config.Server.AdminPort
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
-	if pprofUser == "" || pprofPass == "" {
-		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
-		if metrics.AdminServerUp != nil {
-			metrics.AdminServerUp.Set(0)
-		}
-		return
-	}
+	debugEnabled := pprofUser != "" && pprofPass != ""
 
 	adminMux := http.NewServeMux()
-	debugpkg.RegisterEndpoints(adminMux, debugpkg.MuxConfig{
+	debugCfg := debugpkg.MuxConfig{
 		HealthCheckers: map[string]debugpkg.HealthChecker{
 			"database": func(ctx context.Context) error {
+				if a.DB == nil {
+					return fmt.Errorf("database not initialized")
+				}
 				sqlDB, err := a.DB.DB()
 				if err != nil {
 					return err
@@ -43,17 +51,35 @@ func (a *App) startAdminServer() {
 				return sqlDB.PingContext(ctx)
 			},
 			"redis": func(ctx context.Context) error {
+				if a.CacheClient == nil {
+					return fmt.Errorf("redis not initialized")
+				}
 				return a.CacheClient.GetRDB().Ping(ctx).Err()
 			},
 		},
-		EnablePprof:    true,
+		EnablePprof:    debugEnabled,
 		MetricsHandler: promhttp.Handler(),
-		Auth:           debugpkg.BasicAuth(pprofUser, pprofPass),
-		ConfigDumper:   a.hubConfigDumper(),
-		StateDumper:    a.hubStateDumper(),
-		Version:        "dev",
+		Version:        a.Version,
 		StartTime:      a.startTime,
-	})
+		// High-sensitivity endpoints require credentials; metrics use their
+		// own (default public — the listener is loopback-bound).
+		Auth: debugpkg.BasicAuth(pprofUser, pprofPass),
+	}
+	if debugEnabled {
+		debugCfg.ConfigDumper = a.hubConfigDumper()
+		debugCfg.StateDumper = a.hubStateDumper()
+	}
+	debugpkg.RegisterEndpoints(adminMux, debugCfg)
+
+	// Synchronous bind: a busy port must be known before AdminServerUp is
+	// set to 1 (previously the goroutine discovered it asynchronously).
+	listener, err := net.Listen("tcp", adminListenAddr(adminPort))
+	if err != nil {
+		if metrics.AdminServerUp != nil {
+			metrics.AdminServerUp.Set(0)
+		}
+		return fmt.Errorf("admin server bind failed: %w", err)
+	}
 
 	a.AdminServer = &http.Server{
 		Addr:              adminListenAddr(adminPort),
@@ -63,18 +89,22 @@ func (a *App) startAdminServer() {
 		WriteTimeout:      config.DefaultServerWriteTimeout,
 		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
+	if metrics.AdminServerUp != nil {
+		metrics.AdminServerUp.Set(1)
+	}
 	go func() {
-		slog.Info("admin server starting", "addr", a.AdminServer.Addr)
-		if err := a.AdminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Info("admin server starting", "addr", a.AdminServer.Addr, "debug_capabilities", debugEnabled)
+		if err := a.AdminServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			slog.Error("admin server failed", "error", err)
 			if metrics.AdminServerUp != nil {
 				metrics.AdminServerUp.Set(0)
 			}
 		}
 	}()
-	if metrics.AdminServerUp != nil {
-		metrics.AdminServerUp.Set(1)
+	if !debugEnabled {
+		slog.Warn("admin server started without debug capabilities (AGENTHUB_PPROF_USER/PASS not both set): pprof/config/state disabled, metrics+health available")
 	}
+	return nil
 }
 
 func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
