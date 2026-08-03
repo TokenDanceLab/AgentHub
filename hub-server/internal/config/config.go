@@ -74,6 +74,10 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("edge.auth_token", "")
 	v.SetDefault("edge.device_id", "")
 	v.SetDefault("edge.timeout", 10*time.Second)
+	// #1564: TokenDance ID outbound client policy defaults (10s timeout,
+	// 64 KiB fail-closed response cap) keep the historical behavior.
+	v.SetDefault("tokendance_id.http_timeout", 10*time.Second)
+	v.SetDefault("tokendance_id.max_response_body_bytes", int64(64*1024))
 	setAgentTeamDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
