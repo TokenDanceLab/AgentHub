@@ -1,13 +1,23 @@
-// Package orchestrator is the target leaf package for the A-V1 orchestrator
-// extraction RFC §6. It currently contains only the pre-conditions test stub
-// that gates the extraction: when this test passes in a scratch branch with
-// the 13 orchestrator_*.go files moved here, the extraction is safe to PR.
+// Package orchestrator is the leaf implementation package for the A-V1
+// orchestrator extraction (#1526 Step 0 → #1566 Step 2).
 //
-// Extraction plan (RFC §6):
-//  1. Run this test to confirm no import cycles → gate passes
-//  2. Move the 13 files + 5 test files from parent adapters package
-//  3. Fix package declarations: package adapters → package orchestrator
-//  4. Add adapters parent import where needed
-//  5. Move shared types (PlanTask etc.) to a shared location or keep in parent
-//  6. Run this test again → all checks pass → PR sign-off
+// It holds the orchestrator implementation (13 orchestrator_*.go files +
+// plan_approval.go) that previously lived in the root internal/adapters god
+// package. The leaf depends only on:
+//
+//   - internal/orchestration — neutral contract SSOT (TaskStatus, PlanTask,
+//     AgentAdapter, EventEmitter, SubAgentSpawner, BusEvent* …)
+//   - narrow ports defined in ports.go — AgentExecutor (agent execution),
+//     AdapterRegistry (adapter lookup / registry view)
+//   - external neutral packages — internal/agents, internal/store,
+//     internal/runnerctx, internal/events
+//
+// Dependency direction (machine-gated by TestLeafDoesNotImportRootAdapters
+// and scripts/verify/verify-orchestrator-deps.ps1):
+//
+//	orchestration → adapters/orchestrator ← composition root
+//
+// The leaf never imports the root internal/adapters implementation package;
+// concrete adapters, the adapter Registry, and the PlanApprovalBroker wiring
+// are injected by the composition root (cmd/agenthub-edge, internal/httpserver).
 package orchestrator

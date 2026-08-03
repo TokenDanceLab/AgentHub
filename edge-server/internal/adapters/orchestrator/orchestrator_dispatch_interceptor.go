@@ -1,4 +1,4 @@
-package adapters
+package orchestrator
 
 import (
 	"log/slog"

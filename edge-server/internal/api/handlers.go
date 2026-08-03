@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/errcode"
@@ -59,7 +60,7 @@ type Handler struct {
 
 	// PlanApprovalBroker manages pending orchestrator plans and connects
 	// them to user approval/rejection decisions (P0 #3: plan confirmation gate).
-	PlanApprovalBroker *adapters.PlanApprovalBroker
+	PlanApprovalBroker *orchestrator.PlanApprovalBroker
 
 	// MCPConfigStore holds Hub-synced MCP server configs for injection into runs.
 	// When non-nil, run creation merges Hub-synced configs into the run's MCPConfig.
