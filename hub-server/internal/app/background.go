@@ -81,7 +81,7 @@ func (a *App) shutdown(ctx context.Context) error {
 
 	// 2. Stop admin server (pprof/metrics).
 	if a.AdminServer != nil {
-		record("admin", a.AdminServer.Shutdown(ctx))
+		record("admin", a.shutdownAdminServer(ctx))
 	}
 
 	// 3. Cancel background root: scheduler, heartbeat, metrics collector,
