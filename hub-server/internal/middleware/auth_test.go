@@ -204,7 +204,7 @@ func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testi
 	cfg.TokenDanceID.ClientID = audience
 
 	c, w := ginRequest(http.MethodPost, "/edge/devices/register", "Bearer "+token)
-	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL)).Handler()(c)
+	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL, jwtutil.VerifierConfig{})).Handler()(c)
 	if c.IsAborted() {
 		t.Fatalf("TokenDance bearer should authenticate before device gate, status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -237,7 +237,7 @@ func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
 	cfg.TokenDanceID.ClientID = audience
 
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL)).WSHandler()(c)
+	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL, jwtutil.VerifierConfig{})).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected TokenDance bearer to be rejected before WebSocket upgrade")

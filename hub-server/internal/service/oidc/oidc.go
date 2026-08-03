@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -25,6 +24,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/pkg/reqlog"
 )
@@ -35,9 +35,16 @@ type Service struct {
 	cfg    config.TokenDanceIDConfig
 	jwtCfg config.JWTConfig
 	cache  *cache.Client
+	// httpClient is the purpose-built TokenDance ID token-exchange client
+	// (#1564). Built once in NewService from the injected config with the
+	// default outbound policy: bounded timeout, redirects refused (the form
+	// body carries client_secret, so it must never be replayed to another
+	// origin), default TLS verification.
+	httpClient *http.Client
 	// tdVerifier validates TokenDance ID-issued RS256 ID tokens against the
-	// configured JWKS endpoint. Instance-owned (#1551); nil when TokenDance
-	// ID is not configured (ID-token validation is skipped upstream).
+	// configured JWKS endpoint. Instance-owned (#1551/#1564): URI, client,
+	// cache and refresh policy injected; nil when TokenDance ID is not
+	// configured (ID-token validation is skipped upstream).
 	tdVerifier *jwtutil.TokenDanceVerifier
 }
 
@@ -53,9 +60,19 @@ func NewService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTCon
 	}
 	var tdVerifier *jwtutil.TokenDanceVerifier
 	if jwksURI != "" {
-		tdVerifier = jwtutil.NewTokenDanceVerifier(jwksURI)
+		tdVerifier = jwtutil.NewTokenDanceVerifier(jwksURI, jwtutil.VerifierConfig{
+			HTTPClient:   outboundhttp.NewClient(cfg.HTTPTimeout),
+			MaxBodyBytes: cfg.MaxResponseBodyBytes,
+		})
 	}
-	return &Service{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache, tdVerifier: tdVerifier}
+	return &Service{
+		db:         db,
+		cfg:        cfg,
+		jwtCfg:     jwtCfg,
+		cache:      cache,
+		httpClient: outboundhttp.NewClient(cfg.HTTPTimeout),
+		tdVerifier: tdVerifier,
+	}
 }
 
 // AuthorizationResult is returned from GenerateAuthorizationURL.
@@ -289,8 +306,7 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		slog.Error("oidc provider code exchange unreachable",
 			"provider", oidcProviderHost(tokenURL),
@@ -302,9 +318,17 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := outboundhttp.ReadLimited(resp.Body, s.cfg.MaxResponseBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("read token response: %w", err)
+		// Fail-closed: a provider response beyond the cap is refused and the
+		// body content never surfaces in logs (#1564).
+		slog.Error("oidc provider code exchange response too large",
+			"provider", oidcProviderHost(tokenURL),
+			"request_id", reqlog.GetRequestID(ctx),
+			"error_category", "body_too_large",
+			"limit", s.cfg.MaxResponseBodyBytes,
+		)
+		return nil, fmt.Errorf("token endpoint response too large")
 	}
 
 	if resp.StatusCode != http.StatusOK {
