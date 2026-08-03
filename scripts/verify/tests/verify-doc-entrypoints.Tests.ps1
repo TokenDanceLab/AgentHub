@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 <#
-Behavior-level self-tests for the root Agent/progress entrypoint contract (#1577).
+Behavior-level self-tests for Agent/doc entrypoint ownership (#1577 / #1582).
 All mutations happen in an isolated detached Git worktree. The caller worktree
 status is snapshotted before and after the suite.
 #>
@@ -60,6 +60,23 @@ function Assert-ForbiddenRootFile([string]$RelativePath) {
     }
 }
 
+function Assert-ForbiddenStalePath([string]$RelativePath) {
+    $path = Join-Path $FixtureRoot $RelativePath
+    if (Test-Path -LiteralPath $path) {
+        Fail "precondition failed: stale fixture path already exists: $RelativePath"
+    }
+    try {
+        $parent = Split-Path -Parent $path
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+        [IO.File]::WriteAllText($path, "temporary stale-path fixture`n", [Text.UTF8Encoding]::new($false))
+        $result = Invoke-DocVerifier
+        Assert-FailureCode $result "DOC-STALE-PATH" $RelativePath
+        Pass "$RelativePath is rejected from active docs"
+    } finally {
+        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Assert-ReadmeOwnerLinkRequired {
     $path = Join-Path $FixtureRoot "README.md"
     $originalBytes = [IO.File]::ReadAllBytes($path)
@@ -99,6 +116,14 @@ try {
     Copy-Item -LiteralPath $SourceVerifier -Destination $FixtureVerifier -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot "AGENTS.md") -Destination (Join-Path $FixtureRoot "AGENTS.md") -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot "README.md") -Destination (Join-Path $FixtureRoot "README.md") -Force
+
+    # Mirror the caller's active analysis directory. A pre-commit caller may
+    # have removed stale files that still exist in fixture HEAD.
+    $sourceAnalysis = Join-Path $RepoRoot "docs/analysis"
+    $fixtureAnalysis = Join-Path $FixtureRoot "docs/analysis"
+    Remove-Item -LiteralPath $fixtureAnalysis -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item -LiteralPath $sourceAnalysis -Destination $fixtureAnalysis -Recurse -Force
+
     if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot "PROGRESS.md"))) {
         Remove-Item -LiteralPath (Join-Path $FixtureRoot "PROGRESS.md") -Force -ErrorAction SilentlyContinue
     }
@@ -111,6 +136,7 @@ try {
 
     Assert-ForbiddenRootFile "PROGRESS.md"
     Assert-ForbiddenRootFile "CODEX.md"
+    Assert-ForbiddenStalePath "docs/analysis/project-overview.md"
     Assert-ReadmeOwnerLinkRequired
 
     $final = Invoke-DocVerifier

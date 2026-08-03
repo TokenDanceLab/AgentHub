@@ -117,21 +117,17 @@ export type Skill = HubSkill;
 export type MCPServer = HubMCPServer;
 
 /**
- * Method groups still owned by desktop/web forks (not yet on shared createHubClient).
- * Tracked for T3.2 method parity — do not implement ad-hoc only on one surface.
- * @see docs/analysis/hubclient-ssot-slice1.md
+ * Machine-readable inventory for intentionally surface-only compatibility.
+ * Hub REST methods and DTOs belong to shared createHubClient; do not add an
+ * ad-hoc method to only one platform shell.
+ * @see ../README.md
+ * @see ../../../AGENTS.md
  */
 export const HUBCLIENT_SSOT_GAPS = {
-  /** Present on both desktop and web, missing from shared createHubClient return. */
-  desktopAndWebNotShared: [
-    // T3.2 landed these on shared createHubClient
-  ],
-  /** Desktop-only relative to web (keep desktop-local until product decision). */
-  desktopOnly: [
-    // create/updateExecutionTarget request-shape differences may remain surface-local
-  ],
-  /** Web-only relative to desktop. */
-  webOnly: [
-    // T3.4 landed task approvals/artifacts on shared
-  ],
+  /** Methods implemented by both platform shells but absent from shared. */
+  desktopAndWebNotShared: [],
+  /** Intentional Desktop-only methods pending an explicit product decision. */
+  desktopOnly: [],
+  /** Intentional Web-only methods pending an explicit product decision. */
+  webOnly: [],
 } as const;
