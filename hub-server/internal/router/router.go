@@ -14,7 +14,7 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) error {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddleware, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) error {
 	var workspaceHandler *handler.WorkspaceHandler
 	if len(workspaceHandlers) > 0 {
 		workspaceHandler = workspaceHandlers[0]
@@ -73,7 +73,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	{
 		// WS upgrade: IP rate limit + JWT parse + shared hub-session purpose/device gate
 		// (WSAuthMiddleware embeds RequireHubSession policy; chain is belt-and-suspenders).
-		client.GET("/ws", middleware.WSIPRateLimit(), middleware.WSAuthMiddleware(cfg), middleware.RequireHubSession(), wsHandler.ServeWS)
+		client.GET("/ws", middleware.WSIPRateLimit(), authMW.WSHandler(), authMW.RequireHubSession(), wsHandler.ServeWS)
 
 		auth := client.Group("/auth")
 		{
@@ -88,8 +88,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		authProtected := client.Group("/auth")
-		authProtected.Use(middleware.AuthMiddleware(cfg))
-		authProtected.Use(middleware.RequireHubSession())
+		authProtected.Use(authMW.Handler())
+		authProtected.Use(authMW.RequireHubSession())
 		{
 			authProtected.GET("/me", authHandler.Me)
 			authProtected.POST("/logout", authHandler.Logout)
@@ -97,8 +97,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		contacts := client.Group("/contacts")
-		contacts.Use(middleware.AuthMiddleware(cfg))
-		contacts.Use(middleware.RequireHubSession())
+		contacts.Use(authMW.Handler())
+		contacts.Use(authMW.RequireHubSession())
 		{
 			contacts.GET("/search", contactHandler.SearchUser)
 			contacts.GET("/friend-requests", contactHandler.ListFriendRequests)
@@ -113,8 +113,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		sessions := client.Group("/sessions")
-		sessions.Use(middleware.AuthMiddleware(cfg))
-		sessions.Use(middleware.RequireHubSession())
+		sessions.Use(authMW.Handler())
+		sessions.Use(authMW.RequireHubSession())
 		{
 			sessions.GET("", sessionHandler.List)
 			sessions.POST("", sessionHandler.Create)
@@ -143,8 +143,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		messages := client.Group("/messages")
-		messages.Use(middleware.AuthMiddleware(cfg))
-		messages.Use(middleware.RequireHubSession())
+		messages.Use(authMW.Handler())
+		messages.Use(authMW.RequireHubSession())
 		{
 			messages.POST("/:id/recall", messageHandler.RecallMessage)
 			messages.PUT("/:id", messageHandler.EditMessage)
@@ -158,8 +158,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		attachments := client.Group("/attachments")
-		attachments.Use(middleware.AuthMiddleware(cfg))
-		attachments.Use(middleware.RequireHubSession())
+		attachments.Use(authMW.Handler())
+		attachments.Use(authMW.RequireHubSession())
 		{
 			attachments.POST("/probe", attachmentHandler.Probe)
 			attachments.POST("", middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
@@ -167,8 +167,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		}
 
 		notifications := client.Group("/notifications")
-		notifications.Use(middleware.AuthMiddleware(cfg))
-		notifications.Use(middleware.RequireHubSession())
+		notifications.Use(authMW.Handler())
+		notifications.Use(authMW.RequireHubSession())
 		{
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
@@ -178,8 +178,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		// Settings (user preferences — per-user key-value store)
 		if settingsHandler != nil {
 			settings := client.Group("/settings")
-			settings.Use(middleware.AuthMiddleware(cfg))
-			settings.Use(middleware.RequireHubSession())
+			settings.Use(authMW.Handler())
+			settings.Use(authMW.RequireHubSession())
 			{
 				settings.GET("", settingsHandler.GetSettings)
 				settings.PATCH("", settingsHandler.PatchSettings)
@@ -188,8 +188,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	}
 
 	edge := r.Group("/edge")
-	edge.Use(middleware.AuthMiddleware(cfg))
-	edge.Use(middleware.RequireHubSession())
+	edge.Use(authMW.Handler())
+	edge.Use(authMW.RequireHubSession())
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
 	{
 		edge.POST("/devices/register", deviceHandler.Register)
@@ -201,15 +201,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	// Cloud Edge registration (authenticated, no device type restriction)
 	cloud := r.Group("/cloud")
-	cloud.Use(middleware.AuthMiddleware(cfg))
-	cloud.Use(middleware.RequireHubSession())
+	cloud.Use(authMW.Handler())
+	cloud.Use(authMW.RequireHubSession())
 	{
 		cloud.POST("/edge/register", deviceHandler.CloudEdgeRegister)
 	}
 
 	web := r.Group("/web")
-	web.Use(middleware.AuthMiddleware(cfg))
-	web.Use(middleware.RequireHubSession())
+	web.Use(authMW.Handler())
+	web.Use(authMW.RequireHubSession())
 	web.Use(middleware.DeviceTypeCheck("web", "mobile"))
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
@@ -233,7 +233,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/agent-profiles/:id", agentProfileHandler.GetProfile)
 			web.PATCH("/agent-profiles/:id", agentProfileHandler.UpdateProfile)
 			web.DELETE("/agent-profiles/:id", agentProfileHandler.DeleteProfile)
-			web.POST("/agent-profiles/:id/publish", middleware.RequireAdmin(), agentProfileHandler.PublishProfile)
+			web.POST("/agent-profiles/:id/publish", authMW.RequireAdmin(), agentProfileHandler.PublishProfile)
 			web.POST("/agent-profiles/:id/install", agentProfileHandler.InstallProfile)
 		}
 
@@ -244,8 +244,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/skills/:id", skillHandler.GetSkill)
 			web.PUT("/skills/:id", skillHandler.UpdateSkill)
 			web.DELETE("/skills/:id", skillHandler.DeleteSkill)
-			web.POST("/skills/:id/publish", middleware.RequireAdmin(), skillHandler.PublishSkill)
-			web.POST("/skills/:id/unpublish", middleware.RequireAdmin(), skillHandler.UnpublishSkill)
+			web.POST("/skills/:id/publish", authMW.RequireAdmin(), skillHandler.PublishSkill)
+			web.POST("/skills/:id/unpublish", authMW.RequireAdmin(), skillHandler.UnpublishSkill)
 		}
 
 		// MCP Servers (Phase 3)
@@ -255,8 +255,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/mcp-servers/:id", mcpHandler.GetMCPServer)
 			web.PUT("/mcp-servers/:id", mcpHandler.UpdateMCPServer)
 			web.DELETE("/mcp-servers/:id", mcpHandler.DeleteMCPServer)
-			web.POST("/mcp-servers/:id/publish", middleware.RequireAdmin(), mcpHandler.PublishMCPServer)
-			web.POST("/mcp-servers/:id/unpublish", middleware.RequireAdmin(), mcpHandler.UnpublishMCPServer)
+			web.POST("/mcp-servers/:id/publish", authMW.RequireAdmin(), mcpHandler.PublishMCPServer)
+			web.POST("/mcp-servers/:id/unpublish", authMW.RequireAdmin(), mcpHandler.UnpublishMCPServer)
 		}
 
 		// Market (Phase 4)
@@ -308,14 +308,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		// Audit Events (Phase 6)
 		if auditHandler != nil {
-			web.GET("/audit-events", middleware.RequireAdmin(), auditHandler.ListAuditEvents)
+			web.GET("/audit-events", authMW.RequireAdmin(), auditHandler.ListAuditEvents)
 		}
 
 		// Relay Commands
 		if relayHandler != nil {
-			web.POST("/relay/commands", middleware.RequireAdmin(), relayHandler.CreateCommand)
-			web.GET("/relay/commands/:id", middleware.RequireAdmin(), relayHandler.GetCommand)
-			web.POST("/relay/commands/:id/ack", middleware.RequireAdmin(), relayHandler.AckCommand)
+			web.POST("/relay/commands", authMW.RequireAdmin(), relayHandler.CreateCommand)
+			web.GET("/relay/commands/:id", authMW.RequireAdmin(), relayHandler.GetCommand)
+			web.POST("/relay/commands/:id/ack", authMW.RequireAdmin(), relayHandler.AckCommand)
 		}
 
 		// Devices

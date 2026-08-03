@@ -35,6 +35,10 @@ type Service struct {
 	cfg    config.TokenDanceIDConfig
 	jwtCfg config.JWTConfig
 	cache  *cache.Client
+	// tdVerifier validates TokenDance ID-issued RS256 ID tokens against the
+	// configured JWKS endpoint. Instance-owned (#1551); nil when TokenDance
+	// ID is not configured (ID-token validation is skipped upstream).
+	tdVerifier *jwtutil.TokenDanceVerifier
 }
 
 var validDeviceTypes = []string{"desktop", "web", "cli"}
@@ -43,12 +47,15 @@ const oidcStateTTL = 10 * time.Minute
 
 // NewService creates a new OIDC Service.
 func NewService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *Service {
-	if cfg.JWKSURI != "" {
-		jwtutil.SetJWKSURI(cfg.JWKSURI)
-	} else if cfg.IssuerURL != "" {
-		jwtutil.SetJWKSURI(strings.TrimRight(cfg.IssuerURL, "/") + "/oidc/jwks")
+	jwksURI := cfg.JWKSURI
+	if jwksURI == "" && cfg.IssuerURL != "" {
+		jwksURI = strings.TrimRight(cfg.IssuerURL, "/") + "/oidc/jwks"
 	}
-	return &Service{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache}
+	var tdVerifier *jwtutil.TokenDanceVerifier
+	if jwksURI != "" {
+		tdVerifier = jwtutil.NewTokenDanceVerifier(jwksURI)
+	}
+	return &Service{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache, tdVerifier: tdVerifier}
 }
 
 // AuthorizationResult is returned from GenerateAuthorizationURL.
@@ -197,7 +204,10 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 	}
 
 	// 3. Validate ID token (signature, issuer, audience, expiry)
-	claims, err := jwtutil.ParseTokenDanceJWT(tokenResponse.IDToken, s.cfg.IssuerURL, s.cfg.ClientID)
+	if s.tdVerifier == nil {
+		return nil, errcode.OIDCIDTokenInvalid
+	}
+	claims, err := s.tdVerifier.ParseJWT(tokenResponse.IDToken, s.cfg.IssuerURL, s.cfg.ClientID)
 	if err != nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
