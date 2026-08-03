@@ -800,6 +800,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-doc-ssot.ps1
 
+      - name: Self-test doc entrypoint SSOT
+        shell: pwsh
+        run: ./scripts/verify/tests/verify-doc-entrypoints.Tests.ps1
+
       - name: Self-test vulnerability gates (fail-closed contract)
         shell: bash
         run: bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh

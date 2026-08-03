@@ -34,23 +34,21 @@
 | `tests/` | 活 | 跨服务测试 |
 | tmp/ | 产物 | 本地临时文件（gitignored，已清理） |
 
-## 1. 渐进式加载
+## 1. 首次入仓与渐进式加载
 
-人类同学先读：
+### 新 Agent 90 秒入口
 
-1. `README.md`
-2. `docs/architecture.md`
-3. `docs/developer-quickstart.md`
+1. 先运行 `git status --short --branch`、`git log -5 --oneline`、`git worktree list`，确认真实分支、脏文件和并行 worktree；不要从旧 handoff 推断现场。
+2. 完整读本文件，再读 `docs/progress/MASTER.md` 的当前目标与 active track。仓库根目录不维护第二份进度文件。
+3. 只在任务需要时读 `docs/roadmap.md`、`docs/architecture.md` 和一个 owner 文档；不要先遍历整个 `docs/`。
+4. 查明对应 Issue/PR、允许修改路径、禁改路径和验收命令后再动代码。没有活跃任务且范围复杂时，先按 `.agents/skills/dev-loop/SKILL.md` 建立短 spec。
+5. 每完成一个切片立即运行最窄验证；宣称 merge-ready、真实 E2E、发布或生产就绪前，再运行对应完整 gate。
 
-Agent 按需加载，够用就停：
+**停止加载规则**：已经能回答“当前目标、事实 owner、允许改哪里、用什么验证”时就停止读文档；论证材料最多追加 1-3 篇精确 `docs/reference/**`，历史只通过 `docs/history.md` 定位。
 
-1. 先读本文件。
-2. 读 `docs/progress/MASTER.md`。如果存在，按当前 SPEC 继续，不重启旧计划。
-3. 读 `docs/roadmap.md` 和 `docs/architecture.md` 获取当前目标和架构边界。
-4. 改接口时读 `api/openapi.yaml`、`api/events.md`、`api/conventions.md`。
-5. 做 UI/数据流时读 `docs/architecture/04-frontend-data-flow.md` 和 workspace 设计文档中相关章节。
-6. 做登录、授权、Feishu/Lark、Gateway、安全、公开包装、i18n 或共享设计 token 时，先读 `../AGENTS.md` 和对应 `../docs/` owner 文档。
-7. 需要论证时最多读 1-3 篇精确 `docs/reference/**`。第三方调研默认先看 `docs/history.md` 定位外部归档，避免展开旧长文。
+人类同学的最短入口是 `README.md` → `docs/architecture.md` → `docs/developer-quickstart.md`。
+
+任务路由：接口改动读 `api/openapi.yaml`、`api/events.md`、`api/conventions.md`；UI/数据流读 `docs/architecture/04-frontend-data-flow.md`；登录、授权、Feishu/Lark、Gateway、安全、公开包装、i18n 或设计 token 同时读上级 `../AGENTS.md` 与对应 `../docs/` owner 文档。
 
 ## 2. 项目分工和边界
 
@@ -236,7 +234,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 |---|---|---|
 | CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
-| 文档 SSOT：路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.ps1` | checks.yml → validate |
+| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.ps1` | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.ps1` | checks.yml → validate |
 | Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.ps1` | checks.yml → validate |
 | Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.ps1` | checks.yml → validate |
