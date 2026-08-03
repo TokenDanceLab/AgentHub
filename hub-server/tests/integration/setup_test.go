@@ -28,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
@@ -178,7 +179,7 @@ func TestMain(m *testing.M) {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	if err := router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
+	if err := router.SetupRoutes(r, cfg, middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil), cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
 		panic(fmt.Sprintf("SetupRoutes failed: %v", err))
 	}
 

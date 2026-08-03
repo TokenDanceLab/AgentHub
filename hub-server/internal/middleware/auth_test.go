@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"sync/atomic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
@@ -27,6 +30,15 @@ func testSecret() string { return "test-secret-for-middleware-tests" }
 
 func testConfig() *config.Config {
 	return &config.Config{JWT: config.JWTConfig{Secret: testSecret()}}
+}
+
+// newTestAuthMW builds an AuthMiddleware for tests (#1551): instance-owned
+// deps, no package globals.
+func newTestAuthMW(cfg *config.Config, deps AuthDependencies, tdVerifier *jwtutil.TokenDanceVerifier) *AuthMiddleware {
+	if cfg == nil {
+		cfg = testConfig()
+	}
+	return NewAuthMiddleware(cfg, deps, tdVerifier)
 }
 
 func makeToken(userID, deviceType, deviceID string) string {
@@ -59,7 +71,7 @@ func ginRequest(method, path, authHeader string) (*gin.Context, *httptest.Respon
 
 func TestAuthMiddlewareNoHeader(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "")
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -71,7 +83,7 @@ func TestAuthMiddlewareNoHeader(t *testing.T) {
 
 func TestAuthMiddlewareNoBearerPrefix(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Token some-token")
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -83,7 +95,7 @@ func TestAuthMiddlewareNoBearerPrefix(t *testing.T) {
 
 func TestAuthMiddlewareInvalidToken(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer not.a.valid.token")
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -100,7 +112,7 @@ func TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience(t *testing.
 	cfg.TokenDanceID.ClientID = ""
 
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(cfg)(c)
+	newTestAuthMW(cfg, AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted when TokenDance client_id is missing")
@@ -113,7 +125,7 @@ func TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience(t *testing.
 func TestAuthMiddlewareExpiredToken(t *testing.T) {
 	token := makeExpiredToken("user-1", "desktop", "dev-1")
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted for expired token")
@@ -126,7 +138,7 @@ func TestAuthMiddlewareExpiredToken(t *testing.T) {
 func TestAuthMiddlewareWrongSecret(t *testing.T) {
 	token, _ := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", "wrong-secret", time.Hour)
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted for wrong secret")
@@ -142,7 +154,7 @@ func TestAuthMiddlewareValidToken(t *testing.T) {
 	next := func(c *gin.Context) { called = true }
 
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	handler := AuthMiddleware(testConfig())
+	handler := newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -163,7 +175,7 @@ func TestAuthMiddlewareSetsContextValues(t *testing.T) {
 	token := makeToken("user-99", "mobile", "dev-mobile-1")
 
 	c, _ := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if c.IsAborted() {
 		t.Fatal("expected request not to be aborted")
@@ -186,14 +198,13 @@ func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testi
 		_, _ = w.Write([]byte(jwks))
 	}))
 	t.Cleanup(server.Close)
-	jwtutil.SetJWKSURI(server.URL)
 
 	cfg := testConfig()
 	cfg.TokenDanceID.IssuerURL = issuer
 	cfg.TokenDanceID.ClientID = audience
 
 	c, w := ginRequest(http.MethodPost, "/edge/devices/register", "Bearer "+token)
-	AuthMiddleware(cfg)(c)
+	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL)).Handler()(c)
 	if c.IsAborted() {
 		t.Fatalf("TokenDance bearer should authenticate before device gate, status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -220,16 +231,13 @@ func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
 		_, _ = w.Write([]byte(jwks))
 	}))
 	t.Cleanup(server.Close)
-	jwtutil.ResetJWKSCache()
-	jwtutil.SetJWKSURI(server.URL)
-	t.Cleanup(jwtutil.ResetJWKSCache)
 
 	cfg := testConfig()
 	cfg.TokenDanceID.IssuerURL = issuer
 	cfg.TokenDanceID.ClientID = audience
 
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	WSAuthMiddleware(cfg)(c)
+	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL)).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected TokenDance bearer to be rejected before WebSocket upgrade")
@@ -248,7 +256,7 @@ func TestWSAuthMiddlewareRejectsHubLocalQueryToken(t *testing.T) {
 	token := makeToken("user-ws", "web", "device-ws")
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
 
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected query-only access_token to be rejected on Hub WS upgrade")
@@ -270,7 +278,7 @@ func TestWSAuthMiddlewareAcceptsHubLocalBearerToken(t *testing.T) {
 	token := makeToken("user-ws", "desktop", "device-ws")
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
 
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if c.IsAborted() {
 		t.Fatalf("expected Hub-local Bearer token to authenticate, status=%d body=%s", w.Code, w.Body.String())
@@ -297,7 +305,7 @@ func TestWSAuthMiddlewareAcceptsSubprotocolBearerToken(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
 	c.Request.Header.Set("Sec-WebSocket-Protocol", WSBearerSubprotocol+", "+token)
 
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if c.IsAborted() {
 		t.Fatalf("expected Sec-WebSocket-Protocol bearer token to authenticate, status=%d body=%s", w.Code, w.Body.String())
@@ -320,7 +328,7 @@ func TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
 	c.Request.Header.Set("Sec-WebSocket-Protocol", "access_token."+token)
 
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if c.IsAborted() {
 		t.Fatalf("expected access_token.<jwt> subprotocol to authenticate, status=%d body=%s", w.Code, w.Body.String())
@@ -341,7 +349,7 @@ func TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+queryToken, "")
 	c.Request.Header.Set("Sec-WebSocket-Protocol", WSBearerSubprotocol+", "+protoToken)
 
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if c.IsAborted() {
 		t.Fatalf("expected subprotocol token to authenticate, status=%d body=%s", w.Code, w.Body.String())
@@ -353,7 +361,7 @@ func TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
 
 func TestWSAuthMiddlewareRejectsMissingToken(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected missing WS token to be rejected")
@@ -433,7 +441,7 @@ func TestWSAuthMiddlewareRejectsNonHubSessionPurpose(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+tc.token)
-			WSAuthMiddleware(testConfig())(c)
+			newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 			if !c.IsAborted() {
 				t.Fatal("expected non-hub-session purpose token to be rejected on WS upgrade")
@@ -478,7 +486,7 @@ func TestEnforceHubSessionRejectsPurposeAndDeviceType(t *testing.T) {
 			c.Set("purpose", tc.purpose)
 			c.Set("user_id", "user-gate")
 
-			ok := enforceHubSession(c)
+			ok := newTestAuthMW(nil, AuthDependencies{}, nil).enforceHubSession(c)
 			if ok != tc.wantOK {
 				t.Fatalf("enforceHubSession = %v, want %v (status=%d body=%s)", ok, tc.wantOK, w.Code, w.Body.String())
 			}
@@ -514,7 +522,7 @@ func TestAuthMiddlewareRejectsEdgeToken(t *testing.T) {
 		t.Fatalf("GenerateEdgeToken: %v", err)
 	}
 	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected edge JWT to be rejected on product AuthMiddleware")
@@ -534,7 +542,7 @@ func TestAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 		t.Fatalf("IssueCapabilityToken: %v", err)
 	}
 	c, w := ginRequest(http.MethodGet, "/client/sessions", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected capability JWT to be rejected on product AuthMiddleware")
@@ -550,7 +558,7 @@ func TestAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 func TestAuthMiddlewareProductTokenStillReachesHandler(t *testing.T) {
 	token := makeToken("user-product", "web", "dev-web-1")
 	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 	if c.IsAborted() {
 		t.Fatalf("product token must authenticate, status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -561,7 +569,7 @@ func TestAuthMiddlewareProductTokenStillReachesHandler(t *testing.T) {
 		t.Fatalf("user_id = %q, want user-product", got)
 	}
 	// RequireHubSession still accepts product hub_local.
-	RequireHubSession()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()(c)
 	if c.IsAborted() {
 		t.Fatal("RequireHubSession must accept product hub_local session")
 	}
@@ -573,7 +581,7 @@ func TestWSAuthMiddlewareRejectsEdgeToken(t *testing.T) {
 		t.Fatalf("GenerateEdgeToken: %v", err)
 	}
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected edge JWT to be rejected on WSAuthMiddleware")
@@ -592,7 +600,7 @@ func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 		t.Fatalf("IssueCapabilityToken: %v", err)
 	}
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected capability JWT to be rejected on WSAuthMiddleware")
@@ -659,11 +667,10 @@ func TestAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
 	if claims.ID == "" {
 		t.Fatal("expected minted jti")
 	}
-	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}})
-	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
-
 	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}},
+	}, nil).Handler()(c)
 	if !c.IsAborted() {
 		t.Fatal("expected blacklisted access jti to be rejected")
 	}
@@ -678,11 +685,10 @@ func TestWSAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseToken: %v", err)
 	}
-	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}})
-	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
-
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	WSAuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}},
+	}, nil).WSHandler()(c)
 	if !c.IsAborted() {
 		t.Fatal("expected blacklisted access jti to be rejected on WS")
 	}
@@ -711,11 +717,10 @@ func TestAuthMiddlewareAcceptsLegacyTokenWithoutJTI(t *testing.T) {
 		t.Fatalf("sign legacy: %v", err)
 	}
 	// Even with a blacklist checker present, missing jti is accept-with-log.
-	SetAccessTokenBlacklist(stubAccessBlacklist{blacklisted: map[string]bool{"any": true}})
-	t.Cleanup(func() { SetAccessTokenBlacklist(nil) })
+	// (blacklist injected via newTestAuthMW below)
 
 	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 	if c.IsAborted() {
 		t.Fatalf("legacy missing-jti token must be accepted, status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -730,7 +735,7 @@ func TestAuthMiddlewareAcceptsLegacyTokenWithoutJTI(t *testing.T) {
 func TestAuthMiddlewareSetsAccessJTI(t *testing.T) {
 	token := makeToken("user-jti", "mobile", "dev-jti")
 	c, _ := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
-	AuthMiddleware(testConfig())(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 	if c.IsAborted() {
 		t.Fatal("expected auth success")
 	}
@@ -953,7 +958,7 @@ func TestRequireHubSessionAllowsHubLocalAuth(t *testing.T) {
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireHubSession()
+	handler := newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -975,7 +980,7 @@ func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireHubSession()
+	handler := newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -997,7 +1002,7 @@ func TestRequireHubSessionBlocksEmptyAuthSource(t *testing.T) {
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireHubSession()
+	handler := newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -1019,7 +1024,7 @@ func TestRequireHubSessionBlocksNonEmptyPurpose(t *testing.T) {
 	c.Set("purpose", "edge-api")
 	c.Set("device_type", "desktop")
 
-	RequireHubSession()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected RequireHubSession to reject non-empty purpose")
@@ -1034,7 +1039,7 @@ func TestRequireHubSessionBlocksEdgeDeviceType(t *testing.T) {
 	c.Set("device_type", "edge")
 	c.Set("purpose", "")
 
-	RequireHubSession()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireHubSession()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected RequireHubSession to reject edge device_type")
@@ -1047,7 +1052,7 @@ func TestRequireHubSessionBlocksEdgeDeviceType(t *testing.T) {
 func TestRequireLocalAuthDelegatesToHubSession(t *testing.T) {
 	c, w := requireLocalAuthGinCtx("tokendance_id")
 
-	RequireLocalAuth()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireLocalAuth()(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected RequireLocalAuth alias to require Hub-local auth")
@@ -1055,4 +1060,62 @@ func TestRequireLocalAuthDelegatesToHubSession(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", w.Code)
 	}
+}
+
+// ── #1551 instance isolation ──────────────────────────────────────────────
+
+// TestAuthMiddlewareInstancesAreIsolated proves the process-global wiring is
+// gone: two instances with different blacklist deps behave independently,
+// regardless of construction order (a package global would leak A's
+// blacklist into B).
+func TestAuthMiddlewareInstancesAreIsolated(t *testing.T) {
+	token := makeToken("user-iso", "web", "dev-iso")
+	claims, err := jwtutil.ParseToken(token, testSecret())
+	require.NoError(t, err)
+	if claims.ID == "" {
+		t.Fatal("expected minted jti")
+	}
+
+	// Instance A rejects the blacklisted jti.
+	mwA := newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: stubAccessBlacklist{blacklisted: map[string]bool{claims.ID: true}},
+	}, nil)
+
+	// Instance B (constructed after A) has no blacklist — must accept the
+	// same token.
+	mwB := newTestAuthMW(testConfig(), AuthDependencies{}, nil)
+
+	cA, wA := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	mwA.Handler()(cA)
+	if !cA.IsAborted() || wA.Code != http.StatusUnauthorized {
+		t.Fatalf("instance A: aborted=%v status=%d, want 401 (blacklist must apply)", cA.IsAborted(), wA.Code)
+	}
+
+	cB, _ := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	mwB.Handler()(cB)
+	if cB.IsAborted() {
+		t.Fatal("instance B: request aborted — instance A's blacklist leaked into B")
+	}
+}
+
+// TestAuthMiddlewarePermissionAuditIsolated proves audit callbacks are
+// instance-owned: only the instance with a callback receives the decision.
+func TestAuthMiddlewarePermissionAuditIsolated(t *testing.T) {
+	var auditedA, auditedB atomic.Int64
+
+	mwA := newTestAuthMW(testConfig(), AuthDependencies{
+		PermissionAudit: func(ctx context.Context, userID, decision string, allowed bool, details map[string]interface{}, clientIP string) {
+			auditedA.Add(1)
+		},
+	}, nil)
+	mwB := newTestAuthMW(testConfig(), AuthDependencies{}, nil)
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, "/admin/x", nil)
+
+	mwA.auditPermission(c, "u1", "admin_access", false, nil, "127.0.0.1")
+	mwB.auditPermission(c, "u1", "admin_access", false, nil, "127.0.0.1")
+
+	assert.Equal(t, int64(1), auditedA.Load(), "instance A must receive its audit decision")
+	assert.Equal(t, int64(0), auditedB.Load(), "instance B has no audit callback")
 }

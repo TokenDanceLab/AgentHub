@@ -109,11 +109,8 @@ func setupOIDCTest(t *testing.T) (*Service, *gorm.DB, *miniredis.Miniredis) {
 		RefreshTTL: 720 * time.Hour,
 	}
 
-	// Set up JWKS URI (so ParseTokenDanceJWT doesn't fail on missing JWKS URI;
-	// the actual JWKS fetch won't happen in these unit tests because exchangeCode
-	// will fail first or we stop before token validation)
-	jwtutil.SetJWKSURI("https://id.example.com/oidc/jwks")
-
+	// JWKS URI comes from oidcCfg; the verifier is constructed inside
+	// NewService (#1551) — no process-global JWKS state.
 	svc := NewService(db, oidcCfg, jwtCfg, cacheClient)
 	return svc, db, mr
 }
@@ -285,8 +282,7 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 	t.Cleanup(server.Close)
 	issuer = server.URL
 
-	jwtutil.SetJWKSURI("")
-	jwtutil.ResetJWKSCache()
+	// JWKS URI is carried by the config; NewService builds its own verifier (#1551).
 	svc := NewService(db, config.TokenDanceIDConfig{
 		IssuerURL:    server.URL,
 		JWKSURI:      server.URL + "/oidc/jwks",
@@ -346,8 +342,7 @@ func TestHandleCallback_TokenEndpointErrorDoesNotLogProviderRawBody(t *testing.T
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(previousLogger) })
 
-	jwtutil.SetJWKSURI("")
-	jwtutil.ResetJWKSCache()
+	// JWKS URI is carried by the config; NewService builds its own verifier (#1551).
 	svc := NewService(db, config.TokenDanceIDConfig{
 		IssuerURL:    server.URL,
 		ClientID:     "agenthub-client",

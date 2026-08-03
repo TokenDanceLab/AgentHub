@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -982,7 +982,7 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 
 	a := &App{
 		DB:           db,
-		bus:            b,
+		bus:          b,
 		bg:           newBackgroundGroup(context.Background()),
 		AgentService: service.NewAgentService(db, b, nil, nil, nil, config.EdgeDispatchConfig{}, ""),
 	}
