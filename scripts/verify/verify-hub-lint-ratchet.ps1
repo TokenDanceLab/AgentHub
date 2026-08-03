@@ -76,8 +76,14 @@ if ([string]::IsNullOrEmpty($jsonPath)) {
         "--output.json.path=$jsonPath"
     )
     $lintExit = 0
-    $lintOut = & go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$LintVersion" @lintArgs 2>&1
-    $lintExit = $LASTEXITCODE
+    $lintOut = $null
+    Push-Location $HubDir
+    try {
+        $lintOut = & go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$LintVersion" @lintArgs 2>&1
+        $lintExit = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
     # exit code 1 means findings were reported (expected); anything else is a real failure
     if ($lintExit -gt 1) {
         Fail-Verifier "golangci-lint crashed: $($lintOut -join "`n")"
