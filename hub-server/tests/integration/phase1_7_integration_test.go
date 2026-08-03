@@ -280,12 +280,11 @@ func TestExecutionTarget_CreateAndPing(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 	u := register(t, "et_cp1", "pass1234", "ET_CP")
 
-	// Create a target.
+	// Create a target. #1545: device-routed types (local_edge) cannot
+	// configure a host — host/port belong to host-configured types only.
 	w := postAuth("/web/execution-targets", u.Token, map[string]interface{}{
 		"name":        "My Desktop",
 		"target_type": "local_edge",
-		"host":        "localhost",
-		"port":        2222,
 	})
 	r := parse(w)
 	mustOK(t, r, "create target")
