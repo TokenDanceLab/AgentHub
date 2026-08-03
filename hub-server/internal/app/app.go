@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,6 +34,13 @@ type App struct {
 	CacheClient *cache.Client
 	HTTPServer  *http.Server
 	AdminServer *http.Server
+
+	// adminServeDone closes only after the admin Serve goroutine has exited and
+	// its listener is no longer owned by net/http. Shutdown waits for it so a
+	// successful return is a real lifecycle boundary, not only a signal.
+	adminServeDone <-chan struct{}
+	// adminListen is a narrow test seam; nil uses net.Listen in production.
+	adminListen func(network, address string) (net.Listener, error)
 
 	// Internal runtime state
 	mgr       *ws.Manager
