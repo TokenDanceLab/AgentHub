@@ -136,7 +136,7 @@ assert_workflow_policy() {
   assert_pattern "$readiness_text" "workflow_dispatch" "release readiness workflow is manually dispatchable" "release readiness workflow lacks workflow_dispatch"
   assert_pattern "$readiness_text" "run_windows_package_dry" "Windows package dry gate has an explicit manual input" "Windows package dry gate input is missing"
   assert_pattern "$readiness_text" "verify-tauri-package-dry\.ps1" "Windows dry gate delegates to verify-tauri-package-dry.ps1" "Windows dry gate does not call verify-tauri-package-dry.ps1"
-  assert_pattern "$readiness_text" "actions/upload-artifact@v4" "release readiness dry outputs are workflow artifacts only" "release readiness workflow does not upload dry evidence artifacts"
+  assert_pattern "$readiness_text" "actions/upload-artifact@v7" "release readiness dry outputs are workflow artifacts only" "release readiness workflow does not upload dry evidence artifacts"
   assert_pattern "$readiness_text" "run_macos_unsigned_dry_policy" "macOS future dry policy is manual and policy-only" "macOS unsigned dry policy input is missing"
 
   # Check no release upload/signing in readiness
@@ -147,7 +147,7 @@ assert_workflow_policy() {
   fi
 
   assert_pattern "$release_text" "tags:" "release workflow has tag trigger" "release workflow tag trigger is missing or not constrained to v*"
-  assert_pattern "$release_text" "softprops/action-gh-release@v2" "release workflow has the real GitHub Release uploader isolated in the tag workflow" "release workflow GitHub Release uploader is missing"
+  assert_pattern "$release_text" "softprops/action-gh-release@v3" "release workflow has the real GitHub Release uploader isolated in the tag workflow" "release workflow GitHub Release uploader is missing"
   assert_pattern "$release_text" "prerelease:" "release workflow has prerelease policy" "release workflow prerelease policy is missing"
 }
 

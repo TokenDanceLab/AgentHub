@@ -472,7 +472,7 @@ function Assert-ReleaseWorkflowPrereleasePolicy {
 
     Step "Release workflow prerelease policy"
     $releaseBlock = Get-WorkflowJobBlock $WorkflowText "release"
-    Assert-True ($releaseBlock -match "softprops/action-gh-release@v2") "release job creates GitHub Releases through softprops/action-gh-release"
+    Assert-True ($releaseBlock -match "softprops/action-gh-release@v3") "release job creates GitHub Releases through softprops/action-gh-release"
     Assert-True ($releaseBlock -notmatch "(?m)^\s*prerelease:\s*false\s*$") "release job is not fixed stable for all v* tags"
     Assert-True ($releaseBlock -match "prerelease:\s*\$\{\{\s*contains\(github\.ref_name,\s*'-'\)\s*\}\}") "hyphenated semver tags are marked as GitHub prereleases"
     Pass "RC/pre-release tags avoid the stable releases/latest updater channel; stable tags remain prerelease=false"
@@ -564,7 +564,7 @@ Assert-True ($macosUnsignedDryBlock -match "agenthub-edge-aarch64-apple-darwin")
 Assert-True ($macosUnsignedDryBlock -match "AgentHub\.app" -and $macosUnsignedDryBlock -match "AgentHub_\$\{version\}_aarch64\.dmg") "release readiness workflow documents future macOS app and versioned arm64 DMG bundle boundaries"
 Assert-True ($macosUnsignedDryBlock -match "workflow artifacts only") "release readiness workflow scopes future macOS unsigned outputs to workflow artifacts only"
 Assert-True ($macosUnsignedDryBlock -match "macos-unsigned-dry-policy\.json") "release readiness workflow writes a macOS unsigned dry policy manifest"
-Assert-True ($macosUnsignedDryBlock -match "actions/upload-artifact@v4" -and $macosUnsignedDryBlock -match "name:\s*macos-unsigned-package-dry" -and $macosUnsignedDryBlock -match "path:\s*dist/macos-unsigned-dry-policy\.json") "release readiness workflow uploads only the macOS policy manifest as a workflow artifact"
+Assert-True ($macosUnsignedDryBlock -match "actions/upload-artifact@v7" -and $macosUnsignedDryBlock -match "name:\s*macos-unsigned-package-dry" -and $macosUnsignedDryBlock -match "path:\s*dist/macos-unsigned-dry-policy\.json") "release readiness workflow uploads only the macOS policy manifest as a workflow artifact"
 Assert-True ($macosUnsignedDryBlock -match "Apple Developer ID signing" -and $macosUnsignedDryBlock -match "notarytool notarization" -and $macosUnsignedDryBlock -match "stapler staple") "release readiness workflow records Apple signing, notarization, and stapling as explicit approval gates"
 Assert-True ($macosUnsignedDryBlock -match "GitHub Release upload" -and $macosUnsignedDryBlock -match "production updater metadata publication") "release readiness workflow records release upload and updater production metadata as explicit approval gates"
 Assert-True ($macosUnsignedDryBlock -match "later approval slice") "release readiness workflow keeps signing, notarization, release upload, and updater metadata as later approval slice"

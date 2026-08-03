@@ -130,7 +130,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
 - Nav 图标只用 `DesignNavIcon`（有效名称见 `DesignNavIconName` 类型）；禁止散落的 nav glyph 组件。
 - 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。
-- CI 使用统一 `changes` job（`dorny/paths-filter@v3`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.ps1` 校验 job 结构。
+- CI 使用统一 `changes` job（`dorny/paths-filter@v4`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.ps1` 校验 job 结构。
 
 ## 6. Git 和 worktree
 
@@ -233,6 +233,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
 | CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
+| action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.ps1`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.ps1`） | checks.yml → validate |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.ps1` | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.ps1` | checks.yml → validate |
