@@ -21,14 +21,23 @@ JSON report instead of shelling out to the linter (used by the self-tests).
 #>
 [CmdletBinding()]
 param(
-    [string]$RepoRootPath = (Get-Location),
+    [string]$RepoRootPath = "",
     [string]$LintJsonPath = "",
     [switch]$UpdateBaseline
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrEmpty($RepoRootPath)) {
+    if (-not [string]::IsNullOrEmpty($env:GITHUB_WORKSPACE)) {
+        $RepoRootPath = $env:GITHUB_WORKSPACE
+    } elseif (Test-Path -LiteralPath (Join-Path (Get-Location) "hub-server")) {
+        $RepoRootPath = (Get-Location).Path
+    } else {
+        $RepoRootPath = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    }
+}
 $HubDir = Join-Path $RepoRootPath "hub-server"
-$BaselinePath = Join-Path $PSScriptRoot "hub-lint-baseline.json"
+$BaselinePath = Join-Path $RepoRootPath "scripts/verify/hub-lint-baseline.json"
 $LintVersion = "v2.12.2"
 
 function Fail-Verifier([string]$Message) {
