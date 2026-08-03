@@ -280,3 +280,40 @@ func TestWriteJSON_NilConfig(t *testing.T) {
 		t.Errorf("expected empty or null in body, got: %s", rec.Body.String())
 	}
 }
+
+// TestMetricsAuthIndependentOfAuth (#1547): /metrics 受独立 MetricsAuth 保护，
+// 不受 debug Auth 影响——observability 不依赖 debug 凭证。
+func TestMetricsAuthIndependentOfAuth(t *testing.T) {
+	metricsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("metrics public when MetricsAuth nil even with Auth set", func(t *testing.T) {
+		mux := http.NewServeMux()
+		RegisterEndpoints(mux, MuxConfig{
+			MetricsHandler: metricsHandler,
+			Auth:           BasicAuth("admin", "secret"),
+			// MetricsAuth nil → public.
+		})
+		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("metrics with nil MetricsAuth = %d, want 200 (#1547)", rec.Code)
+		}
+	})
+
+	t.Run("metrics protected by MetricsAuth when set", func(t *testing.T) {
+		mux := http.NewServeMux()
+		RegisterEndpoints(mux, MuxConfig{
+			MetricsHandler: metricsHandler,
+			MetricsAuth:    BasicAuth("metrics", "token"),
+		})
+		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("metrics with MetricsAuth = %d, want 401", rec.Code)
+		}
+	})
+}

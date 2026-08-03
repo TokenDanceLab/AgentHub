@@ -46,7 +46,11 @@ func TestAdminListenAddrUsesLoopback(t *testing.T) {
 	}
 }
 
-func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
+// TestAdminMuxRequiresBasicAuthForPprofOnly (#1547): high-sensitivity debug
+// endpoints (pprof) require Auth; /metrics is protected by its own
+// MetricsAuth and defaults to public (the listener is loopback-bound) so
+// observability never depends on debug credentials.
+func TestAdminMuxRequiresBasicAuthForPprofOnly(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := debugpkg.BasicAuth("admin", "secret")
 	metrics.Register()
@@ -56,7 +60,7 @@ func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
 		Auth:           auth,
 	})
 
-	for _, path := range []string{"/metrics", "/debug/pprof/"} {
+	for _, path := range []string{"/debug/pprof/"} {
 		t.Run(path+" without auth", func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			rec := httptest.NewRecorder()
@@ -92,6 +96,19 @@ func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
 			}
 		})
 	}
+
+	// /metrics is public by default (MetricsAuth nil) — observability must
+	// not depend on debug credentials.
+	t.Run("/metrics without auth", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		rec := httptest.NewRecorder()
+
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (metrics public by default, #1547)", rec.Code, http.StatusOK)
+		}
+	})
 }
 
 func TestHubConfigDumperMasksSecrets(t *testing.T) {
