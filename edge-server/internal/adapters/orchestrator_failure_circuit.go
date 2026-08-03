@@ -83,6 +83,10 @@ type AgentCircuitBreaker struct {
 	failureWindow    time.Duration
 	cooldownPeriod   time.Duration
 	halfOpenInFlight bool // true when a half-open probe is in progress
+	// now is the injectable clock (#1550). nil is never observed after
+	// construction; tests replace it with a fake clock to advance time
+	// deterministically instead of sleeping.
+	now func() time.Time
 }
 
 // newAgentCircuitBreaker creates a circuit breaker with the given configuration.
@@ -102,6 +106,7 @@ func newAgentCircuitBreaker(threshold int, window, cooldown time.Duration) *Agen
 		failureThreshold: threshold,
 		failureWindow:    window,
 		cooldownPeriod:   cooldown,
+		now:              time.Now,
 	}
 }
 
@@ -117,7 +122,7 @@ func (cb *AgentCircuitBreaker) Allow() error {
 	case CircuitClosed:
 		return nil
 	case CircuitOpen:
-		if time.Now().After(cb.openUntil) {
+		if cb.now().After(cb.openUntil) {
 			// Cooldown elapsed: transition to half-open and allow a trial probe.
 			prevState := cb.state
 			cb.state = CircuitHalfOpen
@@ -149,7 +154,7 @@ func (cb *AgentCircuitBreaker) RecordFailure() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
-	now := time.Now()
+	now := cb.now()
 
 	// Reset failure count if outside the window (stale failures expire).
 	if !cb.lastFailure.IsZero() && now.Sub(cb.lastFailure) > cb.failureWindow {
