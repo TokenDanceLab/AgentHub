@@ -132,12 +132,12 @@ func WriteMCPConfigTempFile(configJSON string) (string, error) {
 		return "", fmt.Errorf("mcp: create temp config file: %w", err)
 	}
 	if _, err := f.WriteString(configJSON); err != nil {
-		f.Close()
-		os.Remove(f.Name())
+		_ = f.Close()
+		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("mcp: write temp config file: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("mcp: close temp config file: %w", err)
 	}
 	return f.Name(), nil

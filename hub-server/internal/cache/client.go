@@ -69,6 +69,7 @@ func GetOrLoad[T any](c *Client, ctx context.Context, key string, ttl time.Durat
 			slog.Warn("cache marshal failed, skipping set", "key", key, "error", marshalErr)
 			return v, nil
 		}
+		// #nosec G404 -- TTL jitter only; randomness is not used for security
 		factor := 0.9 + rand.Float64()*0.2
 		jittered := time.Duration(float64(ttl) * factor)
 		if setErr := c.rdb.Set(ctx, key, jsonBytes, jittered).Err(); setErr != nil {

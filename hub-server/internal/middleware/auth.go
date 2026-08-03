@@ -102,6 +102,7 @@ func (m *AuthMiddleware) Handler() gin.HandlerFunc {
 // Query access_token is intentionally not accepted: it leaks into proxy logs,
 // browser history, and Referer headers. External/legacy clients must migrate
 // to Bearer or Sec-WebSocket-Protocol.
+// #nosec G101 -- constant WS subprotocol marker, not a credential
 const WSBearerSubprotocol = "agenthub.bearer.v1"
 
 // WSAuthMiddleware returns a Gin middleware that validates JWT tokens for

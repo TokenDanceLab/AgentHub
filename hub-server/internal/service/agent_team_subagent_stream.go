@@ -256,7 +256,7 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 	if !ok {
 		return
 	}
-	s.bus.Publish(ctx, bus.Event{
+	if err := s.bus.Publish(ctx, bus.Event{
 		Type: bus.EventTypeTeamSubagentStream,
 		Payload: TeamSubagentStreamPayload{
 			TeamRunID:       tctx.teamRunID,
@@ -273,7 +273,9 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 			Payload:         json.RawMessage(runEvent.Payload),
 			CreatedAt:       runEvent.CreatedAt,
 		},
-	})
+	}); err != nil {
+		slog.Warn("failed to publish team subagent stream event", "team_run_id", tctx.teamRunID, "error", err)
+	}
 }
 
 // cachedTeamRunContext returns the team-run context for (sessionID, taskID),

@@ -92,6 +92,7 @@ func hasHubServerLayout(dir string) bool {
 // explicit `export AGENTHUB_*` always wins. Lines starting with '#' and
 // blank lines are ignored.
 func loadDotEnv(path string) {
+	// #nosec G304 -- path is a fixed operator config path (".env"), not request input
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return // .env is optional; silently skip if missing
@@ -115,6 +116,8 @@ func loadDotEnv(path string) {
 		if os.Getenv(key) != "" {
 			continue
 		}
-		os.Setenv(key, value)
+		if err := os.Setenv(key, value); err != nil {
+			slog.Warn("failed to set env var from .env", "key", key, "error", err)
+		}
 	}
 }

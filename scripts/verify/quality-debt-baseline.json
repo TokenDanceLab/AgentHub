@@ -1,11 +1,11 @@
 {
  "soft_gates": [
   {
-   "location": "go-edge: Security scan (gosec)",
+   "location": "go-edge: Race detection",
    "kind": "continue-on-error",
-   "reason": "gosec findings remain advisory pending #1574 adjudication; required fail-closed vuln-scan-go (govulncheck) is the compensating dependency-vulnerability control but does not replace gosec SAST",
-   "issue": 1574,
-   "owner": "security-owners",
+   "reason": "fsnotify hot-reload tests have inherent goroutine races in CI; known-race isolation tracked in #1571",
+   "issue": 1571,
+   "owner": "edge-owners",
    "introduced_at": "2026-05-24",
    "review_by": "2026-09-01"
   },
@@ -17,15 +17,6 @@
    "owner": "hub-owners",
    "introduced_at": "2026-05-24",
    "review_by": "2026-10-01"
-  },
-  {
-   "location": "go-hub: Security scan (gosec)",
-   "kind": "continue-on-error",
-   "reason": "gosec findings remain advisory pending #1574 adjudication; required fail-closed vuln-scan-go (govulncheck) is the compensating dependency-vulnerability control but does not replace gosec SAST",
-   "issue": 1574,
-   "owner": "security-owners",
-   "introduced_at": "2026-05-24",
-   "review_by": "2026-09-01"
   },
   {
    "location": "frontend-desktop: Lint (debt visibility)",

@@ -13,6 +13,7 @@ import (
 // local single-tenant mode (local auth token / unauthenticated local-dev).
 // Empty userID is fail-closed on multi-user paths (#878 / AH-SR-045).
 // The NUL-prefix keeps this sentinel out of real Hub user ID space.
+// #nosec G101 -- sentinel user ID constant, not a credential
 const localSingleTenantBypass = "\x00agenthub-local-single-tenant"
 
 // hubUserFromRequest extracts the Hub-authenticated user ID from the request context.

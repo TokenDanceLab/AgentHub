@@ -28,6 +28,7 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 			// Jitter prevents thundering herd when multiple sub-agents
 			// retry simultaneously after a provider-wide outage.
 			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
+			// #nosec G404 -- retry backoff jitter only; randomness is not used for security
 			delay += time.Duration(rand.Int63n(int64(delay / 4)))
 			slog.Info("anthropic-sdk: retrying request",
 				"attempt", attempt,
@@ -69,12 +70,12 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 			return resp, nil
 		case resp.StatusCode == http.StatusTooManyRequests:
 			// Rate limited -- always retry
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("rate limited (429)")
 			continue
 		case resp.StatusCode >= 500:
 			// Server error -- retry
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("server error (%d)", resp.StatusCode)
 			continue
 		default:

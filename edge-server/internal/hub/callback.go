@@ -364,7 +364,54 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 			lastRetryAfter = retryAfter
 			continue
 		}
+<<<<<<< HEAD
 		return err
+=======
+		req.Header.Set("Content-Type", "application/json")
+		if c.authToken != "" {
+			req.Header.Set("Authorization", "Bearer "+c.authToken)
+		}
+
+		resp, err := c.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("hub callback post: %w", err)
+			continue
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			// Validate Hub response format: {"code": "ok", ...} or {"code": "..."}
+			var hubResp struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			}
+			if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
+				c.recordJournal(taskID, runID, action, true, "", attempt+1)
+				return nil
+			}
+			// Non-OK code from Hub is an application-level failure; do not retry
+			if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
+				errMsg := summarizeHubResponse(resp.StatusCode, respBody, "app_rejected")
+				c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
+				return fmt.Errorf("hub callback rejected: %s", errMsg)
+			}
+			// 2xx without JSON body — accept as success
+			c.recordJournal(taskID, runID, action, true, "", attempt+1)
+			return nil
+		}
+
+		// 4xx errors are not retryable (bad request, auth failure, etc.)
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			errMsg := summarizeHubResponse(resp.StatusCode, respBody, "client_error")
+			c.recordJournal(taskID, runID, action, false, errMsg, attempt+1)
+			return fmt.Errorf("hub callback client error: %s", errMsg)
+		}
+
+		// 5xx errors are retryable
+		lastErr = fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, "server_error"))
+>>>>>>> 06a51469 (fix(security): 分诊并清零 Hub/Edge gosec 告警，security scan 改 hard fail (#1574))
 	}
 
 	errMsg := ""
@@ -410,7 +457,7 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 	}
 
 	respBody, readErr := readLimitedResponse(resp.Body, c.cfg.MaxResponseBodyBytes)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if readErr != nil {
 		// Fail-closed: an oversize response is a protocol anomaly; never
 		// retried, body content never surfaces in logs (#1564).

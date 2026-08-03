@@ -1,7 +1,7 @@
 package api
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -190,7 +190,7 @@ func websocketClientControlResponse(message []byte) (map[string]any, bool) {
 }
 
 func runtimeSessionIDForThread(threadID string) string {
-	seed := sha1.Sum([]byte("agenthub-runtime-session:" + threadID))
+	seed := sha256.Sum256([]byte("agenthub-runtime-session:" + threadID))
 	session := make([]byte, 16)
 	copy(session, seed[:16])
 	session[6] = (session[6] & 0x0f) | 0x50

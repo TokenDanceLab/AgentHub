@@ -167,7 +167,7 @@ func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}) {
 			return
 		}
 		if outStore != nil {
-			outStore.Write(output.Text)
+			_, _ = outStore.Write(output.Text)
 		}
 		e.bus.Publish("run.output.batch", runScope(run), map[string]any{
 			"runId":  run.ID,
@@ -224,7 +224,7 @@ func (e *MockExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.cancels, runID)
 	if s, ok := e.runOutputs[runID]; ok {
-		s.Close()
+		_ = s.Close()
 		delete(e.runOutputs, runID)
 	}
 	e.mu.Unlock()

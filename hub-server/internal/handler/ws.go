@@ -88,7 +88,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	conn := ws.NewConnWithBufferSize(wsConn, h.manager.SendBufferSize())
 	if err := h.manager.Register(conn); err != nil {
 		slog.Error("ws register failed", "error", err)
-		wsConn.Close(websocket.StatusInternalError, "")
+		_ = wsConn.Close(websocket.StatusInternalError, "")
 		return
 	}
 

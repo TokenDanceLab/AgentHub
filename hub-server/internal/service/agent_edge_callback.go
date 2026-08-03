@@ -263,8 +263,12 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
-		s.bus.Publish(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent})
+		if err := s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}); err != nil {
+			slog.Warn("failed to publish message-new event", "session_id", ai.SessionID, "error", err)
+		}
+		if err := s.bus.Publish(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}); err != nil {
+			slog.Warn("failed to publish agent-stream event", "task_id", taskID, "error", err)
+		}
 		// #1478 Phase A: fan the same run event into the team-run view when the
 		// run belongs to a team run. No-op when the session is not a team run;
 		// never fails the chat-side stream path that already succeeded above.
@@ -297,7 +301,7 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 	}
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{
+		if err := s.bus.Publish(ctx, bus.Event{
 			Type: bus.EventTypeAgentRouteDecision,
 			Payload: RouteDecisionPayload{
 				UserID:   run.TriggerUserID,
@@ -305,7 +309,9 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 				RunID:    run.ID,
 				Decision: decision,
 			},
-		})
+		}); err != nil {
+			slog.Warn("failed to publish agent route decision event", "run_id", run.ID, "error", err)
+		}
 	}
 }
 
@@ -407,7 +413,9 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 			}
 		}
 		if s.bus != nil {
-			s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
+			if err := s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}); err != nil {
+				slog.Warn("failed to publish message-new event", "session_id", ai.SessionID, "error", err)
+			}
 		}
 	}
 
@@ -415,11 +423,13 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 	s.autoAck(ctx, taskID)
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
+		if err := s.bus.Publish(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
 			TaskID:          taskID,
 			AgentInstanceID: task.AgentInstanceID,
 			SessionID:       ai.SessionID,
-		}})
+		}}); err != nil {
+			slog.Warn("failed to publish agent-done event", "task_id", taskID, "error", err)
+		}
 	}
 
 	return nil
@@ -461,14 +471,16 @@ func (s *EdgeCallbackService) HandleTaskFail(ctx context.Context, edgeUserID, ed
 	}
 
 	if s.bus != nil {
-		s.bus.Publish(ctx, bus.Event{Type: "agent.failed", Payload: bus.AgentFailedPayload{
+		if err := s.bus.Publish(ctx, bus.Event{Type: "agent.failed", Payload: bus.AgentFailedPayload{
 			AgentTaskPayload: bus.AgentTaskPayload{
 				TaskID:          taskID,
 				AgentInstanceID: task.AgentInstanceID,
 				SessionID:       ai.SessionID,
 			},
 			Error: errMsg,
-		}})
+		}}); err != nil {
+			slog.Warn("failed to publish agent-failed event", "task_id", taskID, "error", err)
+		}
 	}
 
 	return nil
