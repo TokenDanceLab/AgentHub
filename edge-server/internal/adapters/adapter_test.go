@@ -56,19 +56,6 @@ func TestOpenCodeAdapterMetadata(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterMetadata(t *testing.T) {
-	a := NewOrchestratorAdapter("claude", "sonnet", "You are an orchestrator", nil)
-	m := a.Metadata()
-	if m.ID != "orchestrator" {
-		t.Fatalf("ID = %q, want orchestrator", m.ID)
-	}
-	if m.Name != "Orchestrator" {
-		t.Fatalf("Name = %q, want Orchestrator", m.Name)
-	}
-	if m.Description == "" {
-		t.Fatal("Description should not be empty")
-	}
-}
 
 // --- Adapter Capabilities tests ---
 
@@ -135,16 +122,6 @@ func TestOpenCodeAdapterCapabilities(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterCapabilities(t *testing.T) {
-	a := NewOrchestratorAdapter("claude", "sonnet", "You are an orchestrator", nil)
-	c := a.Capabilities()
-	if !c.Streaming {
-		t.Fatal("Streaming should be true")
-	}
-	if !c.SubAgentSpawn {
-		t.Fatal("SubAgentSpawn should be true")
-	}
-}
 
 // --- NeedsStdin tests ---
 
@@ -169,89 +146,6 @@ func TestOpenCodeAdapterNeedsStdin(t *testing.T) {
 	}
 }
 
-func TestOrchestratorAdapterNeedsStdin(t *testing.T) {
-	a := NewOrchestratorAdapter("claude", "sonnet", "You are an orchestrator", nil)
-	if !a.NeedsStdin() {
-		t.Fatal("Orchestrator adapter should need stdin (delegates to inner Claude Code)")
-	}
-}
-
-// --- Orchestrator tests ---
-
-func TestNewOrchestratorAdapter(t *testing.T) {
-	a := NewOrchestratorAdapter("claude", "sonnet", "You are an orchestrator", []string{"sub1", "sub2"})
-	if a == nil {
-		t.Fatal("OrchestratorAdapter should not be nil")
-	}
-	if a.systemPrompt != "You are an orchestrator" {
-		t.Fatalf("systemPrompt = %q, want 'You are an orchestrator'", a.systemPrompt)
-	}
-}
-
-func TestDefaultOrchestratorPrompt(t *testing.T) {
-	prompt := DefaultOrchestratorPrompt([]string{"agent-a", "agent-b"})
-	if prompt == "" {
-		t.Fatal("DefaultOrchestratorPrompt should not be empty")
-	}
-	if !containsStr(prompt, "<ROLE>") {
-		t.Fatal("prompt should contain <ROLE> XML section")
-	}
-}
-
-func TestFormatAgentList(t *testing.T) {
-	tests := []struct {
-		name     string
-		agents   []string
-		expected string
-	}{
-		{"empty", nil, "none"},
-		{"empty slice", []string{}, "none"},
-		{"single", []string{"agent-a"}, "agent-a"},
-		{"multiple", []string{"agent-a", "agent-b", "agent-c"}, "agent-a, agent-b, agent-c"},
-		{"with backtick", []string{"`evil`"}, "\\`evil\\`"},
-		{"with dollar brace", []string{"${foo}"}, "\\${foo}"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := formatAgentList(tt.agents)
-			if got != tt.expected {
-				t.Fatalf("formatAgentList(%v) = %q, want %q", tt.agents, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestEscapePromptLiteral(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"plain text", "plain text"},
-		{"`code`", "\\`code\\`"},
-		{"${VAR}", "\\${VAR}"},
-		{"`code` and ${VAR}", "\\`code\\` and \\${VAR}"},
-		{"already\\`escaped", "already\\\\`escaped"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := escapePromptLiteral(tt.input)
-			if got != tt.expected {
-				t.Fatalf("escapePromptLiteral(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestOrchestratorAdapterEscapesSystemPrompt(t *testing.T) {
-	a := NewOrchestratorAdapter("claude", "sonnet", "Use `code` blocks for ${VAR}", nil)
-	// The constructor should escape backticks and ${} in the system prompt.
-	if a.systemPrompt != "Use \\`code\\` blocks for \\${VAR}" {
-		t.Fatalf("systemPrompt = %q, want escaped version", a.systemPrompt)
-	}
-}
 
 // --- sandboxForPermissionMode tests ---
 
@@ -466,6 +360,8 @@ func TestBuildSiblingContextPromptEdgeCases(t *testing.T) {
 }
 
 // TestAdapterMetadataIsNotEmpty verifies all built-in adapters have non-empty metadata.
+// OrchestratorAdapter 已迁移到叶子包，其 Metadata 校验见叶子包
+// orchestrator_adapter_test.go（#1566）。
 func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 	adapters := []struct {
 		name     string
@@ -474,7 +370,6 @@ func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 		{"ClaudeCode", NewClaudeCodeAdapter("claude", "sonnet", "").Metadata()},
 		{"Codex", NewCodexAdapter("codex", "gpt-5").Metadata()},
 		{"OpenCode", NewOpenCodeAdapter("opencode").Metadata()},
-		{"Orchestrator", NewOrchestratorAdapter("claude", "sonnet", "prompt", nil).Metadata()},
 	}
 	for _, a := range adapters {
 		if a.metadata.ID == "" {

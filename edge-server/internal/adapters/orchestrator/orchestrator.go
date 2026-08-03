@@ -1,4 +1,4 @@
-package adapters
+package orchestrator
 
 import (
 	"context"
@@ -18,19 +18,23 @@ const (
 	DefaultDispatchConcurrency = 10
 )
 
-// OrchestratorAdapter wraps a ClaudeCodeAdapter with an orchestrator system prompt.
+// OrchestratorAdapter wraps an AgentExecutor with an orchestrator system prompt.
 // It is used in group-chat mode to decompose complex tasks and dispatch sub-agents.
 //
-// The orchestrator is Claude Code with a specialized system prompt that instructs
+// The orchestrator is an agent with a specialized system prompt that instructs
 // it to break down user requests, identify sub-tasks, and coordinate other agents.
 // Edge listens for orchestrator events to spawn sub-agent runs.
 //
+// The underlying agent executor is injected through the AgentExecutor port
+// (composition root wires a ClaudeCodeAdapter); the leaf package never imports
+// the concrete adapter package.
+//
 // Residual pure helpers live in orchestrator_*.go companions (peel #1111).
 type OrchestratorAdapter struct {
-	inner               *ClaudeCodeAdapter
+	inner               AgentExecutor
 	systemPrompt        string
 	agentRegistry       *agents.Registry
-	adapterRegistry     *Registry
+	adapterRegistry     AdapterRegistry
 	messageQueue        *agents.Queue
 	spawner             SubAgentSpawner
 	depth               int
@@ -42,11 +46,12 @@ type OrchestratorAdapter struct {
 	planBroker *PlanApprovalBroker
 }
 
-// NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
-func NewOrchestratorAdapter(claudePath, model, systemPrompt string, subAgents []string) *OrchestratorAdapter {
-	_ = subAgents
+// NewOrchestratorAdapter creates an orchestrator wrapping the given agent
+// executor. The executor is injected by the composition root so the leaf
+// package stays decoupled from concrete adapters.
+func NewOrchestratorAdapter(inner AgentExecutor, systemPrompt string) *OrchestratorAdapter {
 	return &OrchestratorAdapter{
-		inner:        NewClaudeCodeAdapter(claudePath, model, ""),
+		inner:        inner,
 		systemPrompt: escapePromptLiteral(systemPrompt),
 		depth:        0,
 	}
@@ -84,7 +89,7 @@ func (a *OrchestratorAdapter) WithDispatchConcurrency(n int) *OrchestratorAdapte
 }
 
 // WithAdapterRegistry attaches the adapter registry for agent name validation (O-01).
-func (a *OrchestratorAdapter) WithAdapterRegistry(r *Registry) *OrchestratorAdapter {
+func (a *OrchestratorAdapter) WithAdapterRegistry(r AdapterRegistry) *OrchestratorAdapter {
 	a.adapterRegistry = r
 	return a
 }
@@ -162,7 +167,7 @@ func (a *OrchestratorAdapter) NeedsStdin() bool { return true }
 
 func (a *OrchestratorAdapter) Available() bool {
 	available := a.inner.Available()
-	slog.Debug("adapter.availability", "adapter", "orchestrator", "path", a.inner.binaryPath, "available", available)
+	slog.Debug("adapter.availability", "adapter", "orchestrator", "available", available)
 	return available
 }
 
@@ -172,7 +177,7 @@ func (a *OrchestratorAdapter) Available() bool {
 type dispatchInterceptor struct {
 	inner           EventEmitter
 	registry        *agents.Registry
-	adapterRegistry *Registry
+	adapterRegistry AdapterRegistry
 	queue           *agents.Queue
 	spawner         SubAgentSpawner
 	parentRun       store.Run

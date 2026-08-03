@@ -1,11 +1,18 @@
-package adapters
+// Package orchestrator is the leaf implementation package for the A-V1
+// orchestrator extraction (#1566). It depends only on the neutral contract
+// package internal/orchestration and narrow ports (AgentExecutor,
+// AdapterRegistry) plus external neutral packages (agents, store, runnerctx,
+// events). It does NOT import the root internal/adapters implementation
+// package — that direction is machine-gated by scripts/verify.
+//
+// Contract types are single-SSOT in internal/orchestration; this file keeps
+// package-local aliases so the moved implementation files reference the
+// contract vocabulary without qualification (aliases are not definitions).
+package orchestrator
 
-// 合同类型唯一权威在 internal/orchestration（A-V1 Step 0, #1526；Step 2, #1566）。
-// 以下 alias 保持本包所有现有调用点（其余 adapter 实现、httpserver、api、
-// lifecycle、tests）零改动；alias 不复制行为，不是双 SSOT。
-import (
-	"github.com/agenthub/edge-server/internal/orchestration"
-)
+import "github.com/agenthub/edge-server/internal/orchestration"
+
+// ── Contract aliases (single SSOT: internal/orchestration) ─────────────────
 
 type TaskStatus = orchestration.TaskStatus
 
@@ -22,13 +29,6 @@ type PlanApprovalConfig = orchestration.PlanApprovalConfig
 type PendingPlan = orchestration.PendingPlan
 type PlanDecision = orchestration.PlanDecision
 
-// ── Adapter-domain contract aliases (A-V1 Step 2, #1566) ─────────────────────
-
-// AgentAdapter / EventEmitter / AdapterMetadata / AgentCapabilities /
-// SubAgentTask / SiblingInfo / SubAgentSpawner / RunProcessContext /
-// CtxBudgetKey / BusEvent* 的唯一权威定义在 internal/orchestration；
-// 本包保留 alias 供既有调用点零改动使用。叶子包 internal/adapters/orchestrator
-// 直接依赖 orchestration，不再经过本包。
 type AgentAdapter = orchestration.AgentAdapter
 type EventEmitter = orchestration.EventEmitter
 type AdapterMetadata = orchestration.AdapterMetadata
@@ -36,6 +36,9 @@ type AgentCapabilities = orchestration.AgentCapabilities
 type SubAgentTask = orchestration.SubAgentTask
 type SiblingInfo = orchestration.SiblingInfo
 type SubAgentSpawner = orchestration.SubAgentSpawner
+type RunProcessContext = orchestration.RunProcessContext
+
+const CtxBudgetKey = orchestration.CtxBudgetKey
 
 // Bus event type strings（与 orchestration 完全一致，防双 SSOT）。
 const (

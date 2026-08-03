@@ -1,9 +1,8 @@
-package adapters
+package orchestrator
 
 import (
 	"context"
 	"errors"
-	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -13,34 +12,10 @@ import (
 
 // ── Test Doubles ────────────────────────────────────────────────────────────
 //
-// The package already provides `stubAdapter` (registry_test.go) but its
-// Available() is hardcoded to true. The registry-facing methods under test
-// (findAlternateAgent / FindAlternateAgentID) need a controllable
-// availability flag, so we define a dedicated mock here.
-//
-// The package also provides `mockEmitter` (parser_ndjson_test.go), but it
-// coerces payloads to map[string]any, which would discard the typed
-// FailureClassifiedEvent. We use a typed emitter to assert on the event
-// struct fields.
-
-// mockAgentAdapter implements AgentAdapter with a controllable availability flag.
-type mockAgentAdapter struct {
-	id        string
-	available bool
-}
-
-func (m *mockAgentAdapter) Metadata() AdapterMetadata {
-	return AdapterMetadata{ID: m.id, Name: m.id}
-}
-func (m *mockAgentAdapter) Capabilities() AgentCapabilities { return AgentCapabilities{} }
-func (m *mockAgentAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
-	return "", nil, nil, ""
-}
-func (m *mockAgentAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	return nil
-}
-func (m *mockAgentAdapter) NeedsStdin() bool { return false }
-func (m *mockAgentAdapter) Available() bool  { return m.available }
+// mockAgentAdapter 与 fake AdapterRegistry 定义统一放在 test_doubles_test.go
+// （叶子包不 import 根 internal/adapters 实现包，测试用 port 假实现替代
+// 根包的 stubAdapter / NewRegistry）。failureRecoveryEmitter 是类型安全的
+// EventEmitter，保留在此处。
 
 // failureRecoveryEmittedEvent records a single Emit call with the raw payload.
 type failureRecoveryEmittedEvent struct {
@@ -81,15 +56,9 @@ func (e *failureRecoveryEmitter) last() (string, map[string]any, FailureClassifi
 	return ev.eventType, ev.scope, fc
 }
 
-// newTestRegistry builds a real *Registry pre-populated with mock adapters.
-// ids maps adapter ID -> availability.
-func newTestRegistry(avail map[string]bool) *Registry {
-	r := NewRegistry()
-	for id, available := range avail {
-		r.Register(&mockAgentAdapter{id: id, available: available})
-	}
-	return r
-}
+// newTestRegistry 已由 test_doubles_test.go 的 newFakeAdapterRegistry 取代：
+// 叶子包不 import 根 internal/adapters 实现包，测试用 port 假实现。
+// mockAgentAdapter 也移入 test_doubles_test.go。
 
 // ── NewFailureRecoveryManager ───────────────────────────────────────────────
 
@@ -274,14 +243,14 @@ func TestFailureRecoveryManager_FindAlternateAgent(t *testing.T) {
 	})
 
 	t.Run("empty registry returns false", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(nil), nil)
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(nil), nil)
 		if m.findAlternateAgent("a1") {
 			t.Error("findAlternateAgent with empty registry should return false")
 		}
 	})
 
 	t.Run("available alternate returns true", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 			"a2": true,
 		}), nil)
@@ -291,7 +260,7 @@ func TestFailureRecoveryManager_FindAlternateAgent(t *testing.T) {
 	})
 
 	t.Run("only failed agent present returns false", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 		}), nil)
 		if m.findAlternateAgent("a1") {
@@ -300,7 +269,7 @@ func TestFailureRecoveryManager_FindAlternateAgent(t *testing.T) {
 	})
 
 	t.Run("alternate present but unavailable returns false", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 			"a2": false, // registered but CLI binary not available
 		}), nil)
@@ -310,7 +279,7 @@ func TestFailureRecoveryManager_FindAlternateAgent(t *testing.T) {
 	})
 
 	t.Run("failed agent not in registry and no available alternate returns false", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a2": false,
 		}), nil)
 		if m.findAlternateAgent("a1") {
@@ -330,14 +299,14 @@ func TestFailureRecoveryManager_FindAlternateAgentID(t *testing.T) {
 	})
 
 	t.Run("empty registry returns empty", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(nil), nil)
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(nil), nil)
 		if got := m.FindAlternateAgentID("a1"); got != "" {
 			t.Errorf("FindAlternateAgentID with empty registry = %q, want empty", got)
 		}
 	})
 
 	t.Run("available alternate returns its ID", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 			"a2": true,
 		}), nil)
@@ -348,7 +317,7 @@ func TestFailureRecoveryManager_FindAlternateAgentID(t *testing.T) {
 	})
 
 	t.Run("failed agent not registered returns the available adapter", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a2": true,
 		}), nil)
 		if got := m.FindAlternateAgentID("a1"); got != "a2" {
@@ -357,7 +326,7 @@ func TestFailureRecoveryManager_FindAlternateAgentID(t *testing.T) {
 	})
 
 	t.Run("only failed agent present returns empty", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 		}), nil)
 		if got := m.FindAlternateAgentID("a1"); got != "" {
@@ -366,7 +335,7 @@ func TestFailureRecoveryManager_FindAlternateAgentID(t *testing.T) {
 	})
 
 	t.Run("alternate present but unavailable returns empty", func(t *testing.T) {
-		m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+		m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 			"a1": true,
 			"a2": false,
 		}), nil)
@@ -549,7 +518,7 @@ func TestHandleSubAgentFailure_FailTripsCircuit(t *testing.T) {
 }
 
 func TestHandleSubAgentFailure_SwitchAgent(t *testing.T) {
-	m := NewFailureRecoveryManager(newTestRegistry(map[string]bool{
+	m := NewFailureRecoveryManager(newFakeAdapterRegistry(map[string]bool{
 		"agent-1": true,
 		"agent-2": true,
 	}), nil)
