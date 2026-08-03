@@ -2,8 +2,11 @@ param()
 
 $ErrorActionPreference = "Stop"
 
-function Fail([string]$Message) {
-    throw "doc SSOT check failed: $Message"
+function Fail([string]$Message, [string]$Code = "DOC-SSOT") {
+    if ($Code -notmatch '^DOC-[A-Z0-9-]+$') {
+        throw "invalid doc SSOT failure code: $Code"
+    }
+    throw "doc SSOT check failed [$Code]: $Message"
 }
 
 function Normalize-Path([string]$Path) {
@@ -28,12 +31,22 @@ function Is-ActiveDoc([string]$Path) {
     return $false
 }
 
-if (Test-Path -LiteralPath "CLAUDE.md") {
-    Fail "root CLAUDE.md must not exist; AGENTS.md is the single project rule surface"
+$forbiddenRootEntrypoints = @(
+    @{ Path = "CLAUDE.md"; Reason = "AGENTS.md is the single project rule surface" },
+    @{ Path = "CODEX.md"; Reason = "tool-specific rules must not fork AGENTS.md" },
+    @{ Path = "GEMINI.md"; Reason = "tool-specific rules must not fork AGENTS.md" },
+    @{ Path = "CURSOR.md"; Reason = "tool-specific rules must not fork AGENTS.md" },
+    @{ Path = "PROGRESS.md"; Reason = "docs/progress/MASTER.md is the single current-progress surface" },
+    @{ Path = "STATE.md"; Reason = "current facts belong to AGENTS.md, MASTER.md, and owner docs" },
+    @{ Path = "ROADMAP.md"; Reason = "docs/roadmap.md is the canonical roadmap path" }
+)
+foreach ($entrypoint in $forbiddenRootEntrypoints) {
+    if (Test-Path -LiteralPath $entrypoint.Path) {
+        Fail "root $($entrypoint.Path) must not exist; $($entrypoint.Reason)" "DOC-ROOT-ENTRYPOINT"
+    }
 }
 
 foreach ($stalePath in @(
-    "STATE.md",
     "docs/contributing.md",
     "docs/roadmap",
     "docs/adr",
@@ -69,7 +82,25 @@ if ($datedGovernance.Count -gt 0) {
     Fail ("dated governance evidence must live in the external archive indexed by docs/history.md: " + (($datedGovernance | ForEach-Object { $_.Name }) -join ", "))
 }
 
+$requiredReadmeEntrypoints = @(
+    "docs/developer-quickstart.md",
+    "docs/architecture.md",
+    "AGENTS.md",
+    "docs/progress/MASTER.md"
+)
+$readmeContent = Get-Content -LiteralPath "README.md" -Raw
+foreach ($target in $requiredReadmeEntrypoints) {
+    $linkPattern = '\[[^\]]+\]\(' + [regex]::Escape($target) + '\)'
+    if ($readmeContent -notmatch $linkPattern) {
+        Fail "README.md is missing required entrypoint target: $target" "DOC-README-ENTRYPOINT"
+    }
+    if (-not (Test-Path -LiteralPath $target)) {
+        Fail "README.md entrypoint target does not exist: $target" "DOC-README-TARGET"
+    }
+}
+
 $requiredMarkers = @(
+    @{ Path = "AGENTS.md"; Marker = "新 Agent 90 秒入口" },
     @{ Path = "AGENTS.md"; Marker = "项目总规则唯一入口" },
     @{ Path = "AGENTS.md"; Marker = "docs/progress/MASTER.md" },
     @{ Path = "AGENTS.md"; Marker = "docs/roadmap.md" },
