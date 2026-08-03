@@ -49,6 +49,11 @@ type MuxConfig struct {
 	// Return true to allow, false to deny (401).
 	// If nil, all endpoints are publicly accessible.
 	Auth func(r *http.Request) bool
+
+	// MetricsAuth protects /metrics independently of Auth (#1547): metrics
+	// availability must not depend on debug credentials. nil = public.
+	// MetricsHandler is still only registered when MetricsHandler != nil.
+	MetricsAuth func(r *http.Request) bool
 }
 
 // RegisterEndpoints registers all debug routes on the given mux.
@@ -71,7 +76,7 @@ func RegisterEndpoints(mux *http.ServeMux, cfg MuxConfig) {
 	}
 
 	if cfg.MetricsHandler != nil {
-		mux.Handle("/metrics", authWrap(cfg.Auth, cfg.MetricsHandler))
+		mux.Handle("/metrics", authWrap(cfg.MetricsAuth, cfg.MetricsHandler))
 	}
 
 	if cfg.ConfigDumper != nil {
