@@ -13,10 +13,11 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/testkit"
 )
 
 // ── behavioral test helpers (moved with Session package #708) ───────────────
@@ -81,14 +82,13 @@ func createFriendship(t *testing.T, db *gorm.DB, userID, friendID string) {
 }
 
 // drainBus waits for the event bus to finish processing all events.
+// Uses the shared Eventually helper so a stuck bus fails loudly instead of
+// silently passing after the bounded loop (#1550).
 func drainBus(t *testing.T, bus *bus.Bus) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		if bus.Pending() == 0 && bus.Running() == 0 {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return bus.Pending() == 0 && bus.Running() == 0
+	}, "bus did not drain", nil)
 }
 
 // ── Session Service behavioral tests ────────────────────────────────────────
