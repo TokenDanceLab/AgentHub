@@ -1,15 +1,6 @@
 {
  "soft_gates": [
   {
-   "location": "go-edge: Race detection",
-   "kind": "continue-on-error",
-   "reason": "fsnotify hot-reload tests have inherent goroutine races in CI; known-race isolation tracked in #1571",
-   "issue": 1571,
-   "owner": "edge-owners",
-   "introduced_at": "2026-05-24",
-   "review_by": "2026-09-01"
-  },
-  {
    "location": "go-hub: Lint",
    "kind": "continue-on-error",
    "reason": "pre-existing Hub lint findings keep this step advisory; #1573 owns a finding-fingerprint ratchet and hard-fail conversion, while #1568 only owns complexity exclusions",
