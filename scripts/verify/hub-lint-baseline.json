@@ -9,6 +9,11 @@
   },
   {
    "linter": "errcheck",
+   "file": "internal/service/agentteam/agent_team_run.go",
+   "message": "Error return value of \\s.bus.Publish\\ is not checked"
+  },
+  {
+   "linter": "errcheck",
    "file": "internal/service/contact/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
@@ -151,6 +156,11 @@
    "linter": "gosec",
    "file": "internal/model/provider_binding_test.go",
    "message": "G101: Potential hardcoded credentials: Password in URL"
+  },
+  {
+   "linter": "gosec",
+   "file": "internal/service/image_meta_test.go",
+   "message": "G306: Expect WriteFile permissions to be 0600 or less"
   },
   {
    "linter": "ineffassign",
