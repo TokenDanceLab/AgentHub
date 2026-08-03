@@ -20,13 +20,13 @@ type EdgeHTTPRequestParts struct {
 // insecure=true when AH-SR-053 rejects non-loopback cleartext (caller logs + aborts).
 // err is set only on body marshal failure.
 func PrepareEdgeHTTPRequest(
-	edgeURLEnv, authTokenEnv string,
+	edgeURL, authToken string,
 	prompt, agentType, systemPrompt, hubTaskID, deliveryID string,
 	messages, pinned []Message,
 	outputSchema *json.RawMessage,
 	capabilityToken string,
 ) (parts EdgeHTTPRequestParts, insecure bool, err error) {
-	edgeURL := ResolveEdgeHTTPURL(edgeURLEnv)
+	edgeURL = ResolveEdgeHTTPURL(edgeURL)
 	if IsInsecureNonLoopbackEdge(edgeURL) {
 		return EdgeHTTPRequestParts{EdgeURL: edgeURL}, true, nil
 	}
@@ -41,7 +41,7 @@ func PrepareEdgeHTTPRequest(
 		EdgeURL: edgeURL,
 		RunsURL: EdgeRunsURL(edgeURL),
 		Body:    body,
-		Headers: EdgeHTTPHeaders(EdgeAuthBearerToken(authTokenEnv), capabilityToken),
+		Headers: EdgeHTTPHeaders(EdgeAuthBearerToken(authToken), capabilityToken),
 		Timeout: time.Duration(EdgeHTTPClientTimeoutSeconds) * time.Second,
 	}, false, nil
 }

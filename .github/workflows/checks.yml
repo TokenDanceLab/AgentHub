@@ -867,6 +867,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify/verify-conventions.ps1
 
+      - name: Verify Outbound client hygiene (#1549)
+        shell: pwsh
+        run: ./scripts/verify/verify-outbound-client-hygiene.ps1
+
       - name: Verify Shared REST contract Hub-client to Hub-router
         shell: pwsh
         run: ./scripts/verify/verify-shared-rest-contract.ps1
