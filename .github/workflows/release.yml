@@ -19,7 +19,7 @@ jobs:
     name: Guard tag format & master ancestry
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -47,9 +47,9 @@ jobs:
     needs: tag-guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -112,7 +112,7 @@ jobs:
         run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-darwin-arm64 ./cmd/server-hub/
 
       - name: Upload Go artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: go-binaries
           path: dist/
@@ -124,13 +124,13 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -144,7 +144,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Download Go binaries for sidecar
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: go-binaries
           path: go-binaries
@@ -207,7 +207,7 @@ jobs:
           }
 
       - name: Upload Desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-artifacts
           path: dist/
@@ -219,13 +219,13 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -239,7 +239,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Download Go binaries for sidecar
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: go-binaries
           path: go-binaries
@@ -269,7 +269,7 @@ jobs:
           cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
 
       - name: Upload macOS Desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-macos-artifacts
           path: dist/
@@ -281,13 +281,13 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -335,7 +335,7 @@ jobs:
           ls -lh ../../dist/
 
       - name: Upload Mobile artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-artifacts
           path: dist/
@@ -348,25 +348,25 @@ jobs:
       contents: write
     steps:
       - name: Download Go artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: go-binaries
           path: dist
 
       - name: Download Desktop artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: desktop-artifacts
           path: dist
 
       - name: Download macOS Desktop artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: desktop-macos-artifacts
           path: dist
 
       - name: Download Mobile artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mobile-artifacts
           path: dist
@@ -375,7 +375,7 @@ jobs:
         run: ls -la dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}

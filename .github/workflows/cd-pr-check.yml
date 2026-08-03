@@ -28,7 +28,7 @@ jobs:
     name: Deployment files validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check required deployment files exist
         run: |
@@ -220,7 +220,7 @@ jobs:
     name: Docker build dry run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build Docker image (no push)
         run: |
