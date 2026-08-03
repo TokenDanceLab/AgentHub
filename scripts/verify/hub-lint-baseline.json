@@ -9,6 +9,16 @@
   },
   {
    "linter": "errcheck",
+   "file": "internal/service/agent_dispatch_ports.go",
+   "message": "Error return value of `s.bus.Publish` is not checked"
+  },
+  {
+   "linter": "errcheck",
+   "file": "internal/service/agentteam/agent_team_run.go",
+   "message": "Error return value of `s.bus.Publish` is not checked"
+  },
+  {
+   "linter": "errcheck",
    "file": "internal/service/contact/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
