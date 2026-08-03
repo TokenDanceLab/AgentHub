@@ -1,5 +1,5 @@
 {
- "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Generated from golangci-lint v2.12.2 release binary JSON report on LF git archive (same binary/args as CI golangci-lint-action). gofmt excluded: formatter verdict drifts with Go toolchain version, not a stable lint fingerprint.",
+ "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Extracted from CI golangci-lint-action v2.12.2 Lint step ##[error] output (job 91707910920, PR #1589). The ratchet reads the same action JSON report (--output.json.path), so baseline and live output share one source. gofmt excluded: formatter verdict drifts with Go toolchain version.",
  "linter_version": "v2.12.2",
  "findings": [
   {
@@ -9,22 +9,17 @@
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/agentteam/agent_team_run.go",
-   "message": "Error return value of \\s.bus.Publish\\ is not checked"
-  },
-  {
-   "linter": "errcheck",
    "file": "internal/service/contact/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/messagereaction/service.go",
+   "file": "internal/service/message/service_helpers.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
    "linter": "errcheck",
-   "file": "internal/service/session/service.go",
+   "file": "internal/service/messagereaction/service.go",
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
@@ -121,26 +116,6 @@
    "linter": "gosec",
    "file": "internal/config/config_test.go",
    "message": "G306: Expect WriteFile permissions to be 0600 or less"
-  },
-  {
-   "linter": "gosec",
-   "file": "internal/handler/attachment_test.go",
-   "message": "G306: Expect WriteFile permissions to be 0600 or less"
-  },
-  {
-   "linter": "gosec",
-   "file": "internal/handler/attachment_test.go",
-   "message": "G306: Expect WriteFile permissions to be 0600 or less"
-  },
-  {
-   "linter": "gosec",
-   "file": "internal/jwtutil/jwt_bench_test.go",
-   "message": "G101: Potential hardcoded credentials"
-  },
-  {
-   "linter": "gosec",
-   "file": "internal/jwtutil/jwt_bench_test.go",
-   "message": "G101: Potential hardcoded credentials"
   },
   {
    "linter": "gosec",
@@ -289,11 +264,6 @@
   },
   {
    "linter": "staticcheck",
-   "file": "internal/jwtutil/jwt_test.go",
-   "message": "QF1008: could remove embedded field \"Time\" from selector"
-  },
-  {
-   "linter": "staticcheck",
    "file": "internal/jwtutil/tokendance_test.go",
    "message": "QF1008: could remove embedded field \"PublicKey\" from selector"
   },
@@ -314,16 +284,6 @@
   },
   {
    "linter": "staticcheck",
-   "file": "internal/repository/agent_team.go",
-   "message": "QF1008: could remove embedded field \"Dialector\" from selector"
-  },
-  {
-   "linter": "staticcheck",
-   "file": "internal/service/agentteam/agent_team_compete.go",
-   "message": "QF1012: Use fmt.Fprintf(...) instead of WriteString(fmt.Sprintf(...))"
-  },
-  {
-   "linter": "staticcheck",
    "file": "internal/service/agentteam/agent_team_compete.go",
    "message": "QF1012: Use fmt.Fprintf(...) instead of WriteString(fmt.Sprintf(...))"
   },
@@ -336,11 +296,6 @@
    "linter": "staticcheck",
    "file": "internal/service/delivery_outbox_model.go",
    "message": "S1016: should convert r (type deliveryOutboxRecord) to DeliveryOutboxEntry instead of using struct literal"
-  },
-  {
-   "linter": "unconvert",
-   "file": "internal/cache/client_test.go",
-   "message": "unnecessary conversion"
   },
   {
    "linter": "unconvert",
