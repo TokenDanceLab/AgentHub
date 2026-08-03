@@ -180,12 +180,12 @@ Assert-Contains "docker-compose.yml" "localhost:5174/auth/tokendance/callback" "
 Assert-Contains "docker-compose.yml" "127\.0\.0\.1:5174/auth/tokendance/callback" "root compose documents loopback Web callback on 5174"
 Assert-Contains "docker-compose.yml" "http://127\.0\.0\.1/callback" "root compose keeps Desktop/native loopback policy"
 Assert-NotContains "docker-compose.yml" "5173/auth/tokendance/callback" "root compose has no stale Web 5173 callback"
-Assert-Contains "hub-server\deployments\.env.production.example" "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=https://hub\.vectorcontrol\.tech/auth/tokendance/callback" "production env example uses Web browser callback as OAuth redirect"
-Assert-Contains "hub-server\deployments\.env.production.example" "POST /client/auth/oidc/callback" "production env example documents Hub exchange endpoint separately"
-Assert-Contains "hub-server\deployments\.env.production.example" "http://127\.0\.0\.1/callback" "production env example keeps Desktop/native loopback policy"
-Assert-Contains "hub-server\deployments\docker-compose.prod.yml" "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: \$\{AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub\.vectorcontrol\.tech/auth/tokendance/callback\}" "production compose default uses Web browser callback as OAuth redirect"
-Assert-Contains "hub-server\deployments\docker-compose.prod.yml" "POST /client/auth/oidc/callback" "production compose documents Hub exchange endpoint separately"
-Assert-Contains "hub-server\deployments\docker-compose.prod.yml" "http://127\.0\.0\.1/callback" "production compose keeps Desktop/native loopback policy"
+Assert-Contains "deployments\production\.env.example" "hub\.vectorcontrol\.tech/auth/tokendance/callback" "production env example uses Web browser callback as OAuth redirect"
+Assert-Contains "deployments\production\.env.example" "POST /client/auth/oidc/callback" "production env example documents Hub exchange endpoint separately"
+Assert-Contains "deployments\production\.env.example" "http://127\.0\.0\.1/callback" "production env example keeps Desktop/native loopback policy"
+Assert-Contains "deployments\production\docker-compose.yml" "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: https://hub\.vectorcontrol\.tech/auth/tokendance/callback" "production compose uses Web browser callback as OAuth redirect"
+Assert-Contains "deployments\production\docker-compose.yml" "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: https://hub\.vectorcontrol\.tech/auth/tokendance/callback" "production compose keeps Web callback as the only allowed redirect"
+Assert-Contains "deployments\production\docker-compose.yml" "AGENTHUB_TOKENDANCE_ID_CLIENT_ID: \$\{AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-\}" "production compose exposes OIDC client env overrides"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Passed: $Passed  |  Failed: $Failed" -ForegroundColor $(if ($Failed -eq 0) { "Green" } else { "Red" })

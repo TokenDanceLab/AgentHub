@@ -1,8 +1,10 @@
 # Hub Server Deployments
 
-最后更新：2026-07-16
+最后更新：2026-08-03（#1527 PR2）
 
-本目录只保存 Hub Server 部署资产和本仓库可验证的部署边界。旧长版部署手册见 [../../docs/history.md](../../docs/history.md)。
+本目录只保存 Hub Server **镜像构建输入**。旧 prod/us1/hk2 compose、deploy.sh 系列脚本、
+Caddy/nginx 反代模板与 env 模板已在 #1527 PR2 收口删除（历史参考归档于
+[../../docs/archives/wiki/pages/ops-hk3.md](../../docs/archives/wiki/pages/ops-hk3.md)）。
 
 Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维护；以 TokenDance server SSOT 为准。
 
@@ -11,40 +13,29 @@ Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维�
 | Priority | Source |
 |---|---|
 | 1 Live ops | server `projects/agenthub` external ops SSOT — **hk3 LIVE** |
-| 2 In-repo production shape | `../../deployments/production/docker-compose.yml` |
-| 3 This directory | Dockerfile + **historical** compose/nginx templates |
-
-`docker-compose.prod.yml` / `hk2/` / `docker-compose.us1.yml` 描述的是**旧独立 PG+Redis 拓扑**，不是当前 Azure PG 生产形状。默认当作 historical reference。
+| 2 In-repo production shape | `../../deployments/production/docker-compose.yml`（唯一权威 compose） |
+| 3 This directory | Dockerfile + docker-entrypoint.sh（构建输入） |
 
 ## Files
 
 | 文件 | 用途 |
 |---|---|
-| `Dockerfile` | Hub Server 镜像构建（仍可能被 CD 使用） |
-| `docker-compose.prod.yml` | **Historical** standalone PG+Redis prod shape（非权威） |
-| `docker-compose.us1.yml`, `hk2/` | 历史/环境模板；使用前必须核对 server SSOT |
-| `nginx.prod.conf` | 反向代理参考配置（非权威） |
-| `.env.production.example` | 生产环境变量占位模板，不含 secret |
+| `Dockerfile` | Hub Server 镜像构建输入（cd-hub-server / cd-production 消费，构建上下文为仓库根） |
+| `docker-entrypoint.sh` | 镜像 ENTRYPOINT（容器启动时校验必需 secret，Dockerfile COPY 自构建上下文） |
+| `README.md` | 本说明 |
 
-## Required Runtime
+## Build
 
-| 组件 | 版本/边界 |
-|---|---|
-| Go | 1.25，用于开发机或 CI 构建 |
-| PostgreSQL | 16 |
-| Redis | 7 |
-| Hub JWT secret | 环境注入，至少 32 字符 |
-| TokenDance ID client secret | secret store 注入，不能写入 repo |
-| Admin pprof/metrics | 独立 admin 端口 + Basic Auth + loopback/internal exposure |
-
-## Local Shape Check
-
-```powershell
-docker compose config
-pwsh ./scripts/verify/verify-oidc-readiness.ps1
+```bash
+docker build -f hub-server/deployments/Dockerfile .
+# 或 CI（cd-pr-check / cd-production）：
+# docker build -t ghcr.io/tokendancelab/agenthub-hub-server:<tag> \
+#   -f hub-server/deployments/Dockerfile .
 ```
 
-`verify-oidc-readiness.ps1` 只检查仓库内配置形状和边界，不连接生产 TokenDance ID，也不证明真实登录。
+## Deploy
+
+人工部署按 `deployments/production/docker-compose.yml` 执行，不在此目录。
 
 ## Production Boundary
 
@@ -57,4 +48,4 @@ pwsh ./scripts/verify/verify-oidc-readiness.ps1
 - admin 端口不可公网访问。
 - rollback 方案和备份状态。
 
-未运行这些 gate 时，PR 只能声明配置/readiness 形状，不得写“生产已验证”。
+未运行这些 gate 时，PR 只能声明配置/readiness 形状，不得写"生产已验证"。
