@@ -14,9 +14,9 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
 // ── behavioral test helpers (moved with Session package #708) ───────────────
@@ -81,7 +81,7 @@ func createFriendship(t *testing.T, db *gorm.DB, userID, friendID string) {
 }
 
 // drainBus waits for the event bus to finish processing all events.
-func drainBus(t *testing.T, bus *service.Bus) {
+func drainBus(t *testing.T, bus *bus.Bus) {
 	t.Helper()
 	for i := 0; i < 100; i++ {
 		if bus.Pending() == 0 && bus.Running() == 0 {
@@ -143,9 +143,9 @@ func TestSessionService_CreatePrivateSessionFailsForSelf(t *testing.T) {
 func TestSessionService_CreateGroupSessionFlow(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	owner := createUser(t, db, "owner", "Owner")
 	f1 := createUser(t, db, "f1", "Friend1")
@@ -266,9 +266,9 @@ func TestSessionService_CannotRemoveOwner(t *testing.T) {
 func TestSessionService_LeaveGroup(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	owner := createUser(t, db, "owner", "Owner")
 	m1 := createUser(t, db, "m1", "M1")
@@ -338,9 +338,9 @@ func TestSessionService_TransferOwnershipThenLeave(t *testing.T) {
 func TestSessionService_DissolveGroupFlow(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	owner := createUser(t, db, "owner", "Owner")
 	m1 := createUser(t, db, "m1", "M1")
@@ -366,9 +366,9 @@ func TestSessionService_DissolveGroupFlow(t *testing.T) {
 func TestSessionService_UpdateGroupInfo(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	owner := createUser(t, db, "owner", "Owner")
 	m1 := createUser(t, db, "m1", "M1")
@@ -452,9 +452,9 @@ func TestSessionService_SearchSessions(t *testing.T) {
 func TestSessionService_DeleteForMe(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cc := newBehaviorServiceCache(t)
-	bus, err := service.NewBus()
+	bus, err := bus.New()
 	require.NoError(t, err)
-	t.Cleanup(bus.Close)
+	t.Cleanup(func() { bus.Close(context.Background()) })
 
 	owner := createUser(t, db, "owner", "Owner")
 	m1 := createUser(t, db, "m1", "M1")

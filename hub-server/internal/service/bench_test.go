@@ -6,21 +6,22 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
 func BenchmarkEventBusPublish(b *testing.B) {
-	bus, err := NewBus()
+	bbus, err := bus.New()
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer bus.Close()
+	defer bbus.Close(context.Background())
 
 	// Subscribe a no-op handler to make the benchmark realistic.
-	bus.Subscribe("test.event", func(ctx context.Context, e Event) {})
+	bbus.Subscribe("test.event", func(ctx context.Context, e bus.Event) {})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Publish(context.Background(), Event{Type: "test.event", Payload: nil})
+		bbus.Publish(context.Background(), bus.Event{Type: "test.event", Payload: nil})
 	}
 }
 

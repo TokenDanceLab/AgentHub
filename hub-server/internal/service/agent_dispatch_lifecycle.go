@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -36,9 +37,14 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 		return err
 	}
 
-	s.publish(ctx, Event{Type: dispatch.EventTypeAgentCancel, Payload: dispatch.CancelEventPayload(
-		taskID, task.AgentInstanceID, ai.SessionID, task.TriggeredByUserID,
-	)})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeAgentCancel, Payload: bus.AgentCancelPayload{
+		AgentTaskPayload: bus.AgentTaskPayload{
+			TaskID:          taskID,
+			AgentInstanceID: task.AgentInstanceID,
+			SessionID:       ai.SessionID,
+		},
+		TriggeredBy: task.TriggeredByUserID,
+	}})
 
 	return nil
 }
@@ -70,9 +76,13 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 		return nil, err
 	}
 
-	s.publish(ctx, Event{Type: dispatch.EventTypeAgentRegenerate, Payload: dispatch.RegenerateEventPayload(
-		taskID, newTask.ID, ai.ID, ai.SessionID, original.TriggerMessageID,
-	)})
+	s.publish(ctx, bus.Event{Type: bus.EventTypeAgentRegenerate, Payload: bus.AgentRegeneratePayload{
+		OriginalTaskID:   taskID,
+		NewTaskID:        newTask.ID,
+		AgentInstanceID:  ai.ID,
+		SessionID:        ai.SessionID,
+		TriggerMessageID: original.TriggerMessageID,
+	}})
 
 	return newTask, nil
 }

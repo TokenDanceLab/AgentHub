@@ -23,10 +23,6 @@ import (
 // agent.stream event when the run's session belongs to a team run. The app
 // layer subscribes and forwards it as the ws.TypeTeamSubagentStream frame.
 //
-// The agent_run_events row remains the SSOT; this event is a read-only
-// projection — it carries no new state and writes nothing.
-const BusEventTeamSubagentStream = "team.subagent.stream"
-
 // TeamSubagentStreamPayload is the wire shape of a team.subagent.stream bus
 // event and WS frame payload. It enriches a run.agent.* event with the
 // (team_run_id, assignment_id, team_task_id, member_id) ownership that the
@@ -261,7 +257,7 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 		return
 	}
 	s.bus.Publish(ctx, bus.Event{
-		Type: BusEventTeamSubagentStream,
+		Type: bus.EventTypeTeamSubagentStream,
 		Payload: TeamSubagentStreamPayload{
 			TeamRunID:       tctx.teamRunID,
 			TeamID:          tctx.teamID,

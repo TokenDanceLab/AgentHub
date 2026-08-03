@@ -24,7 +24,7 @@ func newTestBus(t *testing.T) *Bus {
 	t.Helper()
 	b, err := New()
 	require.NoError(t, err, "New() must not error")
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 	return b
 }
 
@@ -288,7 +288,7 @@ func TestClose_MarksClosed(t *testing.T) {
 	b, err := New()
 	require.NoError(t, err)
 	require.False(t, b.IsClosed(), "fresh bus not closed")
-	b.Close()
+	b.Close(context.Background())
 	assert.True(t, b.IsClosed(), "bus must be closed after Close")
 }
 
@@ -306,7 +306,7 @@ func TestPublish_AfterClose_SubmitFailurePath(t *testing.T) {
 	var called atomic.Bool
 	b.Subscribe("post.close", func(ctx context.Context, e Event) { called.Store(true) })
 
-	b.Close()
+	b.Close(context.Background())
 	require.True(t, b.IsClosed())
 
 	// Must not panic and must not block.
