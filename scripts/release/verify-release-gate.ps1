@@ -108,7 +108,7 @@ function Assert-WorkflowPolicy {
     Test-Pattern $readiness 'workflow_dispatch' "release readiness workflow is manually dispatchable" "release readiness workflow lacks workflow_dispatch"
     Test-Pattern $readiness 'run_windows_package_dry' "Windows package dry gate has an explicit manual input" "Windows package dry gate input is missing"
     Test-Pattern $readiness 'verify-tauri-package-dry\.ps1[^\r\n]+-RunWindowsBundle[^\r\n]+-StrictToolchain' "Windows dry gate delegates to verify-tauri-package-dry.ps1 with bundle and strict toolchain checks" "Windows dry gate does not call verify-tauri-package-dry.ps1 with -RunWindowsBundle -StrictToolchain"
-    Test-Pattern $readiness 'actions/upload-artifact@v4' "release readiness dry outputs are workflow artifacts only" "release readiness workflow does not upload dry evidence artifacts"
+    Test-Pattern $readiness 'actions/upload-artifact@v7' "release readiness dry outputs are workflow artifacts only" "release readiness workflow does not upload dry evidence artifacts"
     Test-Pattern $readiness 'run_macos_unsigned_dry_policy' "macOS future dry policy is manual and policy-only" "macOS unsigned dry policy input is missing"
 
     if ($readiness -match 'softprops/action-gh-release|(?m)^\s*(gh\s+release|xcrun\s+notarytool|notarytool\s+submit|xcrun\s+stapler|stapler\s+staple|codesign\s|TAURI_SIGNING_PRIVATE_KEY|APPLE_)') {
@@ -118,7 +118,7 @@ function Assert-WorkflowPolicy {
     }
 
     Test-Pattern $release "tags:\s*\['v\*'\]" "release workflow is tag-triggered on v* only" "release workflow tag trigger is missing or not constrained to v*"
-    Test-Pattern $release 'softprops/action-gh-release@v2' "release workflow has the real GitHub Release uploader isolated in the tag workflow" "release workflow GitHub Release uploader is missing"
+    Test-Pattern $release 'softprops/action-gh-release@v3' "release workflow has the real GitHub Release uploader isolated in the tag workflow" "release workflow GitHub Release uploader is missing"
     Test-Pattern $release 'prerelease:\s*\$\{\{\s*contains\(github\.ref_name,\s*''-''\)\s*\}\}' "RC tags become GitHub prereleases via contains(github.ref_name, '-')" "release workflow prerelease policy is not tied to hyphenated semver tags"
 }
 
