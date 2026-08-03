@@ -6,17 +6,17 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
 // Bus publishes domain events from contact write paths.
-// *service.Bus satisfies this port via Publish(ctx, service.Event).
+// *bus.Bus satisfies this port via Publish(ctx, bus.Event).
 type Bus interface {
-	Publish(ctx context.Context, event service.Event)
+	Publish(ctx context.Context, event bus.Event) error
 }
 
 // Cache is the subset of *cache.Client methods used by Contact Service.
@@ -62,7 +62,7 @@ func (s *Service) SetCache(cacheClient Cache) {
 }
 
 // publish is a nil-safe wrapper over the bus port.
-func (s *Service) publish(ctx context.Context, event service.Event) {
+func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
 		return
 	}
@@ -192,7 +192,7 @@ func (s *Service) SendFriendRequest(ctx context.Context, userID, friendID, messa
 	}
 
 	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
-	s.publish(ctx, service.Event{Type: "friend.request", Payload: map[string]interface{}{
+	s.publish(ctx, bus.Event{Type: bus.EventTypeFriendRequest, Payload: map[string]interface{}{
 		"request_id":   f.ID,
 		"from_user_id": userID,
 		"message":      message,
@@ -267,7 +267,7 @@ func (s *Service) AcceptFriendRequest(ctx context.Context, userID, requestID str
 	}
 
 	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
-	s.publish(ctx, service.Event{Type: "friend.accepted", Payload: map[string]interface{}{
+	s.publish(ctx, bus.Event{Type: "friend.accepted", Payload: map[string]interface{}{
 		"friendship_id": r.ID,
 		"user_id":       r.UserID,
 		"accepter_id":   userID,

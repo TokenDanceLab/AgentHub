@@ -482,7 +482,7 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(eventBus.Close)
+	t.Cleanup(func() { eventBus.Close(context.Background()) })
 	events := make(chan bus.Event, 1)
 	eventBus.Subscribe("team.run.started", func(ctx context.Context, event bus.Event) {
 		events <- event
@@ -636,7 +636,7 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(eventBus.Close)
+	t.Cleanup(func() { eventBus.Close(context.Background()) })
 	events := make(chan bus.Event, 1)
 	eventBus.Subscribe("team.assignment.completed", func(ctx context.Context, event bus.Event) {
 		events <- event
@@ -673,7 +673,7 @@ func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(eventBus.Close)
+	t.Cleanup(func() { eventBus.Close(context.Background()) })
 	events := make(chan bus.Event, 1)
 	eventBus.Subscribe("team.assignment.failed", func(ctx context.Context, event bus.Event) {
 		events <- event

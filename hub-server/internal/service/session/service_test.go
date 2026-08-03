@@ -16,28 +16,28 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/bus"
 )
 
-func newTestBus(t *testing.T) *service.Bus {
+func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
-	b, err := service.NewBus()
+	b, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { b.Close(context.Background()) })
 	return b
 }
 
-func captureServiceEvents(bus *service.Bus, eventType string) <-chan service.Event {
-	events := make(chan service.Event, 1)
-	bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
+func captureServiceEvents(b *bus.Bus, eventType string) <-chan bus.Event {
+	events := make(chan bus.Event, 1)
+	b.Subscribe(eventType, func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
 	return events
 }
 
-func waitForServiceEventPayload(t *testing.T, events <-chan service.Event) map[string]interface{} {
+func waitForServiceEventPayload(t *testing.T, events <-chan bus.Event) map[string]interface{} {
 	t.Helper()
 	select {
 	case event := <-events:
@@ -73,33 +73,34 @@ func (m *mockSessionCache) InitSeqIfAbsent(ctx context.Context, sessionID string
 
 // recordingSessionBus is a Bus test double that records Publish calls.
 type recordingSessionBus struct {
-	events []service.Event
+	events []bus.Event
 }
 
-func (b *recordingSessionBus) Publish(ctx context.Context, event service.Event) {
+func (b *recordingSessionBus) Publish(ctx context.Context, event bus.Event) error {
 	b.events = append(b.events, event)
+	return nil
 }
 
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil, cacheClient: &mockSessionCache{}}
-	// Must not panic when bus port is unset (read-only/partial construction).
+	// Must not panic when b port is unset (read-only/partial construction).
 	svc.publishEvent(context.Background(), "session.created", map[string]interface{}{"k": "v"})
 }
 
 func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	bus := &recordingSessionBus{}
+	rec := &recordingSessionBus{}
 	cachePort := &mockSessionCache{}
 	svc := NewService(nil, nil)
 	require.NotNil(t, svc)
 
-	svc.SetBus(bus)
+	svc.SetBus(rec)
 	svc.SetCache(cachePort)
 	svc.publishEvent(context.Background(), "session.dissolved", map[string]interface{}{"session_id": "s1"})
 	require.NoError(t, resolveCache(svc.cacheClient).Invalidate(context.Background(), "session:members:s1"))
 	require.NoError(t, resolveCache(svc.cacheClient).InitSeqIfAbsent(context.Background(), "s1", 0))
 
-	require.Len(t, bus.events, 1)
-	assert.Equal(t, "session.dissolved", bus.events[0].Type)
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "session.dissolved", rec.events[0].Type)
 	assert.Contains(t, cachePort.invalidated, "session:members:s1")
 	assert.Equal(t, int64(0), cachePort.initSeq["s1"])
 }
@@ -289,9 +290,9 @@ func TestCreateGroupSession_PublishesCreatedEvent(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(2, 2))
 	mock.ExpectCommit()
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.created")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.created")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{"u2"})
 	require.NoError(t, err)
 
@@ -404,9 +405,9 @@ func TestDeleteForMe_PublishesMemberLeftEvent(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.member_left")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.member_left")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	err := svc.DeleteForMe(context.Background(), "user-1", "sess-1")
 	require.NoError(t, err)
 
@@ -642,9 +643,9 @@ func TestUpdateGroupInfo_PublishesInfoUpdatedEvent(t *testing.T) {
 
 	name := "New name"
 	avatarURL := "https://example.test/avatar.png"
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.info_updated")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.info_updated")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	err := svc.UpdateGroupInfo(context.Background(), "owner-1", "sess-1", &name, &avatarURL, nil)
 	require.NoError(t, err)
 
@@ -842,9 +843,9 @@ func TestDissolveGroup_PublishesDissolvedEvent(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.dissolved")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.dissolved")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	err := svc.DissolveGroup(context.Background(), "owner-1", "sess-1")
 	require.NoError(t, err)
 
@@ -923,9 +924,9 @@ func TestDissolveGroup_CleansUpAgentTasks(t *testing.T) {
 		WithArgs("sess-1", "u2", 100, 100).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.dissolved")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.dissolved")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	err := svc.DissolveGroup(context.Background(), "owner-1", "sess-1")
 	require.NoError(t, err)
 
@@ -1016,9 +1017,9 @@ func TestAddGroupMembers_PublishesMemberJoinedEvents(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	bus := newTestBus(t)
-	events := captureServiceEvents(bus, "session.member_joined")
-	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: bus}
+	b := newTestBus(t)
+	events := captureServiceEvents(b, "session.member_joined")
+	svc := &Service{db: db, cacheClient: testSessionCache(t), bus: b}
 	err := svc.AddGroupMembers(context.Background(), "owner-1", "sess-1", []string{"u2"})
 	require.NoError(t, err)
 
