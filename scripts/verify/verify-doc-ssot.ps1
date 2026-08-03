@@ -55,12 +55,19 @@ foreach ($stalePath in @(
     "docs/release/screenshot-checklist.md",
     "docs/governance/document-standards.md",
     "docs/governance/workflow-standard.md",
+    "docs/analysis/_raw_lane_results.json",
+    "docs/analysis/cleanup-strategy.md",
+    "docs/analysis/engineering-loop-capability-map.md",
+    "docs/analysis/hubclient-ssot-slice1.md",
+    "docs/analysis/module-inventory.md",
+    "docs/analysis/project-overview.md",
+    "docs/analysis/risk-assessment.md",
     "api/events-full.md",
     "edge-server/docs/audit",
     "hub-server/docs/audit"
 )) {
     if (Test-Path -LiteralPath $stalePath) {
-        Fail "$stalePath must stay archived or removed from active docs"
+        Fail "$stalePath must stay archived or removed from active docs" "DOC-STALE-PATH"
     }
 }
 
@@ -180,7 +187,7 @@ $forbiddenPatterns = @(
     @{ Pattern = "132 tests|278 tests|11/11|12/12\s+(Mock|curl|tests|PASS)"; Message = "fixed test-count acceptance claim" }
 )
 
-$files = @(git ls-files | ForEach-Object { Normalize-Path $_ } | Where-Object { Is-ActiveDoc $_ })
+$files = @(git ls-files | ForEach-Object { Normalize-Path $_ } | Where-Object { (Is-ActiveDoc $_) -and (Test-Path -LiteralPath $_) })
 
 foreach ($file in $files) {
     $content = Get-Content -LiteralPath $file -Raw

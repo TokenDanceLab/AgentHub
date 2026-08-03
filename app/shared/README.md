@@ -1,6 +1,6 @@
 # @agenthub/shared
 
-`app/shared/` 是 Desktop 和 Web 共用的前端包，负责类型、事件、错误解析、树/Diff 工具、上下文统计、ChatView 消息卡片渲染系统和通用 UI 组件。它不是运行时控制面，不直接访问 Edge、Hub 或 Agent CLI。
+`app/shared/` 是 Desktop、Web 和 Mobile 共用的前端包，负责 Hub 客户端合同、类型、事件、错误解析、树/Diff 工具、上下文统计、ChatView 消息卡片渲染系统和通用 UI 组件。它不是运行时控制面，不直连 Local Edge 或 Agent CLI；Hub REST/WS 方法和 DTO 由 shared SSOT 统一，平台层只注入 base URL、认证存储、Tauri proxy 等胶水。
 
 ## 职责
 
@@ -9,6 +9,7 @@
 | `@shared/types` | `src/types.ts` | Edge REST 响应、Run、Thread、Agent Runtime 能力等共享类型 |
 | `@shared/events` | `src/events.ts` | Edge WebSocket typed events |
 | `@shared/hubEvents` | `src/hubEvents.ts` | Hub WebSocket event 常量和类型 |
+| `@shared/hubClient` | `src/hubClient.ts` 及 `hubClient*` 模块 | Hub REST/WS 方法、DTO、payload 和 transport SSOT；平台 API 文件只能是 thin shell |
 | `@shared/errors` | `src/errors.ts` | `api/conventions.md` 错误格式解析 |
 | `@shared/tree` | `src/tree.ts` | 消息树和线程树工具 |
 | `@shared/diff` | `src/diff.ts` | Diff 解析和展示辅助 |
@@ -53,16 +54,15 @@ import { ChatViewTranscript } from '@shared/chatview';
 
 ## 验证和已知限制
 
-shared 本身没有独立 npm script；当前通过消费者验证：
+shared 有独立的测试和类型检查脚本；涉及平台胶水时再补消费者验证：
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub\app\desktop
-pnpm test
-pnpm typecheck
-
-cd ..\web
-pnpm typecheck
-pnpm build
+cd app
+corepack pnpm --filter @agenthub/shared test
+corepack pnpm --filter @agenthub/shared lint
+corepack pnpm --filter agenthub-desktop typecheck
+corepack pnpm --filter agenthub-web typecheck
+corepack pnpm --filter agenthub-web build
 ```
 
 已知限制：`app/shared/src/ui` 的 React 类型解析和 pnpm 跨包虚拟存储会影响部分 shared-ui 测试/typecheck。提交或交接时需要区分既有限制和本次新增错误。
