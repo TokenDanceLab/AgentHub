@@ -1245,6 +1245,9 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 	t.Run("trips after custom threshold (2)", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(2, 60*time.Second, 30*time.Second)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// First failure.
 		if err := cb.Allow(); err != nil {
 			t.Fatalf("Allow() before threshold: %v", err)
@@ -1268,6 +1271,9 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 		// Short window so we can test expiry without real waits.
 		cb := newAgentCircuitBreaker(5, 10*time.Millisecond, 30*time.Second)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Accumulate 3 failures within the window.
 		for i := 0; i < 3; i++ {
 			_ = cb.Allow()
@@ -1279,7 +1285,7 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 		// observe state transitions. Uses monotonic clock — not flaky.
 
 		// Wait for the window to expire.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		// Next failure resets window, counter starts fresh at 1.
 		_ = cb.Allow()
@@ -1291,7 +1297,10 @@ func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
 
 	t.Run("zero failure threshold uses default", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(0, 0, 0)
-		// Default threshold is 5.
+
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }		// Default threshold is 5.
 		for i := 0; i < 4; i++ {
 			_ = cb.Allow()
 			cb.RecordFailure()
@@ -1337,6 +1346,9 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 	t.Run("cooldown elapsed transitions to half-open", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open.
 		_ = cb.Allow()
 		cb.RecordFailure()
@@ -1345,7 +1357,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait for cooldown.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		// Allow() transitions to HalfOpen and returns nil.
 		if err := cb.Allow(); err != nil {
@@ -1359,12 +1371,15 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 	t.Run("half-open probe already in flight rejects additional requests", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open.
 		_ = cb.Allow()
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		// First Allow() enters HalfOpen.
 		if err := cb.Allow(); err != nil {
@@ -1383,12 +1398,15 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 	t.Run("half-open probe failure returns to open", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open.
 		_ = cb.Allow()
 		cb.RecordFailure()
 
 		// Wait for cooldown.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		// Enter HalfOpen.
 		_ = cb.Allow()
@@ -1411,12 +1429,15 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 	t.Run("half-open probe failure extends cooldown", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open.
 		_ = cb.Allow()
 		cb.RecordFailure()
 
 		// Wait for cooldown, enter HalfOpen, fail the probe.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		_ = cb.Allow()
 		cb.RecordFailure()
 
@@ -1427,13 +1448,13 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 
 		// Wait for the original cooldown — should still be in Open
 		// because the probe failure sets a new cooldown.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		if cb.State() != CircuitOpen {
 			t.Error("should still be Open after probe failure (cooldown was extended)")
 		}
 
 		// Wait the rest of the new cooldown.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		if err := cb.Allow(); err != nil {
 			t.Errorf("Allow() after new cooldown should succeed, got: %v", err)
 		}
@@ -1445,6 +1466,9 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 	t.Run("full cycle: closed → open → half-open → open → half-open", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(2, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Closed: accumulate and trip.
 		for i := 0; i < 2; i++ {
 			_ = cb.Allow()
@@ -1455,7 +1479,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown, enter HalfOpen.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1468,7 +1492,7 @@ func TestCircuitBreaker_HalfOpenTransition(t *testing.T) {
 		}
 
 		// Wait cooldown again, enter HalfOpen again.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen on second probe")
@@ -1485,12 +1509,15 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	t.Run("half-open probe success closes circuit", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open.
 		_ = cb.Allow()
 		cb.RecordFailure()
 
 		// Wait cooldown, enter HalfOpen.
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 		_ = cb.Allow()
 		if cb.State() != CircuitHalfOpen {
 			t.Fatal("expected HalfOpen")
@@ -1511,6 +1538,9 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	t.Run("closed state success resets failure counter", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(3, 60*time.Second, 30*time.Second)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Accumulate 2 failures (1 below threshold).
 		for i := 0; i < 2; i++ {
 			_ = cb.Allow()
@@ -1541,6 +1571,9 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	t.Run("closed state success after partial failures keeps circuit healthy", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(5, 60*time.Second, 30*time.Second)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Interleave failures and successes: failures never accumulate.
 		for i := 0; i < 10; i++ {
 			_ = cb.Allow()
@@ -1577,10 +1610,13 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	t.Run("halfOpenInFlight is cleared after successful close", func(t *testing.T) {
 		cb := newAgentCircuitBreaker(1, 60*time.Second, 10*time.Millisecond)
 
+		// #1550: fake clock — advance time deterministically instead of sleeping.
+		fakeNow := time.Now()
+		cb.now = func() time.Time { return fakeNow }
 		// Trip to Open, wait cooldown.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		// Enter HalfOpen, then succeed.
 		_ = cb.Allow()
@@ -1589,7 +1625,7 @@ func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 		// Trip again and wait cooldown — should be able to enter HalfOpen again.
 		_ = cb.Allow()
 		cb.RecordFailure()
-		time.Sleep(15 * time.Millisecond)
+		fakeNow = fakeNow.Add(16 * time.Millisecond) // advance past window/cooldown (#1550)?
 
 		if err := cb.Allow(); err != nil {
 			t.Fatalf("Allow() after second cooldown: %v", err)
