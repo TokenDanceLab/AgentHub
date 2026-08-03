@@ -23,6 +23,11 @@
    "message": "Error return value of `s.bus.Publish` is not checked"
   },
   {
+   "linter": "errcheck",
+   "file": "internal/service/session/service.go",
+   "message": "Error return value of `s.bus.Publish` is not checked"
+  },
+  {
    "linter": "gocognit",
    "file": "internal/app/admin.go",
    "message": "cognitive complexity 37 of func `(*App).startMetricsCollector` is high (> 30)"
