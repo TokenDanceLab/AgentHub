@@ -109,6 +109,24 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--thinking")
 	}
 
+	args = appendOpenCodeModelArgs(args, ctx)
+	args = appendOpenCodeRunArgs(args, ctx)
+	args = appendOpenCodeOverrideArgs(args, ctx)
+
+	prompt = buildOpenCodePrompt(ctx, prompt)
+	args = append(args, prompt)
+
+	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
+	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
+	// if a bypass path reaches BuildCommand.
+	workDir := strings.TrimSpace(ctx.WorkDir)
+
+	return a.binaryPath, args, buildOpenCodeEnv(ctx), workDir
+}
+
+// appendOpenCodeModelArgs appends the model (-m) and reasoning effort
+// (--variant) flags from the run context.
+func appendOpenCodeModelArgs(args []string, ctx RunProcessContext) []string {
 	// Model: resolve aliases, then pass as provider/model to OpenCode
 	if ctx.Model != "" {
 		resolved := ResolveModel("opencode", ctx.Model)
@@ -125,7 +143,12 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 			args = append(args, "--variant", effort)
 		}
 	}
+	return args
+}
 
+// appendOpenCodeRunArgs appends agent mode, session continuity, fork and
+// permission-mode flags.
+func appendOpenCodeRunArgs(args []string, ctx RunProcessContext) []string {
 	// Agent mode (build, plan, etc.)
 	if ctx.AgentName != "" {
 		args = append(args, "--agent", ctx.AgentName)
@@ -154,7 +177,12 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	if ctx.PermissionMode == "bypassPermissions" || ctx.PermissionMode == "yolo" {
 		args = append(args, "--dangerously-skip-permissions")
 	}
+	return args
+}
 
+// appendOpenCodeOverrideArgs appends --file/--dir/--command/--title flags
+// derived from the run context's ConfigOverrides and WorkDir.
+func appendOpenCodeOverrideArgs(args []string, ctx RunProcessContext) []string {
 	// Attach files via --file (supports comma-separated list via ConfigOverrides)
 	if files, ok := ctx.ConfigOverrides["files"]; ok && files != "" {
 		for _, f := range splitComma(files) {
@@ -178,7 +206,12 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	if title, ok := ctx.ConfigOverrides["title"]; ok && title != "" {
 		args = append(args, "--title", title)
 	}
+	return args
+}
 
+// buildOpenCodePrompt prepends skills/system/context prompts to the raw user
+// prompt, in the same precedence order as Claude Code's --append-system-prompt.
+func buildOpenCodePrompt(ctx RunProcessContext, prompt string) string {
 	// Skills prompt: prepend to the prompt since OpenCode has no --append-system-prompt.
 	if ctx.SkillsPrompt != "" {
 		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
@@ -199,14 +232,11 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
 		prompt = contextPreface + "\n---\n\n" + prompt
 	}
+	return prompt
+}
 
-	args = append(args, prompt)
-
-	// Empty workDir is rejected at REST/MCP gates (#854). Do not fall back to
-	// UserHomeDir/DefaultWorkDir; keep empty and let the process CWD stay unset
-	// if a bypass path reaches BuildCommand.
-	workDir := strings.TrimSpace(ctx.WorkDir)
-
+// buildOpenCodeEnv builds the child-process environment overrides.
+func buildOpenCodeEnv(ctx RunProcessContext) []string {
 	var env []string // runtime vars set by process executor
 
 	// MCP server config injection via environment variable. OpenCode reads MCP
@@ -215,8 +245,7 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	if ctx.MCPConfig != "" {
 		env = append(env, "OPENCODE_MCP_SERVERS="+ctx.MCPConfig)
 	}
-
-	return a.binaryPath, args, env, workDir
+	return env
 }
 
 func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
