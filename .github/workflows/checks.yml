@@ -816,7 +816,6 @@ jobs:
         run: ./scripts/verify/verify-project-skills.ps1
 
       - name: Verify doc SSOT
-        shell: python
         run: python scripts/verify/verify-doc-ssot.py
 
       - name: Self-test doc entrypoint SSOT
