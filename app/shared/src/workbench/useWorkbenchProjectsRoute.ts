@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { HubClient } from '../hubClient';
 import type {
   ProjectArtifact,
   ProjectDraft,
@@ -8,9 +7,9 @@ import type {
   ProjectTab,
 } from './pages';
 import { WORKBENCH_MOCK_PROJECTS } from './mockData';
-import { workspaceProjectToProjectInfo } from './hubDataMapping';
 import type { WorkbenchDocumentPreview } from './documentPreview';
 import { createProjectArtifactPreview } from './workbenchProjectPreview';
+import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 
 export interface WorkbenchProjectsStatus {
   loading?: boolean | undefined;
@@ -29,7 +28,12 @@ export interface UseWorkbenchProjectsRouteOptions {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  hubClient?: HubClient | undefined;
+  /**
+   * Narrow domain port for workspace project data (#1546). Used only when the
+   * parent does not manage `projects` itself. The shared Workbench never sees
+   * a concrete hub transport client; each platform injects its own implementation.
+   */
+  projectsPort?: WorkbenchProjectsPort | undefined;
   realDataMode: boolean;
 }
 
@@ -54,6 +58,11 @@ export interface WorkbenchProjectsRoute {
   hasMore: boolean;
   /** Whether a load-more page fetch is in flight. */
   loadingMore: boolean;
+  /**
+   * Visible load-more failure (#1546). When set, pagination has stopped
+   * (hasMore=false) and calling `loadMore` acts as the explicit retry.
+   */
+  loadMoreError?: string | undefined;
 }
 
 export function useWorkbenchProjectsRoute({
@@ -63,124 +72,143 @@ export function useWorkbenchProjectsRoute({
   onActiveProjectChange,
   onProjectCreate,
   onProjectUpdate,
-  hubClient,
+  projectsPort,
   realDataMode,
 }: UseWorkbenchProjectsRouteOptions): WorkbenchProjectsRoute {
-  // ── Internal Hub project state (used when hubClient is provided and parent doesn't manage projects) ──
-  const [hubProjects, setHubProjects] = useState<ProjectInfo[]>([]);
-  const [hubProjectsStatus, setHubProjectsStatus] = useState<WorkbenchProjectsStatus>({});
-  const hubProjectsEnabled = Boolean(hubClient) && !projects;
+  // ── Internal port-driven project state (used when a port is injected and the parent doesn't manage projects) ──
+  const [portProjects, setPortProjects] = useState<ProjectInfo[]>([]);
+  const [portProjectsStatus, setPortProjectsStatus] = useState<WorkbenchProjectsStatus>({});
+  const portProjectsEnabled = Boolean(projectsPort) && !projects;
 
-  // ── Pagination state (consumes pageCursor returned by the API) ──
+  // ── Pagination state (consumes the page cursor returned by the port) ──
   const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | undefined>(undefined);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   // Refs keep loadMore stable while avoiding stale-closure issues.
   const hasMoreRef = useRef(false);
   const loadingMoreRef = useRef(false);
   const pageCursorRef = useRef<string | undefined>(undefined);
+  const loadMoreFailedRef = useRef(false);
+  // Drop state updates after unmount so a late response cannot write stale state.
+  const mountedRef = useRef(true);
 
-  const loadHubProjects = useCallback(async () => {
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, loading: true, error: undefined }));
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    if (!projectsPort) return;
+    setPortProjectsStatus((prev) => ({ ...prev, loading: true, error: undefined }));
     try {
-      const response = await hubClient.listWorkspaceProjects({ pageSize: 50 });
-      setHubProjects((response.items ?? []).map(workspaceProjectToProjectInfo));
-      const nextCursor = response.page?.nextCursor;
-      const more = response.page?.hasMore ?? false;
-      setPageCursor(nextCursor);
-      pageCursorRef.current = nextCursor;
-      setHasMore(more);
-      hasMoreRef.current = more;
-      setHubProjectsStatus((prev) => ({ ...prev, loading: false }));
+      const page = await projectsPort.listProjects({ pageSize: 50 });
+      if (!mountedRef.current) return;
+      setPortProjects(page.items);
+      pageCursorRef.current = page.nextCursor;
+      setPageCursor(page.nextCursor);
+      hasMoreRef.current = page.hasMore;
+      setHasMore(page.hasMore);
+      loadMoreFailedRef.current = false;
+      setLoadMoreFailed(false);
+      setLoadMoreError(undefined);
+      setPortProjectsStatus((prev) => ({ ...prev, loading: false }));
     } catch (err) {
+      if (!mountedRef.current) return;
       const message = err instanceof Error ? err.message : 'Failed to load projects';
-      setHubProjectsStatus((prev) => ({ ...prev, loading: false, error: message }));
+      setPortProjectsStatus((prev) => ({ ...prev, loading: false, error: message }));
     }
-  }, [hubClient]);
+  }, [projectsPort]);
 
-  // ── Infinite-scroll load-more (consumes pageCursor from the API) ──
+  // ── Infinite-scroll load-more (consumes the page cursor from the port) ──
+  // On failure the error becomes visible (loadMoreError), hasMore flips to
+  // false so the scroll sentinel stops, and re-entering loadMore acts as the
+  // explicit retry path that clears the failure before fetching again.
   const loadMore = useCallback(async () => {
-    if (!hubClient || !hasMoreRef.current || loadingMoreRef.current) return;
+    if (!projectsPort || loadingMoreRef.current) return;
+    if (loadMoreFailedRef.current) {
+      loadMoreFailedRef.current = false;
+      setLoadMoreFailed(false);
+      setLoadMoreError(undefined);
+    }
+    if (!hasMoreRef.current) return;
     const cursor = pageCursorRef.current;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const response = await hubClient.listWorkspaceProjects({
+      const page = await projectsPort.listProjects({
         pageSize: 50,
         ...(cursor !== undefined ? { pageCursor: cursor } : {}),
       });
-      setHubProjects((prev) => [
-        ...prev,
-        ...(response.items ?? []).map(workspaceProjectToProjectInfo),
-      ]);
-      const nextCursor = response.page?.nextCursor;
-      const more = response.page?.hasMore ?? false;
-      pageCursorRef.current = nextCursor;
-      setPageCursor(nextCursor);
-      hasMoreRef.current = more;
-      setHasMore(more);
-    } catch {
-      // Silently ignore load-more errors; the sentinel retries on next scroll.
+      if (!mountedRef.current) return;
+      setPortProjects((prev) => [...prev, ...page.items]);
+      pageCursorRef.current = page.nextCursor;
+      setPageCursor(page.nextCursor);
+      hasMoreRef.current = page.hasMore;
+      setHasMore(page.hasMore);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      const message = err instanceof Error ? err.message : 'Failed to load more projects';
+      loadMoreFailedRef.current = true;
+      setLoadMoreFailed(true);
+      setHasMore(false);
+      setLoadMoreError(message);
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hubClient]);
+  }, [projectsPort]);
 
   useEffect(() => {
-    if (!hubProjectsEnabled) return;
-    loadHubProjects();
-  }, [hubProjectsEnabled, loadHubProjects]);
+    if (!portProjectsEnabled) return;
+    void loadProjects();
+  }, [portProjectsEnabled, loadProjects]);
 
   const handleProjectCreate = useCallback(async (draft: ProjectDraft): Promise<ProjectInfo | void> => {
     if (onProjectCreate) return onProjectCreate(draft);
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
+    if (!projectsPort) return;
+    setPortProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
     try {
-      const created = await hubClient.createWorkspaceProject({
-        name: draft.name.trim() || 'Untitled Project',
-        description: draft.description.trim(),
-      });
-      const info = workspaceProjectToProjectInfo(created);
-      await loadHubProjects();
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
+      const info = await projectsPort.createProject(draft);
+      await loadProjects();
+      if (!mountedRef.current) return info;
+      setPortProjectsStatus((prev) => ({ ...prev, saving: false }));
       return info;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create project';
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
+      setPortProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
       throw err;
     }
-  }, [onProjectCreate, hubClient, loadHubProjects]);
+  }, [onProjectCreate, projectsPort, loadProjects]);
 
   const handleProjectUpdate = useCallback(async (
     projectId: string,
     draft: ProjectDraft,
   ): Promise<ProjectInfo | void> => {
     if (onProjectUpdate) return onProjectUpdate(projectId, draft);
-    if (!hubClient) return;
-    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
+    if (!projectsPort) return;
+    setPortProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
     try {
-      const updated = await hubClient.updateWorkspaceProject(projectId, {
-        ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
-        ...(draft.description.trim() ? { description: draft.description.trim() } : {}),
-      });
-      const info = workspaceProjectToProjectInfo(updated);
-      await loadHubProjects();
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
+      const info = await projectsPort.updateProject(projectId, draft);
+      await loadProjects();
+      if (!mountedRef.current) return info;
+      setPortProjectsStatus((prev) => ({ ...prev, saving: false }));
       return info;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update project';
-      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
+      setPortProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
       throw err;
     }
-  }, [onProjectUpdate, hubClient, loadHubProjects]);
+  }, [onProjectUpdate, projectsPort, loadProjects]);
 
   const sourceProjects = projects
-    ?? (hubProjectsEnabled ? hubProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
+    ?? (portProjectsEnabled ? portProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
   const effectiveProjectsStatus = projectsStatus
-    ?? (hubProjectsEnabled ? hubProjectsStatus : undefined);
-  const canMutateProject = Boolean(onProjectCreate ?? onProjectUpdate ?? hubClient);
+    ?? (portProjectsEnabled ? portProjectsStatus : undefined);
+  const canMutateProject = Boolean(onProjectCreate ?? onProjectUpdate ?? projectsPort);
   const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
@@ -225,8 +253,9 @@ export function useWorkbenchProjectsRoute({
     handleProjectCreate,
     handleProjectUpdate,
     openArtifactPreview,
-    loadMore: hubProjectsEnabled ? loadMore : undefined,
-    hasMore,
+    loadMore: portProjectsEnabled ? loadMore : undefined,
+    hasMore: hasMore && !loadMoreFailed,
     loadingMore,
+    ...(loadMoreError !== undefined ? { loadMoreError } : {}),
   };
 }

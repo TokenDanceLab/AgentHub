@@ -94,7 +94,7 @@ type WorkbenchProjectsRouteGateProps = Pick<
   | 'onActiveProjectChange'
   | 'onProjectCreate'
   | 'onProjectUpdate'
-  | 'hubClient'
+  | 'projectsPort'
 > & {
   active: boolean;
   realDataMode: boolean;
@@ -111,7 +111,7 @@ const WorkbenchProjectsRouteGate = React.memo(function WorkbenchProjectsRouteGat
   onActiveProjectChange,
   onProjectCreate,
   onProjectUpdate,
-  hubClient,
+  projectsPort,
 }: WorkbenchProjectsRouteGateProps): React.ReactElement | null {
   const projectsRoute = useWorkbenchProjectsRoute({
     projects,
@@ -120,7 +120,7 @@ const WorkbenchProjectsRouteGate = React.memo(function WorkbenchProjectsRouteGat
     onActiveProjectChange,
     onProjectCreate,
     onProjectUpdate,
-    hubClient,
+    projectsPort,
     realDataMode,
   });
   if (!active) return null;
@@ -163,7 +163,7 @@ export function WorkbenchRoutes({
   onActiveProjectChange,
   onProjectCreate,
   onProjectUpdate,
-  hubClient,
+  projectsPort,
   onAgentCreate,
   onAgentUpdate,
   onAgentDelete,
@@ -282,7 +282,7 @@ export function WorkbenchRoutes({
         onActiveProjectChange={onActiveProjectChange}
         onProjectCreate={onProjectCreate}
         onProjectUpdate={onProjectUpdate}
-        hubClient={hubClient}
+        projectsPort={projectsPort}
         realDataMode={realDataMode}
         profiles={profileSources}
       />
