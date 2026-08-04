@@ -107,7 +107,8 @@ export function TaskMain({
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const title = PANE_TITLES[activePane] ?? '我负责的';
 
-  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO #1510) ──
+  // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
+  //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
   onLoadMoreRef.current = onLoadMore;
@@ -263,8 +264,9 @@ export function TaskMain({
         onTaskClick={onTaskClick}
       />
 
-      {/* ── Infinite-scroll load-more (skeleton; hasMore stays false until the
-              data layer exposes pageCursor — see useWorkbenchTasksRoute) ── */}
+      {/* ── Infinite-scroll load-more (mock data-layer cursor pagination,
+              #1510; fallback button for environments without
+              IntersectionObserver) ── */}
       {hasMore && !loadingMore ? (
         <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
           加载更多

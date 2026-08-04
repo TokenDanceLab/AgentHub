@@ -5,7 +5,7 @@ import type {
 } from './pages/ContactsPage';
 import type { DocRow } from './pages/DocsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
-import type { TaskGroup } from './pages/TasksPage';
+import type { TaskGroup, TaskItem } from './pages/TasksPage';
 import type {
   AgentConfig,
   AuditEntry,
@@ -258,3 +258,83 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
   designSystemValidation: '手动',
   stateStrategies: { empty: true, invalid: true, missing: true },
 };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Cursor-pagination mock data layer (#1510).
+
+   Mock pools are intentionally larger than one page (PAGE_SIZE=50) so the
+   contacts/tasks infinite-scroll path can be exercised before the backend
+   API exposes a pageCursor. `readMockCursorPage` slices any pool with an
+   opaque numeric cursor (offset index) and reports hasMore/nextCursor —
+   the shape the route hooks consume.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export const WORKBENCH_MOCK_PAGE_SIZE = 50;
+
+export interface WorkbenchMockCursorPage<T> {
+  items: T[];
+  /** Opaque cursor for the next page; undefined when the pool is exhausted. */
+  nextCursor: string | undefined;
+  /** Whether another page is available after this one. */
+  hasMore: boolean;
+}
+
+/** Slice a mock pool by cursor offset. Pools ≤ PAGE_SIZE simply report hasMore=false. */
+export function readMockCursorPage<T>(
+  pool: readonly T[],
+  pageSize: number,
+  cursor: string | undefined,
+): WorkbenchMockCursorPage<T> {
+  const parsed = cursor === undefined ? 0 : Number(cursor);
+  const start = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  const items = pool.slice(start, start + pageSize);
+  const nextOffset = start + items.length;
+  return {
+    items,
+    nextCursor: nextOffset < pool.length ? String(nextOffset) : undefined,
+    hasMore: nextOffset < pool.length,
+  };
+}
+
+/** Contact member pool: the 3 hand-written seeds plus generated rows so the
+ *  internal contacts pane has more than one page (mock pagination path). */
+const WORKBENCH_MOCK_CONTACT_POOL_SIZE = 63;
+
+export const WORKBENCH_MOCK_CONTACT_MEMBER_POOL: ContactMember[] = (() => {
+  const pool = [...WORKBENCH_MOCK_CONTACT_MEMBERS];
+  for (let i = pool.length + 1; i <= WORKBENCH_MOCK_CONTACT_POOL_SIZE; i += 1) {
+    const member: ContactMember = {
+      id: `member-${String(i).padStart(3, '0')}`,
+      name: `成员 ${String(i).padStart(2, '0')}`,
+      initials: `M${i}`,
+      org: 'TokenDance',
+      status: i % 3 === 0 ? '在线' : '离线',
+    };
+    if (i % 4 === 0) member.tag = '协作者';
+    pool.push(member);
+  }
+  return pool;
+})();
+
+/** Task pool: the hand-written seeds plus generated rows (> one page). */
+const WORKBENCH_MOCK_TASK_POOL_SIZE = 63;
+const MOCK_TASK_PROJECTS = ['前端重构任务', 'AgentHub 设计评审', '文档重构', 'Agent 配置'] as const;
+const MOCK_TASK_ASSIGNEES = ['Builder', 'Johnny', 'Reviewer', 'Trump'] as const;
+const MOCK_TASK_STATUSES = ['未开始', '进行中', '待评审', '待确认', '已完成'] as const;
+
+export const WORKBENCH_MOCK_TASK_POOL: TaskItem[] = (() => {
+  const pool = WORKBENCH_MOCK_TASK_GROUPS.flatMap((group) => group.tasks);
+  for (let i = pool.length + 1; i <= WORKBENCH_MOCK_TASK_POOL_SIZE; i += 1) {
+    pool.push({
+      id: `task-${String(i).padStart(3, '0')}`,
+      title: `分页任务 ${String(i).padStart(2, '0')}`,
+      project: MOCK_TASK_PROJECTS[(i - 1) % MOCK_TASK_PROJECTS.length] ?? '前端重构任务',
+      assignee: MOCK_TASK_ASSIGNEES[(i - 1) % MOCK_TASK_ASSIGNEES.length] ?? 'Builder',
+      startTime: '刚刚',
+      dueDate: i % 2 === 0 ? '今天 18:00' : '明天 18:00',
+      creator: 'Delicious233',
+      status: MOCK_TASK_STATUSES[(i - 1) % MOCK_TASK_STATUSES.length] ?? '未开始',
+    });
+  }
+  return pool;
+})();
