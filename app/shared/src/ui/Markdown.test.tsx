@@ -120,6 +120,58 @@ describe('Markdown renderer regressions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Heading anchor links (#1506)
+// ---------------------------------------------------------------------------
+describe('heading anchors (rehype-slug, #1506)', () => {
+  test('adds a GitHub-style slug id to headings', () => {
+    const container = renderMarkdown('## Hello World');
+    expect(container.querySelector('h2')).toHaveAttribute('id', 'hello-world');
+  });
+
+  test('keeps CJK characters in heading slugs', () => {
+    const container = renderMarkdown('## 重要标题');
+    expect(container.querySelector('h2')).toHaveAttribute('id', '重要标题');
+  });
+
+  test('appends -1/-2 suffixes to duplicate headings', () => {
+    const container = renderMarkdown('## 标题\n## 标题\n## 标题');
+    const ids = Array.from(container.querySelectorAll('h2')).map((h) => h.getAttribute('id'));
+    expect(ids).toEqual(['标题', '标题-1', '标题-2']);
+  });
+
+  test('renders a hover link icon anchored to the heading slug', () => {
+    const container = renderMarkdown('## Section One');
+    const heading = container.querySelector('h2');
+    const link = heading?.querySelector(`a.${styles.headingAnchor ?? ''}`);
+    expect(link).not.toBeNull();
+    expect(link).toHaveAttribute('href', '#section-one');
+    expect(link).toHaveAttribute('aria-label', '跳转到标题');
+  });
+
+  test('covers all heading levels h1-h6', () => {
+    const container = renderMarkdown('# A\n## B\n### C\n#### D\n##### E\n###### F');
+    for (const level of [1, 2, 3, 4, 5, 6]) {
+      const heading = container.querySelector(`h${level}`);
+      expect(heading).not.toBeNull();
+      expect(heading!.querySelector('a')).not.toBeNull();
+    }
+  });
+
+  test('anchor click target resolves to a real heading id', () => {
+    // jsdom cannot perform fragment navigation on click, so assert the
+    // contract that makes the native jump work: href equals the heading id
+    // that exists in the same document (real browsers then scroll to it).
+    const container = renderMarkdown('## Target');
+    const link = container.querySelector('h2 a')!;
+    const href = link.getAttribute('href');
+    expect(href).toBe('#target');
+    const target = href ? container.querySelector(`#${href.slice(1)}`) : null;
+    expect(target).not.toBeNull();
+    expect(target!.tagName).toBe('H2');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Fable UIUX gap #3: code block copy button + long-code collapse
 // ---------------------------------------------------------------------------
 describe('code block copy & collapse (fable UIUX #3)', () => {

@@ -31,6 +31,42 @@
   opacity: 0.9;
 }
 
+/* ── Heading anchor links (#1506) ─────────────────
+   Hover/focus reveals the link icon; the anchor is a real link so keyboard
+   users and click-through both land on the heading's slug id. */
+
+.headingAnchor {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.4em;
+  color: var(--text-3);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast, 90ms) var(--ease, ease);
+}
+
+.root :is(h1, h2, h3, h4, h5, h6):hover .headingAnchor,
+.headingAnchor:focus-visible {
+  opacity: 1;
+}
+
+.headingAnchor:hover {
+  color: var(--primary);
+}
+
+.headingAnchor:focus-visible {
+  outline: none;
+  color: var(--primary);
+  border-radius: var(--r-xs, 4px);
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headingAnchor {
+    transition: none;
+  }
+}
+
 /* ── Paragraphs & lists ─────────────────────── */
 
 .root p {
