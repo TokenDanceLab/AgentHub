@@ -83,6 +83,7 @@ function WebWorkbenchRoot() {
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
   const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
+  const chatActions = workbench.chatActions;
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
   // Fetch real user profile from Hub (originates from TokenDance ID OIDC)
@@ -232,9 +233,9 @@ function WebWorkbenchRoot() {
         isAgentRunning={workbench.isAgentRunning}
         onCancelRun={workbench.onCancelRun}
         onEditMessage={
-          workbench.chatActions
+          chatActions
             ? async (blockId: string, content: string) => {
-                await workbench.chatActions!.onEditMessage(
+                await chatActions.onEditMessage(
                   blockId.replace(/^hub-message-/, ''),
                   content,
                 );
@@ -242,9 +243,9 @@ function WebWorkbenchRoot() {
             : undefined
         }
         onPinMessage={
-          workbench.chatActions
+          chatActions
             ? (messageId: string, sessionId: string) => {
-                void workbench.chatActions!.onPinMessage(
+                void chatActions.onPinMessage(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
                 ).catch(() => {});
@@ -252,9 +253,9 @@ function WebWorkbenchRoot() {
             : undefined
         }
         onUnpinMessage={
-          workbench.chatActions
+          chatActions
             ? (messageId: string, sessionId: string) => {
-                void workbench.chatActions!.onUnpinMessage(
+                void chatActions.onUnpinMessage(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
                 ).catch(() => {});
@@ -262,9 +263,9 @@ function WebWorkbenchRoot() {
             : undefined
         }
         onForwardMessage={
-          workbench.chatActions
+          chatActions
             ? (messageId: string, targetSessionIds: string[]) => {
-                void workbench.chatActions!.onForwardMessage(
+                void chatActions.onForwardMessage(
                   messageId.replace(/^hub-message-/, ''),
                   targetSessionIds,
                 ).catch(() => {});
@@ -272,18 +273,18 @@ function WebWorkbenchRoot() {
             : undefined
         }
         onRecallMessage={
-          workbench.chatActions
+          chatActions
             ? (messageId: string) => {
-                void workbench.chatActions!.onRecallMessage(
+                void chatActions.onRecallMessage(
                   messageId.replace(/^hub-message-/, ''),
                 ).catch(() => {});
               }
             : undefined
         }
         onAddMessageReaction={
-          workbench.chatActions
+          chatActions
             ? (messageId: string, sessionId: string, emoji: string) => {
-                void workbench.chatActions!.onAddReaction(
+                void chatActions.onAddReaction(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
                   emoji,
