@@ -86,8 +86,11 @@ type DispatchService struct {
 	outbox      dispatchOutbox
 	// edgeCfg is the Hub→Edge dispatch client config (#1549). Read once at
 	// construction by the composition root; the request path never calls
-	// os.Getenv. edgeClient reuses one http.Client (connection reuse) with
-	// the configured timeout.
+	// os.Getenv. edgeClient is the shared outbound client built at the
+	// composition root with outboundhttp.NewClient (connection reuse, single
+	// configured timeout, redirects refused); the service layer never
+	// constructs transport clients (#1594). nil is only legal for partial
+	// tests that never reach the edge HTTP path.
 	edgeCfg    config.EdgeDispatchConfig
 	edgeClient *http.Client
 	// jwtSecret signs run-start capability tokens; sourced from config.JWT.
@@ -97,8 +100,10 @@ type DispatchService struct {
 // NewDispatchService constructs a DispatchService. bus/outbox/relay/mgr may be
 // nil for partial tests; write paths that need them fail, degrade, or no-op.
 // edgeCfg/jwtSecret are explicit configuration (zero value = defaults); the
-// service layer never reads process env (#1549).
-func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClient dispatchCache, relay relayDispatcher, outbox dispatchOutbox, edgeCfg config.EdgeDispatchConfig, jwtSecret string) *DispatchService {
+// service layer never reads process env (#1549). edgeClient must come from
+// the composition root (outboundhttp.NewClient); nil is tolerated for tests
+// that never hit the edge HTTP path (#1594).
+func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClient dispatchCache, relay relayDispatcher, outbox dispatchOutbox, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *DispatchService {
 	return &DispatchService{
 		db:          db,
 		bus:         bus,
@@ -107,7 +112,7 @@ func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClien
 		relay:       relay,
 		outbox:      outbox,
 		edgeCfg:     edgeCfg,
-		edgeClient:  &http.Client{Timeout: edgeCfg.Timeout},
+		edgeClient:  edgeClient,
 		jwtSecret:   jwtSecret,
 	}
 }

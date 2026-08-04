@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -145,6 +146,11 @@ func WriteMCPConfigTempFile(configJSON string) (string, error) {
 
 // --- Hub MCP Sync ---
 
+// mcpSyncMaxResponseBodyBytes is the fail-closed cap on the Hub /web/mcp-servers
+// response body (64 KiB, matching the outbound policy default #1593). Oversize
+// responses fail the sync without retaining body content past the cap.
+const mcpSyncMaxResponseBodyBytes = 64 * 1024
+
 // HubMCPSyncer periodically fetches MCP server configs from the Hub server's
 // /web/mcp-servers endpoint and updates the local MCPConfigStore.
 type HubMCPSyncer struct {
@@ -156,15 +162,19 @@ type HubMCPSyncer struct {
 }
 
 // NewHubMCPSyncer creates a new syncer. The syncer does not start until Run()
-// is called.
-func NewHubMCPSyncer(hubURL, authToken string, store *MCPConfigStore) *HubMCPSyncer {
+// is called. client is the shared outbound client built at the composition
+// root (edgehttp.NewClient); a nil client is a wiring bug and fails fast
+// (#1593). Redirect refusal and the bounded timeout come from the injected
+// client; the response body is capped fail-closed inside syncOnce.
+func NewHubMCPSyncer(hubURL, authToken string, store *MCPConfigStore, client *http.Client) *HubMCPSyncer {
+	if client == nil {
+		panic("adapters: NewHubMCPSyncer requires a non-nil *http.Client (construct it at the composition root, e.g. edgehttp.NewClient)")
+	}
 	return &HubMCPSyncer{
 		hubURL:    strings.TrimRight(hubURL, "/"),
 		authToken: authToken,
 		store:     store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
+		client:    client,
 	}
 }
 
@@ -223,6 +233,18 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 		return
 	}
 
+	// Fail-closed response cap (#1593): read at most mcpSyncMaxResponseBodyBytes
+	// and reject oversize bodies without retaining content past the limit.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, mcpSyncMaxResponseBodyBytes+1))
+	if err != nil {
+		slog.Warn("mcp-sync: read body failed", "error", err)
+		return
+	}
+	if int64(len(body)) > mcpSyncMaxResponseBodyBytes {
+		slog.Warn("mcp-sync: response body exceeds limit", "max_bytes", mcpSyncMaxResponseBodyBytes)
+		return
+	}
+
 	var result struct {
 		Code string `json:"code"`
 		Data struct {
@@ -237,7 +259,7 @@ func (s *HubMCPSyncer) syncOnce(ctx context.Context) {
 			} `json:"items"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		slog.Warn("mcp-sync: decode failed", "error", err)
 		return
 	}

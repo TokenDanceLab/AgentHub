@@ -167,7 +167,11 @@ func main() {
 	if cfg.HubMCPSyncURL != "" {
 		mcpConfigStore = adapters.NewMCPConfigStore()
 		syncInterval := parseDurationOrDefault(cfg.HubMCPSyncInterval, 5*time.Minute)
-		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
+		// Shared outbound client built here at the composition root (#1593):
+		// 15s per-request timeout keeps the historical syncer semantics, and
+		// edgehttp.NewClient refuses redirects so the Hub MCP config endpoint
+		// is answered at the exact configured URL.
+		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore, edgehttp.NewClient(15*time.Second))
 		go mcpSyncer.Run(context.Background(), syncInterval)
 		slog.Info("mcp hub sync enabled", "url", cfg.HubMCPSyncURL, "interval", syncInterval)
 	}

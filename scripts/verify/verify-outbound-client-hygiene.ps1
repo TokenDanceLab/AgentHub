@@ -63,13 +63,10 @@ function Fail([string]$Text) {
 }
 
 # ── Allowlist (tracked residual; may only shrink) ─────────────────────────
+# Empty since #1594: the Hub→Edge dispatch client is now built at the
+# composition root (hub-server/internal/app/wiring.go) via outboundhttp.
 if ($null -eq $ClientAllowlist -and -not $NoDefaultAllowlist) {
-    $ClientAllowlist = @(
-        # DispatchService builds its single shared Hub→Edge client once from
-        # the injected edgeCfg (#1549). Composition-root move tracked as
-        # residual; review 2026-09-03.
-        "hub-server/internal/service/agent_dispatch_ports.go|#1564|shared Hub→Edge dispatch client built in NewDispatchService from injected edgeCfg; composition-root move tracked as residual"
-    )
+    $ClientAllowlist = @()
 }
 
 $Allowlist = @{}
