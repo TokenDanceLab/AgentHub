@@ -5,6 +5,7 @@ import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import { ContextMenu, type ContextMenuItem } from './floating';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import Modal from '../ui/Modal';
 import { Tooltip } from '../ui/Tooltip';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -38,6 +39,56 @@ export interface ConversationSidebarProps {
   onPinConversation?: ((conversationId: string, pinned: boolean) => void) | undefined;
   /** Called when the user toggles archive on a conversation. */
   onArchiveConversation?: ((conversationId: string, archived: boolean) => void) | undefined;
+  /** Called with the new title after the user commits an inline rename. */
+  onRenameConversation?: ((conversationId: string, title: string) => void) | undefined;
+  /** Called after the user confirms deletion of a conversation. */
+  onDeleteConversation?: ((conversationId: string) => void) | undefined;
+  /** Called after a conversation link has been copied to the clipboard. */
+  onCopyConversationLink?: ((conversationId: string, link: string) => void) | undefined;
+}
+
+/**
+ * Shareable conversation link. Follows the existing `agenthub://` scheme
+ * family used by card/profile links (workbenchTranscriptChromeLabels /
+ * workbenchProfileChromeHelpers); like those, it is a custom scheme that
+ * consumers may route themselves.
+ */
+export function conversationLinkFor(conversationId: string): string {
+  return `agenthub://threads/${conversationId}`;
+}
+
+/**
+ * Copy text to the clipboard with a textarea fallback for environments where
+ * `navigator.clipboard` is unavailable (older WebViews, permission denied).
+ * Returns whether the copy attempt was written somewhere.
+ */
+function copyTextToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      () => true,
+      () => fallbackWriteClipboard(text),
+    );
+  }
+  return Promise.resolve(fallbackWriteClipboard(text));
+}
+
+function fallbackWriteClipboard(text: string): boolean {
+  if (typeof document === 'undefined' || typeof document.execCommand !== 'function') return false;
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  let copied: boolean;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+  document.body.removeChild(textarea);
+  return copied;
 }
 
 export function ConversationSidebar({
@@ -47,11 +98,18 @@ export function ConversationSidebar({
   onAvatarClick,
   onPinConversation,
   onArchiveConversation,
+  onRenameConversation,
+  onDeleteConversation,
+  onCopyConversationLink,
 }: ConversationSidebarProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>(loadSortBy);
+  /** Conversation id whose row is in inline rename mode (null = none). */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  /** Conversation awaiting delete confirmation in the dialog. */
+  const [deleteTarget, setDeleteTarget] = useState<WorkbenchConversation | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -173,11 +231,13 @@ export function ConversationSidebar({
     }
   };
 
-  const canShowContextMenu = Boolean(onPinConversation || onArchiveConversation || onAvatarClick);
+  const canShowContextMenu = Boolean(onPinConversation || onArchiveConversation || onAvatarClick || onRenameConversation || onDeleteConversation || onCopyConversationLink);
 
   const openContextMenu = (anchor: HTMLElement, index: number) => {
     const conversation = sortedConversations[index];
     if (!canShowContextMenu || !conversation) return;
+    // Opening a menu on another row exits any active inline rename.
+    setRenamingId(null);
     setFocusIndex(index);
     menuAnchorRef.current = anchor;
     const rect = anchor.getBoundingClientRect();
@@ -226,10 +286,41 @@ export function ConversationSidebar({
         onClick: () => onArchiveConversation(conversation.id, !showArchived),
       });
     }
-    // TODO(#1508 uiux gap #9): 重命名 / 删除 / 复制链接 — 需上层新增
-    // onRenameConversation / onDeleteConversation / onCopyConversationLink
-    // 回调后再启用，当前不硬造空操作。
+    // #1508: rename / copy link / delete. Each entry only appears when the
+    // consumer wires the corresponding callback (backward compatible).
+    if (onRenameConversation) {
+      items.push({
+        icon: 'edit',
+        label: t('context.renameConversation'),
+        onClick: () => setRenamingId(conversation.id),
+      });
+    }
+    if (onCopyConversationLink) {
+      items.push({
+        icon: 'link',
+        label: t('context.copyConversationLink'),
+        onClick: () => {
+          const link = conversationLinkFor(conversation.id);
+          void copyTextToClipboard(link).then(() => onCopyConversationLink(conversation.id, link));
+        },
+      });
+    }
+    if (onDeleteConversation) {
+      items.push({
+        icon: 'archive',
+        label: t('context.deleteConversation'),
+        danger: true,
+        onClick: () => setDeleteTarget(conversation),
+      });
+    }
     return items;
+  };
+
+  const handleRenameSubmit = (conversation: WorkbenchConversation, value: string) => {
+    const nextTitle = value.trim();
+    setRenamingId(null);
+    if (!nextTitle || nextTitle === conversation.title) return;
+    onRenameConversation?.(conversation.id, nextTitle);
   };
 
   const focusedConversationId = sortedConversations[focusIndex]?.id;
@@ -302,6 +393,38 @@ export function ConversationSidebar({
                   key={conversation.id}
                   role="option"
                 >
+                  {renamingId === conversation.id ? (
+                    <form
+                      className={styles.conversationRenameForm}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const input = event.currentTarget.querySelector<HTMLInputElement>('input');
+                        handleRenameSubmit(conversation, input?.value ?? '');
+                      }}
+                    >
+                      <input
+                        aria-label={t('aria.renameConversation')}
+                        autoFocus
+                        className={styles.conversationRenameInput}
+                        defaultValue={conversation.title}
+                        onBlur={() => setRenamingId(null)}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleRenameSubmit(conversation, event.currentTarget.value);
+                            return;
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setRenamingId(null);
+                          }
+                        }}
+                        type="text"
+                      />
+                    </form>
+                  ) : (
                   <button
                     aria-current={isActive ? 'true' : undefined}
                     className={styles.conversationButton}
@@ -424,6 +547,7 @@ export function ConversationSidebar({
                       )}
                     </span>
                   </button>
+                  )}
                 </li>
               );
             })}
@@ -438,6 +562,38 @@ export function ConversationSidebar({
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
         />
+      )}
+      {deleteTarget && (
+        <Modal
+          contentClassName={styles.conversationDeleteContent}
+          onClose={() => setDeleteTarget(null)}
+          open
+          title={t('conversation.deleteTitle')}
+        >
+          <p className={styles.conversationDeleteText}>
+            {t('conversation.deleteBody', { title: deleteTarget.title })}
+          </p>
+          <div className={styles.conversationDeleteActions}>
+            <button
+              className={styles.conversationDeleteCancel}
+              onClick={() => setDeleteTarget(null)}
+              type="button"
+            >
+              {t('conversation.cancel')}
+            </button>
+            <button
+              className={styles.conversationDeleteConfirm}
+              onClick={() => {
+                const target = deleteTarget;
+                setDeleteTarget(null);
+                onDeleteConversation?.(target.id);
+              }}
+              type="button"
+            >
+              {t('conversation.deleteConfirm')}
+            </button>
+          </div>
+        </Modal>
       )}
     </aside>
   );
