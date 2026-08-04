@@ -1,6 +1,6 @@
 # AgentHub Progress Tracker
 
-> **Last updated**: 2026-08-04
+> **Last updated**: 2026-08-05
 > **Mode**: `GITHUB_FULL`
 > **Authority**: current source and tests > this tracker > historical analysis. Use `git status`, `git log`, and live GitHub state before acting.
 
@@ -28,15 +28,16 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 | Track | State | Link |
 |---|---|---|
-| Agent-team subtask live stream | SPEC merged (`docs/plan/agentteam-live-streaming.md`); Phase A and frontend starting slice exist; remaining protocol/UI phases require explicit scope | #1478 |
-| ACP migration | Official ACP adapters exist; filesystem/terminal frames, timeout policy, registration, and approved real-run evidence remain | #1404 |
+| Agent-team subtask live stream | SPEC merged；Phase A 已合入 master；剩余 Phase B/C 按 SPEC 推进 | docs/plan/agentteam-live-streaming.md |
+| ACP migration | 管理员已批增量路线；spike 验证状态见 03-runtime-adapters.md §ACP 迁移 | docs/architecture/03-runtime-adapters.md |
 | Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆；Step 0 合同 SSOT 抽离完成（#1526：合同迁入 `internal/orchestration`，adapters alias 零调用点改动，3 项回归门禁）；Step 2 完成（#1566：13 个 orchestrator 源文件 + plan_approval.go 迁入 `internal/adapters/orchestrator` 叶子包，叶子仅依赖合同与窄 ports，composition root 装配，`scripts/verify/verify-orchestrator-deps.ps1` 依赖方向门禁 + 负向自测）—— 已关闭 | #1526 → #1566 |
 | Shared boundary hardening | A-V3 已裁决（#1523）：拒绝全量 shared 三分；quick-wins 与隔离门禁硬化均已落地（apiClient.ts 删除、`workspace:*` 显式依赖、edge 隔离门禁违规 exit 1 + 正负向自测） | #1525 |
-| Release signing | SPEC draft on `docs/plan/proposal-desktop-release-signing.md`, unmerged; needs review + merge | #1403 |
+| Release signing | SPEC merged；实施依赖管理员提供签名证书/密钥，按 SPEC 阶段推进 | docs/plan/proposal-desktop-release-signing.md |
 | Workbench 契约切片（projects 先行） | #1546 完成：shared Workbench 对 concrete HubClient 的 type/value 引用清零，改用窄领域端口 `WorkbenchProjectsPort`（`shared/workbench/workbenchProjectsPort.ts`），Desktop/Web composition root 各实现一个 adapter 注入；projects route 单一 ownership（parent-managed 或 port，不再运行时猜测）；load-more 失败可见、可重试（UI + i18n zh/en）；`verify-shared-ui-hubclient.ps1` 升级为同时禁止 type 引用。这是 #1528 的 projects slice（agents/catalog 收口后续单独切片） | #1546, #1528 |
-| WebSocket incremental sync | SPEC draft on `docs/plan/proposal-ws-incremental-sync.md`, unmerged; needs review + merge | #1411 |
-| IM bridge (Feishu first) | SPEC draft on `docs/plan/proposal-im-bridge.md`, unmerged | #1496 |
-| Automations and session import | Product backlog | #1405, #1407 |
+| WebSocket incremental sync | SPEC merged；实施按 SPEC 阶段（B1-B6/F1-F4）推进 | docs/plan/proposal-ws-incremental-sync.md |
+| IM bridge (Feishu first) | SPEC merged；实施按 SPEC 阶段推进 | docs/plan/proposal-im-bridge.md |
+| Automations and session import | Product backlog | backlog：SPEC 待写（#1405, #1407） |
+| @提及=派单交互 | Product backlog | backlog：SPEC 待写（#1406） |
 
 ## Maintainability program
 
