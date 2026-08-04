@@ -9,6 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/agenthub/pkg/outboundmetrics"
 )
 
 // EdgeMetrics holds all Prometheus metrics for the Edge server.
@@ -21,6 +23,11 @@ type EdgeMetrics struct {
 	EdgeWSConnections      prometheus.Gauge
 	EdgeEventBusDepth      prometheus.GaugeFunc
 	EdgeEventBusDropped    prometheus.CounterFunc
+
+	// Outbound is the unified outbound HTTP metrics contract (#1595):
+	// outbound_requests_total / outbound_request_duration_seconds with
+	// provider/purpose/category/status labels, shared with the Hub server.
+	Outbound *outboundmetrics.Recorder
 }
 
 // New creates and auto-registers all Edge Prometheus metrics in an isolated
@@ -69,6 +76,9 @@ func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *Ed
 			Help: "Total number of event bus fanout deliveries dropped because subscriber channels were full.",
 		}, busDroppedFn)
 	}
+
+	// Unified outbound metrics contract (#1595) on the isolated registry.
+	m.Outbound = outboundmetrics.NewRecorder(reg)
 
 	return m
 }

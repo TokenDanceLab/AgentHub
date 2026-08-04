@@ -5,6 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+
+	"github.com/agenthub/pkg/outboundmetrics"
 )
 
 var (
@@ -60,7 +62,7 @@ var (
 	// G7 — EventBus submit failures (pool full / closed) and events abandoned
 	// when Close hits its drain deadline (#1548).
 	EventBusSubmitFailures prometheus.Counter
-	EventBusDroppedOnClose  prometheus.Counter
+	EventBusDroppedOnClose prometheus.Counter
 
 	// G10 — Admin server up gauge (1 = running, 0 = not started / failed).
 	AdminServerUp prometheus.Gauge
@@ -100,6 +102,12 @@ var (
 	AuditRetries          prometheus.Counter
 	AuditFinalFailures    prometheus.Counter
 	AuditFileSinkFailures prometheus.Counter
+
+	// OutboundMetrics is the unified outbound HTTP metrics contract (#1595):
+	// outbound_requests_total / outbound_request_duration_seconds with
+	// provider/purpose/category/status labels, shared with the Edge server.
+	// Nil-safe — call sites may record before Register() runs.
+	OutboundMetrics *outboundmetrics.Recorder
 
 	once sync.Once
 )
@@ -463,6 +471,9 @@ func Register() {
 		prometheus.MustRegister(AuditRetries)
 		prometheus.MustRegister(AuditFinalFailures)
 		prometheus.MustRegister(AuditFileSinkFailures)
+		// Unified outbound metrics contract (#1595): registered on the
+		// default registry alongside the other Hub metrics.
+		OutboundMetrics = outboundmetrics.NewRecorder(prometheus.DefaultRegisterer)
 		// Built-in collectors may already be registered; ignore if so.
 		_ = prometheus.Register(collectors.NewGoCollector())
 		_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
