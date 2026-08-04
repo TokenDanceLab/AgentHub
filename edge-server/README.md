@@ -8,18 +8,7 @@ Runtime: Go 1.25.
 
 ## Boundary
 
-```text
-Desktop/Web UI
-  -> Edge REST / WebSocket
-  -> lifecycle executor
-  -> Agent Runtime adapter
-  -> Claude Code / Codex / OpenCode
-```
-
-- Edge 是本地执行权威；Hub 是账号、云端 IM、多端同步、远程中继和审计权威。
-- 本地执行不依赖 Hub 登录。
-- 早期独立 `runner/` 目录已废弃；执行生命周期在 `internal/lifecycle/`，Runtime 协议适配在 `internal/adapters/`。
-- `internal/runners/` 只保留旧 UI 兼容 registry，不是新的执行架构中心。
+Edge 是本地执行权威；Hub 是账号、云端 IM、多端同步、远程中继和审计权威。本地执行不依赖 Hub 登录。完整职责/Boundary 见 [docs/architecture/02-edge-server.md](../docs/architecture/02-edge-server.md)（SSOT）；早期独立 `runner/` 目录已废弃，执行生命周期在 `internal/lifecycle/`，Runtime 协议适配在 `internal/adapters/`。
 
 ## Source Map
 
