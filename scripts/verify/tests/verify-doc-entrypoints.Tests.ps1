@@ -8,8 +8,8 @@ status is snapshotted before and after the suite.
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 $FixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ("agenthub-doc-entrypoints-" + [guid]::NewGuid().ToString("N"))
-$SourceVerifier = Join-Path $RepoRoot "scripts/verify/verify-doc-ssot.ps1"
-$FixtureVerifier = Join-Path $FixtureRoot "scripts/verify/verify-doc-ssot.ps1"
+$SourceVerifier = Join-Path $RepoRoot "scripts/verify/verify-doc-ssot.py"
+$FixtureVerifier = Join-Path $FixtureRoot "scripts/verify/verify-doc-ssot.py"
 $InitialStatus = @(& git -C $RepoRoot status --porcelain=v1 --untracked-files=all)
 $Passed = 0
 
@@ -25,7 +25,7 @@ function Fail([string]$Message) {
 function Invoke-DocVerifier {
     Push-Location $FixtureRoot
     try {
-        $output = @(& pwsh -NoProfile -File $FixtureVerifier 2>&1)
+        $output = @(& python $FixtureVerifier 2>&1)
         return @{
             ExitCode = $LASTEXITCODE
             Output = ($output -join "`n")

@@ -35,7 +35,7 @@ echo "AgentHub runtime readiness wrapper"
 echo "Evidence level: proposal-only / structural"
 echo "No real CLI prompt, model/API call, production access, secret read, or package build is executed."
 
-run_gate "Doc SSOT" "$POWERSHELL_BIN" -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-doc-ssot.ps1
+run_gate "Doc SSOT" python ./scripts/verify/verify-doc-ssot.py
 run_gate "Web Hub-only boundary" bash ./scripts/verify/verify-web-hub-boundary.sh
 run_gate "Edge CLI real-readiness proposal" "$POWERSHELL_BIN" -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-edge-cli-real-readiness.ps1 -Mode ProposalOnly
 
