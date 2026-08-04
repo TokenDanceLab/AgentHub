@@ -1,15 +1,13 @@
-// Tests for hubAuth OIDC PKCE flow.
-// Uses mocked fetch (via vitest) to avoid hitting real servers.
+// Tests for the Desktop hubAuth OIDC PKCE flow (issue #1537).
+// The state machine + PKCE helpers now live in @shared/api/auth (covered by
+// shared unit tests); these tests cover the Desktop adapter contract:
+// 1. Hub OIDC API contract (mocked fetch)
+// 2. Browser-dev callback fixture boundary (tokens never in localStorage)
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeCodeChallenge, generateCodeVerifier } from '@shared/api/auth';
 
 // ── Mock setup ────────────────────────────────────
-
-// We test the login flow in isolation by importing the module with mocked deps.
-// The actual E2E flow requires Tauri context, so these tests focus on:
-// 1. PKCE helper correctness
-// 2. Hub OIDC API contract (mocked fetch)
-// 3. State validation in the callback flow
 
 // ── Mock localStorage and sessionStorage ──────────
 
@@ -44,31 +42,11 @@ const sessionStorageMock = (() => {
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
 Object.defineProperty(globalThis, 'sessionStorage', { value: sessionStorageMock, writable: true });
 
-// ── PKCE helpers (inline copies for unit testing) ──
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function generateCodeVerifier(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
-}
-
-async function computeCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(verifier));
-  return base64UrlEncode(new Uint8Array(digest));
-}
+// ── PKCE helpers (shared implementation, #1537) ───
 
 // ── Tests ─────────────────────────────────────────
 
-describe('PKCE helpers', () => {
+describe('PKCE helpers (shared @shared/api/auth)', () => {
   it('generateCodeVerifier produces a 43-character base64url string', () => {
     const verifier = generateCodeVerifier();
     // 32 bytes → 43 base64url chars (no padding)
@@ -94,23 +72,6 @@ describe('PKCE helpers', () => {
     const c1 = await computeCodeChallenge(verifier);
     const c2 = await computeCodeChallenge(verifier);
     expect(c1).toBe(c2);
-  });
-});
-
-describe('OIDC state validation', () => {
-  it('detects state mismatch (CSRF protection)', () => {
-    // Use let to avoid TypeScript narrowing these to literal types
-    const expectedState: string = 'server-state-abc';
-    const receivedState: string = 'attacker-state-xyz';
-    const isValid = receivedState === expectedState;
-    expect(isValid).toBe(false);
-  });
-
-  it('accepts matching states', () => {
-    const expectedState: string = 'server-state-abc';
-    const receivedState: string = 'server-state-abc';
-    const isValid = receivedState === expectedState;
-    expect(isValid).toBe(true);
   });
 });
 

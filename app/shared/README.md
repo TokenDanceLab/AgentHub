@@ -10,6 +10,7 @@
 | `@shared/events` | `src/events.ts` | Edge WebSocket typed events |
 | `@shared/hubEvents` | `src/hubEvents.ts` | Hub WebSocket event 常量和类型 |
 | `@shared/hubClient` | `src/hubClient.ts` 及 `hubClient*` 模块 | Hub REST/WS 方法、DTO、payload 和 transport SSOT；平台 API 文件只能是 thin shell |
+| `@shared/api/auth` | `src/api/auth/` | Hub 认证状态机 SSOT（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）；平台只注入 Port 实现 |
 | `@shared/errors` | `src/errors.ts` | `api/conventions.md` 错误格式解析 |
 | `@shared/tree` | `src/tree.ts` | 消息树和线程树工具 |
 | `@shared/diff` | `src/diff.ts` | Diff 解析和展示辅助 |

@@ -12,6 +12,7 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 
 - Desktop renderer 不直接启动 Agent CLI；执行由 Local Edge 和 Tauri host typed API 承担。
 - 本地执行不依赖 Hub 登录；Hub 登录用于云端 IM、多端同步、远程查看/审批、设备路由和中继。
+- Hub 认证状态机（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）共享自 `../shared/src/api/auth/`；`src/api/hubAuth.ts` 只注入 Desktop Port（Tauri credential store、本地 callback server、系统浏览器跳转）。
 - Desktop/Web 共享工作台、chat、transcript、composer、inspector 和 design contract；不要复制 shared UI。
 - Vite renderer 证据不等于 packaged Desktop。sidecar、sqlite、icon、installer、WebView2 等打包结论必须走 packaged-release 或 approved-real 证据。
 
