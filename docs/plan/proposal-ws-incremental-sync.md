@@ -3,7 +3,7 @@
 > **状态: PROPOSAL（待管理员批准，非 active SPEC）**
 > 提案日期：2026-07-27
 > 追踪 Issue：[#1411](https://github.com/TokenDanceLab/AgentHub/issues/1411)
-> 前置阅读：[web-module.md（Codeg 参考实现）](../../../../Temp/codeg-research/web-module.md) · [backend.md §事件流](../../../../Temp/codeg-research/backend.md)
+> 前置阅读: Codeg 参考实现（原始调研文件已随 2026-08 本机清理删除，见 git 历史）
 > 替代对象：`sync.request` / `sync.events` 死协议面（已由 chore/ws-dead-surface 删除并合入 master）
 
 ---

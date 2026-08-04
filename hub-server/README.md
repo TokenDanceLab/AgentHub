@@ -8,13 +8,7 @@ Hub Server 是 AgentHub 的云端控制面：账号、IM、联系人/群聊、�
 
 ## 职责
 
-| 方向 | Hub 责任 | 不负责 |
-|---|---|---|
-| Identity | TokenDance ID OIDC relying party，签发 Hub session | 第三方 provider token 存储 |
-| AuthZ | Hub-local membership/resource/action 权限 | 把 TokenDance ID 当产品权限系统 |
-| IM | 会话、成员、消息、附件、通知、已读和 reaction | 本地文件系统能力 |
-| Agent routing | Agent Profile、Execution Target、设备路由、pending task、relay control | 启动本机 CLI/runtime |
-| Audit | audit events、admin 查询、公开统计脱敏 | 生产 secret 或 live infra 事实 |
+Hub 是云端控制面：Identity（TokenDance ID OIDC → Hub session）、AuthZ（Hub-local 权限）、IM、Agent routing、Audit。完整 Boundaries 表见 [docs/architecture/01-hub-server.md](../docs/architecture/01-hub-server.md)（SSOT）。
 
 ## 运行
 

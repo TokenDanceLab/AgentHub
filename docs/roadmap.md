@@ -6,9 +6,7 @@
 
 ## 产品北极星
 
-AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人、群聊、项目会话、Agent 队友、审批、Diff、Preview 和产物，而不是 Runtime 下拉框。
-
-核心判断：
+产品定位与架构定义见 [architecture.md](architecture.md)（IM 形态的多 Agent 协作工作台，SSOT 在架构文档）。此处只记录产品方向判断：
 
 - Agent Profile 回答“谁来做事”，Agent Runtime 回答“用什么执行”。
 - Web 远控、Desktop 本地执行、Mobile/IM 审批查看使用同一 Hub/Edge 事件合同。
@@ -21,7 +19,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 | Program | Status | Pointer |
 |---|---|---|
-| Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 #1342 | MASTER · [plan/post-polish-task-breakdown.md](archives/plan/post-polish-task-breakdown.md) |
+| Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 #1342 | [plan/post-polish-task-breakdown.md](archives/plan/post-polish-task-breakdown.md) |
 | Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](archives/analysis/visual-qa-scorecard.md) |
 | Cleanup baseline (Phases 0–7) | closed 2026-07-16 / PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | [archives/cleanup-baseline/](archives/cleanup-baseline/) · historical `docs/plan/*` banners |
 
@@ -57,17 +55,7 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 架构入口
 
-| 主题 | 权威位置 |
-|---|---|
-| 系统结构、数据流、Desktop/Web/Mobile 边界 | [architecture.md](architecture.md) |
-| Hub Server | [architecture/01-hub-server.md](architecture/01-hub-server.md) |
-| Edge Server | [architecture/02-edge-server.md](architecture/02-edge-server.md) |
-| Runtime adapters | [architecture/03-runtime-adapters.md](architecture/03-runtime-adapters.md) |
-| Frontend data flow | [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md) |
-| Deployment | [architecture/05-deployment.md](architecture/05-deployment.md) |
-| Auth and identity | [architecture/06-auth-identity.md](architecture/06-auth-identity.md) |
-| Design system SSOT | [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md) |
-| Architecture decisions | [decisions.md](decisions.md) |
+架构模块导航、owner 链接与数据流概览以 [architecture.md](architecture.md) 及其 `architecture/` 子文档为 SSOT（Hub/Edge/Runtime adapters/Frontend data flow/Deployment/Auth/Design system/Outbound HTTP/decisions）。
 
 ## API 入口
 
@@ -80,29 +68,11 @@ AgentHub 是 IM 形态的多 Agent 协作工作台。用户面对的是联系人
 
 ## 数据模式与证据边界
 
-`dataMode` 是兼容字段，不单独证明数据来源、登录状态或真实执行。验收时同时标注 Surface、Data Source、Auth/Execution，并按 `.agents/skills/real-e2e-acceptance/SKILL.md` 写证据等级。
-
-| 产品模式 | Data Source | Auth/Execution | 边界 |
-|---|---|---|---|
-| Demo | local-mock | anonymous | Workbench runtime 不访问 Hub/Edge；Desktop entry preflight 可探测 Local Edge health |
-| Fixture | deterministic-fixture | anonymous | 只验证离线证据形状，`real_tested=false` |
-| Local | Local Edge | local-only | Desktop 可访问 `127.0.0.1:3210`；Web 不直连 Local Edge |
-| Login/Hub | Hub | hub-signed-in | 需要 Hub session 证据；不等于模型消耗 |
-| Observed | observed replay | read-only observed | 只读回放或无消耗观察；不代表真实执行 |
-| Approved-Real | approved Hub/Edge/CLI/API | approved-real | 只有 approved-real gate 和 manifest 通过时才可声明真实登录或真实 CLI/model/API |
+`dataMode` 是兼容字段，不单独证明数据来源、登录状态或真实执行。产品模式→数据源→Auth/Execution→禁止声明的完整矩阵见 [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)；证据等级矩阵见 `.agents/skills/real-e2e-acceptance/SKILL.md`。
 
 ## 非协商边界
 
-1. Web 只和 Hub 通信，不直接连接 Local Edge 或 raw runtime。
-2. Desktop renderer 不获得 raw process execution 权限。
-3. Local Edge 负责本地执行、adapter 调用、runtime policy、日志和证据。
-4. Hub 负责账号、IM、同步、路由、权限、审计和远程控制面。
-5. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
-6. Mock 和 fixture 模式必须显式；real mode 不能静默降级。
-7. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. 当前 spec 进度只在 `docs/progress/MASTER.md`；规则写 `AGENTS.md`；历史 longform、审计、发布材料、已完成 spec 工件和过期项目 skill 放到 [history.md](history.md) 指向的外部归档。
-9. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
-10. TokenDance API key 不得暴露给浏览器 UI。
+架构级非协商边界以 [architecture.md](architecture.md) 为 SSOT。规则/进度/历史归档的归属见 `AGENTS.md` §8 文档规则。
 
 ## 归档入口
 
