@@ -19,7 +19,7 @@ func (s *AgentService) dispatchService() *DispatchService {
 	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
 		return s.dispatch
 	}
-	return NewDispatchService(s.db, s.bus, s.mgr, s.cacheClient, s.relay, s.deliveryOutboxService(), s.edgeCfg, s.jwtSecret)
+	return NewDispatchService(s.db, s.bus, s.mgr, s.cacheClient, s.relay, s.deliveryOutboxService(), s.edgeCfg, s.edgeClient, s.jwtSecret)
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.

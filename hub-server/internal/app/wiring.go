@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/log"
+	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
@@ -154,7 +155,12 @@ func (a *App) initServices(ctx context.Context) error {
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	a.DeviceService = service.NewDeviceService(a.DB, targetSvc)
-	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, a.Config.JWT.Secret)
+	// Shared Hub→Edge dispatch client (#1594): built once at the composition
+	// root from the injected edge config with the sanctioned outboundhttp
+	// policy (bounded timeout, redirects refused). The service layer never
+	// constructs transport clients.
+	edgeDispatchClient := outboundhttp.NewClient(a.Config.Edge.Timeout)
+	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
 
 	// Agent Profile service
 	agentProfileSvc := service.NewAgentProfileService(a.DB)

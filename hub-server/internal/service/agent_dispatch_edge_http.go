@@ -49,8 +49,17 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	}
 	httpReq.Header = parts.Headers
 
-	// Shared client created once at construction: connection reuse and a
-	// single configured timeout instead of a fresh client per dispatch (#1549).
+	// Shared client created once at the composition root: connection reuse
+	// and a single configured timeout instead of a fresh client per dispatch
+	// (#1549/#1594). A nil client is a wiring gap (only legal in partial
+	// tests) — fail like an unreachable edge instead of panicking.
+	if s.edgeClient == nil {
+		slog.Error(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", "edgeClient not wired at the composition root")
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("unreachable").Inc()
+		}
+		return ""
+	}
 	resp, err := s.edgeClient.Do(httpReq)
 	if err != nil {
 		// G4: Edge unreachable is a classic silent-outage scenario; raised from

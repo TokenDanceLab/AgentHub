@@ -31,7 +31,7 @@ sanctioned client 构造点（policy 原语包，不在 verifier 扫描范围）
 
 | # | 调用点 | 信任边界 / 配置 owner | 重试语义 | egress | body 上限 | metrics | 状态 |
 |---|---|---|---|---|---|---|---|
-| 1 | Hub→Edge dispatch（`service/agent_dispatch_ports.go` + `agent_dispatch_edge_http.go`） | 运营商配置 Edge URL/token（`config.Edge`，composition root 注入）；信任边界=本地 Edge 设备 | 无重试（outbox 负责投递重试，领域语义在 delivery journal） | AH-SR-053 拒绝非 loopback 明文；固定地址不适用 egress allowlist | 64 KiB（`EdgeHTTPResponseBodyLimit`） | `AgentDispatchEdgeHTTPFailures` | ✅ 已收口（#1549）；client 构造点仍在 service 层 → **#1594** |
+| 1 | Hub→Edge dispatch（`service/agent_dispatch_ports.go` + `agent_dispatch_edge_http.go`） | 运营商配置 Edge URL/token（`config.Edge`，composition root 注入）；信任边界=本地 Edge 设备 | 无重试（outbox 负责投递重试，领域语义在 delivery journal） | AH-SR-053 拒绝非 loopback 明文；固定地址不适用 egress allowlist | 64 KiB（`EdgeHTTPResponseBodyLimit`） | `AgentDispatchEdgeHTTPFailures` | ✅ 已收口（#1549 + #1594 client 移到 composition root） |
 | 2 | Edge→Hub callback（`edge-server/internal/hub/callback.go`） | 运营商配置 Hub URL/token（`AGENTHUB_HUB_URL/HUB_TOKEN` + callback policy flags）；信任边界=Hub 服务器 | 有预算重试（10s 默认）；只重试 ack/done/fail（幂等）；stream 不重试；429+Retry-After 重试；4xx/3xx/超限终态 | 固定地址；redirect 拒绝 | 64 KiB fail-closed | 无独立指标（journal 记录 attempts） | ✅ 本 PR 收口 |
 | 3 | Hub OIDC token exchange（`service/oidc/oidc.go`） | 运营商配置 TokenDance ID issuer/client secret（`tokendance_id.*`）；信任边界=TokenDance ID | 无重试（一次性授权码交换，重试不安全） | 固定地址；redirect 拒绝（client_secret 在 form body） | 64 KiB fail-closed | 日志含 request_id + body_sha256（redaction 已验证） | ✅ 本 PR 收口 |
 | 4 | Hub JWKS fetch（`jwtutil/tokendance.go` 实例化 verifier，#1551） | 运营商配置 JWKS URI；信任边界=TokenDance ID | 无重试；cache TTL 1h 注入 | 固定地址；redirect 拒绝 | 64 KiB fail-closed | 无 | ✅ 本 PR 收口 |
@@ -46,7 +46,7 @@ sanctioned client 构造点（policy 原语包，不在 verifier 扫描范围）
 | Issue | 项 | Owner | Review date |
 |---|---|---|---|
 | ~~#1593~~ ✅ | HubMCPSyncer client 收口：composition root 注入、redirect 拒绝、响应体上限 | outbound HTTP 后端 owner（#1564 完成人） | 2026-09-03 |
-| #1594 | Hub→Edge dispatch client 移到 composition root，verifier allowlist 归零 | 同上 | 2026-09-03 |
+| ~~#1594~~ ✅ | Hub→Edge dispatch client 移到 composition root，verifier allowlist 归零 | 同上 | 2026-09-03 |
 | #1595 | 统一出站 correlation/metrics 合同落地 | 同上 | 2026-09-17 |
 
 ## 4. 机器门禁（#1549 → #1564）

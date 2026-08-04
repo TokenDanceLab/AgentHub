@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -366,7 +366,7 @@ func TestDispatchService_SetPortsComposition(t *testing.T) {
 	wsPort := &recordingDispatchWS{conn: &ws.Conn{ID: "conn-1", UserID: "u1", DeviceType: "desktop", DeviceID: "dev-1"}}
 	outbox := &recordingDispatchOutbox{}
 
-	svc := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{}, "")
+	svc := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{}, nil, "")
 	require.NotNil(t, svc)
 
 	svc.SetBus(b)
