@@ -1,15 +1,73 @@
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { Tooltip } from './Tooltip';
+import { Tooltip, type TooltipSide } from './Tooltip';
+
+// jsdom has no layout, so viewport flipping is exercised with mocked
+// geometry (same pattern as the reduced-motion CSS-contract check below:
+// pure-CSS positioning cannot be measured in jsdom).
+const tooltipCss = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'Tooltip.module.css'),
+  'utf8',
+);
+
+const EMPTY_RECT: DOMRect = {
+  x: 0, y: 0, top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0,
+  toJSON: () => ({}),
+};
+
+function rect(x: number, y: number, width: number, height: number): DOMRect {
+  return {
+    x, y, top: y, bottom: y + height, left: x, right: x + width, width, height,
+    toJSON: () => ({}),
+  };
+}
+
+/** Mock layout so the host sits at the bottom-right corner of the viewport
+ *  (top=500, bottom=520, left=590, right=690):
+ *  - a bottom tooltip (100px tall) overflows a 500px-tall viewport: 520+8+100 > 500
+ *  - a right tooltip (200px wide) overflows a 600px-wide viewport: 690+9+200 > 600
+ *  - the same geometry fits a 1024x768 viewport, so "no flip" cases stay sane. */
+function mockOverflowingGeometry(): void {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+    function mockGetRect(this: Element) {
+      if (this.matches('[role="tooltip"]')) return rect(0, 0, 200, 100);
+      // The host span contains the tooltip as a descendant (aria-describedby
+      // lives on the cloned trigger, not on the host).
+      if (this.querySelector('[role="tooltip"]') !== null) return rect(590, 500, 100, 20);
+      return EMPTY_RECT;
+    },
+  );
+}
+
+function setViewport(width: number, height: number): void {
+  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: height, configurable: true });
+}
+
+function openTooltip(label: string, side?: TooltipSide): HTMLElement {
+  render(
+    <Tooltip label={label} side={side}>
+      <button type="button">Trigger</button>
+    </Tooltip>,
+  );
+  fireEvent.focus(screen.getByRole('button', { name: 'Trigger' }));
+  return screen.getByRole('tooltip');
+}
 
 describe('Tooltip', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    setViewport(1024, 768);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+    setViewport(1024, 768);
   });
 
   it('renders role=tooltip and links trigger via aria-describedby when open', () => {
@@ -187,11 +245,84 @@ describe('Tooltip', () => {
     );
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
+});
 
-  // TODO(#1507 reduced-motion): jsdom does not honor prefers-reduced-motion, so the
-  // CSS animation gating cannot be asserted here — verify on a real browser.
-  // TODO(#1507 viewport-flip): first version does not flip the tooltip when it would
-  // overflow the viewport (no portal/IntersectionObserver); add later.
-  // TODO(#1507 real-positioning): jsdom has no layout, so absolute side positioning
-  // cannot be measured — verify visually in the desktop shell.
+// ── Viewport flipping (#1507) ─────────────────────────────────────────
+describe('Tooltip viewport flip (#1507)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setViewport(1024, 768);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    setViewport(1024, 768);
+  });
+
+  it('flips a bottom tooltip to top when it would overflow the viewport', () => {
+    mockOverflowingGeometry();
+    setViewport(1024, 500);
+    const tooltip = openTooltip('Flip me', 'bottom');
+    // host.bottom(520) + 8 + tooltip.height(100) > 500 → flip to top
+    expect(tooltip.getAttribute('data-side')).toBe('top');
+  });
+
+  it('flips a right tooltip to left when it would overflow the viewport', () => {
+    mockOverflowingGeometry();
+    setViewport(600, 768);
+    const tooltip = openTooltip('Flip me', 'right');
+    // host.right(690) + 9 + tooltip.width(200) > 600 → flip to left
+    expect(tooltip.getAttribute('data-side')).toBe('left');
+  });
+
+  it('keeps the requested side when there is no overflow', () => {
+    mockOverflowingGeometry();
+    // Tall/wide enough viewport: 520+8+100 <= 768 and 690+9+200 <= 1024
+    const tooltip = openTooltip('Stay put', 'bottom');
+    expect(tooltip.getAttribute('data-side')).toBe('bottom');
+  });
+
+  it('re-measures on window resize and flips once the viewport shrinks', () => {
+    mockOverflowingGeometry();
+    setViewport(1024, 768);
+    const tooltip = openTooltip('Shrink me', 'bottom');
+    expect(tooltip.getAttribute('data-side')).toBe('bottom');
+
+    setViewport(1024, 500);
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    expect(tooltip.getAttribute('data-side')).toBe('top');
+  });
+
+  it('resets the flip when the requested side prop changes', () => {
+    mockOverflowingGeometry();
+    setViewport(600, 500);
+    const { rerender } = render(
+      <Tooltip label="Switch" side="right">
+        <button type="button">Trigger</button>
+      </Tooltip>,
+    );
+    fireEvent.focus(screen.getByRole('button', { name: 'Trigger' }));
+    expect(screen.getByRole('tooltip').getAttribute('data-side')).toBe('left');
+
+    // Switching to a side that fits (host top is 500; the top edge has room)…
+    rerender(
+      <Tooltip label="Switch" side="top">
+        <button type="button">Trigger</button>
+      </Tooltip>,
+    );
+    expect(screen.getByRole('tooltip').getAttribute('data-side')).toBe('top');
+  });
+});
+
+// ── Reduced motion ────────────────────────────────────────────────────
+describe('Tooltip reduced motion (#1507)', () => {
+  it('gates the enter animation behind prefers-reduced-motion: no-preference', () => {
+    // jsdom cannot evaluate media queries, so assert the CSS contract:
+    // the animation must live inside the no-preference block only.
+    expect(tooltipCss).toMatch(/@media \(prefers-reduced-motion: no-preference\)/);
+    expect(tooltipCss).toMatch(/animation:\s*tooltipIn/);
+  });
 });
