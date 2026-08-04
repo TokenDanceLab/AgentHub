@@ -4,16 +4,17 @@
    Uses react-i18next with 'chatview' namespace (provided by consumer's outer I18nextProvider).
    ══════════════════════════════════════════════════════════════════════ */
 
-import { Component, useMemo, useEffect, useRef, useCallback, memo } from 'react'
+import { Component, useMemo, useEffect, useRef, useCallback, memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, Pin, X } from 'lucide-react'
 
 import { Transcript, type TranscriptHandle } from './Transcript'
 import { TypingIndicator } from './TypingIndicator'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
-import { blocksToTranscriptItems, resolveCompactDividerIndices, resolveUnreadAnchorItemIndex, type TranscriptBlock } from '../adapter'
+import { blocksToTranscriptItems, resolveCompactDividerIndices, resolveUnreadAnchorItemIndex, SEP, type TranscriptBlock } from '../adapter'
+import type { RowItem } from '../types'
 import type { UnreadDividerDescriptor } from '../types'
-import type { BlockActionCallback, TranscriptUserItem } from '../transcript-item'
+import type { BlockActionCallback, TranscriptAgentItem, TranscriptItem, TranscriptUserItem } from '../transcript-item'
 
 // Load ChatView design tokens — scoped to .chatview, no :root pollution
 import '../design/tokens.css'
@@ -101,6 +102,65 @@ class TranscriptErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
   }
 }
 
+function isUserItem(item: TranscriptItem): item is Extract<TranscriptItem, { type: 'user' }> {
+  return 'type' in item && item.type === 'user'
+}
+
+/**
+ * a11y (#1503): collect approval rows still awaiting user action across all
+ * agent items — rows, standalone rows, interleaved row parts, and nested
+ * children. Only `waiting` approvals are actionable requests; completed or
+ * denied ones are status transitions, not arrivals. The adapter mirrors every
+ * row into both the rows/standaloneRows arrays AND `parts`, so rows are
+ * deduped by id to announce each card exactly once.
+ */
+function collectWaitingApprovalRows(items: TranscriptItem[]): RowItem[] {
+  const waitingRows: RowItem[] = []
+  const seenRowIds = new Set<string>()
+  const visitRow = (row: RowItem): void => {
+    if (seenRowIds.has(row.id)) return
+    seenRowIds.add(row.id)
+    if (row.type === 'approval' && row.status === 'waiting') waitingRows.push(row)
+    if (row.children) row.children.forEach(visitRow)
+  }
+  for (const item of items) {
+    if (isUserItem(item)) continue
+    const agentItem: TranscriptAgentItem = item
+    agentItem.rows.forEach(visitRow)
+    agentItem.standaloneRows.forEach(visitRow)
+    if (agentItem.parts) {
+      for (const part of agentItem.parts) {
+        if (part.type === 'row') visitRow(part.row)
+      }
+    }
+  }
+  return waitingRows
+}
+
+/**
+ * Human-readable tool name for the arrival announcement. Approval rows carry
+ * `apReason` as `toolName · risk · reason` (adapterMapBlock), so the first
+ * segment is the tool when present; falls back to the row label.
+ */
+export function approvalToolName(row: RowItem): string {
+  const first = row.apReason?.split(SEP)[0]?.trim()
+  if (first) return first
+  return (row.label || row.toolName || '').trim()
+}
+
+/**
+ * Visually-hidden styling for the approval-arrival live region (#1503).
+ * Kept out of CSS files so the region stays self-contained in this wrapper.
+ */
+const visuallyHiddenStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+}
+
 /**
  * Drop-in replacement for a transcript view (subset of props).
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
@@ -135,6 +195,28 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
     () => resolveCompactDividerIndices(transcript),
     [transcript],
   )
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+
+  // a11y (#1503): approval-arrival announcements. Waiting approval cards live
+  // inside the Transcript's role=log region and are unmounted under
+  // virtualization while off-screen, so their arrival would never reach a
+  // screen reader. Announce through a live region OUTSIDE the virtualizer;
+  // each row id is announced once (ref-set dedup, surviving re-renders).
+  const announcedApprovalIdsRef = useRef<Set<string>>(new Set())
+  const [approvalAnnouncement, setApprovalAnnouncement] = useState('')
+  const waitingApprovalRows = useMemo(() => collectWaitingApprovalRows(items), [items])
+
+  useEffect(() => {
+    const freshRows = waitingApprovalRows.filter((row) => !announcedApprovalIdsRef.current.has(row.id))
+    if (freshRows.length === 0) return
+    for (const row of freshRows) announcedApprovalIdsRef.current.add(row.id)
+    const announcement = freshRows
+      .map((row) => approvalToolName(row) || t('card.approval.title'))
+      .map((tool) => t('a11y.approvalArrived', { tool }))
+      .join('；')
+    setApprovalAnnouncement(announcement)
+  }, [waitingApprovalRows, t])
+
   const containerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   /** Imperative handle into the virtualized Transcript — used to mount the
@@ -242,6 +324,11 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
           )}
         </TranscriptErrorBoundary>
       )}
+      {/* Approval-arrival live region (#1503): OUTSIDE the virtualizer so it
+          survives row unmounts; role=status implies aria-live="polite". */}
+      <div aria-live="polite" className="chatview-live-region" role="status" style={visuallyHiddenStyle}>
+        {approvalAnnouncement}
+      </div>
     </div>
   )
 })
