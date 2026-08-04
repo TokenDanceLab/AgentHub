@@ -132,6 +132,8 @@ export interface ProjectsPageProps {
   loadingMore?: boolean | undefined;
   /** Triggered when the user scrolls near the bottom of the project list. */
   onLoadMore?: (() => void) | undefined;
+  /** Visible load-more failure (#1546). When set, pagination stopped and `onLoadMore` acts as explicit retry. */
+  loadMoreError?: string | undefined;
 }
 
 // ── Defaults / demo data ──

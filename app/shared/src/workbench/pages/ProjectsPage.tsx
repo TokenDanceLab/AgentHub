@@ -60,6 +60,7 @@ export function ProjectsPage({
   hasMore,
   loadingMore,
   onLoadMore,
+  loadMoreError,
 }: ProjectsPageProps): React.ReactElement {
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
 
@@ -112,6 +113,7 @@ export function ProjectsPage({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        loadMoreError={loadMoreError}
       />
       <ProjectMain
         activeProject={activeProject}
