@@ -102,6 +102,7 @@ func TestAnthropicSDK_E2E_SSEStream(t *testing.T) {
 		model:     "claude-sonnet-4-6-20250514",
 		maxTokens: 16384,
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -282,6 +283,7 @@ func TestAnthropicSDK_E2E_SSEStream_WithThinking(t *testing.T) {
 		model:     "claude-sonnet-4-6-20250514",
 		maxTokens: 16384,
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -388,6 +390,7 @@ func TestAnthropicSDK_E2E_SSEStream_MultiBlock(t *testing.T) {
 		model:     "claude-sonnet-4-6-20250514",
 		maxTokens: 16384,
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -634,6 +637,7 @@ func TestAnthropicSDK_BuildMessages_SanitizesHistoryAndPrompt(t *testing.T) {
 	adapter := &AnthropicSDKAdapter{
 		model:     "claude-sonnet-4-6",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{

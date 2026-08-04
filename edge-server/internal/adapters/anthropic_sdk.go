@@ -21,7 +21,10 @@ const (
 	anthropicDefaultModel    = "claude-sonnet-4-6"
 	anthropicDefaultBaseURL  = "https://api.anthropic.com"
 	anthropicAPIVersion      = "2023-06-01"
-	anthropicHTTPTimeout     = 30 * time.Minute
+	// AnthropicHTTPTimeout is the per-request timeout for the shared SDK
+	// outbound client (streaming messages can idle for a long time between
+	// chunks). The composition root passes it to edgehttp.NewClient (#1592).
+	AnthropicHTTPTimeout     = 30 * time.Minute
 	anthropicMaxResponseSize = 50 * 1024 * 1024 // 50MB
 	anthropicMaxRetries      = 3
 	anthropicRetryBaseDelay  = 1 * time.Second
@@ -39,6 +42,7 @@ type AnthropicSDKAdapter struct {
 	baseURL    string
 	model      string
 	maxTokens  int
+	httpClient *http.Client
 	available  bool
 	unavailMsg string
 }
@@ -46,11 +50,17 @@ type AnthropicSDKAdapter struct {
 // NewAnthropicSDKAdapter creates a new Anthropic SDK adapter.
 // apiKey is read from the environment or passed explicitly.
 // model defaults to claude-sonnet-4-6 if empty.
-func NewAnthropicSDKAdapter(apiKey, model string) *AnthropicSDKAdapter {
+// httpClient is the shared outbound client built at the composition root
+// (edgehttp.NewClient); a nil client is a wiring bug and fails fast (#1592).
+func NewAnthropicSDKAdapter(apiKey, model string, httpClient *http.Client) *AnthropicSDKAdapter {
+	if httpClient == nil {
+		panic("adapters: NewAnthropicSDKAdapter requires a non-nil *http.Client (construct it at the composition root, e.g. edgehttp.NewClient)")
+	}
 	a := &AnthropicSDKAdapter{
-		baseURL:   anthropicDefaultBaseURL,
-		model:     model,
-		maxTokens: 16384,
+		baseURL:    anthropicDefaultBaseURL,
+		model:      model,
+		maxTokens:  16384,
+		httpClient: httpClient,
 	}
 	if a.model == "" {
 		a.model = anthropicDefaultModel

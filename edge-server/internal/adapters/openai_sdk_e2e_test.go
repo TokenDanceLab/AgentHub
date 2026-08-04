@@ -66,6 +66,7 @@ func TestOpenAISDK_E2E_SSEStream(t *testing.T) {
 		baseURL:   "https://api.openai.com",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -211,6 +212,7 @@ func TestOpenAISDK_E2E_SSEStream_WithReasoning(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "o3",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -296,6 +298,7 @@ func TestOpenAISDK_E2E_SSEStream_WithToolCalls(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -403,6 +406,7 @@ func TestOpenAISDK_E2E_SSEStream_UsageOnlyChunk(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -478,6 +482,7 @@ func TestOpenAISDK_E2E_SSEStream_EmptyStream(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 	emitter := &testEventEmitter{}
 	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
@@ -542,6 +547,7 @@ func TestOpenAISDK_E2E_SSEStream_ContextCancellation(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 	emitter := &testEventEmitter{}
 	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
@@ -590,6 +596,7 @@ func TestOpenAISDK_E2E_SSEStream_MalformedJSON(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 	emitter := &testEventEmitter{}
 	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
@@ -648,6 +655,7 @@ func TestOpenAISDK_E2E_SSEStream_EarlyDone(t *testing.T) {
 		apiKey:    "test-key-not-used",
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 	emitter := &testEventEmitter{}
 	scope := map[string]any{"projectId": "p", "threadId": "t", "runId": "r"}
@@ -682,6 +690,7 @@ func TestOpenAISDK_BuildMessages_SimpleConversion(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -719,6 +728,7 @@ func TestOpenAISDK_BuildMessages_SystemPromptCombined(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -752,6 +762,7 @@ func TestOpenAISDK_BuildMessages_NoSystemPrompt(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -777,6 +788,7 @@ func TestOpenAISDK_BuildMessages_EmptyPromptDefaults(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -805,6 +817,7 @@ func TestOpenAISDK_BuildMessages_WithHistory(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -855,6 +868,7 @@ func TestOpenAISDK_BuildMessages_RoleNormalization(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -894,6 +908,7 @@ func TestOpenAISDK_BuildMessages_ReturnType(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	// Completely empty context (no system prompt, no messages, no prompt).
@@ -922,6 +937,7 @@ func TestOpenAISDK_BuildMessages_SanitizesHistoryAndPrompt(t *testing.T) {
 	adapter := &OpenAISDKAdapter{
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
@@ -971,6 +987,7 @@ func TestOpenAISDK_E2E_ParseStream_HTTPError(t *testing.T) {
 		baseURL:   srv.URL, // point at mock server
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -1048,6 +1065,7 @@ func TestOpenAISDK_RetryOn429(t *testing.T) {
 		baseURL:   srv.URL,
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -1100,6 +1118,7 @@ func TestOpenAISDK_RetryOn503(t *testing.T) {
 		baseURL:   srv.URL,
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -1142,6 +1161,7 @@ func TestOpenAISDK_Retry_NotOn401(t *testing.T) {
 		baseURL:   srv.URL,
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -1184,6 +1204,7 @@ func TestOpenAISDK_RetryExhausted(t *testing.T) {
 		baseURL:   srv.URL,
 		model:     "gpt-5.5",
 		available: true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}

@@ -20,7 +20,10 @@ const (
 	openaiSDKAdapterID    = "openai-sdk"
 	openaiDefaultModel    = "gpt-5.5"
 	openaiDefaultBaseURL  = "https://api.openai.com"
-	openaiHTTPTimeout     = 30 * time.Minute
+	// OpenAIHTTPTimeout is the per-request timeout for the shared SDK outbound
+	// client (streaming chat completions can idle for a long time between
+	// chunks). The composition root passes it to edgehttp.NewClient (#1592).
+	OpenAIHTTPTimeout     = 30 * time.Minute
 	openaiMaxResponseSize = 50 * 1024 * 1024 // 50MB
 	openaiMaxRetries      = 3
 	openaiRetryBaseDelay  = 1 * time.Second
@@ -38,6 +41,7 @@ type OpenAISDKAdapter struct {
 	apiKey     string
 	baseURL    string
 	model      string
+	httpClient *http.Client
 	available  bool
 	unavailMsg string
 }
@@ -45,10 +49,16 @@ type OpenAISDKAdapter struct {
 // NewOpenAISDKAdapter creates a new OpenAI SDK adapter.
 // apiKey is read from the environment or passed explicitly.
 // model defaults to gpt-5.5 if empty.
-func NewOpenAISDKAdapter(apiKey, model string) *OpenAISDKAdapter {
+// httpClient is the shared outbound client built at the composition root
+// (edgehttp.NewClient); a nil client is a wiring bug and fails fast (#1592).
+func NewOpenAISDKAdapter(apiKey, model string, httpClient *http.Client) *OpenAISDKAdapter {
+	if httpClient == nil {
+		panic("adapters: NewOpenAISDKAdapter requires a non-nil *http.Client (construct it at the composition root, e.g. edgehttp.NewClient)")
+	}
 	a := &OpenAISDKAdapter{
-		baseURL: openaiDefaultBaseURL,
-		model:   model,
+		baseURL:    openaiDefaultBaseURL,
+		model:      model,
+		httpClient: httpClient,
 	}
 	if a.model == "" {
 		a.model = openaiDefaultModel
