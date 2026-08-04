@@ -52,23 +52,6 @@ linters:
           - gocyclo
         path: _test\.go
       - linters:
-          - gocognit
-        path: internal/config/config\.go
-      - linters:
-          - gocognit
-        path: internal/router/router\.go
-      - linters:
-          - cyclop
-          - gocognit
-          - gocyclo
-        path: internal/ws/manager\.go
-      - linters:
-          - gocognit
-        path: internal/repository/migrate\.go
-      - linters:
-          - gocognit
-        path: internal/app/events\.go
-      - linters:
           - revive
         text: context-as-argument
       - linters:
