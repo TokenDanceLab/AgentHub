@@ -97,11 +97,12 @@ func TestAnthropicSDK_E2E_SSEStream(t *testing.T) {
 
 	// Create the adapter (no real API key needed -- we only call parseSSEStream).
 	adapter := &AnthropicSDKAdapter{
-		apiKey:    "test-key-not-used",
-		baseURL:   "https://api.anthropic.com",
-		model:     "claude-sonnet-4-6-20250514",
-		maxTokens: 16384,
-		available: true,
+		apiKey:     "test-key-not-used",
+		baseURL:    "https://api.anthropic.com",
+		model:      "claude-sonnet-4-6-20250514",
+		maxTokens:  16384,
+		available:  true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -277,11 +278,12 @@ func TestAnthropicSDK_E2E_SSEStream_WithThinking(t *testing.T) {
 	defer resp.Body.Close()
 
 	adapter := &AnthropicSDKAdapter{
-		apiKey:    "test-key-not-used",
-		baseURL:   "https://api.anthropic.com",
-		model:     "claude-sonnet-4-6-20250514",
-		maxTokens: 16384,
-		available: true,
+		apiKey:     "test-key-not-used",
+		baseURL:    "https://api.anthropic.com",
+		model:      "claude-sonnet-4-6-20250514",
+		maxTokens:  16384,
+		available:  true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -384,10 +386,11 @@ func TestAnthropicSDK_E2E_SSEStream_MultiBlock(t *testing.T) {
 	defer resp.Body.Close()
 
 	adapter := &AnthropicSDKAdapter{
-		apiKey:    "test-key-not-used",
-		model:     "claude-sonnet-4-6-20250514",
-		maxTokens: 16384,
-		available: true,
+		apiKey:     "test-key-not-used",
+		model:      "claude-sonnet-4-6-20250514",
+		maxTokens:  16384,
+		available:  true,
+		httpClient: &http.Client{},
 	}
 
 	emitter := &testEventEmitter{}
@@ -632,8 +635,9 @@ func TestAnthropicSDK_E2E_SSEStream_MalformedJSON(t *testing.T) {
 // locking the sanitize semantics that the openai-sdk twin mirrors (#1349).
 func TestAnthropicSDK_BuildMessages_SanitizesHistoryAndPrompt(t *testing.T) {
 	adapter := &AnthropicSDKAdapter{
-		model:     "claude-sonnet-4-6",
-		available: true,
+		model:      "claude-sonnet-4-6",
+		available:  true,
+		httpClient: &http.Client{},
 	}
 
 	ctx := runnerctx.RunProcessContext{
