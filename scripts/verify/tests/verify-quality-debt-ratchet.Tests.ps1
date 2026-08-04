@@ -33,6 +33,8 @@ function Copy-RepoFile([string]$FixtureRoot, [string]$RelativePath) {
     Copy-Item -LiteralPath $source -Destination $destination
 }
 
+$SyntheticExclusionPath = 'internal/adapters/parser_ndjson\.go'
+
 function New-QualityDebtFixture {
     $fixture = Join-Path ([IO.Path]::GetTempPath()) ("agenthub-quality-debt-" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $fixture | Out-Null
@@ -48,6 +50,35 @@ function New-QualityDebtFixture {
     }
 
     $baseline = Get-Content -Raw -LiteralPath (Join-Path $fixture $BaselineRelative) | ConvertFrom-Json -AsHashtable
+
+    if (@($baseline.golangci_exclusions).Count -eq 0) {
+        # The repository baseline no longer carries any golangci exclusions
+        # (all complexity debt repaid). Negative cases below mutate the first
+        # exclusion row, so inject a self-consistent synthetic entry: the
+        # baseline row, the matching .golangci.yml rule, and the real Go
+        # source file must all exist for the verifier to accept the fixture.
+        $baseline.golangci_exclusions = @([ordered]@{
+            file = 'edge-server/.golangci.yml'
+            path = $SyntheticExclusionPath
+            linters = @('cyclop', 'gocognit', 'gocyclo')
+            complexity = [ordered]@{ gocognit = 99; gocyclo = 99 }
+            issue = 1569
+            owner = 'test-owner'
+            introduced_at = '2026-08-04'
+            review_by = '2026-10-01'
+            reason = 'synthetic fixture entry for negative self-tests; not a real repository gate'
+        })
+        Write-Utf8NoBom (Join-Path $fixture $BaselineRelative) ($baseline | ConvertTo-Json -Depth 20)
+
+        $configPath = Join-Path $fixture "edge-server/.golangci.yml"
+        $config = Get-Content -Raw -LiteralPath $configPath
+        $config = $config.Replace(
+            "    rules:`n",
+            "    rules:`n      - linters:`n          - cyclop`n          - gocognit`n          - gocyclo`n        path: $SyntheticExclusionPath`n"
+        )
+        Write-Utf8NoBom $configPath $config
+    }
+
     foreach ($entry in @($baseline.golangci_exclusions)) {
         $module = if ($entry.file -match '^hub-server') { "hub-server" } else { "edge-server" }
         $relativeGoPath = $entry.path.Replace('\.', '.')
