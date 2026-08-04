@@ -155,8 +155,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       ? webActiveAgentTaskQueryKey(activeHubSessionId)
       : ['web-v4', 'active-agent-task', 'none'],
     queryFn: () => {
-      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
-      return readStoredWebActiveAgentTask(activeHubSessionId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return readStoredWebActiveAgentTask(activeHubSessionId!);
     },
     enabled: Boolean(activeHubSessionId),
     staleTime: Number.POSITIVE_INFINITY,
@@ -175,8 +175,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const messages = useQuery({
     queryKey: ['web-v4', 'hub-messages', activeHubSessionId],
     queryFn: () => {
-      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
-      return hubClient.getMessages(activeHubSessionId, { limit: 80 });
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.getMessages(activeHubSessionId!, { limit: 80 });
     },
     enabled: Boolean(activeHubSessionId),
     staleTime: 5_000,
@@ -186,8 +186,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const replayedRuntimeEvents = useQuery({
     queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId],
     queryFn: () => {
-      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
-      return hubClient.listTaskRunEvents(activeAgentTaskId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.listTaskRunEvents(activeAgentTaskId!);
     },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
@@ -196,8 +196,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const activeAgentTaskSummary = useQuery({
     queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId],
     queryFn: () => {
-      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
-      return hubClient.getTaskRunEventSummary(activeAgentTaskId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.getTaskRunEventSummary(activeAgentTaskId!);
     },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
@@ -206,8 +206,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const activeAgentTaskApprovals = useQuery({
     queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId],
     queryFn: () => {
-      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
-      return hubClient.listTaskApprovals(activeAgentTaskId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.listTaskApprovals(activeAgentTaskId!);
     },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
@@ -216,8 +216,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const activeAgentTaskArtifacts = useQuery({
     queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId],
     queryFn: () => {
-      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
-      return hubClient.listTaskArtifacts(activeAgentTaskId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.listTaskArtifacts(activeAgentTaskId!);
     },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
@@ -227,8 +227,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const pinnedMessages = useQuery({
     queryKey: ['web-v4', 'hub-pins', activeHubSessionId],
     queryFn: () => {
-      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
-      return hubClient.listPinnedMessages(activeHubSessionId);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
+      return hubClient.listPinnedMessages(activeHubSessionId!);
     },
     enabled: Boolean(activeHubSessionId),
     staleTime: 5_000,

@@ -66,9 +66,8 @@ function generateCodeVerifier(): string {
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
-    const byte = bytes[i];
-    if (byte === undefined) continue;
-    binary += String.fromCharCode(byte);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop bound guarantees the index is in range
+    binary += String.fromCharCode(bytes[i]!);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
