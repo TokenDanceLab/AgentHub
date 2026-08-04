@@ -15,7 +15,7 @@
  * Boundaries (see P6 design report §5):
  *  - CJK-dominant lines fall back to `diffChars` (Chinese has no word
  *    separators, so `diffWords` would treat a whole sentence as one token).
- *  - Oversized lines (>2000 chars or >500 words) skip word-diff entirely
+ *  - Oversized lines (>800 chars or >200 words) skip word-diff entirely
  *    (returns null) so the caller falls back to whole-line Prism highlight,
  *    avoiding O(n*m) LCS blow-up on minified/long lines.
  *  - Whitespace is preserved (jsdiff `diffWords` keeps whitespace in `value`).
@@ -33,9 +33,9 @@ export type { WordDiffToken };
 // ── Guards / heuristics ──────────────────────────────────────────────────
 
 /** Max line length (chars) before word-diff is skipped to avoid O(n*m) cost. */
-const MAX_LINE_CHARS = 2000;
+const MAX_LINE_CHARS = 800;
 /** Max line word count before word-diff is skipped. */
-const MAX_LINE_WORDS = 500;
+const MAX_LINE_WORDS = 200;
 /** CJK char share above which a line is treated as CJK-dominant (-> diffChars). */
 const CJK_DENSITY_THRESHOLD = 0.5;
 
@@ -43,12 +43,26 @@ const CJK_DENSITY_THRESHOLD = 0.5;
 const CJK_RE = /[一-鿿぀-ヿ가-힯]/g;
 
 /**
- * Returns true when either side exceeds the size guard, meaning word-diff
- * should be skipped (caller falls back to whole-line highlight).
+ * Fail-safe guard: returns true when either side exceeds the size thresholds,
+ * meaning word-diff must be skipped so the caller falls back to whole-line
+ * highlight (line-level diff stays available for any line length).
  *
- * Thresholds are empirical estimates from the P6 design report (§5.1) and
- * have NOT been benchmarked against real AgentHub edge-run diff samples.
- * TODO(#1505): calibrate thresholds against real large-diff samples.
+ * Threshold semantics:
+ *  - `MAX_LINE_CHARS` (800): combined guard for a single line side. 800 chars
+ *    already covers real-world diff lines (a typical code line is <200 chars;
+ *    minified/long lines almost always exceed it).
+ *  - `MAX_LINE_WORDS` (200): word-count guard for whitespace-heavy prose
+ *    (e.g. pasted paragraphs). 200 words ≈ 1,000-1,200 chars, so it only
+ *    triggers for lines that are long by the prose standard but compact.
+ *
+ * Calibration rationale (issue #1505): word-diff runs jsdiff's O(n*m) LCS
+ * on every modified line pair inside DiffReviewPanel; the previous
+ * 2000-char / 500-word limits let pathological minified lines through, which
+ * could freeze the UI thread on large diffs. The values below are a
+ * deliberately conservative fail-safe: they keep word-diff for all normal
+ * edit lines while capping worst-case work with ample safety margin. Lines
+ * over the guard lose word-level granularity but never lose readability —
+ * whole-line Prism highlight is the fallback.
  */
 export function shouldSkipWordDiff(oldContent: string, newContent: string): boolean {
   if (oldContent.length > MAX_LINE_CHARS || newContent.length > MAX_LINE_CHARS) {

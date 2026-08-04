@@ -3,12 +3,18 @@
 //  - useId + aria-describedby association (ShellIconButton) +
 //  - hover delay, focus trigger, ESC dismiss (new), reduced-motion gating.
 // Pure CSS positioning (absolute), no portal/Radix runtime dependency.
+// Viewport flipping (#1507): on open, and on scroll/resize while open, the
+// tooltip is measured and `data-side` is flipped when it would overflow the
+// viewport (bottom->top, top->bottom, right->left, left->right). Flip is
+// one-shot (no re-flip of the flipped side) — enough to keep the tooltip
+// visible in normal viewports.
 import {
   cloneElement,
   isValidElement,
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent as ReactFocusEvent,
@@ -21,6 +27,11 @@ import { cx } from './cx';
 import styles from './Tooltip.module.css';
 
 export type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
+
+/** Offset between trigger and tooltip — must mirror Tooltip.module.css gaps
+ *  (8px vertical, 9px horizontal) so the overflow math matches the CSS. */
+const VERTICAL_GAP_PX = 8;
+const HORIZONTAL_GAP_PX = 9;
 
 export interface TooltipProps {
   /** Tooltip text. Kept as plain string — consumers supply localized copy. */
@@ -38,6 +49,14 @@ export interface TooltipProps {
 }
 
 const DEFAULT_DELAY_MS = 500;
+
+/** Opposite side for viewport flipping. */
+function flipSide(side: TooltipSide): TooltipSide {
+  if (side === 'top') return 'bottom';
+  if (side === 'bottom') return 'top';
+  if (side === 'left') return 'right';
+  return 'left';
+}
 
 /** Merge two handlers; if `a` is absent, return `b` unchanged (no wrapper). */
 function chain<T extends React.SyntheticEvent>(
@@ -72,6 +91,67 @@ export function Tooltip({
   const tooltipId = useId();
   const [open, setOpen] = useState(false);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Viewport flipping (#1507) ──────────────────────────────────────
+  // Measure on open and re-measure on scroll/resize while open. The flip is
+  // one-shot per axis: when the requested side would overflow the viewport,
+  // we render the opposite `data-side` (CSS classes already exist for all
+  // four sides, so no portal or layout restructure is needed).
+  const hostRef = useRef<HTMLSpanElement | null>(null);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const [flipped, setFlipped] = useState(false);
+
+  const measureAndMaybeFlip = useCallback(() => {
+    const host = hostRef.current;
+    const tooltip = tooltipRef.current;
+    if (!host || !tooltip) return;
+
+    const hostRect = host.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let shouldFlip = false;
+    if (side === 'bottom') {
+      shouldFlip = hostRect.bottom + VERTICAL_GAP_PX + tooltipRect.height > viewportHeight;
+    } else if (side === 'top') {
+      shouldFlip = hostRect.top - VERTICAL_GAP_PX - tooltipRect.height < 0;
+    } else if (side === 'right') {
+      shouldFlip = hostRect.right + HORIZONTAL_GAP_PX + tooltipRect.width > viewportWidth;
+    } else {
+      shouldFlip = hostRect.left - HORIZONTAL_GAP_PX - tooltipRect.width < 0;
+    }
+    setFlipped(shouldFlip);
+  }, [side]);
+
+  // Reset the flip when the requested side changes (e.g. consumer switches
+  // side while the tooltip is closed); the open-path measure below re-applies
+  // the correct value when the tooltip is visible.
+  useEffect(() => {
+    setFlipped(false);
+  }, [side]);
+
+  // Measure right after the tooltip enters the DOM (before paint) so the
+  // flipped side never flashes.
+  useLayoutEffect(() => {
+    if (!open) return;
+    measureAndMaybeFlip();
+  }, [open, measureAndMaybeFlip]);
+
+  // Re-measure while open: the trigger may scroll under a sticky panel or the
+  // window may resize; capture-phase scroll catches scrolls from any ancestor.
+  useEffect(() => {
+    if (!open) return;
+    const handleViewportChange = () => {
+      measureAndMaybeFlip();
+    };
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [open, measureAndMaybeFlip]);
 
   const clearShowTimer = useCallback(() => {
     if (showTimerRef.current !== null) {
@@ -186,14 +266,15 @@ export function Tooltip({
   }
 
   return (
-    <span className={cx(styles.host, className)}>
+    <span ref={hostRef} className={cx(styles.host, className)}>
       {trigger}
       {open ? (
         <span
+          ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
           className={styles.tooltip}
-          data-side={side}
+          data-side={flipped ? flipSide(side) : side}
         >
           {label}
         </span>

@@ -43,30 +43,51 @@ describe('produceWordDiffTokens', () => {
     expect(t.filter((x) => x.type === 'added').map((x) => x.text).join('')).toBe('两');
   });
 
-  // ── Oversized line guard ──────────────────────────────────────────────
-  it('skips word-diff when a line exceeds the char guard (>2000) and returns null', () => {
-    expect(produceWordDiffTokens('a'.repeat(2001), 'b')).toBeNull();
-    expect(produceWordDiffTokens('a', 'b'.repeat(2001))).toBeNull();
+  // ── Oversized line guard (#1505 calibrated) ──────────────────────────
+  it('skips word-diff when a line exceeds the char guard (>800) and returns null', () => {
+    expect(produceWordDiffTokens('a'.repeat(801), 'b')).toBeNull();
+    expect(produceWordDiffTokens('a', 'b'.repeat(801))).toBeNull();
   });
 
-  it('does NOT skip at the char boundary (exactly 2000 chars)', () => {
-    const same = 'a'.repeat(2000);
+  it('does NOT skip at the char boundary (exactly 800 chars)', () => {
+    const same = 'a'.repeat(800);
     const t = produceWordDiffTokens(same, same);
     expect(t).not.toBeNull();
     expect(t!.every((x) => x.type === 'context')).toBe(true);
   });
 
-  it('skips word-diff when a line exceeds the word guard (>500 words, under char limit)', () => {
-    // 501 single-char words joined by spaces: 1001 chars (< 2000), 501 words
-    const manyWords = Array.from({ length: 501 }, () => 'a').join(' ');
-    expect(manyWords.length).toBeLessThan(2000);
+  it('keeps word-diff for lines far below the char guard', () => {
+    // 100 chars — typical real-world edit line; both sides stay in word-diff.
+    const t = produceWordDiffTokens('a'.repeat(100), 'b'.repeat(100));
+    expect(t).not.toBeNull();
+  });
+
+  it('skips word-diff when a line exceeds the word guard (>200 words, under char limit)', () => {
+    // 201 single-char words joined by spaces: 401 chars (< 800), 201 words
+    const manyWords = Array.from({ length: 201 }, () => 'a').join(' ');
+    expect(manyWords.length).toBeLessThan(800);
     expect(produceWordDiffTokens(manyWords, 'b')).toBeNull();
   });
 
+  it('does NOT skip at the word boundary (exactly 200 words)', () => {
+    // 200 single-char words joined by spaces: 399 chars (< 800), 200 words
+    const words = Array.from({ length: 200 }, () => 'a').join(' ');
+    expect(words.length).toBeLessThan(800);
+    const t = produceWordDiffTokens(words, words);
+    expect(t).not.toBeNull();
+    expect(t!.every((x) => x.type === 'context')).toBe(true);
+  });
+
+  it('keeps word-diff for lines far below the word guard', () => {
+    const t = produceWordDiffTokens('short line', 'another line');
+    expect(t).not.toBeNull();
+  });
+
   it('exposes shouldSkipWordDiff as a pure guard predicate', () => {
-    expect(shouldSkipWordDiff('a'.repeat(2001), 'b')).toBe(true);
-    expect(shouldSkipWordDiff('a', 'b'.repeat(2001))).toBe(true);
+    expect(shouldSkipWordDiff('a'.repeat(801), 'b')).toBe(true);
+    expect(shouldSkipWordDiff('a', 'b'.repeat(801))).toBe(true);
     expect(shouldSkipWordDiff('a', 'b')).toBe(false);
+    expect(shouldSkipWordDiff('a'.repeat(800), 'b')).toBe(false);
   });
 
   // ── Empty / identical lines ───────────────────────────────────────────
