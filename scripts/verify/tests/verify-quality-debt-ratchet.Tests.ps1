@@ -171,25 +171,25 @@ Invoke-NegativeCase "unregistered soft gate" {
 
 Invoke-NegativeCase "directory exclusion widening" {
     param($fixture)
-    $configPath = Join-Path $fixture "hub-server/.golangci.yml"
+    $configPath = Join-Path $fixture "edge-server/.golangci.yml"
     $config = Get-Content -Raw -LiteralPath $configPath
-    $config = $config.Replace('path: internal/config/config\.go', 'path: internal/config/.*\.go')
+    $config = $config.Replace('path: internal/adapters/parser_ndjson\.go', 'path: internal/adapters/.*\.go')
     Write-Utf8NoBom $configPath $config
 
     $baselinePath = Join-Path $fixture $BaselineRelative
     $baseline = Get-Content -Raw -LiteralPath $baselinePath | ConvertFrom-Json -AsHashtable
-    $baseline.golangci_exclusions[0].path = 'internal/config/.*\.go'
+    $baseline.golangci_exclusions[0].path = 'internal/adapters/.*\.go'
     Write-Utf8NoBom $baselinePath ($baseline | ConvertTo-Json -Depth 20)
 } 'QDR-SCHEMA'
 
 Invoke-NegativeCase "linter-set drift" {
     param($fixture)
-    $path = Join-Path $fixture "hub-server/.golangci.yml"
+    $path = Join-Path $fixture "edge-server/.golangci.yml"
     $text = Get-Content -Raw -LiteralPath $path
-    $pattern = '(?ms)(      - linters:\r?\n          - gocognit\r?\n)(        path: internal/config/config\\\.go)'
+    $pattern = '(?ms)(      - linters:\r?\n          - cyclop\r?\n          - gocognit\r?\n          - gocyclo\r?\n)(        path: internal/adapters/parser_ndjson\\\.go)'
     $text = [regex]::Replace($text, $pattern, {
         param($match)
-        return $match.Groups[1].Value + "          - gocyclo`n" + $match.Groups[2].Value
+        return $match.Groups[1].Value + "          - errcheck`n" + $match.Groups[2].Value
     }, 1)
     Write-Utf8NoBom $path $text
 } 'QDR-LINTER-MISMATCH'
@@ -212,14 +212,14 @@ Invoke-NegativeCase "missing review_by" {
 
 Invoke-NegativeCase "path traversal exclusion" {
     param($fixture)
-    $configPath = Join-Path $fixture "hub-server/.golangci.yml"
+    $configPath = Join-Path $fixture "edge-server/.golangci.yml"
     $config = Get-Content -Raw -LiteralPath $configPath
-    $config = $config.Replace('path: internal/config/config\.go', 'path: ../edge-server/internal/api/handlers\.go')
+    $config = $config.Replace('path: internal/adapters/parser_ndjson\.go', 'path: ../hub-server/internal/app/events\.go')
     Write-Utf8NoBom $configPath $config
 
     $baselinePath = Join-Path $fixture $BaselineRelative
     $baseline = Get-Content -Raw -LiteralPath $baselinePath | ConvertFrom-Json -AsHashtable
-    $baseline.golangci_exclusions[0].path = '../edge-server/internal/api/handlers\.go'
+    $baseline.golangci_exclusions[0].path = '../hub-server/internal/app/events\.go'
     Write-Utf8NoBom $baselinePath ($baseline | ConvertTo-Json -Depth 20)
 } 'QDR-SCHEMA'
 
