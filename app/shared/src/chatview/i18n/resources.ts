@@ -359,6 +359,9 @@ export const chatviewResources = {
     'aria.toggleTheme': '切换主题',
     'aria.conversationSidebar': 'Conversation sidebar',
 
+    // ═══ Live region announcements（#1503）═══
+    'a11y.approvalArrived': '收到审批请求：{{tool}}',
+
     // ═══ Shell a11y ═══
     'a11y.skipToContent': '跳到主要内容',
 
@@ -863,6 +866,9 @@ export const chatviewResources = {
     'aria.settings': 'Settings',
     'aria.toggleTheme': 'Toggle theme',
     'aria.conversationSidebar': 'Conversation sidebar',
+
+    // ═══ Live region announcements (#1503) ═══
+    'a11y.approvalArrived': 'Approval request received: {{tool}}',
 
     // ═══ Shell a11y ═══
     'a11y.skipToContent': 'Skip to main content',
