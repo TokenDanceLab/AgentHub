@@ -146,7 +146,7 @@ corepack.cmd pnpm exec vite build
 文档/API：
 
 ```bash
-pwsh ./scripts/verify/verify-doc-ssot.ps1
+python scripts/verify/verify-doc-ssot.py
 pwsh ./scripts/verify/verify-project-skills.ps1
 pwsh ./scripts/verify/verify-real-e2e-contract.ps1
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
