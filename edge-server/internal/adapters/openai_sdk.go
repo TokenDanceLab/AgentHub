@@ -17,9 +17,9 @@ import (
 // orchestration; request/SSE/types moved to companion files.
 
 const (
-	openaiSDKAdapterID    = "openai-sdk"
-	openaiDefaultModel    = "gpt-5.5"
-	openaiDefaultBaseURL  = "https://api.openai.com"
+	openaiSDKAdapterID   = "openai-sdk"
+	openaiDefaultModel   = "gpt-5.5"
+	openaiDefaultBaseURL = "https://api.openai.com"
 	// OpenAIHTTPTimeout is the per-request timeout for the shared SDK outbound
 	// client (streaming chat completions can idle for a long time between
 	// chunks). The composition root passes it to edgehttp.NewClient (#1592).

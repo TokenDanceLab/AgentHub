@@ -17,10 +17,10 @@ import (
 // orchestration; request/SSE/types moved to companion files.
 
 const (
-	anthropicSDKAdapterID    = "anthropic-sdk"
-	anthropicDefaultModel    = "claude-sonnet-4-6"
-	anthropicDefaultBaseURL  = "https://api.anthropic.com"
-	anthropicAPIVersion      = "2023-06-01"
+	anthropicSDKAdapterID   = "anthropic-sdk"
+	anthropicDefaultModel   = "claude-sonnet-4-6"
+	anthropicDefaultBaseURL = "https://api.anthropic.com"
+	anthropicAPIVersion     = "2023-06-01"
 	// AnthropicHTTPTimeout is the per-request timeout for the shared SDK
 	// outbound client (streaming messages can idle for a long time between
 	// chunks). The composition root passes it to edgehttp.NewClient (#1592).
