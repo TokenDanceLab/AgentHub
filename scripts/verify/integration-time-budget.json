@@ -1,0 +1,65 @@
+{
+ "_comment": "Integration/test lane wall-clock budgets (#1565). Each lane has budget_seconds (asserted when a CI step measures the lane and calls verify-integration-time-budget.ps1 -Lane <name> -MeasuredSeconds <n>) and hard_cap_seconds (job/go-test timeout, the fail-closed ceiling). Budgets are generous vs observed CI durations so normal jitter never trips them, but lane growth beyond budget requires an explicit baseline update (tracked approval with owner/review/rationale). Evidence rows are the observed durations with run/date references.",
+ "hub-integration": {
+  "budget_seconds": 300,
+  "hard_cap_seconds": 1200,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "hub-server/tests/integration lane (go test -tags integration, real PostgreSQL+Redis). CI test-step observed 39-46s; budget 300s = 5min headroom; hard cap 1200s = go test -timeout=20m (job timeout-minutes 25).",
+  "evidence": [
+   { "date": "2026-08-03", "run": 30841959028, "seconds": 41 },
+   { "date": "2026-08-03", "run": 30828713463, "seconds": 41 },
+   { "date": "2026-08-03", "run": 30825851111, "seconds": 39 },
+   { "date": "2026-08-03", "run": 30819781608, "seconds": 41 },
+   { "date": "2026-08-03", "run": 30815750577, "seconds": 46 }
+  ]
+ },
+ "hub-short": {
+  "budget_seconds": 300,
+  "hard_cap_seconds": 600,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "go-hub 'Test (unit only, skip integration)' step. CI observed 48s; budget 300s; hard cap 600s = go test default -timeout=10m.",
+  "evidence": [
+   { "date": "2026-08-03", "run": 30841959028, "seconds": 48 }
+  ]
+ },
+ "hub-race": {
+  "budget_seconds": 480,
+  "hard_cap_seconds": 600,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "go-hub 'Race detection' step. CI observed 135s; budget 480s = 8min; hard cap 600s = go test default -timeout=10m.",
+  "evidence": [
+   { "date": "2026-08-03", "run": 30841959028, "seconds": 135 }
+  ]
+ },
+ "edge-short": {
+  "budget_seconds": 300,
+  "hard_cap_seconds": 600,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "go-edge 'Test (unit only, skip integration)' step. CI observed 41s; budget 300s; hard cap 600s = go test default -timeout=10m.",
+  "evidence": [
+   { "date": "2026-08-03", "run": 30841959028, "seconds": 41 }
+  ]
+ },
+ "edge-race": {
+  "budget_seconds": 480,
+  "hard_cap_seconds": 600,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "go-edge 'Race detection' step. CI observed 91s; budget 480s = 8min; hard cap 600s = go test default -timeout=10m.",
+  "evidence": [
+   { "date": "2026-08-03", "run": 30841959028, "seconds": 91 }
+  ]
+ },
+ "edge-e2e": {
+  "budget_seconds": 300,
+  "hard_cap_seconds": 600,
+  "owner": "DeliciousBuding",
+  "review": "2026-11-02",
+  "rationale": "edge-server/tests hub_e2e lane (subprocess protocol, skipped by -short in CI, runs locally). Not measured in CI; local-run evidence to be appended as it accumulates.",
+  "evidence": []
+ }
+}
