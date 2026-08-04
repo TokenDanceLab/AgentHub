@@ -154,7 +154,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     queryKey: activeHubSessionId
       ? webActiveAgentTaskQueryKey(activeHubSessionId)
       : ['web-v4', 'active-agent-task', 'none'],
-    queryFn: () => readStoredWebActiveAgentTask(activeHubSessionId!),
+    queryFn: () => {
+      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
+      return readStoredWebActiveAgentTask(activeHubSessionId);
+    },
     enabled: Boolean(activeHubSessionId),
     staleTime: Number.POSITIVE_INFINITY,
     placeholderData: (previous) => previous,
@@ -171,7 +174,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
 
   const messages = useQuery({
     queryKey: ['web-v4', 'hub-messages', activeHubSessionId],
-    queryFn: () => hubClient.getMessages(activeHubSessionId!, { limit: 80 }),
+    queryFn: () => {
+      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
+      return hubClient.getMessages(activeHubSessionId, { limit: 80 });
+    },
     enabled: Boolean(activeHubSessionId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
@@ -179,28 +185,40 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
 
   const replayedRuntimeEvents = useQuery({
     queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId],
-    queryFn: () => hubClient.listTaskRunEvents(activeAgentTaskId!),
+    queryFn: () => {
+      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
+      return hubClient.listTaskRunEvents(activeAgentTaskId);
+    },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskSummary = useQuery({
     queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId],
-    queryFn: () => hubClient.getTaskRunEventSummary(activeAgentTaskId!),
+    queryFn: () => {
+      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
+      return hubClient.getTaskRunEventSummary(activeAgentTaskId);
+    },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskApprovals = useQuery({
     queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId],
-    queryFn: () => hubClient.listTaskApprovals(activeAgentTaskId!),
+    queryFn: () => {
+      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
+      return hubClient.listTaskApprovals(activeAgentTaskId);
+    },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskArtifacts = useQuery({
     queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId],
-    queryFn: () => hubClient.listTaskArtifacts(activeAgentTaskId!),
+    queryFn: () => {
+      if (!activeAgentTaskId) throw new Error('activeAgentTaskId is required');
+      return hubClient.listTaskArtifacts(activeAgentTaskId);
+    },
     enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
@@ -208,7 +226,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
 
   const pinnedMessages = useQuery({
     queryKey: ['web-v4', 'hub-pins', activeHubSessionId],
-    queryFn: () => hubClient.listPinnedMessages(activeHubSessionId!),
+    queryFn: () => {
+      if (!activeHubSessionId) throw new Error('activeHubSessionId is required');
+      return hubClient.listPinnedMessages(activeHubSessionId);
+    },
     enabled: Boolean(activeHubSessionId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,

@@ -53,8 +53,12 @@ export function workspaceProjectToProjectInfo(
   const messages = projectGroupItems(group?.messages);
   const parsedMessages = messages.map(parseWorkspaceProjectThreadMessageContent);
   const queueRuns = parsedMessages
-    .map((parsed, index) => projectQueueRunFromMessage(messages[index]!, parsed))
-    .filter((run): run is ProjectInfo['runs'][number] => Boolean(run));
+    .flatMap((parsed, index) => {
+      const message = messages[index];
+      if (!message) return [];
+      const run = projectQueueRunFromMessage(message, parsed);
+      return run ? [run] : [];
+    });
   const threadRuns = threads.map(projectThreadToRun);
   const members = uniqueNonEmpty([
     ...threads.map((thread) => thread.role),
