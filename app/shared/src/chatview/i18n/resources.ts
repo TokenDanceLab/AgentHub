@@ -285,6 +285,15 @@ export const chatviewResources = {
     'context.delete': '删除',
     'context.edit': '编辑',
 
+    // ═══ Conversation actions（#1508）═══
+    'context.renameConversation': '重命名',
+    'context.copyConversationLink': '复制链接',
+    'context.deleteConversation': '删除',
+    'conversation.deleteTitle': '删除会话',
+    'conversation.deleteBody': '确定要删除会话“{{title}}”吗？此操作不可撤销。',
+    'conversation.deleteConfirm': '删除',
+    'conversation.cancel': '取消',
+
     // ═══ Forward picker (#1385) ═══
     'forward.confirm': '确认转发',
     'forward.cancel': '取消',
@@ -427,6 +436,7 @@ export const chatviewResources = {
     'aria.diffPreview': 'Diff 预览',
     'aria.markdownPreview': 'Markdown 预览',
     'aria.searchConversations': '搜索会话',
+    'aria.renameConversation': '重命名会话',
     'aria.sortConversations': '排序方式',
     'aria.pinned': '已置顶',
     'aria.archive': '归档',
@@ -793,6 +803,15 @@ export const chatviewResources = {
     'context.delete': 'Delete',
     'context.edit': 'Edit',
 
+    // ═══ Conversation actions (#1508) ═══
+    'context.renameConversation': 'Rename',
+    'context.copyConversationLink': 'Copy link',
+    'context.deleteConversation': 'Delete',
+    'conversation.deleteTitle': 'Delete conversation',
+    'conversation.deleteBody': 'Delete conversation "{{title}}"? This cannot be undone.',
+    'conversation.deleteConfirm': 'Delete',
+    'conversation.cancel': 'Cancel',
+
     // ═══ Forward picker (#1385) ═══
     'forward.confirm': 'Forward',
     'forward.cancel': 'Cancel',
@@ -935,6 +954,7 @@ export const chatviewResources = {
     'aria.diffPreview': 'Diff preview',
     'aria.markdownPreview': 'Markdown preview',
     'aria.searchConversations': 'Search conversations',
+    'aria.renameConversation': 'Rename conversation',
     'aria.sortConversations': 'Sort conversations',
     'aria.pinned': 'Pinned',
     'aria.archive': 'Archive',

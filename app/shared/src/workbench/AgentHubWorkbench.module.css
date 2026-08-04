@@ -398,6 +398,79 @@
   color: var(--text-2);
 }
 
+/* ── #1508: inline rename row ──────────────────────────────────────── */
+.conversationRenameForm {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: var(--wb-gap-2xs, 6px) var(--wb-gap-xs, 10px);
+}
+
+.conversationRenameInput {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--wb-gap-2xs, 6px);
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+}
+
+.conversationRenameInput:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ── #1508: delete-confirm dialog ──────────────────────────────────── */
+.conversationDeleteContent {
+  width: min(360px, calc(100vw - 32px));
+}
+
+.conversationDeleteText {
+  margin: 0 0 var(--wb-gap-sm, 12px);
+  color: var(--text-2);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.conversationDeleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--wb-gap-xs, 10px);
+}
+
+.conversationDeleteCancel,
+.conversationDeleteConfirm {
+  min-height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  cursor: pointer;
+  font: inherit;
+}
+
+.conversationDeleteCancel:hover,
+.conversationDeleteConfirm:hover {
+  background: var(--surface-high);
+}
+
+.conversationDeleteConfirm {
+  border-color: transparent;
+  background: var(--danger);
+  color: var(--text-inv, #fff);
+}
+
+.conversationDeleteConfirm:hover {
+  background: var(--danger);
+  filter: brightness(0.94);
+}
+
 .conversationAvatar {
   position: relative;
   width: 30px;
