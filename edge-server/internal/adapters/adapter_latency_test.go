@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func BenchmarkSDKAdapterLatency(b *testing.B) {
 	b.Run("anthropic_sdk", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			adapter := NewAnthropicSDKAdapter("test-key-not-used", "claude-sonnet-4-6")
+			adapter := NewAnthropicSDKAdapter("test-key-not-used", "claude-sonnet-4-6", &http.Client{})
 			adapter.BuildCommand(runCtx)
 			_ = adapter.buildMessages(runCtx)
 		}
@@ -37,7 +38,7 @@ func BenchmarkSDKAdapterLatency(b *testing.B) {
 	b.Run("openai_sdk", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			adapter := NewOpenAISDKAdapter("test-key-not-used", "gpt-5.5")
+			adapter := NewOpenAISDKAdapter("test-key-not-used", "gpt-5.5", &http.Client{})
 			adapter.BuildCommand(runCtx)
 			_ = adapter.buildMessages(runCtx)
 		}
@@ -63,7 +64,7 @@ func TestSDKAdapterLatencyBaseline(t *testing.T) {
 
 	t.Run("anthropic_sdk", func(t *testing.T) {
 		start := time.Now()
-		adapter := NewAnthropicSDKAdapter("test-key-not-used", "claude-sonnet-4-6")
+		adapter := NewAnthropicSDKAdapter("test-key-not-used", "claude-sonnet-4-6", &http.Client{})
 		adapter.BuildCommand(runCtx)
 		_ = adapter.buildMessages(runCtx)
 		elapsed := time.Since(start)
@@ -76,7 +77,7 @@ func TestSDKAdapterLatencyBaseline(t *testing.T) {
 
 	t.Run("openai_sdk", func(t *testing.T) {
 		start := time.Now()
-		adapter := NewOpenAISDKAdapter("test-key-not-used", "gpt-5.5")
+		adapter := NewOpenAISDKAdapter("test-key-not-used", "gpt-5.5", &http.Client{})
 		adapter.BuildCommand(runCtx)
 		_ = adapter.buildMessages(runCtx)
 		elapsed := time.Since(start)

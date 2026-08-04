@@ -16,6 +16,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
+	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/httpserver"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/security"
@@ -632,10 +633,15 @@ func registerManifestAdapters(reg *adapters.Registry, cfg config) {
 // registerSDKAdapters registers the direct HTTP API adapters (no CLI
 // subprocess needed). When the flag value is "env" or empty, the API key is
 // read from the corresponding environment variable.
+//
+// The shared outbound client is built here at the composition root via
+// edgehttp.NewClient and injected into both SDK adapters (#1592): one client
+// per adapter (connection reuse across retries), redirect refusal and the
+// long streaming timeout come from the edgehttp policy primitive.
 func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	if cfg.AnthropicSDKPath != "" {
 		apiKey := resolveSDKAPIKey(cfg.AnthropicSDKPath, "ANTHROPIC_API_KEY")
-		a := adapters.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel)
+		a := adapters.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(adapters.AnthropicHTTPTimeout))
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register anthropic-sdk adapter", "err", err)
 		} else {
@@ -644,7 +650,7 @@ func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	}
 	if cfg.OpenAISDKPath != "" {
 		apiKey := resolveSDKAPIKey(cfg.OpenAISDKPath, "OPENAI_API_KEY")
-		a := adapters.NewOpenAISDKAdapter(apiKey, cfg.AgentModel)
+		a := adapters.NewOpenAISDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(adapters.OpenAIHTTPTimeout))
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register openai-sdk adapter", "err", err)
 		} else {
