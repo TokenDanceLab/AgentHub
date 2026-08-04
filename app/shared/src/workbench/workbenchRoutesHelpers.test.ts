@@ -71,6 +71,40 @@ describe('buildContactsPageProps', () => {
     expect(props.starredContacts).toHaveLength(1);
     expect(Object.prototype.hasOwnProperty.call(props, 'onMemberClick')).toBe(false);
   });
+
+  it('wires infinite-scroll pagination from the route (#1510)', () => {
+    const onLoadMore = vi.fn();
+    const route = {
+      contactsPane: 'internal',
+      setContactsPane: vi.fn(),
+      contactsData: { members: [] },
+      handleMemberClick: undefined,
+      contactsActions: undefined,
+      hasMore: true,
+      loadingMore: false,
+      onLoadMore,
+    } as unknown as WorkbenchContactsRoute;
+
+    const props = buildContactsPageProps(route);
+    expect(props.hasMore).toBe(true);
+    expect(props.loadingMore).toBe(false);
+    expect(props.onLoadMore).toBe(onLoadMore);
+
+    // Inert pagination (parent-owned data) stays unassigned.
+    const inertRoute = {
+      contactsPane: 'internal',
+      setContactsPane: vi.fn(),
+      contactsData: { members: [] },
+      handleMemberClick: undefined,
+      contactsActions: undefined,
+      hasMore: false,
+      loadingMore: false,
+      onLoadMore: undefined,
+    } as unknown as WorkbenchContactsRoute;
+    const inertProps = buildContactsPageProps(inertRoute);
+    expect(inertProps.hasMore).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(inertProps, 'onLoadMore')).toBe(false);
+  });
 });
 
 describe('buildDocsPageProps', () => {

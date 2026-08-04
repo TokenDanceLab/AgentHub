@@ -121,7 +121,9 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(cardActionLabel('unknown', 'x', t)).toBe('toast.actionRecorded');
     expect(multiActionLabel('delete', 3, t)).toBe('toast.multiDelete:3');
     expect(multiActionLabel('other', 2, t)).toBe('toast.multiProcessed:2');
-    expect(cardLinkForBlock('b9')).toBe('agenthub://card/b9');
+    // #1504: card links are openable web URLs, never the dead custom scheme.
+    expect(cardLinkForBlock('b9')).toMatch(/^https?:\/\//);
+    expect(cardLinkForBlock('b9')).not.toContain('agenthub://');
   });
 
   it('detects nested interactive targets inside a selectable card', () => {

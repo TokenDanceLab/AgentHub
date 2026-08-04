@@ -107,12 +107,10 @@ export function planContextAction(options: {
     effects.push({ type: 'copy', text: copyText });
   }
   if (action === 'link') {
-    // TODO(#1504 copyLink): `agenthub://card/<blockId>` is a custom scheme with no
-    // registered handler — copying it yields a dead link. Needs a product
-    // decision (scheme handler registration or a real shareable URL) before
-    // this copy can be useful; see cardLinkForBlock in
-    // workbenchTranscriptChromeLabels.ts.
-    effects.push({ type: 'copy', text: cardLinkForBlock(blockId) });
+    // #1504: copy an in-app URL that opens on Web/Desktop (session hash
+    // route, `#/session/<sessionId>?block=<blockId>`) instead of the dead
+    // `agenthub://card/<blockId>` custom scheme; see cardLinkForBlock.
+    effects.push({ type: 'copy', text: cardLinkForBlock(blockId, sessionId) });
   }
   if (action === 'delete') {
     effects.push({ type: 'softHide', blockIds: [blockId] });
