@@ -201,6 +201,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       if (!typedHandlers.has(type)) {
         typedHandlers.set(type, new Set());
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- just Set() above guarantees existence
       typedHandlers.get(type)!.add(handler);
       return () => {
         typedHandlers.get(type)?.delete(handler);
