@@ -197,7 +197,7 @@ Assert-StepContinueOnError $validate "Self-test quality-debt ratchet (negative)"
 Assert-Contains $validate "Verify project skill whitelist" "validate job must run the project skill whitelist verifier"
 Assert-Contains $validate "scripts/verify/verify-project-skills\.ps1" "validate job must call scripts/verify/verify-project-skills.ps1"
 $docSsotStep = Get-StepBlock $validate "Verify doc SSOT"
-Assert-Contains $docSsotStep "scripts/verify/verify-doc-ssot\.ps1" "doc SSOT step must call scripts/verify/verify-doc-ssot.ps1"
+Assert-Contains $docSsotStep "scripts/verify/verify-doc-ssot\.py" "doc SSOT step must call scripts/verify/verify-doc-ssot.py"
 Assert-StepContinueOnError $validate "Verify doc SSOT" $false
 
 $docEntrypointSelfTestStep = Get-StepBlock $validate "Self-test doc entrypoint SSOT"

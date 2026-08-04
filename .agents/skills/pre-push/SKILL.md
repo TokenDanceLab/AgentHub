@@ -13,7 +13,7 @@ Prefer focused gates while iterating, then run the gates that match the touched 
 git diff --check
 bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-project-skills.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-doc-ssot.ps1
+python scripts/verify/verify-doc-ssot.py
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-ci-gates.ps1
 bash ./scripts/verify/verify-ci-gates.sh
 ```

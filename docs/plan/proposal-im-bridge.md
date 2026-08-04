@@ -813,7 +813,7 @@ agent 配置管理        不支持        不支持        支持
 - 所有 Go 单测通过（`go test ./internal/im/... -count=1`）
 - fixture 测试：使用 mock 飞书 API 验证完整推送链路
 - 真实飞书 bot 发出一条测试通知（`real_tested=false` 标记为 fixture 阶段，approved-real 需要真实飞书群截图）
-- `verify-doc-ssot.ps1` 通过
+- `verify-doc-ssot.py` 通过
 - migration up + down 在测试 PG 上验证
 
 ### Phase 2：审批卡回调 + 账号绑定
