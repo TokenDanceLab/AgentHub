@@ -20,7 +20,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | ~~Hub integration~~ | **RESOLVED 2026-08-02** — errcode lowercase contract, admin fixture (AGENTHUB_ADMIN_USERS), OIDC config injection, refresh_token FK device seeding, OIDC E2E UUID/scopes/shared-cache SQLite, TeamRun guardrail messages, execution-target ping projection | merged in #1489 |
 | ~~TokenDance ID defaults~~ | **RESOLVED 2026-08-02** — issuer default switched to id.tokendancelab.com; check-secrets.sh now exempts `*_URL` endpoint assignments (TOKENDANCE name contains "token" → false positive) | merged in #1480 |
 | ~~Frontend coverage gate~~ | **RESOLVED 2026-08-02** — web 63.14→66.72 lines (executionTargetQueries/hubAuth/toastStore tests, #1490); desktop tests (#1488); master CI green on 36a24a4b | merged #1490/#1488 |
-| ~~Frontend coverage truth (#1535)~~ | **RESOLVED 2026-08-02** — include contract: all four packages count every production `src/**/*.ts(x)` in the denominator via `app/test-config/coverage.ts` factory (behavior-identical for shared: 76.43/74.82/74.01/70.48 unchanged). Untested modules revealed: web 66.96→64.69, desktop 71.82→49.29, mobile 80.5→36.19 lines (previous numbers excluded unimported files). Absolute floors per package (web 63/62/53/57, desktop 48/46/40/39, mobile 35/34/26/21, shared 60) + baseline non-regression + uncovered_files ratchet (0%-line production modules must not grow; negative self-test proves a probe file is counted 0% and trips it) + production_files==0 fail-closed. Narrow exclusions only: `__e2e__` Playwright specs (default), `main.tsx` pure entry. Improvement targets recorded in baseline note (all dims → 60). | merged in #1552 |
+| ~~Frontend coverage truth (#1535)~~ | **RESOLVED 2026-08-02** — include contract: 4 包按 production `src/**/*.ts(x)` 全量计入分母（factory `app/test-config/coverage.ts`）；绝对下限 + baseline 非回归 + uncovered_files ratchet + 负向自测；未导入模块暴露 web 64.69 / desktop 49.29 / mobile 36.19 / shared 76.43 lines | merged in #1552 |
 | ~~Edge lint debt~~ | **RESOLVED 2026-08-02** — 102→0 golangci-lint issues via pure extraction refactors (RegisterRoutes 69→14 sub-functions, PostRuns 123→~12, parseSSEStream 74→state+handlers…); `*.go text eol=lf` in .gitattributes fixes Windows CRLF gofmt churn | merged in #1491 |
 | CI quality-debt ratchet (#1536) | **PHASE 1 IN REVIEW 2026-08-03** — soft gates and exact-file golangci exclusions are registered with issue/owner/introduced_at/review_by; CI self-tests unregistered gates, directory widening, linter drift, zombie entries, runtime dependency mutation, budget increase and unexplained deadline extension. Edge lint is hard-fail. Conventional Commit verification is path-independent and fail-closed in `validate` (#1576). All complexity exclusions repaid 2026-08-04 (#1606 hub / #1611 edge; `quality-debt-baseline.json` `golangci_exclusions` now empty; negative self-tests use a synthetic fixture row). Remaining debt stays separate: Edge race #1571, Hub lint findings #1573, gosec findings #1574, Desktop lint #1575 | #1570; #1536 remains open |
 
@@ -32,10 +32,10 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | ACP migration | Official ACP adapters exist; filesystem/terminal frames, timeout policy, registration, and approved real-run evidence remain | #1404 |
 | Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆；Step 0 合同 SSOT 抽离完成（#1526：合同迁入 `internal/orchestration`，adapters alias 零调用点改动，3 项回归门禁）；Step 2 完成（#1566：13 个 orchestrator 源文件 + plan_approval.go 迁入 `internal/adapters/orchestrator` 叶子包，叶子仅依赖合同与窄 ports，composition root 装配，`scripts/verify/verify-orchestrator-deps.ps1` 依赖方向门禁 + 负向自测）—— 已关闭 | #1526 → #1566 |
 | Shared boundary hardening | A-V3 已裁决（#1523）：拒绝全量 shared 三分；quick-wins 与隔离门禁硬化均已落地（apiClient.ts 删除、`workspace:*` 显式依赖、edge 隔离门禁违规 exit 1 + 正负向自测） | #1525 |
-| Release signing | SPEC draft on `docs/spec-release-signing` (proposal-desktop-release-signing.md, unmerged); needs review + merge | #1403 |
+| Release signing | SPEC draft on `docs/plan/proposal-desktop-release-signing.md`, unmerged; needs review + merge | #1403 |
 | Workbench 契约切片（projects 先行） | #1546 完成：shared Workbench 对 concrete HubClient 的 type/value 引用清零，改用窄领域端口 `WorkbenchProjectsPort`（`shared/workbench/workbenchProjectsPort.ts`），Desktop/Web composition root 各实现一个 adapter 注入；projects route 单一 ownership（parent-managed 或 port，不再运行时猜测）；load-more 失败可见、可重试（UI + i18n zh/en）；`verify-shared-ui-hubclient.ps1` 升级为同时禁止 type 引用。这是 #1528 的 projects slice（agents/catalog 收口后续单独切片） | #1546, #1528 |
-| WebSocket incremental sync | SPEC draft on `docs/spec-ws-incremental-sync` (proposal-ws-incremental-sync.md, unmerged); needs review + merge | #1411 |
-| IM bridge (Feishu first) | SPEC draft on `docs/spec-im-bridge` (proposal-im-bridge.md, unmerged); not yet an issue | — |
+| WebSocket incremental sync | SPEC draft on `docs/plan/proposal-ws-incremental-sync.md`, unmerged; needs review + merge | #1411 |
+| IM bridge (Feishu first) | SPEC draft on `docs/plan/proposal-im-bridge.md`, unmerged | #1496 |
 | Automations and session import | Product backlog | #1405, #1407 |
 
 ## Maintainability program
@@ -51,11 +51,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 
 ### Database tests
 
-Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/integration/setup_test.go` 动态扫描当前 schema、排除 `schema_migrations`、`TRUNCATE ... RESTART IDENTITY CASCADE`、错误即失败，新表自动发现。
-
-测试分层已落地（#1524）：integration lane 移入 `hub-server/tests/integration/`（`//go:build integration` 作 lane manifest，默认 -short lane 不再编译它）；package-wide `-short` 逃生口已移除；默认 lane 与 integration lane 均在 CI 断言非零测试数。
-
-弱断言修复已落地（#1533）：WS upgrade（401/101+auth.ok 硬断言）、agent-task callbacks（seed DB 全状态机 + 状态转换断言 + negative 分离）、buffer-full（容量 seam 必命中）、heartbeat（interval seam 确定性验证）、Redis restart seq 连续性（DB 镜像 + 恢复，修复并发分配重复 seq 回归）；integration 全量 126 PASS / 0 FAIL。
+Catalog-driven 表清理（#1485/#1486/#1489）、integration lane 移入 `hub-server/tests/integration/`（#1524）、弱断言修复（#1533：WS upgrade / agent-task callbacks / buffer-full / heartbeat / Redis seq；integration 全量 126 PASS）均已落地。
 
 1. Introduce composable SQLite fixture modules for auth, messaging, and agent-team tests instead of maintaining dozens of shadow schemas.
 2. Keep a PostgreSQL schema contract for migration, index, UUID, FK, and dialect semantics. Do not move every fast test to Testcontainers.
@@ -71,15 +67,14 @@ Catalog-driven 表清理已落地（#1485/#1486/#1489）：`hub-server/tests/int
 
 #### Visual QA gate 状态
 
-当前 Visual QA gate: **89/100 Ship**（Phases 74-78，2026-07-20）。7/9 维度满分。剩余 Type/Motion/Empty 需交互测试或跨组件改动，已触及静态截图方法论天花板。规则本身见 `AGENTS.md` §5 前端规范（UI 改动用自动化 Playwright + Visual QA 证明）。
+Visual QA gate **89/100 Ship**（Phases 74-78，2026-07-20）已收口为历史波次；剩余 Type/Motion/Empty 需交互测试。规则见 `AGENTS.md` §5；已完成波次指针见 `docs/roadmap.md` 已完成波次表。
 
 ### Deployment and knowledge SSOT
 
-1. Land #1480 before editing the overlapping issuer line in the production compose template.
-2. Align `deployments/production/docker-compose.yml` with the non-secret live service shape and make CI validate that authoritative template.
-3. Rename or narrow workflows that only publish images/readiness reports; do not label an `echo` step as a production deployment.
-4. Keep live topology in the external server STATE. Product docs should link to it instead of copying Azure/local-PG claims.
-5. This file contains current work only. Completed wave narratives belong in Git history or the external archive indexed by `docs/history.md`.
+1. Align `deployments/production/docker-compose.yml` with the non-secret live service shape and make CI validate that authoritative template（#1480 已完成，issuer 默认值已切换）。
+2. Rename or narrow workflows that only publish images/readiness reports; do not label an `echo` step as a production deployment.
+3. Keep live topology in the external server STATE. Product docs should link to it instead of copying Azure/local-PG claims.
+4. This file contains current work only. Completed wave narratives belong in Git history or the external archive indexed by `docs/history.md`.
 
 ## Evidence boundaries
 

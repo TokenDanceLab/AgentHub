@@ -41,6 +41,8 @@ docs/
 |------|------|
 | 当前 spec-driven 进度 | [progress/MASTER.md](progress/MASTER.md)（活 SSOT） |
 | 总路线与验收边界 | [roadmap.md](roadmap.md) |
+| API 索引 | [api-reference.md](api-reference.md) |
+| 模块架构 | [architecture/README.md](architecture/README.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
 | 现役 SPEC | [plan/](plan/)（历史 plan 见 [archives/plan/](archives/plan/)） |

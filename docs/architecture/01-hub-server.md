@@ -93,7 +93,7 @@ Remote/cloud execution claims require relay/provisioning/device proof/workspace 
 | Handler/service/repository | `cd hub-server; go test ./... -short -count=1` or narrower focused package |
 | REST contract | OpenAPI YAML parse + affected handler tests |
 | WS event behavior | Hub WS tests + `api/events.md` sync |
-| Auth/session | OIDC/session tests + `scripts/verify/verify-oidc-readiness.ps1` if config shape changed |
+| Auth/session | OIDC/session tests（配置形状门禁 KNOWN-OBSOLETE，重写待办见 `AGENTS.md` §9.5） |
 | Performance/leak path | [../reference/backend-performance-gates.md](../reference/backend-performance-gates.md) plus behavior test for the same path |
 
 ## Related

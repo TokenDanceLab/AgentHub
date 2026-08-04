@@ -21,14 +21,12 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 
 ### ACP 迁移（2026-08，对标 codeg 官方 Wrapper）
 
-用户产品纠正：ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已切换官方 ACP：
+用户产品纠正：ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已接入官方 ACP 层（spike 状态，未切默认执行路径）：
 
 - **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
 - **runtime 共享层**：`acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`，修正 3 旧手写错误）+ `acp_client.go`（client skeleton）
 - **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议；3 CLI parser 迁移完成）
-- **诚实 TODO**：`AcpAdapter` 无注册点（spike，main.go flag 默认 off）；fs/terminal 帧设计待管理员 RFC；无超时；真跑验证需 ANTHROPIC_API_KEY/OPENAI_API_KEY + npx registry 网络
-
-详见 memory `agenthub-acp-official-wrapper` + 调研报告 `D:\Code\Temp\codeg-research\agenthub-acp-go-migration.md`。
+- **诚实 TODO**：`AcpAdapter` 无注册点（spike，main.go flag 默认 off）；fs/terminal 帧设计待管理员 RFC；无超时；真跑验证需 ANTHROPIC_API_KEY/OPENAI_API_KEY + npx registry 网络。进度与剩余项见 `docs/progress/MASTER.md` #1404。
 
 ### CLI 执行模式
 

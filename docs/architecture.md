@@ -47,21 +47,20 @@ Mobile shared workbench (viewer / limited control)
 
 ## 核心数据流
 
-| 流 | 路径 |
-|---|---|
-| 控制线 | `Workbench -> Platform Adapter -> Edge/Hub -> Runtime adapter -> Runtime` |
-| 事件线 | `Runtime -> Edge EventStore -> Edge/Hub WS -> Platform Adapter -> Transcript` |
-| 证据线 | `RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview` |
-| 同步线 | `Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers` |
+控制线 `Workbench -> Platform Adapter -> Edge/Hub -> Runtime adapter -> Runtime`；事件/证据/同步线的详细路径见 [02-edge-server.md](architecture/02-edge-server.md) §事件流 与 [04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)。
 
 ## 非协商边界
 
 1. UI 不能直接启动 Agent CLI。
-2. Web 不能持有 TokenDance API key、本机文件系统能力或 Local Edge 直连能力。
+2. Web 不能持有 TokenDance API key、本机文件系统能力或 Local Edge 直连能力；Web 只和 Hub 通信。
 3. Desktop renderer 不能获得 raw process execution 权限；危险能力必须经过 typed Tauri host API 和 allowlist。
 4. Hub 权限由 Hub-local membership/resource/action 决定，TokenDance ID 只证明身份。
 5. 所有来源必须 normalize 到统一 transcript contract 后再渲染。
 6. Mock、fixture、observed、approved-real、production 必须显式区分；stub/fixture/readiness-only 不能冒充真实登录、真实模型/API、packaged Desktop 或 release。
+7. Local Edge 负责本地执行、adapter 调用、runtime policy、日志和证据；Hub 负责账号、IM、同步、路由、权限、审计和远程控制面。
+8. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
+9. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
+10. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
 
 ## 产品模型
 
@@ -77,28 +76,7 @@ Mobile shared workbench (viewer / limited control)
 
 ## Frontend Contract
 
-共享 UI 只消费 platform adapter，不直接调用 Tauri invoke、Hub client 或 Edge client。
-
-```ts
-interface AgentHubPlatform {
-  surface: "desktop" | "web" | "mobile";
-  capabilities: SurfaceCapabilities;
-  conversations: ConversationPort;
-  runs: RunPort;
-  attachments?: AttachmentPort;
-  host?: HostDiagnosticsPort;
-  preview?: PreviewPort;
-  settings?: SettingsPort;
-}
-```
-
-Transcript 目标合同：
-
-```text
-Conversation -> Message -> TranscriptBlock -> TranscriptItem -> RowItem / UserMsg / AgentGroup
-```
-
-消息流必须按时间线性展示。用户输入应立即出现且不闪消；Agent 回复、工具调用、审批、子 Agent 报告、Diff、Preview 和结果卡片按事件时间归一化后渲染。详细分组、滚动、markdown/table 和 data mode 合同见 [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)。
+共享 UI 只消费 platform adapter，不直接调用 Tauri invoke、Hub client 或 Edge client。`AgentHubPlatform` 接口、Transcript 目标合同与消息流规则的完整定义见 [04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)（SSOT）。
 
 ## Module Owners
 

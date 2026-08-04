@@ -22,7 +22,7 @@
 | `api/` | 活 | API 契约 SSOT（openapi.yaml/events.md/conventions.md） |
 | `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared） |
 | artifacts/ | 产物 | 本地构建输出（gitignored） |
-| `deployments/` | 活 | 部署模板（hk2/、production/） |
+| `deployments/` | 活 | 部署模板（production/；hk2/ 已随 #1527 删除） |
 | dist/ | 产物 | 本地构建输出（gitignored，已清理） |
 | `docs/` | 活 | 知识库（architecture/progress/plan/analysis/governance/reference/archives） |
 | `edge-server/` | 活 | Go Edge 服务（local runtime、adapters、lifecycle） |
