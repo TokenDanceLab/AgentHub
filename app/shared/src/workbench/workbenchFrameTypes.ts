@@ -13,7 +13,6 @@ import type {
   WorkbenchContactsData,
   WorkbenchDocumentsActions,
 } from './WorkbenchRoutes';
-import type { HubClient } from '../hubClient';
 import type { AgentConfig, DocRow, ProjectDraft } from './pages';
 import type {
   CCSwitchStatusInfo,
@@ -26,6 +25,7 @@ import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
+import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 
 /* ==========================================================================
    WorkbenchFrame prop contract -- residual extract from WorkbenchFrame
@@ -90,7 +90,7 @@ export interface WorkbenchFrameProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  hubClient?: HubClient | undefined;
+  projectsPort?: WorkbenchProjectsPort | undefined;
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
   contactsActions?: WorkbenchContactsActions | undefined;
   documents?: DocRow[] | undefined;
@@ -195,7 +195,7 @@ export interface WorkbenchRoutesFrameProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  hubClient?: HubClient | undefined;
+  projectsPort?: WorkbenchProjectsPort | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;

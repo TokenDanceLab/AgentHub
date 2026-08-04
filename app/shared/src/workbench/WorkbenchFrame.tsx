@@ -54,7 +54,7 @@ export function WorkbenchFrame({
   onLogout,
   onProjectCreate,
   onProjectUpdate,
-  hubClient,
+  projectsPort,
   onNavigateToConversation,
   contactsActions,
   documents,
@@ -224,7 +224,7 @@ export function WorkbenchFrame({
             onActiveProjectChange={onActiveProjectChange}
             onProjectCreate={onProjectCreate}
             onProjectUpdate={onProjectUpdate}
-            hubClient={hubClient}
+            projectsPort={projectsPort}
             onAgentCreate={onAgentCreate}
             onAgentUpdate={onAgentUpdate}
             onAgentDelete={onAgentDelete}

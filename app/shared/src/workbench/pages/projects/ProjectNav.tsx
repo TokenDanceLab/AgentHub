@@ -32,6 +32,8 @@ export type ProjectNavProps = {
   loadingMore?: boolean | undefined;
   /** Triggered when the scroll sentinel enters the viewport. */
   onLoadMore?: (() => void) | undefined;
+  /** Visible load-more failure (#1546). When set, pagination stopped and `onLoadMore` acts as explicit retry. */
+  loadMoreError?: string | undefined;
 };
 
 export function ProjectNav({
@@ -49,6 +51,7 @@ export function ProjectNav({
   hasMore,
   loadingMore,
   onLoadMore,
+  loadMoreError,
 }: ProjectNavProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
 
@@ -142,6 +145,25 @@ export function ProjectNav({
         >
           {t('projects.loading')}
         </StatusNotice>
+      ) : null}
+      {loadMoreError ? (
+        <div className={styles.statusStack} role="alert">
+          <StatusNotice
+            {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
+            icon={<DesignNavIcon name="error404" size={14} />}
+          >
+            {t('projects.loadMoreError', { message: loadMoreError })}
+          </StatusNotice>
+          {onLoadMore ? (
+            <button
+              type="button"
+              className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
+              onClick={onLoadMore}
+            >
+              {t('projects.retryLoadMore')}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </aside>
   );
