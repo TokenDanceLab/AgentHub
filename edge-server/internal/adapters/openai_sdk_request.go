@@ -68,8 +68,7 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 		req.Header.Set("Authorization", "Bearer "+a.apiKey)
 		req.Header.Set("Accept", "text/event-stream")
 
-		httpClient := &http.Client{Timeout: openaiHTTPTimeout}
-		resp, err := httpClient.Do(req)
+		resp, err := a.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			continue // Network errors are retriable

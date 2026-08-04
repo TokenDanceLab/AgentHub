@@ -57,8 +57,7 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 		req.Header.Set("anthropic-version", anthropicAPIVersion)
 		req.Header.Set("Accept", "text/event-stream")
 
-		httpClient := &http.Client{Timeout: anthropicHTTPTimeout}
-		resp, err := httpClient.Do(req)
+		resp, err := a.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			continue // Network errors are retriable
