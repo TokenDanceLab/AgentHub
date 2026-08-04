@@ -36,7 +36,7 @@ sanctioned client 构造点（policy 原语包，不在 verifier 扫描范围）
 | 3 | Hub OIDC token exchange（`service/oidc/oidc.go`） | 运营商配置 TokenDance ID issuer/client secret（`tokendance_id.*`）；信任边界=TokenDance ID | 无重试（一次性授权码交换，重试不安全） | 固定地址；redirect 拒绝（client_secret 在 form body） | 64 KiB fail-closed | 日志含 request_id + body_sha256（redaction 已验证） | ✅ 本 PR 收口 |
 | 4 | Hub JWKS fetch（`jwtutil/tokendance.go` 实例化 verifier，#1551） | 运营商配置 JWKS URI；信任边界=TokenDance ID | 无重试；cache TTL 1h 注入 | 固定地址；redirect 拒绝 | 64 KiB fail-closed | 无 | ✅ 本 PR 收口 |
 | 5 | Hub execution-target ping（`service/execution_target.go` → `egress` 包，#1540） | 用户提供地址；egress allowlist 是唯一放行路径 | 无重试（探测语义） | ✅ 默认拒绝 + DNS-rebinding 防御 | 64 KiB（`io.LimitReader`） | 无 | ✅ 已收口 |
-| 6 | Edge HubMCPSyncer（`adapters/mcp_config.go`） | 运营商配置 Hub MCP sync URL/token；信任边界=Hub 服务器 | 无重试（周期同步） | 固定地址；默认跟随重定向 ⚠️ | 无上限（`json.Decoder` 直接解）⚠️ | 无 | ❌ 未迁移 → **#1593** |
+| 6 | Edge HubMCPSyncer（`adapters/mcp_config.go`） | 运营商配置 Hub MCP sync URL/token；信任边界=Hub 服务器 | 无重试（周期同步） | 固定地址；redirect 拒绝（`edgehttp` 注入） | 64 KiB fail-closed | 统一合同（#1595） | ✅ 已收口（#1593） |
 | 7 | Edge OpenAI SDK 适配器（`adapters/openai_sdk_request.go`） | 用户配置 API key/baseURL；信任边界=模型 provider | 有界重试（attempts + jitter，ctx 可取消；无显式总 budget） | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
 | 8 | Edge Anthropic SDK 适配器（`adapters/anthropic_sdk_request.go`） | 同上 | 同上 | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
 | 9 | 统一 outbound metrics/correlation 合同 | — | — | — | — | 未落地 | ❌ 未迁移 → **#1595** |
@@ -45,7 +45,7 @@ sanctioned client 构造点（policy 原语包，不在 verifier 扫描范围）
 
 | Issue | 项 | Owner | Review date |
 |---|---|---|---|
-| #1593 | HubMCPSyncer client 收口：composition root 注入、redirect 拒绝、响应体上限 | outbound HTTP 后端 owner（#1564 完成人） | 2026-09-03 |
+| ~~#1593~~ ✅ | HubMCPSyncer client 收口：composition root 注入、redirect 拒绝、响应体上限 | outbound HTTP 后端 owner（#1564 完成人） | 2026-09-03 |
 | #1594 | Hub→Edge dispatch client 移到 composition root，verifier allowlist 归零 | 同上 | 2026-09-03 |
 | #1595 | 统一出站 correlation/metrics 合同落地 | 同上 | 2026-09-17 |
 
