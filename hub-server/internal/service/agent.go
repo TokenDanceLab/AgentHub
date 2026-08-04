@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
-	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -56,12 +57,17 @@ type AgentService struct {
 	dispatch *DispatchService
 	// edgeCfg/jwtSecret are the Hub→Edge dispatch configuration (#1549),
 	// injected by the composition root and forwarded to DispatchService.
-	edgeCfg   config.EdgeDispatchConfig
-	jwtSecret string
+	edgeCfg config.EdgeDispatchConfig
+	// edgeClient is the shared Hub→Edge outbound client built at the
+	// composition root (outboundhttp.NewClient, #1594); forwarded to
+	// DispatchService. nil is tolerated for struct-literal tests that never
+	// reach the edge HTTP path.
+	edgeClient *http.Client
+	jwtSecret  string
 }
 
-func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, jwtSecret string) *AgentService {
-	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, jwtSecret: jwtSecret}
+func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *AgentService {
+	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
 	// Construct outbox first (nil redispatcher), then inject DispatchService
 	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
@@ -73,7 +79,7 @@ func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *ca
 		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
 	)
 	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
-	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox, edgeCfg, jwtSecret)
+	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox, edgeCfg, edgeClient, jwtSecret)
 	s.deliveryOutbox.SetRedispatcher(dispatchRedispatcher{s.dispatch})
 	return s
 }

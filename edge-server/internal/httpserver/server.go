@@ -288,6 +288,9 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 			callbackCfg.MaxAttempts = cfg.HubCallbackMaxAttempts
 		}
 		hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken, edgehttp.NewClient(callbackCfg.Timeout), callbackCfg)
+		// Unified outbound metrics contract (#1595): record every callback
+		// attempt on the Edge metrics registry.
+		hubClient = hubClient.WithMetrics(edgeMetrics.Outbound)
 		hubCallbackClient = hubClient
 		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
 		// Falls back to in-memory journal on open failure so callback path never blocks startup.

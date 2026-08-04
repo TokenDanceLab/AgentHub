@@ -306,7 +306,7 @@ func TestEventDispatch_AgentDoneSkipsNotificationWhenNoTask(t *testing.T) {
 	cc := newBehaviorCache(t)
 	b := newBehaviorBus(t)
 
-	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil, config.EdgeDispatchConfig{}, "")
+	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil, config.EdgeDispatchConfig{}, nil, "")
 	a := &App{
 		mgr:          mgr,
 		bus:          b,
