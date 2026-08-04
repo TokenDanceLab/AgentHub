@@ -390,45 +390,53 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 		return
 	}
 	for _, task := range tasks {
-		var payload json.RawMessage
-		if json.Unmarshal([]byte(task.Payload), &payload) == nil {
-			var meta struct {
-				TaskID     string `json:"task_id"`
-				DeliveryID string `json:"delivery_id"`
-			}
-			_ = json.Unmarshal([]byte(task.Payload), &meta)
-			if meta.DeliveryID != "" && a.AgentService != nil {
-				status, stErr := a.AgentService.GetDeliveryStatus(ctx, meta.DeliveryID)
-				if !dispatch.ShouldReplayOfflinePayload(meta.DeliveryID, status, stErr == nil) {
-					slog.Info("skip target-bound offline replay; outbox owns delivery",
-						"task_id", meta.TaskID, "delivery_id", meta.DeliveryID,
-						"outbox_status", status, "user_id", userID, "device_id", deviceID)
-					// Drop from offline queue so it cannot dual-fire later.
-					_ = a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload)
-					continue
-				}
-			}
-			if meta.TaskID != "" {
-				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
-					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
-					continue
-				}
-			}
-			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
-			if !result.Queued {
-				slog.Warn("target-bound queued task replay not queued; keeping pending task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
-				continue
-			}
-			if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
-				slog.Error("failed to ack target-bound queued task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "error", err)
-				continue
-			}
-			if meta.DeliveryID != "" && a.AgentService != nil {
-				if err := a.AgentService.MarkDeliverySent(ctx, meta.DeliveryID); err != nil {
-					slog.Warn("failed to mark target-bound offline-replayed delivery sent",
-						"task_id", meta.TaskID, "delivery_id", meta.DeliveryID, "error", err)
-				}
-			}
+		a.replayTargetBoundTask(ctx, userID, deviceID, connID, task)
+	}
+}
+
+// replayTargetBoundTask replays one target-bound pending task onto the
+// connection. Tasks that were already handed to the outbox, failed to
+// dispatch, or could not be queued stay pending in the offline list.
+func (a *App) replayTargetBoundTask(ctx context.Context, userID, deviceID, connID string, task cache.PendingTargetTask) {
+	var payload json.RawMessage
+	if json.Unmarshal([]byte(task.Payload), &payload) != nil {
+		return
+	}
+	var meta struct {
+		TaskID     string `json:"task_id"`
+		DeliveryID string `json:"delivery_id"`
+	}
+	_ = json.Unmarshal([]byte(task.Payload), &meta)
+	if meta.DeliveryID != "" && a.AgentService != nil {
+		status, stErr := a.AgentService.GetDeliveryStatus(ctx, meta.DeliveryID)
+		if !dispatch.ShouldReplayOfflinePayload(meta.DeliveryID, status, stErr == nil) {
+			slog.Info("skip target-bound offline replay; outbox owns delivery",
+				"task_id", meta.TaskID, "delivery_id", meta.DeliveryID,
+				"outbox_status", status, "user_id", userID, "device_id", deviceID)
+			// Drop from offline queue so it cannot dual-fire later.
+			_ = a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload)
+			return
+		}
+	}
+	if meta.TaskID != "" {
+		if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
+			slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
+			return
+		}
+	}
+	result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+	if !result.Queued {
+		slog.Warn("target-bound queued task replay not queued; keeping pending task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		return
+	}
+	if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
+		slog.Error("failed to ack target-bound queued task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "error", err)
+		return
+	}
+	if meta.DeliveryID != "" && a.AgentService != nil {
+		if err := a.AgentService.MarkDeliverySent(ctx, meta.DeliveryID); err != nil {
+			slog.Warn("failed to mark target-bound offline-replayed delivery sent",
+				"task_id", meta.TaskID, "delivery_id", meta.DeliveryID, "error", err)
 		}
 	}
 }
@@ -466,44 +474,8 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	}
 	failedTasks := make([]string, 0)
 	for _, taskJSON := range tasks {
-		var payload json.RawMessage
-		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
-			var meta struct {
-				TaskID     string `json:"task_id"`
-				DeliveryID string `json:"delivery_id"`
-			}
-			_ = json.Unmarshal([]byte(taskJSON), &meta)
-			// Coordinate offline reconnect with outbox ownership (#1031): do not
-			// re-fire deliveries already sent/acked (outbox redispatch owns those).
-			if meta.DeliveryID != "" && a.AgentService != nil {
-				status, stErr := a.AgentService.GetDeliveryStatus(ctx, meta.DeliveryID)
-				if !dispatch.ShouldReplayOfflinePayload(meta.DeliveryID, status, stErr == nil) {
-					slog.Info("skip offline reconnect replay; outbox owns delivery",
-						"task_id", meta.TaskID, "delivery_id", meta.DeliveryID,
-						"outbox_status", status, "user_id", userID)
-					continue
-				}
-			}
-			if meta.TaskID != "" {
-				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID); err != nil {
-					slog.Error("failed to mark queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "error", err)
-					continue
-				}
-			}
-			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
-			if !result.Queued {
-				slog.Warn("queued task replay not queued; requeueing pending task", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
-				failedTasks = append(failedTasks, taskJSON)
-				continue
-			}
-			// Live reconnect push: mark outbox sent so SentTimeout owns further
-			// recovery until Edge ack/stream (avoid dual offline+outbox fire) (#1031).
-			if meta.DeliveryID != "" && a.AgentService != nil {
-				if err := a.AgentService.MarkDeliverySent(ctx, meta.DeliveryID); err != nil {
-					slog.Warn("failed to mark offline-replayed delivery sent",
-						"task_id", meta.TaskID, "delivery_id", meta.DeliveryID, "error", err)
-				}
-			}
+		if a.replayPendingTask(ctx, userID, connID, edgeDeviceID, taskJSON) {
+			failedTasks = append(failedTasks, taskJSON)
 		}
 	}
 	for i := len(failedTasks) - 1; i >= 0; i-- {
@@ -511,6 +483,52 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 			slog.Error("failed to requeue pending task after websocket delivery failure", "user_id", userID, "conn_id", connID, "error", err)
 		}
 	}
+}
+
+// replayPendingTask replays one popped pending task onto the connection.
+// Returns true when the frame could not be queued and the task must be
+// requeued for a later attempt.
+func (a *App) replayPendingTask(ctx context.Context, userID, connID, edgeDeviceID, taskJSON string) bool {
+	var payload json.RawMessage
+	if json.Unmarshal([]byte(taskJSON), &payload) != nil {
+		return false
+	}
+	var meta struct {
+		TaskID     string `json:"task_id"`
+		DeliveryID string `json:"delivery_id"`
+	}
+	_ = json.Unmarshal([]byte(taskJSON), &meta)
+	// Coordinate offline reconnect with outbox ownership (#1031): do not
+	// re-fire deliveries already sent/acked (outbox redispatch owns those).
+	if meta.DeliveryID != "" && a.AgentService != nil {
+		status, stErr := a.AgentService.GetDeliveryStatus(ctx, meta.DeliveryID)
+		if !dispatch.ShouldReplayOfflinePayload(meta.DeliveryID, status, stErr == nil) {
+			slog.Info("skip offline reconnect replay; outbox owns delivery",
+				"task_id", meta.TaskID, "delivery_id", meta.DeliveryID,
+				"outbox_status", status, "user_id", userID)
+			return false
+		}
+	}
+	if meta.TaskID != "" {
+		if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID); err != nil {
+			slog.Error("failed to mark queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "error", err)
+			return false
+		}
+	}
+	result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+	if !result.Queued {
+		slog.Warn("queued task replay not queued; requeueing pending task", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		return true
+	}
+	// Live reconnect push: mark outbox sent so SentTimeout owns further
+	// recovery until Edge ack/stream (avoid dual offline+outbox fire) (#1031).
+	if meta.DeliveryID != "" && a.AgentService != nil {
+		if err := a.AgentService.MarkDeliverySent(ctx, meta.DeliveryID); err != nil {
+			slog.Warn("failed to mark offline-replayed delivery sent",
+				"task_id", meta.TaskID, "delivery_id", meta.DeliveryID, "error", err)
+		}
+	}
+	return false
 }
 
 func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {

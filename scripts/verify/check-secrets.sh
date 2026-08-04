@@ -201,6 +201,13 @@ check_added_line() {
 
   if should_scan_secret_assignments "$path"; then
     local value=""
+    # Go config wiring (e.g. cfg.TokenDanceID.ClientSecret = envClientSecret or
+    # cfg.JWT.Secrets = map[string]string{...}): the RHS is an identifier,
+    # call, or map literal — env-provided values bound to struct fields, not
+    # embedded secrets. Only quoted string literals are treated as secret-like.
+    if [[ "$path" == *.go ]] && [[ "$trimmed" =~ ^[A-Za-z_][A-Za-z0-9_.]*\.[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*[A-Za-z_{] ]]; then
+      return
+    fi
     if [[ "$trimmed" =~ [\"\']?[A-Za-z0-9_.-]*(secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|jwt[_-]?secret|auth[_-]?token)[A-Za-z0-9_.-]*[\"\']?[[:space:]]*[:=][[:space:]]*[\"\']?([^\"\'\#[:space:],}\)]{12,}) ]]; then
       value="${BASH_REMATCH[2]}"
       if ! is_placeholder_value "$value"; then
