@@ -26,6 +26,7 @@ import {
   resolveWebWorkbenchAgents,
 } from '@/platform/webPlatform';
 import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
+import { createWebWorkbenchProjectsPort } from '@/platform/webWorkbenchProjectsPort';
 import { useWebAuth } from '@/hooks/useWebAuth';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
@@ -97,6 +98,10 @@ function WebWorkbenchRoot() {
     ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
   const hubClientForConversations = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  // Narrow domain port for workbench project data (#1546); the shared UI never
+  // sees the concrete HubClient. Injected only in real mode — parent-managed
+  // projects keep the port dormant while demo mode falls back to mock fixtures.
+  const webProjectsPort = useMemo(() => createWebWorkbenchProjectsPort(), []);
   const hubReady = !realMode ? false : Boolean(getAccessToken());
 
   // Fetch public Skills for the Skill Market tab
@@ -224,6 +229,7 @@ function WebWorkbenchRoot() {
         onLogout={handleLogout}
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
+        projectsPort={hubReady ? webProjectsPort : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
         onRegenerate={(blockId) => {

@@ -97,6 +97,10 @@ export type {
   WorkbenchContactsData,
   WorkbenchRoutesProps,
 } from './WorkbenchRoutes';
+export type {
+  WorkbenchProjectsPage,
+  WorkbenchProjectsPort,
+} from './workbenchProjectsPort';
 export type { WorkspaceHeaderProps } from './WorkspaceHeader';
 export type {
   DesignFileIconType,
