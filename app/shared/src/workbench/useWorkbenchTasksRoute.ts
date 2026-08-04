@@ -1,6 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskGroup, TasksPane, ViewMode } from './pages';
 import type { TaskEditDraft } from './pages/TasksPage';
+import {
+  WORKBENCH_MOCK_PAGE_SIZE,
+  WORKBENCH_MOCK_TASK_POOL,
+  readMockCursorPage,
+} from './mockData';
 import {
   type TaskGroupMode,
   type TaskSortMode,
@@ -38,7 +43,59 @@ export function useWorkbenchTasksRoute({
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
 
-  const sourceTaskGroups = resolveSourceTaskGroups(realDataMode, taskGroups);
+  // ── Mock cursor pagination (#1510). In mock mode the task pool (larger
+  //    than one page) is exposed as the "默认分组" source; the first page is
+  //    loaded from the pool, loadMore appends the next page with an async
+  //    cursor read. In realDataMode the parent owns taskGroups, so the
+  //    pagination flags stay inert. ──
+  const mockPaginationEnabled = !realDataMode;
+  const firstTaskPage = useMemo(
+    () => readMockCursorPage(WORKBENCH_MOCK_TASK_POOL, WORKBENCH_MOCK_PAGE_SIZE, undefined),
+    [],
+  );
+  const [loadedTaskCount, setLoadedTaskCount] = useState(() => firstTaskPage.items.length);
+  const [taskHasMore, setTaskHasMore] = useState(() => firstTaskPage.hasMore);
+  const [taskLoadingMore, setTaskLoadingMore] = useState(false);
+  const taskHasMoreRef = useRef(firstTaskPage.hasMore);
+  const taskLoadingMoreRef = useRef(false);
+  const taskCursorRef = useRef<string | undefined>(firstTaskPage.nextCursor);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const onLoadMore = useCallback(async () => {
+    if (!mockPaginationEnabled || taskLoadingMoreRef.current) return;
+    if (!taskHasMoreRef.current) return;
+    taskLoadingMoreRef.current = true;
+    setTaskLoadingMore(true);
+    try {
+      const page = await readMockCursorPage(
+        WORKBENCH_MOCK_TASK_POOL,
+        WORKBENCH_MOCK_PAGE_SIZE,
+        taskCursorRef.current,
+      );
+      if (!mountedRef.current) return;
+      setLoadedTaskCount((current) => current + page.items.length);
+      taskCursorRef.current = page.nextCursor;
+      taskHasMoreRef.current = page.hasMore;
+      setTaskHasMore(page.hasMore);
+    } finally {
+      taskLoadingMoreRef.current = false;
+      setTaskLoadingMore(false);
+    }
+  }, [mockPaginationEnabled]);
+
+  const paginatedMockGroups = useMemo<TaskGroup[]>(
+    () => [{ label: '默认分组', tasks: WORKBENCH_MOCK_TASK_POOL.slice(0, loadedTaskCount) }],
+    [loadedTaskCount],
+  );
+
+  const sourceTaskGroups = resolveSourceTaskGroups(realDataMode, taskGroups, paginatedMockGroups);
   const visibleTaskGroups = useMemo(() => buildTaskGroups(
     sourceTaskGroups,
     tasksPane,
@@ -91,6 +148,9 @@ export function useWorkbenchTasksRoute({
     visibleTaskGroups,
     visibleTasks,
     selectedTask,
+    hasMore: mockPaginationEnabled ? taskHasMore : false,
+    loadingMore: mockPaginationEnabled ? taskLoadingMore : false,
+    onLoadMore: mockPaginationEnabled ? onLoadMore : undefined,
     setTaskViewMode,
     ...handlers,
   };

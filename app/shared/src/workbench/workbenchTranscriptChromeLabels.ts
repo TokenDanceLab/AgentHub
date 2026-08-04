@@ -129,12 +129,24 @@ export function multiActionLabel(
   return labels[action] ?? t('toast.multiProcessed', { count });
 }
 
-export function cardLinkForBlock(blockId: string): string {
-  // TODO(#1504 copyLink): `agenthub://card/<blockId>` is a custom scheme with no
-  // registered handler anywhere (Desktop/Web) — copying it produces a dead
-  // link. Do NOT invent a handler: enabling the scheme needs a product
-  // decision (register a protocol handler, or produce a real shareable URL).
-  return `agenthub://card/${blockId}`;
+export function cardLinkForBlock(
+  blockId: string,
+  sessionId?: string | null,
+  baseUrl?: string,
+): string {
+  // #1504: copy a link that opens inside Web/Desktop instead of the dead
+  // `agenthub://card/<blockId>` custom scheme (no handler registered on
+  // Desktop/Web; native scheme registration is out of frontend scope).
+  // The hash route `#/session/<sessionId>?block=<blockId>` is the provisional
+  // in-app convention — the backend session route is not finalized yet.
+  // Without a session id (Desktop/demo shells) fall back to a block-level
+  // hash that still resolves within the app origin.
+  const origin = baseUrl ?? (typeof window !== 'undefined' ? window.location.origin : '');
+  const blockParam = encodeURIComponent(blockId);
+  if (sessionId) {
+    return `${origin}/#/session/${encodeURIComponent(sessionId)}?block=${blockParam}`;
+  }
+  return `${origin}/#/card/${blockParam}`;
 }
 
 export function buildContextMenuState(
