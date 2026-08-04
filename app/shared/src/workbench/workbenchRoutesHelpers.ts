@@ -61,6 +61,11 @@ export function buildContactsPageProps(
   assignDefined(props, 'onBlockContact', actions?.onBlockContact);
   assignDefined(props, 'onUpdateRemark', actions?.onUpdateRemark);
 
+  // ── Infinite-scroll pagination (mock data layer, #1510) ──
+  assignDefined(props, 'hasMore', contactsRoute.hasMore);
+  assignDefined(props, 'loadingMore', contactsRoute.loadingMore);
+  assignDefined(props, 'onLoadMore', contactsRoute.onLoadMore);
+
   return props;
 }
 

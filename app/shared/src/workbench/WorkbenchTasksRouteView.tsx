@@ -54,6 +54,9 @@ export function WorkbenchTasksRouteView({
       editingTaskId={tasksRoute.editingTaskId}
       navMenuOpen={tasksRoute.taskNavMenuOpen}
       incompleteCount={model.incompleteCount}
+      hasMore={tasksRoute.hasMore}
+      loadingMore={tasksRoute.loadingMore}
+      onLoadMore={tasksRoute.onLoadMore}
       onAddTaskRow={realDataMode ? undefined : tasksRoute.handleCreateTask}
       onAssignSelectedTaskToMe={tasksRoute.handleAssignSelectedTaskToMe}
       onCycleSelectedTaskStatus={tasksRoute.handleCycleSelectedTaskStatus}

@@ -121,6 +121,15 @@ export interface WorkbenchTasksRoute {
   visibleTaskGroups: TaskGroup[];
   visibleTasks: TaskItem[];
   selectedTask: TaskItem | null;
+  /**
+   * Whether more mock tasks are available (mock data-layer cursor pagination,
+   * #1510). False in realDataMode — the parent owns taskGroups there.
+   */
+  hasMore: boolean;
+  /** Whether a load-more page fetch is in flight. */
+  loadingMore: boolean;
+  /** Appends the next page of mock tasks; undefined in realDataMode. */
+  onLoadMore: (() => void) | undefined;
   setTaskViewMode: (mode: ViewMode) => void;
   handleTaskPaneChange: (pane: TasksPane) => void;
   handleCreateTask: () => void;

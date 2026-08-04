@@ -67,7 +67,8 @@ export function ContactListPage({
   onMemberClick?: ((member: ContactMember) => void) | undefined;
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
-  // ── Infinite-scroll sentinel (T14 pattern; data-layer pagination TODO #1510) ──
+  // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
+  //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
   onLoadMoreRef.current = onLoadMore;
@@ -109,8 +110,9 @@ export function ContactListPage({
         onAvatarClick={onAvatarClick}
       />
 
-      {/* ── Infinite-scroll load-more (skeleton; hasMore stays false until the
-              data layer exposes pageCursor — see useWorkbenchContactsRoute) ── */}
+      {/* ── Infinite-scroll load-more (mock data-layer cursor pagination,
+              #1510; fallback button for environments without
+              IntersectionObserver) ── */}
       {hasMore && !loadingMore ? (
         <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
           加载更多
