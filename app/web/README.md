@@ -15,6 +15,7 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 - 未登录 preview fallback 只能表示演示状态，不能冒充真实 Runtime 在线。
 - Web token 当前为 tab-scoped `sessionStorage` fallback；公开 Web 发布前应升级为 BFF/HttpOnly cookie 或等价 server-owned session。
 - TokenDance ID 第三方 provider、账号绑定和 OIDC client 归 TokenDance ID；Web 只消费 Hub session。
+- Hub 认证状态机（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）共享自 `../shared/src/api/auth/`；`src/api/hubAuth.ts` 只注入 Web Port（sessionStorage token、浏览器 callback 路由、当前窗口跳转）。
 
 ## Source Map
 
