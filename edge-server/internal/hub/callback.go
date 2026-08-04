@@ -29,6 +29,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/pkg/outboundmetrics"
+	"github.com/agenthub/pkg/reqlog"
+
 	"github.com/agenthub/edge-server/internal/errcode"
 )
 
@@ -96,6 +99,9 @@ type CallbackClient struct {
 	client        *http.Client
 	journal       *DeliveryJournal
 	sqliteJournal *SQLiteDeliveryJournal
+	// outbound records every attempt against the unified outbound metrics
+	// contract (#1595); nil is a no-op.
+	outbound *outboundmetrics.Recorder
 }
 
 // TaskResult carries the final result of a completed task.
@@ -198,6 +204,26 @@ func (c *CallbackClient) WithJournal(j *DeliveryJournal) *CallbackClient {
 		c.journal = j
 	}
 	return c
+}
+
+// WithMetrics attaches the unified outbound metrics recorder (#1595). nil is
+// a no-op, so an unwired client keeps working without observability.
+func (c *CallbackClient) WithMetrics(r *outboundmetrics.Recorder) *CallbackClient {
+	if c != nil {
+		c.outbound = r
+	}
+	return c
+}
+
+// recordOutcome records one callback attempt against the #1595 contract.
+// category is success/failure; status carries the granular outcome (reusing
+// the callback outcome categories).
+func (c *CallbackClient) recordOutcome(category, status string, startedAt time.Time) {
+	if c == nil || c.outbound == nil {
+		return
+	}
+	c.outbound.Record(outboundmetrics.ProviderHub, outboundmetrics.PurposeCallback, category, status)
+	c.outbound.Observe(outboundmetrics.ProviderHub, outboundmetrics.PurposeCallback, category, status, time.Since(startedAt))
 }
 
 // Journal exposes the Edge→Hub delivery journal for reconciliation.
@@ -399,13 +425,19 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 	if c.authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.authToken)
 	}
+	// Correlation contract (#1595): propagate the caller's request id so the
+	// Hub side can join callback logs to the originating Edge request.
+	reqlog.SetRequestIDHeader(ctx, req.Header)
+	startedAt := time.Now()
 
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			// Caller deadline/cancellation — retrying is pointless.
+			c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryTimeout, startedAt)
 			return true, false, 0, fmt.Errorf("hub callback timeout: %w", err)
 		}
+		c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryNetwork, startedAt)
 		return false, true, 0, fmt.Errorf("hub callback post: %w", err)
 	}
 
@@ -416,6 +448,7 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 		// retried, body content never surfaces in logs (#1564).
 		errMsg := fmt.Sprintf("status=%d body_len=over_limit limit=%d category=%s", resp.StatusCode, c.cfg.MaxResponseBodyBytes, callbackCategoryBodyTooLarge)
 		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryBodyTooLarge, startedAt)
 		return true, false, 0, fmt.Errorf("hub callback response too large: %s", errMsg)
 	}
 
@@ -429,20 +462,24 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 		}
 		if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
 			c.recordJournal(taskID, runID, action, true, "", attempt)
+			c.recordOutcome(outboundmetrics.CategorySuccess, callbackCategoryOK, startedAt)
 			return true, false, 0, nil
 		}
 		// Non-OK code from Hub is an application-level failure; do not retry
 		if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
 			errMsg := summarizeHubResponse(resp.StatusCode, respBody, callbackCategoryAppRejected)
 			c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+			c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryAppRejected, startedAt)
 			return true, false, 0, fmt.Errorf("hub callback rejected: %s", errMsg)
 		}
 		// 2xx without JSON body — accept as success
 		c.recordJournal(taskID, runID, action, true, "", attempt)
+		c.recordOutcome(outboundmetrics.CategorySuccess, callbackCategoryOK, startedAt)
 		return true, false, 0, nil
 	}
 
 	if canRetry && retryableAction {
+		c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryServerError, startedAt)
 		return false, true, retryAfter, fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, category))
 	}
 
@@ -452,12 +489,15 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 	switch category {
 	case callbackCategoryClientError, callbackCategoryRateLimited:
 		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		c.recordOutcome(outboundmetrics.CategoryFailure, category, startedAt)
 		return true, false, 0, fmt.Errorf("hub callback client error: %s", errMsg)
 	case callbackCategoryRedirect:
 		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryRedirect, startedAt)
 		return true, false, 0, fmt.Errorf("hub callback redirect error: %s", errMsg)
 	default:
 		c.recordJournal(taskID, runID, action, false, errMsg, attempt)
+		c.recordOutcome(outboundmetrics.CategoryFailure, callbackCategoryServerError, startedAt)
 		return true, false, 0, fmt.Errorf("hub callback not retried (%s): %s", category, errMsg)
 	}
 }

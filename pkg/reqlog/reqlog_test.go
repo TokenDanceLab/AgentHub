@@ -40,6 +40,24 @@ func TestWithGetRequestID(t *testing.T) {
 	}
 }
 
+func TestSetRequestIDHeader(t *testing.T) {
+	t.Run("propagates request id from context", func(t *testing.T) {
+		h := http.Header{}
+		SetRequestIDHeader(WithRequestID(context.Background(), "req_outbound_1"), h)
+		if got := h.Get(RequestIDHeader); got != "req_outbound_1" {
+			t.Fatalf("X-Request-ID = %q, want req_outbound_1", got)
+		}
+	})
+
+	t.Run("no-op without request id", func(t *testing.T) {
+		h := http.Header{}
+		SetRequestIDHeader(context.Background(), h)
+		if got := h.Get(RequestIDHeader); got != "" {
+			t.Fatalf("X-Request-ID = %q, want empty", got)
+		}
+	})
+}
+
 func TestNetHTTPAccessLogPropagatesRequestID(t *testing.T) {
 	var capturedID string
 	handler := AccessLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
