@@ -23,9 +23,11 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/outboundmetrics"
 	"github.com/agenthub/pkg/reqlog"
 )
 
@@ -61,8 +63,9 @@ func NewService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTCon
 	var tdVerifier *jwtutil.TokenDanceVerifier
 	if jwksURI != "" {
 		tdVerifier = jwtutil.NewTokenDanceVerifier(jwksURI, jwtutil.VerifierConfig{
-			HTTPClient:   outboundhttp.NewClient(cfg.HTTPTimeout),
-			MaxBodyBytes: cfg.MaxResponseBodyBytes,
+			HTTPClient:      outboundhttp.NewClient(cfg.HTTPTimeout),
+			MaxBodyBytes:    cfg.MaxResponseBodyBytes,
+			OutboundMetrics: metrics.OutboundMetrics,
 		})
 	}
 	return &Service{
@@ -305,7 +308,11 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 		return nil, fmt.Errorf("build token request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// Correlation contract (#1595): propagate the caller's request id so the
+	// provider side can join its logs to the originating Hub request.
+	reqlog.SetRequestIDHeader(ctx, req.Header)
 
+	started := time.Now()
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		slog.Error("oidc provider code exchange unreachable",
@@ -314,6 +321,7 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 			"error_category", "network_error",
 			"error", err,
 		)
+		metrics.OutboundMetrics.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategoryFailure, "network_error")
 		return nil, fmt.Errorf("token endpoint request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -328,6 +336,7 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 			"error_category", "body_too_large",
 			"limit", s.cfg.MaxResponseBodyBytes,
 		)
+		metrics.OutboundMetrics.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategoryFailure, "body_too_large")
 		return nil, fmt.Errorf("token endpoint response too large")
 	}
 
@@ -341,13 +350,17 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 			"body_len", len(body),
 			"body_sha256", oidcBodySHA256(body),
 		)
+		metrics.OutboundMetrics.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategoryFailure, "non_success")
 		return nil, fmt.Errorf("provider code exchange failed: status=%d category=%s", resp.StatusCode, category)
 	}
 
 	var tokenResp tokenEndpointResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		metrics.OutboundMetrics.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategoryFailure, "decode_fail")
 		return nil, fmt.Errorf("parse token response: %w", err)
 	}
+	metrics.OutboundMetrics.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK)
+	metrics.OutboundMetrics.Observe(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeTokenExchange, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK, time.Since(started))
 	return &tokenResp, nil
 }
 

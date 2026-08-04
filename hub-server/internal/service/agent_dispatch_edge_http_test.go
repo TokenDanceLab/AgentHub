@@ -17,6 +17,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/outboundhttp"
 )
 
 // TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv pins the #1549 guarantee:
@@ -41,7 +42,7 @@ func TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv(t *testing.T) {
 		URL:       srv.URL,
 		AuthToken: "cfg-token",
 		Timeout:   5 * time.Second,
-	}, "cfg-jwt-secret")
+	}, outboundhttp.NewClient(5*time.Second), "cfg-jwt-secret")
 
 	task := &model.PendingAgentTask{ID: "task-1", AgentInstanceID: "ai-1"}
 	dp := dispatchPayload{
@@ -79,7 +80,7 @@ func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{
 		URL:     srv.URL,
 		Timeout: 10 * time.Second, // client timeout is generous
-	}, "")
+	}, outboundhttp.NewClient(10*time.Second), "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()

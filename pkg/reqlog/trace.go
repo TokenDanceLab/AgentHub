@@ -4,11 +4,18 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 )
 
 type traceIDKey struct{}
 type requestIDKey struct{}
+
+// RequestIDHeader is the header used to propagate the request id on inbound
+// and outbound HTTP calls (#1595 correlation contract). Inbound middleware
+// (AccessLog / AccessLogGin) reads it, outbound call sites set it from the
+// caller context via SetRequestIDHeader.
+const RequestIDHeader = "X-Request-ID"
 
 var traceSeq uint64
 
@@ -38,4 +45,14 @@ func GetRequestID(ctx context.Context) string {
 // WithRequestID injects the request ID into context.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, requestIDKey{}, id)
+}
+
+// SetRequestIDHeader propagates the caller's request id to an outbound
+// request (#1595): when ctx carries a request id, header gets X-Request-ID
+// set, so the receiving side can correlate the call with the originating
+// request. No-op when ctx has no request id.
+func SetRequestIDHeader(ctx context.Context, header http.Header) {
+	if id := GetRequestID(ctx); id != "" {
+		header.Set(RequestIDHeader, id)
+	}
 }

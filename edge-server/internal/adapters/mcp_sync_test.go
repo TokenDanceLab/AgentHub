@@ -4,9 +4,18 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/edgehttp"
 )
+
+// newTestMCPClient builds the same policy client the composition root injects
+// (edgehttp.NewClient) for syncer tests (#1593).
+func newTestMCPClient() *http.Client {
+	return edgehttp.NewClient(15 * time.Second)
+}
 
 // --- HubMCPSyncer syncOnce tests ---
 
@@ -56,14 +65,7 @@ func TestMCPSyncOnceSuccess(t *testing.T) {
 
 	store := NewMCPConfigStore()
 
-	syncer := &HubMCPSyncer{
-		hubURL:    mockHub.URL,
-		authToken: "",
-		store:     store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -121,14 +123,7 @@ func TestMCPSyncOnceServerError(t *testing.T) {
 		"existing": {Name: "existing", Transport: "stdio", Command: "echo"},
 	})
 
-	syncer := &HubMCPSyncer{
-		hubURL:    mockHub.URL,
-		authToken: "",
-		store:     store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -158,13 +153,7 @@ func TestMCPSyncOnceInvalidJSON(t *testing.T) {
 		"existing": {Name: "existing", Transport: "stdio", Command: "echo"},
 	})
 
-	syncer := &HubMCPSyncer{
-		hubURL: mockHub.URL,
-		store:  store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -191,14 +180,7 @@ func TestMCPSyncOnceAuthToken(t *testing.T) {
 	defer mockHub.Close()
 
 	store := NewMCPConfigStore()
-	syncer := &HubMCPSyncer{
-		hubURL:    mockHub.URL,
-		authToken: "test-secret-token",
-		store:     store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "test-secret-token", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -217,13 +199,7 @@ func TestMCPSyncOnceEmptyItems(t *testing.T) {
 	defer mockHub.Close()
 
 	store := NewMCPConfigStore()
-	syncer := &HubMCPSyncer{
-		hubURL: mockHub.URL,
-		store:  store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -251,13 +227,7 @@ func TestMCPSyncOnceSkipEmptyName(t *testing.T) {
 	defer mockHub.Close()
 
 	store := NewMCPConfigStore()
-	syncer := &HubMCPSyncer{
-		hubURL: mockHub.URL,
-		store:  store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx := context.Background()
 	syncer.syncOnce(ctx)
@@ -284,13 +254,7 @@ func TestMCPSyncOnceContextCancelled(t *testing.T) {
 		"existing": {Name: "existing"},
 	})
 
-	syncer := &HubMCPSyncer{
-		hubURL: mockHub.URL,
-		store:  store,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	}
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before calling syncOnce
@@ -301,5 +265,65 @@ func TestMCPSyncOnceContextCancelled(t *testing.T) {
 	servers := store.Get()
 	if len(servers) != 1 {
 		t.Fatalf("expected 1 server (unchanged), got %d", len(servers))
+	}
+}
+
+// TestMCPSyncOnceRedirectNotFollowed verifies the injected edgehttp client
+// refuses redirects: a 3xx from the Hub MCP endpoint fails the sync instead
+// of replaying the auth header to another origin (#1593).
+func TestMCPSyncOnceRedirectNotFollowed(t *testing.T) {
+	mockHub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "https://evil.example.com/mcp-servers")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer mockHub.Close()
+
+	store := NewMCPConfigStore()
+	store.Set(map[string]MCPServerConfig{
+		"existing": {Name: "existing"},
+	})
+
+	syncer := NewHubMCPSyncer(mockHub.URL, "test-secret-token", store, newTestMCPClient())
+
+	ctx := context.Background()
+	syncer.syncOnce(ctx)
+
+	// Redirect is not followed: the store keeps its previous contents.
+	servers := store.Get()
+	if len(servers) != 1 {
+		t.Fatalf("expected 1 server (unchanged after redirect), got %d", len(servers))
+	}
+	if _, ok := servers["existing"]; !ok {
+		t.Error("existing server should still be present after refused redirect")
+	}
+}
+
+// TestMCPSyncOnceOversizeBodyRejected verifies the fail-closed response body
+// cap: a body larger than mcpSyncMaxResponseBodyBytes fails the sync without
+// touching the store (#1593).
+func TestMCPSyncOnceOversizeBodyRejected(t *testing.T) {
+	mockHub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"code":"success","data":{"items":[{"name":"` + strings.Repeat("x", mcpSyncMaxResponseBodyBytes+1024) + `"}]}}`))
+	}))
+	defer mockHub.Close()
+
+	store := NewMCPConfigStore()
+	store.Set(map[string]MCPServerConfig{
+		"existing": {Name: "existing"},
+	})
+
+	syncer := NewHubMCPSyncer(mockHub.URL, "", store, newTestMCPClient())
+
+	ctx := context.Background()
+	syncer.syncOnce(ctx)
+
+	servers := store.Get()
+	if len(servers) != 1 {
+		t.Fatalf("expected 1 server (unchanged after oversize body), got %d", len(servers))
+	}
+	if _, ok := servers["existing"]; !ok {
+		t.Error("existing server should still be present after oversize response")
 	}
 }

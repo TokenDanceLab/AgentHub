@@ -12,6 +12,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/agenthub/pkg/outboundmetrics"
+
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 )
 
@@ -39,6 +41,9 @@ type VerifierConfig struct {
 	// MaxBodyBytes is the fail-closed cap on the JWKS response body
 	// (default 64 KiB).
 	MaxBodyBytes int64
+	// OutboundMetrics is the unified outbound metrics recorder (#1595);
+	// nil is a no-op.
+	OutboundMetrics *outboundmetrics.Recorder
 }
 
 func (c VerifierConfig) withDefaults() VerifierConfig {
@@ -56,13 +61,14 @@ func (c VerifierConfig) withDefaults() VerifierConfig {
 
 // jwksCache caches the JWKS response from TokenDance ID.
 type jwksCache struct {
-	mu      sync.RWMutex
-	keys    map[string]*rsa.PublicKey
-	fetched time.Time
-	jwksURI string
-	ttl     time.Duration
-	client  *http.Client
-	maxBody int64
+	mu       sync.RWMutex
+	keys     map[string]*rsa.PublicKey
+	fetched  time.Time
+	jwksURI  string
+	ttl      time.Duration
+	client   *http.Client
+	maxBody  int64
+	outbound *outboundmetrics.Recorder
 }
 
 // TokenDanceVerifier validates TokenDance ID-issued RS256 JWTs against a
@@ -79,10 +85,11 @@ type TokenDanceVerifier struct {
 func NewTokenDanceVerifier(jwksURI string, cfg VerifierConfig) *TokenDanceVerifier {
 	cfg = cfg.withDefaults()
 	return &TokenDanceVerifier{cache: &jwksCache{
-		jwksURI: jwksURI,
-		ttl:     cfg.CacheTTL,
-		client:  cfg.HTTPClient,
-		maxBody: cfg.MaxBodyBytes,
+		jwksURI:  jwksURI,
+		ttl:      cfg.CacheTTL,
+		client:   cfg.HTTPClient,
+		maxBody:  cfg.MaxBodyBytes,
+		outbound: cfg.OutboundMetrics,
 	}}
 }
 
@@ -122,11 +129,13 @@ func (c *jwksCache) fetchJWKS() error {
 
 	resp, err := c.client.Get(c.jwksURI)
 	if err != nil {
+		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "network_error")
 		return fmt.Errorf("jwks fetch failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "non_success")
 		return fmt.Errorf("jwks fetch returned %d", resp.StatusCode)
 	}
 
@@ -134,11 +143,13 @@ func (c *jwksCache) fetchJWKS() error {
 	// anomaly and is refused, never streamed into memory unbounded.
 	body, err := outboundhttp.ReadLimited(resp.Body, c.maxBody)
 	if err != nil {
+		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "body_too_large")
 		return fmt.Errorf("jwks fetch body limit: %w", err)
 	}
 
 	var jwks jwksResponse
 	if err := json.Unmarshal(body, &jwks); err != nil {
+		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "decode_fail")
 		return fmt.Errorf("jwks parse failed: %w", err)
 	}
 
@@ -157,11 +168,13 @@ func (c *jwksCache) fetchJWKS() error {
 	}
 
 	if len(keys) == 0 {
+		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "decode_fail")
 		return fmt.Errorf("no valid RSA keys found in JWKS")
 	}
 
 	c.keys = keys
 	c.fetched = time.Now()
+	c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK)
 	return nil
 }
 
