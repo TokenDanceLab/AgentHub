@@ -120,6 +120,7 @@ export function buildProjectsPageProps(
   assignDefined(props, 'hasMore', projectsRoute.hasMore);
   assignDefined(props, 'loadingMore', projectsRoute.loadingMore);
   assignDefined(props, 'onLoadMore', projectsRoute.loadMore);
+  assignDefined(props, 'loadMoreError', projectsRoute.loadMoreError);
 
   return props;
 }

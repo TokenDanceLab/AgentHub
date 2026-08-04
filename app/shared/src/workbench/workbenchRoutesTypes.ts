@@ -1,5 +1,4 @@
 import type { LocalCliDiscoveryManifest, WorkbenchAgent } from '../platform';
-import type { HubClient } from '../hubClient';
 import type {
   DocRow,
   ProjectDraft,
@@ -14,6 +13,7 @@ import type {
 } from './useWorkbenchContactsRoute';
 import type { WorkbenchDocumentsActions } from './useWorkbenchDocsRoute';
 import type { WorkbenchProjectsStatus } from './useWorkbenchProjectsRoute';
+import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchRoutesTypes — public props/types for WorkbenchRoutes (#660).
@@ -46,8 +46,8 @@ export interface WorkbenchRoutesProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  /** Hub client for direct project API access when callbacks are not provided. */
-  hubClient?: HubClient | undefined;
+  /** Narrow domain port for direct project data access when callbacks are not provided (#1546). */
+  projectsPort?: WorkbenchProjectsPort | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;

@@ -140,6 +140,8 @@ export const sharedWorkbenchResources = {
       edit: '编辑项目',
       projectRuns: '项目运行',
       loading: '正在加载项目…',
+      loadMoreError: '加载更多项目失败：{{message}}',
+      retryLoadMore: '重试加载更多',
       empty: {
         title: '暂无项目',
         description: '创建第一个项目以开始协作。',
@@ -405,6 +407,8 @@ export const sharedWorkbenchResources = {
       edit: 'Edit project',
       projectRuns: 'Project runs',
       loading: 'Loading projects…',
+      loadMoreError: 'Failed to load more projects: {{message}}',
+      retryLoadMore: 'Retry loading more',
       empty: {
         title: 'No projects yet',
         description: 'Create your first project to start collaborating.',
