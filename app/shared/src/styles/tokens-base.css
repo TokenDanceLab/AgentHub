@@ -477,10 +477,44 @@ body {
   }
 }
 
+/* ═══ prefers-contrast: more（Firefox 高对比偏好，无系统色强制）═══════════
+   Firefox 的 prefers-contrast: more 不触发 forced-colors，玻璃仍用主题色。
+   此时把玻璃材质降级为不透明实体表面：背景层 token 改指实体表面 token、
+   关闭 backdrop blur、玻璃文字 token 改指常规文字 token —— 对比度回到
+   常规表面的设计值（主题 token 已按 AA 校准），零硬编码色值。本块必须
+   位于 forced-colors 块之前：两条件同时满足时后者（系统色）胜出。 */
+@media (prefers-contrast: more) {
+  :root {
+    /* 背景层：alpha 玻璃 → 实体表面 */
+    --glass-bg-subtle: var(--surface) !important;
+    --glass-bg-light: var(--surface) !important;
+    --glass-bg-medium: var(--surface) !important;
+    --glass-bg-strong: var(--surface-high) !important;
+    --glass-bg-heavy: var(--surface-high) !important;
+    --glass-bg-hover: var(--surface-high) !important;
+    --glass-bg-active: var(--surface-high) !important;
+    --glass-panel: var(--surface) !important;
+    --glass-panel-strong: var(--surface-high) !important;
+    --glass-panel-overlay: var(--surface-high) !important;
+    --glass-input-bg: var(--surface-high) !important;
+    --glass-input-bg-hover: var(--surface-high) !important;
+    --glass-card-bg: var(--glass-panel) !important;
+    --elevated-card-bg: var(--surface) !important;
+
+    /* 关闭 frosted blur：无透明层可模糊 */
+    --glass-backdrop-filter: none !important;
+
+    /* 玻璃文字 → 常规文字 token（保留 muted/disabled 层级） */
+    --glass-text-muted: var(--text-2) !important;
+    --glass-text-disabled: var(--text-3) !important;
+  }
+}
+
 /* ═══ Forced colors (Windows High Contrast) baseline — a11y #20 ═══════════
    tri-scan P2/N1: 全仓零 forced-colors / prefers-contrast 媒体查询。
    Windows 高对比模式用户无适配——玻璃 alpha 背景被系统色覆盖、品牌色不映射
-   系统语义色。本块保证 HC 模式下文字可见、边框不消失、焦点环用系统色。
+   系统语义色。本块保证 HC 模式下文字可见、边框不消失、焦点环用系统色；
+   玻璃材质降级为实体系统表面（见第 3 节，#1509）。
    与 prefers-reduced-motion 正交（reduced-motion 已在各组件 css + dead
    chatview/design/global.css 标注）。仅作用于 forced-colors: active 媒体，
    屏幕渲染零影响。
@@ -518,6 +552,27 @@ body {
     --td-glass-content-border: CanvasText !important;
     --chat-thinking-border: CanvasText !important;
     --input-panel-border: CanvasText !important;
+
+    /* 玻璃背景 token → 不透明 Canvas（#1509）：HC 下玻璃「装饰背景层」降级为
+       实体系统表面，文字层由系统色强制为 CanvasText —— 无论用户选择浅色还是
+       深色 HC 主题，对比度都是 21:1，不再依赖已知 app-bg 配色的假设。 */
+    --glass-bg-subtle: Canvas !important;
+    --glass-bg-light: Canvas !important;
+    --glass-bg-medium: Canvas !important;
+    --glass-bg-strong: Canvas !important;
+    --glass-bg-heavy: Canvas !important;
+    --glass-bg-hover: Canvas !important;
+    --glass-bg-active: Canvas !important;
+    --glass-panel: Canvas !important;
+    --glass-panel-strong: Canvas !important;
+    --glass-panel-overlay: Canvas !important;
+    --glass-input-bg: Canvas !important;
+    --glass-input-bg-hover: Canvas !important;
+    --glass-card-bg: Canvas !important;
+    --elevated-card-bg: Canvas !important;
+    --glass-backdrop-filter: none !important;
+    --glass-text-muted: CanvasText !important;
+    --glass-text-disabled: CanvasText !important;
 
     /* 语义强调色 → 系统语义色（图标/状态点保留区分度） */
     --primary: LinkText !important;
@@ -569,11 +624,13 @@ body {
     color: HighlightText;
   }
 
-  /* ── 3. 玻璃材质：forced-color-adjust: none 保留视觉 ──────────────
-     frosted glass 的 blur + alpha 背景不强制为不透明 Canvas，保留材质感。
-     forced-color-adjust 可继承，故交互元素（链接/按钮/输入）显式重新
-     opt-in 系统色映射 (auto)，确保 chrome 可识别。:where() 零特异性 →
-     组件自身规则仍可覆盖。 */
+  /* ── 3. 玻璃材质：HC 下降级为实体系统表面（#1509）──────────────
+     设计决策：forced-colors 下玻璃的「装饰背景层」不再保留 alpha 材质，
+     由第 1 节的 token 重映射统一降级为不透明 Canvas —— 无论用户选择浅色
+     还是深色 HC 主题，玻璃面板内文字（系统色强制 CanvasText）都保持 21:1
+     对比，不再依赖已知 app-bg 配色假设。此处 forced-color-adjust: none
+     仅保留盒阴影等非表面装饰不被系统色抹平；交互元素显式重新 opt-in
+     系统色映射 (auto)。:where() 零特异性 → 组件自身规则仍可覆盖。 */
   [class*='glass' i] {
     forced-color-adjust: none;
   }
@@ -582,12 +639,4 @@ body {
                             [role='button'], [contenteditable]) {
     forced-color-adjust: auto;
   }
-
-  /* TODO(a11y #20 → #1509): 深色主题玻璃面板在用户选择 *浅色* HC 主题（Canvas=白、
-     CanvasText=黑）时，保留的 alpha 玻璃底 + 被强制为黑色的文字可能对比
-     不足（glass 依赖已知 app-bg 配色，HC 把 app-bg 换成 Canvas 打破假设）。
-     彻底修法是逐组件将玻璃「装饰背景层」与「文字层」分离，仅在装饰层
-     forced-color-adjust: none。本全局块无法做该分离；jsdom css:false 亦
-     无法实机验证 HC 表现，留作 per-component 后续。Firefox 的
-     prefers-contrast: more 媒体查询未覆盖（本块仅 forced-colors）。 */
 }
