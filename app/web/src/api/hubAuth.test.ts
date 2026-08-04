@@ -337,4 +337,75 @@ describe('web Hub auth token auto-login', () => {
     window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=old');
     await expect(auth.tryAutoLogin()).rejects.toThrow(/expired/i);
   });
+
+  it('starts the OIDC PKCE login: authorize payload, sessionStorage pending state, and window redirect', async () => {
+    const assignSpy = vi.fn();
+    const realLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        href: 'http://localhost:5173/workbench/',
+        origin: 'http://localhost:5173',
+        pathname: '/workbench/',
+        assign: assignSpy,
+        replace: vi.fn(),
+        reload: vi.fn(),
+      },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.endsWith('/client/auth/oidc/authorize')) {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({
+          code_challenge_method: 'S256',
+          device_type: 'web',
+          device_id: DEVICE_ID,
+          redirect_uri: 'http://localhost:5173/auth/tokendance/callback',
+        });
+        expect(body.code_challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        return new Response(
+          JSON.stringify({
+            state: 'server-state-1',
+            authorization_url: 'https://id.tokendancelab.com/authorize?state=server-state-1',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const { createHubAuth } = await loadAuthModule();
+      const auth = createHubAuth();
+
+      // Browser-redirect mode: the page unloads during the redirect, so the
+      // returned promise never settles — assert the pre-redirect side effects.
+      void auth.loginWithTokenDance();
+
+      await vi.waitFor(() => {
+        expect(assignSpy).toHaveBeenCalledWith(
+          'https://id.tokendancelab.com/authorize?state=server-state-1'
+        );
+      });
+      const pending = JSON.parse(sessionStorage.getItem('agenthub_oidc_pkce_pending') ?? '{}');
+      expect(pending).toMatchObject({
+        state: 'server-state-1',
+        deviceId: DEVICE_ID,
+        redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+      });
+      expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(pending.createdAt).toBeGreaterThan(0);
+      // No token material is persisted at login start.
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: realLocation,
+      });
+    }
+  });
 });

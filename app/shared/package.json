@@ -13,6 +13,7 @@
     "./transport": "./src/transport.ts",
     "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
+    "./api/auth": "./src/api/auth/index.ts",
     "./theme": "./src/theme.ts",
     "./composer": "./src/composer/index.ts",
     "./i18n": "./src/i18n/index.ts",
