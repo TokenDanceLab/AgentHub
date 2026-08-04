@@ -3,7 +3,7 @@
 > 状态: PROPOSAL（待管理员批准）
 > 创建: 2026-07-27
 > Issue: [#1403](https://github.com/TokenDanceLab/AgentHub/issues/1403)
-> 输入: [devx.md](../../../Temp/codeg-research/devx.md) — Codeg 发布链竞品拆解
+> 输入: Codeg 发布链竞品拆解（原始调研文件已随 2026-08 本机清理删除，见 git 历史）
 > 上下文: roadmap P1「Desktop packaged boundary」+ P2「Release hardening」长期挂起项；AH-SR-035/036 deploy/client 证据显式 defer
 
 ---
@@ -13,8 +13,8 @@
 AgentHub 发布链现状一句话：**有 CI 构建、有 GitHub Release、有 updater 配置声明，但没有一条完整闭环的信任链。**
 
 - 线上最新 release（v0.5.0）只有 3 个资产（NSIS setup、portable zip、Go server exe），**无 `latest.json`、无 `.sig`**——`tauri.conf.json` 里固定的 updater endpoint 实际 404，内置自动更新从未真正工作。
-- 存在 3 条互不一致的发布入口（release.yml tag 触发、cd-desktop.yml 手动触发、scripts/release/release.ps1 本地构建直传），v0.5.0 资产命名与当前 CI 约定不一致，证实入口漂移。
-- release.yml 无 tag 守卫（master 祖先 / 版本一致），updater 工件收集为 if-present 软放行，缺失时静默发布无更新通道的 release。
+- 存在 3 条互不一致的发布入口（release.yml tag 触发、cd-desktop.yml 手动触发、scripts/release/release.ps1 本地构建直传），v0.5.0 资产命名与当前 CI 约定不一致，证实入口漂移。**2026-08-02 已收敛**：cd-desktop.yml 与 release.ps1 已删除，唯一入口 = git tag → release.yml（AGENTS.md §12）。
+- release.yml 无 tag 守卫（master 祖先 / 版本一致），updater 工件收集为 if-present 软放行，缺失时静默发布无更新通道的 release。**2026-08-02 已补 tag-guard job**（master 祖先 + 版本格式双断言）。
 - macOS DMG unsigned + 无 darwin updater 通道；Windows 无 Authenticode 签名（SmartScreen 告警）。
 - 治理面已做好边界标记：`release-readiness.yml` 将签名/公证/stapling/GitHub Release upload 全部标为 later approval slice，dry gate 体系完整——但生产发布仍是旧链。
 

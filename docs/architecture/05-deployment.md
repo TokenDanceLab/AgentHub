@@ -59,7 +59,7 @@ docker compose up -d
 | Claim | 最低证据 |
 |---|---|
 | Compose 配置形状正确 | `docker compose config` 或 CI compose check |
-| OIDC 配置形状正确 | `pwsh ./scripts/verify/verify-oidc-readiness.ps1` |
+| OIDC 配置形状正确 | OIDC/session tests（`verify-oidc-readiness.ps1` 已 KNOWN-OBSOLETE，见 `AGENTS.md` §9.5） |
 | Hub/Edge API 行为正确 | 相关 Go handler/service tests + OpenAPI parse |
 | Web/Desktop UI 流程正确 | Playwright UI + Visual QA，按证据等级标注 |
 | Desktop packaged 行为正确 | Tauri package/sidecar/icon/installer evidence |

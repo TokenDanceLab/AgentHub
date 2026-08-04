@@ -3,7 +3,7 @@
 > 状态: **Phase A 已合入 master `d4270360`** · Phase B/C DRAFT 待管理员定档 · Issue #1478 · 关联 #1385（投影层）
 > 作者: senior-architect agent · 日期: 2026-07-30
 > 权威: `docs/progress/MASTER.md` P3 表 · `api/events.md` 事件合同
-> 证据: codeg v0.22.1 `c612e6c2` + `D:\Code\Temp\codeg-research\{v0.22.1-DELTA,protocol,frontend,backend}.md`；AgentHub `hub-server/internal/service/agentteam/`、`edge-server/internal/adapters/`、`app/shared/src/hubEvents.ts` 实测
+> 证据: codeg v0.22.1 `c612e6c2`（原始调研文件已随 2026-08 本机清理删除）；AgentHub `hub-server/internal/service/agentteam/`、`edge-server/internal/adapters/`、`app/shared/src/hubEvents.ts` 实测
 
 ---
 
