@@ -79,6 +79,7 @@ function Invoke-VitestCoverage {
         '--coverage',
         '--coverage.reporter=json-summary',
         '--coverage.reporter=text',
+        '--reporter=default',
         '--reporter=json',
         '--outputFile=test-results.json',
         '--hookTimeout=120000'

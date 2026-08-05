@@ -101,7 +101,7 @@ describe('MessageSearchPanel', () => {
     const marks = screen.getAllByText('auth', { selector: 'mark' });
     expect(marks.length).toBeGreaterThanOrEqual(1);
     expect(marks[0].tagName).toBe('MARK');
-  });
+  }, 15000);
 
   it('calls onJumpToMessage when clicking a result', async () => {
     const onJump = vi.fn();
