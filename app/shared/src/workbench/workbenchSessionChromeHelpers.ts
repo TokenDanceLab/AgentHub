@@ -123,7 +123,7 @@ export interface WorkbenchSessionChrome {
 export const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
   readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
-  readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
+  readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
   generatedAt: null,
   items: [
     { id: 'codex', name: 'Codex CLI', installed: false, version: null, path: 'codex', noSpend: true },

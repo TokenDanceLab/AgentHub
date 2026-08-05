@@ -7,9 +7,9 @@ TokenDance ID 登录与 live Hub dispatch 记录为 BLOCKED_WITH_EVIDENCE，
 除非单独的 approval gate 满足。
 
 迁移差异（双跑对照记录）：内部子脚本调用改为 python 执行（对应
-verify-localhost-real-stack-smoke / verify-login-e2e-readiness 的 py
-版本）；client-smoke.ps1 与 release 侧 tauri dry 脚本不在本批迁移范围，
-仍走 pwsh 调用；超时进程树终止用 taskkill /T /F 对齐 Kill($true)；
+verify-localhost-real-stack-smoke / verify-login-e2e-readiness / client-smoke
+的 py 版本）；release 侧 tauri dry 脚本不在本批迁移范围，仍走 pwsh 调用；
+超时进程树终止用 taskkill /T /F 对齐 Kill($true)；
 CLI 参数、退出码（0=通过 / 1=失败）与 RUN/PASS/BLOCK/FAIL/SKIP 行
 前缀格式与原 ps1 一致。
 
@@ -290,8 +290,8 @@ def main() -> int:
     invoke_matrix_command(
         "edge-client-smoke",
         "edge",
-        powershell_path,
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(repo_root, "scripts", "smoke", "client-smoke.ps1"), "-EdgeAddr", edge_client_smoke_addr, "-EdgeAuthToken", "local-smoke-token", "-SkipGoTests", "-SkipCancel"],
+        sys.executable,
+        [os.path.join(repo_root, "scripts", "smoke", "client-smoke.py"), "--EdgeAddr", edge_client_smoke_addr, "--EdgeAuthToken", "local-smoke-token", "--SkipGoTests", "--SkipCancel"],
         repo_root,
         [],
         "",

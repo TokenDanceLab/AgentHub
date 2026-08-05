@@ -345,9 +345,9 @@ def main() -> int:
     step("LocalOnly gates")
     invoke_required_script_gate(
         repo_root,
-        "verify-oidc-flow.ps1 -LocalOnly -SkipTD",
-        os.path.join("scripts", "verify", "verify-oidc-flow.ps1"),
-        ["-LocalOnly", "-SkipTD", "-RepoRoot", repo_root],
+        "verify-oidc-flow.py --LocalOnly --SkipTD",
+        os.path.join("scripts", "verify", "verify-oidc-flow.py"),
+        ["--LocalOnly", "--SkipTD", "--RepoRoot", repo_root],
         "LocalOnly",
     )
 
