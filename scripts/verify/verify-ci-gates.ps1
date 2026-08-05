@@ -104,7 +104,7 @@ Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must 
 Assert-Contains $backendFixture ([regex]::Escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1")) "backend-e2e-fixture must run only the TeamRun fixture smoke test"
 Assert-StepContinueOnError $backendFixture "TeamRun fixture E2E" $false
 Assert-Contains $backendFixture "P0 remote-control fixture readiness" "backend-e2e-fixture must run the P0 remote-control fixture readiness step"
-Assert-Contains $backendFixture ([regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-p0-remote-control-fixture.ps1")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
+Assert-Contains $backendFixture ([regex]::Escape("python ./scripts/verify/verify-p0-remote-control-fixture.py")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
 Assert-StepContinueOnError $backendFixture "P0 remote-control fixture readiness" $false
 
 Assert-Contains $backendFocused "Backend focused subset" "backend-focused-subset must use a clear job name"

@@ -191,7 +191,7 @@ jobs:
 
       - name: P0 remote-control fixture readiness
         working-directory: .
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-p0-remote-control-fixture.ps1
+        run: python ./scripts/verify/verify-p0-remote-control-fixture.py
 
   # -- Backend: focused subset, no real CLI/model/services
   backend-focused-subset:
