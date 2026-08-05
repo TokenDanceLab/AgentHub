@@ -313,10 +313,10 @@ def main() -> int:
                     ]
                     assert_true(len(bad_paths) == 0, "redacted manifest uses package-relative paths only")
                 if os.path.isfile(redacted_manifest_verifier_path):
-                    verify_redacted_run = invoke_repo_script(
+                    verify_redacted_run = invoke_process(
+                        sys.executable,
+                        [redacted_manifest_verifier_path, "-ManifestPath", redacted_manifest],
                         repo_root,
-                        redacted_manifest_verifier_path,
-                        ["-ManifestPath", redacted_manifest],
                     )
                     assert_true(
                         verify_redacted_run[0] == 0,
@@ -341,10 +341,10 @@ def main() -> int:
                         }
                     ]
                     write_json(os.path.join(bad_package_root, "redacted-manifest.json"), bad_redacted)
-                    bad_redacted_run = invoke_repo_script(
+                    bad_redacted_run = invoke_process(
+                        sys.executable,
+                        [redacted_manifest_verifier_path, "-PackagePath", bad_package_root],
                         repo_root,
-                        redacted_manifest_verifier_path,
-                        ["-PackagePath", bad_package_root],
                     )
                     assert_true(
                         bad_redacted_run[0] != 0,
