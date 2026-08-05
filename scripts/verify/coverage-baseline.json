@@ -1,7 +1,7 @@
 {
   "$schema": "coverage-baseline.v1",
   "measuredAt": "2026-08-03",
-  "masterSha": "1a9f3774dacfdc2e17306726f401bf282ed44a0a6",
+  "masterSha": "1a9f3774adac6ac55904e945c4943bc648d364b7",
   "masterShaShort": "1a9f3774",
   "measuredOn": "Windows (verify-coverage-baseline.ps1 per-package runs; #1535 include contract: every package now counts ALL production src/**/*.ts(x) in the denominator via app/test-config/coverage.ts factory. Web/desktop/mobile numbers dropped vs the 2026-08-02 baseline because untested production modules now enter the denominator — truth revealed, not a relaxation. e2e Playwright specs (src/__e2e__/**) and pure entry main.tsx are the only narrow exclusions; see config comments.)",
   "ciPlatform": "ubuntu-latest (v8 coverage is execution-path based; numbers are cross-platform deterministic)",
