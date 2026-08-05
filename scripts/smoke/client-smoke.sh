@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentHub client local smoke test — bash equivalent of client-smoke.ps1
+# AgentHub client local smoke test — bash equivalent of client-smoke.py
 #
 # Chains Edge and Desktop-facing API end-to-end verification.
 # Run ./scripts/dev/setup.sh first, then this script.
