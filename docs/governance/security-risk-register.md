@@ -65,7 +65,7 @@ Hub/Edge 的 `Security scan (gosec)` step 自 #1574 起 hard fail（不再 `cont
 
 ```powershell
 python ./scripts/verify/verify-ci-gates.py
-pwsh ./scripts/release/verify-release-gate.ps1
+python ./scripts/release/verify-release-gate.py
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 git diff --check
 ```
