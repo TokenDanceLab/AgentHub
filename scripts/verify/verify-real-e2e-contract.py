@@ -20,7 +20,7 @@ SKILL_PATH = ".agents/skills/real-e2e-acceptance/SKILL.md"
 RULES_PATH = "AGENTS.md"
 ARCHITECTURE_PATH = "docs/architecture.md"
 ROADMAP_PATH = "docs/roadmap.md"
-SMOKE_MATRIX_PATH = "scripts/smoke/verify-e2e-smoke-matrix.ps1"
+SMOKE_MATRIX_PATH = "scripts/smoke/verify-e2e-smoke-matrix.py"
 
 # 与 ps1 的 [ordered] 字典一致（顺序即检查顺序）。
 CANONICAL_LEVELS = [
