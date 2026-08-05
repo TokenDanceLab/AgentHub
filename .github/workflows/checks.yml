@@ -916,8 +916,7 @@ jobs:
       # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
       # only (339 tests, node env).
       - name: Self-test coverage include contract (negative)
-        shell: pwsh
-        run: ./scripts/verify/tests/coverage-include.Tests.ps1
+        run: python ./scripts/verify/tests/coverage-include.Tests.py
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:

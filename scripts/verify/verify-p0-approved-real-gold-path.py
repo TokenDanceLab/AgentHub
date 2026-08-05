@@ -308,13 +308,13 @@ def main() -> int:
             edge_root = os.path.join(artifact_root, "desktop-edge-cli-smoke")
             edge_run = invoke_repo_script(
                 repo_root,
-                "scripts/smoke/verify-p0-desktop-edge-cli-smoke.ps1",
+                "scripts/smoke/verify-p0-desktop-edge-cli-smoke.py",
                 [
-                    "-RepoRoot", repo_root,
-                    "-Runtime", args.Runtime,
-                    "-ArtifactRoot", edge_root,
-                    "-SkipDesktopDev",
-                    "-TimeoutSec", str(args.TimeoutSec),
+                    "--RepoRoot", repo_root,
+                    "--Runtime", args.Runtime,
+                    "--ArtifactRoot", edge_root,
+                    "--SkipDesktopDev",
+                    "--TimeoutSec", str(args.TimeoutSec),
                 ],
             )
             edge_evidence = os.path.join(edge_root, "smoke-result.json")
@@ -349,7 +349,7 @@ def main() -> int:
                 demo_args += ["-WebSmokeManifestPath", resolve_input_path(web_smoke, repo_root)]
             if args.RunLocalStackSmoke:
                 demo_args += ["-RunLocalStackSmoke"]
-            demo_run = invoke_repo_script(repo_root, "scripts/verify/verify-approved-real-demo-readiness.ps1", demo_args)
+            demo_run = invoke_repo_script(repo_root, "scripts/verify/verify-approved-real-demo-readiness.py", demo_args)
             demo_status = "PASS" if demo_run["ExitCode"] == 0 else "BLOCKED"
             add_segment(
                 segments, failures, warnings,
