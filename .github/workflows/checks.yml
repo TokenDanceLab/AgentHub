@@ -885,8 +885,7 @@ jobs:
         run: ./scripts/verify/verify-outbound-client-hygiene.ps1
 
       - name: Verify test-sleep ratchet (#1550)
-        shell: pwsh
-        run: ./scripts/verify/verify-test-sleep-ratchet.ps1
+        run: python ./scripts/verify/verify-test-sleep-ratchet.py
 
       - name: Verify auth dependency ownership (#1551)
         shell: pwsh
