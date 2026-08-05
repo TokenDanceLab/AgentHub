@@ -89,7 +89,7 @@ function extractFileUrl(content: string | undefined): string {
  *  zero external consumers, stored in shared/src as dead surface).  edgeBaseUrl is unconfigured here
  *  because the shared package has no Local Edge; Desktop drives the Edge
  *  connection through its own wrappers.  InteractiveDiffPreview was already
- *  a known defect per verify-shared-boundary.ps1 (audit-A P → PreviewPort). */
+ *  a known defect per verify-shared-boundary.py (audit-A P → PreviewPort). */
 let edgeBaseUrl = '';
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
