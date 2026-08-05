@@ -136,7 +136,7 @@ def assert_windows_unsigned_dev_package_contract() -> None:
         "package dry checker compiles the Windows Local Edge sidecar explicitly",
     )
     assert_true(
-        "prepare-tauri-sidecar-local.ps1" in dry_text and "agenthub-edge-x86_64-pc-windows-msvc.exe" in dry_text,
+        "prepare-tauri-sidecar-local.py" in dry_text and "agenthub-edge-x86_64-pc-windows-msvc.exe" in dry_text,
         "package dry checker places the sidecar at the Tauri Windows target-triple path",
     )
     assert_true(
