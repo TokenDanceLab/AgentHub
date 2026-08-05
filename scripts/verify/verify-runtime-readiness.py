@@ -35,7 +35,7 @@ def main() -> int:
     print("No real CLI prompt, model/API call, production access, secret read, or package build is executed.", flush=True)
 
     invoke_gate("Doc SSOT", "scripts/verify/verify-doc-ssot.py", [])
-    invoke_gate("Web Hub-only boundary", "scripts/verify/verify-web-hub-boundary.ps1", [])
+    invoke_gate("Web Hub-only boundary", "scripts/verify/verify-web-hub-boundary.py", [])
     invoke_gate("Edge CLI real-readiness proposal", "scripts/verify/verify-edge-cli-real-readiness.ps1", ["-Mode", "ProposalOnly"])
 
     print("\nruntime readiness wrapper ok", flush=True)
