@@ -104,7 +104,7 @@ Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must 
 Assert-Contains $backendFixture ([regex]::Escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1")) "backend-e2e-fixture must run only the TeamRun fixture smoke test"
 Assert-StepContinueOnError $backendFixture "TeamRun fixture E2E" $false
 Assert-Contains $backendFixture "P0 remote-control fixture readiness" "backend-e2e-fixture must run the P0 remote-control fixture readiness step"
-Assert-Contains $backendFixture ([regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-p0-remote-control-fixture.ps1")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
+Assert-Contains $backendFixture ([regex]::Escape("python ./scripts/verify/verify-p0-remote-control-fixture.py")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
 Assert-StepContinueOnError $backendFixture "P0 remote-control fixture readiness" $false
 
 Assert-Contains $backendFocused "Backend focused subset" "backend-focused-subset must use a clear job name"
@@ -168,7 +168,7 @@ foreach ($job in @(
 # The baseline gate runs all four packages plus a negative self-test proving
 # imported-by-nobody modules are counted as 0% and trip the ratchet.
 Assert-Contains $validate "Verify coverage baseline" "validate job must run the coverage baseline gate"
-Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.ps1" "validate job must call the coverage baseline verifier"
+Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.py" "validate job must call the coverage baseline verifier"
 Assert-Contains $validate "Self-test coverage include contract" "validate job must run the coverage include negative self-test"
 Assert-Contains $validate "coverage-include\.Tests\.ps1" "validate job must call the coverage include self-test"
 Assert-StepContinueOnError $validate "Verify coverage baseline" $false
@@ -242,7 +242,7 @@ Assert-Contains $validate "scripts/verify/verify-shared-ui-hubclient\.py" "valid
 Assert-StepContinueOnError $validate "Verify Shared UI hubClient gate" $false
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
 Assert-Contains $validate "Verify coverage baseline" "validate job must run the coverage baseline gate"
-Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.ps1" "validate job must call scripts/verify/verify-coverage-baseline.ps1"
+Assert-Contains $validate "scripts/verify/verify-coverage-baseline\.py" "validate job must call scripts/verify/verify-coverage-baseline.py"
 Assert-StepContinueOnError $validate "Verify coverage baseline" $false
 
 Assert-Contains $mobile "(?m)^\s+timeout-minutes:\s+45\s*$" "frontend-mobile job must have a hard timeout"

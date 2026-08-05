@@ -14,8 +14,8 @@
 - Disposition: 15 files 评估后撤销归档 — 均有活跃执行引用（smoke/release/tests-contract 互引），git mv 未执行
 - 评估原因：obsolete / approval-gate by design / needs live services:
   - approved-real 老批次（`verify-approved-real-{demo-readiness,edge-cli-evidence,preflight}.ps1`、`verify-p0-approved-real-gold-path.ps1`）— 流程已被 `.agents/skills/real-e2e-acceptance/` 取代
-  - edge-cli / runtime / fixture 过时项（`verify-edge-cli-{dispatch-evidence,json-readiness,real-readiness}.ps1`、`verify-runtime-readiness.{ps1,sh}`、`verify-login-fixture-topology.ps1`、`verify-teamrun-demo-readiness.ps1`）
-  - `verify-live-chain-topology.ps1` — 源码重构（agent_team 拆分、useHubIntegration 拆分、handlers 拆分）后 28/88 断言失效；Web Hub-only 边界由活门禁 `verify-web-hub-boundary.ps1` 覆盖
+  - edge-cli / runtime / fixture 过时项（`verify-edge-cli-{dispatch-evidence,json-readiness,real-readiness}.ps1`、`verify-runtime-readiness.{py,sh}`、`verify-login-fixture-topology.ps1`、`verify-teamrun-demo-readiness.ps1`）
+  - `verify-live-chain-topology.py` — 源码重构（agent_team 拆分、useHubIntegration 拆分、handlers 拆分）后 28/88 断言失效；Web Hub-only 边界由活门禁 `verify-web-hub-boundary.ps1` 覆盖
   - 登录/OIDC approval-gate（`verify-login-e2e-readiness.ps1`、`verify-token-dance-id-login-readiness.ps1` 需人工批准元数据/凭据，`verify-oidc-flow.ps1` 需真实 TokenDance ID + Hub 服务）— 非 CI 静态门禁；OIDC 配置形状门禁 `verify-oidc-readiness.ps1` 已 KNOWN-OBSOLETE 且未挂 CI（重写待办见 AGENTS.md §9.5）
 - 现状：15 个脚本仍保留在 `scripts/verify/`（其中 `verify-edge-cli-json-readiness.ps1` 于 2026-08-04 #1610 零引用清理时删除）
 

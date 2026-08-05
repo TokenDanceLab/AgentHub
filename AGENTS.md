@@ -234,7 +234,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 |---|---|---|
 | CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.ps1`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.ps1`） | checks.yml → validate |
-| Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.ps1`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.ps1`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
+| Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.ps1`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.ps1` | checks.yml → validate |
@@ -251,12 +251,12 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | 出站 client 卫生：service/jwtutil/edge-hub 范围内禁裸 client、禁 request-path env 读取、外部响应必须有 body limit、retry 必须有预算；allowlist 只缩且带 issue（#1549/#1564） | `scripts/verify/verify-outbound-client-hygiene.py`（负向自测 `scripts/verify/tests/verify-outbound-client-hygiene.Tests.ps1`） | checks.yml → validate |
 | shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
 | shared UI 依赖 hubClient 门禁 | `scripts/verify/verify-shared-ui-hubclient.py` | checks.yml → validate |
-| 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.ps1` | checks.yml → validate |
+| 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.py` | checks.yml → validate |
 | shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
 | v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.py` | checks.yml → validate |
 | Hub/Edge gosec SAST 告警清零（#1574，hard fail） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`）；go-edge/go-hub Security scan (gosec) step 直接 fail-closed | checks.yml → go-edge / go-hub |
 | OIDC 配置形状与边界（issuer/redirect/无 secret；`verify-oidc-readiness.ps1` 因断言旧服务/测试名已 KNOWN-OBSOLETE，重写待办） | `scripts/verify/verify-oidc-readiness.ps1`（未挂 CI） | — |
-| P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.ps1` | checks.yml → backend-e2e-fixture |
+| P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.ps1` | checks.yml → backend-perf-leak-gates |
 | 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.ps1`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`） | cd-pr-check.yml → deployment-files |
 | Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.ps1` | release-readiness.yml |
