@@ -40,8 +40,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Verify Tauri package readiness policy
-        shell: pwsh
-        run: ./scripts/release/verify-tauri-package-readiness.ps1 -RepoRoot .
+        run: python scripts/release/verify-tauri-package-readiness.py -RepoRoot .
 
   windows-installer-smoke-preflight:
     name: Windows installer smoke preflight
@@ -66,8 +65,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify Windows installer smoke preflight
-        shell: pwsh
-        run: ./scripts/release/verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain
+        run: python scripts/release/verify-tauri-installer-smoke.py -RepoRoot . -StrictToolchain
 
   windows-package-dry:
     name: Windows NSIS and portable dry package
@@ -95,8 +93,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build unsigned Windows package dry run
-        shell: pwsh
-        run: ./scripts/release/verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
+        run: python scripts/release/verify-tauri-package-dry.py -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
 
       - name: Upload dry package artifacts
         uses: actions/upload-artifact@v7

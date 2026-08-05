@@ -107,9 +107,9 @@ def main() -> int:
     assert_contains("scripts/verify/verify-oidc-flow.py", r"--LocalOnly", "OIDC flow verifier exposes -LocalOnly")
     assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipHub\s*=\s*True", "-LocalOnly skips live Hub")
     assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipTD\s*=\s*True", "-LocalOnly skips live TokenDance ID")
-    assert_contains("scripts/release/verify-packaged-login-real-readiness.ps1", r"No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made", "packaged real-readiness gate is dry")
+    assert_contains("scripts/release/verify-packaged-login-real-readiness.py", r"No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made", "packaged real-readiness gate is dry")
     assert_contains("scripts/verify/verify-web-hub-boundary.py", r"Web Hub-only boundary", "Web Hub-only boundary gate exists")
-    assert_contains("scripts/release/verify-tauri-package-readiness.ps1", r"macOS unsigned dry policy boundary", "macOS unsigned dry policy gate remains present")
+    assert_contains("scripts/release/verify-tauri-package-readiness.py", r"macOS unsigned dry policy boundary", "macOS unsigned dry policy gate remains present")
     assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperClaudeGolden", "SDK fixture mapper Claude golden evidence remains fixture-only")
     assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperOpenAIGolden", "SDK fixture mapper OpenAI golden evidence remains fixture-only")
 
@@ -125,9 +125,9 @@ def main() -> int:
     print("  agenthub-desktop: pnpm test -- src/api/hubAuth.test.ts")
     print("  agenthub-desktop: pnpm test -- src/platform/desktopPlatform.test.ts")
     print("  local OIDC: python scripts/verify/verify-oidc-flow.py --LocalOnly")
-    print("  packaged dry: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\release\\verify-packaged-login-real-readiness.ps1 -RepoRoot .")
+    print("  packaged dry: python scripts/release/verify-packaged-login-real-readiness.py --RepoRoot .")
     print("  Web boundary: python scripts/verify/verify-web-hub-boundary.py")
-    print("  Tauri package readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\release\\verify-tauri-package-readiness.ps1 -RepoRoot .")
+    print("  Tauri package readiness: python scripts/release/verify-tauri-package-readiness.py --RepoRoot .")
 
     step("Evidence boundaries")
     print("  Mock-only: fake OIDC callback, Hub-issued fixture tokens, and Hub execution-target inventory fixture")

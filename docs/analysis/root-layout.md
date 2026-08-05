@@ -47,7 +47,7 @@ These are **non-negotiable** for this ADR and any follow-on cleanup:
 **Hard references today (why move is not free):**
 
 - `scripts/dev/dev-up.sh` — `cd` repo root; copies root `.env.example`; runs compose from root
-- `scripts/release/verify-web-deploy-readiness.ps1` — asserts content of root `docker-compose.yml`
+- `scripts/release/verify-web-deploy-readiness.py` — asserts content of root `docker-compose.yml`
 - `scripts/verify/verify-oidc-readiness.{sh,py}` — asserts root `.env.example` + `docker-compose.yml`
 - `scripts/smoke/verify-p0-local-smoke.sh` — asserts root files exist
 - `docs/architecture/05-deployment.md` — table lists root `docker-compose.yml` as local-dev asset
