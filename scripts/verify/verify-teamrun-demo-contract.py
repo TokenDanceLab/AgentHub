@@ -104,7 +104,7 @@ def main() -> int:
     exporter_path = os.path.join(repo_root, "scripts", "lib", "export-teamrun-demo-fixture-evidence.ps1")
     package_path = os.path.join(repo_root, "scripts", "lib", "package-teamrun-demo-evidence.ps1")
     readiness_path = os.path.join(repo_root, "scripts", "verify", "verify-teamrun-demo-readiness.py")
-    redacted_manifest_verifier_path = os.path.join(repo_root, "scripts", "lib", "evidence", "verify-redacted-manifest.ps1")
+    redacted_manifest_verifier_path = os.path.join(repo_root, "scripts", "lib", "evidence", "verify-redacted-manifest.py")
 
     assert_true(os.path.isfile(scenario_path), "TeamRun demo scenario manifest exists")
     assert_true(os.path.isfile(exporter_path), "TeamRun fixture evidence exporter exists")
