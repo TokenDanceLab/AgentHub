@@ -899,8 +899,7 @@ jobs:
         run: ./scripts/verify/tests/verify-quality-debt-ratchet.Tests.ps1
 
       - name: Verify Shared REST contract Hub-client to Hub-router
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-rest-contract.ps1
+        run: python ./scripts/verify/verify-shared-rest-contract.py
 
       - name: Verify Shared UI hubClient gate
         shell: pwsh

@@ -163,7 +163,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ### 5.3 删除 apiClient 对 REST 契约门禁的影响
 
-`#1467 shared-rest-contract`（`verify-shared-rest-contract.ps1`）比对的是 Hub 路由契约，`apiClient.ts` 是 Edge REST 客户端——**不在比对集**。删除 apiClient 对 `#1467` 零影响。需确认 `apiClient.ts` 的 OpenAPI 引用（`api/openapi.yaml` 的 Edge 路径）是否还有其他消费者——实测 desktop `edgeClient.ts` 自维护 schema（`./schemas`），不依赖 `apiClient.ts`。
+`#1467 shared-rest-contract`（`verify-shared-rest-contract.py`）比对的是 Hub 路由契约，`apiClient.ts` 是 Edge REST 客户端——**不在比对集**。删除 apiClient 对 `#1467` 零影响。需确认 `apiClient.ts` 的 OpenAPI 引用（`api/openapi.yaml` 的 Edge 路径）是否还有其他消费者——实测 desktop `edgeClient.ts` 自维护 schema（`./schemas`），不依赖 `apiClient.ts`。
 
 ## 6. 工作量 / 风险 / 建议
 

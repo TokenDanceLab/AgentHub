@@ -249,7 +249,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.ps1` | checks.yml → validate |
 | router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.ps1` | checks.yml → validate |
 | 出站 client 卫生：service/jwtutil/edge-hub 范围内禁裸 client、禁 request-path env 读取、外部响应必须有 body limit、retry 必须有预算；allowlist 只缩且带 issue（#1549/#1564） | `scripts/verify/verify-outbound-client-hygiene.ps1`（负向自测 `scripts/verify/tests/verify-outbound-client-hygiene.Tests.ps1`） | checks.yml → validate |
-| shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.ps1` | checks.yml → validate |
+| shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
 | shared UI 依赖 hubClient 门禁 | `scripts/verify/verify-shared-ui-hubclient.ps1` | checks.yml → validate |
 | 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.ps1` | checks.yml → validate |
 | shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.ps1` | checks.yml → validate |
