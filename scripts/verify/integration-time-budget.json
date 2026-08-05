@@ -1,5 +1,5 @@
 {
- "_comment": "Integration/test lane wall-clock budgets (#1565). Each lane has budget_seconds (asserted when a CI step measures the lane and calls verify-integration-time-budget.ps1 -Lane <name> -MeasuredSeconds <n>) and hard_cap_seconds (job/go-test timeout, the fail-closed ceiling). Budgets are generous vs observed CI durations so normal jitter never trips them, but lane growth beyond budget requires an explicit baseline update (tracked approval with owner/review/rationale). Evidence rows are the observed durations with run/date references.",
+ "_comment": "Integration/test lane wall-clock budgets (#1565). Each lane has budget_seconds (asserted when a CI step measures the lane and calls verify-integration-time-budget.py --Lane <name> --MeasuredSeconds <n>) and hard_cap_seconds (job/go-test timeout, the fail-closed ceiling). Budgets are generous vs observed CI durations so normal jitter never trips them, but lane growth beyond budget requires an explicit baseline update (tracked approval with owner/review/rationale). Evidence rows are the observed durations with run/date references.",
  "hub-integration": {
   "budget_seconds": 300,
   "hard_cap_seconds": 1200,

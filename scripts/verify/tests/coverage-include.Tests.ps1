@@ -6,7 +6,7 @@
 .DESCRIPTION
   Proves the include contract actually counts imported-by-nobody production
   modules as 0% and that the uncovered ratchet in
-  verify-coverage-baseline.ps1 would fail on them:
+  verify-coverage-baseline.py would fail on them:
 
     1. Creates app/mobile-rn/src/__cov_probe__/uncovered_probe.ts — a real
        production-looking module (exported function) that no test imports.
