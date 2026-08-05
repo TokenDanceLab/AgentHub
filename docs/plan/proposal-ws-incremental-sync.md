@@ -1,6 +1,6 @@
 # Subscribe-with-Snapshot：WS 增量同步提案
 
-> **状态: PROPOSAL（待管理员批准，非 active SPEC）**
+> **状态: SPEC merged（2026-08 管理员批准）**
 > 提案日期：2026-07-27
 > 追踪 Issue：[#1411](https://github.com/TokenDanceLab/AgentHub/issues/1411)
 > 前置阅读: Codeg 参考实现（原始调研文件已随 2026-08 本机清理删除，见 git 历史）
