@@ -8,6 +8,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // 与 desktop 配置一致的 worker 上限：全量 2000+ 测试时默认全核并发
+    // 会导致 forks worker 启动/回收超时（vitest-pool Timeout terminating
+    // forks worker），限制并发后 coverage 全量运行稳定。
+    maxWorkers: 4,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // Exclude stray git worktrees (e.g. .worktrees/refactor/*) and the
     // vendored reference/ repos so their test files — which resolve with a
