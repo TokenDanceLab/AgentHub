@@ -130,13 +130,11 @@ jobs:
       # step just produced (single source, no version drift).
       - name: Verify Hub lint fingerprint ratchet (#1573)
         working-directory: .
-        shell: pwsh
-        run: ./scripts/verify/verify-hub-lint-ratchet.ps1 -LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
+        run: python ./scripts/verify/verify-hub-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
 
       - name: Self-test Hub lint fingerprint ratchet
         working-directory: .
-        shell: pwsh
-        run: ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.ps1
+        run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
 
       - name: Test (unit only, skip integration)
         run: |
