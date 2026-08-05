@@ -3,8 +3,7 @@
 最后更新：2026-08-03（#1527 PR2）
 
 本目录只保存 Hub Server **镜像构建输入**。旧 prod/us1/hk2 compose、deploy.sh 系列脚本、
-Caddy/nginx 反代模板与 env 模板已在 #1527 PR2 收口删除（历史参考归档于
-[../../docs/archives/wiki/pages/ops-hk3.md](../../docs/archives/wiki/pages/ops-hk3.md)）。
+Caddy/nginx 反代模板与 env 模板已在 #1527 PR2 收口删除，历史参考以 TokenDance server SSOT 为准。
 
 Live host、DNS、TLS、secret、机器路径和发布状态不在本仓库维护；以 TokenDance server SSOT 为准。
 

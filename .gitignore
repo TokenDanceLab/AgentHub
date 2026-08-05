@@ -25,7 +25,9 @@ output/
 .next/
 .vite/
 *.tgz
+*.zip
 app/desktop/app/
+artifacts/
 
 # =============================================================================
 # Test & Coverage
