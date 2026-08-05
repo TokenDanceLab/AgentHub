@@ -36,8 +36,8 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | Workbench 契约切片（projects 先行） | #1546 完成：shared Workbench 对 concrete HubClient 的 type/value 引用清零，改用窄领域端口 `WorkbenchProjectsPort`（`shared/workbench/workbenchProjectsPort.ts`），Desktop/Web composition root 各实现一个 adapter 注入；projects route 单一 ownership（parent-managed 或 port，不再运行时猜测）；load-more 失败可见、可重试（UI + i18n zh/en）；`verify-shared-ui-hubclient.ps1` 升级为同时禁止 type 引用。这是 #1528 的 projects slice（agents/catalog 收口后续单独切片） | #1546, #1528 |
 | WebSocket incremental sync | SPEC merged；实施按 SPEC 阶段（B1-B6/F1-F4）推进 | docs/plan/proposal-ws-incremental-sync.md |
 | IM bridge (Feishu first) | SPEC merged；实施按 SPEC 阶段推进 | docs/plan/proposal-im-bridge.md |
-| Automations and session import | Product backlog | backlog：SPEC 待写（#1405, #1407） |
-| @提及=派单交互 | Product backlog | backlog：SPEC 待写（#1406） |
+| Automations and session import | Product backlog | backlog：SPEC 待写 |
+| @提及=派单交互 | Product backlog | backlog：SPEC 待写 |
 
 ## Maintainability program
 
