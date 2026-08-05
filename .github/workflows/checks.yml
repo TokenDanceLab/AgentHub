@@ -926,8 +926,7 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
       - name: Verify coverage baseline
-        shell: pwsh
-        run: ./scripts/verify/verify-coverage-baseline.ps1
+        run: python ./scripts/verify/verify-coverage-baseline.py
       # Negative self-test: an imported-by-nobody production file must be
       # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
       # only (339 tests, node env).
