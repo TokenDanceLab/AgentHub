@@ -214,7 +214,7 @@ Assert-Contains $validate "Verify hubClient thin-shell SSOT" "validate job must 
 Assert-Contains $validate "scripts/verify/verify-hubclient-ssot\.py" "validate job must call scripts/verify/verify-hubclient-ssot.py"
 Assert-StepContinueOnError $validate "Verify hubClient thin-shell SSOT" $false
 Assert-Contains $validate "Verify Design token SSOT" "validate job must run the design token SSOT verifier"
-Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.ps1" "validate job must call scripts/verify/verify-design-token-ssot.ps1"
+Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.py" "validate job must call scripts/verify/verify-design-token-ssot.py"
 Assert-StepContinueOnError $validate "Verify Design token SSOT" $false
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
