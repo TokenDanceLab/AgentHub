@@ -48,7 +48,7 @@
 1. **`apiClient.ts` 是"edge 表面"但零外部消费**——它是 Edge REST 的旧 SSOT 客户端，已被三端的 hubClient thin-shell + desktop 的 `edgeClient.ts` 取代。它在 `shared/src/index.ts` 行 236–275 被 re-export，但全仓 `grep '@shared/apiClient'` 无命中。**这是最干净的剔除候选，不是拆分候选。**
 2. **`eventClient.ts` + `transcript/edge*.ts` + `edgeQueryKeys` 是真正 edge-only 的表面**，且**仅 desktop 用**（web/mobile-rn 都是 hub-only 客户端）。这三个加起来 ~1.2k 行。
 3. **`hubClient*.ts` 32 文件 9.3k 行是 hub-side 最大单一表面**，但**mobile-rn 也用它**（mobile 是 hub-only，所以 hubClient 对 mobile 而言是"正确归属"）。把 hubClient 抽到 shared-hub 不解决 mobile 的任何问题——mobile 仍需 hubClient。
-4. **web 和 mobile-rn 都是 hub-only**：web 不 import 任何 `@shared/apiClient`/`edgeQueryKeys`/`eventClient`/`transcript/edge*`；mobile-rn 同样禁（`verify-mobile-hub-boundary.ps1` + `verify-web-hub-boundary.ps1` 已守）。**"edge-only 表面污染 hub-only 消费者"的风险已被既有边界门禁覆盖。**
+4. **web 和 mobile-rn 都是 hub-only**：web 不 import 任何 `@shared/apiClient`/`edgeQueryKeys`/`eventClient`/`transcript/edge*`；mobile-rn 同样禁（`verify-mobile-hub-boundary.py` + `verify-web-hub-boundary.py` 已守）。**"edge-only 表面污染 hub-only 消费者"的风险已被既有边界门禁覆盖。**
 
 ## 2. 证据：消费者实际导入路径
 
@@ -204,7 +204,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ## 9. 参考
 
-- 既有边界门禁：`scripts/verify/verify-shared-boundary.py`、`verify-shared-ui-hubclient.py`、`verify-web-hub-boundary.ps1`、`verify-mobile-hub-boundary.ps1`、`verify-shared-rest-contract.py`、`verify-hubclient-ssot.ps1`
+- 既有边界门禁：`scripts/verify/verify-shared-boundary.py`、`verify-shared-ui-hubclient.py`、`verify-web-hub-boundary.py`、`verify-mobile-hub-boundary.py`、`verify-shared-rest-contract.py`、`verify-hubclient-ssot.ps1`
 - MASTER 门禁索引：`docs/progress/MASTER.md` L94（14 层 validate 硬门禁）
 - hubClient SSOT：`app/desktop/src/api/hubClient.ts:7,14,17`、`app/web/src/api/hubClient.ts:4,12,14`、`app/mobile-rn/src/api/hubClient.ts:24-31`
 - Edge 表面仅 desktop：`app/desktop/src/api/edgeClient.ts:20-23`、`app/desktop/src/stores/edgeEventBridge.ts`、`app/desktop/src/platform/useDesktopEdgeEvents.ts:2-3`

@@ -204,20 +204,20 @@ $docEntrypointSelfTestStep = Get-StepBlock $validate "Self-test doc entrypoint S
 Assert-Contains $docEntrypointSelfTestStep "scripts/verify/tests/verify-doc-entrypoints\.Tests\.ps1" "doc entrypoint self-test step must call its test script"
 Assert-StepContinueOnError $validate "Self-test doc entrypoint SSOT" $false
 Assert-Contains $validate "Verify Web Hub-only boundary" "validate job must run the Web Hub-only boundary verifier"
-Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.ps1" "validate job must call scripts/verify/verify-web-hub-boundary.ps1"
+Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.py" "validate job must call scripts/verify/verify-web-hub-boundary.py"
 Assert-Contains $validate "Verify Hub pure package imports" "validate job must run the Hub pure package import verifier"
-Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.ps1" "validate job must call scripts/verify/verify-hub-pure-packages.ps1"
+Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.py" "validate job must call scripts/verify/verify-hub-pure-packages.py"
 Assert-StepContinueOnError $validate "Verify Hub pure package imports" $false
 Assert-Contains $validate "Verify Mobile Hub-only boundary" "validate job must run the Mobile Hub-only boundary verifier"
-Assert-Contains $validate "scripts/verify/verify-mobile-hub-boundary\.ps1" "validate job must call scripts/verify/verify-mobile-hub-boundary.ps1"
+Assert-Contains $validate "scripts/verify/verify-mobile-hub-boundary\.py" "validate job must call scripts/verify/verify-mobile-hub-boundary.py"
 Assert-Contains $validate "Verify hubClient thin-shell SSOT" "validate job must run the hubClient thin-shell SSOT verifier"
-Assert-Contains $validate "scripts/verify/verify-hubclient-ssot\.ps1" "validate job must call scripts/verify/verify-hubclient-ssot.ps1"
+Assert-Contains $validate "scripts/verify/verify-hubclient-ssot\.py" "validate job must call scripts/verify/verify-hubclient-ssot.py"
 Assert-StepContinueOnError $validate "Verify hubClient thin-shell SSOT" $false
 Assert-Contains $validate "Verify Design token SSOT" "validate job must run the design token SSOT verifier"
-Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.ps1" "validate job must call scripts/verify/verify-design-token-ssot.ps1"
+Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.py" "validate job must call scripts/verify/verify-design-token-ssot.py"
 Assert-StepContinueOnError $validate "Verify Design token SSOT" $false
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
-Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
+Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.py" "validate job must call scripts/verify/verify-real-e2e-contract.py"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "Verify OpenAPI↔hub router contract" "validate job must run the OpenAPI↔hub router contract verifier"
 Assert-Contains $validate "scripts/verify/verify-openapi-contract\.py" "validate job must call scripts/verify/verify-openapi-contract.py"
