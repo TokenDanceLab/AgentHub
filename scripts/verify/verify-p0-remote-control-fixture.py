@@ -201,7 +201,7 @@ def main() -> int:
 
         step("TeamRun demo contract tests")
         invoke_required_script_gate(
-            repo_root, "verify-teamrun-demo-contract.ps1", os.path.join("scripts", "verify", "verify-teamrun-demo-contract.ps1"), ["-RepoRoot", repo_root]
+            repo_root, "verify-teamrun-demo-contract.py", os.path.join("scripts", "verify", "verify-teamrun-demo-contract.py"), ["-RepoRoot", repo_root]
         )
 
         step("Edge SDK fixture focused gate")
