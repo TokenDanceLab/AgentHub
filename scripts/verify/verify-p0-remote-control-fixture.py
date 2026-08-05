@@ -189,8 +189,8 @@ def main() -> int:
         remote_output_root = tempfile.mkdtemp(prefix="agenthub-p0-remote-control-fixture-")
         invoke_required_script_gate(
             repo_root,
-            "verify-remote-control-fixture-e2e.ps1",
-            os.path.join("scripts", "smoke", "verify-remote-control-fixture-e2e.ps1"),
+            "verify-remote-control-fixture-e2e.py",
+            os.path.join("scripts", "smoke", "verify-remote-control-fixture-e2e.py"),
             ["-OutputRoot", remote_output_root, "-Stamp", "p0-fixture-readiness"],
         )
 

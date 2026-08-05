@@ -13,7 +13,7 @@ on:
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
       - "scripts/verify/verify-deployment-shape.py"
-      - "scripts/verify/tests/verify-deployment-shape.Tests.ps1"
+      - "scripts/verify/tests/verify-deployment-shape.Tests.py"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -139,7 +139,7 @@ jobs:
       - name: Run deployment shape verifier self-tests
         run: |
           echo "::group::Deployment shape verifier self-tests"
-          pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/tests/verify-deployment-shape.Tests.ps1
+          python ./scripts/verify/tests/verify-deployment-shape.Tests.py
           echo "::endgroup::"
 
   # ── Docker build dry run ───────────────────────

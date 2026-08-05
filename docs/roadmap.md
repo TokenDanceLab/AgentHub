@@ -41,7 +41,7 @@
 |---|---|---|
 | Web/Mobile client test lanes | Web 保持 Hub-only；Mobile 只澄清 RN-safe shared contract gate，不做 native/UI 深入重构 | Web data-boundary checks + Mobile mock-Hub/Expo Doctor boundary notes |
 | Desktop packaged boundary | 区分 Vite renderer、Tauri packaged、sidecar、icon、installer/signing | packaged-release gate 或明确 `real_tested=false` |
-| Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量；**手动** `workflow_dispatch` job `Backend perf/leak gates` | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.ps1` **PASS**（非 capacity） |
+| Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量；**手动** `workflow_dispatch` job `Backend perf/leak gates` | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.py` **PASS**（非 capacity） |
 | Mobile PR CI light | mobile-rn / shared hubClient 变更跑 typecheck+unit；重 suite 仍 dispatch | checks.yml `frontend-mobile-light` path-filter |
 | API contract hygiene | REST 以 `api/openapi.yaml` 为准，WS 以 `api/events.md` 为准 | OpenAPI parse + endpoint tests |
 

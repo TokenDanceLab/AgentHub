@@ -153,13 +153,13 @@ def invoke_python_script(relative_path: str, arguments: list) -> None:
 
 
 def invoke_prepare_sidecar(arguments: list) -> None:
-    powershell_exe = shutil.which("pwsh") or shutil.which("powershell")
-    if not powershell_exe:
-        fail_check("PowerShell executable not found for prepare-tauri-sidecar-local.ps1")
-    full_path = os.path.join(REPO_ROOT, "scripts", "release", "prepare-tauri-sidecar-local.ps1")
-    run = subprocess.run([powershell_exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", full_path, *arguments])
+    python_exe = shutil.which("python") or shutil.which("python3")
+    if not python_exe:
+        fail_check("Python executable not found for prepare-tauri-sidecar-local.py")
+    full_path = os.path.join(REPO_ROOT, "scripts", "release", "prepare-tauri-sidecar-local.py")
+    run = subprocess.run([python_exe, full_path, *arguments])
     if run.returncode != 0:
-        fail_check(f"prepare-tauri-sidecar-local.ps1 failed with exit code {run.returncode}")
+        fail_check(f"prepare-tauri-sidecar-local.py failed with exit code {run.returncode}")
 
 
 def main() -> int:

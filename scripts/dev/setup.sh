@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
+# ───────────────────────────────────────────────
+# AgentHub 本地环境配置（Python 实现，原 ps1 已迁移；本文件是兼容 launcher）
+# 用法:
+#   ./scripts/dev/setup.sh                    # 仅启用 git hooks
+#   ./scripts/dev/setup.sh --reference-core   # 同步 core reference 仓库
+#   ./scripts/dev/setup.sh --reference-all    # 同步全部 reference 仓库
+# ───────────────────────────────────────────────
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-git config core.hooksPath scripts/git-hooks
-echo "Git hooks enabled: scripts/git-hooks"
-
-if [[ "${1:-}" == "--reference-core" ]]; then
-  if ! command -v pwsh >/dev/null 2>&1; then
-    echo "PowerShell is required for reference sync. Install pwsh or run scripts/dev/sync-reference.ps1 on Windows."
-    exit 1
-  fi
-  pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/dev/sync-reference.ps1 -Tier core
-elif [[ "${1:-}" == "--reference-all" ]]; then
-  if ! command -v pwsh >/dev/null 2>&1; then
-    echo "PowerShell is required for reference sync. Install pwsh or run scripts/dev/sync-reference.ps1 on Windows."
-    exit 1
-  fi
-  pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/dev/sync-reference.ps1 -Tier all
-fi
-
-echo "Setup complete."
+exec python "$SCRIPT_DIR/setup.py" "$@"

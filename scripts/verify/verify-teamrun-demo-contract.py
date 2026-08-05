@@ -2,11 +2,11 @@
 """verify-teamrun-demo-contract — TeamRun demo fixture 证据契约自测（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
 
 对 TeamRun demo 证据链做离线合约自测：scenario manifest 冻结字段与 claims
-诚实性；用 `scripts/lib/export-teamrun-demo-fixture-evidence.ps1` 生成 fixture
+诚实性；用 `scripts/lib/export-teamrun-demo-fixture-evidence.py` 生成 fixture
 证据并校验证据形状；用 `scripts/verify/verify-teamrun-demo-readiness.py`
 验证 Submission 模式拒绝 fixture-only、FixtureRehearsal 模式接受诚实 fixture
-claims、mislabelled claims 被拒；再用 `scripts/lib/package-teamrun-demo-evidence.ps1`
-打包并让 `scripts/lib/evidence/verify-redacted-manifest.ps1` 校验红名单（含
+claims、mislabelled claims 被拒；再用 `scripts/lib/package-teamrun-demo-evidence.py`
+打包并让 `scripts/lib/evidence/verify-redacted-manifest.py` 校验红名单（含
 授权泄漏负向用例）。全程离线、无 secret。
 """
 
@@ -68,15 +68,6 @@ def invoke_process(file_name: str, arguments: list, working_directory: str) -> t
         return -1, str(exc)
 
 
-def invoke_repo_script(repo_root: str, script_path: str, arguments: list) -> tuple:
-    powershell_exe = find_powershell()
-    if not powershell_exe:
-        return -1, "PowerShell executable is unavailable"
-    return invoke_process(
-        powershell_exe, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments], repo_root
-    )
-
-
 def contains_ci(values: list, needle: str) -> bool:
     return any(str(value).casefold() == needle.casefold() for value in values)
 
@@ -101,8 +92,8 @@ def main() -> int:
     FAILED = 0
 
     scenario_path = os.path.join(repo_root, "tests", "fixtures", "teamrun", "teamrun-demo-scenario.json")
-    exporter_path = os.path.join(repo_root, "scripts", "lib", "export-teamrun-demo-fixture-evidence.ps1")
-    package_path = os.path.join(repo_root, "scripts", "lib", "package-teamrun-demo-evidence.ps1")
+    exporter_path = os.path.join(repo_root, "scripts", "lib", "export-teamrun-demo-fixture-evidence.py")
+    package_path = os.path.join(repo_root, "scripts", "lib", "package-teamrun-demo-evidence.py")
     readiness_path = os.path.join(repo_root, "scripts", "verify", "verify-teamrun-demo-readiness.py")
     redacted_manifest_verifier_path = os.path.join(repo_root, "scripts", "lib", "evidence", "verify-redacted-manifest.py")
 
@@ -179,10 +170,10 @@ def main() -> int:
         shutil.rmtree(tmp_root, ignore_errors=True)
         os.makedirs(tmp_root, exist_ok=True)
 
-        export = invoke_repo_script(
+        export = invoke_process(
+            sys.executable,
+            [exporter_path, "-ScenarioManifest", scenario_path, "-OutputRoot", tmp_root, "-Stamp", "contract-test"],
             repo_root,
-            exporter_path,
-            ["-ScenarioManifest", scenario_path, "-OutputRoot", tmp_root, "-Stamp", "contract-test"],
         )
         assert_true(export[0] == 0, "fixture exporter exits successfully", export[1])
 
@@ -266,10 +257,10 @@ def main() -> int:
 
             if os.path.isfile(package_path):
                 package_root = os.path.join(tmp_root, "package")
-                package_run = invoke_repo_script(
+                package_run = invoke_process(
+                    sys.executable,
+                    [package_path, "-EvidencePath", evidence_path, "-OutputRoot", package_root, "-Stamp", "contract-test-package"],
                     repo_root,
-                    package_path,
-                    ["-EvidencePath", evidence_path, "-OutputRoot", package_root, "-Stamp", "contract-test-package"],
                 )
                 assert_true(package_run[0] == 0, "package script writes fixture rehearsal package", package_run[1])
                 package_manifest = os.path.join(package_root, "teamrun-demo-contract-test-package", "manifest.md")
@@ -362,10 +353,10 @@ def main() -> int:
                         bad_redacted_run[1],
                     )
 
-                package_submission_run = invoke_repo_script(
-                    repo_root,
-                    package_path,
+                package_submission_run = invoke_process(
+                    sys.executable,
                     [
+                        package_path,
                         "-EvidencePath",
                         evidence_path,
                         "-OutputRoot",
@@ -375,6 +366,7 @@ def main() -> int:
                         "-PackageMode",
                         "Submission",
                     ],
+                    repo_root,
                 )
                 assert_true(
                     package_submission_run[0] != 0,
