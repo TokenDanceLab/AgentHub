@@ -802,8 +802,7 @@ jobs:
         run: ./scripts/verify/verify-ci-gates.ps1
 
       - name: Verify action runtime allow-list (no Node-20 actions)
-        shell: pwsh
-        run: ./scripts/verify/verify-action-runtimes.ps1
+        run: python ./scripts/verify/verify-action-runtimes.py
 
       - name: Self-test action runtime allow-list gate
         shell: pwsh

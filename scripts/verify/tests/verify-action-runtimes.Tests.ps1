@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 <#
-Negative self-tests for verify-action-runtimes.ps1 (#1580).
+Negative self-tests for verify-action-runtimes.py (#1580, ps1 迁移).
 
 Cases:
 1. positive: fixture workflow using only node24 allow-listed actions -> 0
@@ -11,7 +11,7 @@ Cases:
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
-$VerifierRelative = "scripts/verify/verify-action-runtimes.ps1"
+$VerifierRelative = "scripts/verify/verify-action-runtimes.py"
 $Passed = 0
 
 function Fail([string]$Message) {
@@ -44,7 +44,7 @@ function Copy-RepoFile([string]$FixtureRoot, [string]$RelativePath) {
 }
 
 function Invoke-FixtureVerifier([string]$FixtureRoot) {
-    $output = & pwsh -NoProfile -File (Join-Path $FixtureRoot $VerifierRelative) -WorkflowsRoot (Join-Path $FixtureRoot ".github/workflows") 2>&1
+    $output = & python (Join-Path $FixtureRoot $VerifierRelative) --WorkflowsRoot (Join-Path $FixtureRoot ".github/workflows") 2>&1
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output = ($output -join "`n")
