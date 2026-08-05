@@ -2,7 +2,7 @@
 
 最后更新：2026-07-18
 Issue: #466 / #480 / #482 / #491 / #518 / #607 · closed hardcode: #879 / #910 / #1021
-Companion SSOT map: [../architecture/07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
+Companion SSOT map: [../architecture/07-design-system-ssot.md](../../architecture/07-design-system-ssot.md)
 
 > Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
 
@@ -128,7 +128,7 @@ Sources:
 - `app/shared/src/chatview/design/tokens.css` (scoped `.chatview` + `[data-theme="dark"] .chatview`)
 - `app/shared/src/styles/tokens-base.css`
 - `app/shared/src/styles/themes.css`
-- SSOT map: [07-design-system-ssot.md](../architecture/07-design-system-ssot.md)
+- SSOT map: [07-design-system-ssot.md](../../architecture/07-design-system-ssot.md)
 
 ### 6.1 Load path
 

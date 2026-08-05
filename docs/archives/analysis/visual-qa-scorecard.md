@@ -5,7 +5,7 @@ Issue: #1199 (P74) · SSOT ownership: #1286 · HiDPI extension: #1308 (P75)
 状态：🟢 Ship 89 · 7/9 维度满分 · Phases 74-78 全部关闭 · 16 PRs
 
 > 100-point rubric for Desktop/Web shell screenshots (+ optional HiDPI bonus). North star: **light white frosted glass**, dense spacing, micro-motion, dark translucent pair, crisp type on Retina.
-> Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../architecture/07-design-system-ssot.md).
+> Capture path: §4. Design tokens SSOT: [07-design-system-ssot](../../architecture/07-design-system-ssot.md).
 
 ## 0. Gate SSOT (current)
 
@@ -123,7 +123,8 @@ Motion requires interactive testing, Empty requires multi-state data, Type requi
 None of these are evaluable via static Visual QA screenshots. Gate 89 is the practical maximum.
 
 ### PR trace
-See `docs/analysis/visual-qa-score-2026-07-20-rescore-17-final.md` for complete 16-PR trace.
+
+完整 16-PR trace 记录于 rescore-17-final（与本文档内容重复，已随 2026-08 基线清理归档删除）；本文档为最终 gate 记录。
 
 ## 7. Out of scope (follow-ups)
 

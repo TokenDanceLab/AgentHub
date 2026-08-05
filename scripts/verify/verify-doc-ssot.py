@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """verify-doc-ssot — AgentHub 文档 SSOT 门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
 
-对应 scripts/verify/verify-doc-ssot.ps1（313 行）：
+门禁检查项：
 - 根入口点/过期路径/归档活动路径禁存在；
 - README 必需入口点链接 + 目标存在；
 - 约 35 个 (路径, 标记) 必须出现在对应文档；
