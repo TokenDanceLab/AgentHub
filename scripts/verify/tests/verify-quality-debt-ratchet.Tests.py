@@ -124,13 +124,13 @@ class VerifyQualityDebtRatchetTests(unittest.TestCase):
     def run_verifier(self, base_baseline_path=None, run_complexity=False):
         script = os.path.join(self.fixture, "scripts", "verify", os.path.basename(self.verifier))
         if self.is_python:
-            command = [sys.executable, script, "--repo-root-path", self.fixture, "--baseline-path", self.baseline_path]
+            command = [sys.executable, script, "--RepoRootPath", self.fixture, "--BaselinePath", self.baseline_path]
             if not run_complexity:
-                command.append("--skip-complexity")
+                command.append("--SkipComplexity")
             if base_baseline_path:
-                command += ["--base-baseline-path", base_baseline_path]
+                command += ["--BaseBaselinePath", base_baseline_path]
             else:
-                command.append("--skip-historical-ratchet")
+                command.append("--SkipHistoricalRatchet")
         else:
             command = ["pwsh", "-NoProfile", "-File", script, "-RepoRootPath", self.fixture, "-BaselinePath", self.baseline_path]
             if not run_complexity:
