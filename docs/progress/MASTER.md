@@ -22,20 +22,20 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | ~~Frontend coverage gate~~ | **RESOLVED 2026-08-02** — web 63.14→66.72 lines (executionTargetQueries/hubAuth/toastStore tests, #1490); desktop tests (#1488); master CI green on 36a24a4b | merged #1490/#1488 |
 | ~~Frontend coverage truth (#1535)~~ | **RESOLVED 2026-08-02** — include contract: 4 包按 production `src/**/*.ts(x)` 全量计入分母（factory `app/test-config/coverage.ts`）；绝对下限 + baseline 非回归 + uncovered_files ratchet + 负向自测；未导入模块暴露 web 64.69 / desktop 49.29 / mobile 36.19 / shared 76.43 lines | merged in #1552 |
 | ~~Edge lint debt~~ | **RESOLVED 2026-08-02** — 102→0 golangci-lint issues via pure extraction refactors (RegisterRoutes 69→14 sub-functions, PostRuns 123→~12, parseSSEStream 74→state+handlers…); `*.go text eol=lf` in .gitattributes fixes Windows CRLF gofmt churn | merged in #1491 |
-| CI quality-debt ratchet (#1536) | **PHASE 1 IN REVIEW 2026-08-03** — soft gates and exact-file golangci exclusions are registered with issue/owner/introduced_at/review_by; CI self-tests unregistered gates, directory widening, linter drift, zombie entries, runtime dependency mutation, budget increase and unexplained deadline extension. Edge lint is hard-fail. Conventional Commit verification is path-independent and fail-closed in `validate` (#1576). All complexity exclusions repaid 2026-08-04 (#1606 hub / #1611 edge; `quality-debt-baseline.json` `golangci_exclusions` now empty; negative self-tests use a synthetic fixture row). Remaining debt stays separate: Edge race #1571, Hub lint findings #1573, gosec findings #1574, Desktop lint #1575 | #1570; #1536 remains open |
+| CI quality-debt ratchet (#1536) | **RESOLVED 2026-08-04** — soft gates and exact-file golangci exclusions are registered with issue/owner/introduced_at/review_by; CI self-tests unregistered gates, directory widening, linter drift, zombie entries, runtime dependency mutation, budget increase and unexplained deadline extension. Edge lint is hard-fail. Conventional Commit verification is path-independent and fail-closed in `validate` (#1576). All complexity exclusions repaid 2026-08-04 (#1606 hub / #1611 edge; `quality-debt-baseline.json` `golangci_exclusions` now empty; negative self-tests use a synthetic fixture row). Ratchet 全项落地（复杂度豁免偿清、golangci_exclusions 已空、CI 自测覆盖），#1571/#1573/#1574/#1575 已随之关闭 | merged in #1606/#1611；#1536 closed |
 
 ## Active product and architecture work
 
 | Track | State | Link |
 |---|---|---|
-| Agent-team subtask live stream | SPEC merged；Phase A 已合入 master；剩余 Phase B/C 按 SPEC 推进 | docs/plan/agentteam-live-streaming.md |
-| ACP migration | 管理员已批增量路线；spike 验证状态见 03-runtime-adapters.md §ACP 迁移 | docs/architecture/03-runtime-adapters.md |
+| Agent-team subtask live stream | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/agentteam-live-streaming.md 为准 | docs/plan/agentteam-live-streaming.md |
+| ACP migration | SPEC merged；issue 已归档，实施 tracker 以 docs/architecture/03-runtime-adapters.md §ACP 迁移 为准 | docs/architecture/03-runtime-adapters.md |
 | Targeted adapter extraction | A-V1 已裁决（#1523）：lifecycle 不拆；Step 0 合同 SSOT 抽离完成（#1526：合同迁入 `internal/orchestration`，adapters alias 零调用点改动，3 项回归门禁）；Step 2 完成（#1566：13 个 orchestrator 源文件 + plan_approval.go 迁入 `internal/adapters/orchestrator` 叶子包，叶子仅依赖合同与窄 ports，composition root 装配，`scripts/verify/verify-orchestrator-deps.ps1` 依赖方向门禁 + 负向自测）—— 已关闭 | #1526 → #1566 |
 | Shared boundary hardening | A-V3 已裁决（#1523）：拒绝全量 shared 三分；quick-wins 与隔离门禁硬化均已落地（apiClient.ts 删除、`workspace:*` 显式依赖、edge 隔离门禁违规 exit 1 + 正负向自测） | #1525 |
 | Release signing | SPEC merged；实施依赖管理员提供签名证书/密钥，按 SPEC 阶段推进 | docs/plan/proposal-desktop-release-signing.md |
 | Workbench 契约切片（projects 先行） | #1546 完成：shared Workbench 对 concrete HubClient 的 type/value 引用清零，改用窄领域端口 `WorkbenchProjectsPort`（`shared/workbench/workbenchProjectsPort.ts`），Desktop/Web composition root 各实现一个 adapter 注入；projects route 单一 ownership（parent-managed 或 port，不再运行时猜测）；load-more 失败可见、可重试（UI + i18n zh/en）；`verify-shared-ui-hubclient.ps1` 升级为同时禁止 type 引用。这是 #1528 的 projects slice（agents/catalog 收口后续单独切片） | #1546, #1528 |
-| WebSocket incremental sync | SPEC merged；实施按 SPEC 阶段（B1-B6/F1-F4）推进 | docs/plan/proposal-ws-incremental-sync.md |
-| IM bridge (Feishu first) | SPEC merged；实施按 SPEC 阶段推进 | docs/plan/proposal-im-bridge.md |
+| WebSocket incremental sync | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-ws-incremental-sync.md 为准 | docs/plan/proposal-ws-incremental-sync.md |
+| IM bridge (Feishu first) | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-im-bridge.md 为准 | docs/plan/proposal-im-bridge.md |
 | Automations and session import | Product backlog | backlog：SPEC 待写 |
 | @提及=派单交互 | Product backlog | backlog：SPEC 待写 |
 
