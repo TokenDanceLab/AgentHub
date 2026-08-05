@@ -905,8 +905,7 @@ jobs:
         run: python ./scripts/verify/verify-shared-ui-hubclient.py
 
       - name: Verify Shared Edge surface isolation (web/mobile-rn)
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-edge-surface-isolation.ps1
+        run: python ./scripts/verify/verify-shared-edge-surface-isolation.py
 
       - name: Self-test Shared Edge surface isolation gate
         shell: pwsh

@@ -252,7 +252,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
 | shared UI 依赖 hubClient 门禁 | `scripts/verify/verify-shared-ui-hubclient.py` | checks.yml → validate |
 | 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.ps1` | checks.yml → validate |
-| shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.ps1` | checks.yml → validate |
+| shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
 | v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.ps1` | checks.yml → validate |
 | Hub/Edge gosec SAST 告警清零（#1574，hard fail） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`）；go-edge/go-hub Security scan (gosec) step 直接 fail-closed | checks.yml → go-edge / go-hub |
 | OIDC 配置形状与边界（issuer/redirect/无 secret；`verify-oidc-readiness.ps1` 因断言旧服务/测试名已 KNOWN-OBSOLETE，重写待办） | `scripts/verify/verify-oidc-readiness.ps1`（未挂 CI） | — |
