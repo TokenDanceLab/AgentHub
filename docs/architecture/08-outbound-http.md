@@ -74,5 +74,5 @@ exchange、JWKS fetch（#1595 验收）。
 - 扫描范围：service / jwtutil / edge-server hub 三个 scope（production `.go`）
 - FAIL 条件：`os.Getenv`、裸 `&http.Client{`（allowlist 外）、`io.ReadAll` 无 `io.LimitReader`、
   `http.Get/Post/Head` 隐式 client、HTTP 文件中的无预算 retry 循环、匿名/过期 allowlist 条目
-- 自测：`scripts/verify/tests/verify-outbound-client-hygiene.Tests.ps1`（7 个正/负 fixture，
+- 自测：`scripts/verify/tests/verify-outbound-client-hygiene.Tests.py`（7 个正/负 fixture，
   含裸 client、service env 读取、匿名 allowlist、无 body limit、无预算 retry 五个负向证明）

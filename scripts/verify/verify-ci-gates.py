@@ -205,7 +205,7 @@ def main() -> int:
     assert_step_continue_on_error(validate, "Verify quality-debt ratchet (#1536)", False)
 
     quality_debt_self_test_step = get_step_block(validate, "Self-test quality-debt ratchet (negative)")
-    assert_contains(quality_debt_self_test_step, r"verify-quality-debt-ratchet\.Tests\.ps1", "quality-debt self-test step must call its test script")
+    assert_contains(quality_debt_self_test_step, r"verify-quality-debt-ratchet\.Tests\.py", "quality-debt self-test step must call its test script")
     assert_step_continue_on_error(validate, "Self-test quality-debt ratchet (negative)", False)
     assert_contains(validate, r"Verify project skill whitelist", "validate job must run the project skill whitelist verifier")
     assert_contains(validate, r"scripts/verify/verify-project-skills\.py", "validate job must call scripts/verify/verify-project-skills.py")
@@ -214,7 +214,7 @@ def main() -> int:
     assert_step_continue_on_error(validate, "Verify doc SSOT", False)
 
     doc_entrypoint_self_test_step = get_step_block(validate, "Self-test doc entrypoint SSOT")
-    assert_contains(doc_entrypoint_self_test_step, r"scripts/verify/tests/verify-doc-entrypoints\.Tests\.ps1", "doc entrypoint self-test step must call its test script")
+    assert_contains(doc_entrypoint_self_test_step, r"scripts/verify/tests/verify-doc-entrypoints\.Tests\.py", "doc entrypoint self-test step must call its test script")
     assert_step_continue_on_error(validate, "Self-test doc entrypoint SSOT", False)
     assert_contains(validate, r"Verify Web Hub-only boundary", "validate job must run the Web Hub-only boundary verifier")
     assert_contains(validate, r"scripts/verify/verify-web-hub-boundary.py", "validate job must call scripts/verify/verify-web-hub-boundary.ps1")
