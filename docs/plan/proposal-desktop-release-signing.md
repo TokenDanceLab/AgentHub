@@ -1,6 +1,6 @@
 # Desktop 打包签名与原子发布方案
 
-> 状态: PROPOSAL（待管理员批准）
+> 状态: SPEC merged（2026-08 管理员批准）
 > 创建: 2026-07-27
 > Issue: [#1403](https://github.com/TokenDanceLab/AgentHub/issues/1403)
 > 输入: Codeg 发布链竞品拆解（原始调研文件已随 2026-08 本机清理删除，见 git 历史）
