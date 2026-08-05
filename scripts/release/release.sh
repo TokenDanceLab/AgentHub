@@ -28,6 +28,8 @@ DRY_RUN=false
 SKIP_TESTS=false
 SKIP_BUILD=false
 SKIP_UPLOAD=false
+ALLOW_OPEN_HIGH_RISKS=false
+SKIP_REF_CHECK=false
 
 usage() {
   echo "Usage: $0 <version> [OPTIONS]"
@@ -160,10 +162,10 @@ bump_readme_badge() {
 }
 
 # ═══════════════════════════════════════════════════════════
-# 4. Release gate (verify-release-gate.ps1)
+# 4. Release gate (verify-release-gate.py)
 # ═══════════════════════════════════════════════════════════
 run_release_gate() {
-  local gate_script="$SCRIPT_DIR/verify-release-gate.ps1"
+  local gate_script="$SCRIPT_DIR/verify-release-gate.py"
 
   if [[ ! -f "$gate_script" ]]; then
     warn "Release gate script not found: $gate_script"
@@ -171,26 +173,33 @@ run_release_gate() {
     return 0
   fi
 
-  step "Release gate (verify-release-gate.ps1)"
+  step "Release gate (verify-release-gate.py)"
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    echo "  [DRY RUN] Would run: pwsh -File $gate_script"
+    echo "  [DRY RUN] Would run: python $gate_script"
     return 0
   fi
 
-  local pwsh_cmd=""
-  if command -v pwsh &>/dev/null; then
-    pwsh_cmd="pwsh"
-  elif command -v powershell &>/dev/null; then
-    pwsh_cmd="powershell"
+  local python_cmd=""
+  if command -v python3 &>/dev/null; then
+    python_cmd="python3"
+  elif command -v python &>/dev/null; then
+    python_cmd="python"
   else
-    warn "PowerShell not available — cannot run release gate. Install PowerShell 7+ or run manually:"
-    warn "  pwsh -File $gate_script"
+    warn "Python not available — cannot run release gate. Install Python 3+ or run manually:"
+    warn "  python $gate_script"
     return 0
   fi
 
   echo "  Running release gate..."
-  if "$pwsh_cmd" -File "$gate_script"; then
+  local gate_args=(-RepoRoot "$REPO_ROOT")
+  if [[ "$ALLOW_OPEN_HIGH_RISKS" == "true" ]]; then
+    gate_args+=(-AllowOpenHighRisks)
+  fi
+  if [[ "$SKIP_REF_CHECK" == "true" ]]; then
+    gate_args+=(-SkipRefCheck)
+  fi
+  if "$python_cmd" "$gate_script" "${gate_args[@]}"; then
     ok "Release gate passed"
   else
     err "Release gate failed — see output above for blockers."

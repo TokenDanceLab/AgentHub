@@ -269,8 +269,9 @@ try {
         if ($SkipSidecarBuild) { $prepareArgs += "-NoBuild" }
         & pwsh @prepareArgs
         if ($LASTEXITCODE -ne 0) { Fail-Smoke "prepare-tauri-sidecar-local.ps1 failed" }
-        & pwsh -NoProfile -File (Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.ps1") -RepoRoot $RepoRoot
-        if ($LASTEXITCODE -ne 0) { Fail-Smoke "verify-tauri-sidecar-binary-smoke.ps1 failed" }
+        $sidecarSmokePython = Join-Path $RepoRoot "scripts\release\verify-tauri-sidecar-binary-smoke.py"
+        & python $sidecarSmokePython -RepoRoot $RepoRoot
+        if ($LASTEXITCODE -ne 0) { Fail-Smoke "verify-tauri-sidecar-binary-smoke.py failed" }
         $sidecar = Join-Path $RepoRoot "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
         Assert-True (Test-Path -LiteralPath $sidecar -PathType Leaf) "Tauri sidecar binary exists"
 

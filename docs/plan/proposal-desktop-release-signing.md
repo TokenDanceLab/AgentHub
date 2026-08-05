@@ -26,7 +26,7 @@ AgentHub 发布链现状一句话：**有 CI 构建、有 GitHub Release、有 u
 
 | 维度 | Codeg（目标态） | AgentHub（现状） | Gap |
 |---|---|---|---|
-| **版本 SSOT** | `tauri.conf.json` 为唯一校验源，CI 强校验 tag 与 version 一致 | 至少 5 处版本源（见 2.2 节）无一致性校验，仅 `verify-tauri-package-readiness.ps1` 做静态版本对齐检查 | **无 CI 端 tag-version 校验** |
+| **版本 SSOT** | `tauri.conf.json` 为唯一校验源，CI 强校验 tag 与 version 一致 | 至少 5 处版本源（见 2.2 节）无一致性校验，仅 `verify-tauri-package-readiness.py` 做静态版本对齐检查 | **无 CI 端 tag-version 校验** |
 | **tag 守卫** | tag 必须在 main 祖先链 + tag = `tauri.conf.json` version，双断言 | 无任何 tag 守卫；`release.yml` push tags 触发，不校验 tag 与分支关系 | **缺**（双断言） |
 | **原子发布** | draft → 11 平台并行构建 → 仅全绿才翻正式 release，幂等可重跑 | `draft: false` 直接出正式 release；一个平台失败不阻断另两个 | **缺**（draft-flip 模式） |
 | **macOS 签名+公证** | Developer ID 证书 + 临时 keychain + notarytool + stapler + always() 清理，全自动 | DMG unsigned；`release-readiness.yml` 将 macOS 签名/公证标记为 later approval slice | **缺**（secrets + workflow） |
@@ -38,7 +38,7 @@ AgentHub 发布链现状一句话：**有 CI 构建、有 GitHub Release、有 u
 | **安装脚本** | install.sh (18KB) + install.ps1 (14KB)，一行安装、PATH 冲突清理、幂等自愈、装后实解析验证 | 无安装脚本；当前分发形态 = GitHub Release 直下 NSIS setup.exe | **缺**（P2 可选） |
 | **自更新+回滚** | 桌面 tauri-updater；服务器原地自更新含 minisign 验签 + .bak 回滚 + 30s 试用窗口 | 无（tauri-updater 已集成但 latest.json 404） | **缺**（服务器自更新不在本次范围） |
 | **Changelog** | 双语 release notes 写在 tag commit message，CI 提取为 release body | `generate_release_notes: true` 用 GitHub 自动生成 | **功能对等**（风格不同） |
-| **dry/preflight gate** | 无独立 dry gate（直接靠 CI 的 cancel-in-progress 幂等） | `release-readiness.yml` + `verify-tauri-package-readiness.ps1` + `verify-release-gate.ps1` 三层治理面 | **AgentHub 更精细**（保留，本次不删） |
+| **dry/preflight gate** | 无独立 dry gate（直接靠 CI 的 cancel-in-progress 幂等） | `release-readiness.yml` + `verify-tauri-package-readiness.py` + `verify-release-gate.py` 三层治理面 | **AgentHub 更精细**（保留，本次不删） |
 
 ---
 
@@ -421,7 +421,7 @@ AgentHub 若做安装脚本，必须在脚本内置 **minisign 签名验证**（
 2. **逐 Phase 批准**：每 Phase 开独立 issue + PR，获管理员批准后实施。本 PROPOSAL 批准后不代表可以直接动手改 workflow——它授权的是"这个方向可以推进"。
 3. **Phase 1 PR 禁碰 macOS 签名**：保持 `release-readiness.yml` 的 macOS later approval slice 标记有效，直到 Phase 2 管理员配置 secrets 后再启用。
 4. **回滚能力**：Phase 1 改造 release.yml 时保留旧 `release.yml` 的副本作为回退路径（命名 `release-legacy.yml` 或 git revert）。
-5. **验证脚本不删**：现有的 `verify-tauri-package-readiness.ps1`、`verify-release-gate.ps1`、`release-readiness.yml` 三层治理面是 AgentHub 优于 Codeg 的工程资产，**不删不改**，在新 workflow 中作为前置 gate 调用。
+5. **验证脚本不删**：现有的 `verify-tauri-package-readiness.py`、`verify-release-gate.py`、`release-readiness.yml` 三层治理面是 AgentHub 优于 Codeg 的工程资产，**不删不改**，在新 workflow 中作为前置 gate 调用。
 
 ---
 
