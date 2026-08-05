@@ -168,6 +168,11 @@ def invoke_repo_script(repo_root: str, relative_path: str, arguments: list) -> d
     script_path = os.path.join(repo_root, relative_path)
     if not os.path.isfile(script_path):
         return {"ExitCode": -1, "Output": f"missing {relative_path}"}
+    if script_path.endswith(".py"):
+        python_exe = shutil.which("python") or shutil.which("python3")
+        if not python_exe:
+            return {"ExitCode": -1, "Output": "Python executable is unavailable"}
+        return invoke_captured_process(python_exe, [script_path, *arguments], repo_root)
     powershell_exe = find_powershell()
     if not powershell_exe:
         return {"ExitCode": -1, "Output": "PowerShell executable is unavailable"}
@@ -331,7 +336,7 @@ def invoke_service_readiness(ctx: dict) -> None:
     if ctx["start_services"]:
         service_args += ["-StartServices", "-StartServicePlanPath", ctx["start_service_plan_path"]]
 
-    services_run = invoke_repo_script(ctx["repo_root"], "scripts\\smoke\\verify-localhost-real-services.ps1", service_args)
+    services_run = invoke_repo_script(ctx["repo_root"], "scripts\\smoke\\verify-localhost-real-services.py", service_args)
     ctx["service_probe_exit_code"] = services_run["ExitCode"]
     ctx["service_probe_output"] = services_run["Output"]
     emit(services_run["Output"])
@@ -428,7 +433,7 @@ def new_readiness_manifest(ctx: dict, status: str) -> dict:
                 "local_edge": ctx["expected_edge_marker"],
             },
             "cleanup": {
-                "strategy": "Keep artifacts under the safe artifact root for review; remove that root with Remove-Item after capture. Harness-started child processes are delegated to verify-localhost-real-services.ps1 cleanup.",
+                "strategy": "Keep artifacts under the safe artifact root for review; remove that root with Remove-Item after capture. Harness-started child processes are delegated to verify-localhost-real-services.py cleanup.",
                 "clean_artifact_root": bool(ctx["clean_artifact_root"]),
             },
         },
@@ -440,7 +445,7 @@ def new_readiness_manifest(ctx: dict, status: str) -> dict:
         },
         "gates": [
             {
-                "name": "verify-local-stack-e2e-readiness.ps1",
+                "name": "verify-local-stack-e2e-readiness.py",
                 "mode": "ApprovedReal" if ctx["mode"] == "ApprovedReal" else "ReadinessOnly",
                 "status": "SEE_READINESS_GATE" if ctx["mode"] == "ApprovedReal" else "NOT_RUN_BY_DEFAULT",
                 "evidence": ctx["readiness_gate_path"],
@@ -448,7 +453,7 @@ def new_readiness_manifest(ctx: dict, status: str) -> dict:
                 "start_services": bool(ctx["start_services"]),
             },
             {
-                "name": "verify-observed-localhost-dispatch.ps1",
+                "name": "verify-observed-localhost-dispatch.py",
                 "mode": "FixtureManifestOrApprovedReal",
                 "status": "NOT_RUN_READINESS_ONLY" if ctx["mode"] == "ReadinessOnly" else "SEE_OBSERVED_REPORT",
                 "evidence": ctx["observed_dispatch_report_path"],
@@ -722,7 +727,7 @@ def main() -> int:
             pass_check("fixture observed-dispatch manifest written")
             observed_run = invoke_repo_script(
                 ctx["repo_root"],
-                "scripts\\smoke\\verify-observed-localhost-dispatch.ps1",
+                "scripts\\smoke\\verify-observed-localhost-dispatch.py",
                 ["-RepoRoot", ctx["repo_root"], "-ObservedEvidencePath", manifest_path, "-EvidencePath", observed_dispatch_report_path, "-TimeoutSec", str(args.TimeoutSec)],
             )
             emit(observed_run["Output"])
@@ -755,7 +760,7 @@ def main() -> int:
         if args.StartServices:
             readiness_args += ["-StartServices", "-StartServicePlanPath", args.StartServicePlanPath]
         readiness_run = invoke_repo_script(
-            ctx["repo_root"], "scripts\\smoke\\verify-local-stack-e2e-readiness.ps1", readiness_args
+            ctx["repo_root"], "scripts\\smoke\\verify-local-stack-e2e-readiness.py", readiness_args
         )
         emit(readiness_run["Output"])
         if readiness_run["ExitCode"] != 0:

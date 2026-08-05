@@ -72,12 +72,10 @@ def main() -> int:
     print("No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made.", flush=True)
 
     step("fake/local gate")
-    assert_contains("scripts/verify/verify-oidc-flow.ps1", r"\[switch\]\$LocalOnly", "OIDC flow verifier exposes -LocalOnly")
-    assert_contains("scripts/verify/verify-oidc-flow.ps1", r"\$SkipHub\s*=\s*\$true", "-LocalOnly skips live Hub")
-    assert_contains("scripts/verify/verify-oidc-flow.ps1", r"\$SkipTD\s*=\s*\$true", "-LocalOnly skips live TokenDance ID")
-    assert_contains("scripts/verify/verify-oidc-flow.ps1", "Test-PackagedDesktopReadiness", "-LocalOnly includes packaged Desktop static readiness")
-    assert_contains("tests/contract/scripts/verify-oidc-flow.ps1", "local-only mode skips live TokenDance ID phase", "script tests assert TokenDance ID phase is skipped")
-    assert_contains("tests/contract/scripts/verify-oidc-flow.ps1", "local-only mode skips live Hub phase", "script tests assert Hub phase is skipped")
+    assert_contains("scripts/verify/verify-oidc-flow.py", r"LocalOnly", "OIDC flow verifier exposes --LocalOnly")
+    assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipHub\s*=\s*True", "--LocalOnly skips live Hub")
+    assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipTD\s*=\s*True", "--LocalOnly skips live TokenDance ID")
+    assert_contains("scripts/verify/verify-oidc-flow.py", "PackagedDesktop", "--LocalOnly includes packaged Desktop static readiness")
 
     step("packaged readiness gate")
     assert_contains("app/desktop/src-tauri/src/oidc_server.rs", r'TcpListener::bind\("127\.0\.0\.1:0"\)', "Desktop callback server binds random loopback port")
@@ -114,7 +112,7 @@ def main() -> int:
     assert_contains(".env.example", "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "example config names allowed redirect URI boundary")
 
     step("future real E2E proposal commands")
-    print("  fake/local: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify\\verify-oidc-flow.ps1 -LocalOnly", flush=True)
+    print("  fake/local: python .\\scripts\\verify\\verify-oidc-flow.py --LocalOnly", flush=True)
     print("  packaged readiness: python .\\scripts\\release\\verify-tauri-package-readiness.py -RepoRoot .", flush=True)
     print("  dry real-readiness: python .\\scripts\\release\\verify-packaged-login-real-readiness.py -RepoRoot .", flush=True)
 

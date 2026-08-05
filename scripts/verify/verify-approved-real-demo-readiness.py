@@ -10,8 +10,8 @@ release upload, or Mobile work.
 （--RepoRoot/--ArtifactRoot/--ManifestPath/--PreflightManifestPath/
 --WebSmokeManifestPath/--SkipObservedFixture/--RunLocalStackSmoke/--TimeoutSec，
 0=通过，-TimeoutSec<=0 → 2）；机器可读行格式（PASS:/FAIL:/WARN:/Status）与 ps1
-完全一致。子门禁：verify-localhost-observed-loop / verify-localhost-real-stack-smoke
-仍为 ps1（未迁移）经 pwsh 调用；verify-approved-real-preflight 已迁移为本目录 .py
+完全一致。子门禁：verify-localhost-observed-loop / verify-localhost-real-stack-smoke 已迁移为
+python 经 python 调用；verify-approved-real-preflight 已迁移为本目录 .py
 经 python 调用。
 """
 
@@ -100,26 +100,6 @@ def test_allowed_artifact_root(repo_root: str, path: str) -> bool:
 
 def find_powershell() -> str:
     return shutil.which("pwsh") or shutil.which("powershell")
-
-
-def invoke_repo_script(repo_root: str, relative_path: str, arguments) -> dict:
-    script_path = os.path.join(repo_root, relative_path)
-    powershell_exe = find_powershell()
-    if not powershell_exe:
-        return {"ExitCode": -1, "Output": "PowerShell executable is unavailable", "ScriptPath": script_path}
-    if not os.path.isfile(script_path):
-        return {"ExitCode": -1, "Output": f"missing {relative_path}", "ScriptPath": script_path}
-
-    run_result = subprocess.run(
-        [powershell_exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path] + arguments,
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    output = redact_secret_like((run_result.stdout or "") + "\n" + (run_result.stderr or ""))
-    return {"ExitCode": run_result.returncode, "Output": output, "ScriptPath": script_path}
 
 
 def invoke_repo_python(repo_root: str, relative_path: str, arguments) -> dict:
@@ -287,16 +267,16 @@ def main() -> int:
     observed_passed = False
 
     if len(failures) == 0 and not args.SkipObservedFixture:
-        observed_run = invoke_repo_script(
+        observed_run = invoke_repo_python(
             repo_root,
-            "scripts\\smoke\\verify-localhost-observed-loop.ps1",
+            "scripts\\smoke\\verify-localhost-observed-loop.py",
             [
-                "-RepoRoot", repo_root,
-                "-Mode", "FixtureManifest",
-                "-ArtifactRoot", observed_gate_root,
-                "-ManifestPath", observed_manifest,
-                "-ObservedDispatchReportPath", observed_report,
-                "-TimeoutSec", str(timeout_sec),
+                "--RepoRoot", repo_root,
+                "--Mode", "FixtureManifest",
+                "--ArtifactRoot", observed_gate_root,
+                "--ManifestPath", observed_manifest,
+                "--ObservedDispatchReportPath", observed_report,
+                "--TimeoutSec", str(timeout_sec),
             ],
         )
         add_segment("localhost_observed_fixture_replay", "fixture-observed", observed_run["ExitCode"], observed_manifest, observed_run["Output"])
@@ -305,17 +285,17 @@ def main() -> int:
     local_stack_gate_root = os.path.join(repo_root, ".tmp", "localhost-real-stack-smoke", f"approved-real-demo-{os.getpid()}")
     local_stack_evidence = os.path.join(local_stack_gate_root, "localhost-real-stack-smoke.json")
     if len(failures) == 0 and args.RunLocalStackSmoke:
-        local_stack_run = invoke_repo_script(
+        local_stack_run = invoke_repo_python(
             repo_root,
-            "scripts\\smoke\\verify-localhost-real-stack-smoke.ps1",
+            "scripts\\smoke\\verify-localhost-real-stack-smoke.py",
             [
-                "-RepoRoot", repo_root,
-                "-ArtifactRoot", local_stack_gate_root,
-                "-EvidencePath", local_stack_evidence,
-                "-SkipWeb",
-                "-SkipDesktop",
-                "-ProbeHub",
-                "-TimeoutSec", str(timeout_sec),
+                "--RepoRoot", repo_root,
+                "--ArtifactRoot", local_stack_gate_root,
+                "--EvidencePath", local_stack_evidence,
+                "--SkipWeb",
+                "--SkipDesktop",
+                "--ProbeHub",
+                "--TimeoutSec", str(timeout_sec),
             ],
         )
         add_segment("localhost_real_stack_smoke", "mock-sqlite-readiness", local_stack_run["ExitCode"], local_stack_evidence, local_stack_run["Output"])

@@ -183,7 +183,7 @@ def main() -> int:
     assert_contains(validate, r"Verify coverage baseline", "validate job must run the coverage baseline gate")
     assert_contains(validate, r"scripts/verify/verify-coverage-baseline.py", "validate job must call the coverage baseline verifier")
     assert_contains(validate, r"Self-test coverage include contract", "validate job must run the coverage include negative self-test")
-    assert_contains(validate, r"coverage-include\.Tests\.ps1", "validate job must call the coverage include self-test")
+    assert_contains(validate, r"coverage-include\.Tests\.py", "validate job must call the coverage include self-test")
     assert_step_continue_on_error(validate, "Verify coverage baseline", False)
     assert_step_continue_on_error(validate, "Self-test coverage include contract (negative)", False)
 

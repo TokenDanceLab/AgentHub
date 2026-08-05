@@ -5,7 +5,7 @@ ps1 迁移（契约见 server docs/design/ps1-to-python-migration.md）：stdlib
 CLI 参数/退出码兼容（0=通过/1=失败）、机器可读行（`  PASS  `/`  FAIL  ` 与
 `=== ... ===` step）与原 ps1 一致。
 
-串联 Edge 与 Desktop-facing API 端到端验证。先运行 `scripts/dev/setup.ps1`，
+串联 Edge 与 Desktop-facing API 端到端验证。先运行 `scripts/dev/setup.py`，
 再运行本脚本。默认用 mock runner（powershell 输出 "Initializing mock runner"），
 不调真实 CLI/model。
 """

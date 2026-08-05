@@ -152,11 +152,11 @@ internal/adapters/orchestrator ←── internal/adapters（实现 + Registry �
 cmd/agenthub-edge / internal/httpserver（composition root 装配）
 ```
 
-- 根 adapters **绝不** import 叶子包（机器门禁：`scripts/verify/verify-orchestrator-deps.ps1`）。
+- 根 adapters **绝不** import 叶子包（机器门禁：`scripts/verify/verify-orchestrator-deps.py`）。
 - 不保留根包 `OrchestratorAdapter` alias；orchestrator 的注册、构造、装配移到 composition root（`cmd/agenthub-edge` + `internal/httpserver`）。
 - 移动文件清单不变（13 源 + 5 测试 + plan_approval.go，见 §1 子域图谱 E/K）。
 
-Step 2 合入门禁：`go build ./...`、`go test ./internal/adapters/... ./internal/lifecycle/...`、`go vet ./...` 全过；`go list -deps ./internal/adapters/orchestrator/...` 证明叶子不含根实现包、`internal/orchestration` 无 adapters 依赖、根包不含 `internal/adapters/orchestrator`；负向自测（`scripts/verify/tests/verify-orchestrator-deps.Tests.ps1`）证明两类违规 fixture 真实 FAIL。
+Step 2 合入门禁：`go build ./...`、`go test ./internal/adapters/... ./internal/lifecycle/...`、`go vet ./...` 全过；`go list -deps ./internal/adapters/orchestrator/...` 证明叶子不含根实现包、`internal/orchestration` 无 adapters 依赖、根包不含 `internal/adapters/orchestrator`；负向自测（`scripts/verify/tests/verify-orchestrator-deps.Tests.py`）证明两类违规 fixture 真实 FAIL。
 
 ## 7. 门禁影响
 

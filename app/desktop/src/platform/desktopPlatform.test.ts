@@ -328,7 +328,7 @@ describe('createDesktopPlatform', () => {
       getLocalCliDiscovery: vi.fn().mockResolvedValue({
         mode: 'no-spend-discovery',
         readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
-        readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
+        readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
         generatedAt: null,
         items: [
           {
@@ -356,7 +356,7 @@ describe('createDesktopPlatform', () => {
     expect(discovery).toEqual(expect.objectContaining({
       mode: 'no-spend-discovery',
       readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
-      readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.ps1',
+      readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
     }));
     expect(discovery.items[0]).toEqual(expect.objectContaining({
       id: 'codex',
