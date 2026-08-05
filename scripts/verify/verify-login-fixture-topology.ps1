@@ -76,7 +76,7 @@ Assert-Contains "app\web\src\api\hubAuth.test.ts" "agenthub_hub_refresh_token" "
 Assert-Contains "app\web\src\api\hubAuth.test.ts" "agenthub_token_source" "Web callback fixture asserts TokenDance token source hint"
 Assert-Contains "app\web\src\api\hubAuth.test.ts" "localEdgeLoopback" "Web callback fixture asserts forbidden Local Edge loopback without embedding the forbidden URL"
 Assert-Contains "app\web\src\api\hubAuth.test.ts" "edgeRunApi" "Web callback fixture asserts forbidden Local Edge run API without embedding the forbidden path"
-Assert-Contains "scripts\verify\verify-web-hub-boundary.ps1" "Local Edge loopback URL" "Web boundary gate owns direct Local Edge URL scanning"
+Assert-Contains "scripts\verify\verify-web-hub-boundary.py" "Local Edge loopback URL" "Web boundary gate owns direct Local Edge URL scanning"
 Assert-NotContains "app\web\src\api\hubAuth.test.ts" "id\.vectorcontrol\.tech.*fetch|window\.open\(" "Web focused fixture does not open real TokenDance ID"
 
 Step "Desktop packaged host and fake login boundary"
@@ -97,7 +97,7 @@ Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\[switch\]\$LocalOnly' "O
 Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\$SkipHub\s*=\s*\$true' "-LocalOnly skips live Hub"
 Assert-Contains "scripts\verify\verify-oidc-flow.ps1" '\$SkipTD\s*=\s*\$true' "-LocalOnly skips live TokenDance ID"
 Assert-Contains "scripts\release\verify-packaged-login-real-readiness.ps1" "No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made" "packaged real-readiness gate is dry"
-Assert-Contains "scripts\verify\verify-web-hub-boundary.ps1" "Web Hub-only boundary" "Web Hub-only boundary gate exists"
+Assert-Contains "scripts\verify\verify-web-hub-boundary.py" "Web Hub-only boundary" "Web Hub-only boundary gate exists"
 Assert-Contains "scripts\release\verify-tauri-package-readiness.ps1" "macOS unsigned dry policy boundary" "macOS unsigned dry policy gate remains present"
 Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "TestSDKFixtureMapperClaudeGolden" "SDK fixture mapper Claude golden evidence remains fixture-only"
 Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "TestSDKFixtureMapperOpenAIGolden" "SDK fixture mapper OpenAI golden evidence remains fixture-only"
@@ -115,7 +115,7 @@ Write-Host "  agenthub-desktop: pnpm test -- src/api/hubAuth.test.ts" -Foregroun
 Write-Host "  agenthub-desktop: pnpm test -- src/platform/desktopPlatform.test.ts" -ForegroundColor White
 Write-Host "  local OIDC: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-oidc-flow.ps1 -LocalOnly" -ForegroundColor White
 Write-Host "  packaged dry: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-packaged-login-real-readiness.ps1 -RepoRoot ." -ForegroundColor White
-Write-Host "  Web boundary: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-web-hub-boundary.ps1" -ForegroundColor White
+Write-Host "  Web boundary: python .\scripts\verify\verify-web-hub-boundary.py" -ForegroundColor White
 Write-Host "  Tauri package readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\release\verify-tauri-package-readiness.ps1 -RepoRoot ." -ForegroundColor White
 
 Step "Evidence boundaries"

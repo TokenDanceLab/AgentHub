@@ -825,28 +825,22 @@ jobs:
         run: bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
 
       - name: Verify Web Hub-only boundary
-        shell: pwsh
-        run: ./scripts/verify/verify-web-hub-boundary.ps1
+        run: python scripts/verify/verify-web-hub-boundary.py
 
       - name: Verify Hub pure package imports
-        shell: pwsh
-        run: ./scripts/verify/verify-hub-pure-packages.ps1
+        run: python scripts/verify/verify-hub-pure-packages.py
 
       - name: Verify Mobile Hub-only boundary
-        shell: pwsh
-        run: ./scripts/verify/verify-mobile-hub-boundary.ps1
+        run: python scripts/verify/verify-mobile-hub-boundary.py
 
       - name: Verify hubClient thin-shell SSOT
-        shell: pwsh
-        run: ./scripts/verify/verify-hubclient-ssot.ps1
+        run: python scripts/verify/verify-hubclient-ssot.py
 
       - name: Verify Design token SSOT
-        shell: pwsh
-        run: ./scripts/verify/verify-design-token-ssot.ps1
+        run: python scripts/verify/verify-design-token-ssot.py
 
       - name: Verify real E2E contract
-        shell: pwsh
-        run: ./scripts/verify/verify-real-e2e-contract.ps1
+        run: python scripts/verify/verify-real-e2e-contract.py
 
       - name: Validate OpenAPI YAML
         run: |

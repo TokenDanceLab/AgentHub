@@ -149,7 +149,7 @@ Adapter fixture 是 no-spend 合同：可证 parser/redaction/replay/transcript�
 ```powershell
 git diff --check
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
-pwsh ./scripts/verify/verify-real-e2e-contract.ps1
+python scripts/verify/verify-real-e2e-contract.py
 # shared：HUB_EVENTS ↔ frame.go ↔ events.md（app/shared 下）
 # pnpm exec vitest run src/hubEvents.test.ts
 ```
