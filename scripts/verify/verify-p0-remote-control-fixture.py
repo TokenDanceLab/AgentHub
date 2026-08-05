@@ -179,7 +179,7 @@ def main() -> int:
     if failed == 0:
         step("Login fixture topology")
         invoke_required_script_gate(
-            repo_root, "verify-login-fixture-topology.ps1", os.path.join("scripts", "verify", "verify-login-fixture-topology.ps1"), ["-RepoRoot", repo_root]
+            repo_root, "verify-login-fixture-topology.py", os.path.join("scripts", "verify", "verify-login-fixture-topology.py"), ["-RepoRoot", repo_root]
         )
 
         step("Web Hub boundary")
