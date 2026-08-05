@@ -220,19 +220,19 @@ Assert-Contains $validate "Verify real E2E contract" "validate job must run the 
 Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "Verify OpenAPI↔hub router contract" "validate job must run the OpenAPI↔hub router contract verifier"
-Assert-Contains $validate "scripts/verify/verify-openapi-contract\.ps1" "validate job must call scripts/verify/verify-openapi-contract.ps1"
+Assert-Contains $validate "scripts/verify/verify-openapi-contract\.py" "validate job must call scripts/verify/verify-openapi-contract.py"
 Assert-StepContinueOnError $validate "Verify OpenAPI↔hub router contract" $false
 Assert-Contains $validate "Verify Shared Edge-free boundary" "validate job must run the Shared Edge-free boundary verifier"
-Assert-Contains $validate "scripts/verify/verify-shared-boundary\.ps1" "validate job must call scripts/verify/verify-shared-boundary.ps1"
+Assert-Contains $validate "scripts/verify/verify-shared-boundary\.py" "validate job must call scripts/verify/verify-shared-boundary.py"
 Assert-StepContinueOnError $validate "Verify Shared Edge-free boundary" $false
 Assert-Contains $validate "Verify Shared barrel Edge-export ban" "validate job must run the Shared barrel Edge-export ban verifier"
-Assert-Contains $validate "scripts/verify/verify-shared-barrel\.ps1" "validate job must call scripts/verify/verify-shared-barrel.ps1"
+Assert-Contains $validate "scripts/verify/verify-shared-barrel\.py" "validate job must call scripts/verify/verify-shared-barrel.py"
 Assert-StepContinueOnError $validate "Verify Shared barrel Edge-export ban" $false
 Assert-Contains $validate "Verify Hub handler layering" "validate job must run the Hub handler layering verifier"
-Assert-Contains $validate "scripts/verify/verify-hub-layering\.ps1" "validate job must call scripts/verify/verify-hub-layering.ps1"
+Assert-Contains $validate "scripts/verify/verify-hub-layering\.py" "validate job must call scripts/verify/verify-hub-layering.py"
 Assert-StepContinueOnError $validate "Verify Hub handler layering" $false
 Assert-Contains $validate "Verify Conventions method SSOT" "validate job must run the Conventions method SSOT verifier"
-Assert-Contains $validate "scripts/verify/verify-conventions\.ps1" "validate job must call scripts/verify/verify-conventions.ps1"
+Assert-Contains $validate "scripts/verify/verify-conventions\.py" "validate job must call scripts/verify/verify-conventions.py"
 Assert-StepContinueOnError $validate "Verify Conventions method SSOT" $false
 Assert-Contains $validate "Verify Shared REST contract Hub-client to Hub-router" "validate job must run the Shared REST contract verifier"
 Assert-Contains $validate "scripts/verify/verify-shared-rest-contract\.py" "validate job must call scripts/verify/verify-shared-rest-contract.py"

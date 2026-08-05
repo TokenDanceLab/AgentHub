@@ -7,7 +7,7 @@
 
 所有生产出站 client 必须满足以下统一合同；**在 composition root 构造**，
 服务/领域层不得读 `os.Getenv`、不得构造裸 `http.Client`（机器门禁：
-`scripts/verify/verify-outbound-client-hygiene.ps1`，allowlist 只能缩小且条目必须带 issue）。
+`scripts/verify/verify-outbound-client-hygiene.py`，allowlist 只能缩小且条目必须带 issue）。
 
 | 维度 | 合同 | 违反后果 |
 |---|---|---|
@@ -69,7 +69,7 @@ exchange、JWKS fetch（#1595 验收）。
 
 ## 4. 机器门禁（#1549 → #1564）
 
-`scripts/verify/verify-outbound-client-hygiene.ps1`（CI: checks.yml → validate）：
+`scripts/verify/verify-outbound-client-hygiene.py`（CI: checks.yml → validate）：
 
 - 扫描范围：service / jwtutil / edge-server hub 三个 scope（production `.go`）
 - FAIL 条件：`os.Getenv`、裸 `&http.Client{`（allowlist 外）、`io.ReadAll` 无 `io.LimitReader`、
