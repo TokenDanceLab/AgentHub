@@ -5,7 +5,7 @@
  * 未被测试加载的生产模块从分母消失 —— 删模块、忘测试，覆盖率数字照样好看。
  * 本 factory 强制 include 全部 production src（src 下全部 .ts/.tsx 文件），
  * 任何未导入模块都会以 0% 出现在 coverage 报告里，由
- * scripts/verify/verify-coverage-baseline.ps1 的 uncovered ratchet 拦截。
+ * scripts/verify/verify-coverage-baseline.py 的 uncovered ratchet 拦截。
  *
  * 每个 package 只传真实差异（阈值 + 额外窄排除）；排除必须逐项具体理由，
  * 禁止整类通配排除生产代码（Issue #1535 禁止清单）。
