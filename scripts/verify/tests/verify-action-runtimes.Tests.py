@@ -106,7 +106,7 @@ class VerifyActionRuntimesTests(unittest.TestCase):
     def run_verifier(self):
         script = os.path.join(self.fixture, self.verifier_rel)
         if self.is_python:
-            command = [sys.executable, script, "--workflows-root", self.workflows_dir]
+            command = [sys.executable, script, "--WorkflowsRoot", self.workflows_dir]
         else:
             command = ["pwsh", "-NoProfile", "-File", script, "-WorkflowsRoot", self.workflows_dir]
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
