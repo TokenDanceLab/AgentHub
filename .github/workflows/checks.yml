@@ -885,12 +885,10 @@ jobs:
         run: ./scripts/verify/verify-outbound-client-hygiene.ps1
 
       - name: Verify test-sleep ratchet (#1550)
-        shell: pwsh
-        run: ./scripts/verify/verify-test-sleep-ratchet.ps1
+        run: python ./scripts/verify/verify-test-sleep-ratchet.py
 
       - name: Verify auth dependency ownership (#1551)
-        shell: pwsh
-        run: ./scripts/verify/verify-auth-dep-ownership.ps1
+        run: python ./scripts/verify/verify-auth-dep-ownership.py
 
       - name: Verify quality-debt ratchet (#1536)
         shell: pwsh
@@ -901,24 +899,20 @@ jobs:
         run: ./scripts/verify/tests/verify-quality-debt-ratchet.Tests.ps1
 
       - name: Verify Shared REST contract Hub-client to Hub-router
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-rest-contract.ps1
+        run: python ./scripts/verify/verify-shared-rest-contract.py
 
       - name: Verify Shared UI hubClient gate
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-ui-hubclient.ps1
+        run: python ./scripts/verify/verify-shared-ui-hubclient.py
 
       - name: Verify Shared Edge surface isolation (web/mobile-rn)
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-edge-surface-isolation.ps1
+        run: python ./scripts/verify/verify-shared-edge-surface-isolation.py
 
       - name: Self-test Shared Edge surface isolation gate
         shell: pwsh
         run: ./scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1
 
       - name: Verify v4 old UI active paths
-        shell: pwsh
-        run: ./scripts/verify/verify-v4-old-ui-active-paths.ps1
+        run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
 
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails

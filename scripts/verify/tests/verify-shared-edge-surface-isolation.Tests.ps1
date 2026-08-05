@@ -1,13 +1,13 @@
 #!/usr/bin/env pwsh
 <#
-Self-tests for verify-shared-edge-surface-isolation.ps1 (HARD GATE, #1525).
+Self-tests for verify-shared-edge-surface-isolation.py (HARD GATE, #1525).
 
 Positive: legal Hub imports (web/mobile) and Desktop Edge imports must pass.
 Negative: each forbidden pattern in a Hub-only surface must fail the gate;
           a missing scan directory must fail the gate.
 
 Self-contained (no Pester dependency): builds temporary fixtures under
-$env:TEMP, invokes the gate with -RepoRootOverride, asserts exit codes.
+$env:TEMP, invokes the gate with --repo-root-override, asserts exit codes.
 
 Usage:
   pwsh ./scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1
@@ -18,7 +18,7 @@ param()
 
 $ErrorActionPreference = "Stop"
 
-$GateScript = Join-Path $PSScriptRoot "..\verify-shared-edge-surface-isolation.ps1"
+$GateScript = Join-Path $PSScriptRoot "..\verify-shared-edge-surface-isolation.py"
 if (-not (Test-Path -LiteralPath $GateScript)) {
     throw "gate script not found: $GateScript"
 }
@@ -55,7 +55,7 @@ function Remove-Fixture([string]$dir) {
 }
 
 function Run-Gate([string]$fixture) {
-    & $GateScript -RepoRootOverride $fixture 2>&1 | Out-Null
+    python $GateScript --repo-root-override $fixture 2>&1 | Out-Null
     return $LASTEXITCODE
 }
 

@@ -121,7 +121,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 - **不新建 shared-hub / shared-edge 包。** 保留 `@agenthub/shared` 单包。
 - **把 `apiClient.ts`（零消费的 Edge REST 旧 SSOT）从 `index.ts` re-export 中移除**，确认全仓无导入后删除文件（quick-win 1）。
-- **`eventClient.ts` + `transcript/edge*.ts` + `edgeQueryKeys` 保留在 shared**，但补一条门禁：`shared/src` 内的 edge 表面**不得被 web/mobile-rn import**（当前已由 web/mobile 边界门禁间接守，但 shared 侧无直接门禁——补 `verify-shared-edge-surface-isolation.ps1` 作为软门禁，见 §5）。
+- **`eventClient.ts` + `transcript/edge*.ts` + `edgeQueryKeys` 保留在 shared**，但补一条门禁：`shared/src` 内的 edge 表面**不得被 web/mobile-rn import**（当前已由 web/mobile 边界门禁间接守，但 shared 侧无直接门禁——补 `verify-shared-edge-surface-isolation.py` 作为软门禁，见 §5）。
 - **`hubClient*.ts` 保留在 shared**——mobile-rn 作为 hub-only 客户端合法消费它，抽到 shared-hub 无净收益。
 
 ## 4. 迁移路径（strangler fig，针对 §3.3 的定向方案）
@@ -136,7 +136,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ### 4.2 Step 2 — 硬化 edge 表面隔离门禁
 
-1. 新增 `scripts/verify/verify-shared-edge-surface-isolation.ps1`：扫描 `app/web/src`、`app/mobile-rn/src`，禁止 import `@shared/apiClient`(若已删则禁 path)、`@shared/eventClient`、`@shared/transcript/edge*`(edgeEventMappers/normalizeEdgeEvents)、`@shared/stores/queryKeys` 中的 `edgeQueryKeys`。
+1. 新增 `scripts/verify/verify-shared-edge-surface-isolation.py`：扫描 `app/web/src`、`app/mobile-rn/src`，禁止 import `@shared/apiClient`(若已删则禁 path)、`@shared/eventClient`、`@shared/transcript/edge*`(edgeEventMappers/normalizeEdgeEvents)、`@shared/stores/queryKeys` 中的 `edgeQueryKeys`。
 2. 先以 lint（非阻塞）跑一个周期，确认 0 违规（实测应为 0，因 web/mobile 边界门禁已守）。
 3. 稳定后硬化为 `-ErrorAction Stop`，并入 `validate` 14→15 层门禁索引。
 
@@ -158,12 +158,12 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ### 5.2 新增门禁建议
 
-- **`verify-shared-edge-surface-isolation.ps1`**（软起，稳定后硬化）：禁 web/mobile-rn import `@shared/eventClient`、`@shared/transcript/edge*`、`edgeQueryKeys`。**与 `#1463` 互补**（`#1463` 守 shared 内部不出现 edge 客户端实现；新门禁守 shared 内已存在的 edge 表面不被 hub-only 消费者 import）。
+- **`verify-shared-edge-surface-isolation.py`**（软起，稳定后硬化）：禁 web/mobile-rn import `@shared/eventClient`、`@shared/transcript/edge*`、`edgeQueryKeys`。**与 `#1463` 互补**（`#1463` 守 shared 内部不出现 edge 客户端实现；新门禁守 shared 内已存在的 edge 表面不被 hub-only 消费者 import）。
 - **不新增 coverage 门禁**：剔除 `apiClient.ts` 会微降 shared coverage（apiClient 有单测），但 `#1443` 基线 71.57% 是 shared 整体，删除后需重测基线——预计影响 <0.3pp，可接受，但**合入时须同步更新 `#1443` 基线数**。
 
 ### 5.3 删除 apiClient 对 REST 契约门禁的影响
 
-`#1467 shared-rest-contract`（`verify-shared-rest-contract.ps1`）比对的是 Hub 路由契约，`apiClient.ts` 是 Edge REST 客户端——**不在比对集**。删除 apiClient 对 `#1467` 零影响。需确认 `apiClient.ts` 的 OpenAPI 引用（`api/openapi.yaml` 的 Edge 路径）是否还有其他消费者——实测 desktop `edgeClient.ts` 自维护 schema（`./schemas`），不依赖 `apiClient.ts`。
+`#1467 shared-rest-contract`（`verify-shared-rest-contract.py`）比对的是 Hub 路由契约，`apiClient.ts` 是 Edge REST 客户端——**不在比对集**。删除 apiClient 对 `#1467` 零影响。需确认 `apiClient.ts` 的 OpenAPI 引用（`api/openapi.yaml` 的 Edge 路径）是否还有其他消费者——实测 desktop `edgeClient.ts` 自维护 schema（`./schemas`），不依赖 `apiClient.ts`。
 
 ## 6. 工作量 / 风险 / 建议
 
@@ -186,7 +186,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ### 6.2 需 sign-off 的部分
 
-- **新增 `verify-shared-edge-surface-isolation.ps1` 并硬化入 validate 门禁索引**（§4.2 Step 2 → §5.2）。新增 CI 硬门禁属工程治理变更，建议管理员确认强度（lint vs hard-fail）与是否并入 14 层索引（→15 层）。
+- **新增 `verify-shared-edge-surface-isolation.py` 并硬化入 validate 门禁索引**（§4.2 Step 2 → §5.2）。新增 CI 硬门禁属工程治理变更，建议管理员确认强度（lint vs hard-fail）与是否并入 14 层索引（→15 层）。
 
 ## 7. 与审计/原 issue 的诚实对照
 
@@ -200,11 +200,11 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 1. 全量三分牵动 ~578 文件 + 3 包重建，churn 高一个数量级；既有 14 层门禁已守住 shared 不泄漏 Edge 客户端、shared UI 不 runtime-import hubClient 两条关键边。
 2. Quick-wins 已执行（apiClient.ts 删除 + web/desktop 显式 `workspace:*` 依赖，随 41309678 落地）。
-3. 隔离门禁已按软门禁建（`verify-shared-edge-surface-isolation.ps1`，NON-BLOCKING）；硬化成硬门禁（违规即失败 + 正负向自测）转独立任务 **#1525**。
+3. 隔离门禁已按软门禁建（`verify-shared-edge-surface-isolation.py`，NON-BLOCKING）；硬化成硬门禁（违规即失败 + 正负向自测）转独立任务 **#1525**。
 
 ## 9. 参考
 
-- 既有边界门禁：`scripts/verify/verify-shared-boundary.ps1`、`verify-shared-ui-hubclient.ps1`、`verify-web-hub-boundary.ps1`、`verify-mobile-hub-boundary.ps1`、`verify-shared-rest-contract.ps1`、`verify-hubclient-ssot.ps1`
+- 既有边界门禁：`scripts/verify/verify-shared-boundary.ps1`、`verify-shared-ui-hubclient.py`、`verify-web-hub-boundary.ps1`、`verify-mobile-hub-boundary.ps1`、`verify-shared-rest-contract.py`、`verify-hubclient-ssot.ps1`
 - MASTER 门禁索引：`docs/progress/MASTER.md` L94（14 层 validate 硬门禁）
 - hubClient SSOT：`app/desktop/src/api/hubClient.ts:7,14,17`、`app/web/src/api/hubClient.ts:4,12,14`、`app/mobile-rn/src/api/hubClient.ts:24-31`
 - Edge 表面仅 desktop：`app/desktop/src/api/edgeClient.ts:20-23`、`app/desktop/src/stores/edgeEventBridge.ts`、`app/desktop/src/platform/useDesktopEdgeEvents.ts:2-3`
