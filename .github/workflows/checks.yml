@@ -888,8 +888,7 @@ jobs:
         run: python ./scripts/verify/verify-test-sleep-ratchet.py
 
       - name: Verify auth dependency ownership (#1551)
-        shell: pwsh
-        run: ./scripts/verify/verify-auth-dep-ownership.ps1
+        run: python ./scripts/verify/verify-auth-dep-ownership.py
 
       - name: Verify quality-debt ratchet (#1536)
         shell: pwsh
