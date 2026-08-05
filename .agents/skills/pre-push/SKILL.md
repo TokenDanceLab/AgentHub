@@ -12,7 +12,7 @@ Prefer focused gates while iterating, then run the gates that match the touched 
 ```powershell
 git diff --check
 bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-project-skills.ps1
+python scripts/verify/verify-project-skills.py
 python scripts/verify/verify-doc-ssot.py
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-ci-gates.ps1
 bash ./scripts/verify/verify-ci-gates.sh
@@ -31,7 +31,7 @@ Use `bash scripts/verify/check-secrets.sh --staged` before commit when changes a
 | Web UI | `corepack.cmd pnpm --dir app/web typecheck` + relevant Vitest/Playwright/Visual QA |
 | Shared frontend | focused `app/shared` tests plus affected consumers |
 | Mobile RN | `corepack.cmd pnpm --dir app/mobile-rn verify` unless Mobile is explicitly out of scope |
-| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md`; backend perf/leak also runs `scripts/verify/verify-backend-perf-leak-gates.ps1` |
+| Real E2E/package/login/perf/leak | `.agents/skills/real-e2e-acceptance/SKILL.md`; backend perf/leak also runs `scripts/verify/verify-backend-perf-leak-gates.py` |
 
 ## Reporting
 
