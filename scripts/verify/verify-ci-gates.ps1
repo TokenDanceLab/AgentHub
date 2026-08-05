@@ -204,7 +204,7 @@ $docEntrypointSelfTestStep = Get-StepBlock $validate "Self-test doc entrypoint S
 Assert-Contains $docEntrypointSelfTestStep "scripts/verify/tests/verify-doc-entrypoints\.Tests\.ps1" "doc entrypoint self-test step must call its test script"
 Assert-StepContinueOnError $validate "Self-test doc entrypoint SSOT" $false
 Assert-Contains $validate "Verify Web Hub-only boundary" "validate job must run the Web Hub-only boundary verifier"
-Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.ps1" "validate job must call scripts/verify/verify-web-hub-boundary.ps1"
+Assert-Contains $validate "scripts/verify/verify-web-hub-boundary\.py" "validate job must call scripts/verify/verify-web-hub-boundary.py"
 Assert-Contains $validate "Verify Hub pure package imports" "validate job must run the Hub pure package import verifier"
 Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.ps1" "validate job must call scripts/verify/verify-hub-pure-packages.ps1"
 Assert-StepContinueOnError $validate "Verify Hub pure package imports" $false
