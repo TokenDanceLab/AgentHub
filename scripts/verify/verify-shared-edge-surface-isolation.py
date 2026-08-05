@@ -7,7 +7,7 @@ shared 包携带 Edge 表面（eventClient.ts、transcript/edge*.ts、edgeQueryK
 它们只面向 Desktop。Web 与 Mobile RN 是 Hub-only，不得 import 这些 Edge 专用 shared 模块。
 
 自 2026-08-03（#1525）起为 HARD GATE：违规 exit 1；扫描目录缺失即失败；内部错误即失败。
-自测位于 scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1。
+自测位于 scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.py。
 
 A-V3 裁决（2026-08-03）：shared 不做全量三分，edge 表面补硬门禁——web/mobile-rn
 不得 import @shared/eventClient、@shared/transcript/edge*、edgeQueryKeys。
