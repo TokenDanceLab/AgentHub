@@ -168,6 +168,11 @@ def invoke_repo_script(repo_root: str, relative_path: str, arguments: list) -> d
     script_path = os.path.join(repo_root, relative_path)
     if not os.path.isfile(script_path):
         return {"ExitCode": -1, "Output": f"missing {relative_path}"}
+    if script_path.endswith(".py"):
+        python_exe = shutil.which("python") or shutil.which("python3")
+        if not python_exe:
+            return {"ExitCode": -1, "Output": "Python executable is unavailable"}
+        return invoke_captured_process(python_exe, [script_path, *arguments], repo_root)
     powershell_exe = find_powershell()
     if not powershell_exe:
         return {"ExitCode": -1, "Output": "PowerShell executable is unavailable"}
@@ -331,7 +336,7 @@ def invoke_service_readiness(ctx: dict) -> None:
     if ctx["start_services"]:
         service_args += ["-StartServices", "-StartServicePlanPath", ctx["start_service_plan_path"]]
 
-    services_run = invoke_repo_script(ctx["repo_root"], "scripts\\smoke\\verify-localhost-real-services.ps1", service_args)
+    services_run = invoke_repo_script(ctx["repo_root"], "scripts\\smoke\\verify-localhost-real-services.py", service_args)
     ctx["service_probe_exit_code"] = services_run["ExitCode"]
     ctx["service_probe_output"] = services_run["Output"]
     emit(services_run["Output"])
