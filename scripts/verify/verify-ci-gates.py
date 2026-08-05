@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+r"""CI gate policy verifier — ps1 迁移（契约见 server docs/design/ps1-to-python-migration.md）。
+
+用正则解析 .github/workflows/checks.yml 的 job/step 结构并断言 CI 政策：
+覆盖门禁、gosec/vuln 扫描、backend fixture/focused 边界、前端 pnpm 缓存、
+coverage include、commit-message/quality-debt/doc-ssot 自测、mobile light、
+visual-qa-shell、changes 路径筛选等。断言引用脚本名与本批迁移后 checks.yml
+实际内容一致（本批脚本 .py，其余保持 .ps1）。
+
+CLI 兼容：--WorkflowPath 默认 ".github/workflows/checks.yml"（相对 cwd）；
+通过输出 "ci gate policy ok" 且退出码 0；违例抛异常 → stderr + 退出码 1。
+"""
+
+import argparse
+import os
+import re
+import sys
+
+NEXT_JOB = r"(?:  \#.*\r?\n|[ \t]*\r?\n)*  [A-Za-z0-9_-]+:"
+
+
+def fail(message: str) -> None:
+    raise RuntimeError(f"CI gate policy check failed: {message}")
+
+
+def get_job_block(workflow: str, job_name: str) -> str:
+    # Comments between sibling jobs belong to neither job. Stop before those
+    # comments when they are immediately followed by the next two-space job
+    # key; otherwise policy checks can accidentally inspect the next job's
+    # heading text (for example "PostgreSQL + Redis").
+    pattern = re.compile(r"(?ms)^  " + re.escape(job_name) + r":\r?\n(?P<body>.*?)(?=^" + NEXT_JOB + r"|\Z)")
+    match = pattern.search(workflow)
+    if not match:
+        fail(f"missing job '{job_name}'")
+    return match.group("body")
+
+
+def get_step_block(job_block: str, step_name: str) -> str:
+    pattern = re.compile(r"(?ms)^\s+- name: " + re.escape(step_name) + r"\r?\n(?P<body>.*?)(?=^\s+- name:|\Z)")
+    match = pattern.search(job_block)
+    if not match:
+        fail(f"missing step '{step_name}'")
+    return match.group("body")
+
+
+def assert_contains(text: str, pattern: str, message: str) -> None:
+    if not re.search(pattern, text, re.IGNORECASE):
+        fail(message)
+
+
+def assert_not_contains(text: str, pattern: str, message: str) -> None:
+    if re.search(pattern, text, re.IGNORECASE):
+        fail(message)
+
+
+def assert_step_continue_on_error(job_block: str, step_name: str, expected: bool) -> None:
+    step = get_step_block(job_block, step_name)
+    has_continue = re.search(r"(?m)^\s+continue-on-error:\s+true\s*$", step, re.IGNORECASE) is not None
+    if has_continue != expected:
+        want = "warning-only" if expected else "hard-blocking"
+        fail(f"step '{step_name}' must be {want}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="CI gate policy verifier")
+    parser.add_argument("--WorkflowPath", default=".github/workflows/checks.yml")
+    args = parser.parse_args()
+
+    workflow_path = args.WorkflowPath
+    if not os.path.isfile(workflow_path):
+        fail(f"workflow file not found: {workflow_path}")
+
+    with open(workflow_path, encoding="utf-8-sig", errors="replace") as handle:
+        workflow = handle.read()
+    edge = get_job_block(workflow, "go-edge")
+    hub = get_job_block(workflow, "go-hub")
+    backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
+    backend_focused = get_job_block(workflow, "backend-focused-subset")
+    desktop = get_job_block(workflow, "frontend-desktop")
+    web = get_job_block(workflow, "frontend-web")
+    mobile = get_job_block(workflow, "frontend-mobile")
+    mobile_light = get_job_block(workflow, "frontend-mobile-light")
+    e2e = get_job_block(workflow, "e2e-smoke")
+    changes = get_job_block(workflow, "changes")
+    visual_shell = get_job_block(workflow, "visual-qa-shell")
+    validate = get_job_block(workflow, "validate")
+    backend_perf = get_job_block(workflow, "backend-perf-leak-gates")
+
+    assert_contains(edge, r"Coverage check \(informational\)", "go-edge overall coverage must stay informational")
+    assert_contains(edge, r"Coverage per-package minimums", "go-edge must keep per-package coverage minimums")
+    assert_contains(edge, re.escape('check_pkg "edge-server/internal/security/" 70 "security"'), "go-edge must keep security package coverage minimum")
+    assert_contains(edge, re.escape('check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle"'), "go-edge must keep lifecycle package coverage minimum")
+    assert_contains(edge, re.escape('check_pkg "edge-server/internal/adapters/" 55 "adapters"'), "go-edge must keep adapters package coverage minimum")
+    assert_contains(hub, r"THRESHOLD=40", "go-hub coverage threshold must be 40%")
+
+    # #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
+    # still carries pre-existing findings (tracked in #1573) and stays
+    # warning-only until a finding-fingerprint ratchet exists. Complexity
+    # exclusions remain separately owned by #1568.
+    assert_step_continue_on_error(edge, "Lint", False)
+    assert_step_continue_on_error(hub, "Lint", True)
+    # #1574: gosec findings triaged and cleared in both servers; the gosec
+    # security scan steps are hard-blocking (no continue-on-error).
+    assert_step_continue_on_error(edge, "Security scan (gosec)", False)
+    assert_step_continue_on_error(hub, "Security scan (gosec)", False)
+    assert_step_continue_on_error(edge, "Coverage per-package minimums", False)
+    assert_not_contains(edge, r"Commit message check", "commit-message policy must not live in the path-filtered go-edge job")
+
+    # #1534：vuln 扫描收敛到独立 job（vuln-scan-go / vuln-scan-js）且 fail-closed；
+    # go-hub/go-edge 内不再要求重复的 continue-on-error govulncheck step。
+    vuln_go = get_job_block(workflow, "vuln-scan-go")
+    vuln_js = get_job_block(workflow, "vuln-scan-js")
+    assert_contains(vuln_go, re.escape("verify-vulnerability-gates.sh govulncheck"), "vuln-scan-go must run the fail-closed govulncheck verifier")
+    assert_contains(vuln_js, re.escape("verify-vulnerability-gates.sh pnpm-audit"), "vuln-scan-js must run the fail-closed pnpm audit verifier")
+    assert_contains(validate, r"Self-test vulnerability gates", "validate must self-test the vulnerability gates")
+
+    assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
+    assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")
+    assert_contains(backend_fixture, re.escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1"), "backend-e2e-fixture must run only the TeamRun fixture smoke test")
+    assert_step_continue_on_error(backend_fixture, "TeamRun fixture E2E", False)
+    assert_contains(backend_fixture, r"P0 remote-control fixture readiness", "backend-e2e-fixture must run the P0 remote-control fixture readiness step")
+    assert_contains(backend_fixture, re.escape("python ./scripts/verify/verify-p0-remote-control-fixture.py"), "backend-e2e-fixture must run the P0 remote-control fixture readiness gate")
+    assert_step_continue_on_error(backend_fixture, "P0 remote-control fixture readiness", False)
+
+    assert_contains(backend_focused, r"Backend focused subset", "backend-focused-subset must use a clear job name")
+    assert_contains(backend_focused, r"Hub focused backend packages", "backend-focused-subset must run the Hub focused backend package step")
+    assert_contains(backend_focused, r"Edge focused backend packages", "backend-focused-subset must run the Edge focused backend package step")
+    assert_contains(backend_focused, re.escape("cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1"), "backend-focused-subset must run the approved Hub focused backend packages")
+    assert_contains(backend_focused, re.escape("cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1"), "backend-focused-subset must run the approved Edge focused backend packages")
+    assert_step_continue_on_error(backend_focused, "Hub focused backend packages", False)
+    assert_step_continue_on_error(backend_focused, "Edge focused backend packages", False)
+
+    backend_forbidden_patterns = [
+        r"-RealCli",
+        r"real[-_]?cli",
+        r"self-hosted",
+        r"services:",
+        r"integration-smoke\.ps1",
+        r"edge-runtime-smoke\.ps1",
+        r"OPENAI_API_KEY",
+        r"ANTHROPIC_API_KEY",
+        r"CODEX_",
+        r"CLAUDE_",
+        r"\bcodex\b",
+        r"\bclaude\b",
+        r"\bopencode\b",
+        r"postgres",
+        r"redis",
+        r"dev-up",
+        r"docker",
+        r"codesign",
+        r"signtool",
+        r"notarization",
+        r"notarytool",
+        r"cosign",
+        r"http://",
+        r"https://",
+        r"go test ./tests -count=1",
+    ]
+
+    for forbidden in backend_forbidden_patterns:
+        assert_not_contains(backend_fixture, forbidden, f"backend-e2e-fixture must not invoke '{forbidden}'")
+        assert_not_contains(backend_focused, forbidden, f"backend-focused-subset must not invoke '{forbidden}'")
+
+    for job_name, job_body, lockfile in (
+        ("frontend-desktop", desktop, "app/pnpm-lock.yaml"),
+        ("frontend-web", web, "app/pnpm-lock.yaml"),
+        ("frontend-mobile", mobile, "app/pnpm-lock.yaml"),
+        ("frontend-mobile-light", mobile_light, "app/pnpm-lock.yaml"),
+        ("e2e-smoke", e2e, "app/pnpm-lock.yaml"),
+        ("visual-qa-shell", visual_shell, "app/pnpm-lock.yaml"),
+    ):
+        # runtime major is governed by verify-action-runtimes.py (#1580); here
+        # we only require the pnpm setup step to exist with the pnpm cache wired up
+        assert_contains(job_body, r"pnpm/action-setup@", f"{job_name} must install pnpm explicitly")
+        assert_contains(job_body, r"cache:\s+pnpm", f"{job_name} must enable pnpm cache")
+        assert_contains(job_body, re.escape(lockfile), f"{job_name} must cache the correct pnpm lockfile")
+
+    # #1535: coverage include contract — every frontend package counts ALL
+    # production src in the denominator (app/test-config/coverage.ts factory).
+    # The baseline gate runs all four packages plus a negative self-test proving
+    # imported-by-nobody modules are counted as 0% and trip the ratchet.
+    assert_contains(validate, r"Verify coverage baseline", "validate job must run the coverage baseline gate")
+    assert_contains(validate, r"scripts/verify/verify-coverage-baseline.py", "validate job must call the coverage baseline verifier")
+    assert_contains(validate, r"Self-test coverage include contract", "validate job must run the coverage include negative self-test")
+    assert_contains(validate, r"coverage-include\.Tests\.ps1", "validate job must call the coverage include self-test")
+    assert_step_continue_on_error(validate, "Verify coverage baseline", False)
+    assert_step_continue_on_error(validate, "Self-test coverage include contract (negative)", False)
+
+    ci_policy_step = get_step_block(validate, "Verify CI gate policy")
+    assert_contains(ci_policy_step, r"scripts/verify/verify-ci-gates\.py", "CI policy step must call scripts/verify/verify-ci-gates.py")
+
+    commit_message_step = get_step_block(validate, "Verify commit messages (PR only)")
+    assert_contains(commit_message_step, r"scripts/verify/verify-commit-messages\.sh", "commit-message step must call the commit-message verifier")
+    assert_contains(commit_message_step, re.escape("github.event.pull_request.head.sha"), "commit-message step must inspect the real PR head")
+    assert_contains(commit_message_step, re.escape("origin/${{ github.base_ref }}"), "commit-message step must compare with the real base branch")
+    assert_step_continue_on_error(validate, "Verify commit messages (PR only)", False)
+
+    commit_message_self_test_step = get_step_block(validate, "Self-test commit-message gate")
+    assert_contains(commit_message_self_test_step, r"verify-commit-messages\.Tests\.sh", "commit-message self-test step must call its test script")
+    assert_step_continue_on_error(validate, "Self-test commit-message gate", False)
+
+    quality_debt_step = get_step_block(validate, "Verify quality-debt ratchet (#1536)")
+    assert_contains(quality_debt_step, r"scripts/verify/verify-quality-debt-ratchet\.py", "quality-debt step must call the ratchet verifier")
+    assert_step_continue_on_error(validate, "Verify quality-debt ratchet (#1536)", False)
+
+    quality_debt_self_test_step = get_step_block(validate, "Self-test quality-debt ratchet (negative)")
+    assert_contains(quality_debt_self_test_step, r"verify-quality-debt-ratchet\.Tests\.ps1", "quality-debt self-test step must call its test script")
+    assert_step_continue_on_error(validate, "Self-test quality-debt ratchet (negative)", False)
+    assert_contains(validate, r"Verify project skill whitelist", "validate job must run the project skill whitelist verifier")
+    assert_contains(validate, r"scripts/verify/verify-project-skills\.py", "validate job must call scripts/verify/verify-project-skills.py")
+    doc_ssot_step = get_step_block(validate, "Verify doc SSOT")
+    assert_contains(doc_ssot_step, r"scripts/verify/verify-doc-ssot\.py", "doc SSOT step must call scripts/verify/verify-doc-ssot.py")
+    assert_step_continue_on_error(validate, "Verify doc SSOT", False)
+
+    doc_entrypoint_self_test_step = get_step_block(validate, "Self-test doc entrypoint SSOT")
+    assert_contains(doc_entrypoint_self_test_step, r"scripts/verify/tests/verify-doc-entrypoints\.Tests\.ps1", "doc entrypoint self-test step must call its test script")
+    assert_step_continue_on_error(validate, "Self-test doc entrypoint SSOT", False)
+    assert_contains(validate, r"Verify Web Hub-only boundary", "validate job must run the Web Hub-only boundary verifier")
+    assert_contains(validate, r"scripts/verify/verify-web-hub-boundary.py", "validate job must call scripts/verify/verify-web-hub-boundary.ps1")
+    assert_contains(validate, r"Verify Hub pure package imports", "validate job must run the Hub pure package import verifier")
+    assert_contains(validate, r"scripts/verify/verify-hub-pure-packages.py", "validate job must call scripts/verify/verify-hub-pure-packages.ps1")
+    assert_step_continue_on_error(validate, "Verify Hub pure package imports", False)
+    assert_contains(validate, r"Verify Mobile Hub-only boundary", "validate job must run the Mobile Hub-only boundary verifier")
+    assert_contains(validate, r"scripts/verify/verify-mobile-hub-boundary.py", "validate job must call scripts/verify/verify-mobile-hub-boundary.ps1")
+    assert_contains(validate, r"Verify hubClient thin-shell SSOT", "validate job must run the hubClient thin-shell SSOT verifier")
+    assert_contains(validate, r"scripts/verify/verify-hubclient-ssot.py", "validate job must call scripts/verify/verify-hubclient-ssot.ps1")
+    assert_step_continue_on_error(validate, "Verify hubClient thin-shell SSOT", False)
+    assert_contains(validate, r"Verify Design token SSOT", "validate job must run the design token SSOT verifier")
+    assert_contains(validate, r"scripts/verify/verify-design-token-ssot.py", "validate job must call scripts/verify/verify-design-token-ssot.ps1")
+    assert_step_continue_on_error(validate, "Verify Design token SSOT", False)
+    assert_contains(validate, r"Verify real E2E contract", "validate job must run the real E2E contract verifier")
+    assert_contains(validate, r"scripts/verify/verify-real-e2e-contract.py", "validate job must call scripts/verify/verify-real-e2e-contract.ps1")
+    assert_contains(validate, r"Validate OpenAPI YAML", "validate job must keep OpenAPI YAML parsing")
+    assert_contains(validate, r"Verify OpenAPI↔hub router contract", "validate job must run the OpenAPI↔hub router contract verifier")
+    assert_contains(validate, r"scripts/verify/verify-openapi-contract.py", "validate job must call scripts/verify/verify-openapi-contract.ps1")
+    assert_step_continue_on_error(validate, "Verify OpenAPI↔hub router contract", False)
+    assert_contains(validate, r"Verify Shared Edge-free boundary", "validate job must run the Shared Edge-free boundary verifier")
+    assert_contains(validate, r"scripts/verify/verify-shared-boundary.py", "validate job must call scripts/verify/verify-shared-boundary.ps1")
+    assert_step_continue_on_error(validate, "Verify Shared Edge-free boundary", False)
+    assert_contains(validate, r"Verify Shared barrel Edge-export ban", "validate job must run the Shared barrel Edge-export ban verifier")
+    assert_contains(validate, r"scripts/verify/verify-shared-barrel.py", "validate job must call scripts/verify/verify-shared-barrel.ps1")
+    assert_step_continue_on_error(validate, "Verify Shared barrel Edge-export ban", False)
+    assert_contains(validate, r"Verify Hub handler layering", "validate job must run the Hub handler layering verifier")
+    assert_contains(validate, r"scripts/verify/verify-hub-layering.py", "validate job must call scripts/verify/verify-hub-layering.ps1")
+    assert_step_continue_on_error(validate, "Verify Hub handler layering", False)
+    assert_contains(validate, r"Verify Conventions method SSOT", "validate job must run the Conventions method SSOT verifier")
+    assert_contains(validate, r"scripts/verify/verify-conventions.py", "validate job must call scripts/verify/verify-conventions.ps1")
+    assert_step_continue_on_error(validate, "Verify Conventions method SSOT", False)
+    assert_contains(validate, r"Verify Shared REST contract Hub-client to Hub-router", "validate job must run the Shared REST contract verifier")
+    assert_contains(validate, r"scripts/verify/verify-shared-rest-contract.py", "validate job must call scripts/verify/verify-shared-rest-contract.ps1")
+    assert_step_continue_on_error(validate, "Verify Shared REST contract Hub-client to Hub-router", False)
+    assert_contains(validate, r"Verify Shared UI hubClient gate", "validate job must run the Shared UI hubClient gate verifier")
+    assert_contains(validate, r"scripts/verify/verify-shared-ui-hubclient.py", "validate job must call scripts/verify/verify-shared-ui-hubclient.ps1")
+    assert_step_continue_on_error(validate, "Verify Shared UI hubClient gate", False)
+    assert_contains(validate, r"check-secrets\.sh", "validate job must keep secret guard")
+    assert_contains(validate, r"Verify coverage baseline", "validate job must run the coverage baseline gate")
+    assert_contains(validate, r"scripts/verify/verify-coverage-baseline.py", "validate job must call scripts/verify/verify-coverage-baseline.ps1")
+    assert_step_continue_on_error(validate, "Verify coverage baseline", False)
+
+    assert_contains(mobile, r"(?m)^\s+timeout-minutes:\s+45\s*$", "frontend-mobile job must have a hard timeout")
+    assert_contains(get_step_block(mobile, "Screenshot visual QA (mobile)"), r"(?m)^\s+timeout-minutes:\s+12\s*$", "mobile visual QA must have a hard timeout")
+    assert_contains(get_step_block(mobile, "E2E (mock hub)"), r"(?m)^\s+timeout-minutes:\s+10\s*$", "mobile mock-hub E2E must have a hard timeout")
+    assert_contains(mobile, r"github.event_name == 'workflow_dispatch'", "frontend-mobile full suite must stay workflow_dispatch-only")
+
+    assert_contains(mobile_light, r"Frontend \(mobile light\)", "frontend-mobile-light must use a clear job name")
+    assert_contains(mobile_light, r"needs:\s+changes", "frontend-mobile-light must depend on unified changes job")
+    assert_contains(mobile_light, r"needs.changes.outputs.mobile", "frontend-mobile-light must path-filter on mobile")
+    assert_contains(mobile_light, r"(?m)^\s+timeout-minutes:\s+15\s*$", "frontend-mobile-light job must have a hard timeout")
+    assert_contains(mobile_light, re.escape("pnpm --filter agenthub-mobile-rn typecheck"), "frontend-mobile-light must typecheck mobile")
+    assert_contains(mobile_light, re.escape("pnpm --filter agenthub-mobile-rn test"), "frontend-mobile-light must run mobile unit tests")
+    assert_not_contains(mobile_light, r"npx expo export", "frontend-mobile-light must not run Expo export")
+    assert_not_contains(mobile_light, r"scripts/visual-qa\.mjs", "frontend-mobile-light must not run mobile visual QA")
+    assert_not_contains(mobile_light, r"playwright install --with-deps", "frontend-mobile-light must not install Playwright")
+
+    assert_contains(backend_perf, r"Backend perf/leak gates", "backend-perf-leak-gates must use a clear job name")
+    assert_contains(backend_perf, r"github.event_name == 'workflow_dispatch'", "backend-perf-leak-gates must be workflow_dispatch-only")
+    assert_contains(backend_perf, re.escape("verify-backend-perf-leak-gates.py"), "backend-perf-leak-gates must run the perf/leak script")
+    assert_contains(backend_perf, r"(?m)^\s+timeout-minutes:\s+20\s*$", "backend-perf-leak-gates must have a hard timeout")
+    assert_not_contains(backend_perf, r"load-test", "backend-perf-leak-gates must not claim load/capacity smoke")
+
+    assert_contains(changes, r"dorny/paths-filter@", "changes job must use dorny/paths-filter (major governed by #1580 runtime gate)")
+    assert_contains(changes, re.escape("app/shared/src/workbench/**"), "changes job must watch workbench paths")
+    assert_contains(changes, re.escape("app/shared/src/styles/**"), "changes job must watch shared styles")
+    assert_contains(changes, re.escape("app/web/scripts/visual-qa*"), "changes job must watch web visual-qa scripts")
+    assert_contains(changes, re.escape("app/desktop/scripts/visual-qa*"), "changes job must watch desktop visual-qa scripts")
+    assert_contains(changes, re.escape(".github/workflows/checks.yml"), "changes job must watch checks.yml")
+    assert_contains(changes, re.escape("hub-server/**"), "changes job must watch hub-server paths")
+    assert_contains(changes, re.escape("edge-server/**"), "changes job must watch edge-server paths")
+    assert_contains(changes, re.escape("pkg/**"), "changes job must watch shared pkg module")
+    assert_contains(changes, re.escape("go.work"), "changes job must watch go.work files")
+    assert_contains(changes, re.escape("app/mobile-rn/**"), "changes job must watch mobile-rn paths")
+    assert_contains(changes, r"(?m)^\s+mobile:\s*$", "changes job must expose mobile output")
+
+    assert_contains(visual_shell, r"Visual QA shell \(web, path-filtered\)", "visual-qa-shell must use a clear job name")
+    assert_contains(visual_shell, r"needs:\s+changes", "visual-qa-shell must depend on unified changes job")
+    assert_contains(visual_shell, r"Install Playwright Chromium", "visual-qa-shell must install chromium only")
+    assert_contains(visual_shell, re.escape("playwright install --with-deps chromium"), "visual-qa-shell must install chromium only")
+    assert_contains(visual_shell, re.escape("pnpm visual:qa:shell"), "visual-qa-shell must run visual:qa:shell")
+    assert_contains(visual_shell, re.escape("pnpm assert:visual:qa:shell"), "visual-qa-shell must assert non-blank screenshots")
+    assert_contains(visual_shell, r"Upload visual QA shell screenshots", "visual-qa-shell must upload artifacts")
+    assert_contains(visual_shell, r"web-visual-qa-shell-screenshots", "visual-qa-shell must name the artifact")
+    assert_contains(visual_shell, r"(?m)^\s+timeout-minutes:\s+20\s*$", "visual-qa-shell job must have a hard timeout")
+    assert_contains(get_step_block(visual_shell, "Capture web visual:qa:shell"), r"(?m)^\s+timeout-minutes:\s+15\s*$", "visual-qa-shell capture step must have a hard timeout")
+    assert_not_contains(visual_shell, r"pixel[-_ ]?golden", "visual-qa-shell must not fail on pixel golden")
+    assert_not_contains(visual_shell, r"toHaveScreenshot", "visual-qa-shell must not use Playwright pixel golden matchers")
+    assert_not_contains(visual_shell, r"windows-latest", "visual-qa-shell must stay on ubuntu for cost control")
+
+    print("ci gate policy ok")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)

@@ -62,7 +62,7 @@ go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile op
 go test ./edge-server/... -short -count=1
 pwsh ./scripts/smoke/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
 pwsh ./scripts/smoke/client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
-pwsh ./scripts/verify/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
+python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
 ```
 
 `client-smoke.ps1` uses the current Edge runtime architecture and no longer builds the deleted standalone `runner/` directory.

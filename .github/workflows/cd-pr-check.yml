@@ -12,7 +12,7 @@ on:
       - ".github/workflows/cd-*.yml"
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
-      - "scripts/verify/verify-deployment-shape.ps1"
+      - "scripts/verify/verify-deployment-shape.py"
       - "scripts/verify/tests/verify-deployment-shape.Tests.ps1"
 
 concurrency:
@@ -133,7 +133,7 @@ jobs:
       - name: Enforce deployment shape SSOT (#1527)
         run: |
           echo "::group::Deployment shape SSOT verifier"
-          pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify/verify-deployment-shape.ps1
+          python ./scripts/verify/verify-deployment-shape.py
           echo "::endgroup::"
 
       - name: Run deployment shape verifier self-tests
