@@ -204,7 +204,7 @@ mobile-rn grep **零** edge 表面命中——边界门禁 `#1436` 守住。且 
 
 ## 9. 参考
 
-- 既有边界门禁：`scripts/verify/verify-shared-boundary.ps1`、`verify-shared-ui-hubclient.py`、`verify-web-hub-boundary.ps1`、`verify-mobile-hub-boundary.ps1`、`verify-shared-rest-contract.py`、`verify-hubclient-ssot.ps1`
+- 既有边界门禁：`scripts/verify/verify-shared-boundary.py`、`verify-shared-ui-hubclient.py`、`verify-web-hub-boundary.ps1`、`verify-mobile-hub-boundary.ps1`、`verify-shared-rest-contract.py`、`verify-hubclient-ssot.ps1`
 - MASTER 门禁索引：`docs/progress/MASTER.md` L94（14 层 validate 硬门禁）
 - hubClient SSOT：`app/desktop/src/api/hubClient.ts:7,14,17`、`app/web/src/api/hubClient.ts:4,12,14`、`app/mobile-rn/src/api/hubClient.ts:24-31`
 - Edge 表面仅 desktop：`app/desktop/src/api/edgeClient.ts:20-23`、`app/desktop/src/stores/edgeEventBridge.ts`、`app/desktop/src/platform/useDesktopEdgeEvents.ts:2-3`
