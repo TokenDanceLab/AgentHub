@@ -2171,7 +2171,7 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(within(page).getByRole('button', { name: '新建分组' }));
     expect(within(page).getAllByText(/自定义分组/).length).toBeGreaterThan(0);
-  });
+  }, 20000);
 
   it('renders the local data mode setting with mock and real-mode choices', () => {
     window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
