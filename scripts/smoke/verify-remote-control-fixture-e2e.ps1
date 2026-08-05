@@ -70,18 +70,33 @@ function Test-RequiredString($Object, [string]$Field, [string]$Label) {
 }
 
 function Invoke-Script([string]$Path, [string[]]$Arguments) {
-    $powershellExe = Find-PowerShell
-    if (-not $powershellExe) {
-        return [pscustomobject]@{
-            ExitCode = -1
-            Output = "PowerShell executable is unavailable."
+    $isPython = $Path -like "*.py"
+    if ($isPython) {
+        $pythonExe = Get-Command "python" -ErrorAction SilentlyContinue
+        if (-not $pythonExe) {
+            return [pscustomobject]@{
+                ExitCode = -1
+                Output = "Python executable is unavailable."
+            }
+        }
+    } else {
+        $powershellExe = Find-PowerShell
+        if (-not $powershellExe) {
+            return [pscustomobject]@{
+                ExitCode = -1
+                Output = "PowerShell executable is unavailable."
+            }
         }
     }
 
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $Path @Arguments 2>&1 | Out-String
+        if ($isPython) {
+            $output = & $pythonExe.Source $Path @Arguments 2>&1 | Out-String
+        } else {
+            $output = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $Path @Arguments 2>&1 | Out-String
+        }
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -161,7 +176,7 @@ if ([string]::IsNullOrWhiteSpace($Stamp)) {
 }
 
 $exporterPath = Join-Path $RepoRoot "scripts\lib\export-teamrun-demo-fixture-evidence.ps1"
-$readinessPath = Join-Path $RepoRoot "scripts\verify\verify-teamrun-demo-readiness.ps1"
+$readinessPath = Join-Path $RepoRoot "scripts\verify\verify-teamrun-demo-readiness.py"
 
 Step "Fixture boundary"
 Pass "FixtureRehearsal only: no TokenDanceID, real CLI/model, deployment, or mobile"
