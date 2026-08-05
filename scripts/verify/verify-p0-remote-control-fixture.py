@@ -95,14 +95,16 @@ def invoke_required_script_gate(repo_root: str, label: str, relative_path: str, 
         fail_check(label, f"missing {relative_path}")
         return
 
-    powershell_exe = find_powershell()
-    if not powershell_exe:
-        skip_check(label, "PowerShell executable is unavailable; gate was not run.")
-        return
-
-    exit_code, output = invoke_captured_process(
-        powershell_exe, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments], repo_root
-    )
+    if relative_path.lower().endswith(".py"):
+        exit_code, output = invoke_captured_process(sys.executable, [script_path, *arguments], repo_root)
+    else:
+        powershell_exe = find_powershell()
+        if not powershell_exe:
+            skip_check(label, "PowerShell executable is unavailable; gate was not run.")
+            return
+        exit_code, output = invoke_captured_process(
+            powershell_exe, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments], repo_root
+        )
     if exit_code == 0:
         pass_check(label)
         return
@@ -171,7 +173,7 @@ def main() -> int:
         )
 
         step("Web Hub boundary")
-        invoke_required_script_gate(repo_root, "verify-web-hub-boundary.ps1", os.path.join("scripts", "verify", "verify-web-hub-boundary.ps1"), [])
+        invoke_required_script_gate(repo_root, "verify-web-hub-boundary.py", os.path.join("scripts", "verify", "verify-web-hub-boundary.py"), [])
 
         step("Remote-control fixture E2E")
         remote_output_root = tempfile.mkdtemp(prefix="agenthub-p0-remote-control-fixture-")
