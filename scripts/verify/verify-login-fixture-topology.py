@@ -87,7 +87,7 @@ def main() -> int:
     assert_contains("app/web/src/api/hubAuth.test.ts", r"agenthub_token_source", "Web callback fixture asserts TokenDance token source hint")
     assert_contains("app/web/src/api/hubAuth.test.ts", r"localEdgeLoopback", "Web callback fixture asserts forbidden Local Edge loopback without embedding the forbidden URL")
     assert_contains("app/web/src/api/hubAuth.test.ts", r"edgeRunApi", "Web callback fixture asserts forbidden Local Edge run API without embedding the forbidden path")
-    assert_contains("scripts/verify/verify-web-hub-boundary.ps1", r"Local Edge loopback URL", "Web boundary gate owns direct Local Edge URL scanning")
+    assert_contains("scripts/verify/verify-web-hub-boundary.py", r"Local Edge loopback URL", "Web boundary gate owns direct Local Edge URL scanning")
     assert_not_contains("app/web/src/api/hubAuth.test.ts", r"id\.vectorcontrol\.tech.*fetch|window\.open\(", "Web focused fixture does not open real TokenDance ID")
 
     step("Desktop packaged host and fake login boundary")
@@ -108,7 +108,7 @@ def main() -> int:
     assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipHub\s*=\s*True", "-LocalOnly skips live Hub")
     assert_contains("scripts/verify/verify-oidc-flow.py", r"args\.SkipTD\s*=\s*True", "-LocalOnly skips live TokenDance ID")
     assert_contains("scripts/release/verify-packaged-login-real-readiness.ps1", r"No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made", "packaged real-readiness gate is dry")
-    assert_contains("scripts/verify/verify-web-hub-boundary.ps1", r"Web Hub-only boundary", "Web Hub-only boundary gate exists")
+    assert_contains("scripts/verify/verify-web-hub-boundary.py", r"Web Hub-only boundary", "Web Hub-only boundary gate exists")
     assert_contains("scripts/release/verify-tauri-package-readiness.ps1", r"macOS unsigned dry policy boundary", "macOS unsigned dry policy gate remains present")
     assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperClaudeGolden", "SDK fixture mapper Claude golden evidence remains fixture-only")
     assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperOpenAIGolden", "SDK fixture mapper OpenAI golden evidence remains fixture-only")
@@ -126,7 +126,7 @@ def main() -> int:
     print("  agenthub-desktop: pnpm test -- src/platform/desktopPlatform.test.ts")
     print("  local OIDC: python scripts/verify/verify-oidc-flow.py --LocalOnly")
     print("  packaged dry: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\release\\verify-packaged-login-real-readiness.ps1 -RepoRoot .")
-    print("  Web boundary: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify\\verify-web-hub-boundary.ps1")
+    print("  Web boundary: python scripts/verify/verify-web-hub-boundary.py")
     print("  Tauri package readiness: pwsh -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\release\\verify-tauri-package-readiness.ps1 -RepoRoot .")
 
     step("Evidence boundaries")
