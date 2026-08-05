@@ -14,7 +14,7 @@ git diff --check
 bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
 python scripts/verify/verify-project-skills.py
 python scripts/verify/verify-doc-ssot.py
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify\verify-ci-gates.ps1
+python scripts/verify/verify-ci-gates.py
 bash ./scripts/verify/verify-ci-gates.sh
 ```
 

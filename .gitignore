@@ -275,3 +275,7 @@ app/desktop/stats.html
 .handoff.md
 **/local-secrets/
 **/.config/local-secrets/
+
+# Python bytecode caches (ps1→py migration batches)
+**/__pycache__/
+*.pyc
