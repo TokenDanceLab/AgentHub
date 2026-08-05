@@ -25,10 +25,10 @@ This file is the active owner for Hub/Edge backend performance and leak gate cla
 
 It proves basic reachability, latency percentiles, throughput, and non-2xx error rate for one HTTP endpoint. It does not prove OIDC login, WebSocket fanout, message ordering, agent dispatch concurrency, process leaks, database contention, or production capacity.
 
-`scripts/verify/verify-backend-perf-leak-gates.ps1` runs the current focused behavior gates and short microbenchmarks:
+`scripts/verify/verify-backend-perf-leak-gates.py` runs the current focused behavior gates and short microbenchmarks:
 
-```powershell
-pwsh ./scripts/verify/verify-backend-perf-leak-gates.ps1 -Benchtime 100ms
+```bash
+python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
 ```
 
 ## Evidence Boundary

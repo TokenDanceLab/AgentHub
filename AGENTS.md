@@ -130,7 +130,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
 - Nav 图标只用 `DesignNavIcon`（有效名称见 `DesignNavIconName` 类型）；禁止散落的 nav glyph 组件。
 - 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。
-- CI 使用统一 `changes` job（`dorny/paths-filter@v4`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.ps1` 校验 job 结构。
+- CI 使用统一 `changes` job（`dorny/paths-filter@v4`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.py` 校验 job 结构。
 
 ## 6. Git 和 worktree
 
@@ -159,7 +159,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 
 - **GitHub branch protection + repo 设置**（已配置，最强）：master 禁止 force push、禁止直接 push（必须 PR）、要求线性历史；**合并方式已锁死为 squash only**（merge commit / rebase merge 均已禁用，PR 按钮只剩一个选项）；要求 `validate`/`go-hub`/`go-edge` 通过；`enforce_admins: true` 管理员也不能绕过。strict 模式要求 PR 分支基于最新 master——并行 PR 偶尔需要 rebase 属正常预期，rebase 后 force-with-lease 推分支即可。
 - **本地 pre-push hook**（`scripts/git-hooks/pre-push`，clone 后跑 `bash scripts/git-hooks/install.sh` 启用）：往 master 直 push 本地提前拦截；feat/fix/docs/chore/* 分支放行；非 master 允许 force-with-lease；紧急绕过 `git push --no-verify`（GitHub 层仍兜底）。
-- **CI**：`scripts/verify/verify-commit-messages.sh` 在必跑 `validate` job 中 fail-closed 校验 Conventional Commits；`verify-ci-gates.ps1` 校验 job 结构。
+- **CI**：`scripts/verify/verify-commit-messages.sh` 在必跑 `validate` job 中 fail-closed 校验 Conventional Commits；`verify-ci-gates.py` 校验 job 结构。
 
 提交格式：
 
@@ -185,7 +185,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - `.agents/skills/env-sandbox/`
 - `.agents/skills/real-e2e-acceptance/`
 
-白名单由 `scripts/verify/verify-project-skills.ps1` 校验。过期 skill 只保存在 `docs/history.md` 指向的外部归档，不能作为 active workflow 加载。
+白名单由 `scripts/verify/verify-project-skills.py` 校验。过期 skill 只保存在 `docs/history.md` 指向的外部归档，不能作为 active workflow 加载。
 
 使用规则：
 
@@ -232,10 +232,10 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
-| CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.ps1` | checks.yml → validate |
-| action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.ps1`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.ps1`） | checks.yml → validate |
+| CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.py` | checks.yml → validate |
+| action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.ps1`） | checks.yml → validate |
 | Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
-| skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.ps1` | checks.yml → validate |
+| skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.ps1`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
 | Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.py` | checks.yml → validate |
@@ -257,8 +257,8 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | Hub/Edge gosec SAST 告警清零（#1574，hard fail） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`）；go-edge/go-hub Security scan (gosec) step 直接 fail-closed | checks.yml → go-edge / go-hub |
 | OIDC 配置形状与边界（issuer/redirect/无 secret；`verify-oidc-readiness.ps1` 因断言旧服务/测试名已 KNOWN-OBSOLETE，重写待办） | `scripts/verify/verify-oidc-readiness.ps1`（未挂 CI） | — |
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
-| 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.ps1` | checks.yml → backend-perf-leak-gates |
-| 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.ps1`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`） | cd-pr-check.yml → deployment-files |
+| 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
+| 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`） | cd-pr-check.yml → deployment-files |
 | Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.ps1` | release-readiness.yml |
 | Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.ps1` | release-readiness.yml |
 | Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.ps1` | release-readiness.yml |

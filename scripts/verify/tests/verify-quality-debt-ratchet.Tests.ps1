@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 <#
-Negative self-tests for verify-quality-debt-ratchet.ps1.
+Negative self-tests for verify-quality-debt-ratchet.py (ps1 迁移).
 
 Each case runs against an isolated minimal repository fixture. A negative case
 passes only when the verifier exits non-zero for the expected policy reason.
@@ -8,7 +8,7 @@ passes only when the verifier exits non-zero for the expected policy reason.
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
-$VerifierRelative = "scripts/verify/verify-quality-debt-ratchet.ps1"
+$VerifierRelative = "scripts/verify/verify-quality-debt-ratchet.py"
 $BaselineRelative = "scripts/verify/quality-debt-baseline.json"
 $Passed = 0
 
@@ -72,9 +72,13 @@ function New-QualityDebtFixture {
 
         $configPath = Join-Path $fixture "edge-server/.golangci.yml"
         $config = Get-Content -Raw -LiteralPath $configPath
-        $config = $config.Replace(
-            "    rules:`n",
-            "    rules:`n      - linters:`n          - cyclop`n          - gocognit`n          - gocyclo`n        path: $SyntheticExclusionPath`n"
+        # CRLF/LF agnostic, 保留 ps1 String.Replace 的子串语义（4-space pattern
+        # 也会命中 revive settings 的 6-space `rules:` 行，双注入使
+        # Get-LintersForPath 在 presets 前提前返回正确 linter 集）。
+        $config = [regex]::Replace(
+            $config,
+            "    rules:\r?\n",
+            { param($m) "    rules:`n      - linters:`n          - cyclop`n          - gocognit`n          - gocyclo`n        path: $SyntheticExclusionPath`n" }
         )
         Write-Utf8NoBom $configPath $config
     }
@@ -94,21 +98,20 @@ function Invoke-FixtureVerifier(
     [switch]$RunComplexity
 ) {
     $arguments = @(
-        "-NoProfile",
-        "-File", (Join-Path $FixtureRoot $VerifierRelative),
-        "-RepoRootPath", $FixtureRoot,
-        "-BaselinePath", (Join-Path $FixtureRoot $BaselineRelative)
+        (Join-Path $FixtureRoot $VerifierRelative),
+        "--RepoRootPath", $FixtureRoot,
+        "--BaselinePath", (Join-Path $FixtureRoot $BaselineRelative)
     )
     if (-not $RunComplexity) {
-        $arguments += "-SkipComplexity"
+        $arguments += "--SkipComplexity"
     }
     if ($BaseBaselinePath) {
-        $arguments += @("-BaseBaselinePath", $BaseBaselinePath)
+        $arguments += @("--BaseBaselinePath", $BaseBaselinePath)
     } else {
-        $arguments += "-SkipHistoricalRatchet"
+        $arguments += "--SkipHistoricalRatchet"
     }
 
-    $output = & pwsh @arguments 2>&1
+    $output = & python @arguments 2>&1
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output = ($output -join "`n")
