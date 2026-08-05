@@ -190,7 +190,7 @@ def check_required_markers() -> None:
         ("scripts/release/verify-tauri-package-dry.ps1", "windows-desktop-package-dry"),
         ("docs/architecture/04-frontend-data-flow.md", "Source Owner Map"),
         ("hub-server/README.md", "docs/reference/backend-performance-gates.md"),
-        ("edge-server/README.md", "verify-backend-perf-leak-gates.ps1"),
+        ("edge-server/README.md", "verify-backend-perf-leak-gates.py"),
     ]
     for path, marker in required:
         if marker not in read_text(path):
