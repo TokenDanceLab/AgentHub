@@ -89,20 +89,32 @@ def test_prerequisite_failure(output: str) -> bool:
     return bool(output.strip()) and bool(PREREQUISITE_FAILURE_PATTERN.search(output))
 
 
+def to_python_style_arguments(arguments: list) -> list:
+    """Translate ps1-style -Xxx flags to argparse-style --Xxx for Python sub-gates."""
+    return [
+        "--" + argument[1:] if argument.startswith("-") and not argument.startswith("--") else argument
+        for argument in arguments
+    ]
+
+
 def invoke_required_script_gate(repo_root: str, label: str, relative_path: str, arguments: list) -> None:
     script_path = os.path.join(repo_root, relative_path)
     if not os.path.isfile(script_path):
         fail_check(label, f"missing {relative_path}")
         return
 
-    powershell_exe = find_powershell()
-    if not powershell_exe:
-        skip_check(label, "PowerShell executable is unavailable; gate was not run.")
-        return
-
-    exit_code, output = invoke_captured_process(
-        powershell_exe, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments], repo_root
-    )
+    if relative_path.lower().endswith(".py"):
+        exit_code, output = invoke_captured_process(
+            sys.executable, [script_path, *to_python_style_arguments(arguments)], repo_root
+        )
+    else:
+        powershell_exe = find_powershell()
+        if not powershell_exe:
+            skip_check(label, "PowerShell executable is unavailable; gate was not run.")
+            return
+        exit_code, output = invoke_captured_process(
+            powershell_exe, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments], repo_root
+        )
     if exit_code == 0:
         pass_check(label)
         return
@@ -171,7 +183,7 @@ def main() -> int:
         )
 
         step("Web Hub boundary")
-        invoke_required_script_gate(repo_root, "verify-web-hub-boundary.ps1", os.path.join("scripts", "verify", "verify-web-hub-boundary.ps1"), [])
+        invoke_required_script_gate(repo_root, "verify-web-hub-boundary.py", os.path.join("scripts", "verify", "verify-web-hub-boundary.py"), [])
 
         step("Remote-control fixture E2E")
         remote_output_root = tempfile.mkdtemp(prefix="agenthub-p0-remote-control-fixture-")
@@ -184,7 +196,7 @@ def main() -> int:
 
         step("Remote-control fixture E2E script tests")
         invoke_required_script_gate(
-            repo_root, "verify-remote-control-fixture-e2e.ps1", os.path.join("scripts", "verify", "verify-remote-control-fixture-e2e.ps1"), ["-RepoRoot", repo_root]
+            repo_root, "verify-remote-control-fixture-e2e.py", os.path.join("scripts", "verify", "verify-remote-control-fixture-e2e.py"), ["-RepoRoot", repo_root]
         )
 
         step("TeamRun demo contract tests")
