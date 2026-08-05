@@ -43,7 +43,7 @@ $ProductionDir = Split-Path -Parent $AuthoritativePath
 $LegacyDeployDir = Join-Path $RepoRootPath "hub-server/deployments"
 
 # ── YAML shape extraction via python (PyYAML; same pattern as
-#    verify-openapi-contract.ps1) ──────────────────────────────────────────
+#    verify-openapi-contract.py) ──────────────────────────────────────────
 $pyScript = @'
 import json, pathlib, sys
 import yaml
