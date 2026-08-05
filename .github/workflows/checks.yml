@@ -902,8 +902,7 @@ jobs:
         run: python ./scripts/verify/verify-shared-rest-contract.py
 
       - name: Verify Shared UI hubClient gate
-        shell: pwsh
-        run: ./scripts/verify/verify-shared-ui-hubclient.ps1
+        run: python ./scripts/verify/verify-shared-ui-hubclient.py
 
       - name: Verify Shared Edge surface isolation (web/mobile-rn)
         shell: pwsh

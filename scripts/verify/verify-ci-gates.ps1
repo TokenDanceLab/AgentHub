@@ -238,7 +238,7 @@ Assert-Contains $validate "Verify Shared REST contract Hub-client to Hub-router"
 Assert-Contains $validate "scripts/verify/verify-shared-rest-contract\.py" "validate job must call scripts/verify/verify-shared-rest-contract.py"
 Assert-StepContinueOnError $validate "Verify Shared REST contract Hub-client to Hub-router" $false
 Assert-Contains $validate "Verify Shared UI hubClient gate" "validate job must run the Shared UI hubClient gate verifier"
-Assert-Contains $validate "scripts/verify/verify-shared-ui-hubclient\.ps1" "validate job must call scripts/verify/verify-shared-ui-hubclient.ps1"
+Assert-Contains $validate "scripts/verify/verify-shared-ui-hubclient\.py" "validate job must call scripts/verify/verify-shared-ui-hubclient.py"
 Assert-StepContinueOnError $validate "Verify Shared UI hubClient gate" $false
 Assert-Contains $validate "check-secrets\.sh" "validate job must keep secret guard"
 Assert-Contains $validate "Verify coverage baseline" "validate job must run the coverage baseline gate"
