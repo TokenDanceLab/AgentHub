@@ -2,7 +2,7 @@
 """AgentHub remote-control fixture E2E gate wrapper — ps1 迁移。
 
 Runs the offline TeamRun fixture E2E gate (scripts/smoke/verify-remote-control-
-fixture-e2e.ps1) against the exported fixture and negative evidence mutations,
+fixture-e2e.py) against the exported fixture and negative evidence mutations,
 proving the gate fails closed on missing/placeholder chain fields.
 
 契约（ps1-to-python-migration）：stdlib only；CLI 签名/退出码与 ps1 一致
@@ -32,20 +32,18 @@ def assert_true(condition: bool, message: str, details: str = "") -> None:
         print(details)
 
 
-def resolve_powershell_executable() -> str:
-    pwsh = shutil.which("pwsh")
-    if pwsh:
-        return pwsh
-    windows_powershell = shutil.which("powershell")
-    if windows_powershell:
-        return windows_powershell
-    raise RuntimeError("Unable to locate a PowerShell executable for script self-tests.")
+def resolve_repo_script(repo_root: str, relative_without_extension: str) -> str:
+    """优先 .py、回退 .ps1，迁移过渡期内兼容两种实现。"""
+    for extension in (".py", ".ps1"):
+        candidate = os.path.join(repo_root, relative_without_extension + extension)
+        if os.path.isfile(candidate):
+            return candidate
+    return os.path.join(repo_root, relative_without_extension + ".py")
 
 
-def invoke_repo_script(repo_root: str, arguments) -> dict:
-    powershell_exe = resolve_powershell_executable()
+def invoke_repo_python(repo_root: str, arguments: list) -> dict:
     run_result = subprocess.run(
-        [powershell_exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"] + arguments,
+        [sys.executable] + arguments,
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -65,9 +63,9 @@ def main() -> int:
 
     repo_root = os.path.realpath(args.RepoRoot)
 
-    gate_path = os.path.join(repo_root, "scripts", "smoke", "verify-remote-control-fixture-e2e.ps1")
+    gate_path = os.path.join(repo_root, "scripts", "smoke", "verify-remote-control-fixture-e2e.py")
     gate_implementation_path = gate_path
-    exporter_path = os.path.join(repo_root, "scripts", "lib", "export-teamrun-demo-fixture-evidence.ps1")
+    exporter_path = resolve_repo_script(repo_root, os.path.join("scripts", "lib", "export-teamrun-demo-fixture-evidence"))
     scenario_path = os.path.join(repo_root, "tests", "fixtures", "teamrun", "teamrun-demo-scenario.json")
 
     assert_true(os.path.isfile(gate_path), "remote-control fixture E2E gate exists")
@@ -88,15 +86,15 @@ def main() -> int:
         with open(gate_implementation_path, encoding="utf-8") as handle:
             script_text = handle.read()
         assert_true(
-            re.search("Find-PowerShell", script_text, re.IGNORECASE),
-            "remote-control fixture E2E gate resolves pwsh/powershell instead of hard-coding Windows PowerShell",
+            re.search("resolve_repo_script", script_text),
+            "remote-control fixture E2E gate resolves child scripts by extension",
         )
         assert_true(
             not re.search(r"& powershell\b", script_text, re.IGNORECASE),
             "remote-control fixture E2E gate does not hard-code powershell executable",
         )
 
-        gate_run = invoke_repo_script(
+        gate_run = invoke_repo_python(
             repo_root,
             [gate_path, "-ScenarioManifest", scenario_path, "-OutputRoot", tmp_root, "-Stamp", "strict-pass"],
         )
@@ -155,7 +153,7 @@ def main() -> int:
                 with open(bad_path, "w", encoding="utf-8") as handle:
                     json.dump(bad_evidence, handle)
 
-                bad_run = invoke_repo_script(repo_root, [gate_path, "-EvidencePath", bad_path])
+                bad_run = invoke_repo_python(repo_root, [gate_path, "-EvidencePath", bad_path])
                 assert_true(
                     bad_run["ExitCode"] != 0,
                     f"remote-control fixture E2E gate fails when {field} is missing",
@@ -175,7 +173,7 @@ def main() -> int:
             ]
             with open(missing_adapter_event_path, "w", encoding="utf-8") as handle:
                 json.dump(missing_adapter_event, handle)
-            missing_adapter_event_run = invoke_repo_script(repo_root, [gate_path, "-EvidencePath", missing_adapter_event_path])
+            missing_adapter_event_run = invoke_repo_python(repo_root, [gate_path, "-EvidencePath", missing_adapter_event_path])
             assert_true(
                 missing_adapter_event_run["ExitCode"] != 0,
                 "remote-control fixture E2E gate fails when adapter result/callback event is missing",
@@ -198,7 +196,7 @@ def main() -> int:
             ]
             with open(placeholder_refs_path, "w", encoding="utf-8") as handle:
                 json.dump(placeholder_refs, handle)
-            placeholder_refs_run = invoke_repo_script(repo_root, [gate_path, "-EvidencePath", placeholder_refs_path])
+            placeholder_refs_run = invoke_repo_python(repo_root, [gate_path, "-EvidencePath", placeholder_refs_path])
             assert_true(
                 placeholder_refs_run["ExitCode"] != 0,
                 "remote-control fixture E2E gate fails placeholder eventRefs",
@@ -216,7 +214,7 @@ def main() -> int:
             missing_refs["remote_control_manifest"]["eventRefs"] = []
             with open(missing_refs_path, "w", encoding="utf-8") as handle:
                 json.dump(missing_refs, handle)
-            missing_refs_run = invoke_repo_script(repo_root, [gate_path, "-EvidencePath", missing_refs_path])
+            missing_refs_run = invoke_repo_python(repo_root, [gate_path, "-EvidencePath", missing_refs_path])
             assert_true(
                 missing_refs_run["ExitCode"] != 0,
                 "remote-control fixture E2E gate fails missing eventRefs",
@@ -236,7 +234,7 @@ def main() -> int:
             chain[3]["eventRef"] = ""
             with open(blank_chain_ref_path, "w", encoding="utf-8") as handle:
                 json.dump(blank_chain_ref, handle)
-            blank_chain_ref_run = invoke_repo_script(repo_root, [gate_path, "-EvidencePath", blank_chain_ref_path])
+            blank_chain_ref_run = invoke_repo_python(repo_root, [gate_path, "-EvidencePath", blank_chain_ref_path])
             assert_true(
                 blank_chain_ref_run["ExitCode"] != 0,
                 "remote-control fixture E2E gate fails blank chain eventRef",

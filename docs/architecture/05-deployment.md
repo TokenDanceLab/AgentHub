@@ -31,7 +31,7 @@
 | `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
 | `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
 
-遗留清单由 `verify-deployment-shape.py` 关闭：#1527 PR2 后 `hub-server/deployments/` 下出现**任何** compose 文件即 FAIL（该目录只剩构建输入）；`deployments/production/` 下出现第二份手维护 production compose 同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`。
+遗留清单由 `verify-deployment-shape.py` 关闭：#1527 PR2 后 `hub-server/deployments/` 下出现**任何** compose 文件即 FAIL（该目录只剩构建输入）；`deployments/production/` 下出现第二份手维护 production compose 同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.py`。
 
 ## 本地开发
 

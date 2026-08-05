@@ -13,7 +13,7 @@
 //     internal/runnerctx, internal/events
 //
 // Dependency direction (machine-gated by TestLeafDoesNotImportRootAdapters
-// and scripts/verify/verify-orchestrator-deps.ps1):
+// and scripts/verify/verify-orchestrator-deps.py):
 //
 //	orchestration → adapters/orchestrator ← composition root
 //
