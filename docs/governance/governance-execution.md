@@ -1,6 +1,6 @@
 # AgentHub 治理执行
 
-最后更新：2026-07-18
+最后更新：2026-08-05
 
 本文件将 TokenDance 系统治理映射为 AgentHub 执行项。AgentHub 是多 Agent 协作平台；它是 TokenDance ID 的 relying party，拥有 Hub、Edge、Desktop、Web 和 Mobile 客户端。
 
@@ -21,11 +21,11 @@
 |---|---|---|---|
 | TD-P0-HUB-01 | Hub OIDC 登录 | `hub-server/internal/handler/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`hub-server/internal/service/auth.go` | **代码已落地**：handler/service 覆盖 callback、非法 issuer/audience、`tokendance_sub` 映射、Hub access/refresh session、device proof。**部署证据队列**：发布分支证明、回调/客户端注册、刷新/登出冒烟（对齐 AH-SR-035） |
 | TD-P0-CLIENT-01 | Desktop/Web 登录 | `app/desktop/src/`、`app/web/src/`、`app/desktop/src-tauri/` | **代码已落地**：Desktop/Web tab-scoped `sessionStorage`；Web Hub-only 守卫；WS 接受 Hub-issued session、拒绝升级前 TokenDance bearer。**会话姿态**：AH-SR-037 **Accepted**（#438，非 Open）。**部署/客户端证据队列**：登录/登出截图、WS 认证冒烟、部署配置（对齐 AH-SR-036） |
-| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | 目标：`/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等、`card.action.trigger` 3s 响应、无 3xx 重定向。**状态（2026-07-18）**：仓库内尚无 feishu 集成 handler 落地；仍待开工 |
+| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | 目标：`/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等、`card.action.trigger` 3s 响应、无 3xx 重定向。**状态（2026-08-05）**：IM-bridge SPEC 已 merged（2026-07-27 立项）；实施按 `docs/plan/proposal-im-bridge.md` 推进 |
 | TD-P1-HUB-02 | Hub 授权 | `hub-server/internal/service/`、`hub-server/internal/middleware/` | 对 org/project/thread/run/profile/integration secrets 应用 resource/action 检查。**状态**：代码侧 owner fail-closed / capability 绑定已推进（见 AH-SR-045/046 Mitigated）；完整 membership 矩阵与 live 证据仍排队 |
 | TD-P0-DESIGN-01 | 视觉 QA | `app/desktop/screenshots/`、`app/web/screenshots/`、`app/mobile-rn/screenshots/` | Desktop/Web/Mobile 截图基线与 Visual QA 矩阵（gate 89 Ship，已收口）；公开产品站点属于产品发布事项，归 roadmap/发布流程，非本项范围 |
 | TD-P0-I18N-01 | i18n 对等 | `app/desktop/src/i18n/locales/`、`app/web/src/i18n/locales/` | Desktop 扁平 `zh.json`/`en.json` 与 Web 命名空间目录对齐；Mobile 缺专用 i18n 文件 |
-| TD-P0-SEC-01 | 安全/风险 | `docs/governance/security-risk-register.md` | **SSOT 指针 only**：队列、状态与发布门禁以 register 为准（最后审查 **2026-07-17**）。本文件不复制长表；Critical/High Open\|rotate\|verification-required 阻断公开发布 |
+| TD-P0-SEC-01 | 安全/风险 | `docs/governance/security-risk-register.md` | **SSOT 指针 only**：队列、状态与发布门禁以 register 为准（最后审查 **2026-08-05**）。本文件不复制长表；Critical/High Open\|rotate\|verification-required 阻断公开发布 |
 
 ## 本地分发规则
 
