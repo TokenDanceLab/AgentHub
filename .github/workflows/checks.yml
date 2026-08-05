@@ -803,8 +803,7 @@ jobs:
         run: python ./scripts/verify/verify-action-runtimes.py
 
       - name: Self-test action runtime allow-list gate
-        shell: pwsh
-        run: ./scripts/verify/tests/verify-action-runtimes.Tests.ps1
+        run: python scripts/verify/tests/verify-action-runtimes.Tests.py
 
       - name: Verify project skill whitelist
         run: python ./scripts/verify/verify-project-skills.py
@@ -813,8 +812,7 @@ jobs:
         run: python scripts/verify/verify-doc-ssot.py
 
       - name: Self-test doc entrypoint SSOT
-        shell: pwsh
-        run: ./scripts/verify/tests/verify-doc-entrypoints.Tests.ps1
+        run: python scripts/verify/tests/verify-doc-entrypoints.Tests.py
 
       - name: Self-test vulnerability gates (fail-closed contract)
         shell: bash
@@ -876,8 +874,7 @@ jobs:
         run: python ./scripts/verify/verify-quality-debt-ratchet.py
 
       - name: Self-test quality-debt ratchet (negative)
-        shell: pwsh
-        run: ./scripts/verify/tests/verify-quality-debt-ratchet.Tests.ps1
+        run: python scripts/verify/tests/verify-quality-debt-ratchet.Tests.py
 
       - name: Verify Shared REST contract Hub-client to Hub-router
         run: python ./scripts/verify/verify-shared-rest-contract.py
@@ -889,8 +886,7 @@ jobs:
         run: python ./scripts/verify/verify-shared-edge-surface-isolation.py
 
       - name: Self-test Shared Edge surface isolation gate
-        shell: pwsh
-        run: ./scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1
+        run: python scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.py
 
       - name: Verify v4 old UI active paths
         run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
