@@ -217,7 +217,7 @@ Assert-Contains $validate "Verify Design token SSOT" "validate job must run the 
 Assert-Contains $validate "scripts/verify/verify-design-token-ssot\.py" "validate job must call scripts/verify/verify-design-token-ssot.py"
 Assert-StepContinueOnError $validate "Verify Design token SSOT" $false
 Assert-Contains $validate "Verify real E2E contract" "validate job must run the real E2E contract verifier"
-Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.ps1" "validate job must call scripts/verify/verify-real-e2e-contract.ps1"
+Assert-Contains $validate "scripts/verify/verify-real-e2e-contract\.py" "validate job must call scripts/verify/verify-real-e2e-contract.py"
 Assert-Contains $validate "Validate OpenAPI YAML" "validate job must keep OpenAPI YAML parsing"
 Assert-Contains $validate "Verify OpenAPI↔hub router contract" "validate job must run the OpenAPI↔hub router contract verifier"
 Assert-Contains $validate "scripts/verify/verify-openapi-contract\.py" "validate job must call scripts/verify/verify-openapi-contract.py"
