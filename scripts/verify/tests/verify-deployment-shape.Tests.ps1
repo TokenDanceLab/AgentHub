@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
-Negative self-tests for verify-deployment-shape.ps1 (#1527 PR1, inventory
-closed in PR2).
+Negative self-tests for verify-deployment-shape.py (#1527 PR1, inventory
+closed in PR2; ps1 迁移).
 
 Each case runs against an isolated minimal repository fixture. A negative
 case passes only when the verifier exits non-zero for the expected policy
@@ -16,7 +16,7 @@ reason. Cases:
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
-$VerifierRelative = "scripts/verify/verify-deployment-shape.ps1"
+$VerifierRelative = "scripts/verify/verify-deployment-shape.py"
 $Passed = 0
 
 function Fail([string]$Message) {
@@ -50,7 +50,7 @@ function New-Fixture {
 }
 
 function Invoke-FixtureVerifier([string]$FixtureRoot) {
-    $output = & pwsh -NoProfile -File (Join-Path $FixtureRoot $VerifierRelative) -RepoRootPath $FixtureRoot 2>&1
+    $output = & python (Join-Path $FixtureRoot $VerifierRelative) --RepoRootPath $FixtureRoot 2>&1
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output = ($output -join "`n")
