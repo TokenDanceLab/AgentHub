@@ -828,8 +828,7 @@ jobs:
         run: python scripts/verify/verify-web-hub-boundary.py
 
       - name: Verify Hub pure package imports
-        shell: pwsh
-        run: ./scripts/verify/verify-hub-pure-packages.ps1
+        run: python scripts/verify/verify-hub-pure-packages.py
 
       - name: Verify Mobile Hub-only boundary
         shell: pwsh
