@@ -831,8 +831,7 @@ jobs:
         run: python scripts/verify/verify-hub-pure-packages.py
 
       - name: Verify Mobile Hub-only boundary
-        shell: pwsh
-        run: ./scripts/verify/verify-mobile-hub-boundary.ps1
+        run: python scripts/verify/verify-mobile-hub-boundary.py
 
       - name: Verify hubClient thin-shell SSOT
         shell: pwsh

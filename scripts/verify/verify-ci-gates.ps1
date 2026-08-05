@@ -209,7 +209,7 @@ Assert-Contains $validate "Verify Hub pure package imports" "validate job must r
 Assert-Contains $validate "scripts/verify/verify-hub-pure-packages\.py" "validate job must call scripts/verify/verify-hub-pure-packages.py"
 Assert-StepContinueOnError $validate "Verify Hub pure package imports" $false
 Assert-Contains $validate "Verify Mobile Hub-only boundary" "validate job must run the Mobile Hub-only boundary verifier"
-Assert-Contains $validate "scripts/verify/verify-mobile-hub-boundary\.ps1" "validate job must call scripts/verify/verify-mobile-hub-boundary.ps1"
+Assert-Contains $validate "scripts/verify/verify-mobile-hub-boundary\.py" "validate job must call scripts/verify/verify-mobile-hub-boundary.py"
 Assert-Contains $validate "Verify hubClient thin-shell SSOT" "validate job must run the hubClient thin-shell SSOT verifier"
 Assert-Contains $validate "scripts/verify/verify-hubclient-ssot\.ps1" "validate job must call scripts/verify/verify-hubclient-ssot.ps1"
 Assert-StepContinueOnError $validate "Verify hubClient thin-shell SSOT" $false
