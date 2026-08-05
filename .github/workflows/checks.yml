@@ -912,8 +912,7 @@ jobs:
         run: ./scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.ps1
 
       - name: Verify v4 old UI active paths
-        shell: pwsh
-        run: ./scripts/verify/verify-v4-old-ui-active-paths.ps1
+        run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
 
       # ── Frontend coverage baseline gate (baseline must not regress) ──
       # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
