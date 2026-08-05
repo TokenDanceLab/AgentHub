@@ -65,6 +65,11 @@ def wait_for_port(name: str, port: int, host_addr: str = "127.0.0.1", timeout_se
 
 
 def main() -> int:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except (AttributeError, ValueError):
+        pass
     repo_root = os.path.realpath(REPO_ROOT)
 
     # --- Check prerequisites ---
@@ -76,11 +81,13 @@ def main() -> int:
         print(f"ERROR: Missing required tools: {', '.join(missing)}")
         print("Developers should have Go and Node installed. See https://go.dev/dl/ and https://nodejs.org/")
         return 1
+    go_exe = shutil.which("go")
+    pnpm_exe = shutil.which("pnpm")
 
     # --- Install desktop dependencies if needed ---
     if not os.path.isdir(os.path.join(repo_root, "app", "desktop", "node_modules")):
         print("  [Desktop] Installing dependencies (pnpm install)...")
-        run = subprocess.run(["pnpm", "install", "--frozen-lockfile"], cwd=os.path.join(repo_root, "app", "desktop"))
+        run = subprocess.run([pnpm_exe, "install", "--frozen-lockfile"], cwd=os.path.join(repo_root, "app", "desktop"))
         if run.returncode != 0:
             print("ERROR: pnpm install failed")
             return 1
@@ -90,9 +97,9 @@ def main() -> int:
 
     try:
         # Start all services
-        start_service_process("edge-server", os.path.join(repo_root, "edge-server"), "go", ["run", "./cmd/agenthub-edge", "--addr", "127.0.0.1:3210"])
-        start_service_process("hub-server", os.path.join(repo_root, "hub-server"), "go", ["run", "./cmd/server-hub"])
-        start_service_process("desktop", os.path.join(repo_root, "app", "desktop"), "pnpm", ["dev"])
+        start_service_process("edge-server", os.path.join(repo_root, "edge-server"), go_exe, ["run", "./cmd/agenthub-edge", "--addr", "127.0.0.1:3210"])
+        start_service_process("hub-server", os.path.join(repo_root, "hub-server"), go_exe, ["run", "./cmd/server-hub"])
+        start_service_process("desktop", os.path.join(repo_root, "app", "desktop"), pnpm_exe, ["dev"])
 
         # Wait for health checks
         print("\nWaiting for services to be ready...\n")
