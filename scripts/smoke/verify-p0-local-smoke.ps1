@@ -221,13 +221,21 @@ function Invoke-RequiredScriptGate {
         return
     }
 
-    $powershellExe = Find-PowerShell
-    if (-not $powershellExe) {
-        Block $Label "PowerShell executable is unavailable; gate was not run." $Claim
-        return
+    if ($RelativePath -like "*.py") {
+        $pythonExe = Get-Command "python" -ErrorAction SilentlyContinue
+        if (-not $pythonExe) {
+            Block $Label "Python executable is unavailable; gate was not run." $Claim
+            return
+        }
+        $run = Invoke-CapturedProcess $pythonExe.Source (@($scriptPath) + $Arguments) $RepoRoot
+    } else {
+        $powershellExe = Find-PowerShell
+        if (-not $powershellExe) {
+            Block $Label "PowerShell executable is unavailable; gate was not run." $Claim
+            return
+        }
+        $run = Invoke-CapturedProcess $powershellExe (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments) $RepoRoot
     }
-
-    $run = Invoke-CapturedProcess $powershellExe (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments) $RepoRoot
     if ($run.ExitCode -eq 0) {
         Pass $Label $Claim "exit=0"
         return
@@ -418,8 +426,8 @@ Write-Host "  RealTested=false" -ForegroundColor White
 Pass "smoke claim labels are explicit" "LocalOnly" "Dry-run/plan output cannot claim real execution."
 
 Step "FixtureOnly gates"
-Invoke-RequiredScriptGate "verify-p0-remote-control-fixture.ps1" "scripts\verify\verify-p0-remote-control-fixture.ps1" @(
-    "-RepoRoot", $RepoRoot
+Invoke-RequiredScriptGate "verify-p0-remote-control-fixture.py" "scripts\verify\verify-p0-remote-control-fixture.py" @(
+    "--RepoRoot", $RepoRoot
 ) "FixtureOnly"
 
 Step "LocalOnly gates"
