@@ -259,9 +259,9 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
 | 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.ps1`） | cd-pr-check.yml → deployment-files |
-| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.ps1` | release-readiness.yml |
-| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.ps1` | release-readiness.yml |
-| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.ps1` | release-readiness.yml |
+| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml |
+| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml |
+| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml |
 | secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
@@ -327,9 +327,9 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 打 tag SOP：
 
-1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.ps1`）。
+1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.py`）。
 2. 打 tag：`git tag vX.Y.Z`（正式版）或 `git tag vX.Y.Z-rc.N`（候选版）；tag 指向的 commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml 的 tag-guard job 双重守卫，任一不满足则 job 失败、不触发构建）。
 3. push：`git push origin <tag>` → release.yml 构建出包并发布。
 4. 发布产物：build-desktop（Windows NSIS + portable）、build-desktop-macos（DMG）、build-mobile（Android APK）。
 
-冻结开关：`scripts/release/verify-release-gate.ps1` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。
+冻结开关：`scripts/release/verify-release-gate.py` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。
