@@ -275,8 +275,12 @@ jobs:
           path: dist/
 
   # ── Expo Android APK ─────────────────────────
+  # Mobile 处于深度重构期（AGENTS.md §2），且 EAS 需要 EXPO_TOKEN + EAS 账号；
+  # 发布不硬依赖 APK。设置仓库 variable RELEASE_MOBILE_ENABLED=true 且配置
+  # EXPO_TOKEN 后才参与发布；否则该 job 跳过（release job 照常发布其余产物）。
   build-mobile:
     needs: tag-guard
+    if: ${{ vars.RELEASE_MOBILE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
