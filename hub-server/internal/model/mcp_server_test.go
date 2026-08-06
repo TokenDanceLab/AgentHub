@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package model
 
 import (
@@ -82,7 +83,7 @@ func TestMCPServerValidate(t *testing.T) {
 		},
 		{
 			name:    "url with embedded @ → error",
-			server:  MCPServer{Name: "test", Transport: "sse", URL: "https://user:pass@example.com/api"},
+			server:  MCPServer{Name: "test", Transport: "sse", URL: "https://user:pass@example.com/api"}, // #nosec G101 -- 负向测试：必须含凭据的 URL
 			wantErr: true,
 			errMsg:  "url must not contain credentials",
 		},

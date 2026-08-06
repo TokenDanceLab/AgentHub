@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package jwtutil
 
 import (
@@ -187,10 +188,10 @@ func TestGenerateAccessToken_IncludesRegisteredClaims(t *testing.T) {
 		t.Fatalf("ParseToken failed: %v", err)
 	}
 
-	if claims.ExpiresAt.Time.Before(time.Now()) {
+	if claims.ExpiresAt.Before(time.Now()) {
 		t.Error("expected ExpiresAt to be in the future")
 	}
-	if claims.IssuedAt.Time.After(time.Now()) {
+	if claims.IssuedAt.After(time.Now()) {
 		t.Error("expected IssuedAt to be in the past or present")
 	}
 }
