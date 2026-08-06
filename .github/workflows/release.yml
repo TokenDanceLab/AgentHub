@@ -374,6 +374,8 @@ jobs:
           path: dist
 
       - name: Download Mobile artifacts
+        # build-mobile 未启用时无 mobile-artifacts，条件跳过避免下载失败
+        if: ${{ needs.build-mobile.result == 'success' }}
         uses: actions/download-artifact@v8
         with:
           name: mobile-artifacts
