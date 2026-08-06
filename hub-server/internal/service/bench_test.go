@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package service
 
 import (
@@ -26,6 +27,7 @@ func BenchmarkEventBusPublish(b *testing.B) {
 }
 
 func BenchmarkJWTParse(b *testing.B) {
+	// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
 	const secret = "bench-test-secret"
 
 	token, err := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
@@ -40,6 +42,7 @@ func BenchmarkJWTParse(b *testing.B) {
 }
 
 func BenchmarkJWTSign(b *testing.B) {
+	// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
 	const secret = "bench-test-secret"
 
 	b.ResetTimer()
@@ -49,6 +52,7 @@ func BenchmarkJWTSign(b *testing.B) {
 }
 
 func BenchmarkJWTSignVerifyRoundTrip(b *testing.B) {
+	// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
 	const secret = "bench-test-secret"
 
 	b.ResetTimer()

@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package handler_test
 
 import (
@@ -199,7 +200,7 @@ func TestAttachmentUploadHashMismatchDoesNotModifyExistingBlob(t *testing.T) {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 	existingPath := filepath.Join(relPath, hash)
-	if err := os.WriteFile(existingPath, content, 0644); err != nil {
+	if err := os.WriteFile(existingPath, content, 0o600); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -510,7 +511,7 @@ func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {
 	if err := os.MkdirAll(relPath, 0755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(relPath, hash), content, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(relPath, hash), content, 0o600); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 

@@ -9,6 +9,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestTimeout_WebSocketUpgradeBypassesBuffer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	// 极短 deadline：若 upgrade 请求被 timeoutWriter 包装会直接超时；
+	// 修复后 upgrade 请求绕过包装，handler 正常完成。
+	r.Use(Timeout(10 * time.Millisecond))
+	r.GET("/ws", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "upgrade-passed"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (upgrade request must not hit timeout wrapper)", w.Code, http.StatusOK)
+	}
+}
+
 func TestTimeout_HandlerCompletesNormally(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

@@ -36,6 +36,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | Workbench 契约切片（projects 先行） | #1546 完成：shared Workbench 对 concrete HubClient 的 type/value 引用清零，改用窄领域端口 `WorkbenchProjectsPort`（`shared/workbench/workbenchProjectsPort.ts`），Desktop/Web composition root 各实现一个 adapter 注入；projects route 单一 ownership（parent-managed 或 port，不再运行时猜测）；load-more 失败可见、可重试（UI + i18n zh/en）；`verify-shared-ui-hubclient.py` 升级为同时禁止 type 引用。这是 #1528 的 projects slice（agents/catalog 收口后续单独切片） | #1546, #1528 |
 | WebSocket incremental sync | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-ws-incremental-sync.md 为准 | docs/plan/proposal-ws-incremental-sync.md |
 | IM bridge (Feishu first) | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-im-bridge.md 为准 | docs/plan/proposal-im-bridge.md |
+| WSL 全栈 E2E（真实 OIDC 登录） | SPEC merged + 已跑通（2026-08-06）：容器形态全栈（tokendance-id + hub-server + PG16 + Redis7）真实 OIDC PKCE 登录流 18 项断言全过，证据 `real_tokendance_id_login=true`（integration 级）；顺带修复 hub Timeout 中间件 WS upgrade 挂起、未认证请求审计 user_id 空串 PG 报错、compose hub build context 损坏、release build-mobile 无 EXPO_TOKEN 阻塞 | docs/plan/proposal-wsl-full-stack-e2e.md |
 | Automations and session import | Product backlog | backlog：SPEC 待写 |
 | @提及=派单交互 | Product backlog | backlog：SPEC 待写 |
 
