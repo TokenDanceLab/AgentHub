@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package handler_test
 
 import (
@@ -24,6 +25,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
 const testWSSecret = "test-ws-secret-32-characters-long"
 
 func TestWebSocketHandlerRejectsMissingAuthenticatedContextBeforeUpgrade(t *testing.T) {

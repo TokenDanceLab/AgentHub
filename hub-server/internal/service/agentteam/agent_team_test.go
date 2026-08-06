@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package agentteam
 
 import (
@@ -3061,10 +3062,10 @@ func TestAgentTeamService_CompleteAssignmentConcurrentOnlyOneWins(t *testing.T) 
 	})
 	successes, bad := 0, 0
 	for _, err := range errs {
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			successes++
-		case err == errcode.ErrBadRequest:
+		case errcode.ErrBadRequest:
 			bad++
 		default:
 			require.NoError(t, err)

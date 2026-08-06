@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package middleware
 
 import (
@@ -26,6 +27,7 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
+// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
 func testSecret() string { return "test-secret-for-middleware-tests" }
 
 func testConfig() *config.Config {

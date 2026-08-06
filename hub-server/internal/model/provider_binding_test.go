@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package model
 
 import (
@@ -18,7 +19,7 @@ func TestProviderBindingValidate(t *testing.T) {
 		},
 		{
 			name:    "base_url with @ fails",
-			pb:      ProviderBinding{Provider: "anthropic", BaseURL: "https://user:pass@api.example.com", BindingName: "leaked"},
+			pb:      ProviderBinding{Provider: "anthropic", BaseURL: "https://user:pass@api.example.com", BindingName: "leaked"}, // #nosec G101 -- 负向测试：必须含凭据的 URL
 			wantErr: true,
 			errMsg:  "base_url must not contain credentials",
 		},

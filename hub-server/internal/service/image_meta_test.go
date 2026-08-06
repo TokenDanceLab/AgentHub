@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package service_test
 
 import (
@@ -38,7 +39,7 @@ func TestExtractImageMetadataJSON_ReadsPNGDimensions(t *testing.T) {
 
 func TestExtractImageMetadataJSON_IgnoresNonImageContent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notes.txt")
-	if err := os.WriteFile(path, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("hello"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -53,7 +54,7 @@ func TestExtractImageMetadataJSON_IgnoresNonImageContent(t *testing.T) {
 
 func TestExtractImageMetadataJSON_IgnoresUnsupportedImageDecode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preview.webp")
-	if err := os.WriteFile(path, []byte("RIFF\x12\x00\x00\x00WEBPVP8 "), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("RIFF\x12\x00\x00\x00WEBPVP8 "), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 

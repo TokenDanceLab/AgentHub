@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package jwtutil
 
 import (
@@ -6,7 +7,7 @@ import (
 )
 
 func BenchmarkGenerateAccessToken(b *testing.B) {
-	const secret = "bench-test-secret-with-minimum-32-chars!!"
+	const secret = "bench-test-secret-with-minimum-32-chars!!" // #nosec G101 -- 测试专用固定 secret
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = GenerateAccessToken("user-1", "desktop", "dev-1", secret, 15*time.Minute)
