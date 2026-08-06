@@ -110,17 +110,21 @@ def run(script_wsl_path: str, project_name: str, keep: bool, evidence_wsl_dir: s
 
 
 def collect_evidence(wsl_evidence_dir: str, local_evidence_dir: str) -> None:
+    """在 WSL 内把证据复制到 Windows 可见目录（drvfs 跨进程句柄锁
+    会导致 Windows 直接读失败，WSL 内 cp 无此问题）。"""
     os.makedirs(local_evidence_dir, exist_ok=True)
-    windows_dir = wsl_to_windows_path(wsl_evidence_dir)
-    if not os.path.isdir(windows_dir):
-        print(f"WARN: evidence dir not found: {windows_dir}")
-        return
-    for name in os.listdir(windows_dir):
-        src = os.path.join(windows_dir, name)
-        dst = os.path.join(local_evidence_dir, name)
-        if os.path.isfile(src):
-            shutil.copy2(src, dst)
-            print(f"evidence: {name} -> {dst}")
+    local_wsl = windows_to_wsl_path(os.path.abspath(local_evidence_dir))
+    proc = subprocess.run(
+        ["wsl", "-e", "bash", "-c",
+         f"cp -f '{wsl_evidence_dir}/evidence.json' '{local_wsl}/' 2>/dev/null; ls '{local_wsl}/'"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=30,
+    )
+    for name in proc.stdout.split():
+        if name:
+            print(f"evidence: {name} -> {os.path.join(local_evidence_dir, name)}")
+    if proc.returncode != 0:
+        print(f"WARN: evidence copy failed: {proc.stderr.strip()}")
 
 
 def main() -> int:
@@ -147,7 +151,8 @@ def main() -> int:
     print(f"WSL distro: {distro}")
     print(f"harness:    {script_wsl_path}")
 
-    wsl_evidence_dir = f"/tmp/{os.path.basename(args.EvidenceDir)}-evidence"
+    # 证据目录直接用 Windows 路径的 WSL 视图，bash 侧落盘后 python 侧可直接复制
+    wsl_evidence_dir = windows_to_wsl_path(os.path.abspath(args.EvidenceDir))
     rc = run(script_wsl_path, "agenthub-e2e", args.Keep, wsl_evidence_dir,
              windows_to_wsl_path(args.SrcRoot))
     collect_evidence(wsl_evidence_dir, args.EvidenceDir)
