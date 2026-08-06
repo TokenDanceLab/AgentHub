@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package jwtutil
 
 import (
@@ -51,8 +52,8 @@ func tokenDanceTestKey(t *testing.T) (*rsa.PrivateKey, string) {
 		t.Fatalf("generate key: %v", err)
 	}
 	kid := tokenDanceTestKID(&priv.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
+	n := base64.RawURLEncoding.EncodeToString(priv.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.E)).Bytes())
 	jwks := `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
 	return priv, jwks
 }

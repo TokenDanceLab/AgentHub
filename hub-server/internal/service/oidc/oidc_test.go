@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package oidc
 
 import (
@@ -387,8 +388,8 @@ func oidcTestKey(t *testing.T) (*rsa.PrivateKey, string, string) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	kid := oidcTestKID(&privateKey.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes())
+	n := base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.E)).Bytes())
 	jwks := `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
 	return privateKey, jwks, kid
 }
