@@ -27,7 +27,7 @@ fn ensure_store() -> Result<(), String> {
             }
             #[cfg(target_os = "macos")]
             {
-                let store = apple_native_keyring_store::Store::new()
+                let store = apple_native_keyring_store::keychain::Store::new()
                     .map_err(|e| format!("credential store unavailable: {e}"))?;
                 keyring_core::set_default_store(store);
                 Ok(())
