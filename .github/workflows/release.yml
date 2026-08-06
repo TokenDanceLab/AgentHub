@@ -348,6 +348,9 @@ jobs:
   # ── GitHub Release ───────────────────────────
   release:
     needs: [build-go, build-desktop, build-desktop-macos, build-mobile]
+    # build-mobile 未启用时（RELEASE_MOBILE_ENABLED != true）会 skipped，
+    # needs 依赖被跳过会使下游默认跳过；显式放行 skipped、仍拦截 failure。
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
