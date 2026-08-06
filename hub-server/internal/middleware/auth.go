@@ -441,5 +441,10 @@ func (m *AuthMiddleware) auditPermission(c *gin.Context, userID string, decision
 	if m.deps.PermissionAudit == nil {
 		return
 	}
+	if userID == "" {
+		// 未认证请求（如 WS 401）没有身份可审计；audit_events.user_id 是
+		// NOT NULL uuid，空串会让 PostgreSQL 报 22P02 并污染错误日志。
+		return
+	}
 	m.deps.PermissionAudit(c.Request.Context(), userID, decision, allowed, details, clientIP)
 }
