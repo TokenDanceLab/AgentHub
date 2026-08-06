@@ -515,19 +515,17 @@ status = head.split(b" ", 2)[1].decode()
 proto = "agenthub.bearer.v1" if b"agenthub.bearer.v1" in head else "MISSING"
 if status != "101":
     print(f"WS-ERROR: handshake status {status}, proto={proto}"); raise SystemExit(1)
-# ping → 期待 pong
-frame = bytes([0x89]) + bytes([0])
-s.sendall(frame)
+# 握手后收任意有效帧（hub 可能主动推 text，也可能回 pong）即证明通道建立
 s.settimeout(5)
 try:
     hdr = s.recv(2)
-    if len(hdr) == 2 and (hdr[0] & 0x0F) == 0x0A:
-        print(f"WS-OK: handshake 101, subprotocol={proto}, pong received")
+    if len(hdr) == 2 and (hdr[0] & 0x0F) in (0x1, 0x9, 0x0A):
+        print(f"WS-OK: handshake 101, subprotocol={proto}, first frame opcode={hdr[0] & 0x0F}")
         raise SystemExit(0)
     print(f"WS-ERROR: unexpected first frame {hdr.hex()}")
     raise SystemExit(1)
 except socket.timeout:
-    print(f"WS-ERROR: no pong within timeout (handshake ok, proto={proto})")
+    print(f"WS-ERROR: no frame within timeout (handshake ok, proto={proto})")
     raise SystemExit(1)
 PYEOF
 )"; then
