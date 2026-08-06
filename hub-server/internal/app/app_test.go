@@ -1,3 +1,4 @@
+//nolint:gosec // 测试 fixture：凭据模式字符串用于构造测试用例，非真实凭据
 package app
 
 import (
@@ -120,12 +121,12 @@ func TestHubConfigDumperMasksSecrets(t *testing.T) {
 			Port:     5432,
 			Name:     "agenthub",
 			User:     "agenthub_user",
-			Password: "raw-db-password",
+			Password: "raw-db-password", // #nosec G101 -- 负向测试 fixture
 		},
 		Redis: config.RedisConfig{
 			Host:     "redis.internal",
 			Port:     6379,
-			Password: "raw-redis-password",
+			Password: "raw-redis-password", // #nosec G101 -- 负向测试 fixture
 		},
 		JWT: config.JWTConfig{
 			Secret: "raw-jwt-secret",

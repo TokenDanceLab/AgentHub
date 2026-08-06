@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,12 +129,23 @@ func (w *timeoutWriter) markTimedOut() {
 // 504 Gateway Timeout.  The handler runs in a goroutine whose output is
 // buffered; therefore the real ResponseWriter is written to at most once,
 // eliminating the concurrent-write race that would otherwise panic.
+//
+// WebSocket upgrade requests are passed through unwrapped: the handshake
+// requires hijacking the raw connection (http.Hijacker), which the buffered
+// timeoutWriter does not implement — wrapping it hangs the upgrade forever.
+// WebSocket connections are long-lived by design and are not governed by a
+// per-request deadline.
 func Timeout(d time.Duration) gin.HandlerFunc {
 	if d <= 0 {
 		// No deadline — pass through unchanged.
 		return func(c *gin.Context) { c.Next() }
 	}
 	return func(c *gin.Context) {
+		if isWebSocketUpgrade(c) {
+			c.Next()
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(c.Request.Context(), d)
 		defer cancel()
 		c.Request = c.Request.WithContext(ctx)
@@ -166,6 +178,19 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 			<-done
 		}
 	}
+}
+
+// isWebSocketUpgrade reports whether the request is a WebSocket upgrade.
+func isWebSocketUpgrade(c *gin.Context) bool {
+	if !strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+		return false
+	}
+	for _, token := range strings.Split(c.GetHeader("Connection"), ",") {
+		if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+			return true
+		}
+	}
+	return false
 }
 
 func writeTimeout(w gin.ResponseWriter) {
