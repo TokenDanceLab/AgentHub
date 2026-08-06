@@ -251,7 +251,8 @@ jobs:
 
       - name: Build Tauri (DMG)
         working-directory: app/desktop
-        run: pnpm tauri build
+        # bundle.targets 仅配了 nsis（Windows 专用），macOS 需用 CLI 覆盖为 dmg
+        run: pnpm tauri build --bundles dmg
 
       - name: Create dist directory
         run: mkdir -p dist
