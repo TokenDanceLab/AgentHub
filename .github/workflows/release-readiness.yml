@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_macos_package_dry:
+        description: "Run the macOS unsigned DMG package dry build on a macOS runner. This uploads artifacts only to the workflow run and never signs, notarizes, or releases."
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -156,3 +161,42 @@ jobs:
         with:
           name: macos-unsigned-package-dry
           path: dist/macos-unsigned-dry-policy.json
+
+  macos-package-dry:
+    name: macOS unsigned DMG dry package
+    needs: readiness-policy
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_package_dry == true }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Prepare edge-server darwin arm64 sidecar
+        run: |
+          mkdir -p app/desktop/src-tauri/binaries
+          go build -C edge-server -ldflags="-s -w" -o ../app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin ./cmd/agenthub-edge
+
+      - name: Build unsigned macOS DMG dry run
+        run: python scripts/release/verify-tauri-package-dry.py -RepoRoot . -ArtifactsRoot dist -RunMacosBundle -StrictToolchain
+
+      - name: Upload macOS dry package artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-unsigned-package-dry
+          path: dist/
