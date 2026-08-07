@@ -38,6 +38,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | IM bridge (Feishu first) | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-im-bridge.md 为准 | docs/plan/proposal-im-bridge.md |
 | WSL 全栈 E2E（真实 OIDC 登录） | SPEC merged + 已跑通（2026-08-06）：容器形态全栈（tokendance-id + hub-server + PG16 + Redis7）真实 OIDC PKCE 登录流 18 项断言全过，证据 `real_tokendance_id_login=true`（integration 级）；顺带修复 hub Timeout 中间件 WS upgrade 挂起、未认证请求审计 user_id 空串 PG 报错、compose hub build context 损坏、release build-mobile 无 EXPO_TOKEN 阻塞 | docs/plan/proposal-wsl-full-stack-e2e.md |
 | v0.6.0 正式发布 | **DONE 2026-08-06**：release 全链路（tag-guard → build-go 6 平台 → build-desktop NSIS/portable → build-desktop-macos DMG → release job）通过并发布，10 个资产（无 APK，RELEASE_MOBILE_ENABLED 未启用）；发布验证过程修复 macOS 桌面链路 4 项（keyring feature / keychain::Store / --bundles dmg / 图标 8-bit）与 release job 2 项（skipped 依赖放行 / mobile-artifacts 条件下载，#1643–#1648）；rc.1–rc.4 中间 tag 已清理，rc.5 保留为验证里程碑 | release: v0.6.0（2026-08-06） |
+| 发布链路治理 | 2026-08-07 neat-freak/spec-driven 审计落地：macOS 改 `RELEASE_MACOS_ENABLED` 门控 + `run_macos_package_dry` 预检（#1652）；生产 compose 模板与 live 对齐（本地 PG、canonical 回调 #1650/#1651）；cd-pr-check 加 compose config 干跑（#1655）；approved-real 路径已建档待 operator 审批执行（#1656）；债务登记 #1653/#1654/#1657/#1658 | issue #1650–#1658 |
 | Automations and session import | Product backlog | backlog：SPEC 待写 |
 | @提及=派单交互 | Product backlog | backlog：SPEC 待写 |
 

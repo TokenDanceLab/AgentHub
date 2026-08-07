@@ -125,6 +125,13 @@ def assert_workflow_policy(repo_root: str) -> None:
     )
     test_pattern(readiness_text, "actions/upload-artifact@v7", "release readiness dry outputs are workflow artifacts only", "release readiness workflow does not upload dry evidence artifacts")
     test_pattern(readiness_text, "run_macos_unsigned_dry_policy", "macOS future dry policy is manual and policy-only", "macOS unsigned dry policy input is missing")
+    test_pattern(
+        readiness_text,
+        r"verify-tauri-package-dry\.py[^\r\n]+-RunMacosBundle",
+        "macOS dry gate delegates to verify-tauri-package-dry.py with -RunMacosBundle on a macOS runner",
+        "macOS dry gate does not call verify-tauri-package-dry.py with -RunMacosBundle",
+    )
+    test_pattern(readiness_text, "run_macos_package_dry", "macOS unsigned DMG dry build has an explicit manual input", "macOS package dry gate input is missing")
 
     if re.search(r"softprops/action-gh-release|^\s*(gh\s+release|xcrun\s+notarytool|notarytool\s+submit|xcrun\s+stapler|stapler\s+staple|codesign\s|TAURI_SIGNING_PRIVATE_KEY|APPLE_)", readiness_text, re.IGNORECASE | re.MULTILINE):
         blocker("release-readiness workflow contains release upload/signing/notarization execution surface")
