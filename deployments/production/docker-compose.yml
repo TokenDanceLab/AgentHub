@@ -1,8 +1,9 @@
 # ──────────────────────────────────────────────
 # AgentHub — 生产 Compose (hk3)
 # 独立于 AI 生产栈 (/opt/tokendance/compose.yml)
-# PG 直连 Azure PostgreSQL，Redis 本地轻量
-# 屎山遗留代码，严格资源限制，防止拖死 hk3
+# PG 为 hk3 本地 PostgreSQL 16（127.0.0.1:5433），Redis 本地轻量。
+# live 事实 SSOT：C:\Users\Ding\server\projects\agenthub\STATE.md
+# （Azure PG 已迁出并禁止恢复，勿改回云库形态）
 # ──────────────────────────────────────────────
 
 services:
@@ -41,7 +42,7 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # ── Hub Server（Go 后端 API — PG 直连 Azure）──
+  # ── Hub Server（Go 后端 API — 本地 PG16）──
   hub-server:
     image: ghcr.io/tokendancelab/agenthub-hub-server:latest
     container_name: agenthub-hub
@@ -54,14 +55,14 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Azure PG（agenthub 库）。live 角色为 agenthub（见 server projects/agenthub/STATE.md）；
-      # 默认值 tdadmin 仅为本地/兼容占位，生产 .env 必须显式设置 PG_USER=agenthub。
-      AGENTHUB_DB_HOST: ${PG_HOST:?请设置 PG_HOST}
-      AGENTHUB_DB_PORT: "${PG_PORT:-5432}"
-      AGENTHUB_DB_USER: ${PG_USER:-tdadmin}
+      # hk3 本地 PostgreSQL 16（127.0.0.1:5433）。live 角色为 agenthub；
+      # PG_PASSWORD 必填，其余默认值与 live 对齐（见 server projects/agenthub/STATE.md）。
+      AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1:5433}
+      AGENTHUB_DB_PORT: "${PG_PORT:-5433}"
+      AGENTHUB_DB_USER: ${PG_USER:-agenthub}
       AGENTHUB_DB_PASSWORD: ${PG_PASSWORD:?请设置 PG_PASSWORD}
-      AGENTHUB_DB_NAME: agenthub
-      AGENTHUB_DB_SSLMODE: require
+      AGENTHUB_DB_NAME: ${PG_DB_NAME:-agenthub}
+      AGENTHUB_DB_SSLMODE: ${PG_SSLMODE:-disable}
       # Redis（本地）
       AGENTHUB_REDIS_HOST: redis
       AGENTHUB_REDIS_PORT: "6379"
@@ -83,8 +84,10 @@ services:
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: https://id.tokendancelab.com
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: https://hub.vectorcontrol.tech/auth/tokendance/callback
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: https://hub.vectorcontrol.tech/auth/tokendance/callback
+      # canonical 回调（issue #1651）：与 hub-server router /client/auth/oidc/callback
+      # 及 ID 注册 redirect_uris 对齐；hub.tokendancelab.com 的 /client 前缀由 CF Worker 路由。
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: https://hub.tokendancelab.com/client/auth/oidc/callback
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: https://hub.tokendancelab.com/client/auth/oidc/callback
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"

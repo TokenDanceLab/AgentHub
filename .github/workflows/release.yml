@@ -213,8 +213,12 @@ jobs:
           path: dist/
 
   # ── Tauri Desktop (macOS) ─────────────────────
+  # macOS 低频使用（决策 2026-08-07，issue #1652）：默认跳过，设置仓库
+  # variable RELEASE_MACOS_ENABLED=true 才参与发布；跳过时 release job
+  # 照常发布其余产物（对齐 build-mobile 门控模式）。
   build-desktop-macos:
     needs: build-go
+    if: ${{ vars.RELEASE_MACOS_ENABLED == 'true' }}
     runs-on: macos-latest
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -368,6 +372,9 @@ jobs:
           path: dist
 
       - name: Download macOS Desktop artifacts
+        # macOS 门控（RELEASE_MACOS_ENABLED）未启用时无 desktop-macos-artifacts，
+        # 条件跳过避免下载失败（对齐 build-mobile 的 #1648 模式）
+        if: ${{ needs.build-desktop-macos.result == 'success' }}
         uses: actions/download-artifact@v8
         with:
           name: desktop-macos-artifacts
