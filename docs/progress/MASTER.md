@@ -1,6 +1,6 @@
 # AgentHub Progress Tracker
 
-> **Last updated**: 2026-08-05
+> **Last updated**: 2026-08-07
 > **Mode**: `GITHUB_FULL`
 > **Authority**: current source and tests > this tracker > historical analysis. Use `git status`, `git log`, and live GitHub state before acting.
 
@@ -37,6 +37,7 @@ Restore a trustworthy green main branch, then reduce maintenance cost through si
 | WebSocket incremental sync | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-ws-incremental-sync.md 为准 | docs/plan/proposal-ws-incremental-sync.md |
 | IM bridge (Feishu first) | SPEC merged；issue 已归档，实施 tracker 以 docs/plan/proposal-im-bridge.md 为准 | docs/plan/proposal-im-bridge.md |
 | WSL 全栈 E2E（真实 OIDC 登录） | SPEC merged + 已跑通（2026-08-06）：容器形态全栈（tokendance-id + hub-server + PG16 + Redis7）真实 OIDC PKCE 登录流 18 项断言全过，证据 `real_tokendance_id_login=true`（integration 级）；顺带修复 hub Timeout 中间件 WS upgrade 挂起、未认证请求审计 user_id 空串 PG 报错、compose hub build context 损坏、release build-mobile 无 EXPO_TOKEN 阻塞 | docs/plan/proposal-wsl-full-stack-e2e.md |
+| v0.6.0 正式发布 | **DONE 2026-08-06**：release 全链路（tag-guard → build-go 6 平台 → build-desktop NSIS/portable → build-desktop-macos DMG → release job）通过并发布，10 个资产（无 APK，RELEASE_MOBILE_ENABLED 未启用）；发布验证过程修复 macOS 桌面链路 4 项（keyring feature / keychain::Store / --bundles dmg / 图标 8-bit）与 release job 2 项（skipped 依赖放行 / mobile-artifacts 条件下载，#1643–#1648）；rc.1–rc.4 中间 tag 已清理，rc.5 保留为验证里程碑 | release: v0.6.0（2026-08-06） |
 | Automations and session import | Product backlog | backlog：SPEC 待写 |
 | @提及=派单交互 | Product backlog | backlog：SPEC 待写 |
 
