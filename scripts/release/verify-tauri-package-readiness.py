@@ -111,7 +111,10 @@ def assert_windows_unsigned_dev_package_contract() -> None:
     assert_file_exists("scripts\\release\\verify-tauri-package-dry.py", "Windows unsigned/dev package dry categorized script")
 
     dry_text = read_text("scripts/release/verify-tauri-package-dry.py")
-    assert_true(re.search(r'mode"\s*:\s*"windows-desktop-package-dry"', dry_text), "package dry report declares windows-desktop-package-dry mode")
+    assert_true(
+        re.search(r'mode"\s*:\s*"(windows-desktop-package-dry|macos-desktop-package-dry)"', dry_text),
+        "package dry report declares windows- or macos-desktop-package-dry mode",
+    )
     assert_true(
         re.search(r'"signing"\s*:\s*"out-of-scope"', dry_text)
         and re.search(r'"notarization"\s*:\s*"out-of-scope"', dry_text)

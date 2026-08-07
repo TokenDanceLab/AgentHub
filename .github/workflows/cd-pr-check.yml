@@ -130,6 +130,16 @@ jobs:
           "
           echo "::endgroup::"
 
+      - name: Dry-run compose config interpolation (#1655)
+        run: |
+          echo "::group::docker compose config --quiet"
+          # env 插值干跑：PG_PASSWORD/AGENTHUB_JWT_SECRET 用占位值注入，
+          # 其余变量走默认值；捕获 ${VAR:?} 缺失与格式错误。
+          PG_PASSWORD=dry-run-placeholder \
+          AGENTHUB_JWT_SECRET=dry-run-placeholder-min-32-chars \
+            docker compose -f deployments/production/docker-compose.yml config --quiet
+          echo "::endgroup::"
+
       - name: Enforce deployment shape SSOT (#1527)
         run: |
           echo "::group::Deployment shape SSOT verifier"

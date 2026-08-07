@@ -162,12 +162,16 @@ check_added_line() {
   [[ -z "$trimmed" ]] && return
   [[ "$trimmed" == \#* || "$trimmed" == //* || "$trimmed" == \** || "$trimmed" == "/*"* ]] && return
 
-  # *_URL=…://… assignments are endpoint configuration (e.g.
-  # AGENTHUB_TOKENDANCE_ID_ISSUER_URL=https://id.example.com or the
-  # ${VAR:-https://…} default form in docker-compose files), not secrets.
+  # *_URL / *_URI =…://… assignments are endpoint configuration (e.g.
+  # AGENTHUB_TOKENDANCE_ID_ISSUER_URL=https://id.example.com,
+  # AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=https://hub.example.com/client/auth/callback
+  # or the ${VAR:-https://…} default form in docker-compose files), not secrets.
   # Without this, any variable name containing "token" (TOKENDANCE,
   # TOKEN_EXCHANGE…) gets flagged for its public endpoint value.
   if [[ "$trimmed" =~ ^[A-Za-z0-9_.-]*_URL[\"\']?[[:space:]]*[:=][[:space:]]*.*:// ]]; then
+    return
+  fi
+  if [[ "$trimmed" =~ ^[A-Za-z0-9_.-]*_URI[S]?[\"\']?[[:space:]]*[:=][[:space:]]*.*:// ]]; then
     return
   fi
 
