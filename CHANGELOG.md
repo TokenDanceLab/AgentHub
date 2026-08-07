@@ -11,6 +11,7 @@
 - 修复部署：根 `docker-compose.yml` 的 hub-server build context 改为仓库根（此前 `./hub-server` 与 Dockerfile 的 `COPY go.work/pkg/edge-server` 冲突，`docker compose up --build` 必然失败）。
 - 新增 `scripts/e2e/verify-wsl-full-stack-e2e.py`：WSL 容器形态全栈 E2E（tokendance-id + hub-server + PG16 + Redis7），真实 OIDC PKCE 登录流 18 项断言 + integration 级证据 manifest（`real_tokendance_id_login=true`）。
 - 测试基建：偿还 golangci-lint v2.12.2 对测试文件的 gosec G101/G306 与 staticcheck QF1008/QF1002 finding（master 基线漂移修复）。
+- 修复桌面 macOS 发布链路（自 v0.5.0 起 macOS DMG 从未构建成功，v0.6.0 验证过程逐层修复）：恢复 `apple-native-keyring-store` 的 `keychain` feature（#1643）；修正 `keychain::Store` 模块路径（#1644）；macOS 构建改用 `--bundles dmg` 覆盖仅含 nsis 的 bundle targets（#1645）；应用图标 PNG 16-bit → 8-bit RGBA（#1646）；release job 放行 skipped 依赖（#1647）；`mobile-artifacts` 条件下载（#1648）。
 - 上一版（v0.5.0 及更早）的完整历史见 [docs/history.md](docs/history.md)。
 
 ## 历史
