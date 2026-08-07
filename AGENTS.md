@@ -330,6 +330,6 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.py`）。
 2. 打 tag：`git tag vX.Y.Z`（正式版）或 `git tag vX.Y.Z-rc.N`（候选版）；tag 指向的 commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml 的 tag-guard job 双重守卫，任一不满足则 job 失败、不触发构建）。
 3. push：`git push origin <tag>` → release.yml 构建出包并发布。
-4. 发布产物：build-desktop（Windows NSIS + portable）、build-desktop-macos（DMG）、build-mobile（Android APK）。
+4. 发布产物：build-desktop（Windows NSIS + portable）恒定发布；build-desktop-macos（DMG）由仓库 variable `RELEASE_MACOS_ENABLED=true` 门控（macOS 低频使用，默认跳过，issue #1652；发布前可走 release-readiness 的 `run_macos_package_dry` 手动预检）；build-mobile（Android APK）由 `RELEASE_MOBILE_ENABLED=true` 门控。
 
 冻结开关：`scripts/release/verify-release-gate.py` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。

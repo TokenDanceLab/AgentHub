@@ -169,6 +169,7 @@ def main() -> int:
     parser.add_argument("-SkipInstall", "--SkipInstall", action="store_true", help="skip pnpm install from lockfile")
     parser.add_argument("-SkipExecutableCompile", "--SkipExecutableCompile", action="store_true", help="skip the dev executable compile")
     parser.add_argument("-RunWindowsBundle", "--RunWindowsBundle", action="store_true", help="build the unsigned Windows NSIS/portable bundle")
+    parser.add_argument("-RunMacosBundle", "--RunMacosBundle", action="store_true", help="build the unsigned macOS DMG bundle (must run on a macOS runner)")
     parser.add_argument("-RequireUpdaterMetadata", "--RequireUpdaterMetadata", action="store_true", help="fail when latest.json/.sig were not produced")
     parser.add_argument("-StrictToolchain", "--StrictToolchain", action="store_true", help="require the full toolchain in the installer smoke preflight")
     args = parser.parse_args()
@@ -181,7 +182,7 @@ def main() -> int:
     desktop_package = read_json("app/desktop/package.json")
     desktop_version = str(desktop_package["version"])
     report = {
-        "mode": "windows-desktop-package-dry",
+        "mode": "macos-desktop-package-dry" if args.RunMacosBundle else "windows-desktop-package-dry",
         "version": desktop_version,
         "repoRoot": REPO_ROOT,
         "artifactRoot": artifact_root,
@@ -218,42 +219,49 @@ def main() -> int:
     else:
         report["stages"]["dependencyInstall"] = "skipped"
 
-    invoke_checked(
-        "Build Windows Local Edge sidecar",
-        os.path.join(REPO_ROOT, "edge-server"),
-        ["go", "build", "-ldflags=-s -w", "-o", os.path.join("..", "dist", "agenthub-edge-windows-amd64.exe"), os.path.join(".", "cmd", "agenthub-edge")],
-        {"GOOS": "windows", "GOARCH": "amd64", "CGO_ENABLED": "0"},
-    )
-    sidecar_intermediate = os.path.join(REPO_ROOT, "dist", "agenthub-edge-windows-amd64.exe")
-    assert_true(os.path.isfile(sidecar_intermediate), "Windows Local Edge sidecar intermediate exists")
-    sidecar_artifact = os.path.join(artifact_root, "agenthub-edge-windows-amd64.exe")
-    if os.path.abspath(sidecar_intermediate).lower() != os.path.abspath(sidecar_artifact).lower():
-        shutil.copyfile(sidecar_intermediate, sidecar_artifact)
-
-    step("Prepare Tauri external sidecar")
-    invoke_prepare_sidecar(["-RepoRoot", REPO_ROOT, "-SourceBinary", sidecar_intermediate, "-NoBuild"])
-    tauri_sidecar = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "binaries", "agenthub-edge-x86_64-pc-windows-msvc.exe")
-    assert_true(os.path.isfile(tauri_sidecar), "Tauri external sidecar exists at Windows target triple path")
-    report["stages"]["sidecar"] = "passed"
-
-    if not args.SkipExecutableCompile:
-        invoke_checked(
-            "Build Tauri executable without bundling",
-            os.path.join(REPO_ROOT, "app", "desktop"),
-            [shutil.which("corepack") or "corepack", "pnpm", "tauri", "build", "--no-bundle"],
-            {"CI": "true"},
-        )
-        desktop_exe = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "target", "release", "agenthub-desktop.exe")
-        assert_true(os.path.isfile(desktop_exe), "Tauri executable compile artifact exists")
-        shutil.copyfile(desktop_exe, os.path.join(artifact_root, "agenthub-desktop.exe"))
-        report["stages"]["executableCompile"] = "passed"
+    if args.RunMacosBundle:
+        # macOS dry 模式：sidecar 由 workflow 预置 darwin arm64 二进制，
+        # 这里不构建 Windows sidecar、不编译 Windows exe。
+        darwin_sidecar = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "binaries", "agenthub-edge-aarch64-apple-darwin")
+        assert_true(os.path.isfile(darwin_sidecar), "macOS arm64 Tauri external sidecar exists at aarch64-apple-darwin path")
+        report["stages"]["sidecar"] = "prepared_by_workflow"
+        report["stages"]["executableCompile"] = "skipped_macos_mode"
     else:
-        report["stages"]["executableCompile"] = "skipped"
+        invoke_checked(
+            "Build Windows Local Edge sidecar",
+            os.path.join(REPO_ROOT, "edge-server"),
+            ["go", "build", "-ldflags=-s -w", "-o", os.path.join("..", "dist", "agenthub-edge-windows-amd64.exe"), os.path.join(".", "cmd", "agenthub-edge")],
+            {"GOOS": "windows", "GOARCH": "amd64", "CGO_ENABLED": "0"},
+        )
+        sidecar_intermediate = os.path.join(REPO_ROOT, "dist", "agenthub-edge-windows-amd64.exe")
+        assert_true(os.path.isfile(sidecar_intermediate), "Windows Local Edge sidecar intermediate exists")
+        sidecar_artifact = os.path.join(artifact_root, "agenthub-edge-windows-amd64.exe")
+        if os.path.abspath(sidecar_intermediate).lower() != os.path.abspath(sidecar_artifact).lower():
+            shutil.copyfile(sidecar_intermediate, sidecar_artifact)
+
+        step("Prepare Tauri external sidecar")
+        invoke_prepare_sidecar(["-RepoRoot", REPO_ROOT, "-SourceBinary", sidecar_intermediate, "-NoBuild"])
+        tauri_sidecar = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "binaries", "agenthub-edge-x86_64-pc-windows-msvc.exe")
+        assert_true(os.path.isfile(tauri_sidecar), "Tauri external sidecar exists at Windows target triple path")
+        report["stages"]["sidecar"] = "passed"
+
+        if not args.SkipExecutableCompile:
+            invoke_checked(
+                "Build Tauri executable without bundling",
+                os.path.join(REPO_ROOT, "app", "desktop"),
+                [shutil.which("corepack") or "corepack", "pnpm", "tauri", "build", "--no-bundle"],
+                {"CI": "true"},
+            )
+            desktop_exe = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "target", "release", "agenthub-desktop.exe")
+            assert_true(os.path.isfile(desktop_exe), "Tauri executable compile artifact exists")
+            shutil.copyfile(desktop_exe, os.path.join(artifact_root, "agenthub-desktop.exe"))
+            report["stages"]["executableCompile"] = "passed"
+        else:
+            report["stages"]["executableCompile"] = "skipped"
 
     if args.RunWindowsBundle:
         invoke_checked(
-            "Build unsigned Tauri Windows NSIS package",
-            os.path.join(REPO_ROOT, "app", "desktop"),
+            "Build unsigned Tauri Windows NSIS package",            os.path.join(REPO_ROOT, "app", "desktop"),
             [shutil.which("corepack") or "corepack", "pnpm", "tauri", "build", "--no-sign"],
             {"CI": "true"},
         )
@@ -308,11 +316,29 @@ def main() -> int:
         report["stages"]["portablePackage"] = "skipped"
         report["stages"]["updaterMetadata"] = "skipped"
 
+    if args.RunMacosBundle:
+        invoke_checked(
+            "Build unsigned Tauri macOS DMG package",
+            os.path.join(REPO_ROOT, "app", "desktop"),
+            [shutil.which("corepack") or "corepack", "pnpm", "tauri", "build", "--no-sign", "--bundles", "dmg"],
+            {"CI": "true"},
+        )
+        dmg_dir = os.path.join(REPO_ROOT, "app", "desktop", "src-tauri", "target", "release", "bundle", "dmg")
+        dmg = next(
+            (os.path.join(dmg_dir, name) for name in os.listdir(dmg_dir) if name.endswith(".dmg") and os.path.isfile(os.path.join(dmg_dir, name))),
+            None,
+        )
+        assert_true(dmg is not None, "macOS DMG artifact exists")
+        shutil.copyfile(dmg, os.path.join(artifact_root, f"AgentHub_{desktop_version}_aarch64.dmg"))
+        report["stages"]["macosDmgPackage"] = "passed"
+    else:
+        report["stages"]["macosDmgPackage"] = "skipped"
+
     step("Post-build static readiness gates")
     invoke_python_script("scripts/release/verify-tauri-package-readiness.py", ["-RepoRoot", REPO_ROOT])
     report["stages"]["postBuildReadiness"] = "passed"
 
-    report["stages"]["macosUnsignedDry"] = "policy_only"
+    report["stages"]["macosUnsignedDry"] = "passed" if args.RunMacosBundle else "policy_only"
     with open(os.path.join(artifact_root, "package-dry-report.json"), "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, ensure_ascii=False)
     add_artifact_manifest(artifact_root)
