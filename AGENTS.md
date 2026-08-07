@@ -255,7 +255,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
 | v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.py` | checks.yml → validate |
 | Hub/Edge gosec SAST 告警清零（#1574，hard fail） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`）；go-edge/go-hub Security scan (gosec) step 直接 fail-closed | checks.yml → go-edge / go-hub |
-| OIDC 配置形状与边界（issuer/redirect/无 secret；`verify-oidc-readiness.py` 因断言旧服务/测试名已 KNOWN-OBSOLETE，重写待办） | `scripts/verify/verify-oidc-readiness.py`（未挂 CI） | — |
+| OIDC 配置形状与边界（issuer/redirect/无 secret） | 旧 OIDC readiness 检查器已退役（2026-08-07，#1653：断言旧服务/测试名）；由 release gate（compose 模板 OIDC 字段断言）与 WSL 全栈 E2E（真实 OIDC 流）覆盖 | — |
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
 | 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.py`） | cd-pr-check.yml → deployment-files |
