@@ -1,10 +1,5 @@
 package service
 
-// TODO: persistWithRetry/RecordSync/Query/VerifyChain/RecordPermissionDecision
-// need a real DB (gorm.DB; sqlmock would be over-mock). These all call
-// repository.CreateAuditEvent/ListAuditEvents/VerifyAuditChain which require
-// *gorm.DB — separate DB-backed wave, not faked here.
-
 import (
 	"bytes"
 	"context"
@@ -16,10 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
 func TestNewAuditServiceAllowsNilConfig(t *testing.T) {
+	// retryLoop/drain touch metrics.AuditQueueDepth directly; without
+	// Register the gauge is nil. Register is idempotent (sync.Once).
+	metrics.Register()
+
 	svc := NewAuditService(nil, nil)
 	if svc == nil {
 		t.Fatal("NewAuditService returned nil")
@@ -193,6 +193,7 @@ func TestAuditFileSinkClose(t *testing.T) {
 // --- AuditServiceConfig / NewAuditService ---
 
 func TestNewAuditServiceDefaultConfig(t *testing.T) {
+	metrics.Register()
 	svc := NewAuditService(nil, nil)
 	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 1024 {
@@ -204,6 +205,7 @@ func TestNewAuditServiceDefaultConfig(t *testing.T) {
 }
 
 func TestNewAuditServiceCustomRetryBuffer(t *testing.T) {
+	metrics.Register()
 	svc := NewAuditService(nil, &AuditServiceConfig{RetryBufferSize: 5})
 	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 5 {
@@ -213,6 +215,7 @@ func TestNewAuditServiceCustomRetryBuffer(t *testing.T) {
 
 func TestNewAuditServiceWithAuditLogFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.jsonl")
+	metrics.Register()
 	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
 	defer svc.Shutdown(context.Background())
 	if svc.fileSink == nil {
@@ -227,6 +230,7 @@ func TestNewAuditServiceBadAuditLogFile(t *testing.T) {
 	// newAuditFileSink error must only disable the file sink (logged), not
 	// fail service construction.
 	path := filepath.Join(t.TempDir(), "no-such-dir", "audit.jsonl")
+	metrics.Register()
 	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
 	defer svc.Shutdown(context.Background())
 	if svc == nil {
@@ -261,6 +265,7 @@ func TestAuditRecordQueueFullDrops(t *testing.T) {
 // --- Shutdown ---
 
 func TestAuditShutdownNoHang(t *testing.T) {
+	metrics.Register()
 	svc := NewAuditService(nil, nil)
 	done := make(chan struct{})
 	go func() {
@@ -275,6 +280,7 @@ func TestAuditShutdownNoHang(t *testing.T) {
 }
 
 func TestAuditRecordAfterShutdown(t *testing.T) {
+	metrics.Register()
 	svc := NewAuditService(nil, nil)
 	svc.Shutdown(context.Background())
 
