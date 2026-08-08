@@ -944,15 +944,11 @@ jobs:
       - name: pnpm audit --prod (fail-closed, #1534)
         shell: bash
         run: |
-          set -o pipefail
-          # verifier 是权威判定（schema 校验 + 例外登记）。pnpm audit 发现
-          # 漏洞时自身返回非零；pipefail 会把该退出码误当步骤失败，即使
-          # verifier 已按例外登记判定通过。显式以 verifier 退出码为准。
-          set +e
+          # verifier 是权威判定（schema 校验 + 例外登记，fail-closed）。不加
+          # pipefail：pnpm audit 发现漏洞时返回非零，例外登记后 verifier 判定
+          # 通过（exit 0）应覆盖；verifier 自身对空输出/非 JSON/schema 缺失
+          # 一律 fail，假绿洞已在 #1534 修于 verifier 内部。
           pnpm audit --prod --json 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
-          status=$?
-          set -e
-          exit $status
 
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
