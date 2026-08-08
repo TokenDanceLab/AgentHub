@@ -945,10 +945,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          # JSON 输出经 verifier 校验 vulnerabilities schema；空输出/非 JSON/
-          # schema 缺失一律 fail-closed。旧实现把非 JSON 当 likely clean ——
-          # 假绿已修（#1534）。
+          # verifier 是权威判定（schema 校验 + 例外登记）。pnpm audit 发现
+          # 漏洞时自身返回非零；pipefail 会把该退出码误当步骤失败，即使
+          # verifier 已按例外登记判定通过。显式以 verifier 退出码为准。
+          set +e
           pnpm audit --prod --json 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
+          status=$?
+          set -e
+          exit $status
 
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
