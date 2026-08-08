@@ -21,6 +21,12 @@ type TokenDanceIDConfig struct {
 	RedirectURI string `mapstructure:"redirect_uri"`
 	// AllowedRedirectURIs lists additional browser/native callbacks accepted for one OIDC round trip.
 	AllowedRedirectURIs []string `mapstructure:"allowed_redirect_uris"`
+	// TokenURL overrides the OIDC token exchange endpoint. Derived from
+	// issuer_url/oidc/token when empty. Production points it at the DNS-only
+	// id-token.tokendancelab.com machine entry to bypass the public edge
+	// challenge (Bot Fight) that blocks non-JS clients (2026-08-08).
+	// Env: AGENTHUB_TOKENDANCE_ID_TOKEN_URL.
+	TokenURL string `mapstructure:"token_url"`
 	// HTTPTimeout bounds the OIDC token-exchange and JWKS fetch requests
 	// (#1564). Zero falls back to 10s. Env: AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT.
 	HTTPTimeout time.Duration `mapstructure:"http_timeout"`
@@ -39,6 +45,7 @@ func (t TokenDanceIDConfig) LogValue() slog.Value {
 		slog.String("client_secret", "[REDACTED]"),
 		slog.String("redirect_uri", t.RedirectURI),
 		slog.Any("allowed_redirect_uris", t.AllowedRedirectURIs),
+		slog.String("token_url", t.TokenURL),
 		slog.Duration("http_timeout", t.HTTPTimeout),
 		slog.Int64("max_response_body_bytes", t.MaxResponseBodyBytes),
 	)
