@@ -944,11 +944,12 @@ jobs:
       - name: pnpm audit --prod (fail-closed, #1534)
         shell: bash
         run: |
-          set -o pipefail
-          # JSON 输出经 verifier 校验 vulnerabilities schema；空输出/非 JSON/
-          # schema 缺失一律 fail-closed。旧实现把非 JSON 当 likely clean ——
-          # 假绿已修（#1534）。
-          pnpm audit --prod --json 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit
+          # GHA bash 默认自带 -o pipefail：pnpm audit 发现漏洞时返回非零，
+          # 会传播为管道失败，即使 verifier 已按例外登记判定通过。改为先
+          # 落盘再喂给 verifier，verifier 退出码是唯一判定；pnpm 自身失败
+          # （网络/错误 JSON/空输出）仍被 verifier 按 fail-closed 拒绝。
+          pnpm audit --prod --json 2>&1 > /tmp/pnpm-audit.json || true
+          bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit < /tmp/pnpm-audit.json
 
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
