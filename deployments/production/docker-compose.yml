@@ -95,6 +95,8 @@ services:
       # 挑战（拦非 JS 客户端）；id-token.tokendancelab.com 是 DNS-only 直连 hk1 的
       # 机器入口（LE 证书 + nginx → td-id 9099），hub-server 服务端交换走这里。
       AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-https://id-token.tokendancelab.com/oidc/token}
+      # 同理由：JWKS 拉取（ID token 签名校验）也走机器入口，避开公网挑战。
+      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-https://id-token.tokendancelab.com/oidc/jwks}
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"
