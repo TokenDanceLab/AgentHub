@@ -302,7 +302,10 @@ func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier, redirect
 	form.Set("client_secret", s.cfg.ClientSecret)
 	form.Set("code_verifier", codeVerifier)
 
-	tokenURL := strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/token"
+	tokenURL := s.cfg.TokenURL
+	if tokenURL == "" {
+		tokenURL = strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/token"
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("build token request: %w", err)

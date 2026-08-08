@@ -91,6 +91,10 @@ services:
       # TDID 侧 oauth_clients.redirect_uris 必须同步同一集合（server identity STATE.md）。
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.tokendancelab.com/api/auth/callback}
       AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.tokendancelab.com/api/auth/callback,https://hub.tokendancelab.com/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
+      # 机器侧 code 交换端点（2026-08-08）：公网 id.tokendancelab.com 有 Bot Fight
+      # 挑战（拦非 JS 客户端）；id-token.tokendancelab.com 是 DNS-only 直连 hk1 的
+      # 机器入口（LE 证书 + nginx → td-id 9099），hub-server 服务端交换走这里。
+      AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-https://id-token.tokendancelab.com/oidc/token}
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"
