@@ -21,6 +21,8 @@ RUN pnpm --filter agenthub-web exec vite build
 
 FROM nginx:1.27-alpine AS runner
 COPY --from=builder /app/web/dist /usr/share/nginx/html
+# Vite base=/workbench/ prefix stripping + SPA fallback (see web/nginx.conf)
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:80/ || exit 1
 EXPOSE 80
