@@ -86,6 +86,9 @@ func applyTokenDanceIDEnvOverrides(cfg *Config) {
 	if envAllowedRedirectURIs := firstEnv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); envAllowedRedirectURIs != "" {
 		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
 	}
+	if envTokenURL := firstEnv("AGENTHUB_TOKENDANCE_ID_TOKEN_URL", "AGENTHUB_TOKENDANCE_TOKEN_URL"); envTokenURL != "" {
+		cfg.TokenDanceID.TokenURL = envTokenURL
+	}
 }
 
 func applyS3EnvOverrides(cfg *Config) error {
