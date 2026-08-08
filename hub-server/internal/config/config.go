@@ -94,6 +94,10 @@ func Load(configPath string) (*Config, error) {
 	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
 		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/oidc/jwks"
 	}
+	// Auto-derive token endpoint from issuer URL when not explicitly set.
+	if cfg.TokenDanceID.TokenURL == "" && cfg.TokenDanceID.IssuerURL != "" {
+		cfg.TokenDanceID.TokenURL = cfg.TokenDanceID.IssuerURL + "/oidc/token"
+	}
 	cfg.AgentTeam = cfg.AgentTeam.withDefaults()
 
 	return &cfg, nil
