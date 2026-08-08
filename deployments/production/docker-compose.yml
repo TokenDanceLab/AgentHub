@@ -84,10 +84,13 @@ services:
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: https://id.tokendancelab.com
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
-      # canonical 回调（issue #1651）：与 hub-server router /client/auth/oidc/callback
-      # 及 ID 注册 redirect_uris 对齐；hub.tokendancelab.com 的 /client 前缀由 CF Worker 路由。
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: https://hub.tokendancelab.com/client/auth/oidc/callback
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: https://hub.tokendancelab.com/client/auth/oidc/callback
+      # 回调契约（2026-08-08 live 实测对齐，issue #1651/#1656）：
+      # - /api/auth/callback → 首页 SPA 回调页（nginx /api/auth/ → :3001 静态站）
+      # - /workbench/auth/tokendance/callback → 工作台 app/web（BASE_URL=/workbench/）
+      # - http://127.0.0.1/callback → 桌面 Tauri loopback（RFC 8252 端口宽松匹配）
+      # TDID 侧 oauth_clients.redirect_uris 必须同步同一集合（server identity STATE.md）。
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.tokendancelab.com/api/auth/callback}
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.tokendancelab.com/api/auth/callback,https://hub.tokendancelab.com/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"
