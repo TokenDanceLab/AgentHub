@@ -1,9 +1,6 @@
 use crate::CloseToTrayState;
 use std::sync::atomic::Ordering;
 
-pub use crate::notifications::{notify_run_completed, notify_run_failed};
-pub use crate::tray::set_tray_labels;
-
 #[tauri::command]
 pub fn get_close_to_tray(state: tauri::State<'_, CloseToTrayState>) -> bool {
     state.0.load(Ordering::Relaxed)
