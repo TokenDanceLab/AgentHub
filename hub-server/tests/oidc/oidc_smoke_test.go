@@ -318,8 +318,8 @@ func TestOIDCSmoke(t *testing.T) {
 		mockSvc.accessToken = tok2
 
 		resp = doJSON(t, httpClient, ts.URL, "POST", "/oidc/callback", map[string]string{
-			"code":          "c2", "state": s2, "code_verifier": "v2",
-			"device_type":   "desktop", "device_id": id2,
+			"code": "c2", "state": s2, "code_verifier": "v2",
+			"device_type": "desktop", "device_id": id2,
 		})
 		r = parseAndAssertCode(t, resp, "ok", "2nd cb")
 		tok2FromResp := extract(r.Data, "access_token")

@@ -528,7 +528,8 @@ func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent,
 // Dialect branches:
 //   - PostgreSQL: JSONB payload->>'field' + BTRIM + LOWER.
 //   - SQLite:     json_extract(payload, '$.field') + TRIM + LOWER (unit tests).
-// COALESCE(...,'') maps a missing JSON key to '' so the match mirrors Go's
+//
+// COALESCE(...,”) maps a missing JSON key to ” so the match mirrors Go's
 // zero-value unmarshal semantics (missing next_worker → "").
 func CountTeamRouteDecisionsByActionWorkerInstructions(db *gorm.DB, teamRunID, action, worker, instructions string) (int, error) {
 	const eventType = model.TeamEventRouteDecided

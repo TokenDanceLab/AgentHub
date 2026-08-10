@@ -50,11 +50,11 @@ type Config struct {
 
 // Client is a fail-closed outbound HTTP client.
 type Client struct {
-	hc           *http.Client
-	allowCIDRs   []netip.Prefix
-	allowHosts   map[string]bool
-	allowPlain   bool
-	dialer       *net.Dialer
+	hc         *http.Client
+	allowCIDRs []netip.Prefix
+	allowHosts map[string]bool
+	allowPlain bool
+	dialer     *net.Dialer
 }
 
 // New builds a Client from cfg, parsing the CIDR allowlist up front so

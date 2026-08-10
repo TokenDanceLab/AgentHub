@@ -181,7 +181,7 @@ func FindProfileByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.AgentP
 // DuplicateProfile copies a profile for install.
 func DuplicateProfile(db *gorm.DB, src *model.AgentProfile, newOwnerID string) (*model.AgentProfile, error) {
 	dup := *src
-	dup.ID = ""        // let BeforeCreate generate new UUID
+	dup.ID = "" // let BeforeCreate generate new UUID
 	dup.OwnerID = newOwnerID
 	dup.IsPublic = false
 	dup.InstallCount = 0

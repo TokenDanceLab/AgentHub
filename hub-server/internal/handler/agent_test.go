@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-	type mockAgentService struct {
-		addAgentToSession      func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
-		triggerAgentTask       func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
-		regenerateAgentTask    func(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error)
-		cancelTask             func(ctx context.Context, userID, taskID string) error
+type mockAgentService struct {
+	addAgentToSession      func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
+	triggerAgentTask       func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
+	regenerateAgentTask    func(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error)
+	cancelTask             func(ctx context.Context, userID, taskID string) error
 	handleTaskAck          func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
 	handleTaskStream       func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	handleTaskDone         func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error

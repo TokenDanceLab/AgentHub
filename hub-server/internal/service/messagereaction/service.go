@@ -6,10 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/service/im"
 )
 

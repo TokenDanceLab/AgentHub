@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/gin-gonic/gin"
