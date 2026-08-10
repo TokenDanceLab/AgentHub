@@ -254,6 +254,9 @@ async function main() {
 
   console.log(`AgentHub Mobile mock Hub listening at ${baseUrl}`);
   console.log(`Android emulator base URL: http://10.0.2.2:${actualPort}`);
+  // Legacy mock-only routes below (no producer in hub-server, see #1422):
+  // /v1/mobile/snapshot, /v1/threads, /v1/events. Retained for older dev
+  // fixtures; real Hub routes are /client/sessions + /client/ws.
   console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /v1/threads, GET /client/sessions, GET /client/contacts');
   console.log('WS:   GET /v1/events, GET /client/ws');
 }
