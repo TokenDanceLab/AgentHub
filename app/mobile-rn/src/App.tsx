@@ -8,6 +8,12 @@ import { createHubEventStream, type HubEventStream, type HubWebSocketLike } from
 import { AppShell, BottomTabs } from '@/components/layout';
 import { AgentHubIcon } from '@/components/icons';
 import { Badge, Button, EmptyState, ErrorBoundary, StatusPill, Surface } from '@/components/primitives';
+import { createAgentHubAuthCallbackUrl, startExpoAgentHubDeepLinkBridge, type AgentHubDeepLinkBridge } from '@/integrations/deepLinking';
+import {
+  registerExpoForPushNotificationsAsync,
+  type PushPermissionState,
+} from '@/pushRegistration';
+import { createExpoMobileAuthSession } from '@/session/mobileAuthSession';
 import {
   getMobileFixtureForScenario,
   getPendingReviewCount,
@@ -63,6 +69,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   const [accountReturnTab, setAccountReturnTab] = useState<MobileTab>('chat');
   const [selectedThreadId, setSelectedThreadId] = useState(preview.threadId ?? fixture.threads[0]?.id ?? '');
   const [selectedRunId, setSelectedRunId] = useState(preview.runId ?? fixture.runs[0]?.id ?? '');
+  const [pushPermission, setPushPermission] = useState<PushPermissionState | undefined>();
   const counters = useMemo(
     () => ({
       pendingReviews: getPendingReviewCount(fixture),
@@ -133,6 +140,71 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     localPreviewEnabled,
     localPreviewKey,
   ]);
+
+  // Mount-once push registration: request permission, fetch the Expo push token,
+  // and register the device with the Hub. Best-effort — failures (denied
+  // permission, hub down) are swallowed; the account surface keeps reflecting
+  // fixture state until the OIDC + SecureStore wiring lands (Task 4/5).
+  useEffect(() => {
+    let cancelled = false;
+    registerExpoForPushNotificationsAsync()
+      .then((result) => {
+        if (!cancelled) {
+          setPushPermission(result.status);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPushPermission('unavailable');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Mount-once OIDC + SecureStore assembly: wire the deep-link bridge so that
+  // agenthub://auth/callback?code=…&state=… completes the TokenDance ID code
+  // exchange via the shared Hub client (oidcCallback) and persists the Hub
+  // session in expo-secure-store. The bridge also surfaces navigation intents
+  // from push notifications. Best-effort: native module or network failures do
+  // not crash the app; the local fixture remains the UI fallback.
+  useEffect(() => {
+    let cancelled = false;
+    let bridge: AgentHubDeepLinkBridge | undefined;
+    const baseUrl = resolveAppHubBaseUrl();
+    const redirectUri = createAgentHubAuthCallbackUrl('agenthub');
+
+    createExpoMobileAuthSession(baseUrl)
+      .then(({ authSession }) => {
+        if (cancelled) return;
+        return startExpoAgentHubDeepLinkBridge({
+          onAuthCallback(callback) {
+            if (callback.kind !== 'success') return;
+            const params = new URLSearchParams({
+              code: callback.code,
+              state: callback.state,
+            });
+            const callbackUrl = `${redirectUri}?${params.toString()}`;
+            authSession
+              .handleCallback(callbackUrl, { baseUrl, redirectUri })
+              .catch(() => {
+                /* surfaced via session status; fixture stays the UI fallback */
+              });
+          },
+        }).then((started) => {
+          bridge = started;
+        });
+      })
+      .catch(() => {
+        /* native modules unavailable in this runtime — skip assembly */
+      });
+
+    return () => {
+      cancelled = true;
+      bridge?.stop();
+    };
+  }, []);
 
   const openAccountDrawer = () => {
     setAccountReturnTab(activeTab === 'account' ? 'chat' : activeTab);
@@ -855,7 +927,22 @@ function getLocalPreviewHubBaseUrl(): string {
   }).location;
   const paramValue = new URLSearchParams(location?.search ?? '').get('hubBaseUrl')?.trim();
 
-  return paramValue || 'http://127.0.0.1:8088';
+  return paramValue || resolveAppHubBaseUrl();
+}
+
+function resolveAppHubBaseUrl(): string {
+  const env = (globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }).process?.env;
+
+  if (env?.EXPO_PUBLIC_AGENTHUB_HUB_URL) {
+    return env.EXPO_PUBLIC_AGENTHUB_HUB_URL;
+  }
+  if (env?.AGENTHUB_MOBILE_NATIVE_TARGET === 'android-emulator') {
+    return 'http://10.0.2.2:8088';
+  }
+
+  return 'http://127.0.0.1:8088';
 }
 
 function isBrowserPreviewRuntime(): boolean {

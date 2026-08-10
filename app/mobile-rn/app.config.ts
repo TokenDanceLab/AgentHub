@@ -19,7 +19,7 @@ const config = {
   name: 'AgentHub',
   slug: 'agenthub-mobile',
   scheme: 'agenthub',
-  version: '0.1.0',
+  version: '0.4.1',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   icon: './assets/agenthub-icon.png',
@@ -66,6 +66,7 @@ const config = {
         faceIDPermission: '允许 AgentHub 使用设备生物识别解锁本地 Hub 会话 / Allow AgentHub to unlock the local Hub session with device biometrics.',
       },
     ],
+    'expo-web-browser',
   ],
   extra: {
     hubBaseUrl: resolveDefaultHubBaseUrl(),
