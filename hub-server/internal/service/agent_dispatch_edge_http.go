@@ -71,6 +71,22 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 		metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategoryFailure, "unreachable")
 		return ""
 	}
+	// Per-Edge circuit breaker: when Edge is down, consecutive dispatches would
+	// each block for the full HTTP client timeout (~30s), exhausting the
+	// dispatch semaphore and stalling the TTL/redispatch path. The breaker
+	// fails fast (no HTTP call) while open and admits a single half-open probe
+	// after edgeBreakerOpenDuration to test recovery. Pre-HTTP failures
+	// (insecure/marshal/req_create/edgeClient-nil) are config issues and do
+	// not trip the breaker; only client.Do/non_success/decode_fail indicate
+	// Edge health and are recorded.
+	if !s.edgeBreaker.Allow() {
+		slog.Warn(dispatch.EdgeHTTPLogUnreachable, "task_id", task.ID, "url", parts.RunsURL, "error", "edge circuit breaker open")
+		if metrics.AgentDispatchEdgeHTTPFailures != nil {
+			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("breaker_open").Inc()
+		}
+		metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategoryFailure, "breaker_open")
+		return ""
+	}
 	started := time.Now()
 	resp, err := s.edgeClient.Do(httpReq)
 	if err != nil {
@@ -81,6 +97,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("unreachable").Inc()
 		}
 		metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategoryFailure, "unreachable")
+		s.edgeBreaker.RecordFailure()
 		return ""
 	}
 	defer resp.Body.Close()
@@ -93,6 +110,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("non_success").Inc()
 		}
 		metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategoryFailure, "non_success")
+		s.edgeBreaker.RecordFailure()
 		return ""
 	}
 	if plan.DecodeFail {
@@ -101,8 +119,10 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("decode_fail").Inc()
 		}
 		metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategoryFailure, "decode_fail")
+		s.edgeBreaker.RecordFailure()
 		return ""
 	}
+	s.edgeBreaker.RecordSuccess()
 	metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK)
 	metrics.OutboundMetrics.Observe(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK, time.Since(started))
 	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", task.ID, "edge_run_id", plan.RunID, "url", parts.RunsURL)

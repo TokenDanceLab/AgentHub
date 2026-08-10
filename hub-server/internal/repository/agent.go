@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -322,8 +323,47 @@ func CreateAgentRunEventWithNextSeqLimited(db *gorm.DB, event *model.AgentRunEve
 			return ErrRunEventLimitExceeded
 		}
 		event.EventSeq = maxSeq + 1
-		return tx.Create(event).Error
+		err := tx.Create(event).Error
+		if err == nil {
+			return nil
+		}
+		// 23500 unique-violation (concurrent insert won the race on the
+		// (task_id, event_seq) unique index): requery once. If the row now
+		// exists with the same task_id + event_seq, the create was idempotent
+		// (a parallel writer already persisted this seq) and we return nil so
+		// the caller does not surface a spurious error on a retry. This
+		// mirrors the service_send.go / message-builders duplicate-key
+		// idempotent handling. We only treat it as idempotent when the
+		// conflicting row matches our intended (task_id, event_seq); a
+		// different conflict is surfaced as a real error.
+		if isDuplicateKeyError(err) {
+			var existing model.AgentRunEvent
+			if qerr := tx.Where("task_id = ? AND event_seq = ?", event.TaskID, event.EventSeq).First(&existing).Error; qerr == nil {
+				// The row already exists with the same identity — idempotent
+				// success. Re-populate the caller's event struct so downstream
+				// logic sees the persisted values (ID, timestamps).
+				*event = existing
+				return nil
+			}
+		}
+		return err
 	})
+}
+
+// isDuplicateKeyError reports whether err is a Postgres/SQLite unique-
+// constraint violation (SQLSTATE 23500 / "duplicate key" / SQLite "UNIQUE
+// constraint failed"). Used by the CreateAgentRunEventWithNextSeqLimited
+// idempotent-retry path so a concurrent insert on (task_id, event_seq) is
+// treated as success instead of surfacing a spurious error to the caller's
+// retry. Mirrors the duplicate-key detection in service/message/builders.go
+// but made case-insensitive so SQLite's uppercase "UNIQUE constraint failed"
+// is also recognized.
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
 }
 
 func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEvent, error) {

@@ -297,7 +297,7 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 	}, cacheClient)
 
 	deviceID := "11111111-1111-4111-8111-111111111111"
-	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID, "")
+	authz, err := svc.GenerateAuthorizationURL(context.Background(), pkceS256Challenge("verifier-1"), "S256", "desktop", deviceID, "")
 	require.NoError(t, err)
 
 	result, err := svc.HandleCallback(context.Background(), "auth-code-1", authz.State, "verifier-1", "desktop", deviceID, "")
@@ -356,7 +356,7 @@ func TestHandleCallback_TokenEndpointErrorDoesNotLogProviderRawBody(t *testing.T
 	}, cacheClient)
 
 	deviceID := "11111111-1111-4111-8111-111111111111"
-	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID, "")
+	authz, err := svc.GenerateAuthorizationURL(context.Background(), pkceS256Challenge("verifier-1"), "S256", "desktop", deviceID, "")
 	require.NoError(t, err)
 
 	ctx := reqlog.WithRequestID(context.Background(), "req-oidc-token-redact")
@@ -419,4 +419,54 @@ func signOIDCTestIDToken(t *testing.T, privateKey *rsa.PrivateKey, kid, issuer, 
 	signed, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 	return signed
+}
+
+// pkceS256Challenge computes the RFC 7636 S256 code_challenge for a given
+// code_verifier: BASE64URL-ENCODE(SHA256(ASCII(code_verifier))). Used by the
+// HandleCallback tests so the local PKCE verification (Task 4) sees a
+// challenge that matches the verifier supplied at callback time.
+func pkceS256Challenge(verifier string) string {
+	digest := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(digest[:])
+}
+
+// TestHandleCallback_RejectsPKCEVerifierMismatch (Task 4): the local PKCE
+// check must reject a callback whose code_verifier does not hash to the
+// code_challenge stored during authorize, before any network call to the
+// token endpoint. The state is otherwise valid (fresh, matching device and
+// redirect), so only the PKCE mismatch can produce the rejection.
+func TestHandleCallback_RejectsPKCEVerifierMismatch(t *testing.T) {
+	svc, _, mr := setupOIDCTest(t)
+	ctx := context.Background()
+
+	// Authorize with the real S256 challenge for "correct-verifier".
+	authz, err := svc.GenerateAuthorizationURL(ctx, pkceS256Challenge("correct-verifier"), "S256", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.NoError(t, err)
+
+	// Callback supplies a different verifier — local PKCE check must reject.
+	_, err = svc.HandleCallback(ctx, "auth-code", authz.State, "wrong-verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errcode.OIDCInvalidState)
+
+	// The state must have been consumed atomically (GetDel) even on the
+	// PKCE mismatch path, so a replay with the correct verifier now fails
+	// on the missing state rather than passing.
+	_, replayErr := svc.HandleCallback(ctx, "auth-code", authz.State, "correct-verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, replayErr)
+	require.ErrorIs(t, replayErr, errcode.OIDCInvalidState)
+	_ = mr
+}
+
+// TestHandleCallback_RejectsEmptyPKCEVerifier (Task 4): an empty code_verifier
+// is a client bug and must fail closed before the token exchange.
+func TestHandleCallback_RejectsEmptyPKCEVerifier(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	ctx := context.Background()
+
+	authz, err := svc.GenerateAuthorizationURL(ctx, pkceS256Challenge("verifier-x"), "S256", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.NoError(t, err)
+
+	_, err = svc.HandleCallback(ctx, "auth-code", authz.State, "", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errcode.OIDCInvalidState)
 }

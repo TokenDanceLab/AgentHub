@@ -2,157 +2,14 @@ package ws
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
-	"github.com/coder/websocket"
-	"golang.org/x/time/rate"
 )
-
-// WSReadTimeout is the maximum time to wait for a single WebSocket message
-// read before the connection is considered stale.  Set at 2x the heartbeat
-// interval so idle connections are detected and closed cleanly without
-// interfering with normal heartbeat pings.
-const WSReadTimeout = 2 * config.WSHeartbeatInterval
-
-// Conn represents a single WebSocket connection tracked by the Manager.
-type Conn struct {
-	ID         string
-	UserID     string
-	DeviceType string
-	DeviceID   string
-	W          *websocket.Conn
-	Send       chan []byte
-	missedPong atomic.Int32
-	mu         sync.Mutex
-	sendMu     sync.Mutex
-
-	// closed is set atomically before the Send channel is closed.  PushToConn
-	// and closeSend use sendMu so channel send and close never race.
-	closed atomic.Bool
-
-	// msgLimiter enforces per-connection message rate limiting using a
-	// token-bucket algorithm.
-	msgLimiter *rate.Limiter
-
-	// seq is the per-connection monotonic frame sequence counter. PushToConn
-	// stamps every delivery attempt with seq.Add(1) inside the sendMu critical
-	// section, so wire order always equals seq order and clients can detect
-	// lost frames as gaps.
-	seq atomic.Int64
-
-	// droppedFrames counts frames dropped on this connection because the send
-	// buffer was full. Drives sampled drop logging (first drop, then every
-	// dropLogSampleEvery-th drop).
-	droppedFrames atomic.Int64
-}
-
-// DeliveryStatus describes the observable result of a non-blocking WebSocket
-// enqueue attempt.
-type DeliveryStatus string
-
-const (
-	DeliveryStatusQueued       DeliveryStatus = "queued"
-	DeliveryStatusConnNotFound DeliveryStatus = "conn_not_found"
-	DeliveryStatusConnClosed   DeliveryStatus = "conn_closed"
-	DeliveryStatusMarshalError DeliveryStatus = "marshal_error"
-	DeliveryStatusBufferFull   DeliveryStatus = "buffer_full"
-)
-
-var (
-	ErrDeliveryConnNotFound = errors.New("websocket connection not found")
-	ErrDeliveryConnClosed   = errors.New("websocket connection closed")
-	ErrDeliveryMarshalError = errors.New("websocket frame marshal failed")
-	ErrDeliveryBufferFull   = errors.New("websocket send buffer full")
-	ErrPerUserCapReached    = errors.New("websocket per-user connection cap reached")
-)
-
-type DeliveryResult struct {
-	Queued bool
-	Status DeliveryStatus
-	Err    error
-
-	// ConnDrops is the cumulative number of buffer-full drops on the target
-	// connection, set only when Status is DeliveryStatusBufferFull. Fanout
-	// callers use it with shouldLogDrop to sample aggregate drop logging.
-	ConnDrops int64
-}
-
-// FanoutResult aggregates the per-connection DeliveryResults of a
-// PushToUser / PushToSession fanout so callers and logs can observe drops
-// instead of silently discarding them.
-type FanoutResult struct {
-	Conns   int // connections targeted
-	Queued  int // frames successfully queued
-	Dropped int // frames dropped because the send buffer was full
-	Failed  int // conn closed / not found / marshal failures
-
-	// LogSampled reports whether at least one constituent drop hit the
-	// per-connection log-sampling boundary (first drop or every
-	// dropLogSampleEvery-th drop on that connection).
-	LogSampled bool
-}
-
-// merge folds another FanoutResult into r.
-func (r *FanoutResult) merge(o FanoutResult) {
-	r.Conns += o.Conns
-	r.Queued += o.Queued
-	r.Dropped += o.Dropped
-	r.Failed += o.Failed
-	r.LogSampled = r.LogSampled || o.LogSampled
-}
-
-// dropLogSampleEvery controls sampled logging of buffer-full drops: the first
-// drop on a connection is always logged, then every Nth drop after that, so
-// hot push paths cannot emit one warn line per frame.
-const dropLogSampleEvery = 100
-
-// shouldLogDrop reports whether the n-th cumulative drop on a connection
-// should be logged.
-func shouldLogDrop(n int64) bool {
-	return n == 1 || n%dropLogSampleEvery == 0
-}
-
-func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.UserID = userID
-	c.DeviceType = deviceType
-	c.DeviceID = deviceID
-}
-
-// Close closes the underlying WebSocket connection. It is safe to call
-// multiple times and tolerates a nil *websocket.Conn (useful in tests).
-func (c *Conn) Close() {
-	if c.W != nil {
-		_ = c.W.Close(websocket.StatusNormalClosure, "")
-	}
-}
-
-// AllowMessage checks the per-connection message rate limiter. Returns true
-// if the message should be processed, false if it should be dropped.
-func (c *Conn) AllowMessage() bool {
-	if c.msgLimiter == nil {
-		return true
-	}
-	return c.msgLimiter.Allow()
-}
-
-// closeSend closes the Send channel exactly once and marks the connection as
-// closed so PushToConn can avoid a panic on closed-channel send.
-func (c *Conn) closeSend() {
-	c.sendMu.Lock()
-	defer c.sendMu.Unlock()
-	if c.closed.CompareAndSwap(false, true) {
-		close(c.Send)
-	}
-}
 
 // Manager is the global WebSocket connection registry. It tracks connections
 // by ID and per-user device type.
@@ -215,41 +72,6 @@ func (m *Manager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.conns)
-}
-
-func NewConn(ws *websocket.Conn) *Conn {
-	return NewConnWithBufferSize(ws, config.WSSendBufferSize)
-}
-
-// NewConnWithBufferSize builds a Conn with an explicit send-buffer capacity.
-// Test-only override point (capacity configuration seam): sizes <= 0 fall back
-// to the production default so default semantics never change.
-func NewConnWithBufferSize(ws *websocket.Conn, size int) *Conn {
-	if size <= 0 {
-		size = config.WSSendBufferSize
-	}
-	r := rate.Every(time.Second / time.Duration(config.WSMessageRateLimit))
-	if ws != nil {
-		ws.SetReadLimit(512 * 1024)
-	}
-	return &Conn{
-		W:          ws,
-		Send:       make(chan []byte, size),
-		msgLimiter: rate.NewLimiter(r, config.WSMessageBurst),
-	}
-}
-
-// ReadMessage reads a single WebSocket message with a read deadline.  The
-// deadline is set to WSReadTimeout (2x heartbeat interval).  When the parent
-// context carries its own deadline, the earlier of the two applies.
-//
-// Callers should replace conn.W.Read(ctx) with conn.ReadMessage(ctx) to gain
-// idle-timeout protection.
-func (c *Conn) ReadMessage(ctx context.Context) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, WSReadTimeout)
-	defer cancel()
-	_, data, err := c.W.Read(ctx)
-	return data, err
 }
 
 // Register assigns a unique UUIDv7 connection ID to c and adds it to the global
@@ -409,148 +231,6 @@ func (m *Manager) Unregister(connID string) {
 	slog.Info("ws disconnected", "conn_id", connID, "user_id", c.UserID)
 }
 
-// PushToConn sends a frame to a single connection.
-//
-// Every delivery attempt that reaches the connection (i.e. the conn exists and
-// is not closed) is stamped with the connection's monotonic seq_id inside the
-// sendMu critical section, so queue order — and therefore wire order, since a
-// single writeLoop drains Send — always equals seq order. frame is a value
-// copy, so stamping never races with concurrent fanout of the same logical
-// frame to other connections. Dropped (buffer-full) and marshal-failed frames
-// consume a seq too: the resulting gap is the client-side loss signal.
-func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
-	m.mu.RLock()
-	c, ok := m.conns[connID]
-	m.mu.RUnlock()
-	if !ok {
-		if metrics.WSDeliveryFailures != nil {
-			metrics.WSDeliveryFailures.WithLabelValues("conn_not_found").Inc()
-		}
-		return DeliveryResult{Status: DeliveryStatusConnNotFound, Err: ErrDeliveryConnNotFound}
-	}
-	if c.closed.Load() {
-		if metrics.WSDeliveryFailures != nil {
-			metrics.WSDeliveryFailures.WithLabelValues("conn_closed").Inc()
-		}
-		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
-	}
-
-	c.sendMu.Lock()
-	defer c.sendMu.Unlock()
-	if c.closed.Load() {
-		if metrics.WSDeliveryFailures != nil {
-			metrics.WSDeliveryFailures.WithLabelValues("conn_closed").Inc()
-		}
-		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
-	}
-
-	frame.SeqID = c.seq.Add(1)
-	data, err := frame.Marshal()
-	if err != nil {
-		if metrics.WSDeliveryFailures != nil {
-			metrics.WSDeliveryFailures.WithLabelValues("marshal_error").Inc()
-		}
-		return DeliveryResult{Status: DeliveryStatusMarshalError, Err: errors.Join(ErrDeliveryMarshalError, err)}
-	}
-
-	select {
-	case c.Send <- data:
-		return DeliveryResult{Queued: true, Status: DeliveryStatusQueued}
-	default:
-		if metrics.WSDroppedFrames != nil {
-			metrics.WSDroppedFrames.Inc()
-		}
-		drops := c.droppedFrames.Add(1)
-		if shouldLogDrop(drops) {
-			sessionID := extractSessionID(frame.Payload)
-			slog.Warn("ws frame dropped: send buffer full",
-				"conn_id", connID,
-				"user_id", c.UserID,
-				"device_type", c.DeviceType,
-				"frame_type", frame.Type,
-				"session_id", sessionID,
-				"seq_id", frame.SeqID,
-				"conn_dropped_total", drops,
-			)
-		}
-		return DeliveryResult{Status: DeliveryStatusBufferFull, Err: ErrDeliveryBufferFull, ConnDrops: drops}
-	}
-}
-
-// PushToUser fans a frame out to every connection of a user and aggregates the
-// per-connection delivery results. When at least one drop hits the
-// per-connection log-sampling boundary, a single aggregated warn line is
-// emitted for the whole fanout.
-func (m *Manager) PushToUser(userID string, frame Frame) FanoutResult {
-	m.mu.RLock()
-	devs, ok := m.byUser[userID]
-	if !ok {
-		m.mu.RUnlock()
-		return FanoutResult{}
-	}
-	connIDs := make([]string, 0, len(devs))
-	for _, cid := range devs {
-		connIDs = append(connIDs, cid)
-	}
-	m.mu.RUnlock()
-
-	res := FanoutResult{Conns: len(connIDs)}
-	for _, cid := range connIDs {
-		r := m.PushToConn(cid, frame)
-		switch r.Status {
-		case DeliveryStatusQueued:
-			res.Queued++
-		case DeliveryStatusBufferFull:
-			res.Dropped++
-			if shouldLogDrop(r.ConnDrops) {
-				res.LogSampled = true
-			}
-		default:
-			res.Failed++
-		}
-	}
-	if res.LogSampled {
-		slog.Warn("ws push to user dropped frames: send buffer full",
-			"user_id", userID,
-			"frame_type", frame.Type,
-			"conns", res.Conns,
-			"queued", res.Queued,
-			"dropped", res.Dropped,
-		)
-	}
-	return res
-}
-
-// PushToSession fans a frame out to every member of a session and aggregates
-// the delivery results across members. Aggregate drop logging follows the same
-// per-connection sampling as PushToUser.
-func (m *Manager) PushToSession(sessionID string, frame Frame) (res FanoutResult) {
-	if m.ResolveMembers == nil {
-		return res
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("ws PushToSession panic recovered in ResolveMembers callback",
-				"session_id", sessionID, "panic", r)
-		}
-	}()
-	memberIDs := m.ResolveMembers(sessionID)
-	for _, userID := range memberIDs {
-		res.merge(m.PushToUser(userID, frame))
-	}
-	if res.LogSampled {
-		slog.Warn("ws push to session dropped frames: send buffer full",
-			"session_id", sessionID,
-			"frame_type", frame.Type,
-			"members", len(memberIDs),
-			"conns", res.Conns,
-			"queued", res.Queued,
-			"dropped", res.Dropped,
-		)
-	}
-	return res
-}
-
 func (m *Manager) FindByConnID(connID string) *Conn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -637,37 +317,51 @@ func (m *Manager) pingAll() {
 	}
 	m.mu.RUnlock()
 
-	for _, c := range conns {
-		ctx, cancel := context.WithTimeout(context.Background(), config.WSPingTimeout)
-		err := c.W.Ping(ctx)
-		cancel()
-		if err != nil {
-			missed := c.missedPong.Add(1)
-			slog.Warn("ws ping failed", "conn_id", c.ID, "missed", missed)
-			if missed >= config.WSMaxMissedPongs {
-				if metrics.WSStaleClose != nil {
-					metrics.WSStaleClose.Inc()
+	// Parallel ping with a bounded worker pool so N half-open connections no
+	// longer take N × WSPingTimeout (serial) but max(WSPingTimeout, N/8). The
+	// missed-pong semantics are unchanged: each connection independently
+	// increments its missedPong counter on failure and closes at the
+	// WSMaxMissedPongs threshold. The worker count is intentionally modest
+	// (8) so the ping storm does not itself become a goroutine storm and the
+	// per-ping timeout still bounds each worker's worst case.
+	const pingAllWorkerCount = 8
+	workers := pingAllWorkerCount
+	if len(conns) < workers {
+		workers = len(conns)
+	}
+	if workers <= 0 {
+		return
+	}
+	jobs := make(chan *Conn, len(conns))
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for c := range jobs {
+				ctx, cancel := context.WithTimeout(context.Background(), config.WSPingTimeout)
+				err := c.W.Ping(ctx)
+				cancel()
+				if err != nil {
+					missed := c.missedPong.Add(1)
+					slog.Warn("ws ping failed", "conn_id", c.ID, "missed", missed)
+					if missed >= config.WSMaxMissedPongs {
+						if metrics.WSStaleClose != nil {
+							metrics.WSStaleClose.Inc()
+						}
+						slog.Info("ws closing stale connection", "conn_id", c.ID)
+						c.Close()
+						m.Unregister(c.ID)
+					}
+				} else {
+					c.missedPong.Store(0)
 				}
-				slog.Info("ws closing stale connection", "conn_id", c.ID)
-				c.Close()
-				m.Unregister(c.ID)
 			}
-		} else {
-			c.missedPong.Store(0)
-		}
+		}()
 	}
-}
-
-func extractSessionID(payload any) string {
-	if m, ok := payload.(map[string]interface{}); ok {
-		if sid, ok := m["session_id"].(string); ok {
-			return sid
-		}
+	for _, c := range conns {
+		jobs <- c
 	}
-	if m, ok := payload.(map[string]string); ok {
-		if sid, ok := m["session_id"]; ok {
-			return sid
-		}
-	}
-	return ""
+	close(jobs)
+	wg.Wait()
 }

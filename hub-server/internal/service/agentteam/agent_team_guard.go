@@ -8,29 +8,16 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"gorm.io/gorm"
 )
 
 func firstJSONString(values map[string]any, keys ...string) string {
-	for _, key := range keys {
-		value, ok := values[key]
-		if !ok {
-			continue
-		}
-		if text, ok := value.(string); ok {
-			return strings.TrimSpace(text)
-		}
-	}
-	return ""
+	return agentevent.FirstJSONString(values, keys...)
 }
 
 func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
+	return agentevent.FirstNonEmptyString(values...)
 }
 
 func firstJSONInt(values map[string]any, keys ...string) int64 {
@@ -150,20 +137,29 @@ func assignmentStatusFromPending(status string) string {
 	}
 }
 
-func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, error) {
-	return s.hasTimedOutActiveAssignmentDB(s.db, runID)
-}
-
 func (s *AgentTeamService) hasTimedOutActiveAssignmentDB(db *gorm.DB, runID string) (bool, error) {
 	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
 	return repository.HasTimedOutActiveAssignment(db, runID, deadline)
 }
 
-func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {
-	return s.teamRunBudgetExceededDB(s.db, runID)
-}
-
 func (s *AgentTeamService) teamRunBudgetExceededDB(db *gorm.DB, runID string) (bool, error) {
+	// Read the run row (already locked by the caller via LockTeamRunForUpdate)
+	// to inspect the maintained token_usage_total counter. When non-NULL and
+	// already at or above the run budget, the guard short-circuits in O(1)
+	// without scanning assignments + tasks + run events — the previous path
+	// did a full event scan on every route decision inside the per-run lock
+	// (route_decision.go), a hot-path regression under load.
+	lockedRun, err := repository.GetTeamRunByID(db, runID)
+	if err != nil {
+		return false, err
+	}
+	if lockedRun.TokenUsageTotal != nil && *lockedRun.TokenUsageTotal >= s.guardrails.MaxTeamRunBudgetTokens {
+		return true, nil
+	}
+	// Fallback: project from events (the existing O(n) path). The counter
+	// may be NULL (run not yet incremented, or a pre-backfill historical run)
+	// or stale (events written before the increment path existed); take
+	// max(column, projection) so a NULL/stale counter never under-reports.
 	assignments, err := repository.ListAssignmentsByTeamRun(db, runID)
 	if err != nil {
 		return false, err
@@ -179,6 +175,13 @@ func (s *AgentTeamService) teamRunBudgetExceededDB(db *gorm.DB, runID string) (b
 	budget := projectTeamBudget(events, 0)
 	if budget == nil {
 		return false, nil
+	}
+	// max(column, projection): the counter is maintained incrementally and
+	// may lag the event projection during a race; the projection is the
+	// authoritative fallback. Keep whichever is larger so the guard is
+	// monotonic and never under-reports.
+	if lockedRun.TokenUsageTotal != nil && *lockedRun.TokenUsageTotal > budget.TotalTokensUsed {
+		budget.TotalTokensUsed = *lockedRun.TokenUsageTotal
 	}
 	if budget.TokenLimit > 0 && budget.TotalTokensUsed >= budget.TokenLimit {
 		return true, nil

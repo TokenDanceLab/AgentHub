@@ -24,10 +24,6 @@ func TestUserJSONPasswordExcluded(t *testing.T) {
 	}
 }
 
-func stringPtr(s string) *string {
-	return &s
-}
-
 // --- TableName tests ---
 
 func TestTableNames(t *testing.T) {

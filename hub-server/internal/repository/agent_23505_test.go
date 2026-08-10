@@ -1,0 +1,119 @@
+package repository
+
+import (
+	"fmt"
+	"sync"
+	"testing"
+
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+// TestIsDuplicateKeyError covers the duplicate-key classifier used by the
+// CreateAgentRunEventWithNextSeqLimited idempotent-retry path. It must
+// recognize Postgres ("duplicate key value violates unique constraint"),
+// SQLite ("UNIQUE constraint failed: ..."), and be case-insensitive, while
+// rejecting unrelated errors and nil.
+func TestIsDuplicateKeyError(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"postgres duplicate key", fmt.Errorf("ERROR: duplicate key value violates unique constraint"), true},
+		{"sqlite UNIQUE uppercase", fmt.Errorf("UNIQUE constraint failed: agent_run_events(task_id, event_seq)"), true},
+		{"sqlite unique lowercase", fmt.Errorf("unique constraint failed: agent_run_events.task_id, agent_run_events.event_seq"), true},
+		{"unrelated error", fmt.Errorf("connection refused"), false},
+		{"record not found", gorm.ErrRecordNotFound, false},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, isDuplicateKeyError(c.err))
+		})
+	}
+}
+
+// setupSQLiteWithUniqueEventSeq opens an in-memory SQLite with the
+// agent_run_events table plus a UNIQUE constraint on (task_id, event_seq),
+// so the 23505 idempotent path can be exercised. The shared setupSQLite
+// helper does not include this unique index, so a local helper is used to
+// avoid changing the shared test schema (which other tests depend on).
+func setupSQLiteWithUniqueEventSeq(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	// Force a single shared connection so all goroutines see the same
+	// in-memory database (otherwise :memory: creates a per-connection DB
+	// and concurrent transactions hit "no such table").
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS agent_run_events (
+		id TEXT PRIMARY KEY,
+		task_id TEXT NOT NULL,
+		edge_run_id TEXT DEFAULT '',
+		session_id TEXT NOT NULL DEFAULT '',
+		agent_instance_id TEXT NOT NULL DEFAULT '',
+		event_seq INTEGER NOT NULL,
+		event_type TEXT NOT NULL DEFAULT '',
+		payload TEXT NOT NULL DEFAULT '',
+		created_at DATETIME
+	)`).Error)
+	// The unique index that makes a concurrent (task_id, event_seq) insert
+	// return a duplicate-key error, which CreateAgentRunEventWithNextSeqLimited
+	// must treat as idempotent success after requerying.
+	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_run_events_task_seq ON agent_run_events(task_id, event_seq)`).Error)
+	return db
+}
+
+// TestCreateAgentRunEventWithNextSeqLimited_ConcurrentInsertsNoSpuriousError
+// is a regression test for the 23505 idempotent path: when multiple
+// goroutines race to append the "next" event for the same task, the losers
+// (whose insert hits the unique constraint) must be treated as idempotent
+// success (return nil) rather than surfacing a spurious duplicate-key error
+// to the caller's retry. The final row count for the task must equal the
+// number of callers (one event seq per caller, no duplicates, no losses).
+//
+// SQLite serializes writes, so not every run triggers a 23505 — but the
+// invariant holds either way: every caller returns nil and exactly one row
+// per caller survives.
+func TestCreateAgentRunEventWithNextSeqLimited_ConcurrentInsertsNoSpuriousError(t *testing.T) {
+	db := setupSQLiteWithUniqueEventSeq(t)
+	const taskID = "task-concurrent"
+	const numCallers = 25
+
+	var wg sync.WaitGroup
+	errs := make(chan error, numCallers)
+	start := make(chan struct{})
+	for i := 0; i < numCallers; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start
+			evt := &model.AgentRunEvent{
+				TaskID:         taskID,
+				SessionID:      "sess-1",
+				AgentInstanceID: "ai-1",
+				EventType:      "stream",
+				Payload:        fmt.Sprintf("caller-%d", idx),
+			}
+			errs <- CreateAgentRunEventWithNextSeqLimited(db, evt, 0)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err, "concurrent CreateAgentRunEventWithNextSeqLimited must not surface a spurious duplicate-key error")
+	}
+
+	var count int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Where("task_id = ?", taskID).Count(&count).Error)
+	assert.Equal(t, int64(numCallers), count, "exactly one event per caller must survive (no duplicates, no losses)")
+}

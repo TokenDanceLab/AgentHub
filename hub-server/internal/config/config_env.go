@@ -89,3 +89,19 @@ func RateLimitFailOpen() bool {
 		return RateLimitFailOpenDefault // true
 	}
 }
+
+// AuthFailClosed returns whether access-token blacklist checks must fail closed
+// (reject the request) when the backing store (Redis) returns an error.
+// Controlled by the AGENTHUB_AUTH_FAIL_CLOSED environment variable.
+// Defaults to false when the variable is not set or not a recognized truthy
+// value, preserving the historical fail-open behavior for backward
+// compatibility. Operators hardening production set AGENTHUB_AUTH_FAIL_CLOSED=true
+// so a Redis outage cannot let a revoked (logged-out) access JWT back in.
+func AuthFailClosed() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AGENTHUB_AUTH_FAIL_CLOSED"))) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return AuthFailClosedDefault // false
+	}
+}

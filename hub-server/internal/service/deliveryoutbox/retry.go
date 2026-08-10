@@ -2,6 +2,7 @@ package deliveryoutbox
 
 import (
 	"math"
+	"math/rand"
 	"time"
 )
 
@@ -29,21 +30,45 @@ const (
 
 	// MaxBatch caps the number of deliveries scanned per retry cycle.
 	MaxBatch = 100
+
+	// RetryJitterFraction is the symmetric jitter applied to each backoff as a
+	// fraction of the computed delay (±25%). Spreading retries avoids a
+	// thundering herd when many deliveries become eligible simultaneously
+	// after a Hub outage recovery.
+	RetryJitterFraction = 0.25
 )
 
-// NextRetryDelay calculates the exponential backoff delay for a retry attempt.
-// Formula: RetryBaseInterval * 2^attempt, capped at RetryMaxInterval.
-// Negative attempts use the same math.Pow behavior as the historical helper.
+// NextRetryDelay calculates the exponential backoff delay for a retry attempt
+// with ±25% jitter. Formula: RetryBaseInterval * 2^attempt, capped at
+// RetryMaxInterval, then multiplied by (1 + rand(±25%)). Jitter prevents
+// thundering-herd retries when many deliveries recover at once. Negative
+// attempts use the same math.Pow behavior as the historical helper (→ 0).
 func NextRetryDelay(attempt int) time.Duration {
-	delay := RetryBaseInterval * time.Duration(int64(math.Pow(2, float64(attempt))))
-	if delay > RetryMaxInterval {
-		delay = RetryMaxInterval
+	base := RetryBaseInterval * time.Duration(int64(math.Pow(2, float64(attempt))))
+	if base > RetryMaxInterval {
+		base = RetryMaxInterval
 	}
-	return delay
+	return applyRetryJitter(base)
 }
 
 // NextRetryAt returns now + NextRetryDelay(attempt). The clock is injectable
 // so unit tests can stay deterministic.
 func NextRetryAt(attempt int, now time.Time) time.Time {
 	return now.Add(NextRetryDelay(attempt))
+}
+
+// applyRetryJitter applies a symmetric ±RetryJitterFraction jitter to delay.
+// A zero/negative delay stays zero (no negative backoff).
+func applyRetryJitter(delay time.Duration) time.Duration {
+	if delay <= 0 {
+		return delay
+	}
+	jitter := int64(float64(delay) * RetryJitterFraction)
+	if jitter <= 0 {
+		return delay
+	}
+	// rand.Int63n(2*jitter+1) ∈ [0, 2*jitter]; shift to [-jitter, +jitter].
+	// #nosec G404 -- backoff jitter only; randomness is not security-sensitive.
+	delta := rand.Int63n(2*jitter+1) - jitter
+	return delay + time.Duration(delta)
 }

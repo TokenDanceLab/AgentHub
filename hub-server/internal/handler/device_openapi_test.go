@@ -298,15 +298,15 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/contacts/friend-requests/{id}/accept":                        {"post"},
 		"/client/contacts/friend-requests/{id}/reject":                        {"post"},
 		"/client/contacts":                                                    {"get"},
-		"/client/contacts/{userId}":                                           {"delete"},
-		"/client/contacts/{userId}/block":                                     {"post"},
-		"/client/contacts/{userId}/unblock":                                   {"post"},
-		"/client/contacts/{userId}/remark":                                    {"put"},
+		"/client/contacts/{user_id}":                                          {"delete"},
+		"/client/contacts/{user_id}/block":                                    {"post"},
+		"/client/contacts/{user_id}/unblock":                                  {"post"},
+		"/client/contacts/{user_id}/remark":                                   {"put"},
 		"/client/sessions":                                                    {"get"},
 		"/client/sessions/private":                                            {"post"},
 		"/client/sessions/group":                                              {"post"},
 		"/client/sessions/{id}/members":                                       {"post"},
-		"/client/sessions/{id}/members/{user_id}":                             {"delete"},
+		"/client/sessions/{id}/members/{target_user_id}":                      {"delete"},
 		"/client/sessions/{id}/leave":                                         {"post"},
 		"/client/sessions/{id}/transfer-owner":                                {"post"},
 		"/client/sessions/{id}/dissolve":                                      {"post"},
@@ -344,7 +344,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/web/agent-tasks/{id}/events/summary":                                {"get"},
 		"/web/agent-tasks/{id}/events":                                        {"get"},
 		"/web/agent-tasks/{id}/approvals":                                     {"get"},
-		"/web/agent-tasks/{id}/approvals/{approvalId}/decide":                 {"post"},
+		"/web/agent-tasks/{id}/approvals/{approval_id}/decide":                {"post"},
 		"/web/agent-tasks/{id}/artifacts":                                     {"get"},
 		"/web/custom-agents":                                                  {"get", "post"},
 		"/web/custom-agents/{id}":                                             {"put", "delete"},
@@ -504,7 +504,7 @@ func TestOpenAPITaskApprovalArtifactRoutesDocumentEnvelope(t *testing.T) {
 		t.Fatalf("task approvals data ref = %q", approvalsRef.Value)
 	}
 
-	decide := yamlMapField(t, paths, "/web/agent-tasks/{id}/approvals/{approvalId}/decide", "paths.agent-task-approval-decide")
+	decide := yamlMapField(t, paths, "/web/agent-tasks/{id}/approvals/{approval_id}/decide", "paths.agent-task-approval-decide")
 	decidePost := yamlMapField(t, decide, "post", "paths.agent-task-approval-decide.post")
 	decideData := responseEnvelopeData(t, decidePost, "task approval decide")
 	decideRef := yamlField(t, decideData, "$ref", "task approval decide data ref")

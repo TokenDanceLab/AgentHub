@@ -131,31 +131,6 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-type mockTeamRouteHandler struct {
-	calls []mockRouteCall
-	err   error
-}
-
-type mockRouteCall struct {
-	userID   string
-	teamID   string
-	runID    string
-	decision model.CoordinatorRouteDecision
-}
-
-func (m *mockTeamRouteHandler) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
-	m.calls = append(m.calls, mockRouteCall{
-		userID:   userID,
-		teamID:   teamID,
-		runID:    runID,
-		decision: decision,
-	})
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &model.AgentTeamAssignment{ID: "assignment-1", TeamRunID: runID}, nil
-}
-
 func seedAgentRunEventTeamRun(t *testing.T, db *gorm.DB, status string) {
 	t.Helper()
 	now := time.Now()

@@ -105,6 +105,21 @@ type AgentTeamRun struct {
 	TargetID       *string   `gorm:"type:uuid" json:"target_id,omitempty"`
 	Mode           string    `gorm:"type:varchar(20);not null;default:supervisor" json:"mode"`
 	Status         string    `gorm:"type:varchar(20);not null;default:queued" json:"status"`
+	// TokenUsageTotal is a maintained counter of total tokens consumed by the
+	// run's agent run events, incremented by the edge stream callback when a
+	// stream event carries token usage. NULL until the first increment (or
+	// until a backfill populates it from the event projection). The budget
+	// guard uses it as an O(1) fast path and takes max(column, projection)
+	// so a NULL/stale value never under-reports. See migration 0066.
+	//
+	// Tagged with -> (read-only) so GORM never includes the column in INSERT
+	// or UPDATE column lists — the counter is only advanced via raw
+	// db.Exec UPDATE in IncrementTeamRunTokenUsage (bypassing the struct
+	// field permission), and existing test fixtures whose agent_team_runs
+	// table predates migration 0066 (no token_usage_total column) keep
+	// working because CreateTeamRun never references the column. SELECT
+	// (First/Find) is unaffected by -> so the guard reads the live value.
+	TokenUsageTotal *int64    `gorm:"column:token_usage_total;->" json:"token_usage_total,omitempty"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

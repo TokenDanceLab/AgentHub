@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 )
@@ -263,7 +265,8 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 	// not patchable at all.
 	var patch model.ExecutionTargetPatch
 	if err := c.ShouldBindJSON(&patch); err != nil {
-		Fail(c, errcode.ErrBadRequest.WithMessage("invalid patch body: "+err.Error()))
+		slog.Error("execution target update bind error", "request_id", middleware.GetRequestID(c), "user_id", userID, "target_id", id, "error", err)
+		Fail(c, errcode.ErrBadRequest.WithMessage("invalid patch body"))
 		return
 	}
 

@@ -66,29 +66,67 @@ func (c *Config) validateRedis() error {
 	return nil
 }
 
+// knownHardcodedSecrets is the exact-match blocklist for short or trivially
+// weak secrets. Prefix matching via weakSecretPrefixes catches the whole
+// dev-secret-change-in-production* and change-me-production* families
+// (including the documented .env.example values
+// dev-secret-change-in-production-min-length-32 and
+// change-me-production-min-length-32-chars, both 41 chars and long enough
+// to pass the 32-char minimum length gate).
+var knownHardcodedSecrets = []string{
+	"",
+	"dev-secret",
+	"test-secret",
+	"my-secret-key",
+	"changeme",
+	"secret",
+	"default",
+	"password",
+	"1234567890123456",
+	"aaaaaaaaaaaaaaaa",
+}
+
+// weakSecretPrefixes blocks the publicly-documented placeholder families.
+// Any secret starting with one of these prefixes is treated as a known
+// weak value regardless of length, so documented placeholders that are long
+// enough to pass the 32-char minimum cannot bypass the length gate.
+//
+//   - "dev-secret-change-in-production": the documented dev placeholder
+//     family (e.g. dev-secret-change-in-production-min-length-32, 41 chars).
+//   - "change-me-production": the production .env.example placeholder
+//     family (e.g. change-me-production-min-length-32-chars, 41 chars).
+//     Both PG_PASSWORD and JWT_SECRET in .env.example used this prefix; the
+//     JWT variant was long enough to pass the length gate before this entry.
+var weakSecretPrefixes = []string{
+	"dev-secret-change-in-production",
+	"change-me-production",
+}
+
+// isKnownWeakSecret reports whether the given secret is a hardcoded default
+// or a publicly-documented placeholder. It uses prefix matching for the
+// documented families and exact matching for the remaining blocklist, so
+// derivatives of the documented secrets (e.g. with a suffix bolted on to
+// satisfy the 32-char minimum) are still rejected.
+func isKnownWeakSecret(secret string) bool {
+	for _, prefix := range weakSecretPrefixes {
+		if strings.HasPrefix(secret, prefix) {
+			return true
+		}
+	}
+	return slices.Contains(knownHardcodedSecrets, secret)
+}
+
 func (c *Config) validateJWT() error {
 	// JWT: reject hardcoded defaults and known weak development secrets.
 	// In production (default), any known hardcoded value is fatal.
 	// In dev/test environments these are allowed for convenience.
-	knownHardcodedSecrets := []string{
-		"",
-		"dev-secret-change-in-production",
-		"dev-secret",
-		"test-secret",
-		"my-secret-key",
-		"changeme",
-		"secret",
-		"default",
-		"password",
-		"1234567890123456",
-		"aaaaaaaaaaaaaaaa",
-	}
-	if slices.Contains(knownHardcodedSecrets, c.JWT.Secret) {
-		// Also check the env-var value against the blocklist to prevent
-		// bypass by setting AGENTHUB_JWT_SECRET to the same weak value.
+	if isKnownWeakSecret(c.JWT.Secret) {
+		// Also check the env-var value against the weak-secret check to
+		// prevent bypass by setting AGENTHUB_JWT_SECRET to the same weak
+		// value (covers the .env.example documented dev placeholder).
 		envSecret := os.Getenv("AGENTHUB_JWT_SECRET")
-		if envSecret == "" || slices.Contains(knownHardcodedSecrets, envSecret) {
-			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable with a strong, non-default value; hardcoded defaults are rejected")
+		if envSecret == "" || isKnownWeakSecret(envSecret) {
+			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable with a strong, non-default value; hardcoded defaults and documented dev placeholders are rejected")
 		}
 	}
 

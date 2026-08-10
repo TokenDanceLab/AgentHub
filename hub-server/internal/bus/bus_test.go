@@ -28,20 +28,22 @@ func newTestBus(t *testing.T) *Bus {
 	return b
 }
 
-// drainBus waits until the pool reports no pending or running work, failing
-// the test if that does not happen within a generous deadline. It avoids
-// fixed time.Sleep waits in favour of observing real bus state.
+// drainBus waits until the bus reports no pending work, failing the test if
+// that does not happen within a generous deadline. It deliberately waits on
+// Pending() (the bus's own completion counter, decremented in each handler's
+// defer) rather than Running() (ants pool worker occupancy): an idle ants
+// worker does not exit immediately after a handler returns, so gating on
+// Running()==0 would add a ~1-3s purge wait per publish with no correctness
+// benefit — Pending()==0 is the true "all dispatched handlers have finished"
+// signal (P1: bus drain 语义).
 func drainBus(t *testing.T, b *Bus) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && (b.Running() > 0 || b.Pending() > 0) {
+	for time.Now().Before(deadline) && b.Pending() > 0 {
 		time.Sleep(time.Millisecond)
 	}
 	if got := b.Pending(); got != 0 {
 		t.Fatalf("drain: Pending=%d, want 0", got)
-	}
-	if got := b.Running(); got != 0 {
-		t.Fatalf("drain: Running=%d, want 0", got)
 	}
 }
 
@@ -255,7 +257,13 @@ func TestRunningCounter_NonzeroWhileHandlerBlocked(t *testing.T) {
 
 	close(release)
 	drainBus(t, b)
-	assert.Equal(t, 0, b.Running(), "Running must return to 0 after handler completes")
+	// Running reflects ants worker occupancy, which can lag the handler's
+	// defer (Pending) by a short worker-purge window, so poll for the settle
+	// instead of asserting an instantaneous zero (drainBus now gates on
+	// Pending only — see its doc comment).
+	require.Eventually(t, func() bool { return b.Running() == 0 },
+		2*time.Second, time.Millisecond,
+		"Running must return to 0 after handler completes")
 }
 
 // ── Snapshot semantics ───────────────────────────────────────────────────

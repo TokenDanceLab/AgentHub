@@ -155,7 +155,11 @@ func (c *jwksCache) fetchJWKS() error {
 
 	keys := make(map[string]*rsa.PublicKey, len(jwks.Keys))
 	for _, k := range jwks.Keys {
-		if k.KTY != "RSA" {
+		// Pin alg to RS256: a JWKS entry advertising RS384/RS512 (or no alg)
+		// is refused even though the key is RSA, so an attacker who persuades
+		// the issuer to publish a stronger-alg key cannot slip a token signed
+		// with a different RSA padding/hash past this verifier.
+		if k.KTY != "RSA" || k.Alg != "RS256" {
 			continue
 		}
 		pubKey, err := parseJWKKey(&k)
@@ -239,7 +243,13 @@ func (v *TokenDanceVerifier) ParseJWT(tokenString, expectedIssuer, expectedAudie
 		}
 	}
 
-	// Second pass: full verification with the correct key.
+	// Second pass: full verification with the correct key. Pin the signing
+	// method to RS256 explicitly (WithValidMethods + keyfunc alg check) so a
+	// token signed with RS384/RS512 — even if it shared the kid — is rejected
+	// before signature verification, and the JWKS alg-pin above is reinforced
+	// at parse time. (golang-jwt v5 models RS256/RS384/RS512 as the same
+	// *SigningMethodRSA type, so a type assertion cannot distinguish them;
+	// the alg header string is the authoritative discriminator.)
 	claims := &TokenDanceClaims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -248,8 +258,12 @@ func (v *TokenDanceVerifier) ParseJWT(tokenString, expectedIssuer, expectedAudie
 			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
+			if t.Header["alg"] != "RS256" {
+				return nil, fmt.Errorf("unexpected signing algorithm: %v", t.Header["alg"])
+			}
 			return pubKey, nil
 		},
+		jwt.WithValidMethods([]string{"RS256"}),
 		jwt.WithIssuer(expectedIssuer),
 		jwt.WithAudience(expectedAudience),
 		jwt.WithLeeway(30*time.Second),

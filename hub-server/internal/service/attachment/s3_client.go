@@ -25,18 +25,10 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 	}
 	endpoint := normalizeS3Endpoint(cfg.Endpoint, cfg.UseSSL)
 
-	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		return aws.Endpoint{
-			URL:               endpoint,
-			SigningRegion:     region,
-			HostnameImmutable: true,
-		}, nil
-	})
-
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(region),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
-		awsconfig.WithEndpointResolverWithOptions(resolver),
+		awsconfig.WithBaseEndpoint(endpoint),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s3: failed to load aws config: %w", err)
