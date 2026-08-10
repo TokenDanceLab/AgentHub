@@ -75,7 +75,8 @@ def main() -> int:
     edge = get_job_block(workflow, "go-edge")
     hub = get_job_block(workflow, "go-hub")
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
-    backend_focused = get_job_block(workflow, "backend-focused-subset")
+    # CI5: backend-focused-subset job removed (redundant with go-edge/go-hub
+    # full `go test ./...` runs that already cover the focused packages).
     desktop = get_job_block(workflow, "frontend-desktop")
     web = get_job_block(workflow, "frontend-web")
     mobile = get_job_block(workflow, "frontend-mobile")
@@ -85,6 +86,11 @@ def main() -> int:
     visual_shell = get_job_block(workflow, "visual-qa-shell")
     validate = get_job_block(workflow, "validate")
     backend_perf = get_job_block(workflow, "backend-perf-leak-gates")
+    # #audit: frontend coverage baseline gate split out of the unconditional
+    # validate lane into a path-filtered frontend-coverage job (desktop ∪ web
+    # ∪ shared). A Go-only PR no longer pays for pnpm install + vitest
+    # --coverage. The gate contract moves with it.
+    frontend_coverage = get_job_block(workflow, "frontend-coverage")
 
     assert_contains(edge, r"Coverage check \(informational\)", "go-edge overall coverage must stay informational")
     assert_contains(edge, r"Coverage per-package minimums", "go-edge must keep per-package coverage minimums")
@@ -122,13 +128,10 @@ def main() -> int:
     assert_contains(backend_fixture, re.escape("python ./scripts/verify/verify-p0-remote-control-fixture.py"), "backend-e2e-fixture must run the P0 remote-control fixture readiness gate")
     assert_step_continue_on_error(backend_fixture, "P0 remote-control fixture readiness", False)
 
-    assert_contains(backend_focused, r"Backend focused subset", "backend-focused-subset must use a clear job name")
-    assert_contains(backend_focused, r"Hub focused backend packages", "backend-focused-subset must run the Hub focused backend package step")
-    assert_contains(backend_focused, r"Edge focused backend packages", "backend-focused-subset must run the Edge focused backend package step")
-    assert_contains(backend_focused, re.escape("cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1"), "backend-focused-subset must run the approved Hub focused backend packages")
-    assert_contains(backend_focused, re.escape("cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1"), "backend-focused-subset must run the approved Edge focused backend packages")
-    assert_step_continue_on_error(backend_focused, "Hub focused backend packages", False)
-    assert_step_continue_on_error(backend_focused, "Edge focused backend packages", False)
+    # CI5: backend-focused-subset job deleted — its focused package subset
+    # (hub ./internal/{repository,service,app,handler,router} and edge
+    # ./internal/{store,api,lifecycle}+cmd/agenthub-edge) is fully covered by
+    # the go-hub/go-edge full `go test ./...` runs. No assertions remain.
 
     backend_forbidden_patterns = [
         r"-RealCli",
@@ -160,7 +163,6 @@ def main() -> int:
 
     for forbidden in backend_forbidden_patterns:
         assert_not_contains(backend_fixture, forbidden, f"backend-e2e-fixture must not invoke '{forbidden}'")
-        assert_not_contains(backend_focused, forbidden, f"backend-focused-subset must not invoke '{forbidden}'")
 
     for job_name, job_body, lockfile in (
         ("frontend-desktop", desktop, "app/pnpm-lock.yaml"),
@@ -180,12 +182,20 @@ def main() -> int:
     # production src in the denominator (app/test-config/coverage.ts factory).
     # The baseline gate runs all four packages plus a negative self-test proving
     # imported-by-nobody modules are counted as 0% and trip the ratchet.
-    assert_contains(validate, r"Verify coverage baseline", "validate job must run the coverage baseline gate")
-    assert_contains(validate, r"scripts/verify/verify-coverage-baseline.py", "validate job must call the coverage baseline verifier")
-    assert_contains(validate, r"Self-test coverage include contract", "validate job must run the coverage include negative self-test")
-    assert_contains(validate, r"coverage-include\.Tests\.py", "validate job must call the coverage include self-test")
-    assert_step_continue_on_error(validate, "Verify coverage baseline", False)
-    assert_step_continue_on_error(validate, "Self-test coverage include contract (negative)", False)
+    # #audit: gate moved from unconditional validate lane to path-filtered
+    # frontend-coverage job (desktop ∪ web ∪ shared). Assert the new home
+    # and the path filter so the gate cannot be silently un-wired.
+    assert_contains(frontend_coverage, r"needs:\s+changes", "frontend-coverage must depend on unified changes job")
+    assert_contains(frontend_coverage, r"needs.changes.outputs.frontend", "frontend-coverage must path-filter on frontend changes")
+    assert_contains(frontend_coverage, r"Verify coverage baseline", "frontend-coverage job must run the coverage baseline gate")
+    assert_contains(frontend_coverage, r"scripts/verify/verify-coverage-baseline.py", "frontend-coverage job must call the coverage baseline verifier")
+    assert_contains(frontend_coverage, r"Self-test coverage include contract", "frontend-coverage job must run the coverage include negative self-test")
+    assert_contains(frontend_coverage, r"coverage-include\.Tests\.py", "frontend-coverage job must call the coverage include self-test")
+    assert_step_continue_on_error(frontend_coverage, "Verify coverage baseline", False)
+    assert_step_continue_on_error(frontend_coverage, "Self-test coverage include contract (negative)", False)
+    # validate must no longer carry the heavy coverage gate — it would
+    # re-introduce the unconditional pnpm install + vitest cost on every PR.
+    assert_not_contains(validate, r"Verify coverage baseline", "validate job must not carry the coverage gate (moved to frontend-coverage)")
 
     ci_policy_step = get_step_block(validate, "Verify CI gate policy")
     assert_contains(ci_policy_step, r"scripts/verify/verify-ci-gates\.py", "CI policy step must call scripts/verify/verify-ci-gates.py")
@@ -254,9 +264,8 @@ def main() -> int:
     assert_contains(validate, r"scripts/verify/verify-shared-ui-hubclient.py", "validate job must call scripts/verify/verify-shared-ui-hubclient.ps1")
     assert_step_continue_on_error(validate, "Verify Shared UI hubClient gate", False)
     assert_contains(validate, r"check-secrets\.sh", "validate job must keep secret guard")
-    assert_contains(validate, r"Verify coverage baseline", "validate job must run the coverage baseline gate")
-    assert_contains(validate, r"scripts/verify/verify-coverage-baseline.py", "validate job must call scripts/verify/verify-coverage-baseline.ps1")
-    assert_step_continue_on_error(validate, "Verify coverage baseline", False)
+    # coverage baseline gate now lives in frontend-coverage (see above);
+    # validate must not re-introduce it.
 
     assert_contains(mobile, r"(?m)^\s+timeout-minutes:\s+45\s*$", "frontend-mobile job must have a hard timeout")
     assert_contains(get_step_block(mobile, "Screenshot visual QA (mobile)"), r"(?m)^\s+timeout-minutes:\s+12\s*$", "mobile visual QA must have a hard timeout")

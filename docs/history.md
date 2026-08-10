@@ -30,6 +30,24 @@
 | `css-audit-results.json` | `archive/agenthub/repo/root-evidence/css-audit-results.json` |
 | repo structure cleanup SPEC | `archive/agenthub/repo/specs/repo-structure-doc-tooling-cleanup/` |
 
+## Pending External Archive (in-repo, awaiting migration)
+
+以下文件已无活跃引用、本通道仅标注 `pending external archive — see docs/history.md`，未真外迁（外迁需管理员）。cleanup-baseline 冻结快照（`docs/archives/cleanup-baseline/`）受 §8 + roadmap + archives README 三重背书保留，不在此列。
+
+| Path | Kind |
+|---|---|
+| `docs/archives/analysis/hub-service-boundary-map.md` | historical boundary map |
+| `docs/archives/analysis/post-polish-module-inventory.md` | post-polish inventory |
+| `docs/archives/analysis/post-polish-project-overview.md` | post-polish overview |
+| `docs/archives/analysis/post-polish-risk-assessment.md` | post-polish risk |
+| `docs/archives/analysis/settings-empty-error-inventory.md` | settings inventory |
+| `docs/archives/analysis/settings-sectionid-residual-inventory.md` | settings inventory |
+| `docs/archives/analysis/frontend-dedupe-plan.md` | strangler plan |
+| `docs/archives/plan/post-polish-milestones.md` | post-polish plan |
+| `docs/archives/plan/post-polish-dependency-graph.md` | post-polish plan |
+| `docs/archives/handoff/2026-07-20-phase-74-75-handoff.md` | phase handoff |
+| `docs/archives/branch-hygiene.md` | branch cleanup record |
+
 ## Rules
 
 - Use active AgentHub docs for current rules, architecture, roadmap, APIs, and SPEC progress.

@@ -1,5 +1,6 @@
 # Post-Polish Module Inventory (residual)
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-21
 > focus: residual hotspots after strangler peels + Visual QA polish
 > status: Phase 79–80 **delivered** — table reflects post-#1341 state

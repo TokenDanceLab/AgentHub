@@ -4,7 +4,7 @@
 Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome · **#1197 frosted-glass material layer**
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
-> 可选审计清单见 [design-token-usage-audit.md](../archives/analysis/design-token-usage-audit.md)。
+> 可选审计清单见 [design-token-usage-audit.md](../analysis/design-token-usage-audit.md)。
 > 主架构索引：[architecture.md](../architecture.md)
 
 ## 1. Ownership map
@@ -114,9 +114,9 @@ Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-
 
 | Layer | SSOT |
 |---|---|
-| Capture matrix (P74/P75 gate) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark · DPR **1x default** |
+| Capture matrix (Visual QA gate 89/100，已收口 2026-07-20) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark · DPR **1x default** |
 | Optional 2x capture | `visual:qa:shell:2x` / `VISUAL_QA_DPR=2` · files suffix `@2x` |
-| Score rubric / pass bar | [visual-qa-scorecard.md](../archives/analysis/visual-qa-scorecard.md) (100-pt core + optional HiDPI 6 bonus) |
+| Score rubric / pass bar | [visual-qa-scorecard.md](../analysis/visual-qa-scorecard.md) (100-pt core + optional HiDPI 6 bonus) |
 | Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
 
 Do not cite `1440x920` as the Desktop/Web gate viewport.

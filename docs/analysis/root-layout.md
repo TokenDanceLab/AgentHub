@@ -48,8 +48,8 @@ These are **non-negotiable** for this ADR and any follow-on cleanup:
 
 - `scripts/dev/dev-up.sh` — `cd` repo root; copies root `.env.example`; runs compose from root
 - `scripts/release/verify-web-deploy-readiness.py` — asserts content of root `docker-compose.yml`
-- `scripts/verify/verify-oidc-readiness.{sh,py}` — asserts root `.env.example` + `docker-compose.yml`
-- `scripts/smoke/verify-p0-local-smoke.sh` — asserts root files exist
+- `scripts/verify/verify-oidc-readiness` — retired (#1653)；OIDC 配置形状不再有独立门禁
+- `scripts/smoke/verify-p0-local-smoke.py` — asserts root files exist
 - `docs/architecture/05-deployment.md` — table lists root `docker-compose.yml` as local-dev asset
 
 Production shape already lives under `deployments/production/`; local-dev compose staying at root is intentional until a coordinated move.

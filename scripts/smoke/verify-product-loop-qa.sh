@@ -60,11 +60,22 @@ run_script_quiet() {
 
     printf '\n  > %s (%s)...\n' "$label" "$script"
     if [[ -f "$REPO_ROOT/scripts/$script" ]]; then
-        if bash "$REPO_ROOT/scripts/$script" "${args[@]}" 2>&1 | tail -5; then
-            return 0
-        else
-            return 1
-        fi
+        case "$script" in
+            *.py)
+                if python3 "$REPO_ROOT/scripts/$script" "${args[@]}" 2>&1 | tail -5; then
+                    return 0
+                else
+                    return 1
+                fi
+                ;;
+            *)
+                if bash "$REPO_ROOT/scripts/$script" "${args[@]}" 2>&1 | tail -5; then
+                    return 0
+                else
+                    return 1
+                fi
+                ;;
+        esac
     else
         add_warning "Script not found: $script"
         return 1
@@ -79,18 +90,17 @@ echo "  Repo: $REPO_ROOT"
 echo "===================================="
 
 # Segment 1: Static checks (always run)
+# Bash full-reimplementations of the Python gates were deleted (audit); this
+# umbrella now invokes the maintained Python verifiers directly. The retired
+# OIDC/runtime readiness gates (#1653 / archived) are dropped — re-running
+# them here would re-introduce the stale "script not found" warnings the old
+# .sh names already produced.
 add_segment "Static boundary checks"
-if ! run_script_quiet "verify-oidc-readiness.sh" "OIDC readiness" "-SkipWorkspaceDocs"; then
-    add_failure "OIDC readiness check failed"
-fi
-if ! run_script_quiet "verify-web-hub-boundary.sh" "Web Hub boundary"; then
+if ! run_script_quiet "verify/verify-web-hub-boundary.py" "Web Hub boundary"; then
     add_failure "Web Hub boundary check failed"
 fi
-if ! run_script_quiet "verify-v4-old-ui-active-paths.sh" "v4 old UI paths"; then
+if ! run_script_quiet "verify/verify-v4-old-ui-active-paths.py" "v4 old UI paths"; then
     add_failure "v4 old UI path check failed"
-fi
-if ! run_script_quiet "verify-runtime-readiness.sh" "Runtime readiness"; then
-    add_failure "Runtime readiness check failed"
 fi
 
 # Segment 2: Go tests

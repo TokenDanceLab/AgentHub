@@ -5,4 +5,5 @@ reviews:
     enabled: true
     drafts: false
     base_branches:
+      - master
       - dev/delicious233

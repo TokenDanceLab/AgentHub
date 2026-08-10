@@ -5,31 +5,16 @@
 | branch-hygiene | 分支混乱清理：删除 fork/* 48 个历史分支 + origin/dev/* 3 个早期 dev 分支，保留分支曾存在的痕迹；PR [#1501](https://github.com/TokenDanceLab/AgentHub/pull/1501) | 2026-08-02 | [branch-hygiene.md](./branch-hygiene.md) |
 | docs-hygiene | 历史 analysis/plan 收拢：post-polish 双轨、一次性 inventory、rescore 系列移入 archives | 2026-08-02 | [analysis/](./analysis/) · [plan/](./plan/) |
 | cleanup-baseline | knowledge-first strangler cleanup + SDD closeout；Issues #424–#445 closed；Phase 7 residual #447–#451；Project [cleanup-baseline](https://github.com/users/DeliciousBuding/projects/6)；PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | 2026-07-16 | [cleanup-baseline/](./cleanup-baseline/) |
-| wiki-consolidation | wiki 孤儿知识面处置：14 个文件（pages/ 10 + 根 4）；module-hub 鉴权增量并入 01-hub-server、module-edge lifecycle/store 增量并入 02-edge-server，其余为重复/过时编译层归档；`wiki/` 目录移除 | 2026-08-02 | [wiki/](./wiki/) |
+| wiki-consolidation | wiki 孤儿知识面处置：14 个文件（pages/ 10 + 根 4）；module-hub 鉴权增量并入 01-hub-server、module-edge lifecycle/store 增量并入 02-edge-server，其余为重复/过时编译层归档；`wiki/` 目录移除 | 2026-08-02 | 详见 commit message（wiki/ 已删除，无独立归档目录） |
 
-孤儿 `scripts/verify/` verifier 于 2026-08-02 评估（`chore/rule-enforcement`，#1515）：归档判定已撤销，git mv 未执行，脚本仍原样保留在 `scripts/verify/`。
+## 15-verifier disposition
 
-- Date: 2026-08-02
-- Branch / worktree: `chore/rule-enforcement`
-- Disposition: 15 files 评估后撤销归档 — 均有活跃执行引用（smoke/release/tests-contract 互引），git mv 未执行
-- 评估原因：obsolete / approval-gate by design / needs live services:
-  - approved-real 老批次（`verify-approved-real-{demo-readiness,edge-cli-evidence,preflight}.ps1`、`verify-p0-approved-real-gold-path.py`）— 流程已被 `.agents/skills/real-e2e-acceptance/` 取代
-  - edge-cli / runtime / fixture 过时项（`verify-edge-cli-{dispatch-evidence,json-readiness,real-readiness}.ps1`、`verify-runtime-readiness.{py,sh}`、`verify-login-fixture-topology.py`、`verify-teamrun-demo-readiness.ps1`）
-  - `verify-live-chain-topology.py` — 源码重构（agent_team 拆分、useHubIntegration 拆分、handlers 拆分）后 28/88 断言失效；Web Hub-only 边界由活门禁 `verify-web-hub-boundary.ps1` 覆盖
-  - 登录/OIDC approval-gate（`verify-login-e2e-readiness.py`、`verify-token-dance-id-login-readiness.py` 需人工批准元数据/凭据，`verify-oidc-flow.py` 需真实 TokenDance ID + Hub 服务）— 非 CI 静态门禁；OIDC 配置形状门禁 `verify-oidc-readiness.py` 已 KNOWN-OBSOLETE 且未挂 CI（重写待办见 AGENTS.md §9.5）
-- 现状：15 个脚本仍保留在 `scripts/verify/`（其中 `verify-edge-cli-json-readiness.ps1` 于 2026-08-04 #1610 零引用清理时删除）
+`scripts/verify/` 评估记录（2026-08-02 `chore/rule-enforcement`，#1515）：
 
-## wiki-consolidation
-
-Archive of the orphan `wiki/` compiled-knowledge tree (cleanup-baseline Phase 2 llmwiki), removed 2026-08-02 after merging the two incremental pages into `docs/architecture/` and archiving the rest.
-
-- Date: 2026-08-02
-- Branch / worktree: `chore/wiki-consolidation`
-- Disposition: 14 files archived as-is（原样移动，未改内容）; PR link in commit message
-- Incremental content merged:
-  - `wiki/pages/module-hub.md` → `docs/architecture/01-hub-server.md`（Auth 中间件链与路由分组）
-  - `wiki/pages/module-edge.md` → `docs/architecture/02-edge-server.md`（Run Lifecycle 状态机 + Store/EventBus 持久化细节）
-- Everything else (module-frontend / architecture-seams / flow-control-event / hotspots / risks-open / overview / ops-hk3 / cleanup-playbook + 4 root files) was duplicate of or stale against `docs/architecture*`, `api/events.md`, `docs/governance/*`, `docs/analysis/*` and archived unmodified.
+- 评估后撤销归档 — 均有活跃执行引用，git mv 未执行，脚本仍保留在 `scripts/verify/`。
+- OIDC 配置形状门禁 `verify-oidc-readiness.py` 已退役（#1653）；OIDC 真实流验证非 CI 静态门禁，见 `docs/governance/security-risk-register.md` AH-SR-035。
+- `verify-edge-cli-json-readiness.ps1` 于 2026-08-04 #1610 零引用清理时删除。
+- `.ps1` verifier 已统一迁为 `.py`；当前 `scripts/verify/` 列表以 `verify-doc-ssot.py` §9.5 映射表为准。
 
 ## cleanup-baseline
 

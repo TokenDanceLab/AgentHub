@@ -1,5 +1,7 @@
 # 分支清理归档：fork/* 48 个 + origin/dev/* 3 个
 
+> pending external archive — see docs/history.md
+
 删除日期：2026-08-02
 执行分支：`chore/branch-hygiene`（PR 见 README 索引）
 

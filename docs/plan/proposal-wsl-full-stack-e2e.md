@@ -1,5 +1,7 @@
 # WSL 全栈 E2E（proposal-wsl-full-stack-e2e）
 
+> SPEC completed — pending external archive
+
 - 状态：**SPEC（2026-08-06 实现并首次跑通）**
 - Owner：AgentHub / 部署与集成验证
 - 关联：`docs/architecture/05-deployment.md`、`docs/governance/governance-execution.md`、TokenDanceID `scripts/verify-agenthub-e2e.ps1`

@@ -117,8 +117,14 @@ func TestWriteErrorGeneric(t *testing.T) {
 	if errObj["code"] != "internal_error" {
 		t.Fatalf("code = %v", errObj["code"])
 	}
-	if errObj["message"] != "something broke" {
-		t.Fatalf("message = %v", errObj["message"])
+	// The raw error text must NOT leak into the response (WriteError logs it
+	// via slog and surfaces only the generic internal-error message), so an
+	// operator can correlate via traceId without exposing internals.
+	if msg, _ := errObj["message"].(string); msg == "something broke" {
+		t.Fatalf("message leaked raw error text into response: %q", msg)
+	}
+	if _, ok := errObj["traceId"].(string); !ok || errObj["traceId"] == "" {
+		t.Fatalf("traceId = %v, want non-empty trace id for correlation", errObj["traceId"])
 	}
 }
 

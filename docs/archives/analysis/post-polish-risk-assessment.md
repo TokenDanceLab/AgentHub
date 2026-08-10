@@ -1,5 +1,6 @@
 # Post-Polish Risk Assessment
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-21
 > security SSOT remains `docs/governance/security-risk-register.md`
 > residual program Phases 79–80: **closed** (#1340–#1342)
