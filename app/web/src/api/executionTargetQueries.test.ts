@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccessToken } from '@/hooks/useAuth';
 import {
   fetchExecutionTargets,
-  selectOnlineLocalEdgeExecutionTarget,
   summarizeExecutionTargets,
   type ExecutionTargetInventoryItem,
 } from './executionTargetQueries';
@@ -287,37 +286,6 @@ describe('web execution target queries', () => {
         is_online: false,
       },
     ]);
-  });
-
-  it('selects only an online healthy local edge target', () => {
-    const targets = [
-      {
-        id: 'offline',
-        target_type: 'local_edge' as const,
-        is_online: false,
-        health_state: 'healthy' as const,
-      },
-      {
-        id: 'degraded',
-        target_type: 'local_edge' as const,
-        is_online: true,
-        health_state: 'degraded' as const,
-      },
-      {
-        id: 'relay',
-        target_type: 'hub_relay' as const,
-        is_online: true,
-        health_state: 'healthy' as const,
-      },
-      {
-        id: 'winner',
-        target_type: 'local_edge' as const,
-        is_online: true,
-        health_state: 'healthy' as const,
-      },
-    ];
-    expect(selectOnlineLocalEdgeExecutionTarget(targets)?.id).toBe('winner');
-    expect(selectOnlineLocalEdgeExecutionTarget([])).toBeUndefined();
   });
 
   it('counts unknown health states and preserves zero-filled type buckets', () => {

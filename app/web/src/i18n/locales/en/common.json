@@ -147,6 +147,10 @@
   "auth.tokenDanceLogin": "Continue with TokenDance ID",
   "auth.tokenDanceCallbackPending": "Opening TokenDance ID sign-in. Complete authorization there to return to AgentHub.",
   "auth.error.tokenDanceUnavailable": "TokenDance ID sign-in is temporarily unavailable.",
+  "auth.error.oidc.stateMismatch": "OIDC state mismatch — possible CSRF attack. Please try again.",
+  "auth.error.oidc.timeout": "Login timed out — no callback received within 5 minutes.",
+  "auth.error.oidc.tokenExchangeFailed": "Token exchange failed: {{detail}}",
+  "auth.error.oidc.startFailed": "Failed to start OIDC login: {{detail}}",
   "webChat.signInRequired": "Sign in is required to use web chat",
 
   "diff.empty.title": "No changes to display",
@@ -377,6 +381,13 @@
   "hub.error.wsAuthFailed": "Hub WebSocket auth failed: {{reason}}",
   "hub.error.streamRecoveryFailed": "Failed to recover stream events",
   "hub.error.recoveryFailed": "Recovery failed",
+
+  "error.network": "Network error",
+  "error.auth": "Authentication error",
+  "error.agent": "Agent error",
+  "error.runtime": "Runtime error",
+  "error.unknown": "Unknown error",
+  "error.retry": "Retry",
 
   "errorBoundary.chunkLoadDesc": "A new version of the app is available. Please reload to continue.",
   "errorBoundary.chunkLoadTitle": "Update Required",
