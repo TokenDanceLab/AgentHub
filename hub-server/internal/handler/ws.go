@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -94,9 +95,17 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 
 	h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
 	h.userLimiter.Acquire(userID, conn.ID)
+	// writeLoop must start before PushToConn so the stamped auth.ok frame has a
+	// draining goroutine ready to take it off conn.Send (writeLoop is launched
+	// above on its own goroutine). Routing auth.ok through PushToConn instead
+	// of the legacy sendFrame bypass unifies seq_id stamping so clients can
+	// detect loss via seq gaps (G12 fix); subsequent data frames start at
+	// seq_id=2 because auth.ok now consumes seq_id=1.
 	go h.writeLoop(conn)
-	h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
-	go h.authenticatedReadLoop(conn)
+	h.manager.PushToConn(conn.ID, ws.NewFrame(ws.TypeAuthOK, nil))
+	middleware.SafeGo("ws.readLoop", func() {
+		h.authenticatedReadLoop(conn)
+	})
 }
 
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
@@ -106,9 +115,15 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", r)
 		}
 	}()
-	ctx := context.Background()
 	for data := range conn.Send {
+		// Per-write deadline: a peer that stops draining its TCP receive
+		// buffer would otherwise block this goroutine until the ~65s
+		// read-timeout cleanup reaps the connection (zombie writeLoop). A
+		// bounded write context fails fast so writeLoop returns and
+		// cleanupConn reaps the connection promptly.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := conn.W.Write(ctx, websocket.MessageText, data)
+		cancel()
 		if err != nil {
 			slog.Warn("ws write error", "conn_id", conn.ID, "error", err)
 			return
@@ -224,13 +239,12 @@ func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (ok bool) 
 // wire with SeqID=0, which frame.go's json "omitempty" tag drops entirely, so
 // clients cannot detect loss of these frames via seq_id gaps.
 //
-// G12 KNOWN DEFECT (characterization, not fixed here): the only production
-// caller is ServeWS (ws.go:98) sending the TypeAuthOK handshake ack. Practical
-// impact is limited because auth.ok is a one-shot control frame with no
-// business payload, but the contract violation is real. Recommended fix
-// (operator decision, NOT applied in this PR): route auth.ok through
-// Manager.PushToConn to unify seq_id stamping — this would give auth.ok
-// seq_id=1 and shift subsequent data frames by 1 (wire-visible, M-grade).
+// G12 RESOLVED: the historical production caller (ServeWS auth.ok handshake)
+// now routes through Manager.PushToConn so auth.ok receives seq_id=1 and
+// subsequent data frames shift by 1 (wire-visible). sendFrame is retained for
+// the G12 characterization tests in ws_internal_test.go and any future
+// non-seq-critical control frames; production code MUST prefer PushToConn so
+// every wire frame carries a monotonic seq_id.
 //
 // ws_sendframe_bypass_total{frame_type} observes the bypass traffic rate so
 // operators can see the volume of frames escaping seq_id stamping. The counter

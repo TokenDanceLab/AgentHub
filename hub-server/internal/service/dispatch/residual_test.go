@@ -34,7 +34,7 @@ func TestApplyCustomAgentToPayload(t *testing.T) {
 	assert.Equal(t, "", tw)
 	assert.Nil(t, os)
 
-	sp, mp, tw, os = ApplyCustomAgentToPayload("ca-1", nil)
+	sp, _, _, os = ApplyCustomAgentToPayload("ca-1", nil)
 	assert.Equal(t, "", sp)
 	assert.Nil(t, os)
 }

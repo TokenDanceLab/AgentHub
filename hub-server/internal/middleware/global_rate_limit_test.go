@@ -58,7 +58,7 @@ func TestGlobalRateLimitBlocksAfterExceedingLimit(t *testing.T) {
 
 	assert.True(t, c.IsAborted())
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
-	assert.Contains(t, w.Body.String(), "RATE_LIMITED")
+	assert.Contains(t, w.Body.String(), "rate_limited")
 	assert.NotEmpty(t, w.Header().Get("Retry-After"))
 }
 
@@ -105,7 +105,7 @@ func TestGlobalRateLimitFailClosed_AuthPath(t *testing.T) {
 
 			assert.True(t, c.IsAborted(), "auth path %s should fail-closed when Redis is down", path)
 			assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-			assert.Contains(t, w.Body.String(), "RATE_LIMIT_UNAVAILABLE")
+			assert.Contains(t, w.Body.String(), "rate_limit_unavailable")
 		})
 	}
 }
@@ -126,7 +126,7 @@ func TestGlobalRateLimitFailClosed_NonAuthWhenDisabled(t *testing.T) {
 
 	assert.True(t, c.IsAborted(), "non-auth request should fail-closed when RATE_LIMIT_FAIL_OPEN=false")
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "RATE_LIMIT_UNAVAILABLE")
+	assert.Contains(t, w.Body.String(), "rate_limit_unavailable")
 }
 
 // TestIsAuthPath verifies the path classification helper.
@@ -269,13 +269,23 @@ func TestRateLimitFailClosed_AuthPath(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-// redisDownClient creates a cache client whose underlying Redis server is shut down
-// so that all Redis operations return connection errors.
+// redisDownClient creates a cache client whose underlying Redis server is shut
+// down so that all Redis operations return connection errors.
+//
+// MaxRetries=0 + a short DialTimeout turn off go-redis retry backoff: without
+// these, every operation against the closed server retries with exponential
+// backoff (~8.5s per fail-closed test). With them, each operation fails
+// immediately on the first connection attempt (P1: redisDownClient 不关重试致
+// 慢测试).
 func redisDownClient(t *testing.T) *cache.Client {
 	t.Helper()
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
-	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	rdb := redis.NewClient(&redis.Options{
+		Addr:        mr.Addr(),
+		MaxRetries:  0,
+		DialTimeout: 300 * time.Millisecond,
+	})
 	client := cache.NewClient(rdb)
 	// Close the miniredis server so subsequent operations fail.
 	mr.Close()

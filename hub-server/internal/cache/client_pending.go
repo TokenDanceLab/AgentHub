@@ -56,17 +56,54 @@ func decodePendingTargetTaskOrderEntry(data string) (PendingTargetTask, bool) {
 	if json.Unmarshal([]byte(entry.Payload), &raw) != nil {
 		return PendingTargetTask{}, false
 	}
-	return PendingTargetTask{TargetID: entry.TargetID, Payload: entry.Payload}, true
+	return PendingTargetTask(entry), true
 }
 
-// PushPendingTask pushes a task JSON to the user's offline pending queue.
+// pendingTaskQueueMaxLen bounds the per-user offline pending task list so a
+// disconnected desktop cannot grow Redis without limit. Mirrors the control
+// queue cap (PendingAgentControlQueueMaxLen = 256) so both offline queues share
+// the same backpressure budget. Defined locally because the config package is
+// out of this lane's edit scope; if config ownership is later centralized,
+// move this constant next to PendingAgentControlQueueMaxLen.
+const pendingTaskQueueMaxLen = 256
+
+// PushPendingTask pushes a task JSON to the user's offline pending queue. The
+// queue is capped at pendingTaskQueueMaxLen entries via LTRIM (keeping the most
+// recent) so a long-offline desktop cannot grow Redis without bound; when the
+// cap is hit the oldest entry is evicted. The TTL is refreshed on every push.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
 	key := pendingTaskKey(userID)
 	pipe := c.rdb.TxPipeline()
 	pipe.LPush(ctx, key, taskJSON)
+	// Cap the list to the most recent pendingTaskQueueMaxLen entries. LTRIM
+	// with start = -maxLen and stop = -1 keeps only the tail of the list
+	// (the most recently pushed items, since LPush prepends).
+	pipe.LTrim(ctx, key, int64(-pendingTaskQueueMaxLen), -1)
 	pipe.Expire(ctx, key, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+// PushPendingTaskWithEviction pushes a task JSON and reports whether the cap
+// evicted an older entry. Returns (evicted bool, err error). Used by the
+// requeue path in app/events.go to increment a dropped counter when the
+// offline queue is saturated.
+func (c *Client) PushPendingTaskWithEviction(ctx context.Context, userID, taskJSON string) (bool, error) {
+	key := pendingTaskKey(userID)
+	pipe := c.rdb.TxPipeline()
+	// Capture the LPush result (new list length BEFORE the LTRIM runs) so the
+	// caller can detect eviction. In a TxPipeline each Cmd is returned at
+	// Exec time; the LPush length is the post-push, pre-trim count, so when
+	// it exceeds the cap, LTRIM evicted at least one older entry.
+	pushedLenCmd := pipe.LPush(ctx, key, taskJSON)
+	pipe.LTrim(ctx, key, int64(-pendingTaskQueueMaxLen), -1)
+	pipe.Expire(ctx, key, config.PendingTaskTTL)
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	pushedLen := pushedLenCmd.Val()
+	return pushedLen > pendingTaskQueueMaxLen, nil
 }
 
 // PopPendingTasks pops all pending tasks for a user and clears the queue.

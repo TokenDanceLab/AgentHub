@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -122,7 +123,7 @@ func TestValidateRunEventType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRunEventType(tt.eventType)
+			err := agentevent.ValidateRunEventType(tt.eventType)
 			if tt.wantErr {
 				assert.ErrorIs(t, err, errcode.ErrBadRequest)
 			} else {
@@ -150,7 +151,7 @@ func TestInferRunEventType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, inferRunEventType(tt.payload))
+			assert.Equal(t, tt.want, agentevent.InferRunEventType(tt.payload))
 		})
 	}
 }
@@ -170,7 +171,7 @@ func TestFirstNonEmpty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, firstNonEmpty(tt.values...))
+			assert.Equal(t, tt.want, agentevent.FirstNonEmpty(tt.values...))
 		})
 	}
 }
@@ -180,31 +181,31 @@ func TestFirstNonEmpty(t *testing.T) {
 func TestFirstRuntimeString(t *testing.T) {
 	t.Run("finds first matching key", func(t *testing.T) {
 		payload := map[string]any{"model": "claude-sonnet-4-6", "version": "1.0"}
-		assert.Equal(t, "claude-sonnet-4-6", firstRuntimeString(payload, "model", "name"))
+		assert.Equal(t, "claude-sonnet-4-6", agentevent.FirstRuntimeString(payload, "model", "name"))
 	})
 
 	t.Run("falls back to second key", func(t *testing.T) {
 		payload := map[string]any{"name": "Codex", "label": "test"}
-		assert.Equal(t, "Codex", firstRuntimeString(payload, "model", "name", "label"))
+		assert.Equal(t, "Codex", agentevent.FirstRuntimeString(payload, "model", "name", "label"))
 	})
 
 	t.Run("empty payload", func(t *testing.T) {
-		assert.Equal(t, "", firstRuntimeString(map[string]any{}, "key"))
+		assert.Equal(t, "", agentevent.FirstRuntimeString(map[string]any{}, "key"))
 	})
 
 	t.Run("non-string value skipped", func(t *testing.T) {
 		payload := map[string]any{"count": 42, "name": "found"}
-		assert.Equal(t, "found", firstRuntimeString(payload, "count", "name"))
+		assert.Equal(t, "found", agentevent.FirstRuntimeString(payload, "count", "name"))
 	})
 
 	t.Run("trims whitespace", func(t *testing.T) {
 		payload := map[string]any{"name": "  trimmed  "}
-		assert.Equal(t, "trimmed", firstRuntimeString(payload, "name"))
+		assert.Equal(t, "trimmed", agentevent.FirstRuntimeString(payload, "name"))
 	})
 
 	t.Run("empty string skipped for next key", func(t *testing.T) {
 		payload := map[string]any{"name": "", "label": "Label"}
-		assert.Equal(t, "Label", firstRuntimeString(payload, "name", "label"))
+		assert.Equal(t, "Label", agentevent.FirstRuntimeString(payload, "name", "label"))
 	})
 }
 
@@ -229,7 +230,7 @@ func TestFirstRuntimeInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, firstRuntimeInt(tt.payload, tt.keys...))
+			assert.Equal(t, tt.want, agentevent.FirstRuntimeInt(tt.payload, tt.keys...))
 		})
 	}
 }
@@ -238,12 +239,12 @@ func TestFirstRuntimeInt(t *testing.T) {
 
 func TestValidateAgentCallbackPayloadSize(t *testing.T) {
 	t.Run("within limit", func(t *testing.T) {
-		assert.NoError(t, validateAgentCallbackPayloadSize("small payload"))
+		assert.NoError(t, agentevent.ValidateAgentCallbackPayloadSize("small payload"))
 	})
 
 	t.Run("exceeds limit", func(t *testing.T) {
 		big := make([]byte, model.RunEventPayloadMaxBytes+1)
-		err := validateAgentCallbackPayloadSize(string(big))
+		err := agentevent.ValidateAgentCallbackPayloadSize(string(big))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	})
@@ -253,12 +254,12 @@ func TestValidateAgentCallbackPayloadSize(t *testing.T) {
 
 func TestValidateAgentCallbackEdgeRunID(t *testing.T) {
 	t.Run("within limit", func(t *testing.T) {
-		assert.NoError(t, validateAgentCallbackEdgeRunID("run-123"))
+		assert.NoError(t, agentevent.ValidateAgentCallbackEdgeRunID("run-123"))
 	})
 
 	t.Run("exceeds limit", func(t *testing.T) {
 		big := make([]byte, model.AgentCallbackEdgeRunIDMaxLength+1)
-		err := validateAgentCallbackEdgeRunID(string(big))
+		err := agentevent.ValidateAgentCallbackEdgeRunID(string(big))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, errcode.ErrBadRequest)
 	})

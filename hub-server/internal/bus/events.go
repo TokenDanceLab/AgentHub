@@ -23,7 +23,7 @@ const (
 	EventTypeAgentRouteDecision = "agent.route_decision"
 	EventTypeTeamRunStarted     = "team.run.started"
 	EventTypeTeamEvent          = "team.event"
-	EventTypeTeamAssignmentDone = "team.assignment.completed"
+	EventTypeTeamAssignmentDone = "team.assignment.done"
 	EventTypeTeamAssignmentFail = "team.assignment.failed"
 	EventTypeTeamSubagentStream = "team.subagent.stream"
 	EventTypeFriendRequest      = "friend.request"

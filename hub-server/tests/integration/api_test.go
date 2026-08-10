@@ -157,8 +157,7 @@ func TestMessages(t *testing.T) {
 		var msgs []map[string]interface{}
 		json.Unmarshal(hr.Data, &msgs)
 		if len(msgs) == 0 {
-			t.Skip("no messages")
-			return
+			t.Fatalf("expected messages after send, got none")
 		}
 		mid := msgs[0]["id"].(string)
 		mustOK(t, parse(postAuth("/client/messages/"+mid+"/recall", alice.Token, nil)), "recall")

@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,5 +180,32 @@ func TestTimeout_HandlerWritesHeadersThenSlow(t *testing.T) {
 
 	if w.Code != http.StatusGatewayTimeout {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusGatewayTimeout)
+	}
+}
+
+// TestTimeout_HandlerPanicReturns500 verifies the goroutine recover in the
+// Timeout middleware: a handler that panics inside the spawned goroutine is
+// recovered and the client receives a 500 JSON error instead of a process
+// crash or an empty 200. CustomRecovery's defer-recover lives in the request
+// goroutine and cannot catch a panic that escapes the spawned goroutine, so
+// the Timeout goroutine owns its own recover.
+func TestTimeout_HandlerPanicReturns500(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(Timeout(5 * time.Second))
+	r.GET("/boom", func(c *gin.Context) {
+		panic("timeout goroutine panic")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d (goroutine recover must synthesize 500)", w.Code, http.StatusInternalServerError)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"code":"internal_error"`) {
+		t.Fatalf("response body = %q, want JSON envelope with internal_error code", body)
 	}
 }

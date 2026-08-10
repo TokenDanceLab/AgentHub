@@ -1,13 +1,26 @@
 package repository
 
 import (
+	"net/http"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
 
 const defaultProfilePageSize = 50
+
+// ErrProfileVersionConflict is returned when an UpdateAgentProfile CAS
+// (compare-and-set on version) matched zero rows: either the profile was
+// deleted, or another writer incremented version between the caller's read
+// and write. Surfaced as HTTP 409 so the existing handler errors.As(err, &e)
+// path surfaces the conflict without needing service/handler edits.
+var ErrProfileVersionConflict = errcode.New(
+	"profile_version_conflict",
+	"agent profile version conflict: another update modified the profile concurrently",
+	http.StatusConflict,
+)
 
 func CreateAgentProfile(db *gorm.DB, p *model.AgentProfile) error {
 	return db.Create(p).Error
@@ -22,9 +35,41 @@ func GetAgentProfileByID(db *gorm.DB, id string) (*model.AgentProfile, error) {
 	return &p, nil
 }
 
+// UpdateAgentProfile performs an optimistic-concurrency CAS update: the
+// UPDATE is scoped to WHERE id = ? AND version = ? so a concurrent writer
+// that bumped version between the caller's read and this write matches zero
+// rows and returns ErrProfileVersionConflict (HTTP 409).
+//
+// Select("*") + Updates(p) writes ALL columns (including zero-value bools
+// like is_public=false when toggled from true), preserving the previous
+// db.Save(p) full-row write semantics. Callers (Publish/Unpublish/Update)
+// always load the full profile via GetAgentProfileByID before mutating, so
+// writing all fields back is a no-op for unchanged columns and the version
+// bump is atomic in the same statement.
+//
+// Replaces the previous db.Save(p) path which did Version++ then a blind
+// full-row write with no version guard — two concurrent updates would both
+// read version=N, both write version=N+1, and the second would silently
+// overwrite the first's fields (#1381 concurrent overwrite).
 func UpdateAgentProfile(db *gorm.DB, p *model.AgentProfile) error {
-	p.Version++
-	return db.Save(p).Error
+	expectedVersion := p.Version
+	p.Version = expectedVersion + 1
+
+	result := db.Model(&model.AgentProfile{}).
+		Where("id = ? AND version = ?", p.ID, expectedVersion).
+		Select("*").
+		Updates(p)
+	if result.Error != nil {
+		// Roll back the in-memory version bump so the caller's copy reflects
+		// the pre-update state (the row did not change).
+		p.Version = expectedVersion
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		p.Version = expectedVersion
+		return ErrProfileVersionConflict
+	}
+	return nil
 }
 
 func SoftDeleteAgentProfile(db *gorm.DB, id, ownerID string) error {

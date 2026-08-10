@@ -52,8 +52,8 @@ func TestCustomAgentHandler_CreateRejectsInvalidJSONBShapeBeforeService(t *testi
 	if svc.createCalled {
 		t.Fatal("CreateCustomAgent was called for invalid JSONB shape")
 	}
-	if !strings.Contains(w.Body.String(), "capability_tags must be a JSON array") {
-		t.Fatalf("response body = %q, want capability_tags shape error", w.Body.String())
+	if !strings.Contains(w.Body.String(), "invalid agent configuration") {
+		t.Fatalf("response body = %q, want generic 'invalid agent configuration' message (field-specific detail must stay in server logs only)", w.Body.String())
 	}
 }
 
@@ -76,7 +76,7 @@ func TestCustomAgentHandler_UpdateRejectsInvalidJSONBShapeBeforeService(t *testi
 	if svc.updateCalled {
 		t.Fatal("UpdateCustomAgent was called for invalid JSONB shape")
 	}
-	if !strings.Contains(w.Body.String(), "model_params must be a JSON object") {
-		t.Fatalf("response body = %q, want model_params shape error", w.Body.String())
+	if !strings.Contains(w.Body.String(), "invalid agent configuration") {
+		t.Fatalf("response body = %q, want generic 'invalid agent configuration' message (field-specific detail must stay in server logs only)", w.Body.String())
 	}
 }

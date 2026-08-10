@@ -140,6 +140,97 @@ jwt:
 	}
 }
 
+// TestJWTSecretDocumentedDevPlaceholderRejected covers the publicly-known
+// dev placeholder shipped in .env.example
+// ("dev-secret-change-in-production-min-length-32", 41 chars). It previously
+// bypassed the exact-match blocklist while passing the 32-char minimum,
+// letting a public-known secret into production. Prefix matching now rejects
+// the whole dev-secret-change-in-production* family.
+func TestJWTSecretDocumentedDevPlaceholderRejected(t *testing.T) {
+	yaml := `
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+
+	// The exact value documented in .env.example — a public-known secret.
+	t.Setenv("AGENTHUB_JWT_SECRET", "dev-secret-change-in-production-min-length-32")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for documented dev placeholder JWT secret (prefix match), got nil")
+	}
+}
+
+// TestJWTSecretDevPrefixVariantRejected ensures derivatives of the documented
+// dev secret (e.g. with an extra suffix to look unique) are still blocked by
+// prefix matching.
+func TestJWTSecretDevPrefixVariantRejected(t *testing.T) {
+	yaml := `
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+
+	t.Setenv("AGENTHUB_JWT_SECRET", "dev-secret-change-in-production-please-rotate-me-now")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for dev-prefixed JWT secret variant, got nil")
+	}
+}
+
+// TestJWTSecretProdPlaceholderRejected covers the production .env.example
+// placeholder "change-me-production-min-length-32-chars" (41 chars). It
+// previously bypassed the exact-match blocklist while passing the 32-char
+// minimum, letting a public-known secret into production. Prefix matching
+// on the change-me-production* family now rejects it.
+func TestJWTSecretProdPlaceholderRejected(t *testing.T) {
+	yaml := `
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+
+	// The exact value documented in .env.example — a public-known secret.
+	t.Setenv("AGENTHUB_JWT_SECRET", "change-me-production-min-length-32-chars")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for production placeholder JWT secret (prefix match), got nil")
+	}
+}
+
+// TestJWTSecretProdPrefixVariantRejected ensures derivatives of the
+// production placeholder (e.g. with an extra suffix to look unique) are
+// still blocked by prefix matching.
+func TestJWTSecretProdPrefixVariantRejected(t *testing.T) {
+	yaml := `
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+
+	t.Setenv("AGENTHUB_JWT_SECRET", "change-me-production-please-rotate-this-now!!")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for prod-prefixed JWT secret variant, got nil")
+	}
+}
+
 func TestJWTSecretTooShortRejected(t *testing.T) {
 	yaml := `
 jwt:
@@ -967,6 +1058,33 @@ func TestRateLimitFailOpen(t *testing.T) {
 		t.Setenv("AGENTHUB_RATE_LIMIT_FAIL_OPEN", "")
 		if !RateLimitFailOpen() {
 			t.Error("RateLimitFailOpen() should default to true when env is empty")
+		}
+	})
+}
+
+func TestAuthFailClosed(t *testing.T) {
+	t.Run("defaults to false when env not set", func(t *testing.T) {
+		t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "")
+		if AuthFailClosed() {
+			t.Error("AuthFailClosed() should default to false")
+		}
+	})
+
+	t.Run("true for truthy values", func(t *testing.T) {
+		for _, v := range []string{"true", "1", "yes", "on", "TRUE", "Yes", "ON"} {
+			t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", v)
+			if !AuthFailClosed() {
+				t.Errorf("AuthFailClosed() = false for env value %q, want true", v)
+			}
+		}
+	})
+
+	t.Run("false for falsy values", func(t *testing.T) {
+		for _, v := range []string{"false", "0", "no", "off", "anything-else", ""} {
+			t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", v)
+			if AuthFailClosed() {
+				t.Errorf("AuthFailClosed() = true for env value %q, want false", v)
+			}
 		}
 	})
 }
