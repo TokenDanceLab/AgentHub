@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	debugpkg "github.com/agenthub/pkg/debug"
+
+	"github.com/agenthub/edge-server/internal/jwtutil"
 )
 
 // WSEdgeBearerSubprotocol is the fixed WebSocket subprotocol negotiated for
@@ -110,6 +112,22 @@ func constantTimeEqual(got, want string) bool {
 	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
+// debugAuthFunc builds the auth predicate guarding sensitive debug endpoints
+// (pprof, /debug/config, /debug/state).
+//
+// Defense layers (in priority order):
+//  1. Dev mode → nil (debug endpoints public; dev-only convenience).
+//  2. Configured local auth token → BearerAuth(token) (pre-shared secret).
+//  3. Configured Hub JWT secret → Hub-JWT validation fallback. This closes
+//     the gap where an operator configures HubJWTSecret for the REST auth
+//     middleware but leaves LocalAuthToken empty: previously debugAuthFunc
+//     returned nil, which exposed pprof/config/state to any caller even
+//     though Hub-JWT mode is a production-grade deployment.
+//  4. Neither configured → nil (dev-equivalent open mode).
+//
+// The Hub-JWT fallback reuses the same jwtutil.ValidateHubToken trust chain
+// as localAuthMiddleware, so a Hub-issued Edge-scoped HS256 JWT accepted on
+// REST routes is also accepted on debug routes — and nothing else is.
 func debugAuthFunc(cfg Config) func(r *http.Request) bool {
 	if cfg.Dev {
 		return nil
@@ -117,5 +135,27 @@ func debugAuthFunc(cfg Config) func(r *http.Request) bool {
 	if cfg.LocalAuthToken != "" {
 		return debugpkg.BearerAuth(cfg.LocalAuthToken)
 	}
+	if cfg.HubJWTSecret != "" {
+		return hubJWTDebugAuth(cfg.HubJWTSecret, cfg.EdgeDeviceID)
+	}
 	return nil
+}
+
+// hubJWTDebugAuth returns an auth predicate that accepts a Bearer Hub JWT
+// validated against the shared Hub secret and expected Edge device ID.
+func hubJWTDebugAuth(hubJWTSecret, edgeDeviceID string) func(r *http.Request) bool {
+	secret := []byte(hubJWTSecret)
+	deviceID := strings.TrimSpace(edgeDeviceID)
+	return func(r *http.Request) bool {
+		got := bearerToken(r.Header.Get("Authorization"))
+		if got == "" {
+			return false
+		}
+		if strings.HasPrefix(got, "td_") {
+			// TokenDance bearer tokens are not Edge sessions.
+			return false
+		}
+		_, err := jwtutil.ValidateHubToken(got, secret, deviceID)
+		return err == nil
+	}
 }

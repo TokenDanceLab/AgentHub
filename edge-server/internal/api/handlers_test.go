@@ -251,8 +251,10 @@ func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
 
 	h.GetHealth(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+	// Degraded health now returns 503 (was 200) so load balancers and
+	// operators can distinguish a partially-broken edge from a healthy one.
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503 for degraded health, got %d", rec.Code)
 	}
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
@@ -261,6 +263,9 @@ func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
 	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	if body["http_status"] != float64(http.StatusServiceUnavailable) {
+		t.Fatalf("http_status = %v, want 503", body["http_status"])
 	}
 	checks := body["checks"].(map[string]any)
 	runnerCheck := checks["runners"].(map[string]any)
@@ -287,8 +292,10 @@ func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
 
 	h.GetHealth(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+	// Degraded health now returns 503 (was 200) so load balancers and
+	// operators can distinguish a partially-broken edge from a healthy one.
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503 for degraded health, got %d", rec.Code)
 	}
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
@@ -297,6 +304,9 @@ func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
 	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	if body["http_status"] != float64(http.StatusServiceUnavailable) {
+		t.Fatalf("http_status = %v, want 503", body["http_status"])
 	}
 	checks := body["checks"].(map[string]any)
 	runnerCheck := checks["runners"].(map[string]any)

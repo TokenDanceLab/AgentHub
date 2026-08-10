@@ -19,8 +19,8 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-func TestCodexACPAadapterMetadata(t *testing.T) {
-	a := NewCodexACPAadapter("")
+func TestCodexACPadapterMetadata(t *testing.T) {
+	a := NewCodexACPadapter("")
 	if a.Metadata().ID != "codex-acp" {
 		t.Errorf("ID = %q, want codex-acp", a.Metadata().ID)
 	}
@@ -32,11 +32,11 @@ func TestCodexACPAadapterMetadata(t *testing.T) {
 	}
 }
 
-// TestCodexACPAadapterCapabilitiesUpgrade asserts the ACP switch payoff: the
+// TestCodexACPadapterCapabilitiesUpgrade asserts the ACP switch payoff: the
 // new adapter streams (Streaming: true) where the legacy batch CodexAdapter
 // reports Streaming: false.
-func TestCodexACPAadapterCapabilitiesUpgrade(t *testing.T) {
-	acp := NewCodexACPAadapter("")
+func TestCodexACPadapterCapabilitiesUpgrade(t *testing.T) {
+	acp := NewCodexACPadapter("")
 	if !acp.Capabilities().Streaming {
 		t.Error("codex-acp must advertise Streaming: true (ACP streaming over stdio)")
 	}
@@ -59,8 +59,8 @@ func TestCodexACPAadapterCapabilitiesUpgrade(t *testing.T) {
 	}
 }
 
-func TestCodexACPAadapterBuildCommand(t *testing.T) {
-	a := NewCodexACPAadapter("")
+func TestCodexACPadapterBuildCommand(t *testing.T) {
+	a := NewCodexACPadapter("")
 	cmdPath, args, env, workDir := a.BuildCommand(RunProcessContext{
 		Prompt:  "secret prompt that must NOT appear in argv",
 		WorkDir: `C:\work\proj`,
@@ -94,11 +94,11 @@ func TestCodexACPAadapterBuildCommand(t *testing.T) {
 	}
 }
 
-func TestCodexACPAadapterBuildCommandEnvPassthrough(t *testing.T) {
+func TestCodexACPadapterBuildCommandEnvPassthrough(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "sk-test-key")
 	t.Setenv("OPENAI_BASE_URL", "https://gateway.example/v1")
 
-	a := NewCodexACPAadapter("npx.cmd")
+	a := NewCodexACPadapter("npx.cmd")
 	cmdPath, _, env, _ := a.BuildCommand(RunProcessContext{Prompt: "p", WorkDir: `C:\w`})
 
 	if cmdPath != "npx.cmd" {
@@ -112,7 +112,7 @@ func TestCodexACPAadapterBuildCommandEnvPassthrough(t *testing.T) {
 	}
 }
 
-func TestCodexACPAadapterDefaultNpxPath(t *testing.T) {
+func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
 	got := defaultNpxPath()
 	if got != "npx.cmd" && got != "npx" {
 		t.Fatalf("defaultNpxPath = %q, want platform npx launcher", got)
@@ -137,12 +137,19 @@ func TestAcpBinaryAvailable(t *testing.T) {
 	}
 }
 
-// TestCodexACPAadapterPreflightFailsFast asserts the launcher-missing path
+// TestCodexACPadapterPreflightFailsFast asserts the launcher-missing path
 // fails before spawn.
-func TestCodexACPAadapterPreflightFailsFast(t *testing.T) {
-	a := &CodexACPAadapter{
-		AcpAdapter: NewAcpAdapterWithID(codexACPAadapterID, "", nil, "Codex (ACP)"),
-		env:        nil,
+func TestCodexACPadapterPreflightFailsFast(t *testing.T) {
+	a := &CodexACPadapter{
+		AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+			ID:            codexACPadapterID,
+			Binary:        "",
+			DisplayName:   "Codex (ACP)",
+			VersionLabel:  "codex-acp " + codexACPVersionPin + " (npx)",
+			EnvKeys:       []string{"OPENAI_API_KEY", "OPENAI_BASE_URL"},
+			LauncherLabel: "codex-acp",
+			InstallHint:   "install Node.js/npx",
+		}),
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")
@@ -154,9 +161,9 @@ func TestCodexACPAadapterPreflightFailsFast(t *testing.T) {
 	}
 }
 
-func TestCodexACPAadapterRegistryRegistration(t *testing.T) {
+func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 	reg := NewRegistry()
-	a := NewCodexACPAadapter("")
+	a := NewCodexACPadapter("")
 
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
@@ -170,7 +177,7 @@ func TestCodexACPAadapterRegistryRegistration(t *testing.T) {
 	}
 
 	// Duplicate registration must be rejected.
-	if err := reg.Register(NewCodexACPAadapter("")); err == nil {
+	if err := reg.Register(NewCodexACPadapter("")); err == nil {
 		t.Error("duplicate codex-acp registration must be rejected")
 	}
 
@@ -187,18 +194,18 @@ func TestCodexACPAadapterRegistryRegistration(t *testing.T) {
 	}
 }
 
-func TestValidateCLIAdapterIDAcceptsCodexACPAadapter(t *testing.T) {
+func TestValidateCLIAdapterIDAcceptsCodexACPadapter(t *testing.T) {
 	if err := ValidateCLIAdapterID("codex-acp"); err != nil {
 		t.Fatalf("ValidateCLIAdapterID(codex-acp) = %v, want nil", err)
 	}
 }
 
-// TestCodexACPAadapterParseStreamWithMockACPPeer drives the full adapter path
+// TestCodexACPadapterParseStreamWithMockACPPeer drives the full adapter path
 // — adapter.ParseStream → runACPSession → SDK client ↔ fake ACP agent over
 // real JSON-RPC wire — and asserts the streamed updates surface as
 // run.agent.* events (the Streaming upgrade over the legacy batch parser).
-func TestCodexACPAadapterParseStreamWithMockACPPeer(t *testing.T) {
-	adapter := NewCodexACPAadapter("")
+func TestCodexACPadapterParseStreamWithMockACPPeer(t *testing.T) {
+	adapter := NewCodexACPadapter("")
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-codex-acp-1", ProjectID: "proj-codex-acp", ThreadID: "thread-codex-acp"}
 

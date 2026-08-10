@@ -135,7 +135,6 @@ func TestClaudeACPAdapterVersionPin(t *testing.T) {
 func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &ClaudeACPAdapter{
 		AcpAdapter: NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
-		env:        nil,
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")

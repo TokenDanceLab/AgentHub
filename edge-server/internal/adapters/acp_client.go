@@ -48,9 +48,14 @@ var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1404: fr
 // No JSON-RPC framing, message classification, or response matching is
 // written here — the SDK connection layer owns all of it.
 type acpClientHandler struct {
-	emitter   EventEmitter
-	run       store.Run
-	sessionID acp.SessionId
+	emitter EventEmitter
+	run     store.Run
+	// sessionID is written in runACPSession after session/new and read
+	// concurrently by RequestPermission (the SDK dispatches inbound requests
+	// during Prompt). Guarded by atomic.Pointer so the read observes the
+	// write without a data race (the SDK may dispatch on a separate
+	// goroutine). nil means no session has been established yet.
+	sessionID atomic.Pointer[acp.SessionId]
 
 	// broker bridges session/request_permission to the Edge approval chain
 	// (PermissionDecisionBroker → POST /v1/permissions/decide, see
@@ -102,9 +107,9 @@ func (h *acpClientHandler) SessionUpdate(ctx context.Context, params acp.Session
 // DefaultPermissionHandler's no-decider fallback); the permission_requested /
 // permission_decided events are still emitted for observability.
 func (h *acpClientHandler) RequestPermission(ctx context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	if params.SessionId != "" && h.sessionID != "" && params.SessionId != h.sessionID {
+	if expected := h.sessionID.Load(); params.SessionId != "" && expected != nil && params.SessionId != *expected {
 		slog.Warn("acp: request_permission for unexpected session",
-			"run_id", h.run.ID, "session_id", string(params.SessionId), "expected", string(h.sessionID))
+			"run_id", h.run.ID, "session_id", string(params.SessionId), "expected", string(*expected))
 	}
 	if len(params.Options) == 0 {
 		// Validate() only rejects a nil slice, so guard the empty case here:
@@ -359,7 +364,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	if err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
 	}
-	handler.sessionID = sessResp.SessionId
+	handler.sessionID.Store(&sessResp.SessionId)
 
 	// 3. session/prompt. During this call the SDK dispatches all inbound
 	// session/update notifications (→ SessionUpdate → run.agent.*) and
