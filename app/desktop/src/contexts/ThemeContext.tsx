@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import {
   THEME_PRESETS,
   THEME_PRESET_META,
@@ -87,17 +87,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [themeMode, setThemeMode]);
 
+  const contextValue = useMemo<ThemeContextValue>(
+    () => ({
+      theme: resolvedTheme,
+      themeMode,
+      setThemeMode,
+      toggleTheme,
+      themePreset,
+      setThemePreset,
+    }),
+    [resolvedTheme, themeMode, setThemeMode, toggleTheme, themePreset, setThemePreset],
+  );
+
   return (
-    <ThemeContext.Provider
-      value={{
-        theme: resolvedTheme,
-        themeMode,
-        setThemeMode,
-        toggleTheme,
-        themePreset,
-        setThemePreset,
-      }}
-    >
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

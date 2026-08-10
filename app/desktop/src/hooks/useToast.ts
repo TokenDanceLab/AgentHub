@@ -1,2 +1,2 @@
-export { useToastStore as useToast } from '@/stores/toastStore';
-export type { ToastItem, ToastType, ToastAction } from '@/stores/toastStore';
+export { useToastStore as useToast } from '@shared/ui/toast';
+export type { ToastItem, ToastType, ToastAction } from '@shared/ui/toast';

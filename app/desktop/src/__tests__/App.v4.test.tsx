@@ -148,7 +148,7 @@ vi.mock('@/stores/hubStore', () => ({
   useHubStore: vi.fn(() => ({})),
 }));
 
-vi.mock('@/stores/toastStore', () => {
+vi.mock('@shared/ui/toast', () => {
   const state = {
     toasts: [],
     showToast: vi.fn(),
@@ -160,6 +160,7 @@ vi.mock('@/stores/toastStore', () => {
       (selector?: (s: typeof state) => unknown) =>
         typeof selector === 'function' ? selector(state) : state,
     ),
+    ToastContainer: () => null,
   };
 });
 

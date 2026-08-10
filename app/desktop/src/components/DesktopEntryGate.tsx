@@ -28,7 +28,7 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
   useEffect(() => {
     void tryAutoLogin().catch((err: unknown) => {
       if (err instanceof OidcError) {
-        setLoginError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '' }));
+        setLoginError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '', defaultValue: 'Login failed' }));
       }
     });
   }, [tryAutoLogin, t]);
@@ -52,7 +52,7 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
     } catch (err: unknown) {
       setLoginPending(false);
       if (err instanceof OidcError) {
-        setLoginError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '' }));
+        setLoginError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '', defaultValue: 'Login failed' }));
       } else {
         const message = err instanceof Error ? err.message : '';
         setLoginError(message || t('auth.error.tokenDanceUnavailable'));

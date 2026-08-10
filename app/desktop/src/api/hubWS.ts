@@ -160,6 +160,15 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     // Drop application events before auth
     if (!authenticated) return;
 
+    // device.kicked: the Hub invalidated this device session (e.g. replaced).
+    // Stop auto-reconnect so we don't hammer the server with a dead token;
+    // the auth middleware clears the session and the UI prompts re-login.
+    if (frameType === HUB_EVENTS.DEVICE_KICKED) {
+      authenticated = false;
+      transport.close();
+      return;
+    }
+
     // Route to typed handlers
     const handlers = typedHandlers.get(frameType);
     if (handlers) {

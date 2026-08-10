@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-#[cfg(any(test, debug_assertions))]
+#[cfg(test)]
 use std::time::Duration;
 use tauri::{Manager, Runtime};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -68,7 +68,11 @@ pub struct EdgePreflight {
     pub blocker: Option<String>,
 }
 
-#[cfg(any(test, debug_assertions))]
+/// Test-only sidecar smoke evidence struct. Narrowed from
+/// `#[cfg(any(test, debug_assertions))]` to `#[cfg(test)]` so the non-test
+/// lib build does not carry an unused type. Constructed only by the
+/// test-only `observe_fixture_sidecar_smoke` helper.
+#[cfg(test)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeObservedSidecarSmoke {
     pub mode: &'static str,
@@ -88,7 +92,11 @@ pub struct EdgeObservedSidecarSmoke {
     pub direct_cli_spawn: bool,
 }
 
-#[cfg(any(test, debug_assertions))]
+/// Test-only observed target binding for sidecar smoke diagnostics. Narrowed
+/// from `#[cfg(any(test, debug_assertions))]` to `#[cfg(test)]` so the
+/// non-test lib build does not carry an unused type. Constructed only by the
+/// test-only `observed_target_binding` helper.
+#[cfg(test)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeObservedTargetBinding {
     pub expected_target_id: String,
@@ -108,7 +116,7 @@ enum EdgeChild {
         event_task: tokio::task::JoinHandle<()>,
     },
     Direct {
-        child: Child,
+        child: Box<Child>,
         stdout_task: Option<tokio::task::JoinHandle<()>>,
         stderr_task: Option<tokio::task::JoinHandle<()>>,
     },
@@ -122,7 +130,11 @@ pub struct EdgeManager {
     last_error: Option<String>,
     log_paths: EdgeLogPaths,
     port: u16,
+    restart_count: u32,
+    max_restarts: u32,
 }
+
+const EDGE_MAX_RESTARTS: u32 = 5;
 
 impl EdgeManager {
     pub fn new(edge_path: PathBuf, store_path: PathBuf) -> Result<Self, String> {
@@ -134,6 +146,8 @@ impl EdgeManager {
             last_error: None,
             log_paths: placeholder_edge_log_paths(),
             port: DEFAULT_EDGE_PORT,
+            restart_count: 0,
+            max_restarts: EDGE_MAX_RESTARTS,
         })
     }
 
@@ -152,6 +166,8 @@ impl EdgeManager {
             )),
             log_paths: placeholder_edge_log_paths(),
             port: DEFAULT_EDGE_PORT,
+            restart_count: 0,
+            max_restarts: EDGE_MAX_RESTARTS,
         }
     }
 
@@ -213,14 +229,21 @@ impl EdgeManager {
             .ok();
         let args = edge_launch_args(&store_path_str, &addr, home_dir.as_deref());
 
-        // Persist auth token to a file so external dev tools (e.g. Vite dev
-        // server) can pick it up without needing a Tauri invoke bridge.
+        // Persist auth token to a file ONLY in debug builds so external dev
+        // tools (e.g. Vite dev server) can pick it up without needing a Tauri
+        // invoke bridge. In release builds the token is passed via env var to
+        // the child process instead — never written to disk.
+        #[cfg(debug_assertions)]
         {
             let token_path = store_path.parent().map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
             if let Some(ref p) = token_path {
                 let _ = std::fs::write(p, &auth_token);
             }
         }
+        // Env-var token for the child process (release path). EDGE_AUTH_TOKEN
+        // is consumed by the Edge Server when AGENTHUB_DEV is not set; in dev
+        // mode the token is informational only. Either way, no plaintext on disk.
+        let edge_auth_token_env = auth_token.clone();
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
         let sidecar_result = app_handle.shell().sidecar(EDGE_SIDECAR_NAME);
@@ -239,12 +262,15 @@ impl EdgeManager {
 
             // Always run Edge in dev mode — bound to 127.0.0.1 so auth token is unnecessary.
             cmd = cmd.env("AGENTHUB_DEV", "1");
+            // Pass auth token via env (release path — never written to disk).
+            cmd = cmd.env("EDGE_AUTH_TOKEN", &edge_auth_token_env);
 
             match cmd.spawn() {
                 Ok((mut rx, child)) => {
                     let pid = child.pid();
                     let stdout_log = log_paths.stdout.clone();
                     let stderr_log = log_paths.stderr.clone();
+                    let app_for_restart = app_handle.clone();
 
                     let event_task = tokio::spawn(async move {
                         while let Some(event) = rx.recv().await {
@@ -276,6 +302,9 @@ impl EdgeManager {
                                         payload.code,
                                         payload.signal
                                     );
+                                    // Clear zombie child state and schedule an
+                                    // auto-restart with exponential backoff.
+                                    schedule_edge_restart(app_for_restart.clone());
                                     break;
                                 }
                                 _ => {}
@@ -307,6 +336,7 @@ impl EdgeManager {
         let mut command = Command::new(&self.edge_path);
         command.args(&args);
         command.env("AGENTHUB_DEV", "1");
+        command.env("EDGE_AUTH_TOKEN", &edge_auth_token_env);
 
         let mut child = command
             .stdout(Stdio::piped())
@@ -336,7 +366,7 @@ impl EdgeManager {
         );
         self.last_error = None;
         self.child = Some(EdgeChild::Direct {
-            child,
+            child: Box::new(child),
             stdout_task,
             stderr_task,
         });
@@ -406,6 +436,33 @@ impl EdgeManager {
         self.child.is_some()
     }
 
+    /// Clear the child handle after a sidecar/process termination so that
+    /// `is_running` reflects reality and `start` does not reject with
+    /// "already running". Intended to be called from the restart scheduler
+    /// and the health checker's zombie-detection path.
+    pub fn clear_child(&mut self) {
+        self.child = None;
+    }
+
+    /// Increment the restart counter. Returns `true` if a restart attempt is
+    /// still within the `max_restarts` budget.
+    pub fn increment_restart_count(&mut self) -> bool {
+        self.restart_count += 1;
+        let allowed = self.restart_count <= self.max_restarts;
+        if !allowed {
+            log::error!(
+                "[edge] max restarts ({}) exceeded — giving up",
+                self.max_restarts
+            );
+        }
+        allowed
+    }
+
+    /// Reset the restart counter when the server is confirmed healthy.
+    pub fn reset_restart_count(&mut self) {
+        self.restart_count = 0;
+    }
+
     pub fn local_auth_token(&self) -> Result<&str, String> {
         self.local_auth_token.as_deref().ok_or_else(|| {
             self.last_error.clone().unwrap_or_else(|| {
@@ -471,6 +528,73 @@ impl EdgeManager {
 }
 
 pub type SharedEdgeManager = Arc<Mutex<EdgeManager>>;
+
+/// Exponential backoff in seconds for the Nth restart attempt (1-indexed).
+/// Caps at 60s so a crash loop does not stall the app indefinitely.
+fn edge_restart_backoff_secs(attempt: u32) -> u64 {
+    // 2^attempt capped at 60: attempt 1→2s, 2→4s, 3→8s, 4→16s, 5→32s.
+    let base = 2u64.checked_shl(attempt).unwrap_or(60);
+    base.min(60)
+}
+
+/// Clear the zombie child handle, increment the restart counter, and (if the
+/// budget allows) sleep with exponential backoff then call `EdgeManager::start`.
+/// Intended to be spawned as a background task from the sidecar `Terminated`
+/// handler and from the health checker's zombie-detection path.
+pub(crate) fn schedule_edge_restart<R: Runtime>(app_handle: tauri::AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        let edge: SharedEdgeManager = match app_handle.try_state::<SharedEdgeManager>() {
+            Some(state) => state.inner().clone(),
+            None => {
+                log::error!(
+                    "[edge] cannot restart: SharedEdgeManager not found in app state"
+                );
+                return;
+            }
+        };
+
+        // Phase 1: clear child + increment counter under the lock.
+        let (count, max) = {
+            let mut mgr = edge.lock().await;
+            mgr.clear_child();
+            let allowed = mgr.increment_restart_count();
+            (mgr.restart_count, mgr.max_restarts)
+        };
+
+        if count > max {
+            return;
+        }
+
+        let backoff = edge_restart_backoff_secs(count);
+        log::warn!(
+            "[edge] scheduling restart attempt {count}/{max} after {backoff}s backoff"
+        );
+        tokio::time::sleep(std::time::Duration::from_secs(backoff)).await;
+
+        // Phase 2: attempt restart. If start() fails, recursively schedule
+        // another attempt (which will increment the counter again).
+        let already_running = {
+            let mgr = edge.lock().await;
+            mgr.is_running()
+        };
+        if already_running {
+            log::info!("[edge] child already present, skipping restart");
+            return;
+        }
+
+        let mut mgr = edge.lock().await;
+        match mgr.start(&app_handle).await {
+            Ok(()) => {
+                log::info!("[edge] restart attempt {count}/{max} succeeded");
+            }
+            Err(e) => {
+                log::error!("[edge] restart attempt {count}/{max} failed: {e}");
+                drop(mgr); // release lock before recursive scheduling
+                schedule_edge_restart(app_handle.clone());
+            }
+        }
+    });
+}
 
 fn generate_local_auth_token() -> Result<String, String> {
     let mut bytes = [0_u8; 32];
@@ -567,7 +691,12 @@ fn is_edge_port_occupied(port: u16) -> bool {
     .is_ok()
 }
 
-#[cfg(any(test, debug_assertions))]
+/// Test-only fixture smoke probe. Narrowed from
+/// `#[cfg(any(test, debug_assertions))]` to `#[cfg(test)]` so the non-test
+/// lib build does not carry an unused function. Called only by the
+/// `observed_fixture_smoke_reads_health_app_data_logs_and_spawn_boundary`
+/// integration test.
+#[cfg(test)]
 async fn observe_fixture_sidecar_smoke(
     app_data_dir: PathBuf,
     port: u16,
@@ -632,7 +761,11 @@ async fn observe_fixture_sidecar_smoke(
     })
 }
 
-#[cfg(any(test, debug_assertions))]
+/// Test-only helper that builds an EdgeObservedTargetBinding for sidecar
+/// smoke diagnostics. Narrowed from `#[cfg(any(test, debug_assertions))]`
+/// to `#[cfg(test)]` so the non-test lib build does not carry an unused
+/// function.
+#[cfg(test)]
 fn observed_target_binding(
     expected_target_id: &str,
     expected_edge_device_id: &str,
@@ -1031,7 +1164,11 @@ mod tests {
     }
 }
 
-#[cfg(any(test, debug_assertions))]
+/// Test-only helper that reads the last N lines of an Edge log file. Narrowed
+/// from `#[cfg(any(test, debug_assertions))]` to `#[cfg(test)]` so the
+/// non-test lib build does not carry an unused function. Called only by the
+/// test-only `observe_fixture_sidecar_smoke` probe.
+#[cfg(test)]
 fn read_edge_log_tail(path: &str, max_lines: usize) -> Vec<String> {
     if max_lines == 0 || path.starts_with("<app-data>") {
         return Vec::new();
