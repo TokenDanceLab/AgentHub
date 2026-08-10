@@ -28,7 +28,8 @@ describe('AgentHub mobile tokens', () => {
   it('uses AgentHub desktop-aligned dark glass values', () => {
     expect(agentHubThemes.dark.color.canvas).toBe('#1f1f27');
     expect(agentHubThemes.dark.color.ink).toBe('#e3e4e6');
-    expect(agentHubThemes.dark.color.accent).toBe('#5d68cc');
+    expect(agentHubThemes.dark.color.accent).toBe('#29ABE2');
+    expect(agentHubThemes.oled.color.accent).toBe('#29ABE2');
   });
 
   it('maps every shared Desktop glass mobile alias to an RN token path', () => {

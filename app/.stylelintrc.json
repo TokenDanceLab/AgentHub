@@ -7,9 +7,9 @@
   ],
   "rules": {
     "color-no-hex": true,
-    "color-function-alias-notation": "modern",
     "selector-class-pattern": null,
-    "property-no-vendor-prefix": null
+    "property-no-vendor-prefix": null,
+    "color-function-alias-notation": "with-alpha"
   },
   "overrides": [
     {

@@ -36,7 +36,7 @@ export interface CreateHubEventStreamOptions {
   token?: string;
   since?: string;
   /**
-   * When true, also append access_token to the WS URL (legacy fallback).
+   * When true, also append the legacy WS query auth param to the URL.
    * Default false — prefer Sec-WebSocket-Protocol only.
    */
   useQueryTokenFallback?: boolean;
@@ -74,7 +74,7 @@ export function createHubEventStream(options: CreateHubEventStreamOptions): HubE
     wsUrlOptions.since = options.since;
   }
   // Default path: keep JWT out of the URL; pass via Sec-WebSocket-Protocol.
-  // Query access_token only when explicitly opted into legacy fallback.
+  // The legacy query auth param is only used when explicitly opted in.
   if (options.token && useQueryFallback) {
     wsUrlOptions.token = options.token;
     wsUrlOptions.useQueryTokenFallback = true;
