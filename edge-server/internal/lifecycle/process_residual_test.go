@@ -163,7 +163,7 @@ func TestRunOutputBatchPayload(t *testing.T) {
 func TestSubAgentErrorAndQueuePayload(t *testing.T) {
 	t.Parallel()
 	errP := subAgentErrorPayload(errors.New("boom"))
-	if errP["error"] != "boom" {
+	if errP["error"] != "sub-agent execution failed" {
 		t.Fatalf("error payload %#v", errP)
 	}
 	q := subAgentResultQueuePayload("run_1", "finished", "a1", "worker", "ok", "redacted")
@@ -290,7 +290,7 @@ func TestRunFailedAndPersistencePayloads(t *testing.T) {
 		t.Fatalf("%#v", p)
 	}
 	scope, payload := persistenceErrorScopePayload("run_1", errors.New("disk full"))
-	if scope["runId"] != "run_1" || payload["error"] != "disk full" {
+	if scope["runId"] != "run_1" || payload["error"] != "persistence error" {
 		t.Fatalf("%#v %#v", scope, payload)
 	}
 }

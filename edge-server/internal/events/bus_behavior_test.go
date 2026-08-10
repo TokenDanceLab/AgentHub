@@ -797,12 +797,19 @@ func TestBus_PersistErrorDoesNotCrashBus(t *testing.T) {
 	var failNext atomic.Bool
 	failNext.Store(true)
 
-	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
-		if failNext.CompareAndSwap(true, false) {
-			return errAssert
-		}
-		return nil
-	}))
+	// WithPersistMaxRetries(0) disables the synchronous retry loop so this
+	// test exercises the original "persist fails → event dropped" contract.
+	// The retry-recovery path is covered separately by the
+	// TestBus_PersistRetry* tests below.
+	b := NewBus(100,
+		WithPersister(func(evt EventEnvelope) error {
+			if failNext.CompareAndSwap(true, false) {
+				return errAssert
+			}
+			return nil
+		}),
+		WithPersistMaxRetries(0),
+	)
 
 	_, ch, _ := b.Subscribe(0)
 

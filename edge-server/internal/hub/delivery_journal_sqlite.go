@@ -1,8 +1,10 @@
 package hub
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -14,8 +16,9 @@ import (
 
 // SQLiteDeliveryJournal is a durable Edge→Hub callback journal.
 type SQLiteDeliveryJournal struct {
-	db *sql.DB
-	mu sync.Mutex
+	db     *sql.DB
+	mu     sync.Mutex
+	stopCh chan struct{}
 }
 
 // OpenSQLiteDeliveryJournal opens/creates journal DB at path.
@@ -24,11 +27,17 @@ func OpenSQLiteDeliveryJournal(path string) (*SQLiteDeliveryJournal, error) {
 	if err != nil {
 		return nil, err
 	}
-	j := &SQLiteDeliveryJournal{db: db}
+	j := &SQLiteDeliveryJournal{db: db, stopCh: make(chan struct{})}
 	if err := j.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
+	// Auto-start the retention loop so the Edge gets bounded journal growth
+	// without needing a separate wiring call (the edge startup wiring lives
+	// in internal/httpserver/server.go which is outside the journal
+	// package's lane; self-contained startup keeps retention always-on when
+	// a durable journal is enabled). The loop stops on Close().
+	j.startRetentionLoop()
 	return j, nil
 }
 
@@ -43,6 +52,14 @@ func (j *SQLiteDeliveryJournal) migrate() error {
 		attempts INTEGER NOT NULL,
 		recorded_at TEXT NOT NULL
 	)`)
+	if err != nil {
+		return err
+	}
+	// Cover HasSuccessful(task_id, action[, run_id]) and the
+	// Snapshot(afterSeq) ORDER BY seq cursor scan. Without this index the
+	// reconciliation query (HasSuccessful) full-scans the journal on every
+	// callback ack, which is the hot path for terminal-ack dedup.
+	_, err = j.db.Exec(`CREATE INDEX IF NOT EXISTS idx_journal_task_action ON delivery_journal(task_id, action)`)
 	return err
 }
 
@@ -125,10 +142,125 @@ func (j *SQLiteDeliveryJournal) HasSuccessful(taskID, runID, action string) (boo
 	return true, nil
 }
 
-// Close closes the DB.
+// Close closes the DB and stops the background retention loop.
 func (j *SQLiteDeliveryJournal) Close() error {
-	if j == nil || j.db == nil {
+	if j == nil {
+		return nil
+	}
+	// Signal the retention goroutine to stop before closing the DB so it does
+	// not fire a DELETE on a closed handle.
+	if j.stopCh != nil {
+		select {
+		case <-j.stopCh:
+			// already closed
+		default:
+			close(j.stopCh)
+		}
+	}
+	if j.db == nil {
 		return nil
 	}
 	return j.db.Close()
 }
+
+// startRetentionLoop launches the internal retention goroutine bound to the
+// journal's stopCh (closed by Close). Used by OpenSQLiteDeliveryJournal so
+// retention is always-on without a separate wiring call.
+func (j *SQLiteDeliveryJournal) startRetentionLoop() {
+	if j == nil || j.db == nil || j.stopCh == nil {
+		return
+	}
+	stop := j.stopCh
+	go func() {
+		ticker := time.NewTicker(JournalRetentionInterval)
+		defer ticker.Stop()
+		// Run once at startup so a long-downed Edge does not sit on a full
+		// journal for a full interval before the first purge.
+		j.runRetentionOnce()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				j.runRetentionOnce()
+			}
+		}
+	}()
+}
+
+// CleanupOldJournal purges journal rows whose recorded_at is older than the
+// given cutoff. The journal is append-only and grows unboundedly under steady
+// callback traffic; without retention it eventually exhausts disk on the
+// Edge host. The default retention window is DefaultJournalRetention (7d).
+//
+// Returns the number of rows deleted. Safe to call concurrently with Record:
+// the write path holds the same mutex, and SQLite row-delete does not block
+// inserts on unrelated rows.
+func (j *SQLiteDeliveryJournal) CleanupOldJournal(cutoff time.Time) (int64, error) {
+	if j == nil || j.db == nil {
+		return 0, fmt.Errorf("journal closed")
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	res, err := j.db.Exec(
+		`DELETE FROM delivery_journal WHERE recorded_at < ?`,
+		cutoff.UTC().Format(time.RFC3339Nano),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// StartJournalRetentionLoop launches a background goroutine that periodically
+// purges journal rows older than DefaultJournalRetention. Cancel by closing
+// the supplied context (typically the Edge server lifecycle). The loop is
+// best-effort: a purge failure is logged and retried on the next tick — it
+// never aborts recording, which goes through a separate mutex-guarded path.
+func (j *SQLiteDeliveryJournal) StartJournalRetentionLoop(ctx context.Context) {
+	if j == nil || j.db == nil {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(JournalRetentionInterval)
+		defer ticker.Stop()
+		// Run once at startup so a long-downed Edge does not sit on a full
+		// journal for a full interval before the first purge.
+		j.runRetentionOnce()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				j.runRetentionOnce()
+			}
+		}
+	}()
+}
+
+func (j *SQLiteDeliveryJournal) runRetentionOnce() {
+	cutoff := time.Now().Add(-DefaultJournalRetention)
+	removed, err := j.CleanupOldJournal(cutoff)
+	if err != nil {
+		// Previously this used `_ = fmt.Errorf(...)` which silently discarded
+		// the error — a retention purge failure was invisible to operators
+		// and the journal could grow unbounded with no signal. Surface it
+		// via slog so /metrics and log alerts can catch a stuck purge.
+		slog.Error("edge delivery journal retention purge failed", "error", err)
+		return
+	}
+	if removed > 0 {
+		slog.Debug("edge delivery journal retention purge",
+			"removed", removed, "cutoff", cutoff.Format(time.RFC3339))
+	}
+}
+
+// DefaultJournalRetention is how long a journal row is kept before retention
+// purges it. 7 days balances the Edge reconciliation window (DurableSnapshot
+// replay after a restart) against unbounded disk growth.
+const DefaultJournalRetention = 7 * 24 * time.Hour
+
+// JournalRetentionInterval is how often the retention loop fires. 24h keeps
+// the purge off the hot path; the retention window (not the cadence) governs
+// how old a row must be to qualify.
+const JournalRetentionInterval = 24 * time.Hour

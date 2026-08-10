@@ -22,14 +22,23 @@
 //
 // API key passthrough: ANTHROPIC_API_KEY is filtered out of the child env by
 // the executor's sanitizer (env_sanitizer.go), so BuildCommand injects it
-// explicitly — the same passthrough pattern the codex-acp / opencode-acp
-// adapters use for their provider keys.
+// explicitly. The key is read live from the parent env on each BuildCommand
+// call via the shared AcpAdapter.BuildCommand + acpEnvPassthrough (not
+// snapshotted at construction), so a key rotated after registration still
+// flows to the spawned process.
+//
+// Wrapper shape: this adapter inherits BuildCommand, Metadata, Capabilities,
+// Available, ParseStream, NeedsStdin, and SetPermissionBroker from the
+// embedded AcpAdapter (#1404 wave 2 collapse). BuildCommand reads envKeys
+// live from the parent env on the embedded AcpAdapter (no per-wrapper env
+// field). The PreflightCheck override is retained because the read-only
+// TestClaudeACPAdapterPreflightFailsFast constructs a raw wrapper without the
+// inherited launcherLabel config and still expects the launcher-missing
+// failure; the override guarantees that behavior regardless of construction
+// path.
 package adapters
 
-import (
-	"fmt"
-	"os"
-)
+import "fmt"
 
 // claudeACPAdapterID is the registry identifier of the official claude-agent-acp
 // configuration.
@@ -44,71 +53,44 @@ const claudeACPVersionPin = "0.62.0"
 
 // ClaudeACPAdapter runs the official claude-agent-acp ACP agent binary.
 //
-// It embeds AcpAdapter (protocol handling, permission broker, capabilities)
-// and overrides only the command surface: BuildCommand injects the Anthropic
-// env passthrough (ANTHROPIC_API_KEY), and Metadata() surfaces the version
-// pin. Everything else — ParseStream via runACPSession, NeedsStdin,
-// Available, SetPermissionBroker — is inherited.
+// It embeds AcpAdapter and inherits BuildCommand/Metadata/Capabilities/
+// ParseStream/NeedsStdin/Available/SetPermissionBroker from it; this wrapper
+// only supplies the claude-acp configuration via NewAcpAdapterConfig plus a
+// PreflightCheck override (see file doc for why the override is retained).
 type ClaudeACPAdapter struct {
 	*AcpAdapter
-
-	// env carries the Anthropic key passthrough injected in BuildCommand.
-	env []string
 }
 
 // NewClaudeACPAdapter creates the claude-agent-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
-// Windows and "npx" elsewhere. The agent receives no run-time args beyond
-// `-y @agentclientprotocol/claude-agent-acp`: ACP mode is implicit in the
-// package, and the prompt travels over stdio.
+// Windows and "npx" elsewhere (shared defaultNpxPath). The agent receives no
+// run-time args beyond `-y @agentclientprotocol/claude-agent-acp`: ACP mode
+// is implicit in the package, and the prompt travels over stdio.
 func NewClaudeACPAdapter(npxPath string) *ClaudeACPAdapter {
 	if npxPath == "" {
 		npxPath = defaultNpxPath()
 	}
-	inner := NewAcpAdapterWithID(
-		claudeACPAdapterID,
-		npxPath,
-		[]string{"-y", claudeACPPackage},
-		"Claude Code (ACP)",
-	)
-	return &ClaudeACPAdapter{
-		AcpAdapter: inner,
-		env:        claudeEnvPassthrough(),
-	}
-}
-
-// claudeEnvPassthrough captures ANTHROPIC_API_KEY from the parent environment
-// so BuildCommand can inject it into the child (the env sanitizer strips it
-// from the inherited env).
-func claudeEnvPassthrough() []string {
-	var env []string
-	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
-		env = append(env, "ANTHROPIC_API_KEY="+key)
-	}
-	return env
-}
-
-// Metadata returns the adapter identification with the pinned claude-agent-acp
-// version surfaced for operations.
-func (a *ClaudeACPAdapter) Metadata() AdapterMetadata {
-	m := a.AcpAdapter.Metadata()
-	m.Version = "claude-acp " + claudeACPVersionPin + " (npx)"
-	return m
-}
-
-// BuildCommand returns the npx launcher command with the static claude-agent-acp
-// args, plus the Anthropic env passthrough. The ACP prompt is NOT part of argv —
-// it travels over the stdio protocol (session/prompt).
-func (a *ClaudeACPAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string, args []string, env []string, workDir string) {
-	cmdPath, args, _, workDir = a.AcpAdapter.BuildCommand(ctx)
-	return cmdPath, args, a.env, workDir
+	return &ClaudeACPAdapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+		ID:            claudeACPAdapterID,
+		Binary:        npxPath,
+		Args:          []string{"-y", claudeACPPackage},
+		DisplayName:   "Claude Code (ACP)",
+		VersionLabel:  "claude-acp " + claudeACPVersionPin + " (npx)",
+		EnvKeys:       []string{"ANTHROPIC_API_KEY"},
+		LauncherLabel: "claude-acp",
+		InstallHint:   "install Node.js/npx",
+	})}
 }
 
 // PreflightCheck fails fast when the npx launcher is not resolvable, before
-// the executor spawns the process. (Authentication — ANTHROPIC_API_KEY env or
-// Claude Code login — is left to the claude-agent-acp process itself,
-// mirroring the legacy claude CLI behavior.)
+// the executor spawns the process. Retained as an override (rather than
+// inherited from AcpAdapter.PreflightCheck) because the read-only
+// TestClaudeACPAdapterPreflightFailsFast constructs a raw wrapper without the
+// inherited launcherLabel config and still expects the launcher-missing
+// failure; this override guarantees that behavior regardless of how the
+// wrapper was constructed. Authentication — ANTHROPIC_API_KEY env or Claude
+// Code login — is left to the claude-agent-acp process itself.
 func (a *ClaudeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
 		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.agentBinary)
