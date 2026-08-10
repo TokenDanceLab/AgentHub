@@ -77,21 +77,7 @@ type DeliveryOutboxEntry struct {
 }
 
 func (r deliveryOutboxRecord) toEntry() DeliveryOutboxEntry {
-	return DeliveryOutboxEntry{
-		ID:           r.ID,
-		TaskID:       r.TaskID,
-		DeliveryID:   r.DeliveryID,
-		Payload:      r.Payload,
-		Status:       r.Status,
-		AttemptCount: r.AttemptCount,
-		MaxAttempts:  r.MaxAttempts,
-		NextRetryAt:  r.NextRetryAt,
-		LastError:    r.LastError,
-		EdgeDeviceID: r.EdgeDeviceID,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
-		DeliveredAt:  r.DeliveredAt,
-	}
+	return DeliveryOutboxEntry(r)
 }
 
 // redispatchTarget carries only the opaque fields Redispatcher / DispatchService

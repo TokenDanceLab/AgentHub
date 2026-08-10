@@ -266,6 +266,10 @@ func (a *App) startServer(ctx context.Context) error {
 	// AH-SR-049: durable Hub->Edge delivery retry loop (delivery_outbox).
 	if a.AgentService != nil {
 		a.AgentService.StartDeliveryRetryLoop(a.bg.Ctx())
+		// Bounds outbox table growth: purge delivered/dead-letter rows past
+		// the retention window on a 24h cadence (#1212 — previously
+		// CleanupOldDeliveries was test-only and the outbox grew unbounded).
+		a.AgentService.StartDeliveryCleanupLoop(a.bg.Ctx())
 	}
 
 	// Admin server (observability always, debug capabilities fail-closed).

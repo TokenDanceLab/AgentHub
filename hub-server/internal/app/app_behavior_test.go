@@ -64,12 +64,16 @@ func newBehaviorMgr(t *testing.T) *ws.Manager {
 	return ws.NewManager()
 }
 
-// waitBusDrain waits for all pending events on the b to be processed.
+// waitBusDrain waits for all pending events on the b to be processed. It
+// gates on Pending()==0 (the bus's own completion counter) rather than
+// Running()==0: an idle ants worker does not exit immediately after a
+// handler returns, so gating on Running would add a per-publish purge wait
+// with no correctness benefit (P1: bus drain 语义).
 func waitBusDrain(t *testing.T, b *bus.Bus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		return b.Pending() == 0 && b.Running() == 0
-	}, 3*time.Second, 5*time.Millisecond)
+		return b.Pending() == 0
+	}, 3*time.Second, time.Millisecond)
 }
 
 // readFrame reads a single Frame from the conn's Send channel.
@@ -666,7 +670,7 @@ func TestEventDispatch_TeamEventsWithSessionPushToSession(t *testing.T) {
 	a.startEventSubscriptions(context.Background())
 
 	b.Publish(context.Background(), bus.Event{
-		Type: "team.assignment.completed",
+		Type: bus.EventTypeTeamAssignmentDone,
 		Payload: map[string]interface{}{
 			"team_run_id":   "run-1",
 			"assignment_id": "assignment-1",

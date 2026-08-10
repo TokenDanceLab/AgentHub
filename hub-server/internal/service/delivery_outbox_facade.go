@@ -49,6 +49,16 @@ const (
 
 	// DeliveryOutboxMaxBatch caps the number of deliveries scanned per retry cycle.
 	DeliveryOutboxMaxBatch = deliveryoutbox.MaxBatch
+
+	// DeliveryOutboxRetention is how long a delivered or dead-letter outbox
+	// row is kept before CleanupOldDeliveries purges it. 7 days balances
+	// operator audit window against unbounded table growth.
+	DeliveryOutboxRetention = 7 * 24 * time.Hour
+
+	// DeliveryOutboxCleanupInterval is how often the background cleanup loop
+	// fires. 24h keeps the purge off the hot path; the retention window
+	// (not the cadence) governs how old a row must be to qualify.
+	DeliveryOutboxCleanupInterval = 24 * time.Hour
 )
 
 // computeNextRetryAt calculates the next retry time using exponential backoff.
@@ -119,6 +129,13 @@ func (s *AgentService) GetDeliveryStatus(ctx context.Context, deliveryID string)
 // for retryable deliveries and re-dispatches them.
 func (s *AgentService) StartDeliveryRetryLoop(ctx context.Context) {
 	s.deliveryOutboxService().StartDeliveryRetryLoop(ctx)
+}
+
+// StartDeliveryCleanupLoop starts a background goroutine that periodically
+// purges delivered and dead-letter delivery_outbox rows older than the
+// retention window, bounding outbox table growth.
+func (s *AgentService) StartDeliveryCleanupLoop(ctx context.Context) {
+	s.deliveryOutboxService().StartDeliveryCleanupLoop(ctx)
 }
 
 // CleanupOldDeliveries removes delivered and dead-letter records older than

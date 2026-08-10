@@ -9,12 +9,15 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWSIPRateLimit_AllowsWithinLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	limiter := NewWSIPRateLimiter()
+	t.Cleanup(limiter.Stop)
 	r := gin.New()
-	r.Use(WSIPRateLimit())
+	r.Use(WSIPRateLimitWithLimiter(limiter))
 	r.GET("/ws", func(c *gin.Context) {
 		c.Status(http.StatusSwitchingProtocols)
 	})
@@ -31,8 +34,10 @@ func TestWSIPRateLimit_AllowsWithinLimit(t *testing.T) {
 
 func TestWSIPRateLimit_BlocksOverLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	limiter := NewWSIPRateLimiter()
+	t.Cleanup(limiter.Stop)
 	r := gin.New()
-	r.Use(WSIPRateLimit())
+	r.Use(WSIPRateLimitWithLimiter(limiter))
 	r.GET("/ws", func(c *gin.Context) {
 		c.Status(http.StatusSwitchingProtocols)
 	})
@@ -64,13 +69,13 @@ func TestWSUserConnLimiter_AcquireAndRelease(t *testing.T) {
 		limiter.Acquire("u1", "conn-"+string(rune('a'+i)))
 	}
 
-	// One more should kick the oldest.
+	// One more should kick the oldest. The kick runs in a spawned goroutine,
+	// so poll for the side-effect instead of a fixed time.Sleep: a fixed sleep
+	// is flaky under CI scheduler jitter (P1: time.Sleep → poll).
 	limiter.Acquire("u1", "conn-extra")
-	time.Sleep(50 * time.Millisecond) // Allow goroutine to run.
-
-	if kicked.Load() != 1 {
-		t.Fatalf("kicked = %d, want 1", kicked.Load())
-	}
+	require.Eventually(t, func() bool { return kicked.Load() == 1 },
+		time.Second, time.Millisecond,
+		"expected exactly one connection to be kicked after exceeding the per-user limit")
 
 	// Release all.
 	for i := 0; i < config.WSMaxConnsPerUser; i++ {

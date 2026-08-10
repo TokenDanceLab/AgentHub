@@ -64,8 +64,6 @@ func (m *mockSessionService) SearchSessions(ctx context.Context, userID, q strin
 	return m.searchFn(ctx, userID, q)
 }
 
-func ptr[T any](v T) *T { return &v }
-
 // ── CreatePrivate ───────────────────────────────────────────────────
 
 func TestSessionHandler_CreatePrivate_Success(t *testing.T) {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
@@ -401,21 +402,37 @@ func TestOutbox_ComputeBackoff(t *testing.T) {
 	base := DeliveryRetryBaseInterval
 	max := DeliveryRetryMaxInterval
 
-	// Attempt 0: 2s
-	next := computeNextRetryAt(0)
-	assert.InDelta(t, time.Now().Add(base).Unix(), next.Unix(), 2)
+	// NextRetryAt takes an injectable clock, so use a fixed now to make the
+	// assertion deterministic (no time.Now() drift between the computation
+	// and the assertion). The ±25% jitter from applyRetryJitter still
+	// applies, so the delay must land within [expected*0.75, expected*1.25].
+	// A small slack of 100ms covers sub-millisecond rounding.
+	const slack = 100 * time.Millisecond
+	fixedNow := time.Unix(1_700_000_000, 0).UTC()
 
-	// Attempt 1: 4s
-	next = computeNextRetryAt(1)
-	assert.InDelta(t, time.Now().Add(base*2).Unix(), next.Unix(), 2)
+	// Attempt 0: base (2s) ± 25% jitter → [1.5s, 2.5s]
+	next := deliveryoutbox.NextRetryAt(0, fixedNow)
+	delay := next.Sub(fixedNow)
+	assert.GreaterOrEqual(t, delay, base-base/4-slack)
+	assert.LessOrEqual(t, delay, base+base/4+slack)
 
-	// Attempt 3: 16s
-	next = computeNextRetryAt(3)
-	assert.InDelta(t, time.Now().Add(base*8).Unix(), next.Unix(), 2)
+	// Attempt 1: base*2 (4s) ± 25% jitter → [3s, 5s]
+	next = deliveryoutbox.NextRetryAt(1, fixedNow)
+	delay = next.Sub(fixedNow)
+	assert.GreaterOrEqual(t, delay, base*2-base*2/4-slack)
+	assert.LessOrEqual(t, delay, base*2+base*2/4+slack)
 
-	// Attempt 10: capped at max (30s)
-	next = computeNextRetryAt(10)
-	assert.InDelta(t, time.Now().Add(max).Unix(), next.Unix(), 2)
+	// Attempt 3: base*8 (16s) ± 25% jitter → [12s, 20s]
+	next = deliveryoutbox.NextRetryAt(3, fixedNow)
+	delay = next.Sub(fixedNow)
+	assert.GreaterOrEqual(t, delay, base*8-base*8/4-slack)
+	assert.LessOrEqual(t, delay, base*8+base*8/4+slack)
+
+	// Attempt 10: capped at max (30s) ± 25% jitter → [22.5s, 37.5s]
+	next = deliveryoutbox.NextRetryAt(10, fixedNow)
+	delay = next.Sub(fixedNow)
+	assert.GreaterOrEqual(t, delay, max-max/4-slack)
+	assert.LessOrEqual(t, delay, max+max/4+slack)
 }
 
 // ==================== TestOutbox_CleanupOld ====================

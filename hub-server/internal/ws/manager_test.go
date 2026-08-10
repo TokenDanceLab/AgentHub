@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/coder/websocket"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -801,4 +803,96 @@ func TestRegister_ExceedsPerUserCap(t *testing.T) {
 
 	// Count must not have increased.
 	require.Equal(t, config.WSMaxConnsPerUser, m.Count())
+}
+
+// TestPingAll_ClosesStaleConnection proves the pingAll stale-detection path
+// (P1: pingAll stale-close 14.6%): a real-dial connection whose underlying
+// WebSocket is silently closed must be detected by the heartbeat pinger,
+// accumulate missed-pong up to config.WSMaxMissedPongs, and then be closed +
+// unregistered + counted by the ws_stale_close_total metric.
+//
+// The test uses a real websocket.Dial so the Conn.W is a genuine
+// *websocket.Conn (not a stub), then closes the server-side W so Ping fails
+// immediately and deterministically (rather than waiting WSPingTimeout=5s
+// per miss). The heartbeat cadence is 100ms, so the close lands well inside
+// the Eventually window.
+func TestPingAll_ClosesStaleConnection(t *testing.T) {
+	metrics.Register()
+
+	manager := NewManager()
+
+	// serverConn is captured by the accept handler so the test can close the
+	// underlying WebSocket and assert on the Conn's closed flag afterwards.
+	var serverConn *Conn
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		wsConn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn := NewConn(wsConn)
+		// Capture before Register so the happens-before established by the
+		// manager's lock (which the test observes via Count()) also covers the
+		// serverConn assignment — the test reads serverConn only after
+		// observing Count()==1.
+		serverConn = conn
+		_ = manager.Register(conn)
+		// Deliberately do NOT start read/write loops: the connection must be
+		// detected as stale purely via pingAll, not via a read error path.
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	wsURL := "ws" + srv.URL[4:] + "/ws"
+	dialCtx, dialCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer dialCancel()
+	clientConn, _, err := websocket.Dial(dialCtx, wsURL, nil)
+	require.NoError(t, err, "dial websocket")
+	defer clientConn.Close(websocket.StatusNormalClosure, "")
+
+	// Wait for the server-side registration before silencing the conn.
+	testkit.Eventually(t, 2*time.Second, func() bool { return manager.Count() == 1 },
+		"connection never registered on the server", func() string {
+			return fmt.Sprintf("Count = %d", manager.Count())
+		})
+	require.NotNil(t, serverConn, "server-side Conn must be captured")
+
+	// Baseline the stale-close metric before triggering detection (the counter
+	// is process-global; the delta isolates this test's contribution).
+	metricBefore := testutil.ToFloat64(metrics.WSStaleClose)
+
+	// Start the heartbeat pinger at a tight cadence.
+	hbCtx, hbCancel := context.WithCancel(context.Background())
+	defer hbCancel()
+	manager.StartHeartbeatWithInterval(hbCtx, 100*time.Millisecond)
+
+	// Silently close the underlying server-side WebSocket so c.W.Ping fails
+	// fast on the next tick (a closed *websocket.Conn returns immediately
+	// rather than blocking for WSPingTimeout=5s, keeping the test fast and
+	// deterministic). The Conn remains registered, so pingAll still observes
+	// it and must drive the stale-close path itself.
+	serverConn.Close()
+
+	// After config.WSMaxMissedPongs consecutive failed pings, pingAll must
+	// unregister the connection (Count drops to 0) and close the Send channel.
+	testkit.Eventually(t, 4*time.Second, func() bool { return manager.Count() == 0 },
+		"stale connection was never closed/unregistered by pingAll", func() string {
+			return fmt.Sprintf("Count=%d missedPong=%d closed=%v",
+				manager.Count(),
+				serverConn.missedPong.Load(),
+				serverConn.closed.Load())
+		})
+
+	// The Conn must have been closed (closeSend ran during Unregister).
+	require.True(t, serverConn.closed.Load(),
+		"stale conn Send channel must be closed after pingAll-driven unregister")
+	// The conn must no longer be discoverable.
+	require.Nil(t, manager.FindByConnID(serverConn.ID),
+		"stale conn must be removed from the registry")
+
+	// The stale-close metric must have incremented by exactly 1 (one stale
+	// close driven by this test).
+	require.Equal(t, metricBefore+1, testutil.ToFloat64(metrics.WSStaleClose),
+		"WSStaleClose must increment by exactly 1 for the single stale close")
 }

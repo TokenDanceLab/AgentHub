@@ -1,15 +1,21 @@
 package session
 
-import "github.com/agenthub/hub-server/internal/model"
+import (
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/ws"
+)
 
 // Domain event type strings published by session lifecycle write paths.
-// Values are contract-stable for bus subscribers / WS bridge.
+// These are single-sourced from the ws wire frame catalog (ws.Type*) so the
+// in-process bus value and the client wire value can never drift apart
+// (the silent-drop class closed by the bus/ws contract test). ws is a leaf
+// wire package (no internal imports), so this dependency introduces no cycle.
 const (
-	EventTypeSessionCreated      = "session.created"
-	EventTypeSessionMemberJoined = "session.member_joined"
-	EventTypeSessionMemberLeft   = "session.member_left"
-	EventTypeSessionDissolved    = "session.dissolved"
-	EventTypeSessionInfoUpdated  = "session.info_updated"
+	EventTypeSessionCreated      = ws.TypeSessionCreated
+	EventTypeSessionMemberJoined = ws.TypeSessionMemberJoined
+	EventTypeSessionMemberLeft   = ws.TypeSessionMemberLeft
+	EventTypeSessionDissolved    = ws.TypeSessionDissolved
+	EventTypeSessionInfoUpdated  = ws.TypeSessionInfoUpdated
 )
 
 // PrivateSessionCreatedPayload builds the session.created bus payload for private sessions.

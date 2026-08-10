@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -106,6 +107,27 @@ func (a *App) subscribeMessageEvents() {
 		a.mgr.PushToSession(msg.SessionID, frame)
 	})
 
+	// message.edited: fan the updated message to session members so peers
+	// replace content live without a refetch (previously published but had no
+	// subscriber, so edits were silently invisible to other clients).
+	//
+	// Wire type is the bus constant directly: a ws.TypeMessageEdited constant
+	// is intentionally NOT added to ws/frame.go in this lane because the
+	// OpenAPI parity test (handler/device_openapi_test.go) enforces frame.go
+	// constants == api/openapi.yaml enum, and api/openapi.yaml is owned by the
+	// openapi lane. Adding the frame constant here without the OpenAPI sync
+	// breaks that gate. The openapi+frontend lanes must add the ws constant,
+	// OpenAPI enum, and hubEvents.ts entry together; until then the wire value
+	// "message.edited" still flows correctly (bus constant == wire value).
+	a.bus.Subscribe(bus.EventTypeMessageEdited, func(ctx context.Context, event bus.Event) {
+		msg, ok := event.Payload.(*model.Message)
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(bus.EventTypeMessageEdited, msg)
+		a.mgr.PushToSession(msg.SessionID, frame)
+	})
+
 	a.bus.Subscribe(bus.EventTypeMessagePin, func(ctx context.Context, event bus.Event) {
 		pin, ok := event.Payload.(*model.MessagePin)
 		if !ok {
@@ -173,7 +195,13 @@ func (a *App) subscribeAgentEvents() {
 		frame := ws.NewFrame(ws.TypeAgentDone, payload)
 		a.mgr.PushToSession(payload.SessionID, frame)
 
-		if payload.TaskID != "" {
+		// The notification side-effect is optional: it depends on
+		// AgentService + NotificationService being wired. A misconfigured or
+		// test App that has not wired these must not nil-deref here (the bus
+		// recover would otherwise swallow the panic, producing a false-green
+		// test that only appears to exercise the dispatch path). Guard exactly
+		// like the delivery-status branch below (a.AgentService != nil).
+		if payload.TaskID != "" && a.AgentService != nil && a.NotificationService != nil {
 			task, err := a.AgentService.GetPendingTaskByID(payload.TaskID)
 			if err == nil && task != nil {
 				if err := a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
@@ -219,6 +247,41 @@ func (a *App) subscribeAgentEvents() {
 		}
 		frame := ws.NewFrame(ws.TypeAgentCancel, payload)
 		a.mgr.PushToSession(payload.SessionID, frame)
+	})
+
+	// agent.regenerate: surface that a fresh task was spawned from an original
+	// so clients swap the originating bubble's task binding (previously
+	// published but had no subscriber, so the regenerate signal was silently
+	// invisible to other clients in the session).
+	//
+	// Wire type is the bus constant directly; see the message.edited note for
+	// why a ws.Type* constant is not added here (OpenAPI parity gate owns the
+	// ws constant + openapi enum + hubEvents.ts sync across lanes).
+	a.bus.Subscribe(bus.EventTypeAgentRegenerate, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(bus.AgentRegeneratePayload)
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(bus.EventTypeAgentRegenerate, payload)
+		a.mgr.PushToSession(payload.SessionID, frame)
+	})
+
+	// agent.route_decision: surface the supervisor's auto-parsed route choice
+	// to the team-run owner across all their devices. Desktop otherwise only
+	// observes the decision via the direct Edge stream; this gives web/mobile
+	// the same live signal (previously published but had no subscriber, so the
+	// route decision was silently dropped for non-desktop clients).
+	//
+	// Wire type is the bus constant directly; see the message.edited note for
+	// why a ws.Type* constant is not added here (OpenAPI parity gate owns the
+	// ws constant + openapi enum + hubEvents.ts sync across lanes).
+	a.bus.Subscribe(bus.EventTypeAgentRouteDecision, func(ctx context.Context, event bus.Event) {
+		payload, ok := event.Payload.(service.RouteDecisionPayload)
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(bus.EventTypeAgentRouteDecision, payload)
+		a.mgr.PushToUser(payload.UserID, frame)
 	})
 }
 
@@ -369,9 +432,17 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	if deviceID != "" {
 		routeField = deviceType + ":" + deviceID
 	}
-	_ = a.CacheClient.SetRoute(ctx, userID, routeField, connID)
-
-	if wasOffline {
+	if err := a.CacheClient.SetRoute(ctx, userID, routeField, connID); err != nil {
+		slog.Error("ws set route failed; online-status broadcast skipped",
+			"user_id", userID, "route_field", routeField, "conn_id", connID, "error", err)
+		if metrics.WSRouteSetFailures != nil {
+			metrics.WSRouteSetFailures.Inc()
+		}
+		// Do not broadcast online status: the route table does not track
+		// this connection, so advertising "online" would mislead peers whose
+		// route lookups would miss. Pending-task pushes use connID directly
+		// and are not affected by the route table, so they still proceed.
+	} else if wasOffline {
 		go a.broadcastOnlineStatus(ctx, userID, true)
 	}
 
@@ -414,7 +485,11 @@ func (a *App) replayTargetBoundTask(ctx context.Context, userID, deviceID, connI
 				"task_id", meta.TaskID, "delivery_id", meta.DeliveryID,
 				"outbox_status", status, "user_id", userID, "device_id", deviceID)
 			// Drop from offline queue so it cannot dual-fire later.
-			_ = a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload)
+			if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
+				slog.Error("failed to ack target-bound queued task in skip-replay branch",
+					"task_id", meta.TaskID, "target_id", task.TargetID,
+					"user_id", userID, "device_id", deviceID, "error", err)
+			}
 			return
 		}
 	}
@@ -478,10 +553,37 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 			failedTasks = append(failedTasks, taskJSON)
 		}
 	}
+	// Requeue failed deliveries. Use the eviction-aware push so the cap
+	// (pendingTaskQueueMaxLen, mirroring the control queue) is enforced and
+	// evicted oldest tasks are counted via client_pending_dropped_total
+	// instead of being silently lost. Also warn when the queue is close to
+	// the TTL horizon so operators can act before silent expiry drops tasks.
 	for i := len(failedTasks) - 1; i >= 0; i-- {
-		if err := a.CacheClient.PushPendingTask(ctx, userID, failedTasks[i]); err != nil {
-			slog.Error("failed to requeue pending task after websocket delivery failure", "user_id", userID, "conn_id", connID, "error", err)
+		evicted, err := a.CacheClient.PushPendingTaskWithEviction(ctx, userID, failedTasks[i])
+		if err != nil {
+			slog.Error("failed to requeue pending task after websocket delivery failure",
+				"user_id", userID, "conn_id", connID, "error", err)
+			if metrics.AgentDispatchOfflinePushFailures != nil {
+				metrics.AgentDispatchOfflinePushFailures.WithLabelValues("pending_task_requeue").Inc()
+			}
+			continue
 		}
+		if evicted {
+			// The cap evicted an oldest pending task. Record the drop so the
+			// operator sees the backpressure event instead of Redis quietly
+			// trimming the list.
+			if metrics.ClientPendingDropped != nil {
+				metrics.ClientPendingDropped.Inc()
+			}
+			slog.Warn("pending task queue saturated; evicted oldest task to requeue failed delivery",
+				"user_id", userID, "conn_id", connID,
+				"requeued_task", failedTasks[i])
+		}
+		// Warn when the queue is close to the TTL horizon. PendingTaskTTL is
+		// 24h; we cannot read the per-entry TTL cheaply here, so this warning
+		// is a saturation proxy: when eviction is happening, the queue is
+		// also at risk of silent TTL expiry. The metric above is the durable
+		// signal; this log line is the operator breadcrumb.
 	}
 }
 

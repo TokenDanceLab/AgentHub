@@ -123,3 +123,92 @@ func TestTokenDanceVerifierInstancesIndependent(t *testing.T) {
 		t.Fatalf("subject = %q, want user-1", claims.Subject)
 	}
 }
+
+// TestParseJWTRejectsRS384TokenSignedWithSameKey (Task 4): even when a token
+// is signed with the same RSA private key whose public half is published in
+// the JWKS under alg=RS256, a token signed with RS384 must be rejected. The
+// verifier pins RS256 via WithValidMethods + the keyfunc alg header check,
+// so an alg-confusion downgrade is impossible.
+func TestParseJWTRejectsRS384TokenSignedWithSameKey(t *testing.T) {
+	priv, jwks := tokenDanceTestKey(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(server.Close)
+	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
+
+	now := time.Now()
+	claims := TokenDanceClaims{
+		Email: "user@example.com",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "https://issuer.example",
+			Subject:   "user-1",
+			Audience:  jwt.ClaimStrings{"agenthub-client"},
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS384, claims)
+	token.Header["kid"] = tokenDanceTestKID(&priv.PublicKey)
+	signed, err := token.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign RS384 token: %v", err)
+	}
+	if _, err := v.ParseJWT(signed, "https://issuer.example", "agenthub-client"); err == nil {
+		t.Fatal("expected RS384 token to be rejected (only RS256 is allowed)")
+	}
+}
+
+// TestParseJWTRejectsJWKSPublishedWithRS384Alg (Task 4): a JWKS entry that
+// advertises alg=RS384 (even with a valid RSA key) must not be loaded, so a
+// token signed with RS384 against that key cannot pass verification. The
+// verifier pins the JWKS alg to RS256 during fetch.
+func TestParseJWTRejectsJWKSPublishedWithRS384Alg(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	kid := tokenDanceTestKID(&priv.PublicKey)
+	n := base64.RawURLEncoding.EncodeToString(priv.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.E)).Bytes())
+	// JWKS advertises alg=RS384 — the entry must be skipped during fetch.
+	jwks := `{"keys":[{"kty":"RSA","use":"sig","alg":"RS384","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(server.Close)
+	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
+
+	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
+	if _, err := v.ParseJWT(token, "https://issuer.example", "agenthub-client"); err == nil {
+		t.Fatal("expected token to be rejected when JWKS only publishes an RS384 key")
+	}
+}
+
+// TestParseJWTRejectsJWKSMissingAlg (Task 4): a JWKS entry without an alg
+// field is not trusted, because the verifier cannot confirm the key is
+// intended for RS256. The alg-pin requires alg == "RS256" explicitly.
+func TestParseJWTRejectsJWKSMissingAlg(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	kid := tokenDanceTestKID(&priv.PublicKey)
+	n := base64.RawURLEncoding.EncodeToString(priv.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.E)).Bytes())
+	// No alg field — entry must be skipped.
+	jwks := `{"keys":[{"kty":"RSA","use":"sig","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(server.Close)
+	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
+
+	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
+	if _, err := v.ParseJWT(token, "https://issuer.example", "agenthub-client"); err == nil {
+		t.Fatal("expected token to be rejected when JWKS entry omits alg")
+	}
+}

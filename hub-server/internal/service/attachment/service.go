@@ -9,8 +9,8 @@ package attachment
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"os"
 	"path/filepath"
@@ -83,12 +83,23 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 		}
 		return false, err
 	}
-	defer dst.Close()
 
+	// Close the file BEFORE removing it. The previous code had two defers
+	// (dst.Close + os.Remove) which, due to LIFO ordering, ran Remove BEFORE
+	// Close — on Windows this leaves an orphaned locked file because you
+	// cannot delete an open file handle. Merging into a single defer
+	// guarantees Close runs first, then Remove, and surfaces both errors.
 	keep := false
 	defer func() {
+		if err := dst.Close(); err != nil {
+			slog.Warn("attachment local store close failed",
+				"path", absPath, "error", err)
+		}
 		if !keep {
-			_ = os.Remove(absPath)
+			if err := os.Remove(absPath); err != nil && !os.IsNotExist(err) {
+				slog.Warn("attachment local store remove failed",
+					"path", absPath, "error", err)
+			}
 		}
 	}()
 
@@ -273,11 +284,11 @@ func (s *Service) SaveAttachmentWithMetadata(ctx context.Context, uploaderID, ha
 func (s *Service) StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error) {
 	key := im.PathFromHash(hash)
 	if key == "" {
-		return false, fmt.Errorf("invalid attachment hash: %s", hash)
+		return false, errcode.ErrBadRequest.WithMessagef("invalid attachment hash: %s", hash)
 	}
 	store := s.storagePort()
 	if store == nil {
-		return false, fmt.Errorf("attachment storage is not configured")
+		return false, errcode.ErrInternal.WithMessage("attachment storage is not configured")
 	}
 	return store.Put(ctx, key, r, contentType)
 }
@@ -287,11 +298,11 @@ func (s *Service) StoreBlob(ctx context.Context, hash string, r io.Reader, conte
 func (s *Service) GetBlob(ctx context.Context, hash string) (io.ReadCloser, error) {
 	key := im.PathFromHash(hash)
 	if key == "" {
-		return nil, fmt.Errorf("invalid attachment hash: %s", hash)
+		return nil, errcode.ErrBadRequest.WithMessagef("invalid attachment hash: %s", hash)
 	}
 	store := s.storagePort()
 	if store == nil {
-		return nil, fmt.Errorf("attachment storage is not configured")
+		return nil, errcode.ErrInternal.WithMessage("attachment storage is not configured")
 	}
 	return store.Get(ctx, key)
 }

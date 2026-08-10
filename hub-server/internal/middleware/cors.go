@@ -29,7 +29,7 @@ func CORS(env string) (gin.HandlerFunc, error) {
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Request-ID"},
 		ExposeHeaders:    []string{"X-Request-ID", "Retry-After", "X-API-Version"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}), nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	sharederr "github.com/agenthub/pkg/errcode"
 )
 
 // rateLimitMemberID is an atomically incrementing counter used to guarantee
@@ -71,7 +72,7 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 				retryAfter = int(window.Seconds())
 			}
 			c.Header("Retry-After", fmt.Sprint(retryAfter))
-			fail(c, errcode.New("RATE_LIMITED", "too many requests, please slow down", http.StatusTooManyRequests))
+			fail(c, errcode.New(sharederr.RateLimited, "too many requests, please slow down", http.StatusTooManyRequests))
 			c.Abort()
 			return
 		}

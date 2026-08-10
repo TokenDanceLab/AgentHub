@@ -36,6 +36,13 @@ var (
 	DeliveryOutboxRedispatchFailures prometheus.Counter
 	DeliveryOutboxScanFailures       prometheus.Counter
 
+	// G3-Gauge — Delivery outbox backlog by status. Refreshed every retry
+	// tick by the retry loop (ScanRetryableDeliveries path) so operators see
+	// pending/sent/retrying/dead population growth without polling the DB.
+	// Distinct from the cumulative counters above: a Gauge shows the current
+	// in-flight backlog, not lifetime totals.
+	DeliveryOutboxBacklog *prometheus.GaugeVec
+
 	// G4 — Edge HTTP dispatch failure observability (6 failure categories).
 	AgentDispatchEdgeHTTPFailures *prometheus.CounterVec
 
@@ -102,6 +109,33 @@ var (
 	AuditRetries          prometheus.Counter
 	AuditFinalFailures    prometheus.Counter
 	AuditFileSinkFailures prometheus.Counter
+
+	// ClientPendingDropped counts offline pending tasks evicted by the
+	// pending_tasks Redis queue cap (LTRIM at 256 entries). Incremented by
+	// app/events.go pushPendingTasks requeue path via the
+	// PushPendingTaskWithEviction helper so operators can alert when the
+	// offline queue is saturated and silently dropping oldest tasks.
+	ClientPendingDropped prometheus.Counter
+
+	// HTTPPanicRecoveries counts panics recovered by the Gin CustomRecovery
+	// middleware and the admin RecoveryHTTPHandler. A non-zero rate signals a
+	// handler bug that would otherwise crash the process. Distinct from
+	// eventbus_panics_total (bus goroutine) so operators can attribute panics
+	// to the HTTP path vs. the async bus path.
+	HTTPPanicRecoveries prometheus.Counter
+
+	// WSRouteSetFailures counts SetRoute failures swallowed in onRouteSet
+	// (app/events.go). A non-zero rate means the Redis route table is not
+	// tracking this connection, so downstream routing / online-status
+	// broadcast is skipped to avoid advertising a route that does not exist.
+	WSRouteSetFailures prometheus.Counter
+
+	// GoroutinePanicRecoveries counts panics recovered by the safeGo helper
+	// in long-lived / spawned goroutines (WS readLoop, dispatch launch, etc).
+	// Distinct from http_panic_recoveries_total (HTTP request goroutine) and
+	// eventbus_panics_total (bus worker) so operators can attribute panics to
+	// the goroutine that owns the bug.
+	GoroutinePanicRecoveries prometheus.Counter
 
 	// OutboundMetrics is the unified outbound HTTP metrics contract (#1595):
 	// outbound_requests_total / outbound_request_duration_seconds with
@@ -230,6 +264,15 @@ func Register() {
 				Name: "delivery_outbox_scan_failures_total",
 				Help: "Total number of delivery outbox retry-scan failures.",
 			},
+		)
+
+		// G3-Gauge — current backlog per status, refreshed by the retry tick.
+		DeliveryOutboxBacklog = prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "delivery_outbox_backlog",
+				Help: "Current number of delivery_outbox rows by status (pending/sent/retrying/dead), refreshed each retry tick.",
+			},
+			[]string{"status"},
 		)
 
 		// G4 — Edge HTTP dispatch failure counter (6 failure categories).
@@ -428,6 +471,33 @@ func Register() {
 				Help: "Total number of JSONL audit file sink write failures (async and sync paths).",
 			},
 		)
+		ClientPendingDropped = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "client_pending_dropped_total",
+				Help: "Total number of offline pending tasks evicted by the pending_tasks Redis queue cap (LTRIM).",
+			},
+		)
+
+		HTTPPanicRecoveries = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "http_panic_recoveries_total",
+				Help: "Total number of HTTP handler panics recovered by CustomRecovery / RecoveryHTTPHandler.",
+			},
+		)
+
+		WSRouteSetFailures = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_route_set_failures_total",
+				Help: "Total number of Redis SetRoute failures in onRouteSet; online-status broadcast is skipped on failure.",
+			},
+		)
+
+		GoroutinePanicRecoveries = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "goroutine_panic_recoveries_total",
+				Help: "Total number of panics recovered by the safeGo helper in long-lived / spawned goroutines.",
+			},
+		)
 
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
@@ -445,6 +515,7 @@ func Register() {
 		prometheus.MustRegister(DeliveryOutboxDeadLetters)
 		prometheus.MustRegister(DeliveryOutboxRedispatchFailures)
 		prometheus.MustRegister(DeliveryOutboxScanFailures)
+		prometheus.MustRegister(DeliveryOutboxBacklog)
 		prometheus.MustRegister(AgentDispatchEdgeHTTPFailures)
 		prometheus.MustRegister(JWTVerificationFailures)
 		prometheus.MustRegister(WSAuthFailures)
@@ -471,6 +542,10 @@ func Register() {
 		prometheus.MustRegister(AuditRetries)
 		prometheus.MustRegister(AuditFinalFailures)
 		prometheus.MustRegister(AuditFileSinkFailures)
+		prometheus.MustRegister(ClientPendingDropped)
+		prometheus.MustRegister(HTTPPanicRecoveries)
+		prometheus.MustRegister(WSRouteSetFailures)
+		prometheus.MustRegister(GoroutinePanicRecoveries)
 		// Unified outbound metrics contract (#1595): registered on the
 		// default registry alongside the other Hub metrics.
 		OutboundMetrics = outboundmetrics.NewRecorder(prometheus.DefaultRegisterer)

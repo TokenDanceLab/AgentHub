@@ -12,13 +12,19 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	sharederr "github.com/agenthub/pkg/errcode"
 )
 
 // wsIPLimiter tracks per-IP rate limiters for WebSocket connection attempts.
 // Each IP gets a token-bucket limiter allowing WSIPRateLimitPerMinute connections
 // per minute with a burst equal to the same value.
+//
+// A process-wide default instance (wsIPRL) is used by the production router via
+// WSIPRateLimit(). Tests must construct an isolated instance with
+// NewWSIPRateLimiter and pass it to WSIPRateLimitWithLimiter so that the shared
+// token buckets do not leak state across test runs (see -count=N).
 type wsIPLimiter struct {
-	mu      sync.Mutex
+	mu       sync.Mutex
 	limiters map[string]*ipEntry
 	stopCh   chan struct{}
 }
@@ -28,13 +34,41 @@ type ipEntry struct {
 	lastSeen time.Time
 }
 
-var wsIPRL wsIPLimiter
+// wsIPRL is the process-wide default limiter used by WSIPRateLimit(). It is
+// initialized lazily by newDefaultWSIPRateLimiter so that the background cleanup
+// goroutine is only started once and only in non-test contexts that actually
+// mount the production middleware.
+var (
+	wsIPRL       *wsIPLimiter
+	wsIPRLInitMu sync.Once
+)
 
-func init() {
-	wsIPRL.limiters = make(map[string]*ipEntry)
-	wsIPRL.stopCh = make(chan struct{})
-	// Background cleanup of stale IP limiters every 5 minutes.
-	go wsIPRL.cleanup()
+// newDefaultWSIPRateLimiter returns the singleton default limiter, starting its
+// background cleanup goroutine on first call.
+func newDefaultWSIPRateLimiter() *wsIPLimiter {
+	wsIPRLInitMu.Do(func() {
+		wsIPRL = newWSIPRateLimiter()
+	})
+	return wsIPRL
+}
+
+// newWSIPRateLimiter constructs an isolated wsIPLimiter with its own token
+// buckets and background cleanup goroutine. Callers (especially tests) must
+// call Stop() when done to stop the goroutine.
+func newWSIPRateLimiter() *wsIPLimiter {
+	l := &wsIPLimiter{
+		limiters: make(map[string]*ipEntry),
+		stopCh:   make(chan struct{}),
+	}
+	go l.cleanup()
+	return l
+}
+
+// NewWSIPRateLimiter is the exported constructor for tests and other isolated
+// callers. It returns a fresh limiter with its own cleanup goroutine; the
+// caller MUST call Stop() (e.g. via t.Cleanup) to release it.
+func NewWSIPRateLimiter() *wsIPLimiter {
+	return newWSIPRateLimiter()
 }
 
 // getLimiter returns (or creates) the rate.Limiter for the given IP.
@@ -53,6 +87,15 @@ func (l *wsIPLimiter) getLimiter(ip string) *rate.Limiter {
 	limiter := rate.NewLimiter(r, config.WSIPRateLimitPerMinute)
 	l.limiters[ip] = &ipEntry{limiter: limiter, lastSeen: time.Now()}
 	return limiter
+}
+
+// Reset drops all per-IP token buckets so the limiter starts fresh. Tests use
+// this between subtests when reusing a single instance, though constructing a
+// new instance per test is preferred.
+func (l *wsIPLimiter) Reset() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.limiters = make(map[string]*ipEntry)
 }
 
 // cleanup removes limiters not used in the last 10 minutes.
@@ -92,23 +135,33 @@ func (l *wsIPLimiter) Stop() {
 // WebSocket IP rate limiter. Call during graceful shutdown so the goroutine
 // does not outlive the process.
 func StopWSIPRateLimiter() {
-	wsIPRL.Stop()
+	if wsIPRL != nil {
+		wsIPRL.Stop()
+	}
 }
 
 // WSIPRateLimit is a Gin middleware that enforces per-IP rate limiting for
-// WebSocket upgrade requests. It must be placed BEFORE the WS handler in the
-// middleware chain so that HTTP 429 is returned without attempting the upgrade.
+// WebSocket upgrade requests using the process-wide default limiter. It must
+// be placed BEFORE the WS handler in the middleware chain so that HTTP 429 is
+// returned without attempting the upgrade.
 func WSIPRateLimit() gin.HandlerFunc {
+	return WSIPRateLimitWithLimiter(newDefaultWSIPRateLimiter())
+}
+
+// WSIPRateLimitWithLimiter returns a Gin middleware backed by the given
+// wsIPLimiter. Tests pass an isolated instance so token buckets do not leak
+// across runs; the caller is responsible for calling limiter.Stop().
+func WSIPRateLimitWithLimiter(l *wsIPLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		limiter := wsIPRL.getLimiter(ip)
+		limiter := l.getLimiter(ip)
 		if !limiter.Allow() {
 			slog.Warn("ws rate limit: too many connection attempts from IP",
 				"client_ip", ip,
 				"limit", config.WSIPRateLimitPerMinute,
 			)
 			c.Header("Retry-After", "60")
-			fail(c, errcode.New("WS_RATE_LIMITED",
+			fail(c, errcode.New(sharederr.WSRateLimited,
 				fmt.Sprintf("too many WebSocket connections from this IP (limit: %d/min)", config.WSIPRateLimitPerMinute),
 				http.StatusTooManyRequests))
 			c.Abort()

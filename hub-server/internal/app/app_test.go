@@ -503,7 +503,7 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 		},
 		{
 			name:      "assignment completed",
-			eventType: "team.assignment.completed",
+			eventType: bus.EventTypeTeamAssignmentDone,
 			frameType: ws.TypeTeamAssignmentDone,
 			payload: map[string]interface{}{
 				"team_run_id":   "run-1",
@@ -514,7 +514,7 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 		},
 		{
 			name:      "assignment failed",
-			eventType: "team.assignment.failed",
+			eventType: bus.EventTypeTeamAssignmentFail,
 			frameType: ws.TypeTeamAssignmentFailed,
 			payload: map[string]interface{}{
 				"team_run_id":   "run-1",

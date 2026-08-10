@@ -31,6 +31,12 @@ func (o *DeliveryOutbox) StartDeliveryRetryLoop(ctx context.Context) {
 // retryDeliveries scans for retryable deliveries and re-dispatches them via
 // the injected Redispatcher (opaque payload bytes — no dispatchPayload here).
 func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
+	// Refresh the backlog gauge every tick so operators see the live
+	// pending/sent/retrying/dead population without a separate scrape. The
+	// refresh uses the same GROUP BY query shape as GetDeliveryStats so the
+	// cost is one indexed aggregation per scan interval, not a full table.
+	o.refreshBacklogGauge(ctx)
+
 	records, err := o.ScanRetryableDeliveries(ctx)
 	if err != nil {
 		slog.Warn("failed to scan retryable deliveries", "error", err)
@@ -122,4 +128,87 @@ func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID
 		return fmt.Errorf("redispatch: nil agent service")
 	}
 	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
+}
+
+// refreshBacklogGauge updates the delivery_outbox_backlog GaugeVec with the
+// current per-status row counts. Called once per retry tick. Failures are
+// logged but never abort the retry scan — the backlog gauge is best-effort
+// observability and must not shadow the retry/redispatch control flow.
+func (o *DeliveryOutbox) refreshBacklogGauge(ctx context.Context) {
+	if o == nil || o.db == nil || metrics.DeliveryOutboxBacklog == nil {
+		return
+	}
+	type statusCount struct {
+		Status string
+		Count  int64
+	}
+	var rows []statusCount
+	if err := o.db.WithContext(ctx).
+		Model(outboxModel()).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		slog.Debug("delivery outbox backlog gauge refresh failed", "error", err)
+		return
+	}
+	// Reset all labels to 0 first so a status that vanished (e.g. all rows
+	// cleaned up) does not leave a stale non-zero value pinned to the gauge.
+	for _, status := range []string{
+		DeliveryStatusPending,
+		DeliveryStatusSent,
+		DeliveryStatusRetrying,
+		DeliveryStatusDelivered,
+		DeliveryStatusDead,
+	} {
+		metrics.DeliveryOutboxBacklog.WithLabelValues(status).Set(0)
+	}
+	for _, r := range rows {
+		metrics.DeliveryOutboxBacklog.WithLabelValues(r.Status).Set(float64(r.Count))
+	}
+}
+
+// StartDeliveryCleanupLoop starts a background goroutine that periodically
+// purges delivered and dead-letter delivery_outbox rows older than the
+// retention window. This bounds the outbox table's growth; without it,
+// CleanupOldDeliveries is only ever invoked from tests (#1212 outbox backlog
+// unbounded). Runs alongside StartDeliveryRetryLoop; both share the lifecycle
+// context so shutdown cancels both.
+func (o *DeliveryOutbox) StartDeliveryCleanupLoop(ctx context.Context) {
+	go func() {
+		// 24h cadence: cleanup is a maintenance task, not a scan. The retention
+		// window (DeliveryOutboxRetention) is applied inside CleanupOldDeliveries.
+		ticker := time.NewTicker(DeliveryOutboxCleanupInterval)
+		defer ticker.Stop()
+		// Run once at startup so a long-downed Hub does not sit on a full
+		// outbox for a full interval before the first purge.
+		o.runCleanupOnce(ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				o.runCleanupOnce(ctx)
+			}
+		}
+	}()
+}
+
+// runCleanupOnce runs a single cleanup pass and records the result. Errors
+// are logged and surfaced via the existing scan-failure counter family so
+// operators see a stuck cleanup loop in the same place as retry-scan failures.
+func (o *DeliveryOutbox) runCleanupOnce(ctx context.Context) {
+	removed, err := o.CleanupOldDeliveries(ctx, DeliveryOutboxRetention)
+	if err != nil {
+		slog.Warn("delivery outbox cleanup failed", "error", err, "retention", DeliveryOutboxRetention)
+		if metrics.DeliveryOutboxScanFailures != nil {
+			metrics.DeliveryOutboxScanFailures.Inc()
+		}
+		return
+	}
+	if removed > 0 {
+		slog.Info("delivery outbox cleanup purged rows",
+			"removed", removed,
+			"retention", DeliveryOutboxRetention,
+		)
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"gorm.io/gorm"
 
@@ -67,9 +68,16 @@ type EdgeCallbackService struct {
 	// team.subagent.stream fan-out (#1478 Phase A) does not re-run three DB
 	// lookups per per-token run.agent.* event. Lazily allocated.
 	ctxCache *teamRunContextCache
+	// ctxCacheOnce serializes the lazy allocation of ctxCache so concurrent
+	// teamCtxCache callers cannot both observe nil and double-allocate (a
+	// check-then-write race detectable under -race).
+	ctxCacheOnce sync.Once
 	// ctxLookup resolves a pending task's team-run ownership; overridable in
 	// tests via SetSubagentStreamLookup. Lazily backed by dbTeamRunLookup.
 	ctxLookup subagentStreamLookup
+	// ctxLookupOnce serializes the lazy allocation of ctxLookup for the same
+	// reason as ctxCacheOnce.
+	ctxLookupOnce sync.Once
 }
 
 // NewEdgeCallbackService constructs an EdgeCallbackService.
@@ -248,7 +256,29 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 		if err := repository.CreateAgentRunEventWithNextSeqLimited(tx, runEvent, config.MaxRunEventsPerTask); err != nil {
 			return err
 		}
-		return repository.InsertMessage(tx, msg)
+		if err := repository.InsertMessage(tx, msg); err != nil {
+			return err
+		}
+		// Maintain the team run's token_usage_total counter so the budget
+		// guard (agent_team_guard.go) can short-circuit in O(1) instead of
+		// scanning every run event on each route decision. Best-effort: a
+		// non-team session (no team run for this session) is a no-op, and a
+		// payload with no token usage (delta == 0) skips the lookup. The
+		// lookup runs inside the same transaction so the counter increment
+		// is atomic with the event insert; a failure here rolls back the
+		// whole event+message insert to keep the counter and events in sync.
+		if delta := agentevent.TokenUsageTotalFromPayload(eventPayload); delta > 0 {
+			if teamRun, terr := repository.GetTeamRunBySessionID(tx, ai.SessionID); terr == nil && teamRun != nil {
+				if incErr := repository.IncrementTeamRunTokenUsage(tx, teamRun.ID, delta); incErr != nil {
+					return incErr
+				}
+			} else if terr != nil && !errors.Is(terr, gorm.ErrRecordNotFound) {
+				// A real lookup error (not "no team run for this session")
+				// must fail the transaction so the counter stays honest.
+				return terr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, repository.ErrRunEventLimitExceeded) {
