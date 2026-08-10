@@ -99,9 +99,10 @@ ci: test lint sec
 # ── Release ─────────────────────────────────────
 
 # 发布入口已收敛（2026-08-02）：唯一入口 = git tag vX.Y.Z[-rc.N] → push → release.yml（AGENTS.md §12）。
-# release.ps1 已删除；本地不再上传二进制。
+# release.ps1 已删除；本地不再上传二进制。本地 `make release` 不再假绿灯
+# （审计）：它只提醒走 release.yml 并以 exit 1 失败，避免被误当作发布成功。
 release:
-	@echo "发布只走 release.yml：git tag vX.Y.Z[-rc.N] && git push origin <tag>（见 AGENTS.md §12）"
+	@echo "release is via git push tag -> release.yml" >&2; exit 1
 
 # ── Clean ────────────────────────────────────────
 

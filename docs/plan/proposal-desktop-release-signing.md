@@ -58,13 +58,13 @@ AgentHub 发布链现状一句话：**有 CI 构建、有 GitHub Release、有 u
 
 | # | 位置 | 当前值 | 角色 |
 |---|---|---|---|
-| 1 | `app/desktop/package.json` | `0.5.0` | 前端 npm 版本 |
-| 2 | `app/desktop/src-tauri/tauri.conf.json` | `0.5.0` | Tauri 应用版本（打包+updater） |
-| 3 | `app/desktop/src-tauri/Cargo.toml` | `0.5.0` | Rust crate 版本 |
-| 4 | `app/desktop/src-tauri/Cargo.lock` | `0.5.0` | crate lock 版本 |
-| 5 | `app/package.json` | `0.5.0` | monorepo 根版本 |
-| 6 | `app/web/package.json` | `0.5.0` | Web 前端版本 |
-| 7 | `app/shared/package.json` | `0.5.0` | 共享库版本 |
+| 1 | `app/desktop/package.json` | `0.6.0` | 前端 npm 版本 |
+| 2 | `app/desktop/src-tauri/tauri.conf.json` | `0.6.0` | Tauri 应用版本（打包+updater） |
+| 3 | `app/desktop/src-tauri/Cargo.toml` | `0.6.0` | Rust crate 版本 |
+| 4 | `app/desktop/src-tauri/Cargo.lock` | `0.6.0` | crate lock 版本 |
+| 5 | `app/package.json` | `0.6.0` | monorepo 根版本 |
+| 6 | `app/web/package.json` | `0.6.0` | Web 前端版本 |
+| 7 | `app/shared/package.json` | `0.6.0` | 共享库版本 |
 
 **设计决定**：不引入新的版本源文件。以 `app/desktop/src-tauri/tauri.conf.json` 为版本 SSOT（与 Tauri updater 语义一致，与 Codeg 对齐），其他源跟随。
 

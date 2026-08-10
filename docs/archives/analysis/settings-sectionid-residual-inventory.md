@@ -1,5 +1,6 @@
 # Settings SectionId / surfaceMetadata Residual Inventory
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-18
 > issue: #530 inventory (Phase 14) · #541 Phase B collapse (Phase 15)
 > scope: residual section model vs 5-pane Settings SSOT — inventory + ordered collapse

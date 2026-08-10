@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "timezone": "Asia/Shanghai",
+  "description": "TokenDance AgentHub Renovate config. CI5 lane pilot: npm patch + gomod managers first. Patch auto-merges only after the checks workflow is green; minor is a weekly review PR; major is a standalone review PR. Expo major and Storybook major are excluded (migration owned by separate lanes).",
+  "enabledManagers": [
+    "npm",
+    "gomod",
+    "cargo",
+    "dockerfile",
+    "github-actions",
+    "docker-compose"
+  ],
+  "labels": ["dependencies"],
+  "schedule": ["after 9am on monday"],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "description": "Patch updates: weekly, auto-merge after CI (checks workflow) is green. Patch-only is safe enough to merge unattended; minor/major are NOT in this rule.",
+      "matchUpdateTypes": ["patch"],
+      "groupName": "patch (auto-merge after green)",
+      "schedule": ["after 9am on monday"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "ignoreTests": false,
+      "stabilityDays": 1
+    },
+    {
+      "description": "Minor updates: weekly grouped review PR, no auto-merge.",
+      "matchUpdateTypes": ["minor"],
+      "groupName": "minor (weekly review)",
+      "schedule": ["after 9am on monday"],
+      "automerge": false
+    },
+    {
+      "description": "Major updates: each in its own PR for focused review, no auto-merge.",
+      "matchUpdateTypes": ["major"],
+      "groupName": null,
+      "automerge": false
+    },
+    {
+      "description": "Exclude Expo major bumps — mobile ecosystem major migration is owned by the mobile lane, not Renovate.",
+      "matchPackagePatterns": ["^expo", "^expo-"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Exclude Storybook major bumps — 8.x to 10.x migration is deferred and owned separately.",
+      "matchPackageNames": ["storybook", "@storybook/*"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "vite / typescript majors are deferred (vite 6->8, TS 5->7 carry large migration surface).",
+      "matchPackageNames": ["vite", "typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
+}

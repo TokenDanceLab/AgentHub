@@ -22,6 +22,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # action -> allowed version prefixes (exact string match on the @ref)
 ALLOWED_ACTIONS = {
+    "actions/cache": ["v5", "v6", "v7"],
     "actions/checkout": ["v5", "v6", "v7"],
     "actions/setup-node": ["v5", "v6", "v7"],
     "actions/setup-go": ["v6", "v7"],

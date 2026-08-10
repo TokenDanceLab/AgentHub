@@ -1,5 +1,7 @@
 # Milestones — Post-Polish Residual Hardening
 
+> pending external archive — see docs/history.md
+
 | # | Milestone | Criteria | Status |
 |---|---|---|---|
 | 79 | Docs Authority + Gates Hygiene | plan/* non-live; MASTER sole index; doc SSOT green; perf gate noted | **complete** · #1340 |

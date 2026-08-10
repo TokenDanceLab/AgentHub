@@ -1,5 +1,6 @@
 # Hub `internal/service` Boundary Map
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-18
 > tip: origin/master — live residual/open peels in `docs/progress/MASTER.md` (Phase 73 / ms 85; open #1101–#1105). Product tip: last product code = peels #1084–#1087 (PRs #1089–#1092); latest: `git rev-parse --short origin/master`
 > issue: #823 closed · Phase 61–62 peels closed (#1067–#1069 / #1084–#1087) · **live open: Phase 73 #1101–#1105** (process_executor_pure / sdk_fixture_mapper / codex / httpserver + hygiene)

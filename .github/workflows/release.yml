@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26.5"
   NODE_VERSION: "22"
   PNPM_VERSION: "10"
 
@@ -42,9 +42,34 @@ jobs:
           fi
           echo "tag ancestry ok: $GITHUB_REF_NAME is on master"
 
+  # ── Security Gate: release readiness (no Open High + signing freeze) ─
+  # Runs the release-gate verifier before any build. Hard-blocking (no
+  # continue-on-error): the risk register currently has no Open Critical/High,
+  # so the only remaining blocker is the signing/notarization freeze, which is
+  # lifted only via the repo variable RELEASE_SIGNING_APPROVED + signing
+  # evidence (see scripts/release/verify-release-gate.py). Until the operator
+  # lifts the freeze, tag pushes fail here instead of producing artifacts.
+  security-gate:
+    name: Security release gate
+    needs: tag-guard
+    runs-on: ubuntu-latest
+    env:
+      # Repo variable lifts the signing freeze only when explicitly approved
+      # with matching signing evidence (see verify-release-gate.py).
+      RELEASE_SIGNING_APPROVED: ${{ vars.RELEASE_SIGNING_APPROVED }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run release gate verifier
+        shell: bash
+        run: |
+          python scripts/release/verify-release-gate.py -RepoRoot . -SkipRefCheck
+
   # ── Go: Edge Server + Hub Server ─────────────
   build-go:
-    needs: tag-guard
+    needs: [tag-guard, security-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
